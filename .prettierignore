@@ -6,3 +6,8 @@ docs/product-spec.md
 docs/bridge-spec.md
 docs/crypto-spec.md
 design/
+
+# The spike fixture builds Rust artifacts and Tauri regenerates schemas; both
+# are ignored by git and neither is ours to format.
+spikes/**/target/
+spikes/**/gen/
