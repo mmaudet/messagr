@@ -97,4 +97,42 @@ describe('boot', () => {
       element(by.text('one-time keys published: true')),
     ).toBeVisible()
   })
+
+  it('encrypts a message and sends it into the room', async () => {
+    // The event id itself is not asserted: it is minted by the homeserver and
+    // differs every run. What is asserted is that the line says a send
+    // happened at all -- a status of "not sent: ..." or "not run" is a
+    // failure this test has to fail on, and an earlier version of it passed
+    // on both.
+    // A fixed string, because the event id differs every run and Detox
+    // matches rendered text exactly. The id is rendered on its own line,
+    // which this asserts is present but does not pin.
+    await waitFor(element(by.text('encrypted send: sent')))
+      .toBeVisible()
+      .withTimeout(30000)
+    await detoxExpect(element(by.id('send-event'))).toBeVisible()
+    await detoxExpect(element(by.text('event: —'))).not.toBeVisible()
+  })
+
+  it('decrypts its own intact ciphertext, which is the control', async () => {
+    // Without this the refusal below proves nothing: a machine that cannot
+    // decrypt anything refuses a tampered ciphertext too, for a reason that
+    // has nothing to do with the tampering.
+    await waitFor(element(by.text('intact ciphertext: decrypted')))
+      .toBeVisible()
+      .withTimeout(30000)
+  })
+
+  it('refuses a ciphertext with one character changed', async () => {
+    // The whole difference between end-to-end encryption and an expensive
+    // encoding. Asserted on the refusal, and separately on the acceptance
+    // never appearing, because a screen that failed to render this line at
+    // all would otherwise pass the first assertion by absence.
+    await waitFor(element(by.text('tampered ciphertext: refused')))
+      .toBeVisible()
+      .withTimeout(30000)
+    await detoxExpect(
+      element(by.text('tampered ciphertext: ACCEPTED')),
+    ).not.toBeVisible()
+  })
 })

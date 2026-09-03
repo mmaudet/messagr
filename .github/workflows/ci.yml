@@ -124,16 +124,37 @@ jobs:
         run: |
           ./scripts/provision-bench-accounts.sh
           python3 -c "
-          import json
+          import json, os
           d = json.load(open('/tmp/messagr-bench-accounts.json'))
           invitee = d['invitee']
+          inviter = d['inviter']
           print('::add-mask::' + invitee['access_token'])
+          print('::add-mask::' + inviter['access_token'])
+          print('::add-mask::' + inviter['password'])
           with open('$GITHUB_ENV', 'a') as f:
               f.write(f'MESSAGR_SESSION_HOMESERVER={d[\"homeserver\"]}\n')
               f.write(f'MESSAGR_SESSION_USER_ID={invitee[\"user_id\"]}\n')
               f.write(f'MESSAGR_SESSION_DEVICE_ID={invitee[\"device_id\"]}\n')
               f.write(f'MESSAGR_SESSION_ACCESS_TOKEN={invitee[\"access_token\"]}\n')
+              # The counterparty runs as the other account, the one that has a
+              # password, and reads what the application's account sends.
+              f.write(f'MESSAGR_INTEROP_HOMESERVER={d[\"homeserver\"]}\n')
+              f.write(f'MESSAGR_INTEROP_USER={inviter[\"user_id\"]}\n')
+              f.write(f'MESSAGR_INTEROP_PASSWORD={inviter[\"password\"]}\n')
+              f.write(f'MESSAGR_INTEROP_ROOM={d[\"room_id\"]}\n')
+              f.write(f'MESSAGR_INTEROP_SENDER={invitee[\"user_id\"]}\n')
+              f.write(f'MESSAGR_INTEROP_WORKDIR={os.environ[\"RUNNER_TEMP\"]}/interop\n')
           "
+
+      # Before the emulator, and that ordering is the whole reason this is two
+      # steps. Megolm shares a room key with the devices that exist when the
+      # key is shared, so a counterparty that logs in after the application has
+      # sent cannot decrypt anything -- and would look exactly like a protocol
+      # disagreement rather than a race.
+      - name: Log the independent counterparty in, before anything is sent
+        run: |
+          python3 -m pip install --quiet -r scripts/interop/requirements.txt
+          python3 scripts/interop/nio_counterparty.py login
 
       - name: Enable KVM
         run: |
@@ -163,3 +184,8 @@ jobs:
             npx react-native bundle --platform android --dev false --entry-file index.js --bundle-output android/app/src/main/assets/index.android.bundle --assets-dest android/app/src/main/res
             npx detox build --configuration android.emu.debug
             npx detox test --configuration android.emu.debug
+
+      # The acceptance criterion this whole job exists for: an independent
+      # implementation, not ours, decrypting what the application encrypted.
+      - name: Have the counterparty decrypt what the application sent
+        run: python3 scripts/interop/nio_counterparty.py collect
