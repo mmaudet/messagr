@@ -659,7 +659,13 @@ Three **surfaces**: `paper` (light background), `sunk` (conversation background)
 - Brand: Schibsted Grotesk — brand screen and logotype only.
 - Mono: JetBrains Mono — identifiers, fingerprints, technical labels.
 - Eight type roles: `display 30/36`, `titleLg 22/27`, `titleMd 17/22`, `body 14.5/21`, `bodySm 13/19`, `caption 11.5/17`, `monoLabel 9.5/14 (uppercase +0.14em)`, `monoId 11/16`.
-- Floors: 11.5 pt minimum body on screen, 44 pt minimum touch target, no monospace label under 9.5 pt, line-height never below 1.35.
+- Floors are carried by `tokens.json` under `floors`, which is the source: 11.5 pt
+  minimum body, 9.5 pt minimum mono, 44 pt minimum touch target, and two line-height
+  ratios rather than one — 1.35 for running text (`body`, `bodySm`, `caption`, and the
+  `mono` roles), 1.2 for `title` roles, where tight leading is correct typography rather
+  than a defect. **Scope, not the scale, was the correction:** a single ratio applied to
+  every `type` entry rejected four of the eight roles at V3's first export; each floor now
+  names the classes it governs, and `tokens.json` records which role verifies which value.
 
 **Shapes.** Radii: bubble 16 pt (author corner 4 pt), pill 26 pt, avatar 50%. 45° notch: accent reserved for buttons (16 pt, top-right), framing cards (22 pt, top-right), agent marker (32% of side, bottom-right). Never a background motif.
 
