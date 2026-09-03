@@ -1,0 +1,21 @@
+# Spike, not product code. See README.md: this exists to answer one question
+# and is never grown into the desktop client.
+[package]
+name = "tauri-crypto-link-spike"
+version = "0.0.0"
+edition = "2021"
+publish = false
+
+[build-dependencies]
+tauri-build = "2"
+
+[dependencies]
+tauri = "2"
+# The subject of the experiment: the crate that serves mobile, taken from
+# where mobile takes it rather than from a sibling checkout that only exists
+# on the machine this was written on. Pinned to a commit, because a fixture
+# whose answer silently changes with upstream's main is not evidence of
+# anything.
+matrix-crypto-core = { git = "https://github.com/linagora/react-native-matrix-crypto", rev = "c08d7f1640a556f13bd6f2ae10a0149ff400d3fb" }
+futures = { version = "0.3", default-features = false, features = ["executor"] }
+tempfile = "3"
