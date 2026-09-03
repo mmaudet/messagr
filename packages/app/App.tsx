@@ -10,10 +10,12 @@ import {
   type BridgeStatus,
 } from './src/runtime/cryptoBridge'
 import {
+  receiveOneEncryptedMessage,
   runOutgoingPump,
   sendOneEncryptedMessage,
   startCryptoMachine,
   type CryptoPumpReport,
+  type ReceiveReport,
   type SendReport,
 } from './src/runtime/cryptoPump'
 import { getErrorMessage } from './src/runtime/errors'
@@ -83,6 +85,9 @@ export function App({
   >(null)
   const [pump, setPump] = useState<PumpStatus | null>(null)
   const [send, setSend] = useState<SendReport | 'not-run' | null>(null)
+  const [received, setReceived] = useState<ReceiveReport | 'not-run' | null>(
+    null,
+  )
 
   useEffect(() => {
     const probeAndReport = async (): Promise<void> => {
@@ -95,6 +100,7 @@ export function App({
       let sessionStatus: SessionSyncStatus | 'not-configured'
       let pumpStatus: PumpStatus
       let sendStatus: SendReport | 'not-run' = 'not-run'
+      let receiveStatus: ReceiveReport | 'not-run' = 'not-run'
       if (credentials === null) {
         sessionStatus = 'not-configured'
         pumpStatus = 'not-configured'
@@ -134,6 +140,17 @@ export function App({
               sessionClient,
               credentials,
             )
+            // Reading is attempted whether or not this run's own send
+            // worked: what is being read was written by somebody else, on a
+            // previous run of this suite, and one failure should not hide
+            // the other half of the round trip.
+            if (sendStatus.sent) {
+              receiveStatus = await receiveOneEncryptedMessage(
+                sessionClient,
+                credentials,
+                sendStatus.roomId,
+              )
+            }
           }
         } finally {
           // Nothing left to feed once this run is done: the sync above
@@ -145,6 +162,7 @@ export function App({
       setSession(sessionStatus)
       setPump(pumpStatus)
       setSend(sendStatus)
+      setReceived(receiveStatus)
 
       // Logged as well as rendered. The Android emulator's screencap returns a
       // blank frame regardless of what is on screen, so the log is the only
@@ -160,6 +178,7 @@ export function App({
         session: sessionStatus,
         pump: pumpStatus,
         send: sendStatus,
+        received: receiveStatus,
       })
     }
 
@@ -269,6 +288,16 @@ export function App({
           </Text>
           <Text testID="send-tamper" style={styles.line}>
             {computeTamperLabel(send)}
+          </Text>
+        </View>
+
+        <View style={styles.block}>
+          <Text style={styles.heading}>Received</Text>
+          <Text testID="received-body" style={styles.line}>
+            {computeReceivedLabel(received)}
+          </Text>
+          <Text testID="received-sender" style={styles.line}>
+            {computeClaimedSenderLabel(received)}
           </Text>
         </View>
       </SafeAreaView>
@@ -382,6 +411,36 @@ function computeTamperLabel(status: SendReport | 'not-run' | null): string {
   return status.tamper === 'refused'
     ? 'tampered ciphertext: refused'
     : 'tampered ciphertext: ACCEPTED'
+}
+
+function computeReceivedLabel(
+  status: ReceiveReport | 'not-run' | null,
+): string {
+  if (status === null) {
+    return 'decrypted: probing'
+  }
+  if (status === 'not-run') {
+    return 'decrypted: not run'
+  }
+  return status.received
+    ? `decrypted: ${status.body}`
+    : `decrypted: nothing (${status.reason})`
+}
+
+/**
+ * Says "claims", and says it every time, because decrypting an event does
+ * not establish who wrote it. The sender is transport metadata read off the
+ * event; verifying a device would not change that, and a screen that printed
+ * it as a fact would be the first place this product started lying about its
+ * own trust model.
+ */
+function computeClaimedSenderLabel(
+  status: ReceiveReport | 'not-run' | null,
+): string {
+  if (status === null || status === 'not-run' || !status.received) {
+    return 'claims to be from: —'
+  }
+  return `claims to be from: ${status.claimedSender} (unauthenticated)`
 }
 
 function computePumpStatusLabel(status: PumpStatus | null): string {
