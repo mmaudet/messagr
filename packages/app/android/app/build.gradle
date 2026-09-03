@@ -51,8 +51,30 @@ react {
     // extraPackagerArgs = []
 
     /* Hermes Commands */
-    //   The hermes compiler command to run. By default it is 'hermesc'
-    // hermesCommand = "$rootDir/my-custom-hermesc/bin/hermesc"
+    // hermesc does not ship inside the react-native package any more: it is
+    // its own npm package, `hermes-compiler`, and the plugin does know that
+    // (HERMES_COMPILER_NPM_DIR, in its own PathUtils.kt). What it cannot know
+    // is where node_modules is: it looks under `root`, which defaults to
+    // packages/app, and a yarn workspace hoists node_modules to the monorepo
+    // root instead. So the plugin looks in a directory this layout never
+    // fills, and the error it raises names the older sdks/hermesc path that
+    // no longer exists for anyone.
+    //
+    // Setting `root` to the monorepo would fix that one lookup and break
+    // three others: `root` is also where the plugin looks for the entry file
+    // (index.js lives in packages/app, not at the monorepo root), the working
+    // directory it runs the bundler from, and the file tree it scans to decide
+    // whether the bundle is up to date -- which at the monorepo root would
+    // sweep every sibling workspace package (node_modules itself the task
+    // already excludes). Naming hermesc directly is the narrow fix.
+    //
+    // The path is derived by the same upward walk every other path in this
+    // build uses (gradle.ext.nodeModules, settings.gradle), so it holds
+    // whether the dependency is hoisted or not. %OS-BIN% is left for the
+    // plugin to substitute, which is what lets one line serve a developer's
+    // mac and CI's linux; only Windows would need more, and nothing in this
+    // repository builds there.
+    hermesCommand = new File(nodeModuleDir("hermes-compiler"), "hermesc/%OS-BIN%/hermesc").toString()
     //
     //   The list of flags to pass to the Hermes compiler. By default is "-O", "-output-source-map"
     // hermesFlags = ["-O", "-output-source-map"]

@@ -15,6 +15,7 @@ import {
   type CryptoPumpReport,
 } from './src/runtime/cryptoPump'
 import { getErrorMessage } from './src/runtime/errors'
+import { computeHermesReport, type HermesReport } from './src/runtime/hermes'
 import { logEvent } from './src/runtime/log'
 import { polyfillReport } from './src/runtime/bootstrap'
 import { computeRuntimeGapReport } from './src/runtime/runtimeGaps'
@@ -62,6 +63,7 @@ export function App({
   // would render again, and the bridge would be probed without end.
   const architecture = useMemo(() => computeNewArchitectureReport(), [])
   const gaps = useMemo(() => computeRuntimeGapReport(), [])
+  const hermes = useMemo(() => computeHermesReport(), [])
   // No request is made: constructing a client is local. The address is a
   // reserved-TLD placeholder until account provisioning lands, so that a
   // real deployment's address is not carried in a public repository.
@@ -138,6 +140,7 @@ export function App({
       // read rather than pixels.
       logEvent('info', 'MESSAGR_RUNTIME', {
         architecture,
+        hermes,
         bridge: status,
         gaps,
         polyfills: polyfillReport,
@@ -150,7 +153,7 @@ export function App({
     probeAndReport().catch((cause: unknown) => {
       logEvent('error', 'MESSAGR_RUNTIME_FAILED', { reason: String(cause) })
     })
-  }, [architecture, gaps, client, credentials, storeDir])
+  }, [architecture, hermes, gaps, client, credentials, storeDir])
 
   // The synced case computed once rather than repeated at each of its two
   // uses below: narrowing `session` inline in both the status and the
@@ -183,6 +186,9 @@ export function App({
           </Text>
           <Text testID="arch-fabric" style={styles.line}>
             {`fabric: ${architecture.fabric}`}
+          </Text>
+          <Text testID="js-engine" style={styles.line}>
+            {computeEngineLabel(hermes)}
           </Text>
         </View>
 
@@ -282,6 +288,17 @@ function computeBridgeLabel(status: BridgeStatus | null): string {
   return status.loaded
     ? `loaded, core ${status.coreVersion}`
     : `absent: ${status.reason}`
+}
+
+function computeEngineLabel(report: HermesReport): string {
+  if (!report.present) {
+    // Named rather than left blank: a release build that quietly fell back to
+    // JSC is exactly what this line exists to catch.
+    return 'engine: not Hermes'
+  }
+  return report.version === null
+    ? 'engine: Hermes'
+    : `engine: Hermes ${report.version}`
 }
 
 function computePumpStatusLabel(status: PumpStatus | null): string {

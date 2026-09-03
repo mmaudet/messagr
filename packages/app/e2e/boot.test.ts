@@ -28,6 +28,16 @@ describe('boot', () => {
     await detoxExpect(element(by.text('fabric: true'))).toBeVisible()
   })
 
+  it('runs on Hermes rather than a JSC fallback', async () => {
+    // Asserted as a negative rather than against the version the label
+    // carries: that version moves with every React Native upgrade, while
+    // "not Hermes" is exactly the regression worth catching. The build-time
+    // half of this lives in scripts/assert-hermes-bytecode.sh, which reads
+    // the release APK; this half reads the engine that actually answered.
+    await detoxExpect(element(by.id('js-engine'))).toBeVisible()
+    await detoxExpect(element(by.text('engine: not Hermes'))).not.toBeVisible()
+  })
+
   it('leaves no runtime gap open', async () => {
     await detoxExpect(element(by.id('runtime-gaps'))).toBeVisible()
     await detoxExpect(element(by.text('none'))).toBeVisible()
