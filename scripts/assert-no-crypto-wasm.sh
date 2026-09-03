@@ -9,8 +9,11 @@
 # reinstate the second one silently.
 set -euo pipefail
 
-BUNDLE=$(mktemp -t messagr-bundle)
-ASSETS=$(mktemp -d -t messagr-assets)
+# No -t and no template: GNU mktemp requires a trailing XXXXXX there and BSD
+# does not, so a template that works on a developer's macOS fails on a Linux
+# runner. Bare mktemp is portable.
+BUNDLE=$(mktemp)
+ASSETS=$(mktemp -d)
 trap 'rm -rf "$BUNDLE" "$ASSETS"' EXIT
 
 ROOT=$(cd "$(dirname "$0")/.." && pwd)
