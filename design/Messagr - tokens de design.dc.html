@@ -1,0 +1,336 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Schibsted+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  body { margin:0; background:#e8e4dc; color:#1b1a19; font-family:'Schibsted Grotesk', Helvetica, sans-serif; -webkit-font-smoothing:antialiased; }
+  a { color:#0e8f63; text-decoration:none; }
+  a:hover { color:#06614a; text-decoration:underline; }
+  * { box-sizing:border-box; }
+  ::-webkit-scrollbar { width:7px; height:7px; }
+  ::-webkit-scrollbar-thumb { background:#cfc8bb; border-radius:4px; }
+</style>
+</helmet>
+
+<div style="min-height:100vh; padding:40px 44px 64px;">
+
+  <div style="max-width:1180px; margin:0 auto;">
+
+    <div style="display:flex; align-items:flex-end; justify-content:space-between; gap:24px; flex-wrap:wrap; border-bottom:1px solid #dcd6cb; padding-bottom:22px;">
+      <div>
+        <div style="display:flex; align-items:center; gap:12px;">
+          <span style="color:#12b76a; display:flex;"><svg viewBox="0 0 100 100" width="30" height="30" style="display:block;"><path d="M 30 12 H 70 A 18 18 0 0 1 88 30 V 70 A 18 18 0 0 1 70 88 H 30 A 18 18 0 0 1 12 70 V 30 A 18 18 0 0 1 30 12 Z M 54 12 L 88 46 L 88 58 L 42 12 Z" fill="currentColor" fill-rule="evenodd"></path></svg></span>
+          <h1 style="margin:0; font-size:28px; font-weight:600; letter-spacing:-0.02em; display:inline-flex; align-items:baseline;"><span style="display:inline-flex; align-items:baseline; line-height:1; color:#0c1f19;"><span style="display:inline-block; clip-path:polygon(0 0, 100% 0, 100% 0.27em, calc(100% - 0.108em) 0.27em, 100% 0.378em, 100% 100%, 0 100%);">M</span><span>essag</span><span style="display:inline-block; color:#12b76a; clip-path:polygon(0 0, 100% 0, 100% 0.43em, calc(100% - 0.084em) 0.43em, 100% 0.514em, 100% 100%, 0 100%);">r</span></span><span style="font-weight:500; color:#6b665c;">, tokens de design</span></h1>
+        </div>
+        <p style="margin:10px 0 0; max-width:760px; font-size:15px; line-height:1.5; color:#5b564d; text-wrap:pretty;">Livrable §4 des consignes V3. Palette normative, typographie, iconographie exportable et règles de responsive, dans les valeurs exactes du prototype. Ce qui n'est pas listé ici n'existe pas dans le produit.</p>
+      </div>
+      <div style="font-family:'JetBrains Mono', monospace; font-size:11px; color:#6b665c; line-height:1.9; text-align:right;">
+        <div>tokens · v3.0</div>
+        <div>React Native · Tauri</div>
+        <div style="color:#0e8f63;"><a href="tokens.json">tokens.json</a></div>
+      </div>
+    </div>
+
+    <div style="display:flex; gap:8px; flex-wrap:wrap; margin:22px 0 26px;">
+      <sc-for list="{{ nav }}" as="n" hint-placeholder-count="5">
+        <a href="{{ n.href }}" style="font-family:'JetBrains Mono', monospace; font-size:11px; letter-spacing:.06em; text-transform:uppercase; padding:8px 13px; border:1px solid #cfc8bb; background:#fbf8f3; color:#3f3b34;">{{ n.label }}</a>
+      </sc-for>
+    </div>
+
+    <section id="couleur" style="background:#fbf8f3; border:1px solid #dcd6cb; padding:26px 28px 30px; margin-bottom:22px;">
+      <div style="display:flex; align-items:baseline; justify-content:space-between; gap:20px; flex-wrap:wrap;">
+        <h2 style="margin:0; font-size:20px; font-weight:600; letter-spacing:-0.015em;">Couleur</h2>
+        <span style="font-family:'JetBrains Mono', monospace; font-size:10px; letter-spacing:.1em; text-transform:uppercase; color:#8f8a7e;">24 valeurs · §2.2</span>
+      </div>
+      <p style="margin:8px 0 18px; max-width:720px; font-size:13px; line-height:1.55; color:#6b665c; text-wrap:pretty;">Quatre familles sémantiques et une échelle neutre. La sémantique prime sur l'esthétique : une couleur ne change jamais de sens d'un écran à l'autre.</p>
+
+      <sc-for list="{{ colorGroups }}" as="g" hint-placeholder-count="5">
+        <div style="margin-bottom:20px;">
+          <div style="display:flex; align-items:baseline; gap:12px; margin-bottom:10px;">
+            <span style="font-family:'JetBrains Mono', monospace; font-size:10px; letter-spacing:.14em; text-transform:uppercase; color:#8f8a7e;">{{ g.name }}</span>
+            <span style="font-size:12px; color:#8f8a7e;">{{ g.rule }}</span>
+          </div>
+          <div style="display:grid; grid-template-columns:repeat(4, 1fr); gap:1px; background:#e4dfd4; border:1px solid #e4dfd4;">
+            <sc-for list="{{ g.items }}" as="t" hint-placeholder-count="4">
+              <div style="background:#fbf8f3; padding:12px 13px 13px;">
+                <span style="display:block; height:38px; background:{{ t.value }}; border:1px solid rgba(12,31,25,.14);"></span>
+                <div style="font-family:'JetBrains Mono', monospace; font-size:10.5px; color:#1b1a19; margin-top:9px;">{{ t.name }}</div>
+                <div style="font-family:'JetBrains Mono', monospace; font-size:10px; color:#8f8a7e; margin-top:2px;">{{ t.value }}</div>
+                <div style="font-size:11.5px; line-height:1.45; color:#6b665c; margin-top:6px; text-wrap:pretty;">{{ t.use }}</div>
+              </div>
+            </sc-for>
+          </div>
+        </div>
+      </sc-for>
+
+      <div style="background:#f4f0e8; border:1px solid #e4dfd4; padding:15px 17px;">
+        <div style="font-size:13px; font-weight:600;">Ce que la V3 ferme</div>
+        <div style="display:flex; gap:24px; flex-wrap:wrap; margin-top:10px;">
+          <sc-for list="{{ paletteRules }}" as="r" hint-placeholder-count="4">
+            <div style="flex:1 1 230px; min-width:0; font-size:12px; line-height:1.5; color:#5b564d; text-wrap:pretty;"><strong style="font-weight:600; color:#1b1a19;">{{ r.title }}</strong> — {{ r.body }}</div>
+          </sc-for>
+        </div>
+      </div>
+    </section>
+
+    <section id="typographie" style="background:#fbf8f3; border:1px solid #dcd6cb; padding:26px 28px 30px; margin-bottom:22px;">
+      <div style="display:flex; align-items:baseline; justify-content:space-between; gap:20px; flex-wrap:wrap;">
+        <h2 style="margin:0; font-size:20px; font-weight:600; letter-spacing:-0.015em;">Typographie</h2>
+        <span style="font-family:'JetBrains Mono', monospace; font-size:10px; letter-spacing:.1em; text-transform:uppercase; color:#8f8a7e;">Police système par plateforme</span>
+      </div>
+      <p style="margin:8px 0 18px; max-width:720px; font-size:13px; line-height:1.55; color:#6b665c; text-wrap:pretty;">SF Pro Text sur iOS et macOS, Roboto sur Android, Segoe UI Variable sur Windows. Schibsted Grotesk est cantonnée à l'écran de marque et au logotype ; JetBrains Mono aux identifiants, empreintes et étiquettes techniques.</p>
+
+      <div style="display:flex; flex-direction:column; gap:1px; background:#e4dfd4; border:1px solid #e4dfd4;">
+        <sc-for list="{{ typeScale }}" as="t" hint-placeholder-count="8">
+          <div style="background:#fbf8f3; padding:13px 15px; display:flex; align-items:center; gap:22px; flex-wrap:wrap;">
+            <span style="flex:0 0 118px; font-family:'JetBrains Mono', monospace; font-size:11px; color:#3f3b34;">{{ t.name }}</span>
+            <span style="flex:0 0 190px; font-family:'JetBrains Mono', monospace; font-size:10.5px; color:#8f8a7e;">{{ t.spec }}</span>
+            <span style="flex:1 1 240px; min-width:0; {{ t.sample }}">{{ t.text }}</span>
+          </div>
+        </sc-for>
+      </div>
+
+      <div style="display:flex; gap:22px; flex-wrap:wrap; margin-top:18px;">
+        <div style="flex:1 1 300px; min-width:0; background:#f4f0e8; border:1px solid #e4dfd4; padding:14px 16px;">
+          <div style="font-size:12.5px; font-weight:600;">Règles d'emploi</div>
+          <div style="font-size:12px; line-height:1.55; color:#5b564d; margin-top:6px; text-wrap:pretty;">Jamais plus de trois niveaux de texte par écran. Le monospace n'est pas décoratif : il signale une donnée machine (identifiant, empreinte, horodatage technique, étiquette de section).</div>
+        </div>
+        <div style="flex:1 1 300px; min-width:0; background:#f4f0e8; border:1px solid #e4dfd4; padding:14px 16px;">
+          <div style="font-size:12.5px; font-weight:600;">Planchers</div>
+          <div style="font-size:12px; line-height:1.55; color:#5b564d; margin-top:6px; text-wrap:pretty;">11,5 px de corps minimum à l'écran, 44 pt de cible tactile minimum. Aucune étiquette monospace sous 9,5 px, interlignage jamais inférieur à 1,35.</div>
+        </div>
+      </div>
+    </section>
+
+    <section id="iconographie" style="background:#fbf8f3; border:1px solid #dcd6cb; padding:26px 28px 30px; margin-bottom:22px;">
+      <div style="display:flex; align-items:baseline; justify-content:space-between; gap:20px; flex-wrap:wrap;">
+        <h2 style="margin:0; font-size:20px; font-weight:600; letter-spacing:-0.015em;">Iconographie</h2>
+        <span style="font-family:'JetBrains Mono', monospace; font-size:10px; letter-spacing:.1em; text-transform:uppercase; color:#8f8a7e;">SVG monochrome · currentColor</span>
+      </div>
+      <p style="margin:8px 0 18px; max-width:720px; font-size:13px; line-height:1.55; color:#6b665c; text-wrap:pretty;">Grille 24, trait 1,7 px, extrémités et jonctions arrondies, aucune surface pleine sauf pupilles et points. Les icônes héritent de la couleur du texte : elles ne portent jamais de couleur propre.</p>
+
+      <div style="display:grid; grid-template-columns:repeat(auto-fill, minmax(126px, 1fr)); gap:1px; background:#e4dfd4; border:1px solid #e4dfd4;">
+        <sc-for list="{{ icons }}" as="i" hint-placeholder-count="18">
+          <div style="background:#fbf8f3; padding:15px 12px 13px; display:flex; flex-direction:column; align-items:center; gap:9px; text-align:center;">
+            <span style="color:#1b1a19; display:flex;">{{ i.svg }}</span>
+            <span style="font-family:'JetBrains Mono', monospace; font-size:10px; color:#3f3b34;">{{ i.name }}</span>
+            <span style="font-size:10.5px; line-height:1.35; color:#8f8a7e; text-wrap:pretty;">{{ i.use }}</span>
+          </div>
+        </sc-for>
+      </div>
+
+      <div style="display:flex; gap:22px; flex-wrap:wrap; margin-top:18px;">
+        <div style="flex:1 1 280px; min-width:0; background:#f4f0e8; border:1px solid #e4dfd4; padding:14px 16px;">
+          <div style="font-size:12.5px; font-weight:600;">Marqueur d'agent</div>
+          <div style="display:flex; align-items:center; gap:12px; margin-top:10px;">
+            <span style="width:38px; height:38px; background:#3a3630; color:#f2fbf6; display:flex; align-items:center; justify-content:center; font-family:'JetBrains Mono', monospace; font-size:10px; clip-path:polygon(0 0, 100% 0, 100% 68%, 68% 100%, 0 100%);">CR</span>
+            <div style="font-size:11.5px; line-height:1.5; color:#5b564d; text-wrap:pretty;">Pas d'icône : un carré à coin entaillé, initiales en monospace. Un agent n'a jamais d'avatar rond ni de visage.</div>
+          </div>
+        </div>
+        <div style="flex:1 1 280px; min-width:0; background:#f4f0e8; border:1px solid #e4dfd4; padding:14px 16px;">
+          <div style="font-size:12.5px; font-weight:600;">Entaille à 45°</div>
+          <div style="display:flex; align-items:center; gap:12px; margin-top:10px;">
+            <span style="width:70px; height:38px; background:#12b76a; clip-path:polygon(0 0, calc(100% - 14px) 0, 100% 14px, 100% 100%, 0 100%);"></span>
+            <div style="font-size:11.5px; line-height:1.5; color:#5b564d; text-wrap:pretty;">Accent, jamais motif : boutons principaux, cartes de cadrage, marqueur d'agent. Une seule entaille par élément.</div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section id="formes" style="background:#fbf8f3; border:1px solid #dcd6cb; padding:26px 28px 30px; margin-bottom:22px;">
+      <h2 style="margin:0 0 14px; font-size:20px; font-weight:600; letter-spacing:-0.015em;">Formes, élévations, durées</h2>
+      <div style="display:flex; gap:26px; flex-wrap:wrap;">
+        <sc-for list="{{ shapeGroups }}" as="g" hint-placeholder-count="3">
+          <div style="flex:1 1 260px; min-width:0;">
+            <div style="font-family:'JetBrains Mono', monospace; font-size:10px; letter-spacing:.14em; text-transform:uppercase; color:#8f8a7e; margin-bottom:9px;">{{ g.name }}</div>
+            <sc-for list="{{ g.items }}" as="t" hint-placeholder-count="4">
+              <div style="display:flex; align-items:baseline; justify-content:space-between; gap:14px; padding:9px 0; border-bottom:1px solid #e8e3d9;">
+                <span style="font-family:'JetBrains Mono', monospace; font-size:11px; color:#3f3b34;">{{ t.name }}</span>
+                <span style="font-family:'JetBrains Mono', monospace; font-size:10.5px; color:#8f8a7e; text-align:right;">{{ t.value }}</span>
+              </div>
+            </sc-for>
+          </div>
+        </sc-for>
+      </div>
+    </section>
+
+    <section id="responsive" style="background:#fbf8f3; border:1px solid #dcd6cb; padding:26px 28px 30px; margin-bottom:22px;">
+      <div style="display:flex; align-items:baseline; justify-content:space-between; gap:20px; flex-wrap:wrap;">
+        <h2 style="margin:0; font-size:20px; font-weight:600; letter-spacing:-0.015em;">Responsive</h2>
+        <span style="font-family:'JetBrains Mono', monospace; font-size:10px; letter-spacing:.1em; text-transform:uppercase; color:#8f8a7e;">Mobile de référence</span>
+      </div>
+      <div style="display:flex; flex-direction:column; gap:1px; background:#e4dfd4; border:1px solid #e4dfd4; margin-top:16px;">
+        <sc-for list="{{ breakpoints }}" as="b" hint-placeholder-count="5">
+          <div style="background:#fbf8f3; padding:13px 15px; display:flex; gap:18px; align-items:flex-start; flex-wrap:wrap;">
+            <span style="flex:0 0 172px; font-family:'JetBrains Mono', monospace; font-size:11px; color:{{ b.color }};">{{ b.name }}</span>
+            <span style="flex:1 1 320px; min-width:0; font-size:12.5px; line-height:1.5; color:#5b564d; text-wrap:pretty;">{{ b.note }}</span>
+          </div>
+        </sc-for>
+      </div>
+    </section>
+
+    <section id="json" style="background:#0c1f19; color:#f2fbf6; padding:26px 28px 30px;">
+      <div style="display:flex; align-items:baseline; justify-content:space-between; gap:20px; flex-wrap:wrap;">
+        <h2 style="margin:0; font-size:20px; font-weight:600; letter-spacing:-0.015em;">tokens.json</h2>
+        <a href="tokens.json" style="font-family:'JetBrains Mono', monospace; font-size:11px; letter-spacing:.06em; text-transform:uppercase; color:#12b76a;">Ouvrir le fichier</a>
+      </div>
+      <p style="margin:8px 0 16px; max-width:720px; font-size:13px; line-height:1.55; color:rgba(242,251,246,.62); text-wrap:pretty;">Source unique consommable par React Native et Tauri. Les valeurs de cette page en sont l'exact reflet : toute divergence est un bug du prototype, pas du fichier.</p>
+      <pre style="margin:0; max-height:420px; overflow:auto; background:#0a1a15; border:1px solid rgba(242,251,246,.1); padding:18px 20px; font-family:'JetBrains Mono', monospace; font-size:11.5px; line-height:1.65; color:rgba(242,251,246,.82); white-space:pre; text-wrap:nowrap;">{{ json }}</pre>
+    </section>
+
+  </div>
+</div>
+
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;:{&quot;width&quot;:1280,&quot;height&quot;:1100}}">
+const SVG = (paths, w) => React.createElement("svg", {
+  width: w || 22, height: w || 22, viewBox: "0 0 24 24", fill: "none",
+  stroke: "currentColor", strokeWidth: 1.7, strokeLinecap: "round", strokeLinejoin: "round",
+  dangerouslySetInnerHTML: { __html: paths }
+});
+
+class Component extends DCLogic {
+  state = { json: "Chargement de tokens.json…" };
+
+  componentDidMount() {
+    fetch("tokens.json")
+      .then(r => r.text())
+      .then(t => this.setState({ json: t }))
+      .catch(() => this.setState({ json: "tokens.json — ouvrir le fichier directement." }));
+  }
+
+  renderVals() {
+    return {
+      json: this.state.json,
+
+      nav: [
+        { label: "Couleur", href: "#couleur" },
+        { label: "Typographie", href: "#typographie" },
+        { label: "Iconographie", href: "#iconographie" },
+        { label: "Formes et durées", href: "#formes" },
+        { label: "Responsive", href: "#responsive" },
+        { label: "tokens.json", href: "#json" }
+      ],
+
+      colorGroups: [
+        { name: "brand", rule: "Humain et vérifié. Aucun autre vert n'est autorisé.", items: [
+          { name: "brand.green500", value: "#12b76a", use: "Action principale, accusé de lecture, marque." },
+          { name: "brand.green700", value: "#0e8f63", use: "Texte, bordure, lien sur fond clair." },
+          { name: "brand.green100", value: "#eef8f2", use: "Surface vérifiée, fond d'étiquette." },
+          { name: "brand.ink900", value: "#0c1f19", use: "Fond des frontières de sécurité." }
+        ]},
+        { name: "agent", rule: "Participant non humain. Distinct du gris de désactivation.", items: [
+          { name: "agent.700", value: "#3a3630", use: "Encre agent sur fond clair." },
+          { name: "agent.400", value: "#918a7c", use: "Agent sur fond sombre · 4,6:1 sur ink900, AA texte." },
+          { name: "agent.100", value: "#efeae0", use: "Surface agent, fiche de capacités." },
+          { name: "agent.border", value: "#b0a99b", use: "Pointillé agent. Jamais un état inactif." }
+        ]},
+        { name: "wait", rule: "En attente d'un geste humain ou du réseau.", items: [
+          { name: "wait.700", value: "#8a6d1f", use: "Texte d'attente." },
+          { name: "wait.500", value: "#c9a94a", use: "Marqueur, point d'état, envoi différé." },
+          { name: "wait.200", value: "#ecdcae", use: "Bordure." },
+          { name: "wait.100", value: "#faf1d8", use: "Surface : bandeau hors ligne, brouillon." }
+        ]},
+        { name: "deny", rule: "Mesure ou refus. Jamais un simple avertissement.", items: [
+          { name: "deny.700", value: "#7d3434", use: "Texte de mesure." },
+          { name: "deny.500", value: "#a13b3b", use: "Action : bloquer, suspendre, révoquer." },
+          { name: "deny.200", value: "#e6c3c3", use: "Bordure de mesure." },
+          { name: "deny.100", value: "#faeded", use: "Surface de mesure." }
+        ]},
+        { name: "neutral + surface", rule: "Texte, séparateurs, fonds. Un seul gris de désactivation.", items: [
+          { name: "neutral.900", value: "#1b1a19", use: "Texte principal." },
+          { name: "neutral.600", value: "#6b665c", use: "Texte secondaire." },
+          { name: "neutral.400", value: "#a8a196", use: "Texte tertiaire, placeholder." },
+          { name: "neutral.300", value: "#d5cfc3", use: "Contrôle inactif. Ne signifie jamais « agent »." },
+          { name: "neutral.200", value: "#e4dfd4", use: "Séparateur, bordure de liste." },
+          { name: "surface.paper", value: "#fbf8f3", use: "Fond d'écran clair par défaut." },
+          { name: "surface.sunk", value: "#f2efe8", use: "Fond de conversation." },
+          { name: "surface.raised", value: "#ffffff", use: "Bulle entrante, champ de saisie." }
+        ]}
+      ],
+
+      paletteRules: [
+        { title: "Deux verts", body: "500 pour surfaces et actions, 700 pour texte et bordures sur fond clair." },
+        { title: "Une échelle d'ocre", body: "100 surface, 200 bordure, 500 marqueur, 700 texte. Plus de valeur libre sur les cartes de confiance." },
+        { title: "Une couleur d'agent", body: "agent.700 sur clair, agent.400 sur sombre : le pointillé cesse d'être indistinct sur le desktop." },
+        { title: "Un seul gris inactif", body: "neutral.300, réservé aux contrôles désactivés." }
+      ],
+
+      typeScale: [
+        { name: "display", spec: "30 / 36 · 600 · -0.03em", text: "La messagerie qui ne vous demande rien", sample: "font-size:22px; font-weight:600; letter-spacing:-0.03em; color:#1b1a19;" },
+        { name: "title.lg", spec: "22 / 27 · 600 · -0.02em", text: "Où en est votre lien avec Nadia", sample: "font-size:18px; font-weight:600; letter-spacing:-0.02em; color:#1b1a19;" },
+        { name: "title.md", spec: "17 / 22 · 600", text: "Fiche de capacités", sample: "font-size:16px; font-weight:600; color:#1b1a19;" },
+        { name: "body", spec: "14.5 / 21 · 400", text: "Ce participant n'est pas une personne.", sample: "font-size:14.5px; color:#1b1a19;" },
+        { name: "body.sm", spec: "13 / 19 · 400", text: "Trois états, un seul actif à la fois.", sample: "font-size:13px; color:#3f3b34;" },
+        { name: "caption", spec: "11.5 / 17 · 400", text: "Recommandé · l'agent ne parle jamais seul", sample: "font-size:11.5px; color:#8f8a7e;" },
+        { name: "mono.label", spec: "9.5 / 14 · 500 · 0.14em · UPPER", text: "Ce qu'il peut faire", sample: "font-family:'JetBrains Mono', monospace; font-size:9.5px; letter-spacing:.14em; text-transform:uppercase; color:#8f8a7e;" },
+        { name: "mono.id", spec: "11 / 16 · 400", text: "@nadia#7K2Q", sample: "font-family:'JetBrains Mono', monospace; font-size:11px; color:#0e8f63;" }
+      ],
+
+      icons: [
+        { name: "mic", use: "Micro actif", svg: SVG('<path d="M12 3a3 3 0 013 3v5a3 3 0 01-6 0V6a3 3 0 013-3z"></path><path d="M5.5 11a6.5 6.5 0 0013 0"></path><path d="M12 17.5V21"></path>') },
+        { name: "mic.off", use: "Micro coupé", svg: SVG('<path d="M9 9V6a3 3 0 015.9-.7"></path><path d="M15 12.3V11"></path><path d="M9 11v.5a3 3 0 004.6 2.6"></path><path d="M5.5 11a6.5 6.5 0 0010.2 5.3"></path><path d="M12 17.5V21"></path><path d="M3.5 3.5l17 17"></path>') },
+        { name: "cam", use: "Caméra", svg: SVG('<rect x="2.5" y="6.5" width="13" height="11" rx="2.4"></rect><path d="M15.5 11l6-3.4v8.8l-6-3.4z"></path>') },
+        { name: "cam.off", use: "Caméra coupée", svg: SVG('<path d="M15.5 12.6V15a2.4 2.4 0 01-2.4 2.5H4.9A2.4 2.4 0 012.5 15V9a2.4 2.4 0 012.4-2.5h4.2"></path><path d="M15.5 10.2l6-2.6v8.8l-3.6-2"></path><path d="M3.5 3.5l17 17"></path>') },
+        { name: "speaker", use: "Haut-parleur", svg: SVG('<path d="M4 9.5h3l4.5-3.5v12L7 14.5H4z"></path><path d="M15.5 9.2a4 4 0 010 5.6"></path><path d="M18.2 6.8a7.5 7.5 0 010 10.4"></path>') },
+        { name: "flip", use: "Changer de caméra", svg: SVG('<path d="M4 8.5A4.5 4.5 0 018.5 4H16"></path><path d="M13.5 1.5L16 4l-2.5 2.5"></path><path d="M20 15.5A4.5 4.5 0 0115.5 20H8"></path><path d="M10.5 22.5L8 20l2.5-2.5"></path><circle cx="12" cy="12" r="3"></circle>') },
+        { name: "call.end", use: "Raccrocher · deny.500", svg: SVG('<path d="M22 16.9v3a2 2 0 01-2.2 2 19.8 19.8 0 01-8.6-3.1 19.5 19.5 0 01-6-6A19.8 19.8 0 012.1 4.2 2 2 0 014.1 2h3a2 2 0 012 1.7c.1 1 .4 1.9.7 2.8a2 2 0 01-.5 2.1L8.1 9.9a16 16 0 006 6l1.3-1.2a2 2 0 012.1-.5c.9.3 1.8.6 2.8.7a2 2 0 011.7 2z"></path>') },
+        { name: "lock", use: "Chiffré, vérifié", svg: SVG('<rect x="4" y="10" width="16" height="11" rx="2.5"></rect><path d="M8 10V7a4 4 0 018 0v3"></path>') },
+        { name: "send", use: "Envoyer", svg: SVG('<path d="M12 18V5"></path><path d="M6 11l6-6 6 6"></path>') },
+        { name: "plus", use: "Joindre", svg: SVG('<path d="M12 5v14M5 12h14"></path>') },
+        { name: "emoji", use: "Réactions", svg: SVG('<circle cx="12" cy="12" r="9"></circle><path d="M9 14.5c1 1 2 1.5 3 1.5s2-.5 3-1.5"></path><circle cx="9.2" cy="9.8" r=".9" fill="currentColor" stroke="none"></circle><circle cx="14.8" cy="9.8" r=".9" fill="currentColor" stroke="none"></circle>') },
+        { name: "read", use: "Double accusé", svg: SVG('<path d="M2 12.6l3.4 3.4L13 8.4"></path><path d="M10.5 12.6l3.4 3.4L22 8.4"></path>') },
+        { name: "device", use: "Appareil compagnon", svg: SVG('<rect x="2.5" y="4.5" width="19" height="12.5" rx="2"></rect><path d="M8.5 21h7"></path><path d="M12 17v4"></path>') },
+        { name: "qr.scan", use: "Scanner un code", svg: SVG('<path d="M3 8V5.5A2.5 2.5 0 015.5 3H8"></path><path d="M16 3h2.5A2.5 2.5 0 0121 5.5V8"></path><path d="M21 16v2.5a2.5 2.5 0 01-2.5 2.5H16"></path><path d="M8 21H5.5A2.5 2.5 0 013 18.5V16"></path><path d="M3 12h18"></path>') },
+        { name: "qr.show", use: "Afficher son code", svg: SVG('<rect x="3.5" y="3.5" width="7" height="7" rx="1.4"></rect><rect x="13.5" y="3.5" width="7" height="7" rx="1.4"></rect><rect x="3.5" y="13.5" width="7" height="7" rx="1.4"></rect><path d="M13.5 13.5h3v3"></path><path d="M20.5 20.5h-3v-3"></path>') },
+        { name: "back", use: "Retour, rejouer", svg: SVG('<path d="M20 6.5H8.5A4.5 4.5 0 004 11a4.5 4.5 0 004.5 4.5H14"></path><path d="M17 3.5l3 3-3 3"></path><path d="M11 12.5l3 3-3 3"></path>') },
+        { name: "warn", use: "Lien épuisé, attente", svg: SVG('<circle cx="12" cy="12" r="9"></circle><path d="M12 7.5v5"></path><path d="M12 16.2h.01"></path>') },
+        { name: "export", use: "Exporter, partager", svg: SVG('<path d="M4 12v7a2 2 0 002 2h12a2 2 0 002-2v-7"></path><path d="M12 3v13"></path><path d="M7 8l5-5 5 5"></path>') }
+      ],
+
+      shapeGroups: [
+        { name: "Rayons et entailles", items: [
+          { name: "radius.bubble", value: "16 px · 4 px côté auteur" },
+          { name: "radius.pill", value: "26 px" },
+          { name: "radius.avatar", value: "50 %" },
+          { name: "notch.button", value: "16 px · coin haut-droit" },
+          { name: "notch.card", value: "22 px · coin haut-droit" },
+          { name: "notch.agent", value: "32 % · coin bas-droit" }
+        ]},
+        { name: "Élévations", items: [
+          { name: "elevation.1", value: "0 1 1 rgba(12,31,25,.07)" },
+          { name: "elevation.2", value: "0 12 28 rgba(12,31,25,.06)" },
+          { name: "elevation.modal", value: "0 30 70 rgba(12,31,25,.32)" },
+          { name: "border.hairline", value: "1 px neutral.200" }
+        ]},
+        { name: "Durées", items: [
+          { name: "motion.enter", value: "450 ms · ease-out · Y 8 px" },
+          { name: "motion.toggle", value: "180 ms · ease" },
+          { name: "motion.scan", value: "1900 ms · alternate" },
+          { name: "motion.pulse", value: "1600 ms · ease-in-out" }
+        ]}
+      ],
+
+      breakpoints: [
+        { name: "mobile ≤ 430 pt", color: "#0e8f63", note: "Cible de référence, celle où le produit est conçu d'abord. Toute cible tactile ≥ 44 pt, marges latérales 18 px." },
+        { name: "desktop 900 × 600", color: "#3f3b34", note: "Fenêtre Tauri par défaut : liste 236 px, fil fluide, colonne d'agent 218 px." },
+        { name: "desktop ≥ 1180", color: "#3f3b34", note: "La colonne d'agent passe à 280 px ; le fil ne s'élargit pas au-delà de 720 px pour garder une ligne lisible." },
+        { name: "desktop < 780", color: "#3f3b34", note: "La colonne d'agent se replie en tiroir. La liste des conversations reste visible : c'est le fil qui rétrécit." },
+        { name: "tablette", color: "#8a6d1f", note: "Non traitée en V1. Absence documentée volontairement plutôt qu'une valeur inventée — à cadrer après la V3." }
+      ]
+    };
+  }
+}
+
+</script>
+</body>
+</html>
