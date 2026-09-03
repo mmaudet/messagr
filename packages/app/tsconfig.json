@@ -1,0 +1,29 @@
+{
+  "extends": "@react-native/typescript-config",
+  "compilerOptions": {
+    // @react-native/typescript-config sets `"types": ["jest"]`. This app runs
+    // vitest, so `@types/jest` is not installed and a bare `tsc --noEmit`
+    // would fail with
+    //
+    //   error TS2688: Cannot find type definition file for 'jest'.
+    //
+    // before reading a line of our own code. Overridden here rather than by
+    // installing `@types/jest`, which would declare a dependency that does
+    // not exist. This only governs which `@types/*` packages are included
+    // automatically; every explicit import still resolves normally.
+    //
+    // vitest rather than jest mirrors react-native-matrix-crypto's own
+    // workspace, which this project consumes. The Twake frontend testing
+    // conventions govern how tests are written, not which runner runs them:
+    // what they require, and what this app follows, is colocated `*.spec`
+    // files rather than a `__tests__` folder, and no snapshot tests.
+    "types": ["react"],
+
+    // Asserted rather than inherited. The base config sets it today, so this
+    // is a no-op today; it is here so that a base config which stopped
+    // setting it could not silently drop strict mode from this app.
+    "strict": true
+  },
+  "include": ["**/*.ts", "**/*.tsx"],
+  "exclude": ["**/node_modules", "**/Pods", "**/vendor"]
+}
