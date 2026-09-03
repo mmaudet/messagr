@@ -11,18 +11,30 @@ product that is not referenced from it.
 | `Messagr - tokens de design.dc.html` | Screen 41, which exposes the tokens. |
 | `Messagr Prototype V2.dc.html` | Superseded by V3. Kept for history. |
 | `support.js`, `image-slot.js` | Generated rendering engines. No specification value; present so the prototypes open. |
+| `icons/*.svg` | The icon set, 18 glyphs. Geometry matches `tokens.json`'s `icon` family exactly: 24 grid, 1.5 stroke, round cap and join, `currentColor`. |
 
 Everything here comes from the designer's export. Do not hand-edit it: a local
 change makes this a second source of truth, and the drift is silent. Corrections
 go back to the designer and return through the next export.
 
-## Open point
+## Resolved in this export
 
-`floors.lineHeightRatioMin` (1.35) and `floors.bodySizeMin` (11.5 pt) are stated
-as applying to every entry of `type`. Four of the eight roles fail that reading:
-`display` (1.20), `titleLg` (1.227) and `titleMd` (1.294) on line height, and
-`monoId` (11 pt) on body size. Tight leading on large type is correct
-typography, and `monoId` carries fingerprints and identifiers like `monoLabel`
-does, so the scope of the floors is what needs narrowing, not the scale. A lint
-written today must not enforce these two floors on headings or on `monoId`
-until the next export settles it.
+Five families were missing and are now present: `space` (the v1 spacing scale,
+reintegrated), `stroke` (border weights, including the agent dotted border's
+exact pattern and a per-platform implementation note), `state.disabled` (what
+"greyed" means: no opacity, a fixed text/surface pair, the reason always fully
+readable), `zIndex` (stacking order, with the incoming-call-over-modal rule
+made explicit) and `icon` (the grid and stroke this file's SVGs already used).
+`color.dark` also arrived: a full second palette, one role for one role with
+the light side, plus a rule that dark surfaces get lighter rather than more
+shadowed as they rise.
+
+The floors scope is fixed too: `bodySizeMin` now applies to `body` only,
+`monoSizeMin` replaces the old `monoLabelSizeMin` and covers `monoId` as well,
+and a new `titleLineHeightRatioMin` (1.2) covers the title roles instead of
+holding them to the running-text ratio. Independently re-verified: all eight
+`type` roles pass every floor that applies to them, where four used to fail.
+
+Nothing that was already there changed value. The only edits to existing
+entries are two added cross-references (`color.agent.border` now points at
+`stroke.agentDotted`; `color.neutral.200` now mentions `state.disabled`).
