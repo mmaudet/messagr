@@ -17,7 +17,6 @@ export function logEvent(
   fields: LogFields,
 ): void {
   const line = event + ' ' + JSON.stringify(fields)
-  // eslint-disable-next-line no-console
   if (level === 'error') {
     console.error(line)
   } else if (level === 'warn') {
