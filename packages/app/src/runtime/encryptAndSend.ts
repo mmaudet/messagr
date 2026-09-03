@@ -5,8 +5,10 @@ import type { EventEnvelope } from 'react-native-matrix-crypto'
 
 import type { DeviceIdentity } from './deviceIdentity'
 import {
+  fetchInvitedRooms,
   fetchJoinedMembers,
   fetchJoinedRooms,
+  joinRoom,
   sendEncryptedEvent,
   tamperCiphertext,
 } from './encryptedSend'
@@ -39,6 +41,15 @@ export interface EncryptAndSendDeps {
   readonly newTransactionId: () => string
 }
 
+/**
+ * What came of offering the machine a ciphertext with one character changed.
+ *
+ * `not-attempted` exists because the alternative is worse: folded into
+ * `accepted`, a failure to *build* the tampered copy would raise an alarm
+ * about the cryptography when no tampering ever happened.
+ */
+export type TamperOutcome = 'refused' | 'accepted' | 'not-attempted'
+
 export type SendReport =
   | { readonly sent: false; readonly reason: string }
   | {
@@ -46,12 +57,13 @@ export type SendReport =
       readonly roomId: string
       readonly eventId: string
       /**
-       * A ciphertext with one character changed was refused rather than
-       * decrypted. `false` here is the interesting case and the reason this
-       * is reported rather than asserted in place: a product that accepts a
-       * tampered ciphertext has not built end-to-end encryption.
+       * The intact ciphertext decrypted. This is the positive control, and
+       * without it the line below means nothing: a machine with no inbound
+       * session at all refuses everything, tampered or not, and would report
+       * a refusal that proves only that it cannot decrypt.
        */
-      readonly tamperRefused: boolean
+      readonly intactDecrypted: boolean
+      readonly tamper: TamperOutcome
     }
 
 const MESSAGE_BODY = 'encrypted by the bridge, sent by the application'
@@ -78,10 +90,24 @@ export async function encryptAndSendOneMessage(
 ): Promise<SendReport> {
   const { http, machine, decodeUtf8, newTransactionId } = deps
 
-  const rooms = await fetchJoinedRooms(http)
-  const roomId = rooms[0]
+  let roomId = (await fetchJoinedRooms(http))[0]
+
   if (roomId === undefined) {
-    return { sent: false, reason: 'this account has joined no room to send to' }
+    // Provisioning invites this account; it does not join it for us. An
+    // invitation is not membership, and a message cannot be sent to a room
+    // this account has only been asked to enter.
+    const invited = (await fetchInvitedRooms(http))[0]
+    if (invited === undefined) {
+      return {
+        sent: false,
+        reason: 'this account is in no room, joined or invited',
+      }
+    }
+    try {
+      roomId = await joinRoom(http, invited)
+    } catch (cause: unknown) {
+      return { sent: false, reason: getErrorMessage(cause) }
+    }
   }
 
   const members = await fetchJoinedMembers(http, roomId)
@@ -132,7 +158,11 @@ export async function encryptAndSendOneMessage(
     return { sent: false, reason: getErrorMessage(cause) }
   }
 
-  const tamperRefused = await refusesTamperedCiphertext(
+  const intactDecrypted = await decrypts(
+    machine,
+    rawEventAround(identity, roomId, eventId, contentJson),
+  )
+  const tamper = await tamperOutcome(
     machine,
     identity,
     roomId,
@@ -140,45 +170,68 @@ export async function encryptAndSendOneMessage(
     contentJson,
   )
 
-  return { sent: true, roomId, eventId, tamperRefused }
+  return { sent: true, roomId, eventId, intactDecrypted, tamper }
 }
 
-/**
- * Asks the machine to decrypt the event it just sent, with one character of
- * the ciphertext changed, and reports whether it refused.
- *
- * The tampered event is never sent anywhere: it is built locally, from the
- * real one, and offered only to this device's own machine. Proving the
- * refusal needs no second party and no polluted room.
- */
-async function refusesTamperedCiphertext(
-  machine: EncryptingMachine,
+/** The wire shape `decryptEvent` reads: an event whose content is the encrypted one. */
+function rawEventAround(
   identity: DeviceIdentity,
   roomId: string,
   eventId: string,
   contentJson: string,
-): Promise<boolean> {
-  let tampered: string
-  try {
-    tampered = tamperCiphertext(contentJson)
-  } catch {
-    return false
-  }
-
-  const rawEvent = {
+): unknown {
+  return {
     type: 'm.room.encrypted',
     room_id: roomId,
     event_id: eventId,
     sender: identity.userId,
     origin_server_ts: Date.now(),
-    content: JSON.parse(tampered) as unknown,
+    content: JSON.parse(contentJson) as unknown,
+  }
+}
+
+async function decrypts(
+  machine: EncryptingMachine,
+  rawEvent: unknown,
+): Promise<boolean> {
+  try {
+    await machine.decryptEvent(
+      (rawEvent as { room_id: string }).room_id,
+      rawEvent,
+    )
+    return true
+  } catch {
+    return false
+  }
+}
+
+/**
+ * Asks the machine to decrypt the event it just sent, with one character of
+ * the ciphertext changed, and reports what came of it.
+ *
+ * The tampered event is never sent anywhere: it is built locally, from the
+ * real one, and offered only to this device's own machine. Proving the
+ * refusal needs no second party and no polluted room.
+ */
+async function tamperOutcome(
+  machine: EncryptingMachine,
+  identity: DeviceIdentity,
+  roomId: string,
+  eventId: string,
+  contentJson: string,
+): Promise<TamperOutcome> {
+  let tampered: string
+  try {
+    tampered = tamperCiphertext(contentJson)
+  } catch {
+    // Distinguished from acceptance on purpose: nothing was tampered with,
+    // so there is nothing to conclude about the cryptography.
+    return 'not-attempted'
   }
 
-  try {
-    await machine.decryptEvent(roomId, rawEvent)
-  } catch {
-    // The refusal this whole function exists to observe.
-    return true
-  }
-  return false
+  const refused = !(await decrypts(
+    machine,
+    rawEventAround(identity, roomId, eventId, tampered),
+  ))
+  return refused ? 'refused' : 'accepted'
 }

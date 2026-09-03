@@ -152,8 +152,6 @@ jobs:
       # sent cannot decrypt anything -- and would look exactly like a protocol
       # disagreement rather than a race.
       - name: Log the independent counterparty in, before anything is sent
-        env:
-          MESSAGR_INTEROP_PASSWORD: ${{ env.MESSAGR_INTEROP_PASSWORD }}
         run: |
           python3 -m pip install --quiet -r scripts/interop/requirements.txt
           python3 scripts/interop/nio_counterparty.py login
