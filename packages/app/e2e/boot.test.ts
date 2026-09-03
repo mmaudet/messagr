@@ -97,4 +97,29 @@ describe('boot', () => {
       element(by.text('one-time keys published: true')),
     ).toBeVisible()
   })
+
+  it('encrypts a message and sends it into the room', async () => {
+    // The event id is not asserted, only that one exists: it is minted by the
+    // homeserver and differs every run. What matters here is that the send
+    // reported an id at all, which sendEncryptedEvent refuses to do unless
+    // the server named one.
+    await waitFor(element(by.id('send-status')))
+      .toBeVisible()
+      .withTimeout(30000)
+    await detoxExpect(element(by.text('not run'))).not.toBeVisible()
+    await detoxExpect(element(by.id('send-status'))).toBeVisible()
+  })
+
+  it('refuses a ciphertext with one character changed', async () => {
+    // The whole difference between end-to-end encryption and an expensive
+    // encoding. Asserted on the refusal, and separately on the acceptance
+    // never appearing, because a screen that failed to render this line at
+    // all would otherwise pass the first assertion by absence.
+    await waitFor(element(by.text('tampered ciphertext: refused')))
+      .toBeVisible()
+      .withTimeout(30000)
+    await detoxExpect(
+      element(by.text('tampered ciphertext: ACCEPTED')),
+    ).not.toBeVisible()
+  })
 })
