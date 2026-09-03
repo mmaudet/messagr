@@ -224,7 +224,9 @@ The product consolidates the retained decisions here.
 ### 6.1 "Community" application object
 
 - A **community** is a pseudonymous application object exposed as a set of `Channel`s.
-- Each `Channel` relies on group encryption (MLS is the production target; see crypto spec).
+- Each `Channel` relies on group encryption. **V1 ships Megolm.** MLS (RFC 9420) is the
+  target trajectory, not a target already chosen: no implementation is within reach today,
+  and the migration is the one screen 30 already annotates. See ADR-0003 and the crypto spec.
 - Invitations flow through **capability links** or limited-use invitation tokens, never a server-readable directory.
 - Admin roles are **signed client-side** and not held in a server-readable registry.
 - Server-side metadata (membership, roles, social graphs) is **radically minimized**: the crypto spec details the exact surface.
