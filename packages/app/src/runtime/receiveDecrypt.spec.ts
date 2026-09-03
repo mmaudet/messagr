@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 
 import type { HttpRequester } from './pump'
 import {
-  fetchEncryptedEvents,
+  fetchSyncSlice,
   receiveAndDecrypt,
   type DecryptingMachine,
 } from './receiveDecrypt'
@@ -11,9 +11,10 @@ const ROOM = '!room:example.org'
 const OTHER = '@bob:example.org'
 const SELF = '@alice:example.org'
 
-function syncWith(events: unknown[]): string {
+function syncWith(events: unknown[], toDevice: unknown[] = []): string {
   return JSON.stringify({
     rooms: { join: { [ROOM]: { timeline: { events } } } },
+    to_device: { events: toDevice },
   })
 }
 
@@ -36,18 +37,27 @@ function fakeHttp(responseJson: string): HttpRequester {
 // describing a shape no test depends on, so they are cast rather than filled.
 function fakeMachine(
   decrypt: DecryptingMachine['decryptEvent'],
+  receiveSyncChanges: DecryptingMachine['receiveSyncChanges'] = async () =>
+    undefined,
 ): DecryptingMachine {
-  return { decryptEvent: decrypt }
+  return { decryptEvent: decrypt, receiveSyncChanges }
 }
 
-describe('fetchEncryptedEvents', () => {
+describe('fetchSyncSlice', () => {
   it('finds the encrypted events another account put in the room', async () => {
     const http = fakeHttp(
       syncWith([encryptedEvent(OTHER, '$1'), encryptedEvent(SELF, '$2')]),
     )
-    const events = await fetchEncryptedEvents(http, ROOM, SELF)
-    expect(events).toHaveLength(1)
-    expect((events[0] as { event_id: string }).event_id).toBe('$1')
+    const slice = await fetchSyncSlice(http, ROOM, SELF)
+    expect(slice.encrypted).toHaveLength(1)
+    expect((slice.encrypted[0] as { event_id: string }).event_id).toBe('$1')
+  })
+
+  it('keeps the to-device events, which is where the room key is', async () => {
+    const key = { type: 'm.room.encrypted', sender: OTHER }
+    const http = fakeHttp(syncWith([encryptedEvent(OTHER, '$1')], [key]))
+    const slice = await fetchSyncSlice(http, ROOM, SELF)
+    expect(slice.toDevice).toEqual([key])
   })
 
   it('ignores everything that is not an encrypted event', async () => {
@@ -57,14 +67,13 @@ describe('fetchEncryptedEvents', () => {
         encryptedEvent(OTHER, '$2'),
       ]),
     )
-    const events = await fetchEncryptedEvents(http, ROOM, SELF)
-    expect(events).toHaveLength(1)
+    const slice = await fetchSyncSlice(http, ROOM, SELF)
+    expect(slice.encrypted).toHaveLength(1)
   })
 
-  it('is empty when the room carries nothing, rather than throwing', async () => {
-    await expect(
-      fetchEncryptedEvents(fakeHttp('{}'), ROOM, SELF),
-    ).resolves.toEqual([])
+  it('is empty on both halves when the response carries nothing', async () => {
+    const slice = await fetchSyncSlice(fakeHttp('{}'), ROOM, SELF)
+    expect(slice).toEqual({ toDevice: [], encrypted: [] })
   })
 })
 
@@ -78,7 +87,12 @@ describe('receiveAndDecrypt', () => {
       sender: OTHER,
     })) as never)
     const report = await receiveAndDecrypt(
-      { http, machine, decodeUtf8: bytes => new TextDecoder().decode(bytes) },
+      {
+        http,
+        machine,
+        decodeUtf8: bytes => new TextDecoder().decode(bytes),
+        rounds: 1,
+      },
       ROOM,
       SELF,
     )
@@ -89,6 +103,69 @@ describe('receiveAndDecrypt', () => {
     })
   })
 
+  it('feeds the room key to the machine before trying to decrypt anything', async () => {
+    // The bug this guards: the key arrives as a to-device message in the
+    // same sync response as the event it unlocks, and a decrypt attempted
+    // before it lands fails for a reason nothing to do with the ciphertext.
+    const order: string[] = []
+    const key = { type: 'm.room.encrypted', sender: OTHER }
+    const http = fakeHttp(syncWith([encryptedEvent(OTHER, '$1')], [key]))
+    const machine = fakeMachine(
+      (async () => {
+        order.push('decrypt')
+        return {
+          ciphertext: new TextEncoder().encode(
+            '{"msgtype":"m.text","body":"read at last"}',
+          ),
+          sender: OTHER,
+        }
+      }) as never,
+      async delta => {
+        order.push('feed')
+        expect(delta.to_device_events).toEqual([key])
+      },
+    )
+    const report = await receiveAndDecrypt(
+      {
+        http,
+        machine,
+        decodeUtf8: bytes => new TextDecoder().decode(bytes),
+        rounds: 1,
+      },
+      ROOM,
+      SELF,
+    )
+    expect(order).toEqual(['feed', 'decrypt'])
+    expect(report.received).toBe(true)
+  })
+
+  it('tries again on a later round, because the key and its event need not arrive together', async () => {
+    let attempt = 0
+    const http = fakeHttp(syncWith([encryptedEvent(OTHER, '$1')]))
+    const machine = fakeMachine((async () => {
+      attempt += 1
+      if (attempt < 3) throw new Error('no session found')
+      return {
+        ciphertext: new TextEncoder().encode(
+          '{"msgtype":"m.text","body":"arrived late"}',
+        ),
+        sender: OTHER,
+      }
+    }) as never)
+    const report = await receiveAndDecrypt(
+      {
+        http,
+        machine,
+        decodeUtf8: bytes => new TextDecoder().decode(bytes),
+        rounds: 4,
+      },
+      ROOM,
+      SELF,
+    )
+    expect(report.received).toBe(true)
+    if (report.received) expect(report.body).toBe('arrived late')
+  })
+
   it('reports nothing to decrypt when the other account sent nothing', async () => {
     const report = await receiveAndDecrypt(
       {
@@ -97,6 +174,7 @@ describe('receiveAndDecrypt', () => {
           throw new Error('never called')
         }),
         decodeUtf8: () => '',
+        rounds: 1,
       },
       ROOM,
       SELF,
@@ -115,6 +193,7 @@ describe('receiveAndDecrypt', () => {
           throw new Error('no inbound session')
         }),
         decodeUtf8: () => '',
+        rounds: 1,
       },
       ROOM,
       SELF,
@@ -141,7 +220,12 @@ describe('receiveAndDecrypt', () => {
       }
     }) as never)
     const report = await receiveAndDecrypt(
-      { http, machine, decodeUtf8: bytes => new TextDecoder().decode(bytes) },
+      {
+        http,
+        machine,
+        decodeUtf8: bytes => new TextDecoder().decode(bytes),
+        rounds: 1,
+      },
       ROOM,
       SELF,
     )
@@ -156,7 +240,12 @@ describe('receiveAndDecrypt', () => {
       sender: OTHER,
     })) as never)
     const report = await receiveAndDecrypt(
-      { http, machine, decodeUtf8: bytes => new TextDecoder().decode(bytes) },
+      {
+        http,
+        machine,
+        decodeUtf8: bytes => new TextDecoder().decode(bytes),
+        rounds: 1,
+      },
       ROOM,
       SELF,
     )

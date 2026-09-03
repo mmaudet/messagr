@@ -19,50 +19,79 @@ import type { HttpRequester } from './pump'
  * SDK's room model, the exposure returns exactly as ADR-0001 describes it.
  */
 
-interface SyncTimelineResponse {
+interface RawSyncResponse {
   rooms?: { join?: Record<string, { timeline?: { events?: unknown[] } }> }
+  to_device?: { events?: unknown[] }
+}
+
+/** One raw sync, split into the two halves this module needs from it. */
+export interface SyncSlice {
+  /** To-device messages, which is where the room key arrives. */
+  readonly toDevice: readonly unknown[]
+  /** Encrypted events somebody else put in the room. */
+  readonly encrypted: readonly unknown[]
 }
 
 /**
- * The encrypted events somebody else put in the room.
+ * One raw non-blocking sync, keeping both halves that matter.
  *
- * Read from a raw non-blocking sync, the same escape hatch the pump's own
- * workaround uses: the SDK's loop is stopped by the time this runs, and with
- * no crypto configured it would hand back these events raw anyway.
+ * **The to-device half is not incidental, and dropping it was a real bug.**
+ * A Megolm event is unreadable without its room key, and that key arrives as
+ * a to-device message in the very same sync response as the event it
+ * unlocks. Reading only the timeline gives a ciphertext and no way to open
+ * it -- which looks exactly like a protocol disagreement and is not one.
+ *
+ * The SDK's own sync loop cannot supply either half here: it is stopped
+ * after one poll (`sessionSync.ts`), and with no crypto configured it hands
+ * these events back raw anyway. So the same raw escape hatch the pump's
+ * workaround uses reads them directly.
  *
  * This account's own events are filtered out. They decrypt perfectly well --
  * this device holds the outbound session -- and proving that proves nothing
  * about interoperating with anyone.
  */
-export async function fetchEncryptedEvents(
+export async function fetchSyncSlice(
   http: HttpRequester,
   roomId: string,
   selfUserId: string,
-): Promise<readonly unknown[]> {
+): Promise<SyncSlice> {
   const responseJson = await http.authedRequest(
     'GET',
     '/_matrix/client/v3/sync',
     { timeout: '0' },
     undefined,
   )
-  const response = JSON.parse(responseJson) as SyncTimelineResponse
+  const response = JSON.parse(responseJson) as RawSyncResponse
+
+  const toDevice = response.to_device?.events
   const events = response.rooms?.join?.[roomId]?.timeline?.events
 
-  if (!Array.isArray(events)) {
-    return []
+  return {
+    toDevice: Array.isArray(toDevice) ? toDevice : [],
+    encrypted: Array.isArray(events)
+      ? events.filter(event => {
+          const candidate = event as { type?: unknown; sender?: unknown }
+          return (
+            candidate.type === 'm.room.encrypted' &&
+            typeof candidate.sender === 'string' &&
+            candidate.sender !== selfUserId
+          )
+        })
+      : [],
   }
-
-  return events.filter(event => {
-    const candidate = event as { type?: unknown; sender?: unknown }
-    return (
-      candidate.type === 'm.room.encrypted' &&
-      typeof candidate.sender === 'string' &&
-      candidate.sender !== selfUserId
-    )
-  })
 }
 
+/**
+ * Does not extend `pump.ts`'s `CryptoMachine`, unlike the neighbouring
+ * `EncryptingMachine`, and that is deliberate: receiving drives no outgoing
+ * queue, so the three request-marking methods would be surface this module
+ * never touches.
+ */
 export interface DecryptingMachine {
+  /** Where the room key goes in. Without this, nothing below can decrypt. */
+  readonly receiveSyncChanges: (delta: {
+    to_device_events?: unknown[]
+  }) => Promise<void>
   readonly decryptEvent: (
     scope: string,
     rawEvent: unknown,
@@ -73,7 +102,18 @@ export interface ReceiveDeps {
   readonly http: HttpRequester
   readonly machine: DecryptingMachine
   readonly decodeUtf8: (bytes: Uint8Array) => string
+  /**
+   * How many times to sync and try again. More than one because the key and
+   * the event it unlocks are not promised to be in the same response, and
+   * because the far side may not have finished sending when this first
+   * looks.
+   */
+  readonly rounds?: number
+  /** Awaited between rounds. Absent in tests, which should not sleep. */
+  readonly waitBetweenRounds?: () => Promise<void>
 }
+
+const DEFAULT_ROUNDS = 6
 
 export type ReceiveReport =
   | { readonly received: false; readonly reason: string }
@@ -109,50 +149,78 @@ export async function receiveAndDecrypt(
   roomId: string,
   selfUserId: string,
 ): Promise<ReceiveReport> {
-  const { http, machine, decodeUtf8 } = deps
+  const {
+    http,
+    machine,
+    decodeUtf8,
+    rounds = DEFAULT_ROUNDS,
+    waitBetweenRounds,
+  } = deps
 
-  const events = await fetchEncryptedEvents(http, roomId, selfUserId)
-  if (events.length === 0) {
-    return {
-      received: false,
-      reason: 'no encrypted event from anyone else is in the room',
-    }
-  }
+  let lastReason = 'no encrypted event from anyone else is in the room'
 
-  let lastReason = 'no encrypted event could be decrypted'
+  for (let round = 0; round < rounds; round += 1) {
+    const slice = await fetchSyncSlice(http, roomId, selfUserId)
 
-  for (const event of events) {
-    let envelope: EventEnvelope
-    try {
-      envelope = await machine.decryptEvent(roomId, event)
-    } catch (cause: unknown) {
-      lastReason = getErrorMessage(cause)
-      continue
-    }
-
-    // The library's own naming warning, in the other direction: on the
-    // decrypt path the field called `ciphertext` holds the plaintext this
-    // call just recovered. Everything a product does to plaintext, it must
-    // do to this.
-    let content: DecryptedContent
-    try {
-      content = JSON.parse(decodeUtf8(envelope.ciphertext)) as DecryptedContent
-    } catch (cause: unknown) {
-      lastReason = getErrorMessage(cause)
-      continue
+    // Fed before anything is attempted: this is the room key, and a decrypt
+    // tried before it lands fails for a reason that has nothing to do with
+    // the ciphertext.
+    if (slice.toDevice.length > 0) {
+      try {
+        await machine.receiveSyncChanges({
+          to_device_events: [...slice.toDevice],
+        })
+      } catch (cause: unknown) {
+        lastReason = getErrorMessage(cause)
+      }
     }
 
-    if (typeof content.body !== 'string') {
-      lastReason = 'the decrypted event names no message body'
-      continue
+    for (const event of slice.encrypted) {
+      const attempt = await decryptOne(machine, decodeUtf8, roomId, event)
+      if (attempt.received) {
+        return attempt
+      }
+      lastReason = attempt.reason
     }
 
-    return {
-      received: true,
-      body: content.body,
-      claimedSender: envelope.sender,
+    if (round + 1 < rounds && waitBetweenRounds !== undefined) {
+      await waitBetweenRounds()
     }
   }
 
   return { received: false, reason: lastReason }
+}
+
+async function decryptOne(
+  machine: DecryptingMachine,
+  decodeUtf8: (bytes: Uint8Array) => string,
+  roomId: string,
+  event: unknown,
+): Promise<ReceiveReport> {
+  let envelope: EventEnvelope
+  try {
+    envelope = await machine.decryptEvent(roomId, event)
+  } catch (cause: unknown) {
+    return { received: false, reason: getErrorMessage(cause) }
+  }
+
+  let content: DecryptedContent
+  try {
+    content = JSON.parse(decodeUtf8(envelope.ciphertext)) as DecryptedContent
+  } catch (cause: unknown) {
+    return { received: false, reason: getErrorMessage(cause) }
+  }
+
+  if (typeof content.body !== 'string') {
+    return {
+      received: false,
+      reason: 'the decrypted event names no message body',
+    }
+  }
+
+  return {
+    received: true,
+    body: content.body,
+    claimedSender: envelope.sender,
+  }
 }
