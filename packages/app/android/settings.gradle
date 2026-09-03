@@ -30,6 +30,11 @@ pluginManagement {
         throw new GradleException('@react-native/gradle-plugin not found in any node_modules above ' + settingsDir)
     }
     gradle.ext.reactNativeGradlePlugin = found.absolutePath
+    // The directory the walk landed in, published for every other Gradle file
+    // here so the walk happens exactly once. This one cannot be factored out:
+    // Gradle requires pluginManagement to be the first statement, so nothing
+    // can be defined ahead of it.
+    gradle.ext.nodeModules = found.parentFile.parentFile
     includeBuild(gradle.ext.reactNativeGradlePlugin)
 }
 plugins { id("com.facebook.react.settings") }
