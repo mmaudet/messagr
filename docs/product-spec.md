@@ -426,6 +426,12 @@ Set E — federation:
 | Phase 3 | 1:1 audio/video calls | V1 communication loop complete |
 | Phase 4 | hardened CI, nightly media validation, federated scenarios | maintainable mobile baseline |
 
+**Agents are out of V1, deliberately.** No agent runtime, no agent creation or
+configuration screens, despite the priority §13.1 assigns them. What V1 does carry is the
+invariant: every participant declares its nature from the first conversation screen, so
+that the timeline never has to be rewritten to admit a non-human. The screens of §13.4 and
+the matrix of §5 describe the state after V1.
+
 ## 12. Immediate next steps
 
 1. Translate user journeys into screen-by-screen wireflows.
