@@ -48,6 +48,8 @@ function fakeMachine(
   overrides: Partial<EncryptingMachine> = {},
 ): EncryptingMachine {
   return {
+    // Settled by default: nothing queued, so the share loop finishes on its
+    // first round. A test about the rounds themselves overrides this.
     takeOutgoingRequests: async () => [],
     markRequestSent: async () => undefined,
     markRequestFailed: async () => undefined,
@@ -116,6 +118,58 @@ describe('encryptAndSendOneMessage', () => {
     })
     await encryptAndSendOneMessage(deps(fakeHttp(), machine), IDENTITY)
     expect(order).toEqual(['share', 'drain', 'encrypt'])
+  })
+
+  it('shares again after each drain, because one share never delivers a key', async () => {
+    // The cold case takes three rounds and each does something different:
+    // the first only makes the machine track the users, the second claims a
+    // one-time key while queueing a withheld notice, and only the third
+    // carries the session key. Continuous integration observed exactly this
+    // failing when the loop was a single call.
+    const order: string[] = []
+    let round = 0
+    const machine = fakeMachine({
+      shareScopeKey: async () => {
+        order.push('share')
+      },
+      takeOutgoingRequests: async () => {
+        order.push('drain')
+        round += 1
+        return round <= 3
+          ? [{ id: `r${round}`, kind: 'keys_query', body: '{}' }]
+          : []
+      },
+    })
+    await encryptAndSendOneMessage(deps(fakeHttp(), machine), IDENTITY)
+    expect(order.slice(0, 8)).toEqual([
+      'share',
+      'drain',
+      'share',
+      'drain',
+      'share',
+      'drain',
+      'share',
+      'drain',
+    ])
+  })
+
+  it('refuses to encrypt when the room key never settles, rather than risking the panic', async () => {
+    // Encrypting with no group session does not fail politely: it panics
+    // inside upstream and takes the process down.
+    const machine = fakeMachine({
+      takeOutgoingRequests: async () => [
+        { id: 'endless', kind: 'keys_query', body: '{}' },
+      ],
+      encryptEvent: async () => {
+        throw new Error('encryptEvent must never be reached here')
+      },
+    })
+    const report = await encryptAndSendOneMessage(
+      deps(fakeHttp(), machine),
+      IDENTITY,
+    )
+    expect(report.sent).toBe(false)
+    if (!report.sent) expect(report.reason).toMatch(/never settled/)
   })
 
   it('does not send when the room key itself could not be delivered', async () => {
