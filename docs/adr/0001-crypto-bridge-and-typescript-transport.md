@@ -70,6 +70,26 @@ Nothing is polyfilled for those three. The bundler stub for
 `matrix-sdk-crypto-wasm` was needed, and does deliver the single-crypto goal.
 See `docs/runtime-gaps.md`.
 
+**Amended after implementation (device lists and one-time-key counts).** The
+second exposure named above is closed by a workaround, not by an upstream
+accessor, which did not appear. `device_lists` and `device_one_time_keys_count`
+are recovered with a second, raw request: a non-blocking (`timeout=0`) `GET
+/sync`, sent through the same `client.http.authedRequest` escape hatch the
+outgoing pump already uses, independent of `matrix-js-sdk`'s own long-polling
+sync loop, which has already been stopped by the time this runs. The response
+passes through `react-native-matrix-crypto`'s own `encryptionSlice`, its pure
+field-rename from a raw sync body to the shape `receiveSyncChanges` accepts, so
+this application decides nothing about which fields matter — only that a
+second request is where they come from. See `syncDelta.ts` and `cryptoPump.ts`.
+
+This duplicates a round trip the SDK's own loop already made moments earlier,
+which is accepted rather than fixed here, because that loop is stopped
+immediately after its one sync (see the transport-half consequence above) and
+this application reads nothing else from it. Should `matrix-js-sdk` ever expose
+`device_lists`/`device_one_time_keys_count` publicly, this second request is
+deleted and `fetchEncryptionSyncDelta`'s caller reads the accessor instead;
+nothing downstream of `encryptionSlice` changes.
+
 **This decision carries a stopping criterion.** The first increment sends and
 receives an encrypted event across this seam against a real homeserver, or the
 transport half is reopened. No second increment before that verdict.
