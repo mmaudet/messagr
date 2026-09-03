@@ -1,3 +1,4 @@
+import type { DeviceIdentity } from './deviceIdentity'
 import type { HttpRequester } from './pump'
 
 /**
@@ -31,9 +32,10 @@ interface KeysQueryResponse {
 
 export async function verifyDeviceKeysPublished(
   http: HttpRequester,
-  userId: string,
-  deviceId: string,
+  identity: DeviceIdentity,
 ): Promise<boolean> {
+  const { userId, deviceId } = identity
+
   let responseJson: string
   try {
     responseJson = await http.authedRequest(

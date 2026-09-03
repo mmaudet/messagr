@@ -8,6 +8,7 @@
 // this module's own spec file import it at all.
 import type { IdentityKeys, SyncDelta } from 'react-native-matrix-crypto'
 
+import type { DeviceIdentity } from './deviceIdentity'
 import {
   drainOutgoingRequests,
   type CryptoMachine,
@@ -62,24 +63,22 @@ export interface CryptoPumpReport {
  */
 export async function runOutgoingPumpCycle(
   deps: OutgoingPumpDeps,
-  userId: string,
-  deviceId: string,
+  identity: DeviceIdentity,
 ): Promise<CryptoPumpReport> {
   const { http, machine, encryptionSlice } = deps
 
   const firstDrain = await drainOutgoingRequests(http, machine)
 
-  const { delta } = await fetchEncryptionSyncDelta(http, null, encryptionSlice)
+  const delta = await fetchEncryptionSyncDelta(http, encryptionSlice)
   await machine.receiveSyncChanges(delta)
 
   const secondDrain = await drainOutgoingRequests(http, machine)
 
-  const identityKeys = await machine.getDeviceIdentityKeys(userId, deviceId)
-  const deviceKeysVerified = await verifyDeviceKeysPublished(
-    http,
-    userId,
-    deviceId,
+  const identityKeys = await machine.getDeviceIdentityKeys(
+    identity.userId,
+    identity.deviceId,
   )
+  const deviceKeysVerified = await verifyDeviceKeysPublished(http, identity)
 
   return {
     identityKeys,

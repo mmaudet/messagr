@@ -27,10 +27,10 @@ function fakeHttp(responseJson: string): HttpRequester & {
 }
 
 describe('fetchEncryptionSyncDelta', () => {
-  it('fetches an initial sync with no since token', async () => {
+  it('fetches one non-blocking sync', async () => {
     const http = fakeHttp('{}')
     const encryptionSlice = vi.fn(() => ({}))
-    await fetchEncryptionSyncDelta(http, null, encryptionSlice)
+    await fetchEncryptionSyncDelta(http, encryptionSlice)
     expect(http.calls).toEqual([
       {
         method: 'GET',
@@ -41,16 +41,6 @@ describe('fetchEncryptionSyncDelta', () => {
     ])
   })
 
-  it('carries the since token when one is held', async () => {
-    const http = fakeHttp('{}')
-    const encryptionSlice = vi.fn(() => ({}))
-    await fetchEncryptionSyncDelta(http, 's_123', encryptionSlice)
-    expect(http.calls[0]?.queryParams).toEqual({
-      timeout: '0',
-      since: 's_123',
-    })
-  })
-
   it('parses the response and reduces it through the injected encryptionSlice', async () => {
     const http = fakeHttp(
       '{"device_lists":{"changed":["@a:x"]},"next_batch":"s_2"}',
@@ -59,29 +49,22 @@ describe('fetchEncryptionSyncDelta', () => {
       changed_devices: { changed: ['@a:x'], left: [] },
       next_batch_token: 's_2',
     }))
-    const result = await fetchEncryptionSyncDelta(http, null, encryptionSlice)
+    const delta = await fetchEncryptionSyncDelta(http, encryptionSlice)
     expect(encryptionSlice).toHaveBeenCalledWith({
       device_lists: { changed: ['@a:x'] },
       next_batch: 's_2',
     })
-    expect(result.delta).toEqual({
+    expect(delta).toEqual({
       changed_devices: { changed: ['@a:x'], left: [] },
       next_batch_token: 's_2',
     })
-    expect(result.nextBatchToken).toBe('s_2')
-  })
-
-  it('reports an undefined next batch token when the slice names none', async () => {
-    const http = fakeHttp('{}')
-    const result = await fetchEncryptionSyncDelta(http, null, () => ({}))
-    expect(result.nextBatchToken).toBeUndefined()
   })
 
   it('does not reduce a response that fails to parse as JSON', async () => {
     const http = fakeHttp('not json')
     const encryptionSlice = vi.fn(() => ({}))
     await expect(
-      fetchEncryptionSyncDelta(http, null, encryptionSlice),
+      fetchEncryptionSyncDelta(http, encryptionSlice),
     ).rejects.toThrow()
     expect(encryptionSlice).not.toHaveBeenCalled()
   })
