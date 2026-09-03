@@ -28,6 +28,29 @@ describe('computeTransportStatus', () => {
     })
   })
 
+  it('refuses a client with the external-crypto flag on', () => {
+    // The flag reads like a description of this exact architecture and does
+    // the opposite: it sends plaintext into rooms the client believes are
+    // encrypted, for a proxy that is archived. Asserted rather than assumed,
+    // because nothing else in the application would notice it being on.
+    const status = computeTransportStatus(
+      () => ({ ...workingClient, usingExternalCrypto: true }),
+      'https://homeserver.invalid',
+    )
+    expect(status).toEqual({
+      created: false,
+      reason: 'the transport would send plaintext into encrypted rooms',
+    })
+  })
+
+  it('accepts the flag left off, which is the default the SDK applies', () => {
+    const status = computeTransportStatus(
+      () => ({ ...workingClient, usingExternalCrypto: false }),
+      'https://homeserver.invalid',
+    )
+    expect(status.created).toBe(true)
+  })
+
   it('carries the reason when the factory throws', () => {
     const status = computeTransportStatus(() => {
       throw new Error('crypto.getRandomValues is not a function')

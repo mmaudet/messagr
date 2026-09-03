@@ -1,0 +1,20 @@
+# The independent counterparty, pinned.
+#
+# A floating `matrix-nio[e2e]` would make the interoperability proof depend on
+# whatever PyPI resolved on the day, which is the opposite of what an
+# acceptance criterion should rest on.
+#
+# This pins the direct requirement only. pip still resolves the roughly two
+# dozen transitive dependencies freely, so this is weaker than the crypto
+# library's own level 2 requirements, which pin the whole closure and install
+# it with --no-deps. Pinning the closure here means regenerating and carrying
+# that list; worth doing the day this proof breaks for a reason nobody
+# changed, and not before.
+#
+# WHAT THIS COUNTERPARTY'S INDEPENDENCE IS AND IS NOT: nio 0.26 moved its
+# ratchet to `vodozemac`, the same crate `matrix-sdk-crypto` uses, so a defect
+# inside vodozemac passes both sides of this proof. Everything above it -- the
+# /keys/* payloads, to-device routing, the megolm event body, session
+# lifecycle -- is two independent implementations agreeing or not, and that is
+# the layer this application's own code lives in.
+matrix-nio[e2e]==0.26.0

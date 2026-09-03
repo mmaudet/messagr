@@ -11,8 +11,10 @@ import {
 } from './src/runtime/cryptoBridge'
 import {
   runOutgoingPump,
+  sendOneEncryptedMessage,
   startCryptoMachine,
   type CryptoPumpReport,
+  type SendReport,
 } from './src/runtime/cryptoPump'
 import { getErrorMessage } from './src/runtime/errors'
 import { computeHermesReport, type HermesReport } from './src/runtime/hermes'
@@ -80,6 +82,7 @@ export function App({
     SessionSyncStatus | 'not-configured' | null
   >(null)
   const [pump, setPump] = useState<PumpStatus | null>(null)
+  const [send, setSend] = useState<SendReport | 'not-run' | null>(null)
 
   useEffect(() => {
     const probeAndReport = async (): Promise<void> => {
@@ -91,6 +94,7 @@ export function App({
       // who has not run scripts/provision-bench-accounts.sh.
       let sessionStatus: SessionSyncStatus | 'not-configured'
       let pumpStatus: PumpStatus
+      let sendStatus: SendReport | 'not-run' = 'not-run'
       if (credentials === null) {
         sessionStatus = 'not-configured'
         pumpStatus = 'not-configured'
@@ -123,6 +127,13 @@ export function App({
           } else {
             const report = await runOutgoingPump(sessionClient, credentials)
             pumpStatus = { outcome: 'ran', report }
+            // Only once the keys are published: a message encrypted before
+            // this device's own keys are on the server is one nobody can
+            // ask about, let alone decrypt.
+            sendStatus = await sendOneEncryptedMessage(
+              sessionClient,
+              credentials,
+            )
           }
         } finally {
           // Nothing left to feed once this run is done: the sync above
@@ -133,6 +144,7 @@ export function App({
       }
       setSession(sessionStatus)
       setPump(pumpStatus)
+      setSend(sendStatus)
 
       // Logged as well as rendered. The Android emulator's screencap returns a
       // blank frame regardless of what is on screen, so the log is the only
@@ -147,6 +159,7 @@ export function App({
         client,
         session: sessionStatus,
         pump: pumpStatus,
+        send: sendStatus,
       })
     }
 
@@ -242,6 +255,22 @@ export function App({
             {computePumpOneTimeKeysLabel(ranPump)}
           </Text>
         </View>
+
+        <View style={styles.block}>
+          <Text style={styles.heading}>Encrypted send</Text>
+          <Text testID="send-status" style={styles.line}>
+            {computeSendLabel(send)}
+          </Text>
+          <Text testID="send-event" style={styles.line}>
+            {computeSendEventLabel(send)}
+          </Text>
+          <Text testID="send-control" style={styles.line}>
+            {computeControlLabel(send)}
+          </Text>
+          <Text testID="send-tamper" style={styles.line}>
+            {computeTamperLabel(send)}
+          </Text>
+        </View>
       </SafeAreaView>
     </SafeAreaProvider>
   )
@@ -299,6 +328,60 @@ function computeEngineLabel(report: HermesReport): string {
   return report.version === null
     ? 'engine: Hermes'
     : `engine: Hermes ${report.version}`
+}
+
+/**
+ * Deliberately a fixed string in the case that matters. Detox matches on
+ * rendered text (see e2e/boot.test.ts on why not testIDs), so a verdict that
+ * embedded the event id would be unassertable: the homeserver mints a
+ * different one every run. The id goes on its own line below.
+ */
+function computeSendLabel(status: SendReport | 'not-run' | null): string {
+  if (status === null) {
+    return 'encrypted send: probing'
+  }
+  if (status === 'not-run') {
+    return 'encrypted send: not run'
+  }
+  return status.sent
+    ? 'encrypted send: sent'
+    : `encrypted send: not sent (${status.reason})`
+}
+
+function computeSendEventLabel(status: SendReport | 'not-run' | null): string {
+  if (status === null || status === 'not-run' || !status.sent) {
+    return 'event: —'
+  }
+  return `event: ${status.eventId} in ${status.roomId}`
+}
+
+/**
+ * The positive control, and the line below is worth nothing without it: a
+ * machine that cannot decrypt anything refuses a tampered ciphertext for a
+ * reason that has nothing to do with the tampering.
+ */
+function computeControlLabel(status: SendReport | 'not-run' | null): string {
+  if (status === null || status === 'not-run' || !status.sent) {
+    return 'intact ciphertext: —'
+  }
+  return status.intactDecrypted
+    ? 'intact ciphertext: decrypted'
+    : 'intact ciphertext: NOT decrypted'
+}
+
+function computeTamperLabel(status: SendReport | 'not-run' | null): string {
+  if (status === null || status === 'not-run' || !status.sent) {
+    return 'tampered ciphertext: —'
+  }
+  // The word this line exists for is "refused". A product that encrypts
+  // correctly and accepts anything on the way back has built an expensive
+  // encoding, and nothing on this screen would otherwise say so.
+  if (status.tamper === 'not-attempted') {
+    return 'tampered ciphertext: not attempted'
+  }
+  return status.tamper === 'refused'
+    ? 'tampered ciphertext: refused'
+    : 'tampered ciphertext: ACCEPTED'
 }
 
 function computePumpStatusLabel(status: PumpStatus | null): string {

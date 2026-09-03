@@ -10,17 +10,22 @@
 // already leave untested.
 import type { createClient } from 'matrix-js-sdk'
 import {
+  asCryptoScopeId,
   createCryptoMachine,
+  decryptEvent,
+  encryptEvent,
   encryptionSlice,
   getDeviceIdentityKeys,
   markRequestFailed,
   markRequestSent,
   receiveSyncChanges,
+  shareScopeKey,
   takeOutgoingRequests,
 } from 'react-native-matrix-crypto'
 
 import { computeCryptoMachineConfig } from './cryptoMachineConfig'
 import type { DeviceIdentity } from './deviceIdentity'
+import { encryptAndSendOneMessage, type SendReport } from './encryptAndSend'
 import { getErrorMessage } from './errors'
 import { makePumpHttp } from './pump'
 import {
@@ -30,6 +35,7 @@ import {
 import { makeToDeviceSource, subscribeToDeviceMessages } from './toDeviceBridge'
 
 export type { CryptoPumpReport } from './outgoingPumpCycle'
+export type { SendReport } from './encryptAndSend'
 
 export type MachineStartResult =
   | { readonly started: true; readonly unsubscribeToDevice: () => void }
@@ -96,6 +102,44 @@ export async function runOutgoingPump(
         getDeviceIdentityKeys,
       },
       encryptionSlice,
+    },
+    identity,
+  )
+}
+
+/**
+ * Phase three: encrypts one message and puts it in a room, binding
+ * `encryptAndSendOneMessage` (`encryptAndSend.ts`) to the real transport and
+ * the real crypto machine.
+ *
+ * The scope arguments are wrapped rather than passed through: the library
+ * brands its scope ids so a room id cannot be handed to it by accident, and
+ * this boundary is where a plain string becomes one.
+ */
+export async function sendOneEncryptedMessage(
+  sessionClient: ReturnType<typeof createClient>,
+  identity: DeviceIdentity,
+): Promise<SendReport> {
+  return encryptAndSendOneMessage(
+    {
+      http: makePumpHttp(sessionClient),
+      machine: {
+        takeOutgoingRequests,
+        markRequestSent,
+        markRequestFailed,
+        shareScopeKey: (scope, userIds) =>
+          shareScopeKey(asCryptoScopeId(scope), [...userIds]),
+        encryptEvent: (scope, eventType, payload) =>
+          encryptEvent(asCryptoScopeId(scope), eventType, payload),
+        decryptEvent: (scope, rawEvent) =>
+          decryptEvent(asCryptoScopeId(scope), rawEvent),
+      },
+      decodeUtf8: bytes => new TextDecoder().decode(bytes),
+      // Unique per send, which is all a transaction id has to be: the
+      // homeserver uses it to recognise a retry of the same send, and
+      // nothing here retries.
+      newTransactionId: () =>
+        `messagr-${Date.now()}-${Math.floor(Math.random() * 1e6)}`,
     },
     identity,
   )
