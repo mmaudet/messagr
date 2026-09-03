@@ -69,6 +69,16 @@ export type SendReport =
 const MESSAGE_BODY = 'encrypted by the bridge, sent by the application'
 
 /**
+ * How many times to share and drain before giving up.
+ *
+ * Three rounds are needed in the cold case and each does something
+ * different, which is why this is a loop and not one call. Six leaves room
+ * for a round that learns about a device appearing mid-flight without
+ * letting a machine that never settles spin forever.
+ */
+const MAX_SHARE_ROUNDS = 6
+
+/**
  * Encrypts one message with the crypto machine and puts it in a room.
  *
  * The ordering carries the interoperability claim. `shareScopeKey` is what
@@ -115,20 +125,9 @@ export async function encryptAndSendOneMessage(
     return { sent: false, reason: `nobody is joined to ${roomId}` }
   }
 
-  try {
-    await machine.shareScopeKey(roomId, members)
-  } catch (cause: unknown) {
-    return { sent: false, reason: getErrorMessage(cause) }
-  }
-
-  // The share above only queued the room key. Nothing has left the device
-  // yet, and until it does the far side cannot read anything that follows.
-  const shared = await drainOutgoingRequests(http, machine)
-  if (shared.failed > 0) {
-    return {
-      sent: false,
-      reason: `${shared.failed} of the room key's own requests could not be sent`,
-    }
+  const settled = await shareUntilSettled(http, machine, roomId, members)
+  if (settled !== null) {
+    return settled
   }
 
   let envelope: EventEnvelope
@@ -171,6 +170,66 @@ export async function encryptAndSendOneMessage(
   )
 
   return { sent: true, roomId, eventId, intactDecrypted, tamper }
+}
+
+/**
+ * Shares the room key until there is nothing left to send, and answers
+ * `null` when that worked.
+ *
+ * **One share does not deliver a key, and that is not a quirk to work
+ * around: it is the protocol.** Each round does something different, and
+ * each depends on the answer to the round before it.
+ *
+ * The first share delivers nothing at all. What it does is make the machine
+ * *track* these users, because upstream skips every user it has never seen,
+ * and tracking is what gets a `/keys/query` issued. The second share now
+ * knows the devices exist but has no Olm session to any of them, so what it
+ * queues is a `m.room_key.withheld` -- a notice that the key was *not*
+ * sent -- alongside the `/keys/claim` that fixes that. Only the third,
+ * once a one-time key has been claimed, queues the to-device message that
+ * actually carries the session key.
+ *
+ * Draining between rounds is what makes each answer available to the next:
+ * the responses come back through `markRequestSent`.
+ *
+ * Getting this wrong is silent. The message still encrypts, still sends,
+ * and still looks sent from here -- the far side simply receives something
+ * it can never read, which is exactly what continuous integration observed
+ * before this loop existed.
+ */
+async function shareUntilSettled(
+  http: HttpRequester,
+  machine: EncryptingMachine,
+  roomId: string,
+  members: readonly string[],
+): Promise<SendReport | null> {
+  for (let round = 0; round < MAX_SHARE_ROUNDS; round += 1) {
+    try {
+      await machine.shareScopeKey(roomId, members)
+    } catch (cause: unknown) {
+      return { sent: false, reason: getErrorMessage(cause) }
+    }
+
+    const drained = await drainOutgoingRequests(http, machine)
+    if (drained.failed > 0) {
+      return {
+        sent: false,
+        reason: `${drained.failed} of the room key's own requests could not be sent`,
+      }
+    }
+    if (drained.sent === 0) {
+      // A share that queues nothing is a share with nothing left to do.
+      return null
+    }
+  }
+
+  // Not encrypted anyway, deliberately. Encrypting into a scope with no
+  // group session does not fail politely: it panics inside upstream and
+  // takes the process with it (docs/spikes/tauri-crypto-link.md).
+  return {
+    sent: false,
+    reason: `the room key never settled after ${MAX_SHARE_ROUNDS} rounds`,
+  }
 }
 
 /** The wire shape `decryptEvent` reads: an event whose content is the encrypted one. */
