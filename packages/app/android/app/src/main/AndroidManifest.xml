@@ -1,6 +1,19 @@
-<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+<manifest xmlns:android="http://schemas.android.com/apk/res/android" xmlns:tools="http://schemas.android.com/tools">
 
     <uses-permission android:name="android.permission.INTERNET" />
+
+    <!--
+      React Native's own debug-build manifest fragment
+      (ReactAndroid/src/debug/AndroidManifest.xml) declares this for its
+      DevTools local-network discovery, unrelated to anything the app or
+      Detox needs: Detox drives through ADB instrumentation, not the
+      Inspector, and this bundle is embedded rather than loaded live from
+      Metro when it matters. Left in, Android's newer local-network consent
+      dialog steals focus on first launch and blocks a headless run.
+    -->
+    <uses-permission
+      android:name="android.permission.ACCESS_LOCAL_NETWORK"
+      tools:node="remove" />
 
     <application
       android:name=".MainApplication"
