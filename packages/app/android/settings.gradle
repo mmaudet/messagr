@@ -1,0 +1,39 @@
+// Yarn hoists this package's dependencies to the workspace root, so the React
+// Native template's "../node_modules" path does not exist here.
+//
+// Resolved by walking up from this directory looking for node_modules/<pkg>,
+// which is Node's own algorithm. Preferred over shelling out to `node --print
+// require.resolve(...)` because it needs nothing of the Gradle daemon's
+// environment, in particular not a PATH that contains node.
+//
+// The walk lives inside pluginManagement {} because Gradle requires that block
+// to be the first statement in a settings file, so no helper can be defined
+// ahead of it. Its result is assigned without `def` so that it lands in the
+// Gradle-wide ext namespace, where the second includeBuild below reads it.
+//
+// Both includeBuild calls are needed and neither is redundant: the one in
+// pluginManagement makes com.facebook.react.settings resolvable by this file,
+// and the one at the bottom puts the plugin on the project build's classpath.
+// Removing the second one fails with "Could not resolve all artifacts for
+// configuration 'classpath'", which is how this comment was arrived at.
+pluginManagement {
+    def found = null
+    def dir = settingsDir
+    while (dir != null && found == null) {
+        def candidate = new File(dir, 'node_modules/@react-native/gradle-plugin')
+        if (candidate.isDirectory()) {
+            found = candidate
+        }
+        dir = dir.parentFile
+    }
+    if (found == null) {
+        throw new GradleException('@react-native/gradle-plugin not found in any node_modules above ' + settingsDir)
+    }
+    gradle.ext.reactNativeGradlePlugin = found.absolutePath
+    includeBuild(gradle.ext.reactNativeGradlePlugin)
+}
+plugins { id("com.facebook.react.settings") }
+extensions.configure(com.facebook.react.ReactSettingsExtension){ ex -> ex.autolinkLibrariesFromCommand() }
+rootProject.name = 'Messagr'
+include ':app'
+includeBuild(gradle.ext.reactNativeGradlePlugin)
