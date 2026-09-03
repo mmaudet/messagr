@@ -1,3 +1,9 @@
 node_modules/
 .DS_Store
 *.log
+
+# Rust build artifacts from the spike fixture (spikes/), which is built by
+# hand and never by CI.
+spikes/**/target/
+# Tauri regenerates these on every build.
+spikes/**/gen/
