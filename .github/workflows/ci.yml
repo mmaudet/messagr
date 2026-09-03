@@ -44,3 +44,56 @@ jobs:
       - run: yarn format
       - run: yarn typecheck
       - run: yarn test
+
+      # ADR-0001 allows one crypto implementation in the binary. matrix-js-sdk
+      # brings a second, and Metro resolves it even though it is never called,
+      # so the bundle is inspected rather than the intention trusted.
+      - name: Assert the bundle carries no crypto WebAssembly module
+        run: ./scripts/assert-no-crypto-wasm.sh
+
+  end-to-end:
+    # The boot contract is a claim about a device, so it is asserted on one.
+    # Android on an Ubuntu runner rather than iOS on macOS: same assertions,
+    # a tenth of the billed minutes.
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: yarn
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - uses: android-actions/setup-android@v3
+
+      - run: yarn install --frozen-lockfile
+
+      - name: Enable KVM
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' \
+            | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+
+      - name: Run the boot suite on an emulator
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 34
+          arch: x86_64
+          profile: pixel_6
+          avd-name: messagr-e2e
+          force-avd-creation: false
+          emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim
+          disable-animations: true
+          working-directory: packages/app
+          script: |
+            npx react-native start --port 8081 &
+            npx wait-on http://localhost:8081/status -t 120000
+            npx detox build --configuration android.emu.debug
+            npx detox test --configuration android.emu.debug --headless
