@@ -18,7 +18,7 @@ megolm event body -- is two independent implementations agreeing or not.
 That framing is taken from the crypto library's own level 2 proof, which this
 replays from the application rather than from the library.
 
-# Two phases, and why the order is not negotiable
+# Three phases, and why the order is not negotiable
 
 Megolm shares a room key with the devices that exist when the key is shared.
 A counterparty that logs in *after* the application has sent cannot decrypt
@@ -55,6 +55,11 @@ from nio import (
 # disagrees with the application's own constant, the test fails loudly rather
 # than passing on an empty match.
 EXPECTED_BODY = "encrypted by the bridge, sent by the application"
+
+# What this counterparty sends for the application to decrypt. The other
+# direction of the same proof: the application reading what an independent
+# implementation encrypted.
+COUNTERPARTY_BODY = "encrypted by matrix-nio, for the application to read"
 
 SYNC_TIMEOUT_MS = 10_000
 COLLECT_DEADLINE_SECONDS = 120
@@ -238,17 +243,90 @@ async def collect(session_file: Path, store: Path) -> int:
         await client.close()
 
 
+async def send(session_file: Path, store: Path) -> int:
+    """Encrypt a message for the application to read.
+
+    Runs after the application has published its keys, not before: Megolm
+    shares with the devices that exist and have keys at share time, and the
+    application's device has none until it has run once.
+    """
+    homeserver = env("MESSAGR_INTEROP_HOMESERVER")
+    room_id = env("MESSAGR_INTEROP_ROOM")
+
+    session = json.loads(session_file.read_text())
+    client = client_for(
+        store, session["user_id"], homeserver, device_id=session["device_id"]
+    )
+    try:
+        client.restore_login(
+            user_id=session["user_id"],
+            device_id=session["device_id"],
+            access_token=session["access_token"],
+        )
+
+        # Sync first: nio decides whether to encrypt from the room state it
+        # holds, and a client that has not seen m.room.encryption sends
+        # plaintext without complaining.
+        #
+        # full_state is load-bearing, not caution. The store carries a sync
+        # token from the login phase, so an incremental sync returns no
+        # membership at all -- and share_group_session_parallel then shares
+        # with the empty set, silently, leaving a message nobody can read.
+        await client.sync(timeout=SYNC_TIMEOUT_MS, full_state=True)
+
+        room = client.rooms.get(room_id)
+        if room is None:
+            print(f"FAIL: {room_id} is not a room this account is in", file=sys.stderr)
+            return 1
+        if not room.encrypted:
+            print(
+                f"FAIL: {room_id} is not marked encrypted, so anything sent "
+                "here would go out in plaintext.",
+                file=sys.stderr,
+            )
+            return 1
+
+        # The keys of everyone in the room, then the group session for them.
+        # nio does not do either implicitly, and room_send would refuse.
+        if client.should_query_keys:
+            await client.keys_query()
+        # room_send shares the group session itself when it has to. Doing it
+        # here as well is deliberate: it separates "the key could not be
+        # shared" from "the send was refused", which the combined call
+        # reports as one failure.
+        if client.olm.should_share_group_session(room_id):
+            await client.share_group_session(
+                room_id, ignore_unverified_devices=True
+            )
+
+        response = await client.room_send(
+            room_id=room_id,
+            message_type="m.room.message",
+            content={"msgtype": "m.text", "body": COUNTERPARTY_BODY},
+            ignore_unverified_devices=True,
+        )
+        event_id = getattr(response, "event_id", None)
+        if event_id is None:
+            print(f"FAIL: the send was refused: {response}", file=sys.stderr)
+            return 1
+
+        print(f"OK: the counterparty sent an encrypted message ({event_id})")
+        return 0
+    finally:
+        await client.close()
+
+
 def main() -> int:
-    if len(sys.argv) != 2 or sys.argv[1] not in ("login", "collect"):
-        print("usage: nio_counterparty.py login|collect", file=sys.stderr)
+    phases = {"login": login, "send": send, "collect": collect}
+    if len(sys.argv) != 2 or sys.argv[1] not in phases:
+        print("usage: nio_counterparty.py login|send|collect", file=sys.stderr)
         return 2
 
     work = Path(env("MESSAGR_INTEROP_WORKDIR"))
     session_file = work / "counterparty-session.json"
     store = work / "store"
 
-    phase = login if sys.argv[1] == "login" else collect
-    return asyncio.run(phase(session_file, store))
+    return asyncio.run(phases[sys.argv[1]](session_file, store))
 
 
 if __name__ == "__main__":
