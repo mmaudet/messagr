@@ -224,7 +224,9 @@ The product consolidates the retained decisions here.
 ### 6.1 "Community" application object
 
 - A **community** is a pseudonymous application object exposed as a set of `Channel`s.
-- Each `Channel` relies on group encryption (MLS is the production target; see crypto spec).
+- Each `Channel` relies on group encryption. **V1 ships Megolm.** MLS (RFC 9420) is the
+  target trajectory, not a target already chosen: no implementation is within reach today,
+  and the migration is the one screen 30 already annotates. See ADR-0003 and the crypto spec.
 - Invitations flow through **capability links** or limited-use invitation tokens, never a server-readable directory.
 - Admin roles are **signed client-side** and not held in a server-readable registry.
 - Server-side metadata (membership, roles, social graphs) is **radically minimized**: the crypto spec details the exact surface.
@@ -336,7 +338,7 @@ The desktop client is a native **Tauri 2** application, never a web wrapper. Thi
 
 Rationale:
 
-1. **Single-source cryptographic contract.** The crypto spec defines one Rust core `matrix-crypto-core` consumed by every client. Under Tauri, that same crate is linked directly into the desktop binary, invoked via `#[tauri::command]`, with native access to the OS keychain, disk, and system notifications. Under React Native Web or PWA, we would have to fall back to the parallel `matrix-sdk-crypto-wasm` binding — two crypto backends to audit, two encrypted storage formats to maintain, and the invariant “a desktop device is a `linked_device` like any other” does not translate the same way in WASM/IndexedDB as it does in native Rust/SQLite.
+1. **Single-source cryptographic contract.** The crypto spec defines one Rust core `matrix-crypto-core` consumed by every client. Under Tauri, that same crate is **to be linked** into the desktop binary, invoked via `#[tauri::command]` — a binding that does not exist yet and whose feasibility a time-boxed spike establishes before any desktop screen is built, with native access to the OS keychain, disk, and system notifications. Under React Native Web or PWA, we would have to fall back to the parallel `matrix-sdk-crypto-wasm` binding — two crypto backends to audit, two encrypted storage formats to maintain, and the invariant “a desktop device is a `linked_device` like any other” does not translate the same way in WASM/IndexedDB as it does in native Rust/SQLite.
 2. **System features required by the spec.** Screens 38–40 assume native macOS chrome, Dock badge, actionable notifications, local QR pairing, and the `messagr://` protocol handler. These primitives are official Tauri plugins; in a PWA they are either degraded or absent, and an address bar exposes the instance URL in contradiction with invariant §7.1 (“the origin instance is an infrastructure detail”).
 3. **A single identity anchor.** The product cannot be “in the browser” without breaking §4.1 (identity generated on-device from a local root key): a multi-tab, multi-OS-user browser with easy data wipe is not an acceptable identity carrier.
 
@@ -423,6 +425,12 @@ Set E — federation:
 | Phase 2 | QR/SAS verification + basic recovery | trust and continuity |
 | Phase 3 | 1:1 audio/video calls | V1 communication loop complete |
 | Phase 4 | hardened CI, nightly media validation, federated scenarios | maintainable mobile baseline |
+
+**Agents are out of V1, deliberately.** No agent runtime, no agent creation or
+configuration screens, despite the priority §13.1 assigns them. What V1 does carry is the
+invariant: every participant declares its nature from the first conversation screen, so
+that the timeline never has to be rewritten to admit a non-human. The screens of §13.4 and
+the matrix of §5 describe the state after V1.
 
 ## 12. Immediate next steps
 
@@ -651,7 +659,13 @@ Three **surfaces**: `paper` (light background), `sunk` (conversation background)
 - Brand: Schibsted Grotesk — brand screen and logotype only.
 - Mono: JetBrains Mono — identifiers, fingerprints, technical labels.
 - Eight type roles: `display 30/36`, `titleLg 22/27`, `titleMd 17/22`, `body 14.5/21`, `bodySm 13/19`, `caption 11.5/17`, `monoLabel 9.5/14 (uppercase +0.14em)`, `monoId 11/16`.
-- Floors: 11.5 pt minimum body on screen, 44 pt minimum touch target, no monospace label under 9.5 pt, line-height never below 1.35.
+- Floors are carried by `tokens.json` under `floors`, which is the source: 11.5 pt
+  minimum body, 9.5 pt minimum mono, 44 pt minimum touch target, and two line-height
+  ratios rather than one — 1.35 for running text (`body`, `bodySm`, `caption`, and the
+  `mono` roles), 1.2 for `title` roles, where tight leading is correct typography rather
+  than a defect. **Scope, not the scale, was the correction:** a single ratio applied to
+  every `type` entry rejected four of the eight roles at V3's first export; each floor now
+  names the classes it governs, and `tokens.json` records which role verifies which value.
 
 **Shapes.** Radii: bubble 16 pt (author corner 4 pt), pill 26 pt, avatar 50%. 45° notch: accent reserved for buttons (16 pt, top-right), framing cards (22 pt, top-right), agent marker (32% of side, bottom-right). Never a background motif.
 
