@@ -86,6 +86,18 @@ room_id="$(curl -sS -X POST "$MESSAGR_BENCH_HOMESERVER/_matrix/client/v3/createR
   -d '{"preset":"private_chat","name":"bench"}' \
   | python3 -c 'import sys,json; print(json.load(sys.stdin)["room_id"])')"
 
+# THE BENCH ROOM IS ENCRYPTED, because an unencrypted one is not the thing
+# under test. createRoom's presets do not turn encryption on, and a client
+# that asks whether the room is encrypted -- which is what a Matrix client
+# does before deciding to encrypt -- would be told no and send plaintext.
+# Set here rather than by a client, because the account that creates the room
+# is the one that has the power level to set its state.
+echo "marking the room encrypted" >&2
+curl -sS -o /dev/null -X PUT \
+  "$MESSAGR_BENCH_HOMESERVER/_matrix/client/v3/rooms/$room_id/state/m.room.encryption" \
+  -H "Authorization: Bearer $inviter_token" -H 'Content-Type: application/json' \
+  -d '{"algorithm":"m.megolm.v1.aes-sha2"}'
+
 # The room is required: without it the service cannot read a power level, so it
 # cannot tell an account that can honour the link it hands out from one that
 # cannot.
