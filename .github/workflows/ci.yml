@@ -51,6 +51,44 @@ jobs:
       - name: Assert the bundle carries no crypto WebAssembly module
         run: ./scripts/assert-no-crypto-wasm.sh
 
+  android-release:
+    # The release build takes a different path through the toolchain than the
+    # debug one the end-to-end job builds: it compiles the JavaScript ahead of
+    # time with hermesc, which is the step #16 found broken -- and broken only
+    # in release, so nothing else here would have caught it. No emulator and no
+    # bench account: this asserts that the artifact can be produced and what it
+    # contains, not how the app behaves.
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: yarn
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - uses: android-actions/setup-android@v3
+
+      - run: yarn install --frozen-lockfile
+
+      # Signed with the committed debug keystore, as the React Native template
+      # leaves it: this proves the build, and a real signing key is a shipping
+      # decision that does not belong in a public repository.
+      - name: Build the release APK
+        working-directory: packages/app/android
+        run: ./gradlew :app:assembleRelease
+
+      # hermesc runs on a different %OS-BIN% here than on a developer's mac,
+      # so this is also where the derived path is proven portable.
+      - name: Assert the release bundle is Hermes bytecode
+        run: ./scripts/assert-hermes-bytecode.sh
+
   end-to-end:
     # The boot contract is a claim about a device, so it is asserted on one.
     # Android on an Ubuntu runner rather than iOS on macOS: same assertions,
