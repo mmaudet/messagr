@@ -27,6 +27,7 @@ import { computeCryptoMachineConfig } from './cryptoMachineConfig'
 import type { DeviceIdentity } from './deviceIdentity'
 import { encryptAndSendOneMessage, type SendReport } from './encryptAndSend'
 import { getErrorMessage } from './errors'
+import { fetchJoinedRooms } from './encryptedSend'
 import { makePumpHttp } from './pump'
 import { receiveAndDecrypt, type ReceiveReport } from './receiveDecrypt'
 import {
@@ -167,12 +168,29 @@ export async function receiveOneEncryptedMessage(
     {
       http: makePumpHttp(sessionClient),
       machine: {
+        receiveSyncChanges,
         decryptEvent: (scope, rawEvent) =>
           decryptEvent(asCryptoScopeId(scope), rawEvent),
       },
       decodeUtf8: bytes => new TextDecoder().decode(bytes),
+      // A real pause on a device, where the far side may still be sending.
+      waitBetweenRounds: () =>
+        new Promise(resolve => setTimeout(resolve, 2000)),
     },
     roomId,
     identity.userId,
   )
+}
+
+/**
+ * The room to read from when this run's own send did not resolve one.
+ *
+ * `null` rather than a throw: an account in no room has nothing to receive,
+ * which is a state to report, not a failure.
+ */
+export async function firstJoinedRoom(
+  sessionClient: ReturnType<typeof createClient>,
+): Promise<string | null> {
+  const rooms = await fetchJoinedRooms(makePumpHttp(sessionClient))
+  return rooms[0] ?? null
 }

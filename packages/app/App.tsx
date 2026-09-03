@@ -10,6 +10,7 @@ import {
   type BridgeStatus,
 } from './src/runtime/cryptoBridge'
 import {
+  firstJoinedRoom,
   receiveOneEncryptedMessage,
   runOutgoingPump,
   sendOneEncryptedMessage,
@@ -140,15 +141,19 @@ export function App({
               sessionClient,
               credentials,
             )
-            // Reading is attempted whether or not this run's own send
-            // worked: what is being read was written by somebody else, on a
-            // previous run of this suite, and one failure should not hide
-            // the other half of the round trip.
-            if (sendStatus.sent) {
+            // Attempted whether or not this run's own send worked: what is
+            // being read was written by somebody else, and one direction
+            // failing should not hide the other. The room is the one the
+            // send resolved, or the first joined room when there was no
+            // send to resolve it.
+            const roomId = sendStatus.sent
+              ? sendStatus.roomId
+              : await firstJoinedRoom(sessionClient)
+            if (roomId !== null) {
               receiveStatus = await receiveOneEncryptedMessage(
                 sessionClient,
                 credentials,
-                sendStatus.roomId,
+                roomId,
               )
             }
           }

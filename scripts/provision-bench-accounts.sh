@@ -93,7 +93,10 @@ room_id="$(curl -sS -X POST "$MESSAGR_BENCH_HOMESERVER/_matrix/client/v3/createR
 # Set here rather than by a client, because the account that creates the room
 # is the one that has the power level to set its state.
 echo "marking the room encrypted" >&2
-curl -sS -o /dev/null -X PUT \
+# -f so a refusal is an error here. Without it curl exits 0 on a 403 and the
+# missed state event surfaces two CI jobs later, as a counterparty reporting
+# that the room is not encrypted.
+curl -fsS -o /dev/null -X PUT \
   "$MESSAGR_BENCH_HOMESERVER/_matrix/client/v3/rooms/$room_id/state/m.room.encryption" \
   -H "Authorization: Bearer $inviter_token" -H 'Content-Type: application/json' \
   -d '{"algorithm":"m.megolm.v1.aes-sha2"}'

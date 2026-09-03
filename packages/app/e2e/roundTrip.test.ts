@@ -39,6 +39,7 @@ const COUNTERPARTY = resolve(
 const COUNTERPARTY_BODY = 'encrypted by matrix-nio, for the application to read'
 
 const hasCounterparty =
+  process.env.MESSAGR_INTEROP_HOMESERVER !== undefined &&
   process.env.MESSAGR_INTEROP_ROOM !== undefined &&
   process.env.MESSAGR_INTEROP_WORKDIR !== undefined
 
@@ -79,9 +80,12 @@ describeRoundTrip('encrypted round trip', () => {
     // Decrypting an event does not establish who wrote it, and the day this
     // line loses the word "unauthenticated" is the day the product starts
     // implying otherwise.
-    await detoxExpect(element(by.id('received-sender'))).toBeVisible()
     await detoxExpect(
-      element(by.text('claims to be from: —')),
-    ).not.toBeVisible()
+      element(
+        by.text(
+          `claims to be from: ${process.env.MESSAGR_INTEROP_USER ?? ''} (unauthenticated)`,
+        ),
+      ),
+    ).toBeVisible()
   })
 })

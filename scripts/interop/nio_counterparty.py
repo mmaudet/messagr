@@ -267,6 +267,11 @@ async def send(session_file: Path, store: Path) -> int:
         # Sync first: nio decides whether to encrypt from the room state it
         # holds, and a client that has not seen m.room.encryption sends
         # plaintext without complaining.
+        #
+        # full_state is load-bearing, not caution. The store carries a sync
+        # token from the login phase, so an incremental sync returns no
+        # membership at all -- and share_group_session_parallel then shares
+        # with the empty set, silently, leaving a message nobody can read.
         await client.sync(timeout=SYNC_TIMEOUT_MS, full_state=True)
 
         room = client.rooms.get(room_id)
@@ -285,6 +290,10 @@ async def send(session_file: Path, store: Path) -> int:
         # nio does not do either implicitly, and room_send would refuse.
         if client.should_query_keys:
             await client.keys_query()
+        # room_send shares the group session itself when it has to. Doing it
+        # here as well is deliberate: it separates "the key could not be
+        # shared" from "the send was refused", which the combined call
+        # reports as one failure.
         if client.olm.should_share_group_session(room_id):
             await client.share_group_session(
                 room_id, ignore_unverified_devices=True
