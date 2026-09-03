@@ -1,0 +1,46 @@
+name: CI
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  checks:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: yarn
+
+      # --frozen-lockfile so a dependency that drifted from the lockfile fails
+      # here rather than resolving to something nobody chose.
+      - run: yarn install --frozen-lockfile
+
+      # The crypto bridge ships prebuilt binaries and declares no install
+      # script. This asserts that, rather than trusting it: a package that
+      # started reaching for a compiler would otherwise be discovered on a
+      # developer's machine instead of here.
+      - name: Assert no dependency can invoke a compiler
+        run: |
+          node -e '
+            const p = require("react-native-matrix-crypto/package.json")
+            const hooks = ["preinstall", "install", "postinstall", "prepare"]
+            const found = hooks.filter(h => p.scripts?.[h])
+            if (found.length) {
+              console.error("install hooks declared: " + found.join(", "))
+              process.exit(1)
+            }
+          '
+
+      - run: yarn lint
+      - run: yarn format
+      - run: yarn typecheck
+      - run: yarn test

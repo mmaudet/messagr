@@ -1,0 +1,8 @@
+node_modules/
+yarn.lock
+packages/app/ios/
+packages/app/android/
+docs/product-spec.md
+docs/bridge-spec.md
+docs/crypto-spec.md
+design/
