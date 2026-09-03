@@ -1,4 +1,4 @@
-import { by, device, element, expect as detoxExpect } from 'detox'
+import { by, device, element, expect as detoxExpect, waitFor } from 'detox'
 
 /**
  * The boot contract, asserted on a real device rather than in configuration.
@@ -13,9 +13,13 @@ import { by, device, element, expect as detoxExpect } from 'detox'
  * display.
  */
 describe('boot', () => {
+  // Jest's per-test testTimeout (jest.config.js) does not cover beforeAll:
+  // hooks fall back to Jest's own 5000ms default unless given one here. A
+  // cold launch that restores a session and syncs against a real homeserver
+  // routinely takes longer than that.
   beforeAll(async () => {
     await device.launchApp({ newInstance: true })
-  })
+  }, 60000)
 
   it('runs on the New Architecture', async () => {
     // The crypto bridge is a JSI turbo module with no legacy mode, so this is
@@ -42,5 +46,31 @@ describe('boot', () => {
     await detoxExpect(
       element(by.text('loaded, core 0.1.0+emit.f6ddf39b')),
     ).toBeVisible()
+  })
+
+  it('restores a session and syncs against a real homeserver', async () => {
+    // waitFor rather than an immediate assertion: this is the one status on
+    // screen that depends on a network round trip. The room count is exact,
+    // not a loose match, because scripts/provision-bench-accounts.sh always
+    // invites the provisioned account into exactly one room.
+    //
+    // This is also what keeps Detox's own synchronization usable at all:
+    // restoreAndSync stops the client once this first sync lands, rather
+    // than leaving matrix-js-sdk's long-polling loop running underneath it.
+    // Left running, Detox's network-idle tracker never sees the app go
+    // quiet, and launchApp above hangs forever on "Network is busy, with 1
+    // in-flight calls" instead of failing on anything the app did — watched
+    // failing exactly that way before the client was stopped.
+    await waitFor(element(by.text('synced, 1 room(s)')))
+      .toBeVisible()
+      .withTimeout(30000)
+  })
+
+  it('measures the cold-start sync duration', async () => {
+    // The exact figure is not asserted, only that one was recorded: that is
+    // this ticket's baseline requirement, and the number itself will move
+    // with the network and the account's room history.
+    await detoxExpect(element(by.id('session-sync-duration'))).toBeVisible()
+    await detoxExpect(element(by.text('cold-start sync: —'))).not.toBeVisible()
   })
 })
