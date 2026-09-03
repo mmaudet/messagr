@@ -93,3 +93,52 @@ nothing downstream of `encryptionSlice` changes.
 **This decision carries a stopping criterion.** The first increment sends and
 receives an encrypted event across this seam against a real homeserver, or the
 transport half is reopened. No second increment before that verdict.
+
+## The verdict
+
+**The seam holds.** The transport half is not reopened.
+
+An application built on it encrypts a message through the bridge, sends it as
+an `m.room.encrypted` event through the raw authenticated request path, and an
+independent `matrix-nio` client decrypts it. In the other direction, that same
+client encrypts a message and this application decrypts it and shows the
+plaintext. Both directions run against a real homeserver in continuous
+integration, driven from the application rather than from the library
+(`packages/app/e2e/roundTrip.test.ts`, `scripts/interop/nio_counterparty.py`).
+
+**The largest named exposure was not taken.** This ADR called plaintext
+re-injection through `MatrixEvent.attemptDecryption` -- duck-typed, marked
+`@internal`, not exported -- the biggest risk of an upstream break in the
+design. Nothing in this application calls it. The exposure exists only for a
+product that wants matrix-js-sdk's own timeline model to hold decrypted
+events; this one renders its own screen from its own state, so it reads the
+raw event out of a raw sync and decrypts it through the bridge
+(`receiveDecrypt.ts`).
+
+That is a narrowing, not an escape, and it comes with a condition worth
+stating plainly: **the day a timeline is built on the SDK's room model, this
+exposure returns exactly as described above.** Whoever builds that screen
+inherits this paragraph. How a break would be detected needs a straighter answer than "there is
+nothing to break". Two surfaces are load-bearing and neither is a documented
+contract. `client.http.authedRequest` is what the outgoing pump and every
+raw read here go through, and matrix-js-sdk calls it "intended private, used
+in code". And the raw `/sync` shape this reads `to_device` and `timeline`
+out of is the protocol's, not the SDK's, so it moves with the homeserver
+rather than with a dependency bump.
+
+Both are watched by the same thing, and it is the only thing that can watch
+them: the round trip above, run against a real homeserver on every pull
+request. A signature change breaks the build; a shape change breaks a test
+that decrypts nothing. Neither fails quietly, which is the property that
+matters -- this design's characteristic failure, seen twice while building
+it, is a message that encrypts, sends, and reports success while arriving
+unreadable.
+
+**What the seam does not give.** Decrypting an event does not establish who
+sent it. The sender is transport metadata read off the event, verifying a
+device does not change that, and sender verification is computed once per
+session and never backfilled -- a message decrypted before its sender was
+verified keeps reporting what it reported then. The application names the
+field `claimedSender` and prints it as unauthenticated for that reason. This
+is a property of the design, not a gap in it, and a product surface that
+implies otherwise would be the first place it is lost.
