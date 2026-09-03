@@ -74,6 +74,29 @@ jobs:
 
       - run: yarn install --frozen-lockfile
 
+      # Pure network calls against the bench homeserver: no emulator needed,
+      # so this runs before one is booted and fails fast if the bench is
+      # unreachable. MESSAGR_SESSION_* is what babel.config.js's
+      # transform-inline-environment-variables bakes into the bundle two
+      # steps down, so the names have to match what App.tsx reads.
+      - name: Provision an account and export its session
+        env:
+          MESSAGR_BENCH_HOMESERVER: ${{ secrets.MESSAGR_BENCH_HOMESERVER }}
+          MESSAGR_BENCH_TOKEN: ${{ secrets.MESSAGR_BENCH_TOKEN }}
+        run: |
+          ./scripts/provision-bench-accounts.sh
+          python3 -c "
+          import json
+          d = json.load(open('/tmp/messagr-bench-accounts.json'))
+          invitee = d['invitee']
+          print('::add-mask::' + invitee['access_token'])
+          with open('$GITHUB_ENV', 'a') as f:
+              f.write(f'MESSAGR_SESSION_HOMESERVER={d[\"homeserver\"]}\n')
+              f.write(f'MESSAGR_SESSION_USER_ID={invitee[\"user_id\"]}\n')
+              f.write(f'MESSAGR_SESSION_DEVICE_ID={invitee[\"device_id\"]}\n')
+              f.write(f'MESSAGR_SESSION_ACCESS_TOKEN={invitee[\"access_token\"]}\n')
+          "
+
       - name: Enable KVM
         run: |
           echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' \
