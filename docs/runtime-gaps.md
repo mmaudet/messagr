@@ -7,25 +7,28 @@ the polyfill layer closes.
 
 ## What was measured
 
-`src/runtime/capabilities.ts` exercises each capability against a value whose
-correct answer is known, and treats a capability that throws as absent. It
+`src/runtime/runtimeGaps.ts` exercises each facility against a value whose
+correct answer is known, and treats one that throws as absent. It is named for
+gaps rather than capabilities because in this product a capability is a scoped
+permission held by a participant; see CONTEXT.md. It
 tests behaviour rather than presence, because React Native ships a `URL` that
 is a regular-expression shim: `typeof URL === 'function'` is true while the
 object it builds may be wrong.
 
-Measured on React Native 0.87.1, on an iOS simulator and an Android emulator.
-Both platforms returned the same answer.
+Measured on React Native 0.87.1, on an iOS simulator, an Android emulator and
+a Pixel 10 Pro Fold running Android 17. All three returned the same answer,
+including the phone two API levels above the emulator.
 
-| Capability               | State                          | Polyfill                               |
-| ------------------------ | ------------------------------ | -------------------------------------- |
-| `crypto.getRandomValues` | absent                         | `react-native-get-random-values`       |
-| `TextDecoder`            | absent                         | `text-encoding-polyfill`, decoder only |
-| `Promise.withResolvers`  | works                          | none                                   |
-| `TextEncoder`            | works                          | none                                   |
-| `URL`                    | works, including query parsing | none                                   |
-| `URLSearchParams`        | works                          | none                                   |
+| Facility                 | State                          | Polyfill                               | Needed by                                           |
+| ------------------------ | ------------------------------ | -------------------------------------- | --------------------------------------------------- |
+| `crypto.getRandomValues` | absent                         | `react-native-get-random-values`       | `createClient`, before any request is made          |
+| `TextDecoder`            | absent                         | `text-encoding-polyfill`, decoder only | reading the UTF-8 bodies of the responses it parses |
+| `Promise.withResolvers`  | works                          | none                                   | the send scheduler                                  |
+| `TextEncoder`            | works                          | none                                   | request bodies                                      |
+| `URL`                    | works, including query parsing | none                                   | every endpoint it builds                            |
+| `URLSearchParams`        | works                          | none                                   | filter and pagination parameters                    |
 
-Three capabilities that were expected to need polyfilling do not. Hermes on
+Three facilities that were expected to need polyfilling do not. Hermes on
 0.87.1 supplies `Promise.withResolvers`, and the `URL` shim answers
 `new URL('https://example.org/a/b?x=1&y=2').searchParams.get('y')` correctly.
 Nothing is installed for them: replacing a working implementation adds a risk

@@ -12,6 +12,11 @@ module.exports = {
   },
   apps: {
     'ios.release': {
+      // UNVERIFIED. This configuration has never been run: Detox on iOS needs
+      // applesimutils, whose Homebrew tap has to be trusted on the machine
+      // first, and that is the developer's decision rather than this file's.
+      // Continuous integration runs the suite on Android, for a tenth of the
+      // billed minutes, so nothing here depends on this being right.
       type: 'ios.app',
       binaryPath:
         'ios/build/Build/Products/Release-iphonesimulator/Messagr.app',
@@ -33,6 +38,13 @@ module.exports = {
   },
   devices: {
     simulator: { type: 'ios.simulator', device: { type: 'iPhone 17 Pro' } },
+    attached: {
+      // A phone on the end of a cable. The boot criterion names a physical
+      // device, and an emulator is not one: it runs the host's processor, its
+      // kernel and its graphics, and answers questions about none of them.
+      type: 'android.attached',
+      device: { adbName: process.env.ANDROID_SERIAL || '.*' },
+    },
     emulator: {
       type: 'android.emulator',
       // Named by the environment so that a clone is not tied to one machine's
@@ -43,5 +55,6 @@ module.exports = {
   configurations: {
     'ios.sim.release': { device: 'simulator', app: 'ios.release' },
     'android.emu.debug': { device: 'emulator', app: 'android.debug' },
+    'android.attached.debug': { device: 'attached', app: 'android.debug' },
   },
 }

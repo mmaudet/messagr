@@ -1,81 +1,108 @@
-import { computeCapabilityReport, type CapabilityReport } from './capabilities'
+import { getErrorMessage } from './errors'
+import { computeRuntimeGapReport, type RuntimeGapName } from './runtimeGaps'
 
 /**
- * Closes the runtime gaps matrix-js-sdk needs closed, and only those.
+ * Closes the gaps matrix-js-sdk needs closed, and only those.
  *
- * The set was measured rather than assumed. On React Native 0.87.1, iOS and
- * Android alike report exactly two failures: `crypto.getRandomValues`, which
- * is absent, and `TextDecoder`, which is absent. `Promise.withResolvers`,
- * `TextEncoder`, `URL` and `URLSearchParams` all pass a behavioural check,
- * including the query-parsing case where React Native's `URL` shim was
- * expected to give way. Nothing is polyfilled for them, because replacing a
- * working implementation adds a risk without closing a gap.
+ * The set was measured rather than assumed. On React Native 0.87.1, an iOS
+ * simulator, an Android emulator and an Android phone all report exactly two
+ * failures: `crypto.getRandomValues`, which matrix-js-sdk reaches for inside
+ * `createClient`, and `TextDecoder`, which it uses to read the UTF-8 bodies
+ * of the responses it parses. `Promise.withResolvers`, `TextEncoder`, `URL`
+ * and `URLSearchParams` all pass a behavioural check, including the
+ * query-parsing case where React Native's `URL` shim was expected to give
+ * way. Nothing is installed for those, because replacing a working
+ * implementation adds a risk without closing a gap.
  *
  * Providers install through `require` rather than a top-level import so that
- * a capability the runtime already supplies is never overwritten: a
- * side-effecting import would patch the global before anything could ask
- * whether it needed patching.
+ * a facility the runtime already supplies is never overwritten: a
+ * side-effecting import patches the global before anything can ask whether it
+ * needed patching.
  */
-export interface CapabilityProvider {
-  /** The `CapabilityReport` key this provider closes. */
-  readonly name: keyof Omit<CapabilityReport, 'missing'>
-  readonly install: (scope: object) => void
+export type InstallOutcome =
+  { readonly ok: true } | { readonly ok: false; readonly reason: string }
+
+export interface GapProvider {
+  readonly name: RuntimeGapName
+  readonly install: (globals: object) => InstallOutcome
 }
 
 export interface PolyfillReport {
-  /** Capabilities that were missing, and now work. */
-  readonly installed: readonly string[]
-  /** Capabilities the runtime already supplied. */
-  readonly alreadyPresent: readonly string[]
-  /** Capabilities that still fail. Anything here is a defect, not a state. */
-  readonly stillMissing: readonly string[]
+  /** Gaps that were open, and are now closed. */
+  readonly installed: readonly RuntimeGapName[]
+  /** Facilities the runtime already supplied. */
+  readonly alreadyPresent: readonly RuntimeGapName[]
+  /** Gaps that remain, with why. Anything here is a defect, not a state. */
+  readonly stillMissing: readonly {
+    readonly name: RuntimeGapName
+    readonly reason: string
+  }[]
 }
 
-export function installMissingCapabilities(
-  scope: object,
-  providers: readonly CapabilityProvider[],
+export function ensureRuntimeGapsClosed(
+  globals: object,
+  providers: readonly GapProvider[],
 ): PolyfillReport {
-  const before = computeCapabilityReport(scope)
-  const alreadyPresent = Object.entries(before)
-    .filter(([name, ok]) => name !== 'missing' && ok === true)
-    .map(([name]) => name)
+  const before = computeRuntimeGapReport(globals)
+  const failures = new Map<RuntimeGapName, string>()
 
   for (const provider of providers) {
     if (!before.missing.includes(provider.name)) {
       continue
     }
-    try {
-      provider.install(scope)
-    } catch {
-      // Left for the report below: a provider that could not run leaves its
-      // capability missing, which is what the caller has to know.
+    const outcome = provider.install(globals)
+    if (!outcome.ok) {
+      failures.set(provider.name, outcome.reason)
     }
   }
 
-  const after = computeCapabilityReport(scope)
-  const installed = before.missing.filter(name => !after.missing.includes(name))
+  const after = computeRuntimeGapReport(globals)
 
-  return { installed, alreadyPresent, stillMissing: after.missing }
+  return {
+    installed: before.missing.filter(name => !after.missing.includes(name)),
+    alreadyPresent: (Object.keys(before.working) as RuntimeGapName[]).filter(
+      name => before.working[name],
+    ),
+    stillMissing: after.missing.map(name => ({
+      name,
+      reason: failures.get(name) ?? 'no provider closes this gap',
+    })),
+  }
+}
+
+function guarded(
+  install: (globals: object) => void,
+): (globals: object) => InstallOutcome {
+  return globals => {
+    try {
+      install(globals)
+      return { ok: true }
+    } catch (cause: unknown) {
+      return { ok: false, reason: getErrorMessage(cause) }
+    }
+  }
 }
 
 /** The providers for the two gaps React Native 0.87.1 actually leaves open. */
-export const REACT_NATIVE_PROVIDERS: readonly CapabilityProvider[] = [
+export const REACT_NATIVE_PROVIDERS: readonly GapProvider[] = [
   {
     // Patches globalThis.crypto on load. matrix-js-sdk reaches for it inside
     // createClient, before any request is made, so without this the client
     // cannot be constructed at all.
     name: 'getRandomValues',
-    install: () => {
+    install: guarded(() => {
       require('react-native-get-random-values')
-    },
+    }),
   },
   {
     // Only the decoder is taken. The package also exports a TextEncoder, and
     // assigning it would replace one that already passes its check.
     name: 'textDecoder',
-    install: scope => {
-      const { TextDecoder } = require('text-encoding-polyfill')
-      ;(scope as { TextDecoder?: unknown }).TextDecoder = TextDecoder
-    },
+    install: guarded(globals => {
+      const polyfill = require('text-encoding-polyfill') as {
+        TextDecoder: unknown
+      }
+      ;(globals as { TextDecoder?: unknown }).TextDecoder = polyfill.TextDecoder
+    }),
   },
 ]

@@ -1,4 +1,4 @@
-import { installMissingCapabilities, REACT_NATIVE_PROVIDERS } from './polyfills'
+import { ensureRuntimeGapsClosed, REACT_NATIVE_PROVIDERS } from './polyfills'
 
 /**
  * Runs before anything that needs a patched runtime.
@@ -7,7 +7,7 @@ import { installMissingCapabilities, REACT_NATIVE_PROVIDERS } from './polyfills'
  * itself, because matrix-js-sdk reaches for `crypto.getRandomValues` inside
  * `createClient` and would fail on a runtime that had not been patched yet.
  */
-export const polyfillReport = installMissingCapabilities(
+export const polyfillReport = ensureRuntimeGapsClosed(
   globalThis,
   REACT_NATIVE_PROVIDERS,
 )

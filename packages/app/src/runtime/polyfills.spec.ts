@@ -1,75 +1,63 @@
 import { describe, expect, it, vi } from 'vitest'
 
-import {
-  installMissingCapabilities,
-  type CapabilityProvider,
-} from './polyfills'
+import { ensureRuntimeGapsClosed, type GapProvider } from './polyfills'
 
-const provider = (
-  name: string,
-  install: (scope: never) => void,
-): CapabilityProvider => ({ name, install }) as CapabilityProvider
+const workingDecoder = class {
+  decode(): string {
+    return 'é'
+  }
+}
 
-describe('installMissingCapabilities', () => {
-  it('installs a provider whose capability is absent', () => {
-    const scope: Record<string, unknown> = {}
-    const report = installMissingCapabilities(scope, [
-      provider('textDecoder', s => {
-        ;(s as Record<string, unknown>).TextDecoder = class {
-          decode(): string {
-            return 'é'
-          }
-        }
+function decoderProvider(install: GapProvider['install']): GapProvider {
+  return { name: 'textDecoder', install }
+}
+
+describe('ensureRuntimeGapsClosed', () => {
+  it('installs a provider whose gap is open', () => {
+    const globals: Record<string, unknown> = {}
+    const report = ensureRuntimeGapsClosed(globals, [
+      decoderProvider(g => {
+        ;(g as Record<string, unknown>).TextDecoder = workingDecoder
+        return { ok: true }
       }),
     ])
     expect(report.installed).toEqual(['textDecoder'])
-    expect(scope.TextDecoder).toBeDefined()
+    expect(globals.TextDecoder).toBeDefined()
   })
 
-  it('leaves a working capability alone', () => {
+  it('leaves a working facility alone', () => {
     const install = vi.fn()
-    const scope = {
-      TextDecoder: class {
-        decode(): string {
-          return 'é'
-        }
-      },
-    }
-    const report = installMissingCapabilities(scope, [
-      provider('textDecoder', install),
+    const report = ensureRuntimeGapsClosed({ TextDecoder: workingDecoder }, [
+      decoderProvider(install),
     ])
     expect(install).not.toHaveBeenCalled()
     expect(report.installed).toEqual([])
     expect(report.alreadyPresent).toContain('textDecoder')
   })
 
-  it('reports a capability that is still missing after its provider ran', () => {
-    const scope: Record<string, unknown> = {}
-    const report = installMissingCapabilities(scope, [
-      provider('textDecoder', () => {}),
+  it('carries the reason a provider gave for failing', () => {
+    const report = ensureRuntimeGapsClosed({}, [
+      decoderProvider(() => ({ ok: false, reason: 'no module' })),
+    ])
+    expect(report.stillMissing).toContainEqual({
+      name: 'textDecoder',
+      reason: 'no module',
+    })
+  })
+
+  it('reports a provider that ran without closing its gap', () => {
+    const report = ensureRuntimeGapsClosed({}, [
+      decoderProvider(() => ({ ok: true })),
     ])
     expect(report.installed).toEqual([])
-    expect(report.stillMissing).toContain('textDecoder')
+    expect(report.stillMissing.map(g => g.name)).toContain('textDecoder')
   })
 
-  it('reports a provider that throws as still missing rather than propagating', () => {
-    const scope: Record<string, unknown> = {}
-    expect(() =>
-      installMissingCapabilities(scope, [
-        provider('textDecoder', () => {
-          throw new Error('no module')
-        }),
-      ]),
-    ).not.toThrow()
-    expect(installMissingCapabilities(scope, []).stillMissing).toContain(
-      'textDecoder',
-    )
-  })
-
-  it('reports capabilities no provider covers as still missing', () => {
-    const report = installMissingCapabilities({}, [])
-    expect(report.stillMissing).toContain('getRandomValues')
-    expect(report.stillMissing).toContain('url')
-    expect(report.installed).toEqual([])
+  it('says plainly when no provider covers a gap', () => {
+    const report = ensureRuntimeGapsClosed({}, [])
+    expect(report.stillMissing).toContainEqual({
+      name: 'url',
+      reason: 'no provider closes this gap',
+    })
   })
 })

@@ -1,30 +1,37 @@
 /**
- * Which of the runtime capabilities matrix-js-sdk needs actually work.
+ * Which of the runtime facilities matrix-js-sdk needs actually work.
+ *
+ * Named for gaps rather than capabilities: in this product a capability is a
+ * scoped permission held by a participant, and reusing the word for
+ * `TextDecoder` would put two meanings on one term. See CONTEXT.md.
  *
  * Behaviour rather than presence. React Native ships a `URL` that is a
- * regular-expression shim rather than an implementation, so `typeof URL ===
- * 'function'` is true while the object it builds is wrong. A probe that only
- * counted names would report that gap closed and let the polyfill layer be
- * written against an assumption instead of a measurement.
+ * regular-expression shim, so `typeof URL === 'function'` is true while the
+ * object it builds may be wrong. A probe that only counted names would report
+ * a gap closed and let the polyfill layer be written against an assumption
+ * instead of a measurement.
  *
  * Every check is exercised against a value whose correct answer is known, and
- * every one is guarded: a capability that throws is a capability that is
- * missing, which is precisely what the caller needs to know.
+ * every one is guarded: a facility that throws is a facility that is missing,
+ * which is what the caller needs to know.
  */
-export interface CapabilityReport {
-  readonly getRandomValues: boolean
-  readonly promiseWithResolvers: boolean
-  readonly textEncoder: boolean
-  readonly textDecoder: boolean
-  readonly url: boolean
-  readonly urlSearchParams: boolean
-  /** The names above that failed, in declaration order. */
-  readonly missing: readonly string[]
+export type RuntimeGapName =
+  | 'getRandomValues'
+  | 'promiseWithResolvers'
+  | 'textEncoder'
+  | 'textDecoder'
+  | 'url'
+  | 'urlSearchParams'
+
+export interface RuntimeGapReport {
+  readonly working: Readonly<Record<RuntimeGapName, boolean>>
+  /** The facilities that failed, in declaration order. */
+  readonly missing: readonly RuntimeGapName[]
 }
 
 type Check = () => boolean
 
-const attempt = (check: Check): boolean => {
+function attempt(check: Check): boolean {
   try {
     return check()
   } catch {
@@ -43,15 +50,15 @@ interface Candidates {
   readonly URLSearchParams?: new (q: string) => { get: (k: string) => unknown }
 }
 
-export function computeCapabilityReport(
-  scope: object = globalThis,
-): CapabilityReport {
-  const g = scope as Candidates
+export function computeRuntimeGapReport(
+  globals: object = globalThis,
+): RuntimeGapReport {
+  const g = globals as Candidates
 
-  const checks: Readonly<Record<string, Check>> = {
+  const checks: Readonly<Record<RuntimeGapName, Check>> = {
     // Filling must actually happen. A stub returning the array untouched
-    // leaves it all zeroes, which is the one outcome a random source must
-    // never produce for sixteen bytes.
+    // leaves it all zeroes, the one outcome a random source must never
+    // produce for sixteen bytes.
     getRandomValues: () => {
       const filled = g.crypto?.getRandomValues?.(new Uint8Array(16))
       return filled != null && filled.some(byte => byte !== 0)
@@ -69,8 +76,8 @@ export function computeCapabilityReport(
       )
     },
 
-    // A multi-byte character, so that a single-byte-per-character
-    // implementation fails rather than passing on ASCII.
+    // A multi-byte character, so that a one-byte-per-character implementation
+    // fails rather than passing on ASCII.
     textEncoder: () => {
       const bytes =
         g.TextEncoder != null ? new g.TextEncoder().encode('é') : null
@@ -103,13 +110,13 @@ export function computeCapabilityReport(
       new g.URLSearchParams('x=1&y=2').get('y') === '2',
   }
 
-  const found = Object.fromEntries(
-    Object.entries(checks).map(([name, check]) => [name, attempt(check)]),
-  ) as Omit<CapabilityReport, 'missing'>
+  const entries = Object.entries(checks) as [RuntimeGapName, Check][]
+  const working = Object.fromEntries(
+    entries.map(([name, check]) => [name, attempt(check)]),
+  ) as Record<RuntimeGapName, boolean>
 
-  const missing = Object.entries(found)
-    .filter(([, ok]) => !ok)
-    .map(([name]) => name)
-
-  return { ...found, missing }
+  return {
+    working,
+    missing: entries.map(([name]) => name).filter(name => !working[name]),
+  }
 }
