@@ -64,8 +64,9 @@ react {
     // three others: `root` is also where the plugin looks for the entry file
     // (index.js lives in packages/app, not at the monorepo root), the working
     // directory it runs the bundler from, and the file tree it scans to decide
-    // whether the bundle is up to date -- which at the monorepo root means
-    // scanning node_modules. Naming hermesc directly is the narrow fix.
+    // whether the bundle is up to date -- which at the monorepo root would
+    // sweep every sibling workspace package (node_modules itself the task
+    // already excludes). Naming hermesc directly is the narrow fix.
     //
     // The path is derived by the same upward walk every other path in this
     // build uses (gradle.ext.nodeModules, settings.gradle), so it holds
