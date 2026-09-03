@@ -1,0 +1,56 @@
+import { describe, expect, it } from 'vitest'
+
+import { createTransportClient } from './transportClient'
+
+const workingClient = {
+  getCrypto: () => undefined,
+  getHomeserverUrl: () => 'https://homeserver.invalid',
+}
+
+describe('createTransportClient', () => {
+  it('reports the homeserver when the client is built with no crypto', () => {
+    expect(
+      createTransportClient(() => workingClient, 'https://homeserver.invalid'),
+    ).toEqual({ created: true, homeserver: 'https://homeserver.invalid' })
+  })
+
+  it('refuses a client that already carries a crypto backend', () => {
+    // ADR-0001 allows exactly one crypto implementation in the binary, and it
+    // is the native bridge. A transport that initialised its own would be a
+    // second one, so this is a refusal rather than a warning.
+    const status = createTransportClient(
+      () => ({ ...workingClient, getCrypto: () => ({ name: 'rust-crypto' }) }),
+      'https://homeserver.invalid',
+    )
+    expect(status).toEqual({
+      created: false,
+      reason: 'the transport initialised its own crypto backend',
+    })
+  })
+
+  it('carries the reason when the factory throws', () => {
+    const status = createTransportClient(() => {
+      throw new Error('crypto.getRandomValues is not a function')
+    }, 'https://homeserver.invalid')
+    expect(status).toEqual({
+      created: false,
+      reason: 'crypto.getRandomValues is not a function',
+    })
+  })
+
+  it('survives a factory that rejects with something that is not an Error', () => {
+    const status = createTransportClient(() => {
+      throw 'nope'
+    }, 'https://homeserver.invalid')
+    expect(status.created).toBe(false)
+  })
+
+  it('passes the base url the caller asked for', () => {
+    let seen = ''
+    createTransportClient(opts => {
+      seen = opts.baseUrl
+      return workingClient
+    }, 'https://elsewhere.invalid')
+    expect(seen).toBe('https://elsewhere.invalid')
+  })
+})
