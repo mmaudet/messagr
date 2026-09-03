@@ -25,5 +25,7 @@
     "strict": true
   },
   "include": ["**/*.ts", "**/*.tsx"],
-  "exclude": ["**/node_modules", "**/Pods", "**/vendor"]
+  // e2e is excluded here and typechecked by its own config: it runs under
+  // Jest and needs types this project deliberately does not carry.
+  "exclude": ["**/node_modules", "**/Pods", "**/vendor", "e2e"]
 }
