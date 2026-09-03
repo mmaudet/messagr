@@ -96,9 +96,9 @@ jobs:
             # The bundle is written into the APK rather than served, so no dev
             # server runs here. A backgrounded Metro would hold this step open
             # after the last command, and nothing would stop it.
-            npx react-native bundle --platform android --dev false \
-              --entry-file index.js \
-              --bundle-output android/app/src/main/assets/index.android.bundle \
-              --assets-dest android/app/src/main/res
+            # git does not track an empty directory, so the bundle's
+            # destination does not exist on a fresh checkout.
+            mkdir -p android/app/src/main/assets
+            npx react-native bundle --platform android --dev false --entry-file index.js --bundle-output android/app/src/main/assets/index.android.bundle --assets-dest android/app/src/main/res
             npx detox build --configuration android.emu.debug
             npx detox test --configuration android.emu.debug
