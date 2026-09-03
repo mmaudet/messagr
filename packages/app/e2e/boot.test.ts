@@ -73,4 +73,18 @@ describe('boot', () => {
     await detoxExpect(element(by.id('session-sync-duration'))).toBeVisible()
     await detoxExpect(element(by.text('cold-start sync: —'))).not.toBeVisible()
   })
+
+  it("publishes this device's identity and one-time keys", async () => {
+    // Runs after the session sync above, not concurrently with it: the pump
+    // only starts once that sync has landed (App.tsx), so this waits on the
+    // same network dependency the previous test already resolved, plus the
+    // pump's own round trips (a drain, a raw sync fetch, a second drain, and
+    // an independent /keys/query verifying what the drains actually sent).
+    await waitFor(element(by.text('device keys published: true')))
+      .toBeVisible()
+      .withTimeout(30000)
+    await detoxExpect(
+      element(by.text('one-time keys published: true')),
+    ).toBeVisible()
+  })
 })
