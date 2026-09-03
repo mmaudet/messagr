@@ -19,3 +19,30 @@ buildscript {
 }
 
 apply plugin: "com.facebook.react.rootproject"
+
+// Detox publishes its Android artifact inside the npm package rather than to
+// a public repository, so the build has to be told where it landed. Resolved
+// by walking up for node_modules, the same way settings.gradle finds the
+// React Native Gradle plugin, because yarn hoists it to the workspace root
+// and the path the Detox documentation gives assumes it did not.
+allprojects {
+    repositories {
+        maven {
+            url {
+                def found = null
+                def dir = rootDir
+                while (dir != null && found == null) {
+                    def candidate = new File(dir, 'node_modules/detox/Detox-android')
+                    if (candidate.isDirectory()) {
+                        found = candidate
+                    }
+                    dir = dir.parentFile
+                }
+                if (found == null) {
+                    throw new GradleException('detox/Detox-android not found in any node_modules above ' + rootDir)
+                }
+                found
+            }
+        }
+    }
+}
