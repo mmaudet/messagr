@@ -27,7 +27,9 @@ import { computeCryptoMachineConfig } from './cryptoMachineConfig'
 import type { DeviceIdentity } from './deviceIdentity'
 import { encryptAndSendOneMessage, type SendReport } from './encryptAndSend'
 import { getErrorMessage } from './errors'
+import { fetchJoinedRooms } from './encryptedSend'
 import { makePumpHttp } from './pump'
+import { receiveAndDecrypt, type ReceiveReport } from './receiveDecrypt'
 import {
   runOutgoingPumpCycle,
   type CryptoPumpReport,
@@ -36,6 +38,7 @@ import { makeToDeviceSource, subscribeToDeviceMessages } from './toDeviceBridge'
 
 export type { CryptoPumpReport } from './outgoingPumpCycle'
 export type { SendReport } from './encryptAndSend'
+export type { ReceiveReport } from './receiveDecrypt'
 
 export type MachineStartResult =
   | { readonly started: true; readonly unsubscribeToDevice: () => void }
@@ -143,4 +146,51 @@ export async function sendOneEncryptedMessage(
     },
     identity,
   )
+}
+
+/**
+ * Phase four: reads an encrypted event somebody else put in the room and
+ * shows what it says.
+ *
+ * Nothing here touches matrix-js-sdk's `MatrixEvent.attemptDecryption`, the
+ * internal API ADR-0001 named as this design's largest exposure. It is not
+ * needed: the event is read raw out of a raw sync and decrypted through the
+ * bridge, because this application renders its own screen rather than the
+ * SDK's timeline model. See receiveDecrypt.ts for what that does and does
+ * not settle.
+ */
+export async function receiveOneEncryptedMessage(
+  sessionClient: ReturnType<typeof createClient>,
+  identity: DeviceIdentity,
+  roomId: string,
+): Promise<ReceiveReport> {
+  return receiveAndDecrypt(
+    {
+      http: makePumpHttp(sessionClient),
+      machine: {
+        receiveSyncChanges,
+        decryptEvent: (scope, rawEvent) =>
+          decryptEvent(asCryptoScopeId(scope), rawEvent),
+      },
+      decodeUtf8: bytes => new TextDecoder().decode(bytes),
+      // A real pause on a device, where the far side may still be sending.
+      waitBetweenRounds: () =>
+        new Promise(resolve => setTimeout(resolve, 2000)),
+    },
+    roomId,
+    identity.userId,
+  )
+}
+
+/**
+ * The room to read from when this run's own send did not resolve one.
+ *
+ * `null` rather than a throw: an account in no room has nothing to receive,
+ * which is a state to report, not a failure.
+ */
+export async function firstJoinedRoom(
+  sessionClient: ReturnType<typeof createClient>,
+): Promise<string | null> {
+  const rooms = await fetchJoinedRooms(makePumpHttp(sessionClient))
+  return rooms[0] ?? null
 }
