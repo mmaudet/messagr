@@ -43,7 +43,13 @@ import os
 import sys
 from pathlib import Path
 
-from nio import AsyncClient, AsyncClientConfig, LoginResponse, RoomMessageText
+from nio import (
+    AsyncClient,
+    AsyncClientConfig,
+    LoginResponse,
+    MegolmEvent,
+    RoomMessageText,
+)
 
 # What the application sends. Kept in one place on each side; if this ever
 # disagrees with the application's own constant, the test fails loudly rather
@@ -127,7 +133,22 @@ async def login(session_file: Path, store: Path) -> int:
 
 
 async def collect(session_file: Path, store: Path) -> int:
-    """Resume the same device and read what the application sent."""
+    """Resume the same device and read what the application sent.
+
+    Two things here are not obvious and both are taken from the crypto
+    library's own counterparty, which is known to work.
+
+    The events are read from the **sync response**, not from the room object:
+    nio's `MatrixRoom` has no timeline attribute at all, and a loop over one
+    finds nothing forever.
+
+    An event that is still a `MegolmEvent` after the sync that carried it is
+    retried on every later round, because the room key can arrive in a later
+    sync than the message it unlocks, and a sync token only advances
+    forwards: an event consumed by one round is never offered again. Without
+    the retry, a key that is merely late is indistinguishable from one that
+    never came.
+    """
     homeserver = env("MESSAGR_INTEROP_HOMESERVER")
     room_id = env("MESSAGR_INTEROP_ROOM")
     sender = env("MESSAGR_INTEROP_SENDER")
@@ -142,37 +163,69 @@ async def collect(session_file: Path, store: Path) -> int:
             device_id=session["device_id"],
             access_token=session["access_token"],
         )
-        client.load_store()
 
-        # Synced in a loop rather than once: the room key arrives as a
-        # to-device message and the event as room timeline, and nothing
-        # promises they land in the same sync.
+        pending = {}
+        reasons = {}
+        decrypted_bodies = []
         deadline = asyncio.get_event_loop().time() + COLLECT_DEADLINE_SECONDS
+
         while asyncio.get_event_loop().time() < deadline:
-            await client.sync(timeout=SYNC_TIMEOUT_MS, full_state=True)
+            response = await client.sync(timeout=SYNC_TIMEOUT_MS, full_state=False)
 
-            room = client.rooms.get(room_id)
-            if room is not None:
-                for event in reversed(getattr(room, "timeline", []) or []):
-                    if (
-                        isinstance(event, RoomMessageText)
-                        and event.sender == sender
-                        and event.body == EXPECTED_BODY
-                    ):
-                        print(
-                            "OK: the counterparty decrypted the application's "
-                            f"message ({event.event_id})"
-                        )
-                        return 0
+            rooms = getattr(response, "rooms", None)
+            if rooms is not None and room_id in rooms.join:
+                for event in rooms.join[room_id].timeline.events:
+                    if getattr(event, "sender", None) != sender:
+                        continue
+                    if isinstance(event, MegolmEvent):
+                        pending[event.event_id] = event
+                    elif isinstance(event, RoomMessageText):
+                        decrypted_bodies.append(event.body)
 
-        print(
-            "FAIL: nothing this counterparty could decrypt arrived from "
-            f"{sender} in {room_id} within {COLLECT_DEADLINE_SECONDS}s.\n"
-            "      An encrypted event that stayed encrypted here means the "
-            "room key never reached this device;\n"
-            "      no event at all means the application did not send.",
-            file=sys.stderr,
-        )
+            for event_id, event in list(pending.items()):
+                try:
+                    plain = client.decrypt_event(event)
+                except Exception as error:  # noqa: BLE001 -- reported, not handled
+                    reasons[event_id] = f"{type(error).__name__}: {error}"
+                    continue
+                pending.pop(event_id)
+                if isinstance(plain, RoomMessageText):
+                    decrypted_bodies.append(plain.body)
+
+            # Decryption first, body second, and reported apart. A body that
+            # drifted from the application's own constant is a different
+            # failure from a key that never arrived, and saying so is the
+            # difference between fixing a string and hunting a protocol bug.
+            if decrypted_bodies:
+                if EXPECTED_BODY in decrypted_bodies:
+                    print(
+                        "OK: the counterparty decrypted the application's message"
+                    )
+                    return 0
+                print(
+                    "FAIL: decryption worked, but no message said what was "
+                    f"expected.\n      expected: {EXPECTED_BODY!r}\n"
+                    f"      decrypted: {decrypted_bodies!r}\n"
+                    "      The two sides' message constants have drifted; the "
+                    "cryptography is fine.",
+                    file=sys.stderr,
+                )
+                return 1
+
+        if pending:
+            print(
+                f"FAIL: {len(pending)} event(s) from {sender} stayed encrypted "
+                f"for {COLLECT_DEADLINE_SECONDS}s.\n"
+                f"      The room key never reached this device.\n"
+                f"      last errors: {reasons}",
+                file=sys.stderr,
+            )
+        else:
+            print(
+                f"FAIL: nothing from {sender} arrived in {room_id} within "
+                f"{COLLECT_DEADLINE_SECONDS}s. The application did not send.",
+                file=sys.stderr,
+            )
         return 1
     finally:
         await client.close()

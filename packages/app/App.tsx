@@ -261,6 +261,12 @@ export function App({
           <Text testID="send-status" style={styles.line}>
             {computeSendLabel(send)}
           </Text>
+          <Text testID="send-event" style={styles.line}>
+            {computeSendEventLabel(send)}
+          </Text>
+          <Text testID="send-control" style={styles.line}>
+            {computeControlLabel(send)}
+          </Text>
           <Text testID="send-tamper" style={styles.line}>
             {computeTamperLabel(send)}
           </Text>
@@ -324,16 +330,43 @@ function computeEngineLabel(report: HermesReport): string {
     : `engine: Hermes ${report.version}`
 }
 
+/**
+ * Deliberately a fixed string in the case that matters. Detox matches on
+ * rendered text (see e2e/boot.test.ts on why not testIDs), so a verdict that
+ * embedded the event id would be unassertable: the homeserver mints a
+ * different one every run. The id goes on its own line below.
+ */
 function computeSendLabel(status: SendReport | 'not-run' | null): string {
   if (status === null) {
-    return 'probing'
+    return 'encrypted send: probing'
   }
   if (status === 'not-run') {
-    return 'not run'
+    return 'encrypted send: not run'
   }
   return status.sent
-    ? `sent ${status.eventId} to ${status.roomId}`
-    : `not sent: ${status.reason}`
+    ? 'encrypted send: sent'
+    : `encrypted send: not sent (${status.reason})`
+}
+
+function computeSendEventLabel(status: SendReport | 'not-run' | null): string {
+  if (status === null || status === 'not-run' || !status.sent) {
+    return 'event: —'
+  }
+  return `event: ${status.eventId} in ${status.roomId}`
+}
+
+/**
+ * The positive control, and the line below is worth nothing without it: a
+ * machine that cannot decrypt anything refuses a tampered ciphertext for a
+ * reason that has nothing to do with the tampering.
+ */
+function computeControlLabel(status: SendReport | 'not-run' | null): string {
+  if (status === null || status === 'not-run' || !status.sent) {
+    return 'intact ciphertext: —'
+  }
+  return status.intactDecrypted
+    ? 'intact ciphertext: decrypted'
+    : 'intact ciphertext: NOT decrypted'
 }
 
 function computeTamperLabel(status: SendReport | 'not-run' | null): string {
@@ -343,7 +376,10 @@ function computeTamperLabel(status: SendReport | 'not-run' | null): string {
   // The word this line exists for is "refused". A product that encrypts
   // correctly and accepts anything on the way back has built an expensive
   // encoding, and nothing on this screen would otherwise say so.
-  return status.tamperRefused
+  if (status.tamper === 'not-attempted') {
+    return 'tampered ciphertext: not attempted'
+  }
+  return status.tamper === 'refused'
     ? 'tampered ciphertext: refused'
     : 'tampered ciphertext: ACCEPTED'
 }

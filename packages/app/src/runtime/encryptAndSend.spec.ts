@@ -80,7 +80,8 @@ describe('encryptAndSendOneMessage', () => {
       sent: true,
       roomId: ROOM,
       eventId: '$sent:example.org',
-      tamperRefused: true,
+      intactDecrypted: false,
+      tamper: 'refused',
     })
     expect(http.calls.map(call => call.path)).toContain(
       `/_matrix/client/v3/rooms/${encodeURIComponent(ROOM)}/send/m.room.encrypted/txn-1`,
@@ -140,10 +141,50 @@ describe('encryptAndSendOneMessage', () => {
       IDENTITY,
     )
     expect(report.sent).toBe(true)
-    if (report.sent) expect(report.tamperRefused).toBe(false)
+    if (report.sent) expect(report.tamper).toBe('accepted')
   })
 
-  it('offers the machine a tampered copy, never sending it anywhere', async () => {
+  it('reports the intact ciphertext as the control, separately from the tampered one', async () => {
+    // The machine decrypts what it recognises and refuses what it does not,
+    // which is the only combination that says anything about the tampering.
+    const machine = fakeMachine({
+      decryptEvent: async (_scope, rawEvent) => {
+        const content = (rawEvent as { content: { ciphertext: string } })
+          .content
+        if (content.ciphertext !== 'AwgAEnoriginal') {
+          throw new Error('unable to decrypt')
+        }
+        return {}
+      },
+    })
+    const report = await encryptAndSendOneMessage(
+      deps(fakeHttp(), machine),
+      IDENTITY,
+    )
+    expect(report.sent).toBe(true)
+    if (report.sent) {
+      expect(report.intactDecrypted).toBe(true)
+      expect(report.tamper).toBe('refused')
+    }
+  })
+
+  it('joins a room it has only been invited to, rather than reporting nothing to send to', async () => {
+    const http = fakeHttp({
+      '/_matrix/client/v3/joined_rooms': '{}',
+      '/_matrix/client/v3/sync': `{"rooms":{"invite":{"${ROOM}":{}}}}`,
+      [`/_matrix/client/v3/join/${encodeURIComponent(ROOM)}`]: `{"room_id":"${ROOM}"}`,
+    })
+    const report = await encryptAndSendOneMessage(
+      deps(http, fakeMachine()),
+      IDENTITY,
+    )
+    expect(report.sent).toBe(true)
+    expect(http.calls.map(call => call.path)).toContain(
+      `/_matrix/client/v3/join/${encodeURIComponent(ROOM)}`,
+    )
+  })
+
+  it('offers the machine both copies locally, never sending either anywhere', async () => {
     const decryptEvent = vi.fn(async () => {
       throw new Error('unable to decrypt')
     })
@@ -152,7 +193,9 @@ describe('encryptAndSendOneMessage', () => {
       deps(http, fakeMachine({ decryptEvent })),
       IDENTITY,
     )
-    expect(decryptEvent).toHaveBeenCalledOnce()
+    // Twice: the intact control, then the tampered copy. Neither leaves the
+    // device, and the single PUT is the real message.
+    expect(decryptEvent).toHaveBeenCalledTimes(2)
     const sends = http.calls.filter(call => call.method === 'PUT')
     expect(sends).toHaveLength(1)
   })
@@ -165,7 +208,7 @@ describe('encryptAndSendOneMessage', () => {
     )
     expect(report).toEqual({
       sent: false,
-      reason: 'this account has joined no room to send to',
+      reason: 'this account is in no room, joined or invited',
     })
   })
 

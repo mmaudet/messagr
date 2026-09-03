@@ -46,6 +46,61 @@ export async function fetchJoinedRooms(
   return rooms.filter((room): room is string => typeof room === 'string')
 }
 
+interface SyncInvitesResponse {
+  rooms?: { invite?: Record<string, unknown> }
+}
+
+/**
+ * The rooms this account has been invited to but has not joined.
+ *
+ * Provisioning invites this account rather than joining it, and an invited
+ * room is not a joined one: `/joined_rooms` does not list it, and nothing can
+ * be sent to it. Read from a raw non-blocking sync, the same escape hatch the
+ * pump's own workaround uses, because no public accessor offers invites back
+ * either once the SDK's loop has stopped.
+ */
+export async function fetchInvitedRooms(
+  http: HttpRequester,
+): Promise<readonly string[]> {
+  const responseJson = await http.authedRequest(
+    'GET',
+    '/_matrix/client/v3/sync',
+    { timeout: '0' },
+    undefined,
+  )
+  const response = JSON.parse(responseJson) as SyncInvitesResponse
+  const invited = response.rooms?.invite
+
+  if (invited === null || typeof invited !== 'object') {
+    return []
+  }
+  return Object.keys(invited)
+}
+
+/**
+ * Joins a room, and answers with the id the server confirms.
+ *
+ * Joining a room already joined is not an error, so this needs no prior
+ * check: the server answers with the same room id either way.
+ */
+export async function joinRoom(
+  http: HttpRequester,
+  roomId: string,
+): Promise<string> {
+  const responseJson = await http.authedRequest(
+    'POST',
+    `/_matrix/client/v3/join/${encodeURIComponent(roomId)}`,
+    {},
+    '{}',
+  )
+  const response = JSON.parse(responseJson) as { room_id?: unknown }
+
+  if (typeof response.room_id !== 'string') {
+    throw new Error(`the homeserver did not confirm joining ${roomId}`)
+  }
+  return response.room_id
+}
+
 interface JoinedMembersResponse {
   joined?: Record<string, unknown>
 }
