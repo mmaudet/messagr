@@ -13,7 +13,16 @@ import { logEvent } from './src/runtime/log'
 import { polyfillReport } from './src/runtime/bootstrap'
 import { computeRuntimeGapReport } from './src/runtime/runtimeGaps'
 import { computeNewArchitectureReport } from './src/runtime/newArchitecture'
-import { computeTransportStatus } from './src/runtime/transportStatus'
+import { computeSessionCredentials } from './src/runtime/sessionCredentials'
+import {
+  fetchSessionSyncStatus,
+  makeSyncClient,
+  type SessionSyncStatus,
+} from './src/runtime/sessionSync'
+import {
+  computeTransportStatus,
+  type TransportStatus,
+} from './src/runtime/transportStatus'
 
 /**
  * The scaffold's only screen. It exists to answer the two questions this
@@ -35,11 +44,32 @@ export function App(): React.JSX.Element {
     [],
   )
   const [bridge, setBridge] = useState<BridgeStatus | null>(null)
+  // Read once: the four MESSAGR_SESSION_* values are baked into the bundle at
+  // build time (babel.config.js), not read live, so there is nothing here a
+  // dependency array could usefully react to.
+  const credentials = useMemo(() => computeSessionCredentials(), [])
+  const [session, setSession] = useState<
+    SessionSyncStatus | 'not-configured' | null
+  >(null)
 
   useEffect(() => {
     const probeAndReport = async (): Promise<void> => {
       const status = await fetchBridgeStatus(runProbe)
       setBridge(status)
+
+      // No provisioned account: report it rather than attempt a sync that has
+      // nothing to restore. This keeps the screen runnable for a developer
+      // who has not run scripts/provision-bench-accounts.sh.
+      let sessionStatus: SessionSyncStatus | 'not-configured'
+      if (credentials === null) {
+        sessionStatus = 'not-configured'
+      } else {
+        sessionStatus = await fetchSessionSyncStatus(
+          makeSyncClient(createClient(credentials)),
+        )
+      }
+      setSession(sessionStatus)
+
       // Logged as well as rendered. The Android emulator's screencap returns a
       // blank frame regardless of what is on screen, so the log is the only
       // machine-readable evidence there, and it is what the Detox harness will
@@ -50,13 +80,22 @@ export function App(): React.JSX.Element {
         gaps,
         polyfills: polyfillReport,
         client,
+        session: sessionStatus,
       })
     }
 
     probeAndReport().catch((cause: unknown) => {
       logEvent('error', 'MESSAGR_RUNTIME_FAILED', { reason: String(cause) })
     })
-  }, [architecture, gaps, client])
+  }, [architecture, gaps, client, credentials])
+
+  // The synced case computed once rather than repeated at each of its two
+  // uses below: narrowing `session` inline in both the status and the
+  // duration text was the same three-part guard written out twice.
+  const synced =
+    session !== null && session !== 'not-configured' && session.synced
+      ? session
+      : null
 
   return (
     <SafeAreaProvider>
@@ -94,25 +133,72 @@ export function App(): React.JSX.Element {
         <View style={styles.block}>
           <Text style={styles.heading}>Matrix transport</Text>
           <Text testID="client-status" style={styles.line}>
-            {client.created
-              ? `client created, ${client.homeserver}`
-              : `not created: ${client.reason}`}
+            {computeTransportLabel(client)}
+          </Text>
+        </View>
+
+        <View style={styles.block}>
+          <Text style={styles.heading}>Session sync</Text>
+          <Text testID="session-status" style={styles.line}>
+            {computeSessionLabel(session)}
+          </Text>
+          <Text testID="session-sync-duration" style={styles.line}>
+            {computeSyncDurationLabel(synced)}
           </Text>
         </View>
 
         <View style={styles.block}>
           <Text style={styles.heading}>Crypto bridge</Text>
           <Text testID="bridge-status" style={styles.line}>
-            {bridge === null
-              ? 'probing'
-              : bridge.loaded
-                ? `loaded, core ${bridge.coreVersion}`
-                : `absent: ${bridge.reason}`}
+            {computeBridgeLabel(bridge)}
           </Text>
         </View>
       </SafeAreaView>
     </SafeAreaProvider>
   )
+}
+
+// One small label function per probe, named `compute…` to match this
+// module's own idiom (computeTransportStatus, computeSessionCredentials):
+// each is a pure derivation from a status already held in state, not a
+// generic formatter forcing three differently-shaped probes through one
+// abstraction.
+
+function computeTransportLabel(status: TransportStatus): string {
+  return status.created
+    ? `client created, ${status.homeserver}`
+    : `not created: ${status.reason}`
+}
+
+function computeSessionLabel(
+  status: SessionSyncStatus | 'not-configured' | null,
+): string {
+  if (status === null) {
+    return 'probing'
+  }
+  if (status === 'not-configured') {
+    return 'not configured: set MESSAGR_SESSION_* env vars'
+  }
+  return status.synced
+    ? `synced, ${status.roomCount} room(s)`
+    : `not synced: ${status.reason}`
+}
+
+function computeSyncDurationLabel(
+  synced: Extract<SessionSyncStatus, { synced: true }> | null,
+): string {
+  return synced === null
+    ? 'cold-start sync: —'
+    : `cold-start sync: ${synced.durationMs}ms`
+}
+
+function computeBridgeLabel(status: BridgeStatus | null): string {
+  if (status === null) {
+    return 'probing'
+  }
+  return status.loaded
+    ? `loaded, core ${status.coreVersion}`
+    : `absent: ${status.reason}`
 }
 
 // Values are literal rather than tokenised on purpose: this screen is
