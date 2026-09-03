@@ -11,9 +11,9 @@ import {
 } from './src/runtime/cryptoBridge'
 import { logEvent } from './src/runtime/log'
 import { polyfillReport } from './src/runtime/bootstrap'
-import { computeCapabilityReport } from './src/runtime/capabilities'
+import { computeRuntimeGapReport } from './src/runtime/runtimeGaps'
 import { computeNewArchitectureReport } from './src/runtime/newArchitecture'
-import { createTransportClient } from './src/runtime/transportClient'
+import { computeTransportStatus } from './src/runtime/transportStatus'
 
 /**
  * The scaffold's only screen. It exists to answer the two questions this
@@ -26,12 +26,12 @@ export function App(): React.JSX.Element {
   // would be a new object every time, the effect would re-run, its setState
   // would render again, and the bridge would be probed without end.
   const architecture = useMemo(() => computeNewArchitectureReport(), [])
-  const capabilities = useMemo(() => computeCapabilityReport(), [])
+  const gaps = useMemo(() => computeRuntimeGapReport(), [])
   // No request is made: constructing a client is local. The address is a
   // reserved-TLD placeholder until account provisioning lands, so that a
   // real deployment's address is not carried in a public repository.
   const client = useMemo(
-    () => createTransportClient(createClient, 'https://homeserver.invalid'),
+    () => computeTransportStatus(createClient, 'https://homeserver.invalid'),
     [],
   )
   const [bridge, setBridge] = useState<BridgeStatus | null>(null)
@@ -47,7 +47,7 @@ export function App(): React.JSX.Element {
       logEvent('info', 'MESSAGR_RUNTIME', {
         architecture,
         bridge: status,
-        capabilities,
+        gaps,
         polyfills: polyfillReport,
         client,
       })
@@ -56,7 +56,7 @@ export function App(): React.JSX.Element {
     probeAndReport().catch((cause: unknown) => {
       logEvent('error', 'MESSAGR_RUNTIME_FAILED', { reason: String(cause) })
     })
-  }, [architecture, capabilities, client])
+  }, [architecture, gaps, client])
 
   return (
     <SafeAreaProvider>
@@ -79,10 +79,15 @@ export function App(): React.JSX.Element {
 
         <View style={styles.block}>
           <Text style={styles.heading}>Runtime gaps</Text>
-          <Text testID="capability-gaps" style={styles.line}>
-            {capabilities.missing.length === 0
+          <Text testID="runtime-gaps" style={styles.line}>
+            {gaps.missing.length === 0
               ? 'none'
-              : capabilities.missing.join(', ')}
+              : // The reason, not just the name: a gap that stayed open
+                // because a module would not load reads differently from one
+                // no provider covers, and the difference is what gets fixed.
+                polyfillReport.stillMissing
+                  .map(gap => `${gap.name} (${gap.reason})`)
+                  .join(', ')}
           </Text>
         </View>
 

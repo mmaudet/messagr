@@ -93,7 +93,12 @@ jobs:
           disable-animations: true
           working-directory: packages/app
           script: |
-            npx react-native start --port 8081 &
-            npx wait-on http://localhost:8081/status -t 120000
+            # The bundle is written into the APK rather than served, so no dev
+            # server runs here. A backgrounded Metro would hold this step open
+            # after the last command, and nothing would stop it.
+            npx react-native bundle --platform android --dev false \
+              --entry-file index.js \
+              --bundle-output android/app/src/main/assets/index.android.bundle \
+              --assets-dest android/app/src/main/res
             npx detox build --configuration android.emu.debug
-            npx detox test --configuration android.emu.debug --headless
+            npx detox test --configuration android.emu.debug

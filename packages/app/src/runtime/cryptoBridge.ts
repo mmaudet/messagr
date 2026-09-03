@@ -8,6 +8,8 @@
  * cheapest proof that the whole chain is present, because a stub that merely
  * resolved would pass a call that only checked for the absence of a throw.
  */
+import { getErrorMessage } from './errors'
+
 export type BridgeStatus =
   | { readonly loaded: true; readonly coreVersion: string }
   | { readonly loaded: false; readonly reason: string }
@@ -30,19 +32,19 @@ const PAYLOAD = Uint8Array.from([0x6d, 0x65, 0x73, 0x73, 0x61, 0x67, 0x72])
 // The core reverses the payload it is given. That is its documented contract,
 // and asserting it rather than identity is what makes this a real proof: a
 // stub that echoed the input back untouched would satisfy an identity check.
-const isReversalOf = (returned: Uint8Array, sent: Uint8Array): boolean =>
-  returned.length === sent.length &&
-  returned.every((byte, i) => byte === sent[sent.length - 1 - i])
+function isReversalOf(returned: Uint8Array, sent: Uint8Array): boolean {
+  return (
+    returned.length === sent.length &&
+    returned.every((byte, i) => byte === sent[sent.length - 1 - i])
+  )
+}
 
 export async function fetchBridgeStatus(probe: ProbeFn): Promise<BridgeStatus> {
   let report: ProbeReport
   try {
     report = await probe(INPUT, PAYLOAD)
   } catch (cause: unknown) {
-    return {
-      loaded: false,
-      reason: cause instanceof Error ? cause.message : String(cause),
-    }
+    return { loaded: false, reason: getErrorMessage(cause) }
   }
 
   if (report.echoed !== INPUT) {

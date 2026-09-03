@@ -24,8 +24,8 @@ describe('boot', () => {
     await detoxExpect(element(by.text('fabric: true'))).toBeVisible()
   })
 
-  it('leaves no runtime capability gap', async () => {
-    await detoxExpect(element(by.id('capability-gaps'))).toBeVisible()
+  it('leaves no runtime gap open', async () => {
+    await detoxExpect(element(by.id('runtime-gaps'))).toBeVisible()
     await detoxExpect(element(by.text('none'))).toBeVisible()
   })
 
