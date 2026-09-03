@@ -1,0 +1,12 @@
+{
+  "extends": "../tsconfig.json",
+  "compilerOptions": {
+    // The end-to-end suite runs under Jest, unlike the unit tests, so it needs
+    // the types the app's own config deliberately excludes.
+    "types": ["jest", "detox"]
+  },
+  "include": ["./**/*.ts"],
+  // Repeated rather than inherited: the parent excludes this directory, and an
+  // inherited exclude would leave this config matching nothing at all.
+  "exclude": ["**/node_modules"]
+}

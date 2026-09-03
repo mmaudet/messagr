@@ -57,11 +57,18 @@ uses, rather than the typed endpoint wrappers, whose shape does not fit.
 
 React Native is the real risk rather than the seam. `matrix-js-sdk` does not
 support it: no continuous integration, not named in its supported platforms, and
-no production-grade project running it. It needs polyfills for
-`crypto.getRandomValues`, `Promise.withResolvers`, `TextEncoder` and `URL`, and a
-bundler stub for `matrix-sdk-crypto-wasm` which also delivers the single-crypto
-goal. Only the in-memory store works, so every cold start resynchronises in full
-until a store is written.
+no production-grade project running it. Only the in-memory store works, so every
+cold start resynchronises in full until a store is written.
+
+**Amended after measurement.** This paragraph named four polyfills, taken from
+research rather than from a runtime. Probed behaviourally on React Native
+0.87.1, across an iOS simulator, an Android emulator and an Android phone, the
+runtime leaves exactly two gaps: `crypto.getRandomValues` and `TextDecoder`,
+which this ADR did not list. `Promise.withResolvers`, `TextEncoder` and `URL`
+all work, `URL` including the query parsing its shim was expected to fail.
+Nothing is polyfilled for those three. The bundler stub for
+`matrix-sdk-crypto-wasm` was needed, and does deliver the single-crypto goal.
+See `docs/runtime-gaps.md`.
 
 **This decision carries a stopping criterion.** The first increment sends and
 receives an encrypted event across this seam against a real homeserver, or the
