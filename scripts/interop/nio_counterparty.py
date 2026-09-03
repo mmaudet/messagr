@@ -82,7 +82,7 @@ def client_for(store: Path, user_id: str, homeserver: str, device_id=None):
 
 
 async def login(session_file: Path, store: Path) -> int:
-    """Create this device, upload its keys, and join the room.
+    """Create this device, upload its keys, and confirm it is in the room.
 
     Runs before the application does, so that the application's own key
     sharing can see a device to share with.
@@ -101,18 +101,25 @@ async def login(session_file: Path, store: Path) -> int:
             print(f"FAIL: login refused: {response}", file=sys.stderr)
             return 1
 
-        # Joining before syncing, so the first sync already carries the room:
-        # the application reads the member list from the server, and a member
-        # who is not joined yet is a member it will not share the key with.
-        joined = await client.join(room_id)
-        if getattr(joined, "room_id", None) != room_id:
-            print(f"FAIL: could not join {room_id}: {joined}", file=sys.stderr)
+        # Membership is checked, not asked for. This account created the room
+        # during provisioning, so it is already in it -- and nio's own join
+        # sends no request body, which this homeserver rejects outright
+        # (M_BAD_JSON, "EOF while parsing a value"). Reading the sync response
+        # proves the thing that actually matters, which asking would only have
+        # assumed.
+        response = await client.sync(timeout=SYNC_TIMEOUT_MS, full_state=True)
+        rooms = getattr(response, "rooms", None)
+        if rooms is None or room_id not in rooms.join:
+            print(
+                f"FAIL: this counterparty is not joined to {room_id}, so the "
+                "application will never share a room key with it.",
+                file=sys.stderr,
+            )
             return 1
 
         # The keys this device is known by. Without this upload the
         # application's /keys/query finds a device with nothing to encrypt to,
         # and skips it silently.
-        await client.sync(timeout=SYNC_TIMEOUT_MS, full_state=True)
         if client.should_upload_keys:
             await client.keys_upload()
 
@@ -126,7 +133,7 @@ async def login(session_file: Path, store: Path) -> int:
             )
         )
         session_file.chmod(0o600)
-        print(f"OK: counterparty is {client.device_id}, joined {room_id}")
+        print(f"OK: counterparty is {client.device_id}, in {room_id}")
         return 0
     finally:
         await client.close()
