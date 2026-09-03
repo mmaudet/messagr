@@ -27,11 +27,6 @@ import type { HttpRequester } from './pump'
  */
 export type EncryptionSliceFn = (sync: Record<string, unknown>) => SyncDelta
 
-export interface EncryptionSyncResult {
-  readonly delta: SyncDelta
-  readonly nextBatchToken: string | undefined
-}
-
 /**
  * Fetches one raw `/sync` and reduces it to the crypto machine's slice via
  * `encryptionSlice`.
@@ -40,21 +35,23 @@ export interface EncryptionSyncResult {
  * already runs and stops one of those), it is a single, deliberately
  * non-blocking round trip whose only purpose is to recover the two fields
  * the SDK's own loop cannot hand back.
+ *
+ * No `since` token, and none returned: one fetch per pump cycle is all this
+ * increment needs, and a continuation token nothing persists or reads back
+ * would be plumbing for a caller that does not exist yet. The ticket that
+ * first pumps more than once is the one that should decide where such a
+ * token lives.
  */
 export async function fetchEncryptionSyncDelta(
   http: HttpRequester,
-  sinceToken: string | null,
   encryptionSlice: EncryptionSliceFn,
-): Promise<EncryptionSyncResult> {
-  const queryParams: Record<string, string> =
-    sinceToken === null ? { timeout: '0' } : { timeout: '0', since: sinceToken }
+): Promise<SyncDelta> {
   const responseJson = await http.authedRequest(
     'GET',
     '/_matrix/client/v3/sync',
-    queryParams,
+    { timeout: '0' },
     undefined,
   )
   const sync = JSON.parse(responseJson) as Record<string, unknown>
-  const delta = encryptionSlice(sync)
-  return { delta, nextBatchToken: delta.next_batch_token }
+  return encryptionSlice(sync)
 }

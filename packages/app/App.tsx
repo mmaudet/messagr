@@ -119,11 +119,7 @@ export function App({
               reason: sessionStatus.reason,
             }
           } else {
-            const report = await runOutgoingPump(
-              sessionClient,
-              credentials.userId,
-              credentials.deviceId,
-            )
+            const report = await runOutgoingPump(sessionClient, credentials)
             pumpStatus = { outcome: 'ran', report }
           }
         } finally {
@@ -302,7 +298,7 @@ function computePumpStatusLabel(status: PumpStatus | null): string {
 }
 
 function computePumpDeviceKeysLabel(
-  ran: { readonly report: CryptoPumpReport } | null,
+  ran: Extract<PumpStatus, { outcome: 'ran' }> | null,
 ): string {
   return ran === null
     ? 'device keys published: —'
@@ -310,7 +306,7 @@ function computePumpDeviceKeysLabel(
 }
 
 function computePumpOneTimeKeysLabel(
-  ran: { readonly report: CryptoPumpReport } | null,
+  ran: Extract<PumpStatus, { outcome: 'ran' }> | null,
 ): string {
   return ran === null
     ? 'one-time keys published: —'

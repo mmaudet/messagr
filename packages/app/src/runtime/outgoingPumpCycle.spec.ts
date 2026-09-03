@@ -38,6 +38,7 @@ function fakeMachine(
   }
 }
 
+const IDENTITY = { userId: '@alice:example.org', deviceId: 'DEVICE1' }
 const SYNC_RESPONSE = '{"next_batch":"tok-1","to_device":{"events":[]}}'
 const DEVICE_KEYS_RESPONSE = JSON.stringify({
   device_keys: {
@@ -76,11 +77,7 @@ describe('runOutgoingPumpCycle', () => {
       encryptionSlice: () => ({ next_batch_token: 'tok-1' }),
     }
 
-    const report = await runOutgoingPumpCycle(
-      deps,
-      '@alice:example.org',
-      'DEVICE1',
-    )
+    const report = await runOutgoingPumpCycle(deps, IDENTITY)
 
     expect(report.identityKeys).toEqual({
       curve25519: 'curve-key',
@@ -106,11 +103,7 @@ describe('runOutgoingPumpCycle', () => {
       encryptionSlice: () => ({}),
     }
 
-    const report = await runOutgoingPumpCycle(
-      deps,
-      '@alice:example.org',
-      'DEVICE1',
-    )
+    const report = await runOutgoingPumpCycle(deps, IDENTITY)
 
     expect(report.firstDrain).toEqual({ sent: 0, failed: 0, sentKinds: [] })
     expect(report.secondDrain).toEqual({ sent: 0, failed: 0, sentKinds: [] })
@@ -153,11 +146,7 @@ describe('runOutgoingPumpCycle', () => {
       encryptionSlice: () => ({ next_batch_token: 'tok-1' }),
     }
 
-    const report = await runOutgoingPumpCycle(
-      deps,
-      '@alice:example.org',
-      'DEVICE1',
-    )
+    const report = await runOutgoingPumpCycle(deps, IDENTITY)
 
     expect(order).toEqual([
       'take-outgoing-requests', // first drain

@@ -11,6 +11,8 @@
  * MainActivity.kt) rather than through a dependency this workspace does not
  * otherwise need.
  */
+import type { DeviceIdentity } from './deviceIdentity'
+
 export interface CryptoMachineConfig {
   readonly userId: string
   readonly deviceId: string
@@ -37,7 +39,7 @@ const SCAFFOLD_PASSPHRASE = 'messagr-scaffold-crypto-store'
  * correct rather than accidental.
  */
 export function computeCryptoMachineConfig(
-  session: { readonly userId: string; readonly deviceId: string },
+  session: DeviceIdentity,
   storeDir: string,
 ): CryptoMachineConfig | null {
   if (storeDir === '') {

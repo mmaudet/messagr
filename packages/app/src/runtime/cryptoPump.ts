@@ -20,6 +20,7 @@ import {
 } from 'react-native-matrix-crypto'
 
 import { computeCryptoMachineConfig } from './cryptoMachineConfig'
+import type { DeviceIdentity } from './deviceIdentity'
 import { getErrorMessage } from './errors'
 import { makePumpHttp } from './pump'
 import {
@@ -48,7 +49,7 @@ export type MachineStartResult =
  */
 export async function startCryptoMachine(
   sessionClient: ReturnType<typeof createClient>,
-  credentials: { readonly userId: string; readonly deviceId: string },
+  credentials: DeviceIdentity,
   storeDir: string,
   onToDeviceError: (cause: unknown) => void,
 ): Promise<MachineStartResult> {
@@ -82,8 +83,7 @@ export async function startCryptoMachine(
  */
 export async function runOutgoingPump(
   sessionClient: ReturnType<typeof createClient>,
-  userId: string,
-  deviceId: string,
+  identity: DeviceIdentity,
 ): Promise<CryptoPumpReport> {
   return runOutgoingPumpCycle(
     {
@@ -97,7 +97,6 @@ export async function runOutgoingPump(
       },
       encryptionSlice,
     },
-    userId,
-    deviceId,
+    identity,
   )
 }
