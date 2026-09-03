@@ -28,6 +28,7 @@ import type { DeviceIdentity } from './deviceIdentity'
 import { encryptAndSendOneMessage, type SendReport } from './encryptAndSend'
 import { getErrorMessage } from './errors'
 import { makePumpHttp } from './pump'
+import { receiveAndDecrypt, type ReceiveReport } from './receiveDecrypt'
 import {
   runOutgoingPumpCycle,
   type CryptoPumpReport,
@@ -36,6 +37,7 @@ import { makeToDeviceSource, subscribeToDeviceMessages } from './toDeviceBridge'
 
 export type { CryptoPumpReport } from './outgoingPumpCycle'
 export type { SendReport } from './encryptAndSend'
+export type { ReceiveReport } from './receiveDecrypt'
 
 export type MachineStartResult =
   | { readonly started: true; readonly unsubscribeToDevice: () => void }
@@ -142,5 +144,35 @@ export async function sendOneEncryptedMessage(
         `messagr-${Date.now()}-${Math.floor(Math.random() * 1e6)}`,
     },
     identity,
+  )
+}
+
+/**
+ * Phase four: reads an encrypted event somebody else put in the room and
+ * shows what it says.
+ *
+ * Nothing here touches matrix-js-sdk's `MatrixEvent.attemptDecryption`, the
+ * internal API ADR-0001 named as this design's largest exposure. It is not
+ * needed: the event is read raw out of a raw sync and decrypted through the
+ * bridge, because this application renders its own screen rather than the
+ * SDK's timeline model. See receiveDecrypt.ts for what that does and does
+ * not settle.
+ */
+export async function receiveOneEncryptedMessage(
+  sessionClient: ReturnType<typeof createClient>,
+  identity: DeviceIdentity,
+  roomId: string,
+): Promise<ReceiveReport> {
+  return receiveAndDecrypt(
+    {
+      http: makePumpHttp(sessionClient),
+      machine: {
+        decryptEvent: (scope, rawEvent) =>
+          decryptEvent(asCryptoScopeId(scope), rawEvent),
+      },
+      decodeUtf8: bytes => new TextDecoder().decode(bytes),
+    },
+    roomId,
+    identity.userId,
   )
 }
