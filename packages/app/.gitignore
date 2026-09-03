@@ -56,6 +56,12 @@ yarn-error.log
 # Bundle artifact
 *.jsbundle
 
+# The Android equivalent has no fixed extension and, unlike the iOS bundle
+# above, is written into a source directory (android/app/src/main/assets)
+# rather than a build one, and it bakes in MESSAGR_SESSION_* whenever one is
+# configured: never something to check in.
+android/app/src/main/assets/
+
 # Ruby / CocoaPods
 **/Pods/
 /vendor/bundle/
