@@ -93,8 +93,11 @@ describe('boot', () => {
     await waitFor(element(by.text('device keys published: true')))
       .toBeVisible()
       .withTimeout(30000)
+    // Asked of the server, not of this run. The count itself is not
+    // asserted: it falls as keys are claimed and rises as they are
+    // replenished, and pinning a number would be pinning a moment.
     await detoxExpect(
-      element(by.text('one-time keys published: true')),
+      element(by.text('one-time keys on server: yes')),
     ).toBeVisible()
   })
 

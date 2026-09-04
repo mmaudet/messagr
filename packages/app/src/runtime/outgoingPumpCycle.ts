@@ -21,6 +21,7 @@ import {
 } from './pump'
 import { fetchEncryptionSyncDelta, type EncryptionSliceFn } from './syncDelta'
 import { computeSharingStrategy, type SharingStrategy } from './sharingStrategy'
+import { countOneTimeKeysOnServer } from './verifyOneTimeKeys'
 import { verifyDeviceKeysPublished } from './verifyPublishedKeys'
 
 /** What this cycle needs from the crypto machine, beyond `pump.ts`'s own `CryptoMachine`. */
@@ -45,7 +46,14 @@ export interface CryptoPumpReport {
   readonly firstDrain: DrainResult
   readonly secondDrain: DrainResult
   readonly deviceKeysVerified: boolean
-  readonly oneTimeKeysPublished: boolean
+  /**
+   * How many one-time keys the server holds for this device, asked of the
+   * server rather than inferred from what this run happened to upload.
+   *
+   * `null` when the question could not be answered, which is not the same as
+   * none: zero is a claim about the server and a failed request is not one.
+   */
+  readonly oneTimeKeysOnServer: number | null
   /**
    * Which strategy the machine uses to choose who receives a room key,
    * observed rather than assumed. 0.4.0 changes this on its own for a
@@ -69,11 +77,10 @@ export interface CryptoPumpReport {
  * fetch recovers `device_lists` and one-time-key counts, ADR-0001's second
  * named exposure, and feeding it to the machine can itself queue more
  * outgoing work, which the second drain sends before anything reads the
- * result. `oneTimeKeysPublished` reads whether a `keys_upload` reached
- * either drain's `sentKinds`: `markRequestSent`'s own validation already
- * rejects a response that does not carry `one_time_key_counts`, so a
- * `keys_upload` appearing there already proves the server accepted them,
- * with no response body to re-parse here.
+ * result. One-time keys are counted by asking the server, not by noting
+ * whether this run uploaded any. A machine with a warm store queues no
+ * upload because it needs none, and a signal that read false there would be
+ * reporting the absence of work rather than the absence of keys.
  */
 export async function runOutgoingPumpCycle(
   deps: OutgoingPumpDeps,
@@ -96,6 +103,7 @@ export async function runOutgoingPumpCycle(
     await machine.getIdentityStatus(),
   )
   const deviceKeysVerified = await verifyDeviceKeysPublished(http, identity)
+  const oneTimeKeysOnServer = await countOneTimeKeysOnServer(http)
 
   return {
     identityKeys,
@@ -103,8 +111,6 @@ export async function runOutgoingPumpCycle(
     secondDrain,
     deviceKeysVerified,
     sharingStrategy,
-    oneTimeKeysPublished:
-      firstDrain.sentKinds.includes('keys_upload') ||
-      secondDrain.sentKinds.includes('keys_upload'),
+    oneTimeKeysOnServer,
   }
 }
