@@ -179,6 +179,12 @@ async def collect(session_file: Path, store: Path) -> int:
         pending = {}
         reasons = {}
         decrypted_bodies = []
+        # Every sender seen in the room, whether or not it is the one being
+        # waited for. A filter that drops what it rejects can only ever report
+        # an absence, and "nothing arrived" reads identically whether nothing
+        # was sent or the wrong account was named -- which costs a whole run
+        # to tell apart. This is what makes the two distinguishable.
+        seen_senders: dict[str, int] = {}
         deadline = asyncio.get_event_loop().time() + COLLECT_DEADLINE_SECONDS
 
         while asyncio.get_event_loop().time() < deadline:
@@ -187,7 +193,10 @@ async def collect(session_file: Path, store: Path) -> int:
             rooms = getattr(response, "rooms", None)
             if rooms is not None and room_id in rooms.join:
                 for event in rooms.join[room_id].timeline.events:
-                    if getattr(event, "sender", None) != sender:
+                    origin = getattr(event, "sender", None)
+                    if origin is not None:
+                        seen_senders[origin] = seen_senders.get(origin, 0) + 1
+                    if origin != sender:
                         continue
                     if isinstance(event, MegolmEvent):
                         pending[event.event_id] = event
@@ -233,9 +242,19 @@ async def collect(session_file: Path, store: Path) -> int:
                 file=sys.stderr,
             )
         else:
+            others = {who: n for who, n in seen_senders.items() if who != sender}
             print(
                 f"FAIL: nothing from {sender} arrived in {room_id} within "
-                f"{COLLECT_DEADLINE_SECONDS}s. The application did not send.",
+                f"{COLLECT_DEADLINE_SECONDS}s.\n"
+                f"      senders actually seen: {seen_senders or 'none'}\n"
+                + (
+                    "      The room was not silent, so this is more likely the "
+                    "wrong account\n      than a send that never happened: "
+                    f"{sorted(others)} did send.\n"
+                    if others
+                    else "      The room was silent: the application did not "
+                    "send.\n"
+                ),
                 file=sys.stderr,
             )
         return 1

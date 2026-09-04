@@ -35,6 +35,25 @@
             <action android:name="android.intent.action.MAIN" />
             <category android:name="android.intent.category.LAUNCHER" />
         </intent-filter>
+
+        <!--
+          The invitation link, which is the product's entry point. Without
+          this the operating system has no reason to believe a Messagr link
+          concerns Messagr, and tapping one opens a browser.
+
+          The application's own scheme only, for now. Claiming an https link
+          as well needs Digital Asset Links published at the instance, and
+          which instances may vouch for this application is a deployment
+          decision rather than a build one. An unverified https filter would
+          show a chooser instead of opening, which is worse than not claiming
+          the link at all.
+        -->
+        <intent-filter>
+            <action android:name="android.intent.action.VIEW" />
+            <category android:name="android.intent.category.DEFAULT" />
+            <category android:name="android.intent.category.BROWSABLE" />
+            <data android:scheme="messagr" />
+        </intent-filter>
       </activity>
     </application>
 </manifest>
