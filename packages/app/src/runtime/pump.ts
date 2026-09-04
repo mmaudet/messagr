@@ -196,10 +196,14 @@ export interface DrainResult {
    * `to_device` is a message that did not arrive. Reporting the pair is what
    * lets a caller say which happened instead of a reader guessing.
    */
-  readonly failures: readonly {
-    readonly kind: string
-    readonly status: number
-  }[]
+  readonly failures: readonly DrainFailure[]
+}
+
+/** One request a drain could not send, and what refused it. */
+export interface DrainFailure {
+  readonly kind: string
+  /** The HTTP status that refused it, or `0` when nothing HTTP did. */
+  readonly status: number
 }
 
 /**
@@ -221,7 +225,7 @@ export async function drainOutgoingRequests(
   let sent = 0
   let failed = 0
   const sentKinds: string[] = []
-  const failures: { kind: string; status: number }[] = []
+  const failures: DrainFailure[] = []
 
   for (const request of requests) {
     try {

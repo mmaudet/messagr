@@ -26,6 +26,7 @@ import {
   takeOutgoingRequests,
 } from 'react-native-matrix-crypto'
 
+import type { IdentityEntitlement } from './crossSigningIdentity'
 import { computeCryptoMachineConfig } from './cryptoMachineConfig'
 import type { DeviceIdentity } from './deviceIdentity'
 import { encryptAndSendOneMessage, type SendReport } from './encryptAndSend'
@@ -98,7 +99,7 @@ export async function startCryptoMachine(
 export async function runOutgoingPump(
   sessionClient: ReturnType<typeof createClient>,
   identity: DeviceIdentity,
-  accountCreatedByThisLaunch: boolean,
+  entitlement: IdentityEntitlement,
 ): Promise<CryptoPumpReport> {
   return runOutgoingPumpCycle(
     {
@@ -116,7 +117,7 @@ export async function runOutgoingPump(
       encryptionSlice,
     },
     identity,
-    accountCreatedByThisLaunch,
+    entitlement,
   )
 }
 

@@ -95,7 +95,11 @@ describe('runOutgoingPumpCycle', () => {
       encryptionSlice: () => ({ next_batch_token: 'tok-1' }),
     }
 
-    const report = await runOutgoingPumpCycle(deps, IDENTITY, false)
+    const report = await runOutgoingPumpCycle(
+      deps,
+      IDENTITY,
+      'restored-session',
+    )
 
     expect(report.identityKeys).toEqual({
       curve25519: 'curve-key',
@@ -126,7 +130,11 @@ describe('runOutgoingPumpCycle', () => {
       encryptionSlice: () => ({}),
     }
 
-    const report = await runOutgoingPumpCycle(deps, IDENTITY, false)
+    const report = await runOutgoingPumpCycle(
+      deps,
+      IDENTITY,
+      'restored-session',
+    )
 
     expect(report.firstDrain).toEqual({
       sent: 0,
@@ -179,7 +187,11 @@ describe('runOutgoingPumpCycle', () => {
       encryptionSlice: () => ({ next_batch_token: 'tok-1' }),
     }
 
-    const report = await runOutgoingPumpCycle(deps, IDENTITY, false)
+    const report = await runOutgoingPumpCycle(
+      deps,
+      IDENTITY,
+      'restored-session',
+    )
 
     expect(order).toEqual([
       'take-outgoing-requests', // first drain

@@ -82,7 +82,7 @@ describe('establishCrossSigningIdentity', () => {
     const m = machine()
     const d = drainer([SENT_THE_BATCH])
     await expect(
-      establishCrossSigningIdentity(m, d.drain, false),
+      establishCrossSigningIdentity(m, d.drain, 'restored-session'),
     ).resolves.toEqual({ established: true, how: 'published' })
     expect(m.calls).toEqual(['bootstrap'])
   })
@@ -92,7 +92,7 @@ describe('establishCrossSigningIdentity', () => {
     // An identity "established" but never uploaded is one the server has
     // never heard of.
     const d = drainer([SENT_THE_BATCH])
-    await establishCrossSigningIdentity(machine(), d.drain, false)
+    await establishCrossSigningIdentity(machine(), d.drain, 'restored-session')
     expect(d.calls).toHaveLength(1)
   })
 
@@ -113,7 +113,7 @@ describe('establishCrossSigningIdentity', () => {
       SENT_THE_BATCH,
     ])
     await expect(
-      establishCrossSigningIdentity(m, d.drain, false),
+      establishCrossSigningIdentity(m, d.drain, 'restored-session'),
     ).resolves.toEqual({ established: true, how: 'published' })
     expect(m.calls).toEqual(['bootstrap', 'bootstrap'])
   })
@@ -130,7 +130,11 @@ describe('establishCrossSigningIdentity', () => {
       status: { accountKeysFetched: false, accountKeysAnswerUnsettled: true },
     })
     const d = drainer([NOTHING_TO_SEND])
-    const result = await establishCrossSigningIdentity(m, d.drain, true)
+    const result = await establishCrossSigningIdentity(
+      m,
+      d.drain,
+      'account-just-created',
+    )
     expect(result.established).toBe(false)
     if (!result.established) expect(result.reason).toContain('case')
     // Asked once and stopped, rather than spending every round on it.
@@ -146,7 +150,7 @@ describe('establishCrossSigningIdentity', () => {
     })
     const d = drainer([SENT_THE_BATCH])
     await expect(
-      establishCrossSigningIdentity(m, d.drain, true),
+      establishCrossSigningIdentity(m, d.drain, 'account-just-created'),
     ).resolves.toEqual({ established: true, how: 'created' })
     expect(m.calls).toEqual(['bootstrap', 'create'])
   })
@@ -168,33 +172,87 @@ describe('establishCrossSigningIdentity', () => {
     const result = await establishCrossSigningIdentity(
       m,
       drainer([NOTHING_TO_SEND]).drain,
-      false,
+      'restored-session',
     )
     expect(result.established).toBe(false)
     expect(m.calls).toEqual(['bootstrap'])
     expect(m.calls).not.toContain('create')
   })
 
-  it('finishes a publication it created and never saw accepted, even on a restore', async () => {
+  it('reports a publication left unacknowledged without finishing it on a restore', async () => {
     // The one state where the account still has no identity and this device
     // holds one: created here, never acknowledged by a homeserver, and it
     // survives a relaunch because the identity is on disk and the publication
-    // was in memory. The library's remedy is the same call again, which hands
-    // back the publication that was lost rather than minting a second
-    // identity.
+    // was in memory.
     //
-    // Without this the account stays unpublished for good: every later launch
-    // is a restore, and no restore is entitled to create.
+    // The library's remedy is the same create call again -- and its next
+    // sentence is why that must not be automatic: "which is why finishing is
+    // a decision". The incident it reports measuring is exactly this shape: a
+    // device in this state, answered honestly that the account has no
+    // identity, publishing over an identity a second device had legitimately
+    // created in the gap. "The launch-time call did it."
+    //
+    // Finishing needs a fact that outlives the launch that started it. Until
+    // something persists it, reporting the state is the safe direction.
     const m = machine({
       bootstrap: async () => {
         throw crypto('identity_not_known')
       },
       status: { identityPublicationPending: true },
     })
-    await expect(
-      establishCrossSigningIdentity(m, drainer([SENT_THE_BATCH]).drain, false),
-    ).resolves.toEqual({ established: true, how: 'resumed' })
-    expect(m.calls).toEqual(['bootstrap', 'create'])
+    const result = await establishCrossSigningIdentity(
+      m,
+      drainer([SENT_THE_BATCH]).drain,
+      'restored-session',
+    )
+    expect(result.established).toBe(false)
+    expect(m.calls).not.toContain('create')
+  })
+
+  it('does not claim an identity the machine does not report holding', async () => {
+    // A call that did not throw is not the same fact as an identity that
+    // exists. The acceptance criterion asks for the machine's own state, so
+    // the state is read back rather than inferred from an absence of errors.
+    const m = machine({
+      status: { identityKnown: false, privateKeysHeld: false },
+    })
+    const result = await establishCrossSigningIdentity(
+      m,
+      drainer([SENT_THE_BATCH]).drain,
+      'restored-session',
+    )
+    expect(result.established).toBe(false)
+  })
+
+  it('does not report "none" for an identity it just created but could not publish', async () => {
+    // Creation is irreversible, so a 401 leaves an identity that exists on
+    // this device and nowhere else. Saying "none" would hide it; saying
+    // "established" is the error the library names outright.
+    const m = machine({
+      bootstrap: async () => {
+        throw crypto('identity_not_known')
+      },
+      status: { identityPublicationPending: true },
+    })
+    const d = drainer([
+      {
+        sent: 0,
+        failed: 1,
+        sentKinds: [],
+        failures: [{ kind: 'signing_keys_upload', status: 401 }],
+      },
+    ])
+    const result = await establishCrossSigningIdentity(
+      m,
+      d.drain,
+      'account-just-created',
+    )
+    expect(result.established).toBe(false)
+    expect(result).toHaveProperty('publicationPending', true)
+    if (!result.established) {
+      expect(result.reason).toContain('created here')
+      expect(result.reason).toContain('interactive authentication')
+    }
   })
 
   it('never creates an identity over one another device published', async () => {
@@ -209,7 +267,7 @@ describe('establishCrossSigningIdentity', () => {
     const result = await establishCrossSigningIdentity(
       m,
       drainer([NOTHING_TO_SEND]).drain,
-      true,
+      'account-just-created',
     )
     expect(result.established).toBe(false)
     if (!result.established) expect(result.reason).toContain('another device')
@@ -235,7 +293,11 @@ describe('establishCrossSigningIdentity', () => {
         failures: [{ kind: 'signing_keys_upload', status: 401 }],
       },
     ])
-    const result = await establishCrossSigningIdentity(m, d.drain, true)
+    const result = await establishCrossSigningIdentity(
+      m,
+      d.drain,
+      'account-just-created',
+    )
     expect(result.established).toBe(false)
     if (!result.established) {
       expect(result.reason).toContain('interactive authentication')
@@ -256,7 +318,11 @@ describe('establishCrossSigningIdentity', () => {
         failures: [{ kind: 'signing_keys_upload', status: 500 }],
       },
     ])
-    const result = await establishCrossSigningIdentity(m, d.drain, true)
+    const result = await establishCrossSigningIdentity(
+      m,
+      d.drain,
+      'account-just-created',
+    )
     expect(result.established).toBe(false)
     if (!result.established) {
       expect(result.reason).toContain('signing_keys_upload')
@@ -272,7 +338,7 @@ describe('establishCrossSigningIdentity', () => {
     const result = await establishCrossSigningIdentity(
       m,
       drainer([NOTHING_TO_SEND]).drain,
-      true,
+      'account-just-created',
     )
     expect(result.established).toBe(false)
     expect(m.calls).not.toContain('create')
@@ -291,7 +357,7 @@ describe('establishCrossSigningIdentity', () => {
       m,
       drainer([{ sent: 1, failed: 0, sentKinds: ['keys_query'], failures: [] }])
         .drain,
-      false,
+      'restored-session',
     )
     expect(result.established).toBe(false)
     if (!result.established) expect(result.reason).toContain('settle')

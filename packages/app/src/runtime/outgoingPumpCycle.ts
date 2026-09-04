@@ -10,6 +10,7 @@ import type { IdentityKeys, SyncDelta } from 'react-native-matrix-crypto'
 
 import {
   establishCrossSigningIdentity,
+  type IdentityEntitlement,
   type IdentityMachineOps,
   type IdentityReport,
 } from './crossSigningIdentity'
@@ -94,7 +95,7 @@ export interface CryptoPumpReport {
 export async function runOutgoingPumpCycle(
   deps: OutgoingPumpDeps,
   identity: DeviceIdentity,
-  accountCreatedByThisLaunch: boolean,
+  entitlement: IdentityEntitlement,
 ): Promise<CryptoPumpReport> {
   const { http, machine, encryptionSlice } = deps
 
@@ -112,7 +113,7 @@ export async function runOutgoingPumpCycle(
   const crossSigning = await establishCrossSigningIdentity(
     machine,
     () => drainOutgoingRequests(http, machine),
-    accountCreatedByThisLaunch,
+    entitlement,
   )
 
   const identityKeys = await machine.getDeviceIdentityKeys(
