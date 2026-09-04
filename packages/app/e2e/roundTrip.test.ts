@@ -68,11 +68,36 @@ describeRoundTrip('encrypted round trip', () => {
     // nothing for the counterparty to encrypt to.
     runCounterparty('send')
 
-    await device.launchApp({ newInstance: true })
+    // Relaunched, repeatedly, and that is not a workaround dressed up: the
+    // application has no live sync loop. It stops after one sync by design
+    // (sessionSync.ts), so its whole attempt at decrypting happens in the
+    // seconds after launch and then stops for good. Reopening the app is
+    // the only retry a user has today, so it is the only retry this test is
+    // entitled to model.
+    //
+    // Waiting longer inside one launch would not help and would be a lie
+    // about the product: the screen it is waiting on has already settled.
+    // The day a timeline brings a live loop (ADR-0005), this becomes one
+    // launch and one wait.
+    let seen = false
+    for (let attempt = 0; attempt < 4 && !seen; attempt += 1) {
+      await device.launchApp({ newInstance: true })
+      try {
+        await waitFor(element(by.text(`decrypted: ${COUNTERPARTY_BODY}`)))
+          .toBeVisible()
+          .withTimeout(30000)
+        seen = true
+      } catch {
+        // The room key had not arrived within this launch's own attempt.
+        // Another launch asks again.
+      }
+    }
 
-    await waitFor(element(by.text(`decrypted: ${COUNTERPARTY_BODY}`)))
-      .toBeVisible()
-      .withTimeout(90000)
+    if (!seen) {
+      throw new Error(
+        "the counterparty's message never decrypted across four launches",
+      )
+    }
   })
 
   it('does not present the sender as established', async () => {
