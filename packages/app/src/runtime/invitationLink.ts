@@ -15,6 +15,27 @@
  * `http` is refused. The token is a bearer credential — whoever reads it is
  * the invited person — and a link that carried one in clear text would be an
  * invitation to whoever is between.
+ *
+ * ## Why this parses the link itself instead of using `URL`
+ *
+ * It used to use `URL`, and that worked in every test and failed on a device.
+ * React Native does not have the platform's `URL`; it ships a polyfill whose
+ * accessors hard-code the http schemes:
+ *
+ * ```js
+ * get pathname() { return this._url.match(/https?:\/\/[^/]+(\/[^?#]*)?/) ... }
+ * get host()     { return this._url.match(/^https?:\/\/(?:[^@]+@)?([^:/?#]+)/) ... }
+ * ```
+ *
+ * So for `messagr://host/i/<token>` it answers `protocol` correctly and then
+ * reports the path as `/` and the host as empty. Exactly the application's
+ * own scheme — the one the operating system hands over, and the only one that
+ * matters on a device — is the one it cannot read. The `https` form worked,
+ * which is why nothing caught it until an emulator opened the real link.
+ *
+ * The tests could not have caught it either: they run on Node, so they were
+ * exercising Node's `URL` rather than the one this code meets at runtime. A
+ * pattern applied here behaves the same in both places, which is the point.
  */
 export interface InvitationLink {
   /** The bearer token. Spending it is what creates the account. */
@@ -25,37 +46,36 @@ export interface InvitationLink {
   readonly service: string
 }
 
-const SCHEMES = ['https:', 'messagr:']
-
 /**
- * The path the invitation service's own links use. A link into this instance
- * that is not shaped like this is not an invitation, and treating it as one
- * would spend a token nobody offered.
+ * Scheme, host, and the one path the invitation service's own links use. A
+ * link into this instance shaped any other way is not an invitation, and
+ * treating it as one would spend a token nobody offered.
+ *
+ * Anything after the token — a query or a fragment — is accepted and ignored,
+ * because a link that travelled through a messenger may well come back with
+ * tracking parameters attached to it.
  */
-const INVITATION_PATH = /^\/i\/([^/]+)\/?$/
+const INVITATION_LINK =
+  /^(https|messagr):\/\/([^/?#]+)\/i\/([^/?#]+?)\/?(?:[?#].*)?$/i
 
 export function parseInvitationLink(raw: string): InvitationLink | null {
-  let url: URL
-  try {
-    url = new URL(raw)
-  } catch {
+  const match = INVITATION_LINK.exec(raw.trim())
+  if (match === null) {
     return null
   }
 
-  if (!SCHEMES.includes(url.protocol)) {
-    return null
-  }
-
-  const match = INVITATION_PATH.exec(url.pathname)
-  const token = match?.[1]
-  if (token === undefined || token === '') {
+  const [, , host, token] = match
+  if (host === undefined || token === undefined) {
     return null
   }
 
   // Always https for the instance, whichever scheme carried the link: the
   // application's own scheme names a host, not a transport, and every request
-  // that follows is an ordinary web request to that host.
-  const homeserver = `https://${url.host}`
+  // that follows is an ordinary web request to that host. The host is lowered
+  // because host names are case-insensitive and this one becomes a base URL
+  // that later comparisons rely on; the token is left exactly as it arrived,
+  // because it is a credential and its case is significant.
+  const homeserver = `https://${host.toLowerCase()}`
 
   return {
     token,
