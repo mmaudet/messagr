@@ -64,6 +64,31 @@ COUNTERPARTY_BODY = "encrypted by matrix-nio, for the application to read"
 SYNC_TIMEOUT_MS = 10_000
 COLLECT_DEADLINE_SECONDS = 120
 
+# WHAT THIS COUNTERPARTY IS ENTITLED TO READ, AND WHY IT CHANGED.
+#
+# The application now holds a cross-signing identity, so its crypto machine
+# collects room-key recipients by identity (MSC4153) instead of sharing with
+# every unblacklisted device. matrix-nio has no cross-signing at all -- its
+# whole surface is device-level verification -- so nothing vouches for this
+# device and it receives no room key. That is the feature working, not a
+# protocol disagreement.
+#
+# So the outbound half of the round trip cannot be proven against this
+# counterparty any more, and pretending otherwise would be the one thing
+# worse than losing it. What is asserted instead is the exclusion itself:
+# an event from the application must arrive, and must stay encrypted. That
+# still proves the application encrypted and sent -- a silent stop would
+# fail it -- and it proves the recipient was excluded on purpose.
+#
+# The inbound half is untouched and still the real interoperability proof:
+# nio encrypts, the application decrypts, and an independent implementation
+# is what makes that worth something.
+#
+# Restoring the outbound proof needs a counterparty that does cross-signing
+# and is not built on matrix-sdk-crypto, since two instances of the same
+# implementation share any misreading of the protocol. That is a ticket.
+EXPECT_EXCLUDED = os.environ.get("MESSAGR_INTEROP_EXPECT") == "excluded"
+
 
 def env(name: str) -> str:
     value = os.environ.get(name)
@@ -217,6 +242,18 @@ async def collect(session_file: Path, store: Path) -> int:
             # drifted from the application's own constant is a different
             # failure from a key that never arrived, and saying so is the
             # difference between fixing a string and hunting a protocol bug.
+            if decrypted_bodies and EXPECT_EXCLUDED:
+                print(
+                    "FAIL: this device decrypted the application's message, "
+                    "and it should not have been able to.\n"
+                    "      Nothing vouches for it, so identity-based sharing "
+                    "should have excluded it.\n"
+                    "      Either the application has no identity, or it fell "
+                    "back to sharing by device.",
+                    file=sys.stderr,
+                )
+                return 1
+
             if decrypted_bodies:
                 if EXPECTED_BODY in decrypted_bodies:
                     print(
@@ -234,6 +271,14 @@ async def collect(session_file: Path, store: Path) -> int:
                 return 1
 
         if pending:
+            if EXPECT_EXCLUDED:
+                print(
+                    "OK: the application's message arrived and stayed "
+                    f"encrypted ({len(pending)} event(s) from {sender}). "
+                    "No identity vouches for this device, so it was given no "
+                    "room key -- which is what identity-based sharing is for."
+                )
+                return 0
             print(
                 f"FAIL: {len(pending)} event(s) from {sender} stayed encrypted "
                 f"for {COLLECT_DEADLINE_SECONDS}s.\n"
