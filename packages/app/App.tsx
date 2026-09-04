@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react'
-import { StyleSheet, Text, View } from 'react-native'
+import { ScrollView, StyleSheet, Text, View } from 'react-native'
 import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context'
 import { createClient } from 'matrix-js-sdk'
 
@@ -243,110 +243,112 @@ export function App({
   return (
     <SafeAreaProvider>
       <SafeAreaView style={styles.screen}>
-        {probe !== null && (
+        <ScrollView contentContainerStyle={styles.content}>
+          {probe !== null && (
+            <View style={styles.block}>
+              <Text style={styles.heading}>Panic probe (#27)</Text>
+              <Text testID="panic-probe" style={styles.line}>
+                {`${probe.outcome}: ${probe.detail}`}
+              </Text>
+            </View>
+          )}
+
           <View style={styles.block}>
-            <Text style={styles.heading}>Panic probe (#27)</Text>
-            <Text testID="panic-probe" style={styles.line}>
-              {`${probe.outcome}: ${probe.detail}`}
+            <Text style={styles.heading}>New Architecture</Text>
+            <Text testID="arch-enabled" style={styles.line}>
+              {`enabled: ${architecture.enabled}`}
+            </Text>
+            <Text testID="arch-bridgeless" style={styles.line}>
+              {`bridgeless: ${architecture.bridgeless}`}
+            </Text>
+            <Text testID="arch-turbomodules" style={styles.line}>
+              {`turboModules: ${architecture.turboModules}`}
+            </Text>
+            <Text testID="arch-fabric" style={styles.line}>
+              {`fabric: ${architecture.fabric}`}
+            </Text>
+            <Text testID="js-engine" style={styles.line}>
+              {computeEngineLabel(hermes)}
             </Text>
           </View>
-        )}
 
-        <View style={styles.block}>
-          <Text style={styles.heading}>New Architecture</Text>
-          <Text testID="arch-enabled" style={styles.line}>
-            {`enabled: ${architecture.enabled}`}
-          </Text>
-          <Text testID="arch-bridgeless" style={styles.line}>
-            {`bridgeless: ${architecture.bridgeless}`}
-          </Text>
-          <Text testID="arch-turbomodules" style={styles.line}>
-            {`turboModules: ${architecture.turboModules}`}
-          </Text>
-          <Text testID="arch-fabric" style={styles.line}>
-            {`fabric: ${architecture.fabric}`}
-          </Text>
-          <Text testID="js-engine" style={styles.line}>
-            {computeEngineLabel(hermes)}
-          </Text>
-        </View>
+          <View style={styles.block}>
+            <Text style={styles.heading}>Runtime gaps</Text>
+            <Text testID="runtime-gaps" style={styles.line}>
+              {gaps.missing.length === 0
+                ? 'none'
+                : // The reason, not just the name: a gap that stayed open
+                  // because a module would not load reads differently from one
+                  // no provider covers, and the difference is what gets fixed.
+                  polyfillReport.stillMissing
+                    .map(gap => `${gap.name} (${gap.reason})`)
+                    .join(', ')}
+            </Text>
+          </View>
 
-        <View style={styles.block}>
-          <Text style={styles.heading}>Runtime gaps</Text>
-          <Text testID="runtime-gaps" style={styles.line}>
-            {gaps.missing.length === 0
-              ? 'none'
-              : // The reason, not just the name: a gap that stayed open
-                // because a module would not load reads differently from one
-                // no provider covers, and the difference is what gets fixed.
-                polyfillReport.stillMissing
-                  .map(gap => `${gap.name} (${gap.reason})`)
-                  .join(', ')}
-          </Text>
-        </View>
+          <View style={styles.block}>
+            <Text style={styles.heading}>Matrix transport</Text>
+            <Text testID="client-status" style={styles.line}>
+              {computeTransportLabel(client)}
+            </Text>
+          </View>
 
-        <View style={styles.block}>
-          <Text style={styles.heading}>Matrix transport</Text>
-          <Text testID="client-status" style={styles.line}>
-            {computeTransportLabel(client)}
-          </Text>
-        </View>
+          <View style={styles.block}>
+            <Text style={styles.heading}>Session sync</Text>
+            <Text testID="session-status" style={styles.line}>
+              {computeSessionLabel(session)}
+            </Text>
+            <Text testID="session-sync-duration" style={styles.line}>
+              {computeSyncDurationLabel(synced)}
+            </Text>
+          </View>
 
-        <View style={styles.block}>
-          <Text style={styles.heading}>Session sync</Text>
-          <Text testID="session-status" style={styles.line}>
-            {computeSessionLabel(session)}
-          </Text>
-          <Text testID="session-sync-duration" style={styles.line}>
-            {computeSyncDurationLabel(synced)}
-          </Text>
-        </View>
+          <View style={styles.block}>
+            <Text style={styles.heading}>Crypto bridge</Text>
+            <Text testID="bridge-status" style={styles.line}>
+              {computeBridgeLabel(bridge)}
+            </Text>
+          </View>
 
-        <View style={styles.block}>
-          <Text style={styles.heading}>Crypto bridge</Text>
-          <Text testID="bridge-status" style={styles.line}>
-            {computeBridgeLabel(bridge)}
-          </Text>
-        </View>
+          <View style={styles.block}>
+            <Text style={styles.heading}>Crypto pump</Text>
+            <Text testID="pump-status" style={styles.line}>
+              {computePumpStatusLabel(pump)}
+            </Text>
+            <Text testID="pump-device-keys" style={styles.line}>
+              {computePumpDeviceKeysLabel(ranPump)}
+            </Text>
+            <Text testID="pump-one-time-keys" style={styles.line}>
+              {computePumpOneTimeKeysLabel(ranPump)}
+            </Text>
+          </View>
 
-        <View style={styles.block}>
-          <Text style={styles.heading}>Crypto pump</Text>
-          <Text testID="pump-status" style={styles.line}>
-            {computePumpStatusLabel(pump)}
-          </Text>
-          <Text testID="pump-device-keys" style={styles.line}>
-            {computePumpDeviceKeysLabel(ranPump)}
-          </Text>
-          <Text testID="pump-one-time-keys" style={styles.line}>
-            {computePumpOneTimeKeysLabel(ranPump)}
-          </Text>
-        </View>
+          <View style={styles.block}>
+            <Text style={styles.heading}>Encrypted send</Text>
+            <Text testID="send-status" style={styles.line}>
+              {computeSendLabel(send)}
+            </Text>
+            <Text testID="send-event" style={styles.line}>
+              {computeSendEventLabel(send)}
+            </Text>
+            <Text testID="send-control" style={styles.line}>
+              {computeControlLabel(send)}
+            </Text>
+            <Text testID="send-tamper" style={styles.line}>
+              {computeTamperLabel(send)}
+            </Text>
+          </View>
 
-        <View style={styles.block}>
-          <Text style={styles.heading}>Encrypted send</Text>
-          <Text testID="send-status" style={styles.line}>
-            {computeSendLabel(send)}
-          </Text>
-          <Text testID="send-event" style={styles.line}>
-            {computeSendEventLabel(send)}
-          </Text>
-          <Text testID="send-control" style={styles.line}>
-            {computeControlLabel(send)}
-          </Text>
-          <Text testID="send-tamper" style={styles.line}>
-            {computeTamperLabel(send)}
-          </Text>
-        </View>
-
-        <View style={styles.block}>
-          <Text style={styles.heading}>Received</Text>
-          <Text testID="received-body" style={styles.line}>
-            {computeReceivedLabel(received)}
-          </Text>
-          <Text testID="received-sender" style={styles.line}>
-            {computeClaimedSenderLabel(received)}
-          </Text>
-        </View>
+          <View style={styles.block}>
+            <Text style={styles.heading}>Received</Text>
+            <Text testID="received-body" style={styles.line}>
+              {computeReceivedLabel(received)}
+            </Text>
+            <Text testID="received-sender" style={styles.line}>
+              {computeClaimedSenderLabel(received)}
+            </Text>
+          </View>
+        </ScrollView>
       </SafeAreaView>
     </SafeAreaProvider>
   )
@@ -523,7 +525,15 @@ function computePumpOneTimeKeysLabel(
 // scaffolding, not product surface. Anything that survives into a real screen
 // must come from design/tokens.json, per interface invariant 11.
 const styles = StyleSheet.create({
-  screen: { flex: 1, justifyContent: 'center', padding: 24 },
+  // Scrolls, and no longer centres. This readout has grown one block per
+  // ticket -- architecture, engine, gaps, transport, session, pump, send,
+  // received -- and its last lines had reached past the bottom of a phone.
+  // Detox reads rendered text, so a line pushed off-screen is a line the
+  // suite reports as absent: the round trip's sender assertion failed for
+  // that reason and for no other, which is a false negative about the trust
+  // model, the one place this project can least afford one.
+  screen: { flex: 1 },
+  content: { padding: 24, paddingBottom: 48 },
   block: { marginBottom: 32 },
   heading: { fontSize: 17, fontWeight: '600', marginBottom: 8 },
   line: { fontSize: 14.5, lineHeight: 21 },
