@@ -27,7 +27,10 @@ import { logEvent } from './src/runtime/log'
 import { polyfillReport } from './src/runtime/bootstrap'
 import { computeRuntimeGapReport } from './src/runtime/runtimeGaps'
 import { computeNewArchitectureReport } from './src/runtime/newArchitecture'
-import { computeSessionCredentials } from './src/runtime/sessionCredentials'
+import { sessionSecrets } from './src/runtime/deviceSecrets'
+import { enterWithASession, type EntryResult } from './src/runtime/entry'
+import { initialLink } from './src/runtime/incomingLink'
+import { servicePoster } from './src/runtime/servicePoster'
 import {
   fetchSessionSyncStatus,
   makeSyncClient,
@@ -79,10 +82,7 @@ export function App({
     [],
   )
   const [bridge, setBridge] = useState<BridgeStatus | null>(null)
-  // Read once: the four MESSAGR_SESSION_* values are baked into the bundle at
-  // build time (babel.config.js), not read live, so there is nothing here a
-  // dependency array could usefully react to.
-  const credentials = useMemo(() => computeSessionCredentials(), [])
+  const [entry, setEntry] = useState<EntryResult | null>(null)
   // #27's diagnostic, off in every ordinary build. A static read, because
   // that is the only shape babel's inliner replaces (sessionCredentials.ts
   // says the same about its four).
@@ -123,6 +123,17 @@ export function App({
       // No provisioned account: report it rather than attempt a sync that has
       // nothing to restore. This keeps the screen runnable for a developer
       // who has not run scripts/provision-bench-accounts.sh.
+      // How this application comes to have a session: one kept from a
+      // previous launch, or one obtained by spending the invitation it was
+      // opened with. Nothing arrives from the build any more.
+      const entered = await enterWithASession({
+        secrets: sessionSecrets,
+        poster: servicePoster,
+        link: initialLink,
+      })
+      setEntry(entered)
+      const credentials = entered.entered ? entered.session : null
+
       let sessionStatus: SessionSyncStatus | 'not-configured'
       let pumpStatus: PumpStatus
       let sendStatus: SendReport | 'not-run' = 'not-run'
@@ -205,6 +216,7 @@ export function App({
         gaps,
         polyfills: polyfillReport,
         client,
+        entry: entered,
         session: sessionStatus,
         pump: pumpStatus,
         send: sendStatus,
@@ -215,15 +227,7 @@ export function App({
     probeAndReport().catch((cause: unknown) => {
       logEvent('error', 'MESSAGR_RUNTIME_FAILED', { reason: String(cause) })
     })
-  }, [
-    architecture,
-    hermes,
-    gaps,
-    client,
-    credentials,
-    storeDir,
-    panicProbeRequested,
-  ])
+  }, [architecture, hermes, gaps, client, storeDir, panicProbeRequested])
 
   // The synced case computed once rather than repeated at each of its two
   // uses below: narrowing `session` inline in both the status and the
@@ -292,6 +296,13 @@ export function App({
             <Text style={styles.heading}>Matrix transport</Text>
             <Text testID="client-status" style={styles.line}>
               {computeTransportLabel(client)}
+            </Text>
+          </View>
+
+          <View style={styles.block}>
+            <Text style={styles.heading}>Entry</Text>
+            <Text testID="entry-status" style={styles.line}>
+              {computeEntryLabel(entry)}
             </Text>
           </View>
 
@@ -369,6 +380,26 @@ function computeTransportLabel(status: TransportStatus): string {
   return status.created
     ? `client created, ${status.homeserver}`
     : `not created: ${status.reason}`
+}
+
+/**
+ * Says which of the three ways in produced this session, because they are
+ * not interchangeable: an invitation is single-use, so "restored" and
+ * "claimed" describe different amounts of remaining road.
+ */
+function computeEntryLabel(entry: EntryResult | null): string {
+  if (entry === null) {
+    return 'entry: probing'
+  }
+  if (!entry.entered) {
+    return `entry: none (${entry.reason})`
+  }
+  if (!entry.claimed) {
+    return 'entry: session restored'
+  }
+  return entry.kept === false
+    ? 'entry: invitation claimed, BUT THE SESSION WAS NOT KEPT'
+    : 'entry: invitation claimed'
 }
 
 function computeSessionLabel(

@@ -6,28 +6,5 @@ module.exports = {
     // to build with "Export namespace should be first transformed by
     // @babel/plugin-transform-export-namespace-from".
     '@babel/plugin-transform-export-namespace-from',
-
-    // Bakes the four MESSAGR_SESSION_* values into the bundle at build time,
-    // read from the environment the bundler itself runs in. There is no
-    // product screen yet to type a session into, so this is how a
-    // provisioned account's credentials reach a build without ever being
-    // committed. Restricted to `include`: an unlisted `process.env.X` stays a
-    // real runtime lookup, which is what the rest of this codebase's
-    // `process.env` reads (none, today) would need if any existed.
-    [
-      'transform-inline-environment-variables',
-      {
-        include: [
-          'MESSAGR_SESSION_HOMESERVER',
-          'MESSAGR_SESSION_USER_ID',
-          'MESSAGR_SESSION_DEVICE_ID',
-          'MESSAGR_SESSION_ACCESS_TOKEN',
-          // Off in every ordinary build. Turns the screen into the #27
-          // diagnostic, which deliberately tries to make the process die and
-          // would break every other assertion if it ran by default.
-          'MESSAGR_PANIC_PROBE',
-        ],
-      },
-    ],
   ],
 }
