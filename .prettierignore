@@ -11,3 +11,5 @@ design/
 # are ignored by git and neither is ours to format.
 spikes/**/target/
 spikes/**/gen/
+
+services/**/target/
