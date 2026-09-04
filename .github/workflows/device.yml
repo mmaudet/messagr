@@ -54,9 +54,12 @@ jobs:
 
       - run: yarn install --frozen-lockfile
 
-      # Signed with the committed debug keystore, as the React Native template
-      # leaves it: this proves the build, and a real signing key is a shipping
-      # decision that does not belong in a public repository.
+      # Unsigned, and that is now the correct state rather than a gap. The
+      # template signed release builds with the committed debug keystore,
+      # which produces something that installs, looks finished, and can never
+      # be published under this identity. This job asserts what the artifact
+      # contains, which needs no signature; publishing is publish.yml's, and
+      # it holds the only key that exists.
       - name: Build the release APK
         working-directory: packages/app/android
         run: ./gradlew :app:assembleRelease
