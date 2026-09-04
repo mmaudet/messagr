@@ -106,9 +106,18 @@ android {
     buildToolsVersion rootProject.ext.buildToolsVersion
     compileSdk rootProject.ext.compileSdkVersion
 
-    namespace "com.messagr"
+    // eu.messagr, the reverse-DNS of messagr.eu, which this project owns and
+    // which serves the application's own site and its production homeserver.
+    //
+    // The template left com.messagr, which claims a namespace belonging to a
+    // domain nobody here holds, and the application already contradicted it:
+    // its keychain entries have always been eu.messagr.session and
+    // eu.messagr.crypto-store. A package name is permanent from the first
+    // publication, so this was the last moment it could be corrected for
+    // nothing.
+    namespace "eu.messagr"
     defaultConfig {
-        applicationId "com.messagr"
+        applicationId "eu.messagr"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
         versionCode 1

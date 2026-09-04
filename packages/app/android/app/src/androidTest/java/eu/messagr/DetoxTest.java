@@ -1,4 +1,4 @@
-package com.messagr;
+package eu.messagr;
 
 import androidx.test.ext.junit.runners.AndroidJUnit4;
 import androidx.test.filters.LargeTest;
