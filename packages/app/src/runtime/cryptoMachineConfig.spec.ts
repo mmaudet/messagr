@@ -6,13 +6,13 @@ describe('computeCryptoMachineConfig', () => {
   it('derives a store path from storeDir and the device id', () => {
     const config = computeCryptoMachineConfig(
       { userId: '@alice:example.org', deviceId: 'DEVICE1' },
-      '/data/user/0/com.messagr/files',
+      '/data/user/0/eu.messagr/files',
       'a-passphrase',
     )
     expect(config).toEqual({
       userId: '@alice:example.org',
       deviceId: 'DEVICE1',
-      storePath: '/data/user/0/com.messagr/files/crypto/DEVICE1',
+      storePath: '/data/user/0/eu.messagr/files/crypto/DEVICE1',
       // Handed in, not invented: the constant that used to live in the
       // source could open any device's store for anyone who read the
       // repository.
