@@ -120,14 +120,25 @@ describe('boot', () => {
     ).toBeVisible()
   })
 
-  it("shares room keys by device, which is what this machine's state implies", async () => {
-    // 0.4.0 switches to identity-based sharing for a machine holding a
-    // cross-signing identity of its own, and then stops giving keys to
-    // devices no identity vouches for. This application creates no identity,
-    // so the strategy should be unchanged -- asserted from what the machine
-    // reports rather than taken from the release notes.
+  it('gives the account it just created a signing identity of its own', async () => {
+    // Created, not published or resumed: this launch spent the invitation, so
+    // the account is seconds old and has never had one. The three words are
+    // deliberately different on screen because they are very different
+    // events, and only one of them may ever happen to an account.
     await detoxExpect(
-      element(by.text('room keys shared: device-based')),
+      element(by.text('signing identity: created')),
+    ).toBeVisible()
+  })
+
+  it('shares room keys by identity once one vouches for this device', async () => {
+    // 0.4.0 collects recipients by identity (MSC4153) for a machine holding a
+    // cross-signing identity of its own, instead of sharing with every
+    // unblacklisted device. This is the observable consequence of the line
+    // above, read out of the machine rather than taken from the release
+    // notes -- and it was `device-based` here until the account had an
+    // identity to be vouched for by.
+    await detoxExpect(
+      element(by.text('room keys shared: identity-based')),
     ).toBeVisible()
   })
 

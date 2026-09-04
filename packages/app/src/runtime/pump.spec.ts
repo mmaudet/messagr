@@ -174,6 +174,7 @@ describe('drainOutgoingRequests', () => {
       sent: 2,
       failed: 0,
       sentKinds: ['keys_upload', 'keys_query'],
+      failures: [],
     })
     expect(machine.sentIds).toEqual(['id-keys_upload', 'id-keys_query'])
   })
@@ -192,9 +193,24 @@ describe('drainOutgoingRequests', () => {
       sent: 1,
       failed: 1,
       sentKinds: ['keys_query'],
+      // Named, not just counted: a caller has to be able to say which
+      // request a drain lost and what refused it.
+      failures: [{ kind: 'keys_upload', status: 429 }],
     })
     expect(machine.failedIds).toEqual([{ id: 'id-keys_upload', status: 429 }])
     expect(machine.sentIds).toEqual(['id-keys_query'])
+  })
+
+  it('reports a failure that was not HTTP with a zero status rather than inventing one', async () => {
+    // A transport that threw something other than a refusal carries no
+    // status, and reporting a plausible-looking one would be a fact nobody
+    // established.
+    const machine = fakeMachine([request('keys_upload', {})])
+    const http = fakeHttp(async () => {
+      throw new Error('the socket went away')
+    })
+    const result = await drainOutgoingRequests(http, machine)
+    expect(result.failures).toEqual([{ kind: 'keys_upload', status: 0 }])
   })
 
   it('lists only the kinds that actually succeeded, in send order', async () => {
@@ -250,6 +266,11 @@ describe('drainOutgoingRequests', () => {
     const machine = fakeMachine([])
     const http = fakeHttp(vi.fn())
     const result = await drainOutgoingRequests(http, machine)
-    expect(result).toEqual({ sent: 0, failed: 0, sentKinds: [] })
+    expect(result).toEqual({
+      sent: 0,
+      failed: 0,
+      sentKinds: [],
+      failures: [],
+    })
   })
 })
