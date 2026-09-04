@@ -28,7 +28,9 @@ import { polyfillReport } from './src/runtime/bootstrap'
 import { computeRuntimeGapReport } from './src/runtime/runtimeGaps'
 import { computeNewArchitectureReport } from './src/runtime/newArchitecture'
 import { sessionSecrets } from './src/runtime/deviceSecrets'
-import { space, type as typeScale } from './src/design/tokens'
+import { floors, notch, space, type as typeScale } from './src/design/tokens'
+import { NotchedButton } from './src/ui/NotchedButton'
+import { notchLegFor } from './src/ui/notchGeometry'
 import { enterWithASession, type EntryResult } from './src/runtime/entry'
 import { initialLink } from './src/runtime/incomingLink'
 import { servicePoster } from './src/runtime/servicePoster'
@@ -90,6 +92,13 @@ export function App({
   const [storePassphrase, setStorePassphrase] = useState<
     'minted' | 'reused' | null
   >(null)
+  // What the notched button actually laid out at, reported from the device.
+  // The shape is the brand's, so something has to be able to check it where
+  // it renders rather than only where it is computed.
+  const [geometry, setGeometry] = useState<{
+    height: number
+    leg: number
+  } | null>(null)
   // #27's diagnostic, off in every ordinary build. A static read, because
   // that is the only shape babel's inliner replaces (sessionCredentials.ts
   // says the same about its four).
@@ -298,6 +307,21 @@ export function App({
             </Text>
             <Text testID="js-engine" style={styles.line}>
               {computeEngineLabel(hermes)}
+            </Text>
+          </View>
+
+          <View style={styles.block}>
+            <Text style={styles.heading}>Brand geometry</Text>
+            <NotchedButton
+              label="Action principale"
+              testID="notched-button"
+              onGeometry={setGeometry}
+            />
+            <Text testID="notch-touch-target" style={styles.line}>
+              {computeTouchTargetLabel(geometry)}
+            </Text>
+            <Text testID="notch-proportion" style={styles.line}>
+              {computeNotchLabel(geometry)}
             </Text>
           </View>
 
@@ -596,6 +620,37 @@ function computeStoreLabel(state: 'minted' | 'reused' | null): string {
   return state === 'minted'
     ? 'store passphrase: minted for this device'
     : 'store passphrase: reused, the store reopened'
+}
+
+/**
+ * The touch-target floor is the one floor no provenance rule can reach: a
+ * button's height is geometry, not a token. So it is asserted here, against
+ * the height the device actually gave it rather than the height the style
+ * asked for.
+ */
+function computeTouchTargetLabel(
+  geometry: { height: number; leg: number } | null,
+): string {
+  if (geometry === null) return 'touch target: —'
+  return geometry.height >= floors.touchTargetMin
+    ? 'touch target: met'
+    : `touch target: MISSED (${geometry.height.toFixed(1)}pt)`
+}
+
+/**
+ * That the cut followed the height rather than a constant. A fixed leg looks
+ * deliberate at one size and like a mistake at every other, and a screenshot
+ * would not tell the two apart.
+ */
+function computeNotchLabel(
+  geometry: { height: number; leg: number } | null,
+): string {
+  if (geometry === null) return 'notch: —'
+  const expected = notchLegFor(geometry.height)
+  const held = Math.abs(geometry.leg - expected) < 0.01
+  return held
+    ? `notch: derived from height (${notch.button.size}pt at 48pt)`
+    : `notch: WRONG (${geometry.leg.toFixed(2)} where ${expected.toFixed(2)} was due)`
 }
 
 function computePumpStatusLabel(status: PumpStatus | null): string {

@@ -133,6 +133,19 @@ function assertFloors() {
 
 // ------------------------------------------------------------- the emitters
 
+/**
+ * A value this generator did not understand must stop the build. Emitting
+ * `undefined` is worse than emitting nothing: it typechecks, it renders as a
+ * missing style rather than an error, and it waits for the first screen that
+ * reaches for it.
+ */
+function requireValue(value, path) {
+  if (value === undefined) {
+    console.error(`design token "${path}" has no value this generator can read`)
+    process.exit(1)
+  }
+}
+
 const quote = value =>
   typeof value === 'string' ? `'${value.replace(/'/g, "\\'")}'` : String(value)
 
@@ -191,20 +204,34 @@ function emitSpace() {
   return `/**\n * The spacing scale. Every margin, padding and gap comes from here.\n *\n * ${tokens.space.$forbidden}\n */\nexport const space = {\n${lines.join('\n')}\n} as const\n`
 }
 
-function emitColor() {
-  const groups = entries(tokens.color).map(([group, shades]) => {
-    const lines = entries(shades).map(([name, spec]) => {
+/**
+ * Recursive, because the palette is not one level deep: `color.dark` holds a
+ * whole second palette with the same family names under it. A flat emitter
+ * read those families as if they were shades, found no `value` on them, and
+ * wrote `undefined` -- silently, because `undefined` typechecks and nothing
+ * had used the dark palette yet. `requireValue` is what stops that class of
+ * miss from being quiet a second time.
+ */
+function emitColorGroup(node, indent) {
+  return entries(node)
+    .map(([name, spec]) => {
+      if (spec !== null && typeof spec === 'object' && !('value' in spec)) {
+        return `${indent}${JSON.stringify(name)}: {\n${emitColorGroup(spec, `${indent}  `)}\n${indent}},`
+      }
       const value = typeof spec === 'object' ? spec.value : spec
-      // Read directly rather than through `entries`, which now drops prose:
-      // here the prose is the point. Every colour states what it is for, and
-      // a palette whose reasons travelled separately would be one nobody
-      // could apply correctly.
+      requireValue(value, `color.${name}`)
+      // The prose is read directly rather than through `entries`, which drops
+      // it: here it is the point. Every colour states what it is for, and a
+      // palette whose reasons travelled separately would be one nobody could
+      // apply correctly.
       const use = typeof spec === 'object' && spec.use ? ` // ${spec.use}` : ''
-      return `    ${JSON.stringify(name)}: ${quote(value)},${use}`
+      return `${indent}${JSON.stringify(name)}: ${quote(value)},${use}`
     })
-    return `  ${group}: {\n${lines.join('\n')}\n  },`
-  })
-  return `/**\n * ${tokens.$meta.note}\n */\nexport const color = {\n${groups.join('\n')}\n} as const\n`
+    .join('\n')
+}
+
+function emitColor() {
+  return `/**\n * ${tokens.$meta.note}\n */\nexport const color = {\n${emitColorGroup(tokens.color, '  ')}\n} as const\n`
 }
 
 function emitType() {
