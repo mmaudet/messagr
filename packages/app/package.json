@@ -16,7 +16,7 @@
     "react": "19.2.3",
     "react-native": "0.87.1",
     "react-native-get-random-values": "^2.0.0",
-    "react-native-matrix-crypto": "^0.3.0",
+    "react-native-matrix-crypto": "^0.4.0",
     "react-native-safe-area-context": "^5.5.2",
     "text-encoding-polyfill": "^0.6.7"
   },

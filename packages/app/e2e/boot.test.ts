@@ -98,6 +98,17 @@ describe('boot', () => {
     ).toBeVisible()
   })
 
+  it("shares room keys by device, which is what this machine's state implies", async () => {
+    // 0.4.0 switches to identity-based sharing for a machine holding a
+    // cross-signing identity of its own, and then stops giving keys to
+    // devices no identity vouches for. This application creates no identity,
+    // so the strategy should be unchanged -- asserted from what the machine
+    // reports rather than taken from the release notes.
+    await detoxExpect(
+      element(by.text('room keys shared: device-based')),
+    ).toBeVisible()
+  })
+
   it('encrypts a message and sends it into the room', async () => {
     // The event id itself is not asserted: it is minted by the homeserver and
     // differs every run. What is asserted is that the line says a send
