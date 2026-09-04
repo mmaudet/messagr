@@ -149,6 +149,28 @@ export const fr = {
   settings_row_not_yet: 'Pas encore',
   settings_version_footer: 'messagr %1$@ (%2$@)',
   language_endonym: 'Français',
+
+  // WRITTEN HERE, NOT CARRIED OVER.
+  //
+  // The previous product's conversation copy came with its trust wording
+  // attached, and that wording is refused above: it describes a ceremony
+  // which gated nothing and uses "reconnaissance" in the sense the glossary
+  // reassigned to vouching. These few lines are what a conversation needs and
+  // are new, so they say what is true now rather than what was true then.
+  //
+  // `conversation_sender_claimed` is the one that matters. Decrypting an
+  // event proves which key wrote it and nothing about who holds that key, so
+  // the screen says the sender is announced rather than known. It avoids
+  // "vérifier" on purpose: verification is a real act in this product, it has
+  // not happened here, and borrowing its word would be the first place the
+  // interface starts lying about its own trust model.
+  'conversation_sender_claimed %@': 'Se présente comme %@',
+  conversation_send: 'Envoyer',
+  conversation_empty: 'Rien n’a encore été dit ici.',
+  conversation_unreadable:
+    'Message illisible sur cet appareil : sa clé n’est pas arrivée.',
+  conversation_sending: 'Envoi…',
+  conversation_send_failed: 'Non envoyé. Réessayez.',
 } as const
 
 /** Every key any screen may ask for. A typo is a compile error, not a blank. */
