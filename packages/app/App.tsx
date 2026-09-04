@@ -311,21 +311,6 @@ export function App({
           </View>
 
           <View style={styles.block}>
-            <Text style={styles.heading}>Brand geometry</Text>
-            <NotchedButton
-              label="Action principale"
-              testID="notched-button"
-              onGeometry={setGeometry}
-            />
-            <Text testID="notch-touch-target" style={styles.line}>
-              {computeTouchTargetLabel(geometry)}
-            </Text>
-            <Text testID="notch-proportion" style={styles.line}>
-              {computeNotchLabel(geometry)}
-            </Text>
-          </View>
-
-          <View style={styles.block}>
             <Text style={styles.heading}>Runtime gaps</Text>
             <Text testID="runtime-gaps" style={styles.line}>
               {gaps.missing.length === 0
@@ -415,6 +400,25 @@ export function App({
             </Text>
             <Text testID="received-sender" style={styles.line}>
               {computeClaimedSenderLabel(received)}
+            </Text>
+          </View>
+          {/* Appended, and new blocks must be. Every block here was added at
+              the end of the readout, and the suite's assertions assume that
+              order: Detox does not scroll on its own, so inserting this one
+              in the middle pushed the crypto readout below the fold and
+              failed six assertions on a change that touched none of them. */}
+          <View style={styles.block}>
+            <Text style={styles.heading}>Brand geometry</Text>
+            <NotchedButton
+              label="Action principale"
+              testID="notched-button"
+              onGeometry={setGeometry}
+            />
+            <Text testID="notch-touch-target" style={styles.line}>
+              {computeTouchTargetLabel(geometry)}
+            </Text>
+            <Text testID="notch-proportion" style={styles.line}>
+              {computeNotchLabel(geometry)}
             </Text>
           </View>
         </ScrollView>
