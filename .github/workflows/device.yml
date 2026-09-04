@@ -172,23 +172,7 @@ jobs:
             mkdir -p android/app/src/main/assets
             npx react-native bundle --platform android --dev false --entry-file index.js --bundle-output android/app/src/main/assets/index.android.bundle --assets-dest android/app/src/main/res
             npx detox build --configuration android.emu.debug
-            # The application's own account of what happened, printed into
-            # this log when the suite fails rather than left in an artifact
-            # nobody downloads.
-            #
-            # It already knows: a run where the emulator had no network said
-            # "the invitation service could not be reached" on screen, while
-            # the job showed thirteen crypto assertions failing for no stated
-            # reason -- and provisioning had succeeded from the runner, so
-            # nothing above hinted at a network at all. That cost two round
-            # trips to see in a screenshot.
-            npx detox test --configuration android.emu.debug || {
-              status=$?
-              echo "──────── what the application itself reported ────────"
-              adb logcat -d 2>/dev/null | grep -E 'MESSAGR|ReactNativeJS' | tail -40 || true
-              echo "─────────────────────────────────────────────────────"
-              exit $status
-            }
+            ../../scripts/run-device-suite.sh
 
       # Only on failure, and that is the point: a green run's logs are noise,
       # while a red one without the device's own log costs a whole run per
