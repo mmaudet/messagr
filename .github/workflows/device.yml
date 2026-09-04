@@ -184,7 +184,13 @@ jobs:
       # about an absence that is entirely correct -- burying the failure that
       # actually happened under a second one that did not.
       - name: Keep the device's own logs when the suite fails
-        if: failure() && steps.suite.conclusion == 'failure'
+        # `hashFiles` is empty when nothing matched, which is how this asks
+        # "is there anything to keep" without a shell step. The suite failing
+        # is not enough on its own: it also fails when the build never
+        # produced an app, and there are no device logs for a device that
+        # never ran. `if-no-files-found: error` stays, so an upload that was
+        # supposed to carry something and did not still says so.
+        if: failure() && hashFiles('packages/app/.artifacts/**') != ''
         uses: actions/upload-artifact@v4
         with:
           name: detox-artifacts
