@@ -28,6 +28,7 @@ import type { DeviceIdentity } from './deviceIdentity'
 import { encryptAndSendOneMessage, type SendReport } from './encryptAndSend'
 import { getErrorMessage } from './errors'
 import { fetchJoinedRooms } from './encryptedSend'
+import { probeUnsettledEncrypt, type ProbeReport } from './panicProbe'
 import { makePumpHttp } from './pump'
 import { receiveAndDecrypt, type ReceiveReport } from './receiveDecrypt'
 import {
@@ -39,6 +40,7 @@ import { makeToDeviceSource, subscribeToDeviceMessages } from './toDeviceBridge'
 export type { CryptoPumpReport } from './outgoingPumpCycle'
 export type { SendReport } from './encryptAndSend'
 export type { ReceiveReport } from './receiveDecrypt'
+export type { ProbeReport } from './panicProbe'
 
 export type MachineStartResult =
   | { readonly started: true; readonly unsubscribeToDevice: () => void }
@@ -193,4 +195,24 @@ export async function firstJoinedRoom(
 ): Promise<string | null> {
   const rooms = await fetchJoinedRooms(makePumpHttp(sessionClient))
   return rooms[0] ?? null
+}
+
+/**
+ * Runs #27's diagnostic against the real bridge. Off unless the build asked
+ * for it; see panicProbe.ts for what it asks and why.
+ */
+export async function runPanicProbe(
+  identity: DeviceIdentity,
+  storeDir: string,
+): Promise<ProbeReport> {
+  return probeUnsettledEncrypt(
+    {
+      createCryptoMachine,
+      encryptEvent: (scope, eventType, payload) =>
+        encryptEvent(asCryptoScopeId(scope), eventType, payload),
+      getDeviceIdentityKeys,
+    },
+    identity,
+    storeDir,
+  )
 }
