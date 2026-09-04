@@ -84,6 +84,12 @@ export function App({
   )
   const [bridge, setBridge] = useState<BridgeStatus | null>(null)
   const [entry, setEntry] = useState<EntryResult | null>(null)
+  // Whether this launch minted the crypto store's passphrase or reopened
+  // with the one it already held -- never the passphrase itself. A relaunch
+  // that mints is a relaunch that lost every room key it had.
+  const [storePassphrase, setStorePassphrase] = useState<
+    'minted' | 'reused' | null
+  >(null)
   // #27's diagnostic, off in every ordinary build. A static read, because
   // that is the only shape babel's inliner replaces (sessionCredentials.ts
   // says the same about its four).
@@ -160,6 +166,10 @@ export function App({
           sessionStatus = await fetchSessionSyncStatus(
             makeSyncClient(sessionClient),
           )
+
+          if (start.started) {
+            setStorePassphrase(start.passphraseMinted ? 'minted' : 'reused')
+          }
 
           if (!start.started) {
             pumpStatus = { outcome: 'not-started', reason: start.reason }
@@ -333,6 +343,9 @@ export function App({
             <Text style={styles.heading}>Crypto bridge</Text>
             <Text testID="bridge-status" style={styles.line}>
               {computeBridgeLabel(bridge)}
+            </Text>
+            <Text testID="crypto-store" style={styles.line}>
+              {computeStoreLabel(storePassphrase)}
             </Text>
           </View>
 
@@ -570,6 +583,19 @@ function computeIdentityLabel(
   return identity.established
     ? `signing identity: ${identity.how}`
     : `signing identity: none (${identity.reason})`
+}
+
+/**
+ * The store's own continuity, which nothing else on this readout shows. A
+ * relaunch reporting "minted" would mean the passphrase did not survive, and
+ * therefore that this device opened a new, empty store and lost every room
+ * key the old one held.
+ */
+function computeStoreLabel(state: 'minted' | 'reused' | null): string {
+  if (state === null) return 'store passphrase: —'
+  return state === 'minted'
+    ? 'store passphrase: minted for this device'
+    : 'store passphrase: reused, the store reopened'
 }
 
 function computePumpStatusLabel(status: PumpStatus | null): string {
