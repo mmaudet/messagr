@@ -196,7 +196,11 @@ TOTAL_STAGES=11
 ENV_FILE="${TMPDIR:-/tmp}/messagr-play-wizard.env"
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-KEYSTORE_PATH="${MESSAGR_UPLOAD_KEYSTORE:-$HOME/messagr-upload.jks}"
+# The key this project already has, recovered from the previous repository's
+# setup: RSA 4096, valid to 2053. Minting a second one would be a different
+# application identity for no reason, so the default points at the one that
+# exists rather than at a name a fresh run would invent.
+KEYSTORE_PATH="${MESSAGR_UPLOAD_KEYSTORE:-$HOME/.messagr-signature/messagr-distribution.jks}"
 
 banner "Messagr: publishing to Play"
 
@@ -295,12 +299,18 @@ pause "Backed up. Continue?"
 # ── 4 ──────────────────────────────────────────────────────────────────────
 stage "Hand the upload key to continuous integration"
 say "Four secrets, set on this repository. None of them touches a file here."
+if gh secret list 2>/dev/null | grep -q MESSAGR_UPLOAD_KEYSTORE_BASE64; then
+  note "They are already set. Re-setting them is harmless and idempotent."
+  confirm "Set them again anyway?" || { pause "Skipped. Continue?"; SKIP_SECRETS=1; }
+fi
+if [[ "${SKIP_SECRETS:-0}" != "1" ]]; then
 UPLOAD_KEYSTORE_BASE64="$(base64 < "$KEYSTORE_PATH" | tr -d '\n')"
 set_secret MESSAGR_UPLOAD_KEYSTORE_BASE64 "$UPLOAD_KEYSTORE_BASE64"
 set_secret MESSAGR_UPLOAD_KEYSTORE_PASSWORD "$UPLOAD_STORE_PASSWORD"
 set_secret MESSAGR_UPLOAD_KEY_ALIAS "$UPLOAD_ALIAS"
 set_secret MESSAGR_UPLOAD_KEY_PASSWORD "$UPLOAD_KEY_PASSWORD"
 unset UPLOAD_KEYSTORE_BASE64
+fi
 pause "Continue?"
 
 # ── 5 ──────────────────────────────────────────────────────────────────────
