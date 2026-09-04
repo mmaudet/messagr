@@ -1,7 +1,18 @@
 import { execFileSync } from 'node:child_process'
 import { resolve } from 'node:path'
 
-import { by, device, element, expect as detoxExpect, waitFor } from 'detox'
+import { by, device, element, waitFor } from 'detox'
+
+/**
+ * Everything this file asserts sits at the bottom of a readout that has
+ * grown past one screen, so every assertion has to scroll to reach it.
+ * Detox does not scroll on its own: an element below the fold is reported
+ * absent, which is indistinguishable from an element that was never
+ * rendered. That cost five continuous-integration runs and a wrong theory
+ * about key delivery -- the application had decrypted the message correctly
+ * every single time.
+ */
+const SCROLL = by.id('diagnostic-scroll')
 
 /**
  * The round trip, and the verdict ADR-0001 asks for: a message encrypted by
@@ -68,11 +79,37 @@ describeRoundTrip('encrypted round trip', () => {
     // nothing for the counterparty to encrypt to.
     runCounterparty('send')
 
-    await device.launchApp({ newInstance: true })
+    // Relaunched, repeatedly, and that is not a workaround dressed up: the
+    // application has no live sync loop. It stops after one sync by design
+    // (sessionSync.ts), so its whole attempt at decrypting happens in the
+    // seconds after launch and then stops for good. Reopening the app is
+    // the only retry a user has today, so it is the only retry this test is
+    // entitled to model.
+    //
+    // Waiting longer inside one launch would not help and would be a lie
+    // about the product: the screen it is waiting on has already settled.
+    // The day a timeline brings a live loop (ADR-0005), this becomes one
+    // launch and one wait.
+    let seen = false
+    for (let attempt = 0; attempt < 4 && !seen; attempt += 1) {
+      await device.launchApp({ newInstance: true })
+      try {
+        await waitFor(element(by.text(`decrypted: ${COUNTERPARTY_BODY}`)))
+          .toBeVisible()
+          .whileElement(SCROLL)
+          .scroll(400, 'down')
+        seen = true
+      } catch {
+        // The room key had not arrived within this launch's own attempt.
+        // Another launch asks again.
+      }
+    }
 
-    await waitFor(element(by.text(`decrypted: ${COUNTERPARTY_BODY}`)))
-      .toBeVisible()
-      .withTimeout(90000)
+    if (!seen) {
+      throw new Error(
+        "the counterparty's message never decrypted across four launches",
+      )
+    }
   })
 
   it('does not present the sender as established', async () => {
@@ -80,12 +117,15 @@ describeRoundTrip('encrypted round trip', () => {
     // Decrypting an event does not establish who wrote it, and the day this
     // line loses the word "unauthenticated" is the day the product starts
     // implying otherwise.
-    await detoxExpect(
+    await waitFor(
       element(
         by.text(
           `claims to be from: ${process.env.MESSAGR_INTEROP_USER ?? ''} (unauthenticated)`,
         ),
       ),
-    ).toBeVisible()
+    )
+      .toBeVisible()
+      .whileElement(SCROLL)
+      .scroll(400, 'down')
   })
 })
