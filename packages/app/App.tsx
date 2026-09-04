@@ -409,7 +409,7 @@ function computeSessionLabel(
     return 'probing'
   }
   if (status === 'not-configured') {
-    return 'not configured: set MESSAGR_SESSION_* env vars'
+    return 'no session: see Entry above'
   }
   return status.synced
     ? `synced, ${status.roomCount} room(s)`
@@ -549,7 +549,7 @@ function computePumpStatusLabel(status: PumpStatus | null): string {
     return 'probing'
   }
   if (status === 'not-configured') {
-    return 'not configured: set MESSAGR_SESSION_* env vars'
+    return 'no session: see Entry above'
   }
   if (status.outcome === 'ran') {
     return 'ran'
