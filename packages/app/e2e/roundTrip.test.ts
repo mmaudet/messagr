@@ -163,6 +163,21 @@ describeRoundTrip('encrypted round trip', () => {
     }
   })
 
+  it("shows the independent client's message as announced, not as known", async () => {
+    // The trust model, on the screen a person actually reads rather than on
+    // a diagnostic line. Decrypting proves which key wrote the message and
+    // nothing about who holds it, so the conversation says the sender is
+    // announced -- and the word "vérifier" appears nowhere on it.
+    await waitFor(
+      element(
+        by.text(`Se présente comme ${process.env.MESSAGR_INTEROP_USER ?? ''}`),
+      ),
+    )
+      .toBeVisible()
+      .whileElement(SCROLL)
+      .scroll(400, 'down')
+  })
+
   it('does not present the sender as established', async () => {
     // The trust model, asserted on screen rather than trusted to a comment.
     // Decrypting an event does not establish who wrote it, and the day this
