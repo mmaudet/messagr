@@ -91,10 +91,12 @@ jobs:
 
       # Pure network calls against the bench homeserver: no emulator needed,
       # so this runs before one is booted and fails fast if the bench is
-      # unreachable. MESSAGR_SESSION_* is what babel.config.js's
-      # transform-inline-environment-variables bakes into the bundle two
-      # steps down, so the names have to match what App.tsx reads.
-      - name: Provision an account and export its session
+      # unreachable.
+      #
+      # It hands over an invitation LINK, not a session. The application
+      # claims it on the device, which is what a real person does and what
+      # the four build-time values used to stand in for.
+      - name: Provision an invitation
         env:
           MESSAGR_BENCH_HOMESERVER: ${{ secrets.MESSAGR_BENCH_HOMESERVER }}
           MESSAGR_BENCH_TOKEN: ${{ secrets.MESSAGR_BENCH_TOKEN }}
@@ -103,24 +105,30 @@ jobs:
           python3 -c "
           import json, os
           d = json.load(open('/tmp/messagr-bench-accounts.json'))
-          invitee = d['invitee']
           inviter = d['inviter']
-          print('::add-mask::' + invitee['access_token'])
           print('::add-mask::' + inviter['access_token'])
           print('::add-mask::' + inviter['password'])
+          print('::add-mask::' + d['invitation_link'])
+          print('::add-mask::' + d['roundtrip_invitation_link'])
           with open('$GITHUB_ENV', 'a') as f:
-              f.write(f'MESSAGR_SESSION_HOMESERVER={d[\"homeserver\"]}\n')
-              f.write(f'MESSAGR_SESSION_USER_ID={invitee[\"user_id\"]}\n')
-              f.write(f'MESSAGR_SESSION_DEVICE_ID={invitee[\"device_id\"]}\n')
-              f.write(f'MESSAGR_SESSION_ACCESS_TOKEN={invitee[\"access_token\"]}\n')
+              f.write(f'MESSAGR_INVITATION_LINK={d[\"invitation_link\"]}\\n')
+              # One per suite: an invitation is single-use and the harness
+              # reinstalls the application between test files, so neither the
+              # token nor the session it produces crosses that boundary.
+              f.write(f'MESSAGR_ROUNDTRIP_INVITATION_LINK={d[\"roundtrip_invitation_link\"]}\\n')
               # The counterparty runs as the other account, the one that has a
               # password, and reads what the application's account sends.
-              f.write(f'MESSAGR_INTEROP_HOMESERVER={d[\"homeserver\"]}\n')
-              f.write(f'MESSAGR_INTEROP_USER={inviter[\"user_id\"]}\n')
-              f.write(f'MESSAGR_INTEROP_PASSWORD={inviter[\"password\"]}\n')
-              f.write(f'MESSAGR_INTEROP_ROOM={d[\"room_id\"]}\n')
-              f.write(f'MESSAGR_INTEROP_SENDER={invitee[\"user_id\"]}\n')
-              f.write(f'MESSAGR_INTEROP_WORKDIR={os.environ[\"RUNNER_TEMP\"]}/interop\n')
+              f.write(f'MESSAGR_INTEROP_HOMESERVER={d[\"homeserver\"]}\\n')
+              f.write(f'MESSAGR_INTEROP_USER={inviter[\"user_id\"]}\\n')
+              f.write(f'MESSAGR_INTEROP_PASSWORD={inviter[\"password\"]}\\n')
+              f.write(f'MESSAGR_INTEROP_ROOM={d[\"room_id\"]}\\n')
+              # The round-trip suite's account, not the boot suite's: this
+              # step is the other half of that suite's exchange, and it is
+              # that suite's send the counterparty is meant to read. With one
+              # account the two readings coincided; with one per suite they
+              # do not.
+              f.write(f'MESSAGR_INTEROP_SENDER={d[\"roundtrip_entrant_user_id\"]}\\n')
+              f.write(f'MESSAGR_INTEROP_WORKDIR={os.environ[\"RUNNER_TEMP\"]}/interop\\n')
           "
 
       # Before the emulator, and that ordering is the whole reason this is two
@@ -141,6 +149,7 @@ jobs:
           sudo udevadm trigger --name-match=kvm
 
       - name: Run the boot suite on an emulator
+        id: suite
         uses: reactivecircus/android-emulator-runner@v2
         with:
           api-level: 34
@@ -166,8 +175,13 @@ jobs:
       # while a red one without the device's own log costs a whole run per
       # hypothesis. The application says what it decided; this is how that
       # reaches whoever is reading the failure.
+      # Conditioned on the suite itself having failed, not on the job having
+      # failed. When something earlier goes wrong the suite never runs, there
+      # are no artifacts to keep, and an empty upload erroring there shouts
+      # about an absence that is entirely correct -- burying the failure that
+      # actually happened under a second one that did not.
       - name: Keep the device's own logs when the suite fails
-        if: failure()
+        if: failure() && steps.suite.conclusion == 'failure'
         uses: actions/upload-artifact@v4
         with:
           name: detox-artifacts

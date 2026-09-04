@@ -18,8 +18,27 @@ describe('boot', () => {
   // cold launch that restores a session and syncs against a real homeserver
   // routinely takes longer than that.
   beforeAll(async () => {
-    await device.launchApp({ newInstance: true })
-  }, 60000)
+    // Opened BY the invitation, which is how a real person arrives: the
+    // application carries no session of its own any more, so this url is the
+    // only thing that gives it one. A launch without it would reach a screen
+    // saying so, correctly, and every assertion below would fail for that
+    // reason rather than for anything they are about.
+    await device.launchApp({
+      newInstance: true,
+      url: process.env.MESSAGR_INVITATION_LINK,
+      delete: true,
+    })
+  }, 120000)
+
+  it('enters by spending the invitation it was opened with', async () => {
+    // The first launch of a freshly installed application: no session kept,
+    // so the link is claimed. `delete: true` above is what makes that true
+    // rather than accidental -- it clears the keystore entry a previous run
+    // would have left.
+    await waitFor(element(by.text('entry: invitation claimed')))
+      .toBeVisible()
+      .withTimeout(60000)
+  })
 
   it('runs on the New Architecture', async () => {
     // The crypto bridge is a JSI turbo module with no legacy mode, so this is
