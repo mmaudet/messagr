@@ -1,51 +1,7 @@
 import { by, device, element, expect as detoxExpect, waitFor } from 'detox'
 
-/** The readout's scroll container. Every assertion below starts from its top. */
-const SCROLL = by.id('diagnostic-scroll')
-/**
- * Assert a line of the readout, from wherever the screen happens to be.
- *
- * Detox does not scroll on its own, so an assertion written as a plain
- * expectation is really an assertion about scroll position. That has cost
- * this suite three continuous-integration runs, each time for a different
- * reason and each time looking like a product failure: a block inserted
- * rather than appended pushed the crypto readout below the fold, and the
- * notched button -- the only focusable view on the screen -- took initial
- * focus, which made Android scroll the whole readout to reach it.
- *
- * Both were correct behaviour. What was wrong was a suite that depended on
- * a layout nobody had promised. Going to the top first and then searching
- * downwards removes the dependency rather than accommodating it once more.
- */
-async function seeText(text: string): Promise<void> {
-  await element(SCROLL).scrollTo('top')
-  await waitFor(element(by.text(text)))
-    .toBeVisible()
-    .whileElement(SCROLL)
-    .scroll(300, 'down')
-}
+import { SCROLL, seeId, seeText } from './readout'
 
-/** The same, for a line reached by its identifier rather than its words. */
-async function seeId(id: string): Promise<void> {
-  await element(SCROLL).scrollTo('top')
-  await waitFor(element(by.id(id)))
-    .toBeVisible()
-    .whileElement(SCROLL)
-    .scroll(300, 'down')
-}
-
-/**
- * The boot contract, asserted on a real device rather than in configuration.
- *
- * Everything here was verified by hand first, screenshot by screenshot. This
- * suite exists so that the next change does not have to be.
- *
- * Assertions match on the rendered text rather than on a testID with
- * `toHaveText`. Under the New Architecture the latter finds the view and
- * reads a null string from it on Android, so it fails on a correct screen.
- * Matching the text asserts the same thing: that the value reached the
- * display.
- */
 describe('boot', () => {
   // Jest's per-test testTimeout (jest.config.js) does not cover beforeAll:
   // hooks fall back to Jest's own 5000ms default unless given one here. A
@@ -164,7 +120,13 @@ describe('boot', () => {
     // reach: type, send, and find it in the conversation afterwards.
     const written = `écrit à la main ${Date.now()}`
     await element(SCROLL).scrollTo('top')
-    await element(by.id('conversation-input')).typeText(written)
+    // `replaceText`, not `typeText`: the emulator's input method cannot
+    // translate accented characters into key events, and fails with a message
+    // about key events rather than about the accent. Setting the field
+    // directly is what Espresso itself suggests, and it is closer to what a
+    // person does anyway -- nobody types a message one key event at a time
+    // while a test watches.
+    await element(by.id('conversation-input')).replaceText(written)
     await element(by.id('conversation-send')).tap()
 
     // Generous: this encrypts, shares a room key if the session needs one,

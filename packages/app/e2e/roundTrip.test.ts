@@ -3,6 +3,8 @@ import { resolve } from 'node:path'
 
 import { by, device, element, waitFor } from 'detox'
 
+import { SCROLL, seeText } from './readout'
+
 /**
  * Everything this file asserts sits at the bottom of a readout that has
  * grown past one screen, so every assertion has to scroll to reach it.
@@ -12,7 +14,6 @@ import { by, device, element, waitFor } from 'detox'
  * about key delivery -- the application had decrypted the message correctly
  * every single time.
  */
-const SCROLL = by.id('diagnostic-scroll')
 
 /**
  * The round trip, and the verdict ADR-0001 asks for: a message encrypted by
@@ -168,14 +169,11 @@ describeRoundTrip('encrypted round trip', () => {
     // a diagnostic line. Decrypting proves which key wrote the message and
     // nothing about who holds it, so the conversation says the sender is
     // announced -- and the word "vérifier" appears nowhere on it.
-    await waitFor(
-      element(
-        by.text(`Se présente comme ${process.env.MESSAGR_INTEROP_USER ?? ''}`),
-      ),
-    )
-      .toBeVisible()
-      .whileElement(SCROLL)
-      .scroll(400, 'down')
+    // The label is two lines tall, because a Matrix user id is long. A
+    // scroll that merely reached it left it 60 per cent visible and the
+    // assertion failed on a screen that was rendering exactly the right
+    // words. Going to the top first lands it properly.
+    await seeText(`Se présente comme ${process.env.MESSAGR_INTEROP_USER ?? ''}`)
   })
 
   it('does not present the sender as established', async () => {
