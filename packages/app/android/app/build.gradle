@@ -136,15 +136,46 @@ android {
             keyAlias 'androiddebugkey'
             keyPassword 'android'
         }
+
+        // THE UPLOAD KEY, WHICH IS NEVER IN THIS REPOSITORY.
+        //
+        // Play App Signing: the store holds the app signing key, the one an
+        // application's identity is permanently bound to. This is the upload
+        // key, which only proves that a build came from us. That split is the
+        // whole reason it is replaceable at all -- losing the app signing key
+        // would end the application, losing this one is a support request.
+        //
+        // Supplied through the environment, so it lives in the
+        // continuous-integration secret store and on whichever machine a
+        // person publishes from. The same discipline the bench credentials
+        // already follow.
+        upload {
+            def keystore = System.getenv("MESSAGR_UPLOAD_KEYSTORE")
+            if (keystore) {
+                storeFile file(keystore)
+                storePassword System.getenv("MESSAGR_UPLOAD_KEYSTORE_PASSWORD")
+                keyAlias System.getenv("MESSAGR_UPLOAD_KEY_ALIAS")
+                keyPassword System.getenv("MESSAGR_UPLOAD_KEY_PASSWORD")
+            }
+        }
     }
     buildTypes {
         debug {
             signingConfig signingConfigs.debug
         }
         release {
-            // Caution! In production, you need to generate your own keystore file.
-            // see https://reactnative.dev/docs/signed-apk-android.
-            signingConfig signingConfigs.debug
+            // Unsigned when no upload key is supplied, and deliberately not
+            // signed with the debug key the template reached for. A release
+            // build carrying the debug signature is one that installs, looks
+            // finished, and can never be published under this identity --
+            // the framework's own comment warns about exactly that, and the
+            // warning was still standing here.
+            //
+            // An unsigned release still builds, which is what continuous
+            // integration needs to inspect the bundle. It simply cannot be
+            // installed, which is correct: nothing should be installable
+            // from a build nobody signed.
+            signingConfig System.getenv("MESSAGR_UPLOAD_KEYSTORE") ? signingConfigs.upload : null
             minifyEnabled enableProguardInReleaseBuilds
             proguardFiles getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro"
         }
