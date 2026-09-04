@@ -28,6 +28,8 @@ import {
 
 import type { IdentityEntitlement } from './crossSigningIdentity'
 import { computeCryptoMachineConfig } from './cryptoMachineConfig'
+import { cryptoStoreSecrets } from './deviceSecrets'
+import { openStorePassphrase } from './storePassphrase'
 import type { DeviceIdentity } from './deviceIdentity'
 import { encryptAndSendOneMessage, type SendReport } from './encryptAndSend'
 import { getErrorMessage } from './errors'
@@ -47,7 +49,19 @@ export type { ReceiveReport } from './receiveDecrypt'
 export type { ProbeReport } from './panicProbe'
 
 export type MachineStartResult =
-  | { readonly started: true; readonly unsubscribeToDevice: () => void }
+  | {
+      readonly started: true
+      readonly unsubscribeToDevice: () => void
+      /**
+       * Whether this launch minted the store's passphrase or reopened with
+       * the one it already held. Never the passphrase itself.
+       *
+       * Reported because it is the difference between a store this device
+       * can still read and a new, empty one: a relaunch that mints is a
+       * relaunch that lost every room key it had.
+       */
+      readonly passphraseMinted: boolean
+    }
   | { readonly started: false; readonly reason: string }
 
 /**
@@ -68,7 +82,22 @@ export async function startCryptoMachine(
   storeDir: string,
   onToDeviceError: (cause: unknown) => void,
 ): Promise<MachineStartResult> {
-  const config = computeCryptoMachineConfig(credentials, storeDir)
+  // Before the config, because there is no useful config without it. A
+  // store opened with the wrong passphrase is not a degraded store, it is a
+  // different one -- and the first launch to open a second store loses every
+  // room key the first one held.
+  const passphrase = await openStorePassphrase(cryptoStoreSecrets, byteLength =>
+    crypto.getRandomValues(new Uint8Array(byteLength)),
+  )
+  if (!passphrase.held) {
+    return { started: false, reason: passphrase.reason }
+  }
+
+  const config = computeCryptoMachineConfig(
+    credentials,
+    storeDir,
+    passphrase.passphrase,
+  )
   if (config === null) {
     return {
       started: false,
@@ -88,7 +117,11 @@ export async function startCryptoMachine(
     onToDeviceError,
   )
 
-  return { started: true, unsubscribeToDevice }
+  return {
+    started: true,
+    unsubscribeToDevice,
+    passphraseMinted: passphrase.minted,
+  }
 }
 
 /**
