@@ -74,6 +74,20 @@ describeRoundTrip('encrypted round trip', () => {
       .withTimeout(60000)
   }, 180000)
 
+  it('restores its session on relaunch instead of claiming again', async () => {
+    // The launch in beforeAll carried no invitation link, and the application
+    // entered anyway: the session came out of the device's keystore.
+    //
+    // This is not a convenience. An invitation is single-use, so an
+    // application that lost its session and claimed again would find the
+    // token spent and the account unreachable -- losing a session is losing
+    // the account.
+    await waitFor(element(by.text('entry: session restored')))
+      .toBeVisible()
+      .whileElement(SCROLL)
+      .scroll(400, 'down')
+  })
+
   it('reads a message an independent client encrypted for it', async () => {
     // Sent only now: before this device published its keys, there was
     // nothing for the counterparty to encrypt to.
