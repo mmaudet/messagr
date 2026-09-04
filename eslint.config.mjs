@@ -6,6 +6,8 @@
 import reactNative from '@react-native/eslint-config/flat'
 import prettier from 'eslint-config-prettier'
 
+import designTokens from './eslint-rules/design-tokens.mjs'
+
 // @react-native/eslint-config parses `**/*.js` with @babel/eslint-parser and
 // runs eslint-plugin-ft-flow over the result, because the React Native
 // template's .js files are Flow. This workspace has none: it is TypeScript
@@ -40,6 +42,17 @@ export default [
   },
 
   ...withoutFlow,
+
+  // Interface invariant 11, enforced rather than stated: no design value may
+  // be written in place. The generated module is exempt because it is where
+  // the values legitimately live, and the end-to-end suite because it asserts
+  // rendered text and renders nothing itself.
+  {
+    files: ['packages/app/**/*.{ts,tsx}'],
+    ignores: ['packages/app/src/design/tokens.ts', 'packages/app/e2e/**'],
+    plugins: { design: designTokens },
+    rules: { 'design/tokens-only': 'error' },
+  },
 
   // eslint-config-prettier last, deliberately. @react-native/eslint-config
   // applies it too, but as the first element of its array, so any stylistic

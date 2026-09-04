@@ -40,6 +40,14 @@ jobs:
             }
           '
 
+      # Before the lint, and that ordering carries the argument. The lint
+      # refuses any design value written in place, which is only a rule worth
+      # having if the module it points at still matches design/tokens.json.
+      # A stale module would make the lint enforce yesterday's design very
+      # strictly.
+      - name: Assert the generated design tokens match their source
+        run: yarn tokens:check
+
       - run: yarn lint
       - run: yarn format
       - run: yarn typecheck
