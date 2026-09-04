@@ -20,13 +20,6 @@ export interface CryptoMachineConfig {
   readonly storePassphrase: string | null
 }
 
-// Not a secret, and not to be read as an example of choosing one: this
-// screen has no user, no keychain and no secret of its own to protect, the
-// same reasoning the library's own example app states for its literal demo
-// passphrase. A real passphrase policy is product work, and belongs to
-// whichever ticket first gives this screen a person to protect.
-const SCAFFOLD_PASSPHRASE = 'messagr-scaffold-crypto-store'
-
 /**
  * `null` when the host supplied no writable directory: reported as a defect
  * rather than a store silently opened somewhere nobody agreed to.
@@ -41,6 +34,7 @@ const SCAFFOLD_PASSPHRASE = 'messagr-scaffold-crypto-store'
 export function computeCryptoMachineConfig(
   session: DeviceIdentity,
   storeDir: string,
+  storePassphrase: string,
 ): CryptoMachineConfig | null {
   if (storeDir === '') {
     return null
@@ -49,6 +43,9 @@ export function computeCryptoMachineConfig(
     userId: session.userId,
     deviceId: session.deviceId,
     storePath: `${storeDir}/crypto/${session.deviceId}`,
-    storePassphrase: SCAFFOLD_PASSPHRASE,
+    // Handed in rather than chosen here: it is per-device, random, and kept
+    // in the operating system's keystore. See storePassphrase.ts for why a
+    // second one is not a second chance.
+    storePassphrase,
   }
 }

@@ -7,12 +7,16 @@ describe('computeCryptoMachineConfig', () => {
     const config = computeCryptoMachineConfig(
       { userId: '@alice:example.org', deviceId: 'DEVICE1' },
       '/data/user/0/com.messagr/files',
+      'a-passphrase',
     )
     expect(config).toEqual({
       userId: '@alice:example.org',
       deviceId: 'DEVICE1',
       storePath: '/data/user/0/com.messagr/files/crypto/DEVICE1',
-      storePassphrase: expect.any(String),
+      // Handed in, not invented: the constant that used to live in the
+      // source could open any device's store for anyone who read the
+      // repository.
+      storePassphrase: 'a-passphrase',
     })
   })
 
@@ -21,6 +25,7 @@ describe('computeCryptoMachineConfig', () => {
       computeCryptoMachineConfig(
         { userId: '@alice:example.org', deviceId: 'DEVICE1' },
         '',
+        'a-passphrase',
       ),
     ).toBeNull()
   })
@@ -30,10 +35,12 @@ describe('computeCryptoMachineConfig', () => {
     const a = computeCryptoMachineConfig(
       { userId: '@alice:example.org', deviceId: 'DEVICE1' },
       storeDir,
+      'a-passphrase',
     )
     const b = computeCryptoMachineConfig(
       { userId: '@bob:example.org', deviceId: 'DEVICE2' },
       storeDir,
+      'a-passphrase',
     )
     expect(a?.storePath).not.toBe(b?.storePath)
   })
