@@ -61,12 +61,42 @@ export const color = {
     raised: '#ffffff', // Bulle entrante, champ de saisie.
   },
   dark: {
-    brand: undefined,
-    agent: undefined,
-    wait: undefined,
-    deny: undefined,
-    neutral: undefined,
-    surface: undefined,
+    brand: {
+      green500: '#2fd48a', // Action principale, marque. Remonté en clarté pour tenir sur fond sombre.
+      green700: '#54dfa0', // Rôle « texte et bordure » : sur sombre, il est plus clair que green500, pas plus foncé.
+      green100: '#10281f', // Surface vérifiée.
+      ink900: '#05100d', // Fond des frontières de sécurité : reste distinct de surface.paper en sombre.
+    },
+    agent: {
+      '100': '#23211d', // Surface agent, fiche de capacités.
+      '400': '#9c9486', // Agent en retrait.
+      '700': '#d2cabb', // Encre agent : rôle « texte fort agent », donc clair en sombre.
+      border: '#8a8273', // Pointillé agent. Jamais un état désactivé — et jamais confondu avec dark.neutral.300 (#4a4741).
+    },
+    wait: {
+      '100': '#2a2211', // Surface : bandeau hors ligne, brouillon d'agent.
+      '200': '#5b4a1c', // Bordure.
+      '500': '#c9a94a', // Marqueur, point d'état : valeur inchangée, elle tient sur les deux fonds.
+      '700': '#e6c977', // Texte d'attente.
+    },
+    deny: {
+      '100': '#2b1616', // Surface de mesure.
+      '200': '#5e2a2a', // Bordure de mesure.
+      '500': '#c25656', // Action de mesure.
+      '700': '#eda1a1', // Texte de mesure.
+    },
+    neutral: {
+      '200': '#2c322f', // Séparateur, bordure de liste, plaque inerte.
+      '300': '#4a4741', // Contrôle inactif. Seul gris de désactivation autorisé en sombre.
+      '400': '#857f74', // Texte tertiaire, placeholder.
+      '600': '#a9a298', // Texte secondaire.
+      '900': '#f1ede5', // Texte principal.
+    },
+    surface: {
+      paper: '#121815', // Fond d'écran par défaut.
+      sunk: '#0c110f', // Fond de conversation.
+      raised: '#1c2320', // Bulle entrante, champ de saisie.
+    },
   },
 } as const
 
