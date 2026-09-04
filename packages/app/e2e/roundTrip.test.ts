@@ -3,7 +3,7 @@ import { resolve } from 'node:path'
 
 import { by, device, element, waitFor } from 'detox'
 
-import { SCROLL, seeText } from './readout'
+import { seeText } from './readout'
 
 /**
  * Everything this file asserts sits at the bottom of a readout that has
@@ -93,9 +93,15 @@ describeRoundTrip('encrypted round trip', () => {
     // The first run claims the invitation, publishes this device's keys and
     // sends its own message.
     await device.launchApp({ newInstance: true, delete: true, url: INVITATION })
+    // Existence first, then visibility. `toBeVisible` with a timeout was
+    // answering two questions at once -- has the send finished, and can the
+    // line be seen -- and the conversation screen rendering above the readout
+    // pushed the line below the fold, which failed as if the send had never
+    // happened.
     await waitFor(element(by.text('encrypted send: sent')))
-      .toBeVisible()
+      .toExist()
       .withTimeout(60000)
+    await seeText('encrypted send: sent')
   }, 180000)
 
   it('restores its session on relaunch instead of claiming again', async () => {
@@ -108,22 +114,14 @@ describeRoundTrip('encrypted round trip', () => {
     // token spent and the account unreachable -- losing a session is losing
     // the account.
     await device.launchApp({ newInstance: true })
-    await waitFor(element(by.text('entry: session restored')))
-      .toBeVisible()
-      .whileElement(SCROLL)
-      .scroll(400, 'down')
+    await seeText('entry: session restored')
 
     // The store's passphrase survived too, and that is a separate claim from
     // the session's. A relaunch that minted a new one would have opened a
     // new, empty store and lost every room key the old one held -- which the
     // decryption below would then fail on, several minutes later and looking
     // like a key-delivery problem rather than a storage one.
-    await waitFor(
-      element(by.text('store passphrase: reused, the store reopened')),
-    )
-      .toBeVisible()
-      .whileElement(SCROLL)
-      .scroll(400, 'down')
+    await seeText('store passphrase: reused, the store reopened')
   })
 
   it('reads a message an independent client encrypted for it', async () => {
@@ -146,10 +144,7 @@ describeRoundTrip('encrypted round trip', () => {
     for (let attempt = 0; attempt < 4 && !seen; attempt += 1) {
       await device.launchApp({ newInstance: true })
       try {
-        await waitFor(element(by.text(`decrypted: ${COUNTERPARTY_BODY}`)))
-          .toBeVisible()
-          .whileElement(SCROLL)
-          .scroll(400, 'down')
+        await seeText(`decrypted: ${COUNTERPARTY_BODY}`)
         seen = true
       } catch {
         // The room key had not arrived within this launch's own attempt.
@@ -181,15 +176,8 @@ describeRoundTrip('encrypted round trip', () => {
     // Decrypting an event does not establish who wrote it, and the day this
     // line loses the word "unauthenticated" is the day the product starts
     // implying otherwise.
-    await waitFor(
-      element(
-        by.text(
-          `claims to be from: ${process.env.MESSAGR_INTEROP_USER ?? ''} (unauthenticated)`,
-        ),
-      ),
+    await seeText(
+      `claims to be from: ${process.env.MESSAGR_INTEROP_USER ?? ''} (unauthenticated)`,
     )
-      .toBeVisible()
-      .whileElement(SCROLL)
-      .scroll(400, 'down')
   })
 })
