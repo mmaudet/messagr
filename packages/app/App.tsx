@@ -12,6 +12,8 @@ import {
 import {
   firstJoinedRoom,
   receiveOneEncryptedMessage,
+  runPanicProbe,
+  type ProbeReport,
   runOutgoingPump,
   sendOneEncryptedMessage,
   startCryptoMachine,
@@ -81,6 +83,14 @@ export function App({
   // build time (babel.config.js), not read live, so there is nothing here a
   // dependency array could usefully react to.
   const credentials = useMemo(() => computeSessionCredentials(), [])
+  // #27's diagnostic, off in every ordinary build. A static read, because
+  // that is the only shape babel's inliner replaces (sessionCredentials.ts
+  // says the same about its four).
+  const panicProbeRequested = useMemo(
+    () => process.env.MESSAGR_PANIC_PROBE === '1',
+    [],
+  )
+  const [probe, setProbe] = useState<ProbeReport | null>(null)
   const [session, setSession] = useState<
     SessionSyncStatus | 'not-configured' | null
   >(null)
@@ -94,6 +104,21 @@ export function App({
     const probeAndReport = async (): Promise<void> => {
       const status = await fetchBridgeStatus(runProbe)
       setBridge(status)
+
+      // Answers one question and does nothing else. The machine it creates
+      // carries a made-up identity and its own store, so letting the normal
+      // flow run afterwards would be driving a bridge configured for
+      // somebody who does not exist.
+      if (panicProbeRequested) {
+        setProbe({ outcome: 'attempting', detail: 'calling encryptEvent' })
+        const report = await runPanicProbe(
+          { userId: '@probe:example.invalid', deviceId: 'PROBEDEVICE' },
+          storeDir,
+        )
+        setProbe(report)
+        logEvent('info', 'MESSAGR_PANIC_PROBE', { ...report })
+        return
+      }
 
       // No provisioned account: report it rather than attempt a sync that has
       // nothing to restore. This keeps the screen runnable for a developer
@@ -190,7 +215,15 @@ export function App({
     probeAndReport().catch((cause: unknown) => {
       logEvent('error', 'MESSAGR_RUNTIME_FAILED', { reason: String(cause) })
     })
-  }, [architecture, hermes, gaps, client, credentials, storeDir])
+  }, [
+    architecture,
+    hermes,
+    gaps,
+    client,
+    credentials,
+    storeDir,
+    panicProbeRequested,
+  ])
 
   // The synced case computed once rather than repeated at each of its two
   // uses below: narrowing `session` inline in both the status and the
@@ -210,6 +243,15 @@ export function App({
   return (
     <SafeAreaProvider>
       <SafeAreaView style={styles.screen}>
+        {probe !== null && (
+          <View style={styles.block}>
+            <Text style={styles.heading}>Panic probe (#27)</Text>
+            <Text testID="panic-probe" style={styles.line}>
+              {`${probe.outcome}: ${probe.detail}`}
+            </Text>
+          </View>
+        )}
+
         <View style={styles.block}>
           <Text style={styles.heading}>New Architecture</Text>
           <Text testID="arch-enabled" style={styles.line}>

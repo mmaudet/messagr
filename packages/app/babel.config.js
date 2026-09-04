@@ -22,6 +22,10 @@ module.exports = {
           'MESSAGR_SESSION_USER_ID',
           'MESSAGR_SESSION_DEVICE_ID',
           'MESSAGR_SESSION_ACCESS_TOKEN',
+          // Off in every ordinary build. Turns the screen into the #27
+          // diagnostic, which deliberately tries to make the process die and
+          // would break every other assertion if it ran by default.
+          'MESSAGR_PANIC_PROBE',
         ],
       },
     ],
