@@ -196,7 +196,15 @@ jobs:
           name: detox-artifacts
           path: packages/app/.artifacts
           retention-days: 7
-          if-no-files-found: warn
+          # The directory is hidden, and this action skips hidden files by
+          # default -- which is how the previous attempt uploaded nothing
+          # while reporting success. The second silent failure of the same
+          # instrument, for a different reason than the first.
+          include-hidden-files: true
+          # An error, not a warning: an instrument that reports success over
+          # an empty directory is worse than no instrument, because it reads
+          # as evidence that there was nothing to find.
+          if-no-files-found: error
 
       # The acceptance criterion this whole job exists for: an independent
       # implementation, not ours, decrypting what the application encrypted.
