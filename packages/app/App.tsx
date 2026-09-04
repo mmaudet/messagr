@@ -534,12 +534,21 @@ function computePumpDeviceKeysLabel(
     : `device keys published: ${ran.report.deviceKeysVerified}`
 }
 
+/**
+ * Counted on the server rather than inferred from this run's own uploads: a
+ * warm store queues none because it needs none, and the old signal read
+ * false there while the server held a full set.
+ */
 function computePumpOneTimeKeysLabel(
   ran: Extract<PumpStatus, { outcome: 'ran' }> | null,
 ): string {
-  return ran === null
-    ? 'one-time keys published: —'
-    : `one-time keys published: ${ran.report.oneTimeKeysPublished}`
+  if (ran === null) {
+    return 'one-time keys on server: —'
+  }
+  const count = ran.report.oneTimeKeysOnServer
+  return count === null
+    ? 'one-time keys on server: unknown'
+    : `one-time keys on server: ${count > 0 ? 'yes' : 'none'}`
 }
 
 // Values are literal rather than tokenised on purpose: this screen is
