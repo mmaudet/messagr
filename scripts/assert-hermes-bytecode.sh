@@ -19,13 +19,35 @@ set -euo pipefail
 # beside it, so it runs from any working directory rather than only from the
 # repository root the CI step happens to use.
 ROOT=$(cd "$(dirname "$0")/.." && pwd)
-APK="$ROOT/packages/app/android/app/build/outputs/apk/release/app-release.apk"
+OUT="$ROOT/packages/app/android/app/build/outputs/apk/release"
 
-if [ ! -f "$APK" ]; then
-  echo "FAIL: no release APK at $APK" >&2
+# TWO NAMES, ONE ARTEFACT.
+#
+# Gradle names the file app-release.apk when a signing config produced it and
+# app-release-unsigned.apk when none did. Ordinary continuous integration
+# builds the unsigned one on purpose -- the upload key belongs to the publish
+# workflow and to nothing else -- so a check that knew only the signed name
+# would fail on the correct state, which it did.
+#
+# This assertion is about which engine compiled the bundle. It has no opinion
+# about signatures, and says which artefact it read so that a reader is not
+# left guessing which one existed.
+APK=""
+for candidate in "$OUT/app-release.apk" "$OUT/app-release-unsigned.apk"; do
+  if [ -f "$candidate" ]; then
+    APK="$candidate"
+    break
+  fi
+done
+
+if [ -z "$APK" ]; then
+  echo "FAIL: no release APK in $OUT" >&2
+  echo "      Looked for app-release.apk and app-release-unsigned.apk." >&2
   echo "      Build it first: (cd packages/app/android && ./gradlew :app:assembleRelease)" >&2
   exit 1
 fi
+
+echo "inspecting $(basename "$APK")"
 
 EXTRACT=$(mktemp -d)
 trap 'rm -rf "$EXTRACT"' EXIT
