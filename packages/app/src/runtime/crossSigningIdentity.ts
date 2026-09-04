@@ -61,6 +61,21 @@ import type { DrainResult } from './pump'
  * instead of by device. `sharingStrategy.ts` reads that out of the machine,
  * so the change is observed rather than asserted.
  */
+/**
+ * Why this launch may, or may not, create the account's first identity.
+ *
+ * A boolean here read `false` at every call site and said nothing about what
+ * was being refused. The entitlement is a domain fact, so it is spelled.
+ */
+export type IdentityEntitlement =
+  /**
+   * This launch claimed an invitation, so it created the account seconds ago
+   * by spending a single-use token. No other device has ever held it.
+   */
+  | 'account-just-created'
+  /** This launch restored a session. It creates nothing. */
+  | 'restored-session'
+
 export interface IdentityMachineOps {
   readonly getIdentityStatus: () => Promise<IdentityStatus>
   readonly bootstrapCrossSigning: () => Promise<void>
@@ -71,13 +86,28 @@ export type IdentityReport =
   | {
       readonly established: true
       /**
-       * `'published'` republished an identity this device already held and
-       * the server already knew. `'created'` made the account's first, which
-       * happens exactly once in an account's life. `'resumed'` re-handed a
-       * publication this device had created and never seen accepted -- the
-       * same identity, not a new one.
+       * `'published'` republished an identity this device already held and a
+       * homeserver already knew. `'created'` made the account's first, which
+       * happens exactly once in an account's life.
+       *
+       * Both are read back out of the machine before they are claimed: a
+       * call that did not throw is not the same fact as an identity the
+       * machine reports holding.
        */
-      readonly how: 'published' | 'created' | 'resumed'
+      readonly how: 'published' | 'created'
+    }
+  | {
+      /**
+       * Created on this device and not yet acknowledged by any homeserver.
+       *
+       * Deliberately not `established`. The library is explicit that this is
+       * the one state where `identityKnown` is true and the account still has
+       * no identity, and that a product showing "encryption is set up" here
+       * is wrong.
+       */
+      readonly established: false
+      readonly publicationPending: true
+      readonly reason: string
     }
   | { readonly established: false; readonly reason: string }
 
@@ -129,10 +159,58 @@ function describeFailedDrain(drained: DrainResult): string {
     .join(', ')}`
 }
 
+/**
+ * Sends what the machine queued and reports what the machine then holds.
+ *
+ * Both halves matter and neither is enough. A call that did not throw has
+ * queued a batch that is still on the device, so nothing is published until
+ * the drain sends it; and a drain that succeeded is a claim about requests,
+ * not about the identity. So the status is read back afterwards, which is
+ * what "observed from the machine's own state" has to mean.
+ */
+async function sendAndConfirm(
+  machine: IdentityMachineOps,
+  drain: () => Promise<DrainResult>,
+  how: 'published' | 'created',
+): Promise<IdentityReport> {
+  const drained = await drain()
+  const status = await machine.getIdentityStatus()
+
+  if (status.identityPublicationPending) {
+    // The identity exists on this device and no homeserver has said it
+    // received it. Reporting "none" here would be wrong twice over: one was
+    // created, and it is irreversible. Reporting it established would be the
+    // error the library names outright.
+    return {
+      established: false,
+      publicationPending: true,
+      reason:
+        drained.failed > 0
+          ? `created here, but not published: ${describeFailedDrain(drained)}`
+          : 'created here, and no homeserver has acknowledged it yet',
+    }
+  }
+
+  if (drained.failed > 0) {
+    return { established: false, reason: describeFailedDrain(drained) }
+  }
+
+  // Asked rather than assumed. Both fields, because recognising an identity
+  // is not holding one.
+  return status.identityKnown && status.privateKeysHeld
+    ? { established: true, how }
+    : {
+        established: false,
+        reason:
+          'the requests were sent and the machine still reports no identity ' +
+          'it holds',
+      }
+}
+
 export async function establishCrossSigningIdentity(
   machine: IdentityMachineOps,
   drain: () => Promise<DrainResult>,
-  accountCreatedByThisLaunch: boolean,
+  entitlement: IdentityEntitlement,
 ): Promise<IdentityReport> {
   for (let round = 0; round < MAX_ROUNDS; round += 1) {
     let refusal: unknown = null
@@ -145,10 +223,7 @@ export async function establishCrossSigningIdentity(
     if (refusal === null) {
       // Published, or republished. Either way the batch is in the machine and
       // nothing has left the device until it is sent.
-      const drained = await drain()
-      return drained.failed > 0
-        ? { established: false, reason: describeFailedDrain(drained) }
-        : { established: true, how: 'published' }
+      return sendAndConfirm(machine, drain, 'published')
     }
 
     switch (kindOf(refusal)) {
@@ -178,29 +253,42 @@ export async function establishCrossSigningIdentity(
       }
 
       case 'identity_not_known': {
-        // The server was asked and named no identity for this account -- but
-        // that is two situations, and the second one is a device this
-        // application itself left half-finished.
+        // The server was asked and named no identity for this account.
+        if (entitlement === 'account-just-created') {
+          return createFirstIdentity(machine, drain)
+        }
+
+        // A restore creates nothing, and that includes finishing a
+        // publication an earlier launch left unacknowledged.
+        //
+        // The library does say the remedy for that state is the same create
+        // call again, and it is tempting to make it automatic here. Its next
+        // sentence is why that is wrong: "which is why finishing is a
+        // decision". The incident it reports measuring is this exact shape --
+        // a device in this state, answered honestly that the account has no
+        // identity, publishing over an identity a second device had
+        // legitimately created in the gap. "The launch-time call did it."
+        //
+        // Finishing needs a fact that outlives the launch that started it:
+        // that this account is still in sign-up. Nothing persists that yet,
+        // so this reports the state and stops rather than deciding.
         const status = await machine.getIdentityStatus()
         if (status.identityPublicationPending) {
-          // This device created an identity and never saw a homeserver
-          // accept it: the store survived, the publication did not. The
-          // library's remedy is to make the same call again, deliberately,
-          // and it hands back the publication that was lost rather than
-          // minting a second identity. Without this an account interrupted
-          // mid-creation stays unpublished for good, because every later
-          // launch is a restore and no restore is entitled to create.
-          return publishHeldIdentity(machine, drain, 'resumed')
-        }
-        if (!accountCreatedByThisLaunch) {
           return {
             established: false,
+            publicationPending: true,
             reason:
-              'this account has no identity, and a launch that only restored ' +
-              'a session is not entitled to create one',
+              'an identity was created on this device and no homeserver has ' +
+              'acknowledged it; finishing that is a decision a restore ' +
+              'cannot make',
           }
         }
-        return publishHeldIdentity(machine, drain, 'created')
+        return {
+          established: false,
+          reason:
+            'this account has no identity, and a launch that only restored ' +
+            'a session is not entitled to create one',
+        }
       }
 
       case 'identity_already_exists':
@@ -228,24 +316,18 @@ export async function establishCrossSigningIdentity(
 }
 
 /**
- * The destructive call, made only where one of two entitlements holds: this
- * launch created the account, or this device is finishing a publication it
- * had already created and never saw accepted. `how` records which, because
- * they are the same call and a very different event.
+ * The one destructive call on the library's surface, reached from exactly one
+ * place: a launch that created this account itself, moments ago, by spending
+ * a single-use invitation.
  */
-async function publishHeldIdentity(
+async function createFirstIdentity(
   machine: IdentityMachineOps,
   drain: () => Promise<DrainResult>,
-  how: 'created' | 'resumed',
 ): Promise<IdentityReport> {
   try {
     await machine.createCrossSigningIdentity()
   } catch (cause: unknown) {
     return { established: false, reason: getErrorMessage(cause) }
   }
-
-  const drained = await drain()
-  return drained.failed > 0
-    ? { established: false, reason: describeFailedDrain(drained) }
-    : { established: true, how }
+  return sendAndConfirm(machine, drain, 'created')
 }

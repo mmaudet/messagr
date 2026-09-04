@@ -177,7 +177,9 @@ export function App({
             const report = await runOutgoingPump(
               sessionClient,
               credentials,
-              entered.entered && entered.claimed,
+              entered.entered && entered.claimed
+                ? 'account-just-created'
+                : 'restored-session',
             )
             pumpStatus = { outcome: 'ran', report }
             // Only once the keys are published: a message encrypted before
