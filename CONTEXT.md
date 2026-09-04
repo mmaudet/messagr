@@ -107,6 +107,24 @@ The cryptographic act that changes a trust state, by comparing a short string
 or scanning a code.
 _Avoid_: Authentication, validation, confirmation
 
+**Signing identity**:
+The account's own cross-signing identity: the key pair an account uses to
+vouch, cryptographically, for its own devices. One per account, for its whole
+life. It is what verification signs with, and what lets a device be trusted
+without being verified again on every other device.
+
+Replacing it resets every trust anyone ever placed in the account, cannot be
+undone, and cannot be detected afterwards — which is why creating one is
+gated on an entitlement rather than on a server's answer.
+_Avoid_: Master key, identity key, device key, account key
+
+**Entitlement**:
+The product's own answer to a question cryptography cannot settle: whether
+this launch is allowed to make an irreversible identity decision. Today the
+only one that grants it is a launch that created the account itself, by
+spending an invitation.
+_Avoid_: Permission, authorization, right
+
 **Recognition**:
 Reaching `recognized` through address book matching or another reliable local
 signal. Weaker than verification and never a substitute for it.

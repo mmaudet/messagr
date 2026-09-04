@@ -43,6 +43,15 @@ function fakeMachine(
       accountKeysAnswerUnsettled: false,
       identityPublicationPending: false,
     }),
+    // The account has no identity and this launch did not create it, so
+    // the cycle's establishment step declines rather than creating one.
+    // That is the state every test here is written against.
+    bootstrapCrossSigning: async () => {
+      throw Object.assign(new Error('identity_not_known'), {
+        kind: 'identity_not_known',
+      })
+    },
+    createCrossSigningIdentity: async () => undefined,
     ...rest,
   }
 }
@@ -86,7 +95,11 @@ describe('runOutgoingPumpCycle', () => {
       encryptionSlice: () => ({ next_batch_token: 'tok-1' }),
     }
 
-    const report = await runOutgoingPumpCycle(deps, IDENTITY)
+    const report = await runOutgoingPumpCycle(
+      deps,
+      IDENTITY,
+      'restored-session',
+    )
 
     expect(report.identityKeys).toEqual({
       curve25519: 'curve-key',
@@ -117,10 +130,24 @@ describe('runOutgoingPumpCycle', () => {
       encryptionSlice: () => ({}),
     }
 
-    const report = await runOutgoingPumpCycle(deps, IDENTITY)
+    const report = await runOutgoingPumpCycle(
+      deps,
+      IDENTITY,
+      'restored-session',
+    )
 
-    expect(report.firstDrain).toEqual({ sent: 0, failed: 0, sentKinds: [] })
-    expect(report.secondDrain).toEqual({ sent: 0, failed: 0, sentKinds: [] })
+    expect(report.firstDrain).toEqual({
+      sent: 0,
+      failed: 0,
+      sentKinds: [],
+      failures: [],
+    })
+    expect(report.secondDrain).toEqual({
+      sent: 0,
+      failed: 0,
+      sentKinds: [],
+      failures: [],
+    })
     expect(report.deviceKeysVerified).toBe(false)
     expect(report.oneTimeKeysOnServer).toBe(0)
   })
@@ -160,7 +187,11 @@ describe('runOutgoingPumpCycle', () => {
       encryptionSlice: () => ({ next_batch_token: 'tok-1' }),
     }
 
-    const report = await runOutgoingPumpCycle(deps, IDENTITY)
+    const report = await runOutgoingPumpCycle(
+      deps,
+      IDENTITY,
+      'restored-session',
+    )
 
     expect(order).toEqual([
       'take-outgoing-requests', // first drain
