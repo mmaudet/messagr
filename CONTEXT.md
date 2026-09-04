@@ -72,6 +72,18 @@ its members. Anonymity holds against its administrators too.
 The relation between a participant and a conversation space, carrying role,
 status, join source and visibility.
 
+**Entrant**:
+A participant who entered a conversation space through an invitation and has
+not been vouched for yet. A membership status, never a trust state: an entrant
+may be perfectly verified and still be an entrant.
+_Avoid_: Guest, pending member, unverified user, newcomer
+
+**Promotion**:
+The passage from entrant to full member, granted by vouching. It confers the
+conversation's history and the right to invite. Nothing about it changes a
+trust state.
+_Avoid_: Validation, activation, upgrade, approval
+
 ### Trust, discovery and verification
 
 These are three distinct notions. Conflating them is the most common error in
@@ -98,6 +110,17 @@ _Avoid_: Authentication, validation, confirmation
 **Recognition**:
 Reaching `recognized` through address book matching or another reliable local
 signal. Weaker than verification and never a substitute for it.
+_Avoid_: Using this word for the inviter's judgement, which is vouching
+
+**Vouching**:
+The inviter's own act of saying that the person who entered is the one they
+meant to invite. A human judgement about a person, made after a few exchanges.
+It proves nothing cryptographically and is not a trust state.
+
+It answers what verification cannot. Verification proves which account and
+which device; vouching proves which person holds them — an inviter's stolen
+telephone produces an invitation that verifies perfectly.
+_Avoid_: Recognition, validation, approval, confirmation
 
 ### Agents and capabilities
 
