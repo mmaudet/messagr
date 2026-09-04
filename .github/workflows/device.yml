@@ -122,7 +122,12 @@ jobs:
               f.write(f'MESSAGR_INTEROP_USER={inviter[\"user_id\"]}\\n')
               f.write(f'MESSAGR_INTEROP_PASSWORD={inviter[\"password\"]}\\n')
               f.write(f'MESSAGR_INTEROP_ROOM={d[\"room_id\"]}\\n')
-              f.write(f'MESSAGR_INTEROP_SENDER={d[\"entrant_user_id\"]}\\n')
+              # The round-trip suite's account, not the boot suite's: this
+              # step is the other half of that suite's exchange, and it is
+              # that suite's send the counterparty is meant to read. With one
+              # account the two readings coincided; with one per suite they
+              # do not.
+              f.write(f'MESSAGR_INTEROP_SENDER={d[\"roundtrip_entrant_user_id\"]}\\n')
               f.write(f'MESSAGR_INTEROP_WORKDIR={os.environ[\"RUNNER_TEMP\"]}/interop\\n')
           "
 
