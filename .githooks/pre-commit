@@ -1,0 +1,29 @@
+#!/usr/bin/env sh
+#
+# The gates that cost seconds, run before the ones that cost minutes.
+#
+# Formatting and lint failures are the cheapest possible thing to catch and
+# the most annoying to catch remotely: a push, a wait, a red build, a fix
+# commit. Twice already a formatting miss reached continuous integration
+# because running the check was something to remember rather than something
+# that happened.
+#
+# Deliberately not running the unit tests or the typechecker: those belong to
+# a commit's author to run when they are working, and a hook slow enough to
+# be resented is a hook people disable. Everything here finishes in seconds.
+#
+# Enabled by `git config core.hooksPath .githooks`, which CONTRIBUTING
+# explains. To skip it once, commit with `--no-verify`.
+set -e
+
+if ! yarn --silent prettier --check . >/dev/null 2>&1; then
+  echo "Formatting: some files are not formatted." >&2
+  echo "  Fix with: yarn prettier --write ." >&2
+  exit 1
+fi
+
+if ! yarn --silent eslint . --max-warnings 0 >/dev/null 2>&1; then
+  echo "Lint: eslint reported problems." >&2
+  echo "  See them with: yarn lint" >&2
+  exit 1
+fi
