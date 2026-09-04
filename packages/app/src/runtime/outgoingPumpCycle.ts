@@ -6,7 +6,11 @@
 // are already written around. Keeping that value import out of this file
 // entirely, rather than just out of its exported functions, is what lets
 // this module's own spec file import it at all.
-import type { IdentityKeys, SyncDelta } from 'react-native-matrix-crypto'
+import type {
+  IdentityKeys,
+  IdentityStatus,
+  SyncDelta,
+} from 'react-native-matrix-crypto'
 
 import type { DeviceIdentity } from './deviceIdentity'
 import {
@@ -16,6 +20,7 @@ import {
   type HttpRequester,
 } from './pump'
 import { fetchEncryptionSyncDelta, type EncryptionSliceFn } from './syncDelta'
+import { computeSharingStrategy, type SharingStrategy } from './sharingStrategy'
 import { verifyDeviceKeysPublished } from './verifyPublishedKeys'
 
 /** What this cycle needs from the crypto machine, beyond `pump.ts`'s own `CryptoMachine`. */
@@ -25,6 +30,8 @@ export interface CryptoMachineOps extends CryptoMachine {
     userId: string,
     deviceId: string,
   ) => Promise<IdentityKeys>
+  /** Read to establish which key-sharing strategy is in force. */
+  readonly getIdentityStatus: () => Promise<IdentityStatus>
 }
 
 export interface OutgoingPumpDeps {
@@ -39,6 +46,13 @@ export interface CryptoPumpReport {
   readonly secondDrain: DrainResult
   readonly deviceKeysVerified: boolean
   readonly oneTimeKeysPublished: boolean
+  /**
+   * Which strategy the machine uses to choose who receives a room key,
+   * observed rather than assumed. 0.4.0 changes this on its own for a
+   * machine holding a cross-signing identity, and this application holds
+   * none — but a changelog is not evidence, so the machine is asked.
+   */
+  readonly sharingStrategy: SharingStrategy
 }
 
 /**
@@ -78,6 +92,9 @@ export async function runOutgoingPumpCycle(
     identity.userId,
     identity.deviceId,
   )
+  const sharingStrategy = computeSharingStrategy(
+    await machine.getIdentityStatus(),
+  )
   const deviceKeysVerified = await verifyDeviceKeysPublished(http, identity)
 
   return {
@@ -85,6 +102,7 @@ export async function runOutgoingPumpCycle(
     firstDrain,
     secondDrain,
     deviceKeysVerified,
+    sharingStrategy,
     oneTimeKeysPublished:
       firstDrain.sentKinds.includes('keys_upload') ||
       secondDrain.sentKinds.includes('keys_upload'),

@@ -34,6 +34,15 @@ function fakeMachine(
       curve25519: 'curve-key',
       ed25519: 'ed-key',
     }),
+    // No identity of its own, which is this application's real state and the
+    // one under which 0.4.0 keeps the previous sharing strategy.
+    getIdentityStatus: async () => ({
+      accountKeysFetched: true,
+      identityKnown: false,
+      privateKeysHeld: false,
+      accountKeysAnswerUnsettled: false,
+      identityPublicationPending: false,
+    }),
     ...rest,
   }
 }
