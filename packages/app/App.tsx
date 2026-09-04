@@ -168,7 +168,19 @@ export function App({
               reason: sessionStatus.reason,
             }
           } else {
-            const report = await runOutgoingPump(sessionClient, credentials)
+            // The entitlement to create this account's first cross-signing
+            // identity, and the only launch that ever carries it. A claim
+            // created the account seconds ago by spending a single-use
+            // token, so no other device can have published an identity --
+            // which is the fact the library cannot have and refuses to
+            // guess. See crossSigningIdentity.ts.
+            const report = await runOutgoingPump(
+              sessionClient,
+              credentials,
+              entered.entered && entered.claimed
+                ? 'account-just-created'
+                : 'restored-session',
+            )
             pumpStatus = { outcome: 'ran', report }
             // Only once the keys are published: a message encrypted before
             // this device's own keys are on the server is one nobody can
@@ -336,6 +348,9 @@ export function App({
             </Text>
             <Text testID="pump-sharing-strategy" style={styles.line}>
               {computeSharingStrategyLabel(ranPump)}
+            </Text>
+            <Text testID="pump-identity" style={styles.line}>
+              {computeIdentityLabel(ranPump)}
             </Text>
           </View>
 
@@ -542,6 +557,18 @@ function computeSharingStrategyLabel(
   return ran === null
     ? 'room keys shared: —'
     : `room keys shared: ${ran.report.sharingStrategy}`
+}
+
+function computeIdentityLabel(
+  ran: Extract<PumpStatus, { outcome: 'ran' }> | null,
+): string {
+  if (ran === null) {
+    return 'signing identity: —'
+  }
+  const { identity } = ran.report
+  return identity.established
+    ? `signing identity: ${identity.how}`
+    : `signing identity: none (${identity.reason})`
 }
 
 function computePumpStatusLabel(status: PumpStatus | null): string {

@@ -6,12 +6,14 @@
 // are already written around. Keeping that value import out of this file
 // entirely, rather than just out of its exported functions, is what lets
 // this module's own spec file import it at all.
-import type {
-  IdentityKeys,
-  IdentityStatus,
-  SyncDelta,
-} from 'react-native-matrix-crypto'
+import type { IdentityKeys, SyncDelta } from 'react-native-matrix-crypto'
 
+import {
+  establishCrossSigningIdentity,
+  type IdentityEntitlement,
+  type IdentityMachineOps,
+  type IdentityReport,
+} from './crossSigningIdentity'
 import type { DeviceIdentity } from './deviceIdentity'
 import {
   drainOutgoingRequests,
@@ -25,14 +27,12 @@ import { countOneTimeKeysOnServer } from './verifyOneTimeKeys'
 import { verifyDeviceKeysPublished } from './verifyPublishedKeys'
 
 /** What this cycle needs from the crypto machine, beyond `pump.ts`'s own `CryptoMachine`. */
-export interface CryptoMachineOps extends CryptoMachine {
+export interface CryptoMachineOps extends CryptoMachine, IdentityMachineOps {
   readonly receiveSyncChanges: (delta: SyncDelta) => Promise<void>
   readonly getDeviceIdentityKeys: (
     userId: string,
     deviceId: string,
   ) => Promise<IdentityKeys>
-  /** Read to establish which key-sharing strategy is in force. */
-  readonly getIdentityStatus: () => Promise<IdentityStatus>
 }
 
 export interface OutgoingPumpDeps {
@@ -61,6 +61,16 @@ export interface CryptoPumpReport {
    * none — but a changelog is not evidence, so the machine is asked.
    */
   readonly sharingStrategy: SharingStrategy
+  /**
+   * What became of this account's cross-signing identity on this launch:
+   * published, created for the first time, or not established and why.
+   *
+   * Reported next to the strategy above because the two are one fact seen
+   * from two sides — the strategy only turns identity-based for a machine
+   * that holds an identity — and a strategy that stayed device-based is
+   * otherwise a symptom with its cause off screen.
+   */
+  readonly identity: IdentityReport
 }
 
 /**
@@ -85,6 +95,7 @@ export interface CryptoPumpReport {
 export async function runOutgoingPumpCycle(
   deps: OutgoingPumpDeps,
   identity: DeviceIdentity,
+  entitlement: IdentityEntitlement,
 ): Promise<CryptoPumpReport> {
   const { http, machine, encryptionSlice } = deps
 
@@ -94,6 +105,16 @@ export async function runOutgoingPumpCycle(
   await machine.receiveSyncChanges(delta)
 
   const secondDrain = await drainOutgoingRequests(http, machine)
+
+  // Before the strategy is read, because establishing an identity is what
+  // changes it: a machine that has just published one collects recipients by
+  // identity rather than by device. Reading first would report the strategy
+  // of a moment that has already passed.
+  const crossSigning = await establishCrossSigningIdentity(
+    machine,
+    () => drainOutgoingRequests(http, machine),
+    entitlement,
+  )
 
   const identityKeys = await machine.getDeviceIdentityKeys(
     identity.userId,
@@ -112,5 +133,6 @@ export async function runOutgoingPumpCycle(
     deviceKeysVerified,
     sharingStrategy,
     oneTimeKeysOnServer,
+    identity: crossSigning,
   }
 }

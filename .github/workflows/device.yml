@@ -199,5 +199,13 @@ jobs:
 
       # The acceptance criterion this whole job exists for: an independent
       # implementation, not ours, decrypting what the application encrypted.
-      - name: Have the counterparty decrypt what the application sent
+      # Renamed with what it now proves. The application holds a
+      # cross-signing identity, so it shares room keys only with devices an
+      # identity vouches for -- and matrix-nio has no cross-signing at all.
+      # This asserts the exclusion: the message must arrive and must stay
+      # encrypted. The inbound direction, which the Detox suite covers, is
+      # where the interoperability proof lives now. See #58.
+      - name: Have the counterparty confirm it was excluded, as it should be
+        env:
+          MESSAGR_INTEROP_EXPECT: excluded
         run: python3 scripts/interop/nio_counterparty.py collect
