@@ -144,6 +144,22 @@ jobs:
           python3 -m pip install --quiet -r scripts/interop/requirements.txt
           python3 scripts/interop/nio_counterparty.py login
 
+      # THE EMULATOR'S QEMU LINKS AGAINST libpulse AT LOAD TIME.
+      #
+      # The runner image stopped shipping it, and the failure reads as
+      # anything but its cause: `emulator -version` fails, adb cannot reach a
+      # daemon, and the suite reports every assertion failing against an
+      # application that never started. Two runs were written off as an
+      # unstable runner before the message was read.
+      #
+      # `-noaudio` is already passed and does not help: the library is
+      # resolved when the binary loads, before any option is read.
+      - name: Install the library the emulator links against
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends libpulse0
+          echo "libpulse0 present: $(ldconfig -p | grep -c libpulse.so.0) match(es)"
+
       - name: Enable KVM
         run: |
           echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' \
