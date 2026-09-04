@@ -11,7 +11,9 @@
 import type { createClient } from 'matrix-js-sdk'
 import {
   asCryptoScopeId,
+  bootstrapCrossSigning,
   createCryptoMachine,
+  createCrossSigningIdentity,
   decryptEvent,
   encryptEvent,
   encryptionSlice,
@@ -96,6 +98,7 @@ export async function startCryptoMachine(
 export async function runOutgoingPump(
   sessionClient: ReturnType<typeof createClient>,
   identity: DeviceIdentity,
+  accountCreatedByThisLaunch: boolean,
 ): Promise<CryptoPumpReport> {
   return runOutgoingPumpCycle(
     {
@@ -107,10 +110,13 @@ export async function runOutgoingPump(
         receiveSyncChanges,
         getDeviceIdentityKeys,
         getIdentityStatus,
+        bootstrapCrossSigning,
+        createCrossSigningIdentity,
       },
       encryptionSlice,
     },
     identity,
+    accountCreatedByThisLaunch,
   )
 }
 

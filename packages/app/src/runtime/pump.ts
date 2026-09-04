@@ -186,6 +186,20 @@ export interface DrainResult {
    * one-time keys were published checks for the kind, not a parsed count.
    */
   readonly sentKinds: readonly string[]
+  /**
+   * What each failure was, in the order it happened: the request's `kind`
+   * and the HTTP status that refused it (`0` when nothing HTTP did).
+   *
+   * A count alone says a drain failed without saying what to look at, and
+   * the kinds differ in what a failure means -- a refused `signing_keys_upload`
+   * is a server asking for interactive authentication, while a refused
+   * `to_device` is a message that did not arrive. Reporting the pair is what
+   * lets a caller say which happened instead of a reader guessing.
+   */
+  readonly failures: readonly {
+    readonly kind: string
+    readonly status: number
+  }[]
 }
 
 /**
@@ -207,6 +221,7 @@ export async function drainOutgoingRequests(
   let sent = 0
   let failed = 0
   const sentKinds: string[] = []
+  const failures: { kind: string; status: number }[] = []
 
   for (const request of requests) {
     try {
@@ -218,10 +233,11 @@ export async function drainOutgoingRequests(
       const status = cause instanceof PumpHttpError ? cause.status : 0
       await machine.markRequestFailed(request.id, status)
       failed += 1
+      failures.push({ kind: request.kind, status })
     }
   }
 
-  return { sent, failed, sentKinds }
+  return { sent, failed, sentKinds, failures }
 }
 
 /**
