@@ -1,4 +1,4 @@
-package com.messagr
+package eu.messagr
 
 import android.app.Application
 import com.facebook.react.PackageList
