@@ -39,8 +39,12 @@ either repository**, and it binds whatever is built: Dechand (USENIX 2016)
 measured 6.4 % missed attacks, Schröder (EuroUSEC 2016) 21–25 %, Vaziripour
 (SOUPS 2017/18) a success rate moving from 14 % to 90 % **on wording alone**.
 Hence PRD §8.3: _"Le libellé décide plus que le mécanisme. Aucun écran ne doit
-porter le mot « vérifier »."_ It is recognition, not authentication, and the
-realistic attacker belongs to the same social circle.
+porter le mot « vérifier »."_ What the previous product called recognition
+there is what this one calls vouching — a human judgement, not
+authentication — and the realistic attacker belongs to the same social
+circle. The passages above quote that codebase in its own words; where they
+say "recognition", read the gesture, not the glossary term this project has
+since reserved for address-book matching.
 
 ## The constraint that decides the shape
 

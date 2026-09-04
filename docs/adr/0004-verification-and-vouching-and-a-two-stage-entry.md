@@ -1,11 +1,10 @@
-# Two recognitions, and a two-stage entry
+# Verification and vouching, and a two-stage entry
 
 An invitation carries the inviter's identity fingerprint. The joining
 application pins it, and a match lets the entrant participate: join, read the
 live conversation, write in it. It does not grant history and does not grant
-the right to invite. Those come from a second, human gesture — the inviter
-recognising the person after a few exchanges — and that is what promotion
-means.
+the right to invite. Those come from a second, human gesture — the inviter **vouching** for the
+person after a few exchanges — and that is what promotion means.
 
 ## Why two, and not one
 
@@ -16,13 +15,23 @@ nothing about **which human** holds it: an inviter's stolen phone produces an
 invitation whose pin matches perfectly. Only the inviter, reading how the
 newcomer writes, catches that.
 
-The inviter's recognition proves the opposite direction and has the opposite
-blind spot: it says who arrived, and nothing about whether the link the
-newcomer followed was the one that was sent.
+Vouching proves the opposite direction and has the opposite blind spot: it
+says who arrived, and nothing about whether the link the newcomer followed was
+the one that was sent.
+
+**The words here are the glossary's, and an earlier draft of this document got
+them wrong.** `CONTEXT.md` reserves _verification_ for the cryptographic act —
+comparing a short string, scanning a code — and _recognition_ for reaching
+`recognized` through the address book. That draft used both against those
+definitions, calling the emoji ceremony something other than verification and
+the inviter's judgement a recognition. It is the exact confusion the glossary
+warns is the most common error in this domain, committed in the document that
+settles the area. The inviter's judgement is **vouching**; `entrant` and
+`promotion` are _membership_ statuses rather than trust states, so an entrant
+may be fully verified and still be an entrant.
 
 An earlier draft of this decision treated them as alternatives and proposed
-dropping the inviter's gesture, on the grounds that the pin had already done
-the work. That was a conflation of two directions, and it would have removed
+dropping vouching, on the grounds that the pin had already done the work. That was a conflation of two directions, and it would have removed
 the only defence against a compromised inviter account.
 
 ## Why the ceremony is not the gate
@@ -71,8 +80,8 @@ power level rises, so that the power level is a guarantee the keys already
 arrived — an ordering the previous codebase discovered repaired a defect it
 had not set out to fix.
 
-**Inviting is impossible to express, not checked and refused.** An unpromoted
-entrant's session type cannot name the operation. A check is something to
+**Inviting is impossible to express, not checked and refused.** An entrant's
+session type cannot name the operation. A check is something to
 forget; an absent method is not.
 
 **`senderTrustRequirement` stays at `'any'` until cross-signing exists.** The
