@@ -11,3 +11,6 @@ spikes/**/gen/
 # Python bytecode from the interop counterparty.
 __pycache__/
 *.pyc
+
+# Detox writes device logs and screenshots here on failure.
+packages/app/.artifacts/
