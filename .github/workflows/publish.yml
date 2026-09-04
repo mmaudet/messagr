@@ -15,6 +15,12 @@
 #
 # What to do if it is lost is written in docs/publishing-android.md, because
 # the recoverable half is only recoverable if somebody knows how.
+#
+# This workflow does not make an application's first release. Not because the
+# API is known to refuse one -- Google's documentation says nothing either way
+# -- but because a first release needs a store listing, a content rating, a
+# data safety form and target audience declarations, and the API fills in none
+# of them.
 name: Publish
 
 on:

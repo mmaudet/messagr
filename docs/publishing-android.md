@@ -94,9 +94,12 @@ the first upload rather than after it.
 the internal testing track, which reaches testers listed in the Play Console
 within minutes and does not go through review.
 
-The first upload has to be made **by hand** through the Play Console, because
-Play will not accept an API upload for an application that has never had a
-release. Every upload after that is this workflow's.
+The first release is made **by hand** through the Play Console. Not because
+the API is known to refuse it — Google's own documentation says nothing either
+way, and the claim is folklore — but because a first release cannot go out
+until the store listing, the content rating, the data safety form and the
+target audience declarations are filled in, and the API fills in none of
+them. Every upload after that is this workflow's.
 
 ## Why the release build is unsigned everywhere else
 
