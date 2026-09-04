@@ -36,11 +36,26 @@ const SCROLL = by.id('diagnostic-scroll')
  * that encrypts before that run has nothing to encrypt to. So: the app runs,
  * then the counterparty sends, then the app runs again and reads.
  *
+ * # Why this suite claims an invitation of its own
+ *
+ * The harness uninstalls the application between test files, so this one
+ * starts on a device with an empty keystore: it cannot inherit the session
+ * the boot suite claimed, and an invitation is single-use so it cannot spend
+ * that suite's link either. Provisioning therefore mints one invitation per
+ * suite, and they are two different people in the same room -- which is what
+ * they are.
+ *
+ * None of this showed until the application began claiming its own
+ * invitation. Before that the session was baked into the build, so a
+ * reinstall cost nothing and the two suites looked independent while sharing
+ * one identity.
+ *
  * # Skipped without a counterparty
  *
  * The environment variables come from continuous integration, which
- * provisions the accounts. A developer running the suite locally without them
- * gets a skip rather than a failure that says nothing about their change.
+ * provisions the accounts and both invitations. A developer running the suite
+ * locally without them gets a skip rather than a failure that says nothing
+ * about their change.
  */
 
 const COUNTERPARTY = resolve(
@@ -49,10 +64,13 @@ const COUNTERPARTY = resolve(
 )
 const COUNTERPARTY_BODY = 'encrypted by matrix-nio, for the application to read'
 
+const INVITATION = process.env.MESSAGR_ROUNDTRIP_INVITATION_LINK
+
 const hasCounterparty =
   process.env.MESSAGR_INTEROP_HOMESERVER !== undefined &&
   process.env.MESSAGR_INTEROP_ROOM !== undefined &&
-  process.env.MESSAGR_INTEROP_WORKDIR !== undefined
+  process.env.MESSAGR_INTEROP_WORKDIR !== undefined &&
+  INVITATION !== undefined
 
 function runCounterparty(phase: 'send'): void {
   execFileSync('python3', [COUNTERPARTY, phase], {
@@ -67,21 +85,28 @@ const describeRoundTrip = hasCounterparty ? describe : describe.skip
 
 describeRoundTrip('encrypted round trip', () => {
   beforeAll(async () => {
-    // The first run publishes this device's keys and sends its own message.
-    await device.launchApp({ newInstance: true })
+    // `delete` because this suite owns its device state: a clean install is
+    // what an invited person actually starts from, and it is the only way to
+    // be sure the session asserted below is the one this launch created.
+    //
+    // The first run claims the invitation, publishes this device's keys and
+    // sends its own message.
+    await device.launchApp({ newInstance: true, delete: true, url: INVITATION })
     await waitFor(element(by.text('encrypted send: sent')))
       .toBeVisible()
       .withTimeout(60000)
   }, 180000)
 
   it('restores its session on relaunch instead of claiming again', async () => {
-    // The launch in beforeAll carried no invitation link, and the application
-    // entered anyway: the session came out of the device's keystore.
+    // Relaunched with no link at all. The application enters anyway, so the
+    // session came out of the device's keystore rather than from a second
+    // claim.
     //
     // This is not a convenience. An invitation is single-use, so an
     // application that lost its session and claimed again would find the
     // token spent and the account unreachable -- losing a session is losing
     // the account.
+    await device.launchApp({ newInstance: true })
     await waitFor(element(by.text('entry: session restored')))
       .toBeVisible()
       .whileElement(SCROLL)
