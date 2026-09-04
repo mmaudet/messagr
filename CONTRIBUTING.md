@@ -16,7 +16,9 @@ something that happened. Skip the hook once with `git commit --no-verify`.
 
 Play App Signing holds the app signing key; this repository holds only the
 replaceable upload key, in the Actions secret store. `Actions → Publish` sends
-a signed bundle to the internal testing track. What to do when the upload key
+a signed bundle to the internal testing track. Setting that up for the first
+time is `./scripts/setup-play-publishing.sh`, which walks through it stage by
+stage. What to do when the upload key
 is lost — which is the recoverable half — is in `docs/publishing-android.md`.
 
 ## Design tokens

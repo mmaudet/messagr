@@ -25,6 +25,21 @@ So the upload key is **replaceable**, and that replaceability is not a
 convenience — it is what makes it safe to keep in a secret store, on a runner,
 in the hands of continuous integration.
 
+## Doing all of this once, guided
+
+```
+./scripts/setup-play-publishing.sh
+```
+
+Eleven stages, one task each: it opens every page, says what to click, mints
+the key, sets the five secrets, builds a signed bundle **before** you touch
+Play, and stops at the two things only a person can do — the first release and
+installing it on a phone. Nothing it captures is written to a file in this
+repository.
+
+The rest of this document is what the wizard does, written out, for whoever
+needs to do it by hand or understand what it did.
+
 ## Creating the upload key
 
 Once, by hand, and never in this repository.
