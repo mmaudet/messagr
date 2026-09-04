@@ -159,38 +159,40 @@ curl -sS -o /dev/null -X POST \
 # same instant.
 sleep 2
 
-echo "second claim, expected to succeed now the entrant is invited" >&2
-invitee=""
-for attempt in $(seq 1 10); do
-  invitee="$(curl -sS -X POST "$SERVICE/invitations/claim" \
-    -H 'Content-Type: application/json' \
-    -d "$(python3 -c 'import json,sys; print(json.dumps({"token":sys.argv[1]}))' "$invite_token")")"
-  printf '%s' "$invitee" | grep -q '"user_id"' && break
-  printf '%s' "$invitee" | grep -q 'MESSAGR_NOT_YET_INVITED' || { echo "claim refused: $invitee" >&2; exit 1; }
-  sleep 2
-done
+# THE SECOND CLAIM IS NOT MADE HERE ANY MORE, AND THAT IS THE POINT.
+#
+# It used to happen in this script, and the session it produced was baked
+# into the application's bundle at build time. That made the application
+# unrunnable by anyone who was not building it, and it is exactly the scaffold
+# the invitation flow replaces: the application claims the invitation itself,
+# on the device, which is what a real person does.
+#
+# What this script hands over is therefore the link, not a session. The
+# invitation is drawn and its entrant invited, so the claim will succeed; the
+# claim itself belongs to whoever opens the link.
+
+link="messagr://${MESSAGR_BENCH_HOMESERVER#https://}/i/$invite_token"
 
 python3 -c "
 import json, sys
-inviter, invitee, room = sys.argv[1:4]
+inviter, room, entrant, link = sys.argv[1:5]
 out = {
     'homeserver': '$MESSAGR_BENCH_HOMESERVER',
     'room_id': room,
     'inviter': json.loads(inviter),
-    'invitee': json.loads(invitee),
+    'entrant_user_id': entrant,
+    'invitation_link': link,
 }
-missing = [k for k in ('user_id', 'device_id', 'access_token') if k not in out['invitee']]
-if missing:
-    raise SystemExit('the claim response is missing ' + ', '.join(missing))
 print(json.dumps(out, indent=2))
-" "$inviter" "$invitee" "$room_id" > "$OUT"
+" "$inviter" "$room_id" "$entrant" "$link" > "$OUT"
 
 chmod 600 "$OUT"
-echo "wrote two accounts to $OUT" >&2
+echo "wrote the invitation to $OUT" >&2
 python3 -c "
 import json
 d = json.load(open('$OUT'))
-print('inviter:', d['inviter']['user_id'], '(registered)')
-print('invitee:', d['invitee']['user_id'], '(claimed through the invitation service)')
-print('room   :', d['room_id'])
+print('inviter :', d['inviter']['user_id'], '(registered)')
+print('entrant :', d['entrant_user_id'], '(drawn, invited, not yet claimed)')
+print('room    :', d['room_id'])
+print('the link is in the file; the application claims it')
 "
