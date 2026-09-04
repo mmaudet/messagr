@@ -19,6 +19,7 @@
     "react-native-keychain": "10",
     "react-native-matrix-crypto": "^0.4.0",
     "react-native-safe-area-context": "^5.5.2",
+    "react-native-svg": "15.15.5",
     "text-encoding-polyfill": "^0.6.7"
   },
   "devDependencies": {

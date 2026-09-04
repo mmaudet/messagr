@@ -45,6 +45,18 @@ jobs:
       # having if the module it points at still matches design/tokens.json.
       # A stale module would make the lint enforce yesterday's design very
       # strictly.
+      # A shell mistake reached the device job once and cost a nine-minute
+      # build to discover: a multi-line block written into a workflow arrived
+      # at `sh` a line at a time and failed as an unterminated brace. Parsing
+      # every script here is a second and catches that class outright.
+      - name: Parse every shell script
+        run: |
+          for script in scripts/*.sh .githooks/*; do
+            [ -f "$script" ] || continue
+            bash -n "$script" || { echo "$script does not parse" >&2; exit 1; }
+          done
+          echo "every shell script parses"
+
       - name: Assert the generated design tokens match their source
         run: yarn tokens:check
 

@@ -1,5 +1,39 @@
 import { by, device, element, expect as detoxExpect, waitFor } from 'detox'
 
+/** The readout's scroll container. Every assertion below starts from its top. */
+const SCROLL = by.id('diagnostic-scroll')
+/**
+ * Assert a line of the readout, from wherever the screen happens to be.
+ *
+ * Detox does not scroll on its own, so an assertion written as a plain
+ * expectation is really an assertion about scroll position. That has cost
+ * this suite three continuous-integration runs, each time for a different
+ * reason and each time looking like a product failure: a block inserted
+ * rather than appended pushed the crypto readout below the fold, and the
+ * notched button -- the only focusable view on the screen -- took initial
+ * focus, which made Android scroll the whole readout to reach it.
+ *
+ * Both were correct behaviour. What was wrong was a suite that depended on
+ * a layout nobody had promised. Going to the top first and then searching
+ * downwards removes the dependency rather than accommodating it once more.
+ */
+async function seeText(text: string): Promise<void> {
+  await element(SCROLL).scrollTo('top')
+  await waitFor(element(by.text(text)))
+    .toBeVisible()
+    .whileElement(SCROLL)
+    .scroll(300, 'down')
+}
+
+/** The same, for a line reached by its identifier rather than its words. */
+async function seeId(id: string): Promise<void> {
+  await element(SCROLL).scrollTo('top')
+  await waitFor(element(by.id(id)))
+    .toBeVisible()
+    .whileElement(SCROLL)
+    .scroll(300, 'down')
+}
+
 /**
  * The boot contract, asserted on a real device rather than in configuration.
  *
@@ -36,15 +70,16 @@ describe('boot', () => {
     // rather than accidental -- it clears the keystore entry a previous run
     // would have left.
     await waitFor(element(by.text('entry: invitation claimed')))
-      .toBeVisible()
+      .toExist()
       .withTimeout(60000)
+    await seeText('entry: invitation claimed')
   })
 
   it('runs on the New Architecture', async () => {
     // The crypto bridge is a JSI turbo module with no legacy mode, so this is
     // a precondition for everything below rather than a nice-to-have.
-    await detoxExpect(element(by.text('enabled: true'))).toBeVisible()
-    await detoxExpect(element(by.text('fabric: true'))).toBeVisible()
+    await seeText('enabled: true')
+    await seeText('fabric: true')
   })
 
   it('runs on Hermes rather than a JSC fallback', async () => {
@@ -53,28 +88,24 @@ describe('boot', () => {
     // "not Hermes" is exactly the regression worth catching. The build-time
     // half of this lives in scripts/assert-hermes-bytecode.sh, which reads
     // the release APK; this half reads the engine that actually answered.
-    await detoxExpect(element(by.id('js-engine'))).toBeVisible()
+    await seeId('js-engine')
     await detoxExpect(element(by.text('engine: not Hermes'))).not.toBeVisible()
   })
 
   it('leaves no runtime gap open', async () => {
-    await detoxExpect(element(by.id('runtime-gaps'))).toBeVisible()
-    await detoxExpect(element(by.text('none'))).toBeVisible()
+    await seeId('runtime-gaps')
+    await seeText('none')
   })
 
   it('creates a Matrix client', async () => {
     // Reported as created only when the transport carries no crypto backend
     // of its own, so this also asserts the single-implementation invariant of
     // ADR-0001.
-    await detoxExpect(
-      element(by.text('client created, https://homeserver.invalid')),
-    ).toBeVisible()
+    await seeText('client created, https://homeserver.invalid')
   })
 
   it('loads the crypto bridge across the JSI boundary', async () => {
-    await detoxExpect(
-      element(by.text('loaded, core 0.1.0+emit.f6ddf39b')),
-    ).toBeVisible()
+    await seeText('loaded, core 0.1.0+emit.f6ddf39b')
   })
 
   it('restores a session and syncs against a real homeserver', async () => {
@@ -91,15 +122,16 @@ describe('boot', () => {
     // in-flight calls" instead of failing on anything the app did — watched
     // failing exactly that way before the client was stopped.
     await waitFor(element(by.text('synced, 1 room(s)')))
-      .toBeVisible()
+      .toExist()
       .withTimeout(30000)
+    await seeText('synced, 1 room(s)')
   })
 
   it('measures the cold-start sync duration', async () => {
     // The exact figure is not asserted, only that one was recorded: that is
     // this ticket's baseline requirement, and the number itself will move
     // with the network and the account's room history.
-    await detoxExpect(element(by.id('session-sync-duration'))).toBeVisible()
+    await seeId('session-sync-duration')
     await detoxExpect(element(by.text('cold-start sync: —'))).not.toBeVisible()
   })
 
@@ -110,14 +142,26 @@ describe('boot', () => {
     // pump's own round trips (a drain, a raw sync fetch, a second drain, and
     // an independent /keys/query verifying what the drains actually sent).
     await waitFor(element(by.text('device keys published: true')))
-      .toBeVisible()
+      .toExist()
       .withTimeout(30000)
+    await seeText('device keys published: true')
     // Asked of the server, not of this run. The count itself is not
     // asserted: it falls as keys are claimed and rises as they are
     // replenished, and pinning a number would be pinning a moment.
-    await detoxExpect(
-      element(by.text('one-time keys on server: yes')),
-    ).toBeVisible()
+    await seeText('one-time keys on server: yes')
+  })
+
+  it('carries the brand geometry at a size the device gave it', async () => {
+    // The notch is a CSS clip path in the prototype and React Native has
+    // none, so the shape is drawn. A unit test can check the path against
+    // the original polygon -- it does -- but not that a real layout produced
+    // a real height for it to follow. These two lines are computed on the
+    // device from what it actually measured.
+    //
+    // The touch-target floor is asserted here and nowhere else it could be:
+    // a button's height is geometry, so no token-provenance rule reaches it.
+    await seeText('touch target: met')
+    await seeText('notch: derived from height (16pt at 48pt)')
   })
 
   it('gives the account it just created a signing identity of its own', async () => {
@@ -125,9 +169,7 @@ describe('boot', () => {
     // the account is seconds old and has never had one. The three words are
     // deliberately different on screen because they are very different
     // events, and only one of them may ever happen to an account.
-    await detoxExpect(
-      element(by.text('signing identity: created')),
-    ).toBeVisible()
+    await seeText('signing identity: created')
   })
 
   it('shares room keys by identity once one vouches for this device', async () => {
@@ -137,9 +179,7 @@ describe('boot', () => {
     // above, read out of the machine rather than taken from the release
     // notes -- and it was `device-based` here until the account had an
     // identity to be vouched for by.
-    await detoxExpect(
-      element(by.text('room keys shared: identity-based')),
-    ).toBeVisible()
+    await seeText('room keys shared: identity-based')
   })
 
   it('encrypts a message and sends it into the room', async () => {
@@ -152,9 +192,10 @@ describe('boot', () => {
     // matches rendered text exactly. The id is rendered on its own line,
     // which this asserts is present but does not pin.
     await waitFor(element(by.text('encrypted send: sent')))
-      .toBeVisible()
+      .toExist()
       .withTimeout(30000)
-    await detoxExpect(element(by.id('send-event'))).toBeVisible()
+    await seeText('encrypted send: sent')
+    await seeId('send-event')
     await detoxExpect(element(by.text('event: —'))).not.toBeVisible()
   })
 
@@ -163,8 +204,9 @@ describe('boot', () => {
     // decrypt anything refuses a tampered ciphertext too, for a reason that
     // has nothing to do with the tampering.
     await waitFor(element(by.text('intact ciphertext: decrypted')))
-      .toBeVisible()
+      .toExist()
       .withTimeout(30000)
+    await seeText('intact ciphertext: decrypted')
   })
 
   it('refuses a ciphertext with one character changed', async () => {
@@ -173,8 +215,9 @@ describe('boot', () => {
     // never appearing, because a screen that failed to render this line at
     // all would otherwise pass the first assertion by absence.
     await waitFor(element(by.text('tampered ciphertext: refused')))
-      .toBeVisible()
+      .toExist()
       .withTimeout(30000)
+    await seeText('tampered ciphertext: refused')
     await detoxExpect(
       element(by.text('tampered ciphertext: ACCEPTED')),
     ).not.toBeVisible()
