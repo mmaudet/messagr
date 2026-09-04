@@ -97,6 +97,12 @@ const MAX_SHARE_ROUNDS = 6
 export async function encryptAndSendOneMessage(
   deps: EncryptAndSendDeps,
   identity: DeviceIdentity,
+  /**
+   * What to send. Defaults to the bench's own constant, which the interop
+   * counterparty matches on: a conversation screen passes what a person
+   * typed, and the bench keeps sending the sentence it has always sent.
+   */
+  body: string = MESSAGE_BODY,
 ): Promise<SendReport> {
   const { http, machine, decodeUtf8, newTransactionId } = deps
 
@@ -134,7 +140,7 @@ export async function encryptAndSendOneMessage(
   try {
     envelope = await machine.encryptEvent(roomId, 'm.room.message', {
       msgtype: 'm.text',
-      body: MESSAGE_BODY,
+      body,
     })
   } catch (cause: unknown) {
     return { sent: false, reason: getErrorMessage(cause) }

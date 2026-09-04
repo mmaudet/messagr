@@ -151,6 +151,30 @@ describe('boot', () => {
     await seeText('one-time keys on server: yes')
   })
 
+  it("shows the conversation, with this account's own message in it", async () => {
+    // The pump sent one message during boot, so the conversation is not
+    // empty by the time this looks. It is this account's own, which is why
+    // no "se présente comme" line accompanies it: nothing is claimed about a
+    // message this device encrypted itself.
+    await seeText('encrypted by the bridge, sent by the application')
+  })
+
+  it('lets a person write a message and see it arrive', async () => {
+    // The criterion the whole screen exists for, and the one no unit test can
+    // reach: type, send, and find it in the conversation afterwards.
+    const written = `écrit à la main ${Date.now()}`
+    await element(SCROLL).scrollTo('top')
+    await element(by.id('conversation-input')).typeText(written)
+    await element(by.id('conversation-send')).tap()
+
+    // Generous: this encrypts, shares a room key if the session needs one,
+    // sends, and then reads the room back.
+    await waitFor(element(by.text(written)))
+      .toExist()
+      .withTimeout(60000)
+    await seeText(written)
+  })
+
   it('carries the brand geometry at a size the device gave it', async () => {
     // The notch is a CSS clip path in the prototype and React Native has
     // none, so the shape is drawn. A unit test can check the path against

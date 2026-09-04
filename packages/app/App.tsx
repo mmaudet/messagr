@@ -14,6 +14,7 @@ import {
   receiveOneEncryptedMessage,
   runPanicProbe,
   type ProbeReport,
+  loadConversation,
   runOutgoingPump,
   sendOneEncryptedMessage,
   startCryptoMachine,
@@ -29,6 +30,8 @@ import { computeRuntimeGapReport } from './src/runtime/runtimeGaps'
 import { computeNewArchitectureReport } from './src/runtime/newArchitecture'
 import { sessionSecrets } from './src/runtime/deviceSecrets'
 import { floors, notch, space, type as typeScale } from './src/design/tokens'
+import { mergeTimeline, type TimelineEntry } from './src/timeline/mergeTimeline'
+import { Conversation } from './src/ui/Conversation'
 import { NotchedButton } from './src/ui/NotchedButton'
 import { notchLegFor } from './src/ui/notchGeometry'
 import { enterWithASession, type EntryResult } from './src/runtime/entry'
@@ -86,6 +89,17 @@ export function App({
   )
   const [bridge, setBridge] = useState<BridgeStatus | null>(null)
   const [entry, setEntry] = useState<EntryResult | null>(null)
+  // The conversation this application holds, derived from the room on every
+  // launch rather than read from a copy on disk. See ADR-0006.
+  const [conversation, setConversation] = useState<TimelineEntry[] | null>(null)
+  const [selfUserId, setSelfUserId] = useState('')
+  const [sending, setSending] = useState<'idle' | 'sending' | 'failed'>('idle')
+  // Held rather than rebuilt: it closes over the session and the room, which
+  // only the probe below knows. `useState` with a function needs the extra
+  // wrapper, since a bare function would be read as an updater.
+  const [sendMessage, setSendMessage] = useState<
+    ((body: string) => void) | null
+  >(null)
   // Whether this launch minted the crypto store's passphrase or reopened
   // with the one it already held -- never the passphrase itself. A relaunch
   // that mints is a relaunch that lost every room key it had.
@@ -223,6 +237,41 @@ export function App({
                 credentials,
                 roomId,
               )
+
+              // THE CONVERSATION, DERIVED RATHER THAN STORED.
+              //
+              // ADR-0006: nothing decrypted reaches the disk, so this is
+              // fetched and decrypted on every launch instead of read from a
+              // second copy. It costs a round trip and it is why a device
+              // holds no cleartext history.
+              setSelfUserId(credentials.userId)
+              setConversation(
+                mergeTimeline(
+                  [],
+                  await loadConversation(sessionClient, roomId),
+                ),
+              )
+              setSendMessage(() => (body: string) => {
+                setSending('sending')
+                const deliver = async () => {
+                  const sent = await sendOneEncryptedMessage(
+                    sessionClient,
+                    credentials,
+                    body,
+                  )
+                  if (!sent.sent) {
+                    setSending('failed')
+                    return
+                  }
+                  setSending('idle')
+                  const fresh = await loadConversation(sessionClient, roomId)
+                  setConversation(held => mergeTimeline(held ?? [], fresh))
+                }
+                // A send that failed for a reason nothing here anticipated
+                // still has to leave the composer usable. Reported on the
+                // screen rather than swallowed.
+                deliver().catch(() => setSending('failed'))
+              })
             }
           }
         } finally {
@@ -291,6 +340,20 @@ export function App({
             </View>
           )}
 
+          {conversation !== null && sendMessage !== null && (
+            <View style={styles.block}>
+              <Conversation
+                entries={conversation}
+                selfUserId={selfUserId}
+                onSend={sendMessage}
+                sending={sending}
+              />
+            </View>
+          )}
+
+          {/* Everything below is the instrument, not the product. It is what
+              proves the increment on a device, and it goes when the product
+              has screens of its own to prove it. */}
           <View style={styles.block}>
             <Text style={styles.heading}>New Architecture</Text>
             <Text testID="arch-enabled" style={styles.line}>

@@ -73,6 +73,19 @@ const TYPE = new Set([
   'textTransform',
 ])
 
+/**
+ * Stroke widths. A border is a design value like any other, and the token
+ * file has a family for it -- a `borderWidth: 1` written in place looked
+ * innocent enough to slip past the first version of this rule.
+ */
+const STROKE = new Set([
+  'borderWidth',
+  'borderTopWidth',
+  'borderRightWidth',
+  'borderBottomWidth',
+  'borderLeftWidth',
+])
+
 const ELEVATION = new Set([
   'shadowOpacity',
   'shadowRadius',
@@ -85,6 +98,7 @@ const FAMILIES = [
   [SPACING, 'space', 'a spacing value'],
   [RADIUS, 'radius', 'a corner radius'],
   [TYPE, 'type', 'a type value'],
+  [STROKE, 'stroke', 'a stroke width'],
   [ELEVATION, 'elevation', 'an elevation'],
 ]
 
