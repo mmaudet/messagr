@@ -109,7 +109,7 @@ jobs:
           print('::add-mask::' + inviter['access_token'])
           print('::add-mask::' + inviter['password'])
           print('::add-mask::' + d['invitation_link'])
-          with open('\$GITHUB_ENV', 'a') as f:
+          with open('$GITHUB_ENV', 'a') as f:
               f.write(f'MESSAGR_INVITATION_LINK={d[\"invitation_link\"]}\\n')
               # The counterparty runs as the other account, the one that has a
               # password, and reads what the application's account sends.
@@ -139,6 +139,7 @@ jobs:
           sudo udevadm trigger --name-match=kvm
 
       - name: Run the boot suite on an emulator
+        id: suite
         uses: reactivecircus/android-emulator-runner@v2
         with:
           api-level: 34
@@ -164,8 +165,13 @@ jobs:
       # while a red one without the device's own log costs a whole run per
       # hypothesis. The application says what it decided; this is how that
       # reaches whoever is reading the failure.
+      # Conditioned on the suite itself having failed, not on the job having
+      # failed. When something earlier goes wrong the suite never runs, there
+      # are no artifacts to keep, and an empty upload erroring there shouts
+      # about an absence that is entirely correct -- burying the failure that
+      # actually happened under a second one that did not.
       - name: Keep the device's own logs when the suite fails
-        if: failure()
+        if: failure() && steps.suite.conclusion == 'failure'
         uses: actions/upload-artifact@v4
         with:
           name: detox-artifacts
