@@ -41,6 +41,8 @@ import {
   runOutgoingPumpCycle,
   type CryptoPumpReport,
 } from './outgoingPumpCycle'
+import { fetchRoomMessages, toTimelineEntries } from '../timeline/buildTimeline'
+import type { TimelineEntry } from '../timeline/mergeTimeline'
 import { makeToDeviceSource, subscribeToDeviceMessages } from './toDeviceBridge'
 
 export type { CryptoPumpReport } from './outgoingPumpCycle'
@@ -166,6 +168,8 @@ export async function runOutgoingPump(
 export async function sendOneEncryptedMessage(
   sessionClient: ReturnType<typeof createClient>,
   identity: DeviceIdentity,
+  /** What a person typed, when a person typed it. */
+  body?: string,
 ): Promise<SendReport> {
   return encryptAndSendOneMessage(
     {
@@ -189,6 +193,7 @@ export async function sendOneEncryptedMessage(
         `messagr-${Date.now()}-${Math.floor(Math.random() * 1e6)}`,
     },
     identity,
+    body,
   )
 }
 
@@ -223,6 +228,36 @@ export async function receiveOneEncryptedMessage(
     },
     roomId,
     identity.userId,
+  )
+}
+
+/**
+ * The conversation, read from the room and decrypted here.
+ *
+ * ADR-0006: nothing decrypted is written to disk, so a relaunch derives the
+ * timeline again rather than reading a second copy of it. That costs a round
+ * trip and buys a device that holds no cleartext history.
+ *
+ * The room key comes from the crypto store, which this device already
+ * reopened with the passphrase in the operating system's keystore -- so this
+ * decrypts everything that device ever had a session for, and reports the
+ * rest as unreadable rather than hiding it.
+ */
+export async function loadConversation(
+  sessionClient: ReturnType<typeof createClient>,
+  roomId: string,
+  limit = 40,
+): Promise<TimelineEntry[]> {
+  const http = makePumpHttp(sessionClient)
+  const events = await fetchRoomMessages(http, roomId, limit)
+  return toTimelineEntries(
+    {
+      decryptEvent: (scope, rawEvent) =>
+        decryptEvent(asCryptoScopeId(scope), rawEvent),
+    },
+    bytes => new TextDecoder().decode(bytes),
+    roomId,
+    events,
   )
 }
 
