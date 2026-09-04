@@ -1,0 +1,25 @@
+[package]
+name = "messagr-invitations"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+axum = "0.7"
+tokio = { version = "1", features = ["full"] }
+sqlx = { version = "0.8", features = ["runtime-tokio", "sqlite", "macros", "migrate"] }
+reqwest = { version = "0.12", features = ["json"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+chacha20poly1305 = "0.10"
+sha2 = "0.10"
+data-encoding = "2"
+rand = "0.8"
+thiserror = "1"
+tracing = "0.1"
+tracing-subscriber = "0.3"
+base64 = "0.22"
+uuid = { version = "1", features = ["v4"] }
+anyhow = "1"
+
+[dev-dependencies]
+tempfile = "3"

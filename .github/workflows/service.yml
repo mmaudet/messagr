@@ -1,0 +1,52 @@
+name: Service
+
+# The invitation service is Rust, has its own database and its own tests, and
+# shares nothing with the mobile build. So it gets its own workflow: it does
+# not wait on an emulator, and an emulator does not wait on it.
+#
+# `paths` rather than `paths-ignore` here, unlike the device workflow, and the
+# asymmetry is deliberate. The device suite errs toward running because a
+# change anywhere might reach a device; this service is self-contained, so
+# nothing outside its own directory can change what it does.
+on:
+  push:
+    branches: [master]
+    paths: &owned
+      - 'services/invitations/**'
+      - '.github/workflows/service.yml'
+  pull_request:
+    paths: *owned
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  invitations:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    defaults:
+      run:
+        working-directory: services/invitations
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: services/invitations
+
+      - run: cargo fmt --check
+
+      # Denied rather than reported. One inherited lint is allowed at its own
+      # site, with the reason written there; everything else fails here.
+      - run: cargo clippy --all-targets -- -D warnings
+
+      # The whole safety argument for internalising this service rather than
+      # rewriting it: the tests that came with it pass identically. They need
+      # no homeserver and no network -- the three that do are ignored, and are
+      # exercised against a real deployment instead.
+      - run: cargo test
