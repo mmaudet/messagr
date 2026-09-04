@@ -243,7 +243,9 @@ export function App({
   return (
     <SafeAreaProvider>
       <SafeAreaView style={styles.screen}>
-        <ScrollView contentContainerStyle={styles.content}>
+        <ScrollView
+          testID="diagnostic-scroll"
+          contentContainerStyle={styles.content}>
           {probe !== null && (
             <View style={styles.block}>
               <Text style={styles.heading}>Panic probe (#27)</Text>
