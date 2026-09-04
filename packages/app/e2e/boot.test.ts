@@ -120,6 +120,24 @@ describe('boot', () => {
     ).toBeVisible()
   })
 
+  it('carries the brand geometry at a size the device gave it', async () => {
+    // The notch is a CSS clip path in the prototype and React Native has
+    // none, so the shape is drawn. A unit test can check the path against
+    // the original polygon -- it does -- but not that a real layout produced
+    // a real height for it to follow. These two lines are computed on the
+    // device from what it actually measured.
+    //
+    // The touch-target floor is asserted here and nowhere else it could be:
+    // a button's height is geometry, so no token-provenance rule reaches it.
+    await waitFor(element(by.text('touch target: met')))
+      .toBeVisible()
+      .whileElement(by.id('diagnostic-scroll'))
+      .scroll(400, 'down')
+    await detoxExpect(
+      element(by.text('notch: derived from height (16pt at 48pt)')),
+    ).toBeVisible()
+  })
+
   it('gives the account it just created a signing identity of its own', async () => {
     // Created, not published or resumed: this launch spent the invitation, so
     // the account is seconds old and has never had one. The three words are
