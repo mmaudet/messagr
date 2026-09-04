@@ -109,8 +109,13 @@ jobs:
           print('::add-mask::' + inviter['access_token'])
           print('::add-mask::' + inviter['password'])
           print('::add-mask::' + d['invitation_link'])
+          print('::add-mask::' + d['roundtrip_invitation_link'])
           with open('$GITHUB_ENV', 'a') as f:
               f.write(f'MESSAGR_INVITATION_LINK={d[\"invitation_link\"]}\\n')
+              # One per suite: an invitation is single-use and the harness
+              # reinstalls the application between test files, so neither the
+              # token nor the session it produces crosses that boundary.
+              f.write(f'MESSAGR_ROUNDTRIP_INVITATION_LINK={d[\"roundtrip_invitation_link\"]}\\n')
               # The counterparty runs as the other account, the one that has a
               # password, and reads what the application's account sends.
               f.write(f'MESSAGR_INTEROP_HOMESERVER={d[\"homeserver\"]}\\n')
