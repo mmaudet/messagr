@@ -6,6 +6,21 @@ const metroPort = Number(process.env.RCT_METRO_PORT || 8081)
 
 /** @type {Detox.DetoxConfig} */
 module.exports = {
+  // Kept because debugging a remote device without its own log costs a full
+  // continuous-integration run per hypothesis, and this suite has already
+  // spent three of them on one failure. `log` is the one that matters: the
+  // application reports what it decided, and that report never reached the
+  // build output before this existed.
+  artifacts: {
+    rootDir: '.artifacts',
+    plugins: {
+      log: { enabled: true },
+      screenshot: {
+        shouldTakeAutomaticSnapshots: true,
+        takeWhen: { testDone: true },
+      },
+    },
+  },
   testRunner: {
     args: { $0: 'jest', config: 'e2e/jest.config.js' },
     jest: { setupTimeout: 180000 },
