@@ -22,6 +22,15 @@ if ! yarn --silent prettier --check . >/dev/null 2>&1; then
   exit 1
 fi
 
+# Before the lint, because the lint points at the generated token module and
+# a stale one would make it enforce yesterday's design very strictly. Costs
+# under a second, which is the bar for living here.
+if ! yarn --silent node scripts/generate-design-tokens.mjs --check >/dev/null 2>&1; then
+  echo "Design tokens: the generated module no longer matches design/tokens.json." >&2
+  echo "  Fix with: yarn tokens" >&2
+  exit 1
+fi
+
 if ! yarn --silent eslint . --max-warnings 0 >/dev/null 2>&1; then
   echo "Lint: eslint reported problems." >&2
   echo "  See them with: yarn lint" >&2
