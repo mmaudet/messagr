@@ -111,6 +111,18 @@ describeRoundTrip('encrypted round trip', () => {
       .toBeVisible()
       .whileElement(SCROLL)
       .scroll(400, 'down')
+
+    // The store's passphrase survived too, and that is a separate claim from
+    // the session's. A relaunch that minted a new one would have opened a
+    // new, empty store and lost every room key the old one held -- which the
+    // decryption below would then fail on, several minutes later and looking
+    // like a key-delivery problem rather than a storage one.
+    await waitFor(
+      element(by.text('store passphrase: reused, the store reopened')),
+    )
+      .toBeVisible()
+      .whileElement(SCROLL)
+      .scroll(400, 'down')
   })
 
   it('reads a message an independent client encrypted for it', async () => {
