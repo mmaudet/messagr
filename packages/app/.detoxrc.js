@@ -11,14 +11,19 @@ module.exports = {
   // spent three of them on one failure. `log` is the one that matters: the
   // application reports what it decided, and that report never reached the
   // build output before this existed.
+  // Presets, not objects: `log` is parsed from a string ('none' | 'failing' |
+  // 'all') and defaults to 'none'. An object here is accepted and silently
+  // does nothing, which is how the first attempt at this produced a green
+  // upload step and no files.
+  //
+  // 'all' rather than 'failing' for the log, deliberately: the failure being
+  // chased spans several application launches, and the launch that explains
+  // it is not necessarily the one the runner marks as failed.
   artifacts: {
     rootDir: '.artifacts',
     plugins: {
-      log: { enabled: true },
-      screenshot: {
-        shouldTakeAutomaticSnapshots: true,
-        takeWhen: { testDone: true },
-      },
+      log: 'all',
+      screenshot: 'failing',
     },
   },
   testRunner: {
