@@ -323,6 +323,9 @@ export function App({
             <Text testID="pump-one-time-keys" style={styles.line}>
               {computePumpOneTimeKeysLabel(ranPump)}
             </Text>
+            <Text testID="pump-sharing-strategy" style={styles.line}>
+              {computeSharingStrategyLabel(ranPump)}
+            </Text>
           </View>
 
           <View style={styles.block}>
@@ -492,6 +495,22 @@ function computeClaimedSenderLabel(
     return 'claims to be from: —'
   }
   return `claims to be from: ${status.claimedSender} (unauthenticated)`
+}
+
+/**
+ * Read out of the machine, not out of a changelog. 0.4.0 shares room keys by
+ * identity once a machine holds a cross-signing identity of its own, and a
+ * device no identity vouches for then stops receiving keys entirely. This
+ * application creates no such identity, so it should say device-based — and
+ * saying it on screen is what makes that a fact continuous integration
+ * checks rather than an assumption.
+ */
+function computeSharingStrategyLabel(
+  ran: Extract<PumpStatus, { outcome: 'ran' }> | null,
+): string {
+  return ran === null
+    ? 'room keys shared: —'
+    : `room keys shared: ${ran.report.sharingStrategy}`
 }
 
 function computePumpStatusLabel(status: PumpStatus | null): string {
