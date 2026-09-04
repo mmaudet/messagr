@@ -94,7 +94,7 @@ describe('runOutgoingPumpCycle', () => {
     })
     expect(report.firstDrain.sentKinds).toEqual(['keys_upload'])
     expect(report.deviceKeysVerified).toBe(true)
-    expect(report.oneTimeKeysPublished).toBe(true)
+    expect(report.oneTimeKeysOnServer).toBe(50)
   })
 
   it('reports nothing published and nothing verified when the machine has nothing to send and the server confirms no device', async () => {
@@ -102,6 +102,11 @@ describe('runOutgoingPumpCycle', () => {
       if (path === '/_matrix/client/v3/sync') return SYNC_RESPONSE
       if (method === 'POST' && path === '/_matrix/client/v3/keys/query') {
         return '{"device_keys":{}}'
+      }
+      // A server that holds none, which is different from a question that
+      // could not be asked -- the latter answers null.
+      if (method === 'POST' && path === '/_matrix/client/v3/keys/upload') {
+        return '{"one_time_key_counts":{}}'
       }
       throw new Error(`unexpected request: ${method} ${path}`)
     })
@@ -117,7 +122,7 @@ describe('runOutgoingPumpCycle', () => {
     expect(report.firstDrain).toEqual({ sent: 0, failed: 0, sentKinds: [] })
     expect(report.secondDrain).toEqual({ sent: 0, failed: 0, sentKinds: [] })
     expect(report.deviceKeysVerified).toBe(false)
-    expect(report.oneTimeKeysPublished).toBe(false)
+    expect(report.oneTimeKeysOnServer).toBe(0)
   })
 
   it('feeds the recovered delta to the machine before draining what it queues in response', async () => {
