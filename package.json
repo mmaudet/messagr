@@ -11,6 +11,8 @@
     "node": "^22.22.3 || ^24.3.0 || >=26.0.0"
   },
   "scripts": {
+    "tokens": "node scripts/generate-design-tokens.mjs",
+    "tokens:check": "node scripts/generate-design-tokens.mjs --check",
     "lint": "eslint . --max-warnings 0",
     "format": "prettier --check .",
     "typecheck": "yarn workspaces run typecheck",

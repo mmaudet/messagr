@@ -28,6 +28,7 @@ import { polyfillReport } from './src/runtime/bootstrap'
 import { computeRuntimeGapReport } from './src/runtime/runtimeGaps'
 import { computeNewArchitectureReport } from './src/runtime/newArchitecture'
 import { sessionSecrets } from './src/runtime/deviceSecrets'
+import { space, type as typeScale } from './src/design/tokens'
 import { enterWithASession, type EntryResult } from './src/runtime/entry'
 import { initialLink } from './src/runtime/incomingLink'
 import { servicePoster } from './src/runtime/servicePoster'
@@ -621,8 +622,15 @@ const styles = StyleSheet.create({
   // that reason and for no other, which is a false negative about the trust
   // model, the one place this project can least afford one.
   screen: { flex: 1 },
-  content: { padding: 24, paddingBottom: 48 },
-  block: { marginBottom: 32 },
-  heading: { fontSize: 17, fontWeight: '600', marginBottom: 8 },
-  line: { fontSize: 14.5, lineHeight: 21 },
+  // The bottom padding was 48, which is not on the scale and never could be:
+  // the file forbids its own intermediate values outright. `xxl` is the
+  // answer the scale gives, and a screen that needed more would be a
+  // composition error rather than a missing token.
+  content: { padding: space.xl, paddingBottom: space.xxl },
+  block: { marginBottom: space.xxl },
+  // Spread rather than picked apart: size, leading, weight and tracking
+  // travel together, and separating them is how a line-height floor gets
+  // broken without anyone deciding to break it.
+  heading: { ...typeScale.titleMd, marginBottom: space.s },
+  line: typeScale.body,
 })
