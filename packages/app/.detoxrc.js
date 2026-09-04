@@ -6,6 +6,26 @@ const metroPort = Number(process.env.RCT_METRO_PORT || 8081)
 
 /** @type {Detox.DetoxConfig} */
 module.exports = {
+  // Kept because debugging a remote device without its own log costs a full
+  // continuous-integration run per hypothesis, and this suite has already
+  // spent three of them on one failure. `log` is the one that matters: the
+  // application reports what it decided, and that report never reached the
+  // build output before this existed.
+  // Presets, not objects: `log` is parsed from a string ('none' | 'failing' |
+  // 'all') and defaults to 'none'. An object here is accepted and silently
+  // does nothing, which is how the first attempt at this produced a green
+  // upload step and no files.
+  //
+  // 'all' rather than 'failing' for the log, deliberately: the failure being
+  // chased spans several application launches, and the launch that explains
+  // it is not necessarily the one the runner marks as failed.
+  artifacts: {
+    rootDir: '.artifacts',
+    plugins: {
+      log: 'all',
+      screenshot: 'failing',
+    },
+  },
   testRunner: {
     args: { $0: 'jest', config: 'e2e/jest.config.js' },
     jest: { setupTimeout: 180000 },
