@@ -84,6 +84,18 @@ conversation's history and the right to invite. Nothing about it changes a
 trust state.
 _Avoid_: Validation, activation, upgrade, approval
 
+**Given name**:
+The name one participant gives another, held only on the device that gave it
+and never published. It is what makes a list of conversations readable when
+identifiers are pseudonymous by design. It says who somebody is _to you_, and
+it says nothing to anybody else.
+
+It is not a display name: nothing about it reaches the homeserver or the other
+participant, who may be known under a different given name on every device
+that knows them.
+_Avoid_: Nickname, alias, contact name, display name. **Contact** in
+particular belongs to discovery and means something else here.
+
 ### Trust, discovery and verification
 
 These are three distinct notions. Conflating them is the most common error in
