@@ -1,0 +1,381 @@
+<!doctype html>
+<html lang="fr">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Conditions générales — Messagr</title>
+    <meta
+      name="description"
+      content="Qui exploite Messagr, ce qui est interdit, comment la modération travaille, et comment contester une décision." />
+    <style>
+      :root {
+        --ground: #f7f5ef;
+        --surface: #ffffff;
+        --ink: #0c1f19;
+        --soft: #5a6b63;
+        --accent: #06614a;
+        --mark: #12b76a;
+        --bubble: #c9f2dc;
+        --rule: #e2ded2;
+      }
+      * {
+        box-sizing: border-box;
+      }
+      html,
+      body {
+        margin: 0;
+      }
+      body {
+        background: var(--ground);
+        color: var(--ink);
+        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+        line-height: 1.6;
+        -webkit-font-smoothing: antialiased;
+      }
+      main {
+        max-width: 640px;
+        margin: 0 auto;
+        padding: 56px 24px 80px;
+      }
+      .mark {
+        display: block;
+        margin-bottom: 40px;
+        width: max-content;
+      }
+      .mark:focus-visible {
+        outline: 3px solid var(--mark);
+        outline-offset: 4px;
+      }
+      .logotype {
+        display: block;
+        width: min(260px, 62vw);
+        height: auto;
+      }
+      .logotype.dark {
+        display: none;
+      }
+      h1 {
+        font-size: clamp(28px, 6vw, 38px);
+        line-height: 1.14;
+        letter-spacing: -0.025em;
+        font-weight: 650;
+        margin: 0 0 18px;
+        text-wrap: balance;
+      }
+      h2 {
+        font-size: 20px;
+        line-height: 1.25;
+        letter-spacing: -0.015em;
+        font-weight: 640;
+        margin: 38px 0 12px;
+      }
+      .lead {
+        font-size: 18px;
+        color: var(--soft);
+        margin: 0 0 8px;
+        text-wrap: pretty;
+      }
+      .stamp {
+        font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+        font-size: 11px;
+        letter-spacing: 0.13em;
+        text-transform: uppercase;
+        color: var(--soft);
+        margin: 0 0 34px;
+      }
+      p {
+        margin: 0 0 14px;
+      }
+      ul {
+        list-style: none;
+        padding: 0;
+        margin: 0 0 18px;
+        display: flex;
+        flex-direction: column;
+        gap: 9px;
+      }
+      li {
+        display: flex;
+        gap: 11px;
+        align-items: baseline;
+        font-size: 16px;
+      }
+      li::before {
+        content: '◆';
+        color: var(--mark);
+        font-size: 12px;
+        flex: 0 0 auto;
+      }
+      .card {
+        background: var(--surface);
+        border: 1px solid var(--rule);
+        border-radius: 4px;
+        padding: 22px 24px;
+        margin: 22px 0;
+      }
+      .card p:last-child {
+        margin-bottom: 0;
+      }
+      .invite {
+        background: var(--bubble);
+        border-radius: 4px;
+        padding: 18px 20px;
+        font-size: 15.5px;
+        margin: 22px 0;
+      }
+      .invite b {
+        font-weight: 640;
+      }
+      code {
+        font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+        font-size: 14px;
+        background: var(--surface);
+        border: 1px solid var(--rule);
+        border-radius: 3px;
+        padding: 1px 5px;
+      }
+      a {
+        color: var(--accent);
+      }
+      footer {
+        margin-top: 46px;
+        padding-top: 20px;
+        border-top: 1px solid var(--rule);
+        font-size: 13.5px;
+        color: var(--soft);
+      }
+      @media (prefers-color-scheme: dark) {
+        :root {
+          --ground: #0b1a15;
+          --surface: #11241d;
+          --ink: #e9f1ec;
+          --soft: #93a89e;
+          --accent: #4fd39b;
+          --rule: #23392f;
+          --bubble: #1c3d30;
+        }
+        .logotype.light {
+          display: none;
+        }
+        .logotype.dark {
+          display: block;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <a class="mark" href="/" aria-label="Messagr">
+        <img
+          class="logotype light"
+          src="/messagr-logotype-vert.svg"
+          alt="Messagr"
+          width="260"
+          height="60" />
+        <img
+          class="logotype dark"
+          src="/messagr-logotype-vert-inverse.svg"
+          alt="Messagr"
+          width="260"
+          height="60" />
+      </a>
+
+      <h1>Conditions générales d'utilisation</h1>
+      <p class="lead">
+        Article 14 du règlement (UE) 2022/2065. Court, parce que le service est
+        petit et qu'un texte que personne ne lit ne renseigne personne.
+      </p>
+      <p class="stamp">Version du 5 septembre 2026</p>
+
+      <p>
+        Ce que l'application affiche fait foi pour l'utilisateur&nbsp;: les
+        trois points exigés par l'article 14 sont portés par l'écran
+        «&nbsp;Informations légales&nbsp;», atteignable depuis les Réglages.
+        Cette page les reprend et ajoute ce qu'un écran ne peut pas porter — qui
+        exploite le service, et sous quel droit.
+      </p>
+
+      <h2>1. Qui exploite le service</h2>
+      <p>
+        Messagr est exploité par <b>RV Myriagone Holding</b>, dont le siège est
+        au 22 rue de la Garenne, 78130 Chapet, société à responsabilité limitée
+        à associé unique au capital de 5&nbsp;087&nbsp;000&nbsp;euros,
+        immatriculée au registre du commerce et des sociétés de Versailles sous
+        le numéro <b>894&nbsp;754&nbsp;548</b>, représentée par son gérant
+        Michel-Marie Maudet.
+      </p>
+      <p>
+        Point de contact&nbsp;:
+        <a href="mailto:conformite@messagr.eu">conformite@messagr.eu</a>.
+      </p>
+      <p>
+        Le droit applicable est le droit français, et le règlement 2022/2065
+        pour ce qui relève des services numériques.
+      </p>
+
+      <h2>2. Ce qui est interdit</h2>
+      <ul>
+        <li>
+          les contenus pédocriminels, au sens des articles 3 à 7 de la directive
+          2011/93/UE et de l'article 227-23 du code pénal&nbsp;;
+        </li>
+        <li>les menaces contre la vie ou la sécurité d'une personne&nbsp;;</li>
+        <li>le harcèlement&nbsp;;</li>
+        <li>l'usurpation d'identité&nbsp;;</li>
+        <li>
+          tout autre contenu illégal au regard du droit français ou européen.
+        </li>
+      </ul>
+      <p>
+        <b>On n'entre dans Messagr que sur invitation nominative.</b> Une
+        invitation est personnelle, à usage limité, et elle ne se revend pas.
+        Son émetteur peut la révoquer, et cette révocation ne se défait pas
+        depuis l'application.
+      </p>
+      <p>
+        <b
+          >Un quota hebdomadaire d'invitations s'applique à tous les comptes de
+          la même façon.</b
+        >
+        Il existe pour empêcher qu'une invitation serve à démarcher, et il ne
+        vise aucun compte en particulier.
+      </p>
+      <p>
+        <b>L'âge minimum est de quinze ans en France</b>, âge du consentement
+        numérique fixé par l'article 45 de la loi Informatique et Libertés.
+        Entre quinze ans et la majorité, l'ouverture d'un compte exige l'accord
+        conjoint du mineur et de l'un de ses représentants légaux.
+      </p>
+
+      <h2>3. Les moyens de modération réellement employés</h2>
+      <p>
+        <b>La modération est celle des administrateurs du serveur.</b> Ce sont
+        des personnes.
+      </p>
+      <div class="invite">
+        <b
+          >Il n'existe aucun outil automatique de détection, aucun filtre,
+          aucune analyse de contenu, et il ne peut pas en exister.</b
+        >
+        Ce n'est pas une politique révocable en silence&nbsp;: le contenu est
+        chiffré de bout en bout, les clés n'existent que sur les appareils des
+        membres d'une conversation, et l'exploitant détient des messages qu'il
+        lui est <b>cryptographiquement impossible</b> de lire.
+      </div>
+      <p>
+        <b>Rien n'est examiné qui n'ait été signalé par une personne.</b> Il n'y
+        a ni surveillance générale, ni détection proactive, ni classement
+        algorithmique, puisqu'il n'y a rien à classer&nbsp;: aucun fil
+        d'actualité, aucune recommandation, aucun annuaire.
+      </p>
+      <p>
+        <b>Ce que l'exploitant peut décider sans lire</b>&nbsp;: suspendre un
+        compte, lui retirer sa capacité d'émettre des invitations, l'exclure
+        d'un groupe, révoquer une branche d'invitation.
+      </p>
+      <p>
+        <b>Ce qu'il ne peut pas faire</b>&nbsp;: retirer un message précis,
+        qualifier un contenu, établir qu'une règle a été enfreinte par la
+        lecture. Une mesure de compte se prend sur des faits établissables sans
+        lire, jamais sur la seule affirmation d'un signalant, faute de quoi le
+        signalement deviendrait une arme.
+      </p>
+
+      <h2>4. Le réexamen humain</h2>
+      <p>
+        <b
+          >Toute décision est prise par une personne, jamais par un
+          automatisme.</b
+        >
+        Il n'y a donc aucune décision automatisée à réexaminer, et la garantie
+        que l'article 14 attache au réexamen humain est ici acquise par
+        construction plutôt que par procédure.
+      </p>
+      <p>
+        <b>Une décision peut être contestée</b> auprès de
+        <a href="mailto:conformite@messagr.eu">conformite@messagr.eu</a>, en
+        citant la référence du signalement. Elle est alors réexaminée, par une
+        personne autre que celle qui l'a prise chaque fois que l'organisation le
+        permet. Sur un service exploité par une ou deux personnes, cette
+        condition ne peut pas toujours être tenue, et l'écrire vaut mieux que de
+        promettre une séparation qui n'existerait pas.
+      </p>
+      <p>
+        <b
+          >Messagr est un service d'hébergement et non une plateforme en
+          ligne</b
+        >, le considérant 14 du DSA écartant les services de messagerie
+        interpersonnelle. Les articles 20 et 21, qui imposent un système interne
+        de traitement des réclamations et une information sur le règlement
+        extrajudiciaire des litiges, ne s'appliquent donc pas. Ce document ne
+        prétend pas les offrir.
+      </p>
+
+      <h2>5. Signaler, décider, et sous quel délai</h2>
+      <p>
+        Le mécanisme de signalement est accessible
+        <b
+          >par courriel à
+          <a href="mailto:conformite@messagr.eu">conformite@messagr.eu</a></b
+        >.
+      </p>
+      <div class="card">
+        <p>
+          <b
+            >Le geste depuis l'application n'existe pas encore, et le dire vaut
+            mieux que le promettre.</b
+          >
+          Une version antérieure de ce document annonçait un signalement
+          «&nbsp;accessible depuis l'application, sur chaque message
+          reçu&nbsp;». Confronté au code, rien de tel n'existait. Tant que ce
+          geste n'est pas construit, cette page décrit la seule voie qui
+          fonctionne, et l'écran «&nbsp;Informations légales&nbsp;» de
+          l'application dit la même chose.
+        </p>
+      </div>
+      <p>
+        Un signalement produit <b>une référence</b>, transmise avec lui. Un
+        signalement adressé au point de contact reçoit
+        <b>un accusé de réception</b>, puis
+        <b>une décision motivée au plus tard trente jours après sa réception</b
+        >, avec la voie pour la contester.
+      </p>
+      <p>
+        <b
+          >Le signalement d'une menace pour la vie ou la sécurité aux autorités
+          ne suit pas ce délai</b
+        >&nbsp;: il part sans attendre l'issue de l'examen.
+      </p>
+
+      <h2>6. Points de contact</h2>
+      <p>
+        <b>Pour les destinataires du service</b> (article 12)&nbsp;:
+        <a href="mailto:conformite@messagr.eu">conformite@messagr.eu</a>, par
+        voie électronique, en français ou en anglais. Il n'existe pas d'autre
+        canal relevé.
+      </p>
+      <p>
+        <b
+          >Pour les autorités des États membres, la Commission européenne et le
+          comité européen des services numériques</b
+        >
+        (article 11)&nbsp;: la même adresse, en français ou en anglais. Les
+        demandes des autorités sont traitées en priorité sur toute autre
+        correspondance.
+      </p>
+
+      <h2>7. Modification</h2>
+      <p>
+        Toute modification de ces conditions est portée à la connaissance des
+        destinataires du service. La date en tête de cette page est celle de la
+        dernière version.
+      </p>
+
+      <footer>
+        <a href="/">Messagr</a> ·
+        <a href="/confidentialite">Politique de confidentialité</a> ·
+        <a href="mailto:conformite@messagr.eu">conformite@messagr.eu</a>
+      </footer>
+    </main>
+  </body>
+</html>
