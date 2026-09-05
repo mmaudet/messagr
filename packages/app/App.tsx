@@ -383,7 +383,16 @@ export function App({
         gaps,
         polyfills: polyfillReport,
         client,
-        entry: entered,
+        // NOT `entered` itself. `EntryResult.session` is a
+        // `RestoreCredentials`, which carries the account's access token --
+        // "whoever reads it is the account", as sessionStore.ts puts it. This
+        // line used to log the whole thing, and the only reason no token ever
+        // reached logcat is that the object also happened to be cyclical, so
+        // the stringify threw and took the launch down with it. The accident
+        // was doing the work of the rule; the rule is here now.
+        entry: entered.entered
+          ? { entered: true, claimed: entered.claimed, kept: entered.kept }
+          : { entered: false, reason: entered.reason },
         session: sessionStatus,
         pump: pumpStatus,
         send: sendStatus,
@@ -392,7 +401,17 @@ export function App({
     }
 
     probeAndReport().catch((cause: unknown) => {
+      // The stack, not only the message. A launch failure reported as
+      // "TypeError: cyclical structure in JSON object" names a symptom and
+      // no location, and the first real device run of #34 spent its
+      // diagnosis on exactly that. Reported through a second call so a
+      // stack that is itself unserialisable cannot swallow the first.
       logEvent('error', 'MESSAGR_RUNTIME_FAILED', { reason: String(cause) })
+      if (cause instanceof Error && typeof cause.stack === 'string') {
+        logEvent('error', 'MESSAGR_RUNTIME_FAILED_WHERE', {
+          stack: cause.stack.split('\n').slice(0, 8).join(' | '),
+        })
+      }
     })
   }, [architecture, hermes, gaps, client, storeDir, panicProbeRequested])
 
