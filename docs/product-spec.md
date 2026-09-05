@@ -716,6 +716,54 @@ These rules take precedence over aesthetic choices and are normative for any UI 
 11. Any colour, size, radius, elevation, or duration absent from `tokens.json` is forbidden in the product.
 
 
+### 13.20 The conversation list (designed here, not in the prototype)
+
+The prototype draws a conversation list only in the desktop window; every
+mobile screen it draws is standalone, with its own header and a back chevron.
+So this screen was designed against `design/tokens.json` and the invariants
+above, and is recorded here for the designer's next export rather than being
+drawn twice.
+
+**A row is two lines.** The first names the other participant, the second
+carries the opening of the last message. Nothing else: no avatar, no
+timestamp, no unread count. Each of those is a decision this lot has not
+taken, and a row that shows one before it is taken is a row that has to be
+redesigned rather than extended.
+
+**The first line distinguishes a name from an identifier typographically, not
+with a badge.** A given name is set in `titleMd`; an identifier is set in
+`monoId`. A badge saying "not named yet" would be a second thing on the row
+repeating what the first already says.
+
+**Three silences are told apart on the second line**, because they mean
+opposite things to the person reading them: nothing has been said yet,
+something was said that this device cannot read, and the conversation could
+not be reached at all. Invariant 6 governs the wording — a sentence, never an
+error code; the technical reason goes to the log.
+
+**Ordering is most-recently-active first, ties broken by identifier.** A
+stable tie-break matters more than it looks: two conversations swapping places
+between launches reads as movement nobody caused.
+
+**A conversation with no single other participant shows its own identifier.**
+More than two participants is a channel, which this lot does not build; until
+it does, the row must still be distinguishable rather than blank. This was
+found on a device, not in review: a bench room of three rendered a row whose
+first line was empty.
+
+**No padlock and no green** (invariants 2 and 3). Every conversation here is
+encrypted, so saying so on each row says nothing and trains a person to ignore
+the badge where it would matter; green is the signal reserved for a verified
+human and spending it as a list accent would answer a question nobody asked.
+
+**Naming is offered from inside the conversation, not from a row.** The list
+is where a name is read; the conversation is where you know whose it is. The
+hint sits above the field rather than below it, because somebody typing a real
+name into a pseudonymous messenger is entitled to know where it goes before
+they type it: *« Ce nom reste sur cet appareil. Ni le serveur ni votre
+correspondant ne le voient. »* (ADR-0010.)
+
+
 ## 14. Canonical glossary
 
 This section is the project's canonical glossary. The bridge and crypto specs only carry the subset strictly relevant to their perimeter.

@@ -1,5 +1,12 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react'
-import { AppState, ScrollView, StyleSheet, Text, View } from 'react-native'
+import {
+  AppState,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  View,
+} from 'react-native'
 import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context'
 import { createClient } from 'matrix-js-sdk'
 
@@ -19,6 +26,7 @@ import {
   loadConversation,
   runOutgoingPump,
   sendOneEncryptedMessage,
+  listConversations,
   startCryptoMachine,
   startLiveSync,
   vouchForEntrant,
@@ -53,9 +61,15 @@ import { mergeTimeline, type TimelineEntry } from './src/timeline/mergeTimeline'
 import { makePumpHttp } from './src/runtime/pump'
 import { fetchJoinedMembers } from './src/runtime/encryptedSend'
 import { theOtherMember, type VouchOutcome } from './src/runtime/vouch'
+import type { ConversationSummary } from './src/runtime/conversationList'
+import type { GivenNames } from './src/runtime/givenName'
+import { forgetfulGivenNames } from './src/runtime/givenNameStore'
+import { openGivenNamesDatabase } from './src/runtime/givenNamesDatabase'
 import type { EvictOutcome } from './src/runtime/evict'
 import type { HistoryClaim } from './src/runtime/claimHistory'
 import { Conversation } from './src/ui/Conversation'
+import { ConversationList } from './src/ui/ConversationList'
+import { GiveName } from './src/ui/GiveName'
 import { FirstLaunch } from './src/ui/FirstLaunch'
 import { Evict } from './src/ui/Evict'
 import { Vouch } from './src/ui/Vouch'
@@ -135,6 +149,19 @@ export function App({
   // names a loop that dies silently as worse than no loop, because the
   // screen keeps looking live.
   const [live, setLive] = useState<SyncLoopState | null>(null)
+  // The conversations this account is in, and the names this device gives
+  // their other participants. ADR-0010: the names are held here and nowhere
+  // else -- not on the homeserver, not with the other participant.
+  const [summaries, setSummaries] = useState<readonly ConversationSummary[]>([])
+  const [names, setNames] = useState<ReadonlyMap<string, string>>(new Map())
+  const [notebook, setNotebook] = useState<string | null>(null)
+  const namesRef = useRef<GivenNames>(forgetfulGivenNames())
+  // Which conversation is open, held in a ref as well as in state: the live
+  // sync loop's callbacks are created once and would otherwise keep deriving
+  // whichever conversation was open when the loop started.
+  const [openScope, setOpenScope] = useState<string | null>(null)
+  const openScopeRef = useRef<string | null>(null)
+  const openConversationRef = useRef<((scope: string) => void) | null>(null)
   const runningSyncRef = useRef<RunningSyncLoop | null>(null)
   // Set once by the launch effect, which is the only place that holds
   // everything a loop needs. Read by the foreground handler below, which
@@ -388,6 +415,89 @@ export function App({
             const roomId = sendStatus.sent
               ? sendStatus.roomId
               : await firstJoinedRoom(sessionClient)
+
+            // THE NOTEBOOK. ADR-0010: the application's own encrypted store,
+            // with a passphrase of its own. It degrades rather than failing --
+            // a launch that cannot open it shows conversations as identifiers,
+            // which is what an unnamed conversation looks like anyway.
+            const opening = await openGivenNamesDatabase(storeDir)
+            namesRef.current = opening.names
+            setNotebook(opening.opened ? 'open' : (opening.reason ?? 'closed'))
+            logEvent(opening.opened ? 'info' : 'warn', 'MESSAGR_GIVEN_NAMES', {
+              opened: opening.opened,
+              ...(opening.minted === undefined
+                ? {}
+                : { minted: opening.minted }),
+              ...(opening.reason === undefined
+                ? {}
+                : { reason: opening.reason }),
+            })
+            setNames(await opening.names.all())
+
+            // OPENING A CONVERSATION, from the list or from the launch.
+            //
+            // Everything a conversation needs and nothing a launch needs:
+            // the timeline, who the other participant is, and the sender the
+            // composer calls. The launch path below does more for the first
+            // one -- the receive probe, the history claim -- because those
+            // are diagnostics of a launch rather than of a conversation.
+            const showConversation = (scope: string) => {
+              setOpenScope(scope)
+              openScopeRef.current = scope
+              setConversation(null)
+              setSendMessage(() => (body: string) => {
+                setSending('sending')
+                const deliver = async () => {
+                  const sent = await sendOneEncryptedMessage(
+                    sessionClient,
+                    credentials,
+                    body,
+                  )
+                  if (!sent.sent) {
+                    setSending('failed')
+                    return
+                  }
+                  setSending('idle')
+                  const fresh = await loadConversation(sessionClient, scope)
+                  setConversation(held => mergeTimeline(held ?? [], fresh))
+                }
+                // A send that failed for a reason nothing here anticipated
+                // still has to leave the composer usable. Reported on the
+                // screen rather than swallowed.
+                deliver().catch(() => setSending('failed'))
+              })
+
+              const derive = async () => {
+                const fresh = await loadConversation(sessionClient, scope)
+                setConversation(held => mergeTimeline(held ?? [], fresh))
+                const members = await fetchJoinedMembers(
+                  makePumpHttp(sessionClient),
+                  scope,
+                )
+                const other = theOtherMember(members, credentials.userId)
+                setParty(other === null ? null : { scope, other })
+              }
+              derive().catch((cause: unknown) =>
+                logEvent('warn', 'MESSAGR_OPEN_CONVERSATION_FAILED', {
+                  reason: getErrorMessage(cause),
+                }),
+              )
+            }
+            openConversationRef.current = showConversation
+
+            // THE LIST. Derived rather than stored, like the conversation
+            // itself: see conversationList.ts for why it is not built out of
+            // the sync loop's own response.
+            const refreshList = async () => {
+              setSummaries(
+                await listConversations(sessionClient, credentials.userId),
+              )
+            }
+            await refreshList().catch((cause: unknown) =>
+              logEvent('warn', 'MESSAGR_LIST_FAILED', {
+                reason: getErrorMessage(cause),
+              }),
+            )
             // THE LOOP THAT MAKES THIS A MESSENGER. ADR-0007.
             //
             // Started here, at the end of the launch path, for two reasons
@@ -430,9 +540,29 @@ export function App({
                     // not something to discover as a slow start.
                     logEvent('warn', 'MESSAGR_LIVE_CURSOR_LOST', {})
                   }
-                  if (roomId === null) return
-                  if (!tick.changedScopes.includes(roomId)) return
-                  loadConversation(sessionClient, roomId)
+                  if (tick.changedScopes.length === 0) return
+
+                  // The list first, because a row moving is what a person
+                  // sees from wherever they are. Every summary is re-derived
+                  // rather than only the changed ones -- one round trip per
+                  // conversation, the limit `conversationList.ts` names, and
+                  // the day somebody has two hundred this is one of the two
+                  // places that has to change.
+                  refreshList().catch((cause: unknown) =>
+                    logEvent('warn', 'MESSAGR_LIST_FAILED', {
+                      reason: getErrorMessage(cause),
+                    }),
+                  )
+
+                  // Then the conversation on screen, if it is one that moved.
+                  // Read from the ref rather than the closure: this callback
+                  // was made once, and the conversation open now is not
+                  // necessarily the one that was open when the loop started.
+                  const open = openScopeRef.current
+                  if (open === null || !tick.changedScopes.includes(open)) {
+                    return
+                  }
+                  loadConversation(sessionClient, open)
                     .then(fresh =>
                       setConversation(held => mergeTimeline(held ?? [], fresh)),
                     )
@@ -508,34 +638,10 @@ export function App({
                 setClaimed(historyClaim)
               }
 
-              // Merged into whatever is held rather than replacing it: the
-              // loop started above may already have derived this conversation,
-              // and a launch that overwrote its result would be a race whose
-              // loser the network picks.
-              const derived = await loadConversation(sessionClient, roomId)
-              setConversation(held => mergeTimeline(held ?? [], derived))
-
-              setSendMessage(() => (body: string) => {
-                setSending('sending')
-                const deliver = async () => {
-                  const sent = await sendOneEncryptedMessage(
-                    sessionClient,
-                    credentials,
-                    body,
-                  )
-                  if (!sent.sent) {
-                    setSending('failed')
-                    return
-                  }
-                  setSending('idle')
-                  const fresh = await loadConversation(sessionClient, roomId)
-                  setConversation(held => mergeTimeline(held ?? [], fresh))
-                }
-                // A send that failed for a reason nothing here anticipated
-                // still has to leave the composer usable. Reported on the
-                // screen rather than swallowed.
-                deliver().catch(() => setSending('failed'))
-              })
+              // And the conversation itself, through the same path a row of
+              // the list takes. One way to open a conversation, so a launch
+              // and a tap cannot drift into two.
+              showConversation(roomId)
             }
 
             // Started last, after the `Received` probe above has had its
@@ -685,91 +791,145 @@ export function App({
             </View>
           )}
 
-          {conversation !== null && sendMessage !== null && (
-            <View style={styles.block}>
-              <Conversation
-                entries={conversation}
-                selfUserId={selfUserId}
-                onSend={sendMessage}
-                sending={sending}
-              />
+          {/* THE LIST **OR** THE CONVERSATION, never both.
+              Stacking them was the first shape this took, and it was wrong
+              twice over. On a phone nobody shows a list above the
+              conversation it opens; and the end-to-end suite found the same
+              thing from the other side, matching one sentence in two places
+              -- the list carries the opening of the last message and the
+              conversation carries that message. An assertion that has to say
+              *where* is an assertion about a screen nobody would ship.
 
-              {/* #34's gesture, and only where it means something: a
-                  conversation of two, where "the other person" names
-                  somebody rather than being chosen by this application. */}
-              {party !== null && sessionClientRef.current !== null && (
-                <Vouch
-                  entrantId={party.other}
-                  hasHistory={conversation.length > 0}
-                  state={vouch}
-                  onVouch={() => {
-                    const vouching = sessionClientRef.current
-                    const held = credentialsRef.current
-                    if (vouching === null || held === null) return
-                    setVouch('working')
-                    // The outcome is a value rather than a throw --
-                    // `vouchFor` reports which step stopped -- so there is
-                    // nothing here to catch, and the promise is deliberately
-                    // left to settle into state.
-                    vouchForEntrant(
-                      vouching,
-                      held,
-                      party.scope,
-                      party.other,
-                    ).then(setVouch, () => {
-                      setVouch({
-                        vouched: false,
-                        stage: 'assembling',
-                        reason: 'the gesture could not be started',
-                        promoted: false,
-                      })
-                    })
+              The instrument below stays on both, which is what a scaffold
+              still needs and a product will not. */}
+          {openScope === null && (
+            <View style={styles.block}>
+              <ConversationList
+                summaries={summaries}
+                names={names}
+                onOpen={scope => openConversationRef.current?.(scope)}
+              />
+            </View>
+          )}
+
+          {openScope !== null &&
+            conversation !== null &&
+            sendMessage !== null && (
+              <View style={styles.block}>
+                {/* Back to the list. The only navigation this screen has, and
+                  it is enough: a conversation is opened from one place. */}
+                <Pressable
+                  testID="back-to-list"
+                  onPress={() => {
+                    setOpenScope(null)
+                    openScopeRef.current = null
+                  }}
+                  accessibilityRole="button"
+                  accessibilityLabel={t('list_back')}>
+                  <Text style={styles.back}>{`\u2190 ${t('list_back')}`}</Text>
+                </Pressable>
+
+                {/* Naming is offered here rather than on a row: the list is
+                  where you read a name, the conversation is where you know
+                  whose it is. */}
+                <GiveName
+                  participant={party?.other ?? null}
+                  given={party === null ? undefined : names.get(party.other)}
+                  onName={async (participant, name) => {
+                    const kept = await namesRef.current.set(participant, name)
+                    // Shown either way. A name held only in memory is still the
+                    // name on this screen, and `kept` is what says whether it
+                    // will survive the next launch.
+                    setNames(held => new Map(held).set(participant, name))
+                    if (!kept) {
+                      logEvent('warn', 'MESSAGR_GIVEN_NAME_NOT_KEPT', {})
+                    }
+                    return kept
                   }}
                 />
-              )}
+                <Conversation
+                  entries={conversation}
+                  selfUserId={selfUserId}
+                  onSend={sendMessage}
+                  sending={sending}
+                />
 
-              {/* The mirror gesture, offered beside the one it undoes the
+                {/* #34's gesture, and only where it means something: a
+                  conversation of two, where "the other person" names
+                  somebody rather than being chosen by this application. */}
+                {party !== null && sessionClientRef.current !== null && (
+                  <Vouch
+                    entrantId={party.other}
+                    hasHistory={conversation.length > 0}
+                    state={vouch}
+                    onVouch={() => {
+                      const vouching = sessionClientRef.current
+                      const held = credentialsRef.current
+                      if (vouching === null || held === null) return
+                      setVouch('working')
+                      // The outcome is a value rather than a throw --
+                      // `vouchFor` reports which step stopped -- so there is
+                      // nothing here to catch, and the promise is deliberately
+                      // left to settle into state.
+                      vouchForEntrant(
+                        vouching,
+                        held,
+                        party.scope,
+                        party.other,
+                      ).then(setVouch, () => {
+                        setVouch({
+                          vouched: false,
+                          stage: 'assembling',
+                          reason: 'the gesture could not be started',
+                          promoted: false,
+                        })
+                      })
+                    }}
+                  />
+                )}
+
+                {/* The mirror gesture, offered beside the one it undoes the
                   effect of. Same two-step shape, because removing somebody
                   cannot be undone either -- and the sentence it owes a
                   person is a different one. */}
-              {party !== null && (
-                <Evict
-                  memberId={party.other}
-                  state={evicted}
-                  onEvict={() => {
-                    const evicting = sessionClientRef.current
-                    if (evicting === null) return
-                    setEvicted('working')
-                    evictMember(evicting, party.scope, party.other).then(
-                      setEvicted,
-                      () => {
-                        setEvicted({
-                          evicted: false,
-                          stage: 'removing',
-                          reason: 'the gesture could not be started',
-                          rotated: false,
-                        })
-                      },
-                    )
-                  }}
-                />
-              )}
+                {party !== null && (
+                  <Evict
+                    memberId={party.other}
+                    state={evicted}
+                    onEvict={() => {
+                      const evicting = sessionClientRef.current
+                      if (evicting === null) return
+                      setEvicted('working')
+                      evictMember(evicting, party.scope, party.other).then(
+                        setEvicted,
+                        () => {
+                          setEvicted({
+                            evicted: false,
+                            stage: 'removing',
+                            reason: 'the gesture could not be started',
+                            rotated: false,
+                          })
+                        },
+                      )
+                    }}
+                  />
+                )}
 
-              {/* What the passive half found, when it found anything. A
+                {/* What the passive half found, when it found anything. A
                   refusal for an untrusted sender is the one worth saying:
                   what fixes it is verifying them, and this screen is where
                   somebody would otherwise just see a gap. */}
-              {claimed !== null && claimed.claimed !== 'none' && (
-                <Text testID="history-claim" style={styles.line}>
-                  {claimed.claimed === 'imported'
-                    ? t('vouch_history_arrived')
-                    : claimed.kind === 'untrusted'
-                      ? t('vouch_history_untrusted')
-                      : `${claimed.kind}: ${claimed.reason}`}
-                </Text>
-              )}
-            </View>
-          )}
+                {claimed !== null && claimed.claimed !== 'none' && (
+                  <Text testID="history-claim" style={styles.line}>
+                    {claimed.claimed === 'imported'
+                      ? t('vouch_history_arrived')
+                      : claimed.kind === 'untrusted'
+                        ? t('vouch_history_untrusted')
+                        : `${claimed.kind}: ${claimed.reason}`}
+                  </Text>
+                )}
+              </View>
+            )}
 
           {/* Everything below is the instrument, not the product. It is what
               proves the increment on a device, and it goes when the product
@@ -916,6 +1076,13 @@ export function App({
           </View>
 
           <View style={styles.block}>
+            <Text style={styles.heading}>Given names</Text>
+            <Text testID="given-names" style={styles.line}>
+              {computeNotebookLabel(notebook, summaries.length, openScope)}
+            </Text>
+          </View>
+
+          <View style={styles.block}>
             <Text style={styles.heading}>Keystore form</Text>
             <Text testID="keystore-form" style={styles.line}>
               {computeKeystoreFormLabel(keystoreForm)}
@@ -932,6 +1099,30 @@ export function App({
 // each is a pure derivation from a status already held in state, not a
 // generic formatter forcing three differently-shaped probes through one
 // abstraction.
+
+/**
+ * The notebook, the list it names, and which conversation is open.
+ *
+ * Three facts on one line because they fail together: a notebook that did not
+ * open shows a list of identifiers, and a list that came back empty makes the
+ * open conversation the only thing on screen. Read separately they each look
+ * like a different bug.
+ */
+function computeNotebookLabel(
+  notebook: string | null,
+  listed: number,
+  openScope: string | null,
+): string {
+  const store =
+    notebook === null
+      ? 'not opened yet'
+      : notebook === 'open'
+        ? 'open'
+        : `CLOSED: ${notebook}`
+  return `given names: ${store}, ${listed} conversation(s)${
+    openScope === null ? ', none open' : ''
+  }`
+}
 
 /**
  * Where the passphrase's keystore accessibility stands. ADR-0008.
@@ -1255,6 +1446,11 @@ function computePumpOneTimeKeysLabel(
 // scaffolding, not product surface. Anything that survives into a real screen
 // must come from design/tokens.json, per interface invariant 11.
 const styles = StyleSheet.create({
+  back: {
+    ...typeScale.bodySm,
+    color: color.brand.green700,
+    paddingVertical: space.s,
+  },
   // The launch frame's own colour, so the handover between them shows nothing.
   promiseGround: {
     flex: 1,
