@@ -37,6 +37,7 @@ import { openStorePassphrase } from './storePassphrase'
 import type { DeviceIdentity } from './deviceIdentity'
 import { encryptAndSendOneMessage, type SendReport } from './encryptAndSend'
 import { getErrorMessage } from './errors'
+import { logEvent } from './log'
 import { fetchJoinedRooms } from './encryptedSend'
 import { probeUnsettledEncrypt, type ProbeReport } from './panicProbe'
 import { claimHistory, type HistoryClaim } from './claimHistory'
@@ -319,7 +320,7 @@ export async function vouchForEntrant(
   scope: string,
   entrantId: string,
 ): Promise<VouchOutcome> {
-  return vouchFor(
+  const outcome = await vouchFor(
     makePumpHttp(sessionClient),
     {
       takeOutgoingRequests,
@@ -334,6 +335,12 @@ export async function vouchForEntrant(
     scope,
     entrantId,
   )
+  // Logged as well as returned. The gesture's whole value is an ordering, and
+  // an ordering is not something a screen can show: what a person sees is
+  // "c'est fait" either way. The log is where the level actually granted, and
+  // the step that stopped, can be read back.
+  logEvent(outcome.vouched ? 'info' : 'warn', 'MESSAGR_VOUCH', { ...outcome })
+  return outcome
 }
 
 /**
