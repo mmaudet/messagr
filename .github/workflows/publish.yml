@@ -91,14 +91,24 @@ jobs:
       # Asserted rather than assumed: a bundle that reached Play unsigned
       # would be rejected there, with a message about the upload rather than
       # about the signature.
+      # Asked of jarsigner rather than inferred from an entry name, and
+      # without a pipe. `grep -q` closes the pipe at its first match, `unzip`
+      # dies of SIGPIPE listing the rest of an eighty-megabyte archive, and a
+      # shell with pipefail reads that as a failure -- intermittently, which
+      # is worse than always. jarsigner's exit status is not the answer
+      # either: it returns 0 for an unsigned jar, so the verdict is what it
+      # says.
       - name: Assert the bundle is signed
         run: |
           bundle=packages/app/android/app/build/outputs/bundle/release/app-release.aab
-          if ! unzip -l "$bundle" | grep -q 'META-INF/.*\.RSA\|META-INF/.*\.EC'; then
-            echo "the bundle carries no signature block" >&2
-            exit 1
-          fi
-          echo "the bundle is signed"
+          verdict="$(jarsigner -verify "$bundle" 2>&1 || true)"
+          case "$verdict" in
+            *"jar verified"*) echo "the bundle is signed" ;;
+            *)
+              echo "the bundle is not signed: ${verdict%%$'\n'*}" >&2
+              exit 1
+              ;;
+          esac
 
       - name: Upload to the internal testing track
         uses: r0adkll/upload-google-play@935ef9c68bb393a8e6116b1575626a7f5be3a7fb # v1.1.3
