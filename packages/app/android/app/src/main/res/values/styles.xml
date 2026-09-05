@@ -6,4 +6,15 @@
         <item name="android:editTextBackground">@drawable/rn_edit_text_material</item>
     </style>
 
+
+    <!--
+      The theme the activity is declared with, so the frame is up before any
+      of this application's code runs. MainActivity swaps back to AppTheme in
+      onCreate, before super, which is what stops the launch drawable from
+      staying behind the React view and showing through anything translucent.
+    -->
+    <style name="AppTheme.Launch" parent="AppTheme">
+        <item name="android:windowBackground">@drawable/launch_screen</item>
+    </style>
+
 </resources>

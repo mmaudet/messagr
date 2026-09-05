@@ -4,6 +4,7 @@ import { resolve } from 'node:path'
 import { by, device, element, waitFor } from 'detox'
 
 import { IGNORING_THE_LIVE_POLL } from './longPoll'
+import { acceptThePromise } from './promise'
 import { seeText } from './readout'
 
 /**
@@ -99,6 +100,9 @@ describeRoundTrip('encrypted round trip', () => {
       url: INVITATION,
       launchArgs: IGNORING_THE_LIVE_POLL,
     })
+    // See promise.ts: `delete: true` cleared the flag, so the launch path is
+    // waiting behind the first-launch screen and nothing below has started.
+    await acceptThePromise()
     // Existence first, then visibility. `toBeVisible` with a timeout was
     // answering two questions at once -- has the send finished, and can the
     // line be seen -- and the conversation screen rendering above the readout

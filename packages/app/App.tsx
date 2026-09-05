@@ -35,9 +35,20 @@ import { logEvent } from './src/runtime/log'
 import { polyfillReport } from './src/runtime/bootstrap'
 import { computeRuntimeGapReport } from './src/runtime/runtimeGaps'
 import { computeNewArchitectureReport } from './src/runtime/newArchitecture'
-import { sessionSecrets, signUpSecrets } from './src/runtime/deviceSecrets'
+import {
+  promiseSecrets,
+  sessionSecrets,
+  signUpSecrets,
+} from './src/runtime/deviceSecrets'
+import { hasSeenPromise, rememberPromiseSeen } from './src/runtime/promiseSeen'
 import { clearSignUp, isSignUpUnfinished } from './src/runtime/signUpMarker'
-import { floors, notch, space, type as typeScale } from './src/design/tokens'
+import {
+  color,
+  floors,
+  notch,
+  space,
+  type as typeScale,
+} from './src/design/tokens'
 import { mergeTimeline, type TimelineEntry } from './src/timeline/mergeTimeline'
 import { makePumpHttp } from './src/runtime/pump'
 import { fetchJoinedMembers } from './src/runtime/encryptedSend'
@@ -45,6 +56,7 @@ import { theOtherMember, type VouchOutcome } from './src/runtime/vouch'
 import type { EvictOutcome } from './src/runtime/evict'
 import type { HistoryClaim } from './src/runtime/claimHistory'
 import { Conversation } from './src/ui/Conversation'
+import { FirstLaunch } from './src/ui/FirstLaunch'
 import { Evict } from './src/ui/Evict'
 import { Vouch } from './src/ui/Vouch'
 import { t } from './src/copy'
@@ -103,6 +115,17 @@ export function App({
     () => computeTransportStatus(createClient, 'https://homeserver.invalid'),
     [],
   )
+  // THE PROMISE GATES EVERYTHING BELOW IT, and that is the screen's whole
+  // claim rather than an ordering preference. Its own words are "l'application
+  // ne réclame rien avant d'avoir montré ce qu'elle promet" — so nothing may
+  // reach the network, claim an invitation or ask a permission until somebody
+  // has read it and tapped through.
+  //
+  // `null` means the keystore has not answered yet. It is a third state and
+  // not a synonym for `false`: rendering the promise while the answer is
+  // unknown would flash it at every relaunch of a device that has long since
+  // seen it.
+  const [promiseSeen, setPromiseSeen] = useState<boolean | null>(null)
   const [bridge, setBridge] = useState<BridgeStatus | null>(null)
   const [entry, setEntry] = useState<EntryResult | null>(null)
   // The conversation this application holds, derived from the room on every
@@ -215,7 +238,20 @@ export function App({
     }
   }, [])
 
+  // Asked once, before anything else. A keystore read and nothing more: no
+  // network, which is what lets it run under the promise rather than after it.
   useEffect(() => {
+    hasSeenPromise(promiseSecrets)
+      .then(setPromiseSeen)
+      .catch(() => setPromiseSeen(false))
+  }, [])
+
+  useEffect(() => {
+    // Not started until the promise has been accepted. The effect re-runs when
+    // it is, because `promiseSeen` is one of its dependencies — which is the
+    // whole mechanism, and why it is listed there rather than read from a ref.
+    if (promiseSeen !== true) return
+
     const probeAndReport = async (): Promise<void> => {
       const status = await fetchBridgeStatus(runProbe)
       setBridge(status)
@@ -573,7 +609,15 @@ export function App({
         })
       }
     })
-  }, [architecture, hermes, gaps, client, storeDir, panicProbeRequested])
+  }, [
+    architecture,
+    hermes,
+    gaps,
+    client,
+    storeDir,
+    panicProbeRequested,
+    promiseSeen,
+  ])
 
   // The synced case computed once rather than repeated at each of its two
   // uses below: narrowing `session` inline in both the status and the
@@ -589,6 +633,42 @@ export function App({
     pump !== null && pump !== 'not-configured' && pump.outcome === 'ran'
       ? pump
       : null
+
+  // BEFORE ANYTHING ELSE, AND WITHOUT A FLASH BETWEEN.
+  //
+  // While the keystore has not answered, the same ground the launch frame
+  // paints, and nothing on it. The alternative — rendering the readout for the
+  // handful of frames it takes to read one keystore entry — is precisely the
+  // flash the launch frame exists to prevent, and it would show the diagnostic
+  // screen to somebody who has not yet been told what this is.
+  if (promiseSeen === null) {
+    return (
+      <SafeAreaProvider>
+        <View style={styles.promiseGround} />
+      </SafeAreaProvider>
+    )
+  }
+
+  if (!promiseSeen) {
+    return (
+      <SafeAreaProvider>
+        <FirstLaunch
+          onBegin={() => {
+            // Set first, kept second. A keystore that refuses must not leave
+            // somebody stuck on a screen whose only action does nothing —
+            // being shown the promise twice is the cost, and `promiseSeen.ts`
+            // says why that is the right way round.
+            setPromiseSeen(true)
+            rememberPromiseSeen(promiseSecrets)
+              .then(kept => {
+                if (!kept) logEvent('warn', 'MESSAGR_PROMISE_NOT_KEPT', {})
+              })
+              .catch(() => logEvent('warn', 'MESSAGR_PROMISE_NOT_KEPT', {}))
+          }}
+        />
+      </SafeAreaProvider>
+    )
+  }
 
   return (
     <SafeAreaProvider>
@@ -1175,6 +1255,11 @@ function computePumpOneTimeKeysLabel(
 // scaffolding, not product surface. Anything that survives into a real screen
 // must come from design/tokens.json, per interface invariant 11.
 const styles = StyleSheet.create({
+  // The launch frame's own colour, so the handover between them shows nothing.
+  promiseGround: {
+    flex: 1,
+    backgroundColor: color.brand.ink900,
+  },
   // Scrolls, and no longer centres. This readout has grown one block per
   // ticket -- architecture, engine, gaps, transport, session, pump, send,
   // received -- and its last lines had reached past the bottom of a phone.

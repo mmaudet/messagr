@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Two values from design/tokens.json, and the only two this application needs
+  outside JavaScript: the launch frame is painted by the system, before any
+  token module is loaded.
+
+  They are copied rather than generated, and that is a known duplication. It
+  is written down here so a reader knows where the other copy is:
+  packages/app/src/design/tokens.ts, itself generated from design/tokens.json.
+  If the brand's ink changes, this file changes with it.
+-->
+<resources>
+  <color name="brand_ink900">#0c1f19</color>
+  <color name="brand_green500">#12b76a</color>
+</resources>

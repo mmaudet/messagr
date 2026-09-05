@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  What the system paints between the tap on the icon and the first React
+  frame. Without it that gap carries the theme's default window background,
+  which nobody chose and which is white on a product whose first screen is
+  ink.
+
+  A layer-list rather than the Android 12 splash-screen API on purpose: that
+  API needs androidx.core:core-splashscreen, and a dependency added to paint
+  one rectangle and one vector is a dependency that has to be justified at
+  every upgrade. This works on every version the application supports.
+-->
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+  <item android:drawable="@color/brand_ink900" />
+  <item android:gravity="center">
+    <bitmap android:src="@drawable/brand_mark" android:gravity="center" />
+  </item>
+</layer-list>
