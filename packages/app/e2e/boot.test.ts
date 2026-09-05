@@ -1,6 +1,7 @@
 import { by, device, element, expect as detoxExpect, waitFor } from 'detox'
 
 import { IGNORING_THE_LIVE_POLL } from './longPoll'
+import { acceptThePromise } from './promise'
 import { SCROLL, seeId, seeText } from './readout'
 
 describe('boot', () => {
@@ -22,6 +23,9 @@ describe('boot', () => {
       // See longPoll.ts: without this, `launchApp` never returns.
       launchArgs: IGNORING_THE_LIVE_POLL,
     })
+    // `delete: true` cleared the keystore, so the promise is shown again and
+    // nothing below it has started. See promise.ts.
+    await acceptThePromise()
   }, 120000)
 
   it('enters by spending the invitation it was opened with', async () => {

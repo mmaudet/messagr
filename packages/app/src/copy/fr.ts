@@ -247,6 +247,22 @@ export const fr = {
   // would reasonably stop, which is exactly the wrong thing to do here.
   evict_failed_key_still_valid:
     'Elle est sortie, mais la clé n’a pas pu être remplacée : elle peut encore lire ce qui sera dit. Réessayez.',
+
+  // THE PROMISE, shown once and before anything is asked of anybody.
+  //
+  // Verbatim from the prototype's §1, which is the only brand screen of the
+  // whole journey. These words are the design rather than a caption for it,
+  // so they are copied rather than rewritten -- and the four points are the
+  // product's claims, each one falsifiable, which is why none of them is a
+  // slogan.
+  promise_thesis: 'La messagerie qui ne vous demande rien.',
+  promise_subtitle:
+    'Pas de numéro, pas de compte, pas de mot de passe. Quelqu’un vous invite, vous écrivez.',
+  promise_point_encrypted: 'Chiffrée de bout en bout, sans réglage',
+  promise_point_no_harvest: 'Aucun carnet d’adresses aspiré, aucune publicité',
+  promise_point_agents: 'Les agents y sont des participants déclarés',
+  promise_point_invitation: 'Vous entrez par invitation, pas par formulaire',
+  promise_action: 'Commencer',
 } as const
 
 /** Every key any screen may ask for. A typo is a compile error, not a blank. */

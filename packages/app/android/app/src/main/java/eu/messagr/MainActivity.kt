@@ -15,6 +15,23 @@ class MainActivity : ReactActivity() {
   override fun getMainComponentName(): String = "Messagr"
 
   /**
+   * Back to the ordinary theme before React draws anything.
+   *
+   * The activity is declared with `AppTheme.Launch`, whose window background
+   * is the launch drawable, so the frame is up from the moment the system
+   * creates the window. Left in place it would stay behind the React view and
+   * show through wherever nothing is painted over it -- which looks like a
+   * rendering fault rather than a splash that outstayed its welcome.
+   *
+   * Before `super.onCreate`, because that is where the window's decor is
+   * built: after it, the swap has no effect.
+   */
+  override fun onCreate(savedInstanceState: Bundle?) {
+    setTheme(R.style.AppTheme)
+    super.onCreate(savedInstanceState)
+  }
+
+  /**
    * Returns the instance of the [ReactActivityDelegate]. We use [DefaultReactActivityDelegate]
    * which allows you to enable New Architecture with a single boolean flags [fabricEnabled]
    *

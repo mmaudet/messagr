@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  The sign, as Android draws it before there is any JavaScript.
+
+  The same path as src/ui/BrandMark.tsx, and it has to stay the same: this is
+  the frame the system paints while the process starts, and the React screen
+  takes over from it. Two marks that differ by a pixel would show as a jump at
+  exactly the handover the launch frame exists to hide.
+
+  `fillType="evenOdd"` is load-bearing. The second subpath is the 45 degree cut
+  across the top-right corner; under the default winding rule it would fill
+  instead of removing.
+-->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="96dp"
+    android:height="96dp"
+    android:viewportWidth="100"
+    android:viewportHeight="100">
+  <path
+      android:fillColor="@color/brand_green500"
+      android:fillType="evenOdd"
+      android:pathData="M 30 12 H 70 A 18 18 0 0 1 88 30 V 70 A 18 18 0 0 1 70 88 H 30 A 18 18 0 0 1 12 70 V 30 A 18 18 0 0 1 30 12 Z M 54 12 L 88 46 L 88 58 L 42 12 Z" />
+</vector>
