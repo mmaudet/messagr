@@ -171,6 +171,46 @@ export const fr = {
     'Message illisible sur cet appareil : sa clé n’est pas arrivée.',
   conversation_sending: 'Envoi…',
   conversation_send_failed: 'Non envoyé. Réessayez.',
+
+  // Vouching. The key prefix is `vouch_` rather than `promotion_`, which the
+  // copy spec refuses: `promotion` was the previous product's word for a
+  // ceremony that gated nothing. What happens here is a person saying they
+  // answer for another person, and the promotion is its consequence rather
+  // than its name.
+  //
+  // **No string here counts anything.** `buildHistoryBundle` reports how many
+  // Megolm sessions a bundle carries, and that number exists so the
+  // application can tell "there is a past to hand over" from "there is not".
+  // It is not a count of messages and does not correspond to anything a
+  // person could check, so putting it on screen would be precision about a
+  // quantity nobody can interpret. The screen says what is handed over
+  // instead, which is the thing that is actually true: everything.
+  //
+  // "Vérifier" appears nowhere, for the reason `conversation_sender_claimed`
+  // states: verification is a real act in this product and this is not it.
+  vouch_action: 'Je réponds de cette personne',
+  vouch_hint:
+    'À faire quand vous êtes sûr de savoir qui vous écrit — pas avant.',
+  vouch_explain_title: 'Ce que cela fait',
+  vouch_explain_history:
+    'Elle pourra lire tout ce qui a été dit ici depuis le début, y compris avant son arrivée.',
+  vouch_explain_history_empty:
+    'Rien n’a encore été dit ici, donc il n’y a pas de passé à lui transmettre.',
+  vouch_explain_invite: 'Elle pourra inviter d’autres personnes.',
+  vouch_explain_final:
+    'Cela ne s’annule pas : les clés qu’elle reçoit, elle les garde.',
+  vouch_confirm: 'Oui, je réponds de cette personne',
+  vouch_cancel: 'Annuler',
+  vouch_working: 'En cours…',
+  vouch_done: 'C’est fait. Elle a l’historique et peut inviter.',
+  vouch_done_no_history:
+    'C’est fait. Elle peut inviter ; il n’y avait pas de passé à transmettre.',
+  vouch_failed_nothing_changed:
+    'Cela n’a pas abouti, et rien n’a changé pour elle. Vous pouvez réessayer.',
+  vouch_history_arrived:
+    'Quelqu’un a répondu de vous : le passé de cette conversation vous est désormais lisible.',
+  vouch_history_untrusted:
+    'Un passé vous a été proposé, depuis un appareil que celui-ci ne sait pas rattacher à son propriétaire. Il n’a pas été repris.',
 } as const
 
 /** Every key any screen may ask for. A typo is a compile error, not a blank. */

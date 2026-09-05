@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react'
+import React, { useEffect, useMemo, useRef, useState } from 'react'
 import { ScrollView, StyleSheet, Text, View } from 'react-native'
 import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context'
 import { createClient } from 'matrix-js-sdk'
@@ -10,6 +10,7 @@ import {
   type BridgeStatus,
 } from './src/runtime/cryptoBridge'
 import {
+  claimOfferedHistory,
   firstJoinedRoom,
   receiveOneEncryptedMessage,
   runPanicProbe,
@@ -18,6 +19,7 @@ import {
   runOutgoingPump,
   sendOneEncryptedMessage,
   startCryptoMachine,
+  vouchForEntrant,
   type CryptoPumpReport,
   type ReceiveReport,
   type SendReport,
@@ -32,7 +34,13 @@ import { sessionSecrets, signUpSecrets } from './src/runtime/deviceSecrets'
 import { clearSignUp, isSignUpUnfinished } from './src/runtime/signUpMarker'
 import { floors, notch, space, type as typeScale } from './src/design/tokens'
 import { mergeTimeline, type TimelineEntry } from './src/timeline/mergeTimeline'
+import { makePumpHttp } from './src/runtime/pump'
+import { fetchJoinedMembers } from './src/runtime/encryptedSend'
+import { theOtherMember, type VouchOutcome } from './src/runtime/vouch'
+import type { HistoryClaim } from './src/runtime/claimHistory'
 import { Conversation } from './src/ui/Conversation'
+import { Vouch } from './src/ui/Vouch'
+import { t } from './src/copy'
 import { NotchedButton } from './src/ui/NotchedButton'
 import { notchLegFor } from './src/ui/notchGeometry'
 import { enterWithASession, type EntryResult } from './src/runtime/entry'
@@ -93,6 +101,23 @@ export function App({
   // The conversation this application holds, derived from the room on every
   // launch rather than read from a copy on disk. See ADR-0006.
   const [conversation, setConversation] = useState<TimelineEntry[] | null>(null)
+  // The other person in this conversation, and the two halves of #34's
+  // gesture. `party` is `null` for anything that is not a conversation of
+  // two: vouching names one person, so it has nothing to offer a group.
+  const [party, setParty] = useState<{
+    readonly scope: string
+    readonly other: string
+  } | null>(null)
+  const [vouch, setVouch] = useState<'idle' | 'working' | VouchOutcome>('idle')
+  // Refs rather than state, and for one reason: the gesture's button lives
+  // outside the effect that built the session, and re-rendering when a
+  // client is stored would be a render nothing on screen depends on.
+  const sessionClientRef = useRef<ReturnType<typeof createClient> | null>(null)
+  const credentialsRef = useRef<{
+    readonly baseUrl: string
+    readonly accessToken: string
+  } | null>(null)
+  const [claimed, setClaimed] = useState<HistoryClaim | null>(null)
   const [selfUserId, setSelfUserId] = useState('')
   const [sending, setSending] = useState<'idle' | 'sending' | 'failed'>('idle')
   // Held rather than rebuilt: it closes over the session and the room, which
@@ -182,6 +207,8 @@ export function App({
         pumpStatus = 'not-configured'
       } else {
         const sessionClient = createClient(credentials)
+        sessionClientRef.current = sessionClient
+        credentialsRef.current = credentials
         // Started before the sync below, not after: see startCryptoMachine's
         // own documentation for why the ordering is load-bearing.
         const start = await startCryptoMachine(
@@ -281,6 +308,29 @@ export function App({
               // second copy. It costs a round trip and it is why a device
               // holds no cleartext history.
               setSelfUserId(credentials.userId)
+
+              // Who this conversation's gesture is for, and the passive half
+              // of it. Both run before the timeline is built, so history
+              // that arrives on this launch is history this launch can read:
+              // `claimOfferedHistory` imports Megolm sessions, and
+              // `loadConversation` below decrypts with whatever the store
+              // then holds. The other order would show the gap and import
+              // the key that closed it a moment later, with nothing on
+              // screen changing until the next launch.
+              const members = await fetchJoinedMembers(
+                makePumpHttp(sessionClient),
+                roomId,
+              )
+              const other = theOtherMember(members, credentials.userId)
+              if (other !== null) {
+                setParty({ scope: roomId, other })
+                // Never throws: see claimHistory.ts for why a history that
+                // did not arrive must not be a launch that did not finish.
+                setClaimed(
+                  await claimOfferedHistory(credentials, roomId, other),
+                )
+              }
+
               setConversation(
                 mergeTimeline(
                   [],
@@ -384,6 +434,54 @@ export function App({
                 onSend={sendMessage}
                 sending={sending}
               />
+
+              {/* #34's gesture, and only where it means something: a
+                  conversation of two, where "the other person" names
+                  somebody rather than being chosen by this application. */}
+              {party !== null && sessionClientRef.current !== null && (
+                <Vouch
+                  entrantId={party.other}
+                  hasHistory={conversation.length > 0}
+                  state={vouch}
+                  onVouch={() => {
+                    const vouching = sessionClientRef.current
+                    const held = credentialsRef.current
+                    if (vouching === null || held === null) return
+                    setVouch('working')
+                    // The outcome is a value rather than a throw --
+                    // `vouchFor` reports which step stopped -- so there is
+                    // nothing here to catch, and the promise is deliberately
+                    // left to settle into state.
+                    vouchForEntrant(
+                      vouching,
+                      held,
+                      party.scope,
+                      party.other,
+                    ).then(setVouch, () => {
+                      setVouch({
+                        vouched: false,
+                        stage: 'assembling',
+                        reason: 'the gesture could not be started',
+                        promoted: false,
+                      })
+                    })
+                  }}
+                />
+              )}
+
+              {/* What the passive half found, when it found anything. A
+                  refusal for an untrusted sender is the one worth saying:
+                  what fixes it is verifying them, and this screen is where
+                  somebody would otherwise just see a gap. */}
+              {claimed !== null && claimed.claimed !== 'none' && (
+                <Text testID="history-claim" style={styles.line}>
+                  {claimed.claimed === 'imported'
+                    ? t('vouch_history_arrived')
+                    : claimed.kind === 'untrusted'
+                      ? t('vouch_history_untrusted')
+                      : `${claimed.kind}: ${claimed.reason}`}
+                </Text>
+              )}
             </View>
           )}
 
