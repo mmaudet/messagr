@@ -57,6 +57,13 @@ jobs:
       # Refused early and by name. Gradle would otherwise produce an unsigned
       # bundle and the upload would fail much later with a message about the
       # bundle rather than about the missing secret that caused it.
+      # Before the build, because Google fetches the privacy policy link
+      # during review and a 404 fails that review without saying clearly why:
+      # the console reports a rejected submission, not a missing page. Nine
+      # minutes of build and an upload would be spent to learn it.
+      - name: Assert the legal pages are being served
+        run: ./scripts/assert-legal-pages.sh
+
       - name: Assert the upload key is present
         env:
           KEYSTORE: ${{ secrets.MESSAGR_UPLOAD_KEYSTORE_BASE64 }}
