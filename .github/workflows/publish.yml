@@ -84,6 +84,17 @@ jobs:
           printf '%s' "$KEYSTORE" | base64 -d > "$RUNNER_TEMP/upload.jks"
           chmod 600 "$RUNNER_TEMP/upload.jks"
 
+      # COMPUTED IN A SHELL, NOT IN AN EXPRESSION, AND THAT IS NOT A STYLE
+      # CHOICE. This line used to read `${{ 100 + github.run_number }}`, and
+      # GitHub Actions expressions HAVE NO ARITHMETIC -- the documented
+      # operators are comparison, logic and indexing, and nothing else. The
+      # workflow was rejected at dispatch with "Unexpected symbol: '+'", which
+      # is a parse error for the whole file: not the step failing, the run
+      # never starting. Nothing catches that until somebody dispatches, and
+      # nobody had since the version code stopped being a constant.
+      - name: Compute the version code
+        run: echo "MESSAGR_VERSION_CODE=$((100 + GITHUB_RUN_NUMBER))" >> "$GITHUB_ENV"
+
       # A bundle rather than an APK: Play requires one, and it is what lets
       # the store sign and split per device.
       - name: Build the signed app bundle
@@ -93,7 +104,7 @@ jobs:
           # was being set up, and monotonic afterwards because a run number
           # only goes up. Play refuses a code it has seen before, so this is
           # the field that must never repeat.
-          MESSAGR_VERSION_CODE: ${{ 100 + github.run_number }}
+          MESSAGR_VERSION_CODE: ${{ env.MESSAGR_VERSION_CODE }}
           MESSAGR_UPLOAD_KEYSTORE: ${{ runner.temp }}/upload.jks
           MESSAGR_UPLOAD_KEYSTORE_PASSWORD: ${{ secrets.MESSAGR_UPLOAD_KEYSTORE_PASSWORD }}
           MESSAGR_UPLOAD_KEY_ALIAS: ${{ secrets.MESSAGR_UPLOAD_KEY_ALIAS }}
