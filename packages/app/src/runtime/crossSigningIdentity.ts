@@ -73,6 +73,14 @@ export type IdentityEntitlement =
    * by spending a single-use token. No other device has ever held it.
    */
   | 'account-just-created'
+  /**
+   * This launch restored a session, and the device still carries the marker
+   * saying its sign-up never finished. Only that marker grants this, and it
+   * is written when an invitation is claimed and cleared when a homeserver
+   * acknowledges the identity -- see signUpMarker.ts for why nothing else in
+   * this application may grant the same thing.
+   */
+  | 'finishing-sign-up'
   /** This launch restored a session. It creates nothing. */
   | 'restored-session'
 
@@ -88,13 +96,15 @@ export type IdentityReport =
       /**
        * `'published'` republished an identity this device already held and a
        * homeserver already knew. `'created'` made the account's first, which
-       * happens exactly once in an account's life.
+       * happens exactly once in an account's life. `'resumed'` handed back a
+       * publication this device had created and never seen accepted -- the
+       * same identity, not a second one.
        *
        * Both are read back out of the machine before they are claimed: a
        * call that did not throw is not the same fact as an identity the
        * machine reports holding.
        */
-      readonly how: 'published' | 'created'
+      readonly how: 'published' | 'created' | 'resumed'
     }
   | {
       /**
@@ -171,7 +181,7 @@ function describeFailedDrain(drained: DrainResult): string {
 async function sendAndConfirm(
   machine: IdentityMachineOps,
   drain: () => Promise<DrainResult>,
-  how: 'published' | 'created',
+  how: 'published' | 'created' | 'resumed',
 ): Promise<IdentityReport> {
   const drained = await drain()
   const status = await machine.getIdentityStatus()
@@ -255,7 +265,7 @@ export async function establishCrossSigningIdentity(
       case 'identity_not_known': {
         // The server was asked and named no identity for this account.
         if (entitlement === 'account-just-created') {
-          return createFirstIdentity(machine, drain)
+          return createFirstIdentity(machine, drain, 'created')
         }
 
         // A restore creates nothing, and that includes finishing a
@@ -274,13 +284,21 @@ export async function establishCrossSigningIdentity(
         // so this reports the state and stops rather than deciding.
         const status = await machine.getIdentityStatus()
         if (status.identityPublicationPending) {
+          // The same create call again, and the library says so: it hands
+          // back the publication that was lost rather than minting a second
+          // identity. What made it unsafe in #46 was doing it on every
+          // launch; what makes it safe here is the marker, which says this
+          // account is still in sign-up and which nothing else can grant.
+          if (entitlement === 'finishing-sign-up') {
+            return createFirstIdentity(machine, drain, 'resumed')
+          }
           return {
             established: false,
             publicationPending: true,
             reason:
               'an identity was created on this device and no homeserver has ' +
-              'acknowledged it; finishing that is a decision a restore ' +
-              'cannot make',
+              'acknowledged it; this launch carries no sign-up marker, so ' +
+              'finishing it is not its decision to make',
           }
         }
         return {
@@ -323,11 +341,12 @@ export async function establishCrossSigningIdentity(
 async function createFirstIdentity(
   machine: IdentityMachineOps,
   drain: () => Promise<DrainResult>,
+  how: 'created' | 'resumed',
 ): Promise<IdentityReport> {
   try {
     await machine.createCrossSigningIdentity()
   } catch (cause: unknown) {
     return { established: false, reason: getErrorMessage(cause) }
   }
-  return sendAndConfirm(machine, drain, 'created')
+  return sendAndConfirm(machine, drain, how)
 }
