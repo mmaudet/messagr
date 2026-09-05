@@ -80,6 +80,42 @@ power level rises, so that the power level is a guarantee the keys already
 arrived — an ordering the previous codebase discovered repaired a defect it
 had not set out to fix.
 
+**How the history half became true, recorded because it nearly did not.**
+This decision said promotion shares history keys before the power level
+rises, and for a while nothing could do it. Two findings, in order.
+
+First, the obvious mechanism does not work and looks like it does.
+`shareScopeKey` shares a Megolm session, and the natural assumption is that
+sharing it late gives the recipient everything it ever encrypted. It does
+not: `vodozemac`'s `GroupSession::session_key()` exports the session **at
+its current message index**, so a session built from that key decrypts from
+there forward. Both branches land in the same place — share the existing
+session and the newcomer reads nothing earlier; rotate instead and the
+newcomer reads nothing earlier. Setting `history_visibility` to `shared` on
+the server does not help either: it lets a newcomer _fetch_ the past events,
+and gives them no key to open them. They would hold ciphertext, not history.
+
+Second, the mechanism that does work was already in the crypto library and
+not reachable. [MSC4268] room key bundles: the inviter assembles the
+sessions they hold, encrypts them into a file, uploads it, and tells the
+invitee where it is over an encrypted to-device message.
+`matrix-sdk-crypto` 0.18 implements every cryptographic step and exposes
+none of it to React Native. That exposure was added to the bridge rather
+than worked around here, because the alternative was to weaken this decision
+to match a bridge, which is the wrong direction for a decision to move.
+
+**The ordering has a step that is easy to leave out, and it is not the
+obvious one.** Announcing the bundle only _queues_ the announcement: every
+outbound message the crypto library produces is queued for the application
+to send. So raising the power level right after the announcing call —
+which reads as correct, and passes any test that does not look — publishes a
+level whose history is still sitting in a queue. That is the exact inversion
+this ordering exists to prevent, reached by a route that looks like
+compliance. The gesture therefore waits for a drain that reports a
+`to_device` request actually sent, and refuses to promote otherwise.
+
+[MSC4268]: https://github.com/matrix-org/matrix-spec-proposals/pull/4268
+
 **Inviting is impossible to express, not checked and refused.** An entrant's
 session type cannot name the operation. A check is something to
 forget; an absent method is not.

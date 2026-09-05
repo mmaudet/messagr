@@ -43,6 +43,19 @@ describe('the copy catalogue', () => {
     expect(offending).toEqual([])
   })
 
+  it('never says "vérifier" anywhere, in any string', () => {
+    // #34's own acceptance criterion, kept as a test rather than as
+    // something somebody re-reads. Verification is a real act in this
+    // product -- comparing a short string, scanning a code -- and vouching
+    // is a human judgement that proves nothing cryptographically. A screen
+    // that borrowed the word would be telling somebody they had done the
+    // one when they had done the other.
+    const offending = Object.entries(fr).filter(([, value]) =>
+      /vérifi|verifi/i.test(value),
+    )
+    expect(offending).toEqual([])
+  })
+
   it('has no empty string, which would render as a missing label', () => {
     const blank = Object.entries(fr).filter(([, value]) => value.trim() === '')
     expect(blank).toEqual([])
