@@ -29,6 +29,12 @@ cd "$(dirname "$0")/../packages/app"
 npx detox test --configuration android.emu.debug
 status=$?
 
+# Only on a green suite: a screenshot of a state the tests refused would be a
+# listing showing something nobody should get.
+if [ "$status" -eq 0 ] && [ "${MESSAGR_CAPTURE_STORE:-0}" = "1" ]; then
+  ../../scripts/capture-store-screenshots.sh "../../store-screenshots" || true
+fi
+
 if [ "$status" -ne 0 ]; then
   echo "──────── what the application itself reported ────────"
   adb logcat -d 2>/dev/null | grep -E 'MESSAGR|ReactNativeJS' | tail -40 || true
