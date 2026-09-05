@@ -40,3 +40,12 @@ export const signUpSecrets = keychainStore('eu.messagr.sign-up')
 
 /** Where the crypto store's passphrase lives. See cryptoMachineConfig.ts. */
 export const cryptoStoreSecrets = keychainStore('eu.messagr.crypto-store')
+
+/**
+ * Where the live sync loop's cursor lives between launches. See
+ * syncCursor.ts: not a secret, but `SecretStore` is the only durable
+ * per-device store this application has, and its own entry rather than a
+ * field beside the session so that a value rewritten every thirty seconds
+ * cannot corrupt the credential whose loss is the loss of the account.
+ */
+export const syncCursorSecrets = keychainStore('eu.messagr.sync-cursor')

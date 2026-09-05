@@ -3,6 +3,7 @@ import { resolve } from 'node:path'
 
 import { by, device, element, waitFor } from 'detox'
 
+import { IGNORING_THE_LIVE_POLL } from './longPoll'
 import { seeText } from './readout'
 
 /**
@@ -92,7 +93,12 @@ describeRoundTrip('encrypted round trip', () => {
     //
     // The first run claims the invitation, publishes this device's keys and
     // sends its own message.
-    await device.launchApp({ newInstance: true, delete: true, url: INVITATION })
+    await device.launchApp({
+      newInstance: true,
+      delete: true,
+      url: INVITATION,
+      launchArgs: IGNORING_THE_LIVE_POLL,
+    })
     // Existence first, then visibility. `toBeVisible` with a timeout was
     // answering two questions at once -- has the send finished, and can the
     // line be seen -- and the conversation screen rendering above the readout
@@ -113,7 +119,10 @@ describeRoundTrip('encrypted round trip', () => {
     // application that lost its session and claimed again would find the
     // token spent and the account unreachable -- losing a session is losing
     // the account.
-    await device.launchApp({ newInstance: true })
+    await device.launchApp({
+      newInstance: true,
+      launchArgs: IGNORING_THE_LIVE_POLL,
+    })
     await seeText('entry: session restored')
 
     // The store's passphrase survived too, and that is a separate claim from
@@ -144,20 +153,21 @@ describeRoundTrip('encrypted round trip', () => {
     // nothing for the counterparty to encrypt to.
     runCounterparty('send')
 
-    // Relaunched, repeatedly, and that is not a workaround dressed up: the
-    // application has no live sync loop. It stops after one sync by design
-    // (sessionSync.ts), so its whole attempt at decrypting happens in the
-    // seconds after launch and then stops for good. Reopening the app is
-    // the only retry a user has today, so it is the only retry this test is
-    // entitled to model.
-    //
-    // Waiting longer inside one launch would not help and would be a lie
-    // about the product: the screen it is waiting on has already settled.
-    // The day a timeline brings a live loop (ADR-0005), this becomes one
-    // launch and one wait.
+    // Relaunched, repeatedly. The application now runs a live sync loop
+    // (ADR-0007), so waiting inside one launch is no longer a lie about the
+    // product — but this block is skipped unless a counterparty is built,
+    // and the counterparty has not run since the mautrix-go one-time-key
+    // signature bug was found -- diagnosed on the docs/interop-otk-bug
+    // branch, which is not merged. Rewriting a test that
+    // cannot be watched failing is how a suite acquires assertions nobody
+    // has ever seen pass, so this keeps the retry it was proven with until
+    // somebody can run it.
     let seen = false
     for (let attempt = 0; attempt < 4 && !seen; attempt += 1) {
-      await device.launchApp({ newInstance: true })
+      await device.launchApp({
+        newInstance: true,
+        launchArgs: IGNORING_THE_LIVE_POLL,
+      })
       try {
         await seeText(`decrypted: ${COUNTERPARTY_BODY}`)
         seen = true
