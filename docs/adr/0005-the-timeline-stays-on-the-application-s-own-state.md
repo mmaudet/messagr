@@ -20,6 +20,19 @@ application deliberately stops after its first sync (`sessionSync.ts`), and
 whose long-polling is what made Detox's network-idle tracker hang before it
 was stopped. Taking the model means taking the loop back.
 
+## What this decided, and what it did not
+
+**It did not decide that there is no live sync.** The sentence above about
+stopping the SDK's loop is a consequence of not taking its model, with a
+test-tooling reason attached — Detox's network-idle tracker hung on
+long-polling. It was never argued on product or security grounds, and it was
+read afterwards as settling a question it never asked.
+
+ADR-0007 asks that question and answers it: the application runs a sync loop
+**of its own**, over the `/sync` fetch it already performs through
+`authedRequest`. That takes nothing back. What this decision refuses —
+`MatrixEvent`, `attemptDecryption`, the SDK's room model — stays refused.
+
 ## The cost, stated plainly
 
 Pagination, ordering, deduplication, gap handling and read markers are

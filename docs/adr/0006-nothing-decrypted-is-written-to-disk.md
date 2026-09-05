@@ -22,7 +22,9 @@ homeserver still holds and Megolm sessions the crypto store already keeps.
 
 We take the second, and the reason it costs little here is specific rather
 than general: this application already fetches and decrypts on every launch.
-It has no live sync loop (ADR-0005), so a launch is already a fetch. Deriving
+It has no live sync loop (ADR-0005), so a launch is already a fetch.
+(ADR-0007 gives it one, which strengthens this argument rather than
+weakening it: the work was happening anyway, and now it happens more often.) Deriving
 the timeline is not extra work bolted on; it is the work that was happening
 anyway, kept rather than duplicated into a second store.
 
