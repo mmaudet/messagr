@@ -23,6 +23,7 @@ import {
   startLiveSync,
   vouchForEntrant,
   type CryptoPumpReport,
+  type FormMigration,
   type ReceiveReport,
   type RunningSyncLoop,
   type SendReport,
@@ -149,6 +150,11 @@ export function App({
   // Whether this launch minted the crypto store's passphrase or reopened
   // with the one it already held -- never the passphrase itself. A relaunch
   // that mints is a relaunch that lost every room key it had.
+  // Whether the passphrase sits at the accessibility a background wake needs.
+  // ADR-0008. Reported whether or not the machine then started: it is the
+  // difference between a device that can decrypt while its screen is off and
+  // one that cannot, and it is invisible everywhere else.
+  const [keystoreForm, setKeystoreForm] = useState<FormMigration | null>(null)
   const [storePassphrase, setStorePassphrase] = useState<
     'minted' | 'reused' | null
   >(null)
@@ -267,6 +273,11 @@ export function App({
               reason: getErrorMessage(cause),
             }),
         )
+
+        // Outside the `started` test below, deliberately: the migration runs
+        // before the store is opened, so it has an answer even on a launch
+        // that then fails to start a machine at all.
+        setKeystoreForm(start.passphraseForm)
 
         try {
           sessionStatus = await fetchSessionSyncStatus(
@@ -823,6 +834,13 @@ export function App({
               {computeLiveSyncLabel(live)}
             </Text>
           </View>
+
+          <View style={styles.block}>
+            <Text style={styles.heading}>Keystore form</Text>
+            <Text testID="keystore-form" style={styles.line}>
+              {computeKeystoreFormLabel(keystoreForm)}
+            </Text>
+          </View>
         </ScrollView>
       </SafeAreaView>
     </SafeAreaProvider>
@@ -834,6 +852,29 @@ export function App({
 // each is a pure derivation from a status already held in state, not a
 // generic formatter forcing three differently-shaped probes through one
 // abstraction.
+
+/**
+ * Where the passphrase's keystore accessibility stands. ADR-0008.
+ *
+ * The five outcomes are not five ways of saying the same thing, so none of
+ * them collapses into another: `current` and `rewritten` both end at the
+ * right place but only one of them touched a secret; `deferred` is a launch
+ * that was right not to try; `failed` is the one that leaves a device unable
+ * to decrypt while its screen is off, and it is the only one worth an alarm.
+ */
+function computeKeystoreFormLabel(migration: FormMigration | null): string {
+  if (migration === null) return 'keystore form: —'
+  const said = {
+    current: 'already after first unlock',
+    rewritten: 'moved to after first unlock',
+    'nothing-stored': 'nothing stored yet, the first write moves it',
+    deferred: 'not attempted, this launch could not read the old form',
+    failed: `NOT MOVED: ${migration.reason ?? 'no reason given'}`,
+  }[migration.outcome]
+  // Whether it will be attempted again, said only when it will be: a settled
+  // migration that also says "settled" is noise on a line read at a glance.
+  return `keystore form: ${said}${migration.marked ? '' : ', unmarked'}`
+}
 
 /**
  * What the loop is doing, in the words ADR-0007 asks for. `not started` is

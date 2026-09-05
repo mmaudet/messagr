@@ -8,6 +8,8 @@
 // tested elsewhere or is a single native call and its catch, the same shape
 // `pump.ts`'s `makePumpHttp` and `toDeviceBridge.ts`'s `makeToDeviceSource`
 // already leave untested.
+import { AppState } from 'react-native'
+
 import type { createClient } from 'matrix-js-sdk'
 import {
   asCryptoScopeId,
@@ -33,7 +35,12 @@ import {
 
 import type { IdentityEntitlement } from './crossSigningIdentity'
 import { computeCryptoMachineConfig } from './cryptoMachineConfig'
-import { cryptoStoreSecrets, syncCursorSecrets } from './deviceSecrets'
+import {
+  cryptoStoreFormMarker,
+  cryptoStoreSecrets,
+  syncCursorSecrets,
+} from './deviceSecrets'
+import { migrateKeystoreForm, type FormMigration } from './keystoreForm'
 import { openStorePassphrase } from './storePassphrase'
 import type { DeviceIdentity } from './deviceIdentity'
 import { encryptAndSendOneMessage, type SendReport } from './encryptAndSend'
@@ -65,9 +72,19 @@ export type { CryptoPumpReport } from './outgoingPumpCycle'
 export type { SendReport } from './encryptAndSend'
 export type { ReceiveReport } from './receiveDecrypt'
 export type { ProbeReport } from './panicProbe'
+export type { FormMigration, FormOutcome } from './keystoreForm'
 export type { RunningSyncLoop, SyncLoopState, SyncTick } from './syncLoop'
 
-export type MachineStartResult =
+export type MachineStartResult = {
+  /**
+   * What became of the passphrase's keystore accessibility on this launch.
+   * ADR-0008, and reported whether or not the machine then started: a
+   * migration that could not run is the difference between a device that can
+   * decrypt on a background wake and one that cannot, and it is invisible
+   * everywhere else.
+   */
+  readonly passphraseForm: FormMigration
+} & (
   | {
       readonly started: true
       readonly unsubscribeToDevice: () => void
@@ -82,6 +99,7 @@ export type MachineStartResult =
       readonly passphraseMinted: boolean
     }
   | { readonly started: false; readonly reason: string }
+)
 
 /**
  * Phase one: create the crypto machine and start feeding it to-device
@@ -101,6 +119,26 @@ export async function startCryptoMachine(
   storeDir: string,
   onToDeviceError: (cause: unknown) => void,
 ): Promise<MachineStartResult> {
+  // BEFORE THE PASSPHRASE IS READ, not after, and that ordering is the whole
+  // migration. Reading an entry in the old form works here, in the
+  // foreground; moving it afterwards would leave the window ADR-0008 exists
+  // to close open for one more launch.
+  //
+  // `AppState.currentState` is asked rather than assumed. It is `active` on
+  // every launch this application has today, which is exactly why writing
+  // `true` would be wrong: the day ADR-0009's silent wake lands, this is the
+  // line that already knows not to try.
+  const passphraseForm = await migrateKeystoreForm(
+    cryptoStoreSecrets,
+    cryptoStoreFormMarker,
+    AppState.currentState === 'active',
+  )
+  logEvent(
+    passphraseForm.outcome === 'failed' ? 'warn' : 'info',
+    'MESSAGR_KEYSTORE_FORM',
+    { ...passphraseForm },
+  )
+
   // Before the config, because there is no useful config without it. A
   // store opened with the wrong passphrase is not a degraded store, it is a
   // different one -- and the first launch to open a second store loses every
@@ -108,8 +146,19 @@ export async function startCryptoMachine(
   const passphrase = await openStorePassphrase(cryptoStoreSecrets, byteLength =>
     crypto.getRandomValues(new Uint8Array(byteLength)),
   )
+  // Logged next to the migration above, and for the same reason: the pair is
+  // the only evidence that a launch could actually reach its own passphrase.
+  // ADR-0008's whole claim is that this read works while the screen is off,
+  // and the readout cannot show it -- a launch that never got here draws no
+  // screen at all.
+  logEvent(passphrase.held ? 'info' : 'warn', 'MESSAGR_STORE_PASSPHRASE', {
+    held: passphrase.held,
+    ...(passphrase.held
+      ? { minted: passphrase.minted }
+      : { reason: passphrase.reason }),
+  })
   if (!passphrase.held) {
-    return { started: false, reason: passphrase.reason }
+    return { started: false, reason: passphrase.reason, passphraseForm }
   }
 
   const config = computeCryptoMachineConfig(
@@ -121,13 +170,14 @@ export async function startCryptoMachine(
     return {
       started: false,
       reason: 'no writable directory was supplied at launch',
+      passphraseForm,
     }
   }
 
   try {
     await createCryptoMachine(config)
   } catch (cause: unknown) {
-    return { started: false, reason: getErrorMessage(cause) }
+    return { started: false, reason: getErrorMessage(cause), passphraseForm }
   }
 
   const unsubscribeToDevice = subscribeToDeviceMessages(
@@ -140,6 +190,7 @@ export async function startCryptoMachine(
     started: true,
     unsubscribeToDevice,
     passphraseMinted: passphrase.minted,
+    passphraseForm,
   }
 }
 
