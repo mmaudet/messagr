@@ -122,6 +122,13 @@ describeRoundTrip('encrypted round trip', () => {
     // decryption below would then fail on, several minutes later and looking
     // like a key-delivery problem rather than a storage one.
     await seeText('store passphrase: reused, the store reopened')
+
+    // And the sign-up marker is still cleared, so this relaunch created
+    // nothing. `published` rather than `created` or `resumed` is what says
+    // the destructive call was not reached: the identity was republished,
+    // not minted a second time.
+    await seeText('sign-up: complete, the marker is cleared')
+    await seeText('signing identity: published')
   })
 
   it('reads a message an independent client encrypted for it', async () => {

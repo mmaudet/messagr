@@ -28,7 +28,8 @@ import { logEvent } from './src/runtime/log'
 import { polyfillReport } from './src/runtime/bootstrap'
 import { computeRuntimeGapReport } from './src/runtime/runtimeGaps'
 import { computeNewArchitectureReport } from './src/runtime/newArchitecture'
-import { sessionSecrets } from './src/runtime/deviceSecrets'
+import { sessionSecrets, signUpSecrets } from './src/runtime/deviceSecrets'
+import { clearSignUp, isSignUpUnfinished } from './src/runtime/signUpMarker'
 import { floors, notch, space, type as typeScale } from './src/design/tokens'
 import { mergeTimeline, type TimelineEntry } from './src/timeline/mergeTimeline'
 import { Conversation } from './src/ui/Conversation'
@@ -106,6 +107,13 @@ export function App({
   const [storePassphrase, setStorePassphrase] = useState<
     'minted' | 'reused' | null
   >(null)
+  // Whether this device still carries the marker saying its sign-up never
+  // finished. Reported because it is the entitlement to the one destructive
+  // call on the crypto surface, and a marker that never clears would leave
+  // that call armed on every launch, forever.
+  const [signUpState, setSignUpState] = useState<
+    'unfinished' | 'complete' | null
+  >(null)
   // What the notched button actually laid out at, reported from the device.
   // The shape is the brand's, so something has to be able to check it where
   // it renders rather than only where it is computed.
@@ -160,6 +168,7 @@ export function App({
         secrets: sessionSecrets,
         poster: servicePoster,
         link: initialLink,
+        signUp: signUpSecrets,
       })
       setEntry(entered)
       const credentials = entered.entered ? entered.session : null
@@ -208,14 +217,41 @@ export function App({
             // token, so no other device can have published an identity --
             // which is the fact the library cannot have and refuses to
             // guess. See crossSigningIdentity.ts.
+            // THE ENTITLEMENT TO CREATE THIS ACCOUNT'S FIRST IDENTITY.
+            //
+            // A claim carries it outright: the account is seconds old, so
+            // nothing can be overwritten. A restore carries it only when the
+            // device still holds the sign-up marker, which says a previous
+            // launch began a sign-up it may not have finished.
+            //
+            // Everything uncertain resolves to `restored-session`, which
+            // creates nothing. See signUpMarker.ts.
+            const entitlement =
+              entered.entered && entered.claimed
+                ? ('account-just-created' as const)
+                : (await isSignUpUnfinished(signUpSecrets))
+                  ? ('finishing-sign-up' as const)
+                  : ('restored-session' as const)
+
             const report = await runOutgoingPump(
               sessionClient,
               credentials,
-              entered.entered && entered.claimed
-                ? 'account-just-created'
-                : 'restored-session',
+              entitlement,
             )
             pumpStatus = { outcome: 'ran', report }
+
+            // Cleared only once a homeserver has acknowledged the identity,
+            // which is exactly what `established` means here: the machine
+            // reports holding one and reports no publication pending. Clearing
+            // any earlier would strand a device that still needed to finish.
+            if (report.identity.established) {
+              await clearSignUp(signUpSecrets)
+            }
+            setSignUpState(
+              (await isSignUpUnfinished(signUpSecrets))
+                ? 'unfinished'
+                : 'complete',
+            )
             // Only once the keys are published: a message encrypted before
             // this device's own keys are on the server is one nobody can
             // ask about, let alone decrypt.
@@ -437,6 +473,9 @@ export function App({
             </Text>
             <Text testID="pump-identity" style={styles.line}>
               {computeIdentityLabel(ranPump)}
+            </Text>
+            <Text testID="pump-signup" style={styles.line}>
+              {computeSignUpLabel(signUpState)}
             </Text>
           </View>
 
@@ -718,6 +757,21 @@ function computeNotchLabel(
   return held
     ? `notch: derived from height (${notch.button.size}pt at 48pt)`
     : `notch: WRONG (${geometry.leg.toFixed(2)} where ${expected.toFixed(2)} was due)`
+}
+
+/**
+ * Whether the entitlement to create an identity is still on this device.
+ *
+ * "unfinished" after a launch that published successfully would mean the
+ * marker did not clear, and that every later launch stays entitled to the one
+ * destructive call on the crypto surface -- which is the failure this whole
+ * mechanism exists to prevent, so it is worth being able to see.
+ */
+function computeSignUpLabel(state: 'unfinished' | 'complete' | null): string {
+  if (state === null) return 'sign-up: —'
+  return state === 'complete'
+    ? 'sign-up: complete, the marker is cleared'
+    : 'sign-up: unfinished, this device may still finish it'
 }
 
 function computePumpStatusLabel(status: PumpStatus | null): string {
