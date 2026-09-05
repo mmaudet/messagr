@@ -17,11 +17,15 @@ import {
   decryptEvent,
   encryptEvent,
   encryptionSlice,
+  buildHistoryBundle,
   getDeviceIdentityKeys,
   getIdentityStatus,
   markRequestFailed,
   markRequestSent,
+  offeredHistoryBundle,
+  receiveHistoryBundle,
   receiveSyncChanges,
+  shareHistoryBundle,
   shareScopeKey,
   takeOutgoingRequests,
 } from 'react-native-matrix-crypto'
@@ -35,7 +39,10 @@ import { encryptAndSendOneMessage, type SendReport } from './encryptAndSend'
 import { getErrorMessage } from './errors'
 import { fetchJoinedRooms } from './encryptedSend'
 import { probeUnsettledEncrypt, type ProbeReport } from './panicProbe'
+import { claimHistory, type HistoryClaim } from './claimHistory'
+import { mediaRepository } from './mediaRepository'
 import { makePumpHttp } from './pump'
+import { vouchFor, type VouchOutcome } from './vouch'
 import { receiveAndDecrypt, type ReceiveReport } from './receiveDecrypt'
 import {
   runOutgoingPumpCycle,
@@ -291,5 +298,66 @@ export async function runPanicProbe(
     },
     identity,
     storeDir,
+  )
+}
+
+/**
+ * Phase five: the inviter's gesture, bound to the real bridge and the real
+ * media repository.
+ *
+ * Pure glue, like everything else here. The sequence -- and the ordering that
+ * makes it worth anything -- is `vouch.ts`'s `vouchFor`, tested there against
+ * injected fakes.
+ *
+ * `fetch` is passed rather than reached for inside `mediaRepository`, which
+ * keeps that module testable without a server and keeps this file the only
+ * place a global is touched.
+ */
+export async function vouchForEntrant(
+  sessionClient: ReturnType<typeof createClient>,
+  credentials: { readonly baseUrl: string; readonly accessToken: string },
+  scope: string,
+  entrantId: string,
+): Promise<VouchOutcome> {
+  return vouchFor(
+    makePumpHttp(sessionClient),
+    {
+      takeOutgoingRequests,
+      markRequestSent,
+      markRequestFailed,
+      buildHistoryBundle: bundleScope =>
+        buildHistoryBundle(asCryptoScopeId(bundleScope)),
+      shareHistoryBundle: (bundleScope, userId, url, secret) =>
+        shareHistoryBundle(asCryptoScopeId(bundleScope), userId, url, secret),
+    },
+    mediaRepository(credentials.baseUrl, credentials.accessToken, fetch),
+    scope,
+    entrantId,
+  )
+}
+
+/**
+ * Phase five, the other side: taking history somebody vouched for you with.
+ *
+ * Called on launch after the sync, because the announcement is a to-device
+ * event and exists for this device only once a sync carrying it has been
+ * ingested. `claimHistory` never throws, which is what lets this sit in the
+ * launch path.
+ */
+export async function claimOfferedHistory(
+  credentials: { readonly baseUrl: string; readonly accessToken: string },
+  scope: string,
+  voucherId: string,
+): Promise<HistoryClaim> {
+  return claimHistory(
+    {
+      offeredHistoryBundle: (claimScope, senderId) =>
+        offeredHistoryBundle(asCryptoScopeId(claimScope), senderId),
+      receiveHistoryBundle: (claimScope, senderId, ciphertext) =>
+        receiveHistoryBundle(asCryptoScopeId(claimScope), senderId, ciphertext),
+    },
+    mediaRepository(credentials.baseUrl, credentials.accessToken, fetch),
+    scope,
+    voucherId,
   )
 }

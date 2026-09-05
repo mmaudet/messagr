@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest'
 import type { HttpRequester } from './pump'
 import {
   PROMOTED_LEVEL,
+  theOtherMember,
   vouchFor,
   type HistoryMachine,
   type MediaUploader,
@@ -242,5 +243,27 @@ describe('vouching for an entrant', () => {
     expect(
       (after.users as Record<string, number>)['@inviter:example.org'],
     ).toBe(100)
+  })
+})
+
+describe('naming who a gesture is for', () => {
+  const SELF = '@me:example.org'
+
+  it('finds the other person in a conversation of two', () => {
+    expect(theOtherMember([SELF, ENTRANT], SELF)).toBe(ENTRANT)
+    expect(theOtherMember([ENTRANT, SELF], SELF)).toBe(ENTRANT)
+  })
+
+  it('refuses to pick one out of three', () => {
+    // A conversation of three has no "other person", and choosing one would
+    // be this application inventing a target for something irreversible.
+    expect(
+      theOtherMember([SELF, ENTRANT, '@third:example.org'], SELF),
+    ).toBeNull()
+  })
+
+  it('refuses a conversation this account is alone in', () => {
+    expect(theOtherMember([SELF], SELF)).toBeNull()
+    expect(theOtherMember([], SELF)).toBeNull()
   })
 })

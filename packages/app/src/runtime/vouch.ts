@@ -224,3 +224,23 @@ export async function vouchFor(
     }
   }
 }
+
+/**
+ * The other person in a two-person conversation.
+ *
+ * Both halves of this gesture need one: the inviter vouches for somebody,
+ * and the entrant takes history from somebody. In a conversation of two,
+ * that somebody is whoever is not this account.
+ *
+ * `null` for anything that is not a conversation of two, and deliberately so.
+ * A conversation of three has no "other person", and picking one would be
+ * this application inventing a target for an irreversible act. Groups get
+ * their own gesture, with their own way of naming who it is for.
+ */
+export function theOtherMember(
+  members: readonly string[],
+  selfUserId: string,
+): string | null {
+  const others = members.filter(member => member !== selfUserId)
+  return others.length === 1 ? others[0]! : null
+}
