@@ -263,6 +263,27 @@ export const fr = {
   promise_point_agents: 'Les agents y sont des participants déclarés',
   promise_point_invitation: 'Vous entrez par invitation, pas par formulaire',
   promise_action: 'Commencer',
+
+  // THE LIST OF CONVERSATIONS.
+  //
+  // Degraded states in natural language, never an error code and never the
+  // word "federation" -- §13.19 invariant 6. What went wrong technically goes
+  // to the log; a row says what it means for the person reading it.
+  list_title: 'Conversations',
+  list_empty:
+    'Aucune conversation pour l’instant. Invitez quelqu’un pour en commencer une.',
+  list_nothing_said: 'Rien n’a encore été dit',
+  list_unreadable: 'Cet appareil ne peut pas lire le dernier message',
+  list_unreachable: 'Cette conversation n’a pas pu être relue',
+  list_name_action: 'Donner un nom',
+  list_name_title: 'Comment appelez-vous cette personne ?',
+  list_name_hint:
+    'Ce nom reste sur cet appareil. Ni le serveur ni votre correspondant ne le voient.',
+  list_name_placeholder: 'Un prénom, un surnom',
+  list_name_confirm: 'Enregistrer',
+  list_name_cancel: 'Annuler',
+  list_name_not_kept:
+    'Le nom n’a pas pu être conservé : il sera oublié au prochain démarrage.',
 } as const
 
 /** Every key any screen may ask for. A typo is a compile error, not a blank. */

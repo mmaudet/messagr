@@ -90,3 +90,10 @@ export const cryptoStoreFormMarker = keychainStore(
  * one durable per-device store this application has today.
  */
 export const promiseSecrets = keychainStore('eu.messagr.promise')
+
+/**
+ * Where the given-names notebook's passphrase lives. See ADR-0010: its own
+ * entry rather than the crypto store's, because one secret for two stores
+ * means compromising either gives both.
+ */
+export const givenNamesSecrets = keychainStore('eu.messagr.given-names')
