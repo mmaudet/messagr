@@ -368,12 +368,34 @@ pause "Build now? This takes a few minutes."
   ./gradlew :app:bundleRelease
 )
 BUNDLE="$REPO_ROOT/packages/app/android/app/build/outputs/bundle/release/app-release.aab"
-if unzip -l "$BUNDLE" | grep -qE 'META-INF/.*\.(RSA|EC)'; then
-  printf '  %s✓%s the bundle is signed: %s\n' "$GREEN" "$RESET" "$BUNDLE"
-else
-  warn "The bundle carries no signature block. The key did not reach gradle."
-  exit 1
-fi
+
+# ASKED OF JARSIGNER, AND WITHOUT A PIPE.
+#
+# This looked for a `META-INF/*.RSA` entry with `unzip -l | grep -q`, and it
+# was wrong twice over.
+#
+# `grep -q` stops at its first match and closes the pipe. `unzip`, still
+# listing thousands of entries from an eighty-megabyte archive, then dies of
+# SIGPIPE -- and `set -o pipefail` turns that into a failed pipeline even
+# though the match was found. Measured: two runs in six. So a perfectly
+# signed bundle was called unsigned about a third of the time, which is worse
+# than always failing.
+#
+# And the entry name was only ever a proxy. `jarsigner` answers the actual
+# question. Its exit status does not: it returns 0 for an unsigned jar too,
+# so the verdict is read from what it says, with `case` rather than another
+# pipe.
+verdict="$(jarsigner -verify "$BUNDLE" 2>&1 || true)"
+case "$verdict" in
+  *"jar verified"*)
+    printf '  %s✓%s the bundle is signed: %s\n' "$GREEN" "$RESET" "$BUNDLE"
+    ;;
+  *)
+    warn "The bundle is not signed. The key did not reach gradle."
+    note "jarsigner said: ${verdict%%$'\n'*}"
+    exit 1
+    ;;
+esac
 pause "Continue?"
 
 # ── 9 ──────────────────────────────────────────────────────────────────────
