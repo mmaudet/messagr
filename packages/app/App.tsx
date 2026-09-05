@@ -1,5 +1,12 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react'
-import { AppState, ScrollView, StyleSheet, Text, View } from 'react-native'
+import {
+  AppState,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  View,
+} from 'react-native'
 import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context'
 import { createClient } from 'matrix-js-sdk'
 
@@ -784,120 +791,145 @@ export function App({
             </View>
           )}
 
-          {/* THE LIST, above the conversation and above the instrument.
-              A person's own surface comes first on this screen; the readout
-              below is what a scaffold still needs and a product will not. */}
-          <View style={styles.block}>
-            <ConversationList
-              summaries={summaries}
-              names={names}
-              onOpen={scope => openConversationRef.current?.(scope)}
-            />
-          </View>
+          {/* THE LIST **OR** THE CONVERSATION, never both.
+              Stacking them was the first shape this took, and it was wrong
+              twice over. On a phone nobody shows a list above the
+              conversation it opens; and the end-to-end suite found the same
+              thing from the other side, matching one sentence in two places
+              -- the list carries the opening of the last message and the
+              conversation carries that message. An assertion that has to say
+              *where* is an assertion about a screen nobody would ship.
 
-          {conversation !== null && sendMessage !== null && (
+              The instrument below stays on both, which is what a scaffold
+              still needs and a product will not. */}
+          {openScope === null && (
             <View style={styles.block}>
-              {/* Naming is offered here rather than on a row: the list is
+              <ConversationList
+                summaries={summaries}
+                names={names}
+                onOpen={scope => openConversationRef.current?.(scope)}
+              />
+            </View>
+          )}
+
+          {openScope !== null &&
+            conversation !== null &&
+            sendMessage !== null && (
+              <View style={styles.block}>
+                {/* Back to the list. The only navigation this screen has, and
+                  it is enough: a conversation is opened from one place. */}
+                <Pressable
+                  testID="back-to-list"
+                  onPress={() => {
+                    setOpenScope(null)
+                    openScopeRef.current = null
+                  }}
+                  accessibilityRole="button"
+                  accessibilityLabel={t('list_back')}>
+                  <Text style={styles.back}>{`\u2190 ${t('list_back')}`}</Text>
+                </Pressable>
+
+                {/* Naming is offered here rather than on a row: the list is
                   where you read a name, the conversation is where you know
                   whose it is. */}
-              <GiveName
-                participant={party?.other ?? null}
-                given={party === null ? undefined : names.get(party.other)}
-                onName={async (participant, name) => {
-                  const kept = await namesRef.current.set(participant, name)
-                  // Shown either way. A name held only in memory is still the
-                  // name on this screen, and `kept` is what says whether it
-                  // will survive the next launch.
-                  setNames(held => new Map(held).set(participant, name))
-                  if (!kept) {
-                    logEvent('warn', 'MESSAGR_GIVEN_NAME_NOT_KEPT', {})
-                  }
-                  return kept
-                }}
-              />
-              <Conversation
-                entries={conversation}
-                selfUserId={selfUserId}
-                onSend={sendMessage}
-                sending={sending}
-              />
-
-              {/* #34's gesture, and only where it means something: a
-                  conversation of two, where "the other person" names
-                  somebody rather than being chosen by this application. */}
-              {party !== null && sessionClientRef.current !== null && (
-                <Vouch
-                  entrantId={party.other}
-                  hasHistory={conversation.length > 0}
-                  state={vouch}
-                  onVouch={() => {
-                    const vouching = sessionClientRef.current
-                    const held = credentialsRef.current
-                    if (vouching === null || held === null) return
-                    setVouch('working')
-                    // The outcome is a value rather than a throw --
-                    // `vouchFor` reports which step stopped -- so there is
-                    // nothing here to catch, and the promise is deliberately
-                    // left to settle into state.
-                    vouchForEntrant(
-                      vouching,
-                      held,
-                      party.scope,
-                      party.other,
-                    ).then(setVouch, () => {
-                      setVouch({
-                        vouched: false,
-                        stage: 'assembling',
-                        reason: 'the gesture could not be started',
-                        promoted: false,
-                      })
-                    })
+                <GiveName
+                  participant={party?.other ?? null}
+                  given={party === null ? undefined : names.get(party.other)}
+                  onName={async (participant, name) => {
+                    const kept = await namesRef.current.set(participant, name)
+                    // Shown either way. A name held only in memory is still the
+                    // name on this screen, and `kept` is what says whether it
+                    // will survive the next launch.
+                    setNames(held => new Map(held).set(participant, name))
+                    if (!kept) {
+                      logEvent('warn', 'MESSAGR_GIVEN_NAME_NOT_KEPT', {})
+                    }
+                    return kept
                   }}
                 />
-              )}
+                <Conversation
+                  entries={conversation}
+                  selfUserId={selfUserId}
+                  onSend={sendMessage}
+                  sending={sending}
+                />
 
-              {/* The mirror gesture, offered beside the one it undoes the
+                {/* #34's gesture, and only where it means something: a
+                  conversation of two, where "the other person" names
+                  somebody rather than being chosen by this application. */}
+                {party !== null && sessionClientRef.current !== null && (
+                  <Vouch
+                    entrantId={party.other}
+                    hasHistory={conversation.length > 0}
+                    state={vouch}
+                    onVouch={() => {
+                      const vouching = sessionClientRef.current
+                      const held = credentialsRef.current
+                      if (vouching === null || held === null) return
+                      setVouch('working')
+                      // The outcome is a value rather than a throw --
+                      // `vouchFor` reports which step stopped -- so there is
+                      // nothing here to catch, and the promise is deliberately
+                      // left to settle into state.
+                      vouchForEntrant(
+                        vouching,
+                        held,
+                        party.scope,
+                        party.other,
+                      ).then(setVouch, () => {
+                        setVouch({
+                          vouched: false,
+                          stage: 'assembling',
+                          reason: 'the gesture could not be started',
+                          promoted: false,
+                        })
+                      })
+                    }}
+                  />
+                )}
+
+                {/* The mirror gesture, offered beside the one it undoes the
                   effect of. Same two-step shape, because removing somebody
                   cannot be undone either -- and the sentence it owes a
                   person is a different one. */}
-              {party !== null && (
-                <Evict
-                  memberId={party.other}
-                  state={evicted}
-                  onEvict={() => {
-                    const evicting = sessionClientRef.current
-                    if (evicting === null) return
-                    setEvicted('working')
-                    evictMember(evicting, party.scope, party.other).then(
-                      setEvicted,
-                      () => {
-                        setEvicted({
-                          evicted: false,
-                          stage: 'removing',
-                          reason: 'the gesture could not be started',
-                          rotated: false,
-                        })
-                      },
-                    )
-                  }}
-                />
-              )}
+                {party !== null && (
+                  <Evict
+                    memberId={party.other}
+                    state={evicted}
+                    onEvict={() => {
+                      const evicting = sessionClientRef.current
+                      if (evicting === null) return
+                      setEvicted('working')
+                      evictMember(evicting, party.scope, party.other).then(
+                        setEvicted,
+                        () => {
+                          setEvicted({
+                            evicted: false,
+                            stage: 'removing',
+                            reason: 'the gesture could not be started',
+                            rotated: false,
+                          })
+                        },
+                      )
+                    }}
+                  />
+                )}
 
-              {/* What the passive half found, when it found anything. A
+                {/* What the passive half found, when it found anything. A
                   refusal for an untrusted sender is the one worth saying:
                   what fixes it is verifying them, and this screen is where
                   somebody would otherwise just see a gap. */}
-              {claimed !== null && claimed.claimed !== 'none' && (
-                <Text testID="history-claim" style={styles.line}>
-                  {claimed.claimed === 'imported'
-                    ? t('vouch_history_arrived')
-                    : claimed.kind === 'untrusted'
-                      ? t('vouch_history_untrusted')
-                      : `${claimed.kind}: ${claimed.reason}`}
-                </Text>
-              )}
-            </View>
-          )}
+                {claimed !== null && claimed.claimed !== 'none' && (
+                  <Text testID="history-claim" style={styles.line}>
+                    {claimed.claimed === 'imported'
+                      ? t('vouch_history_arrived')
+                      : claimed.kind === 'untrusted'
+                        ? t('vouch_history_untrusted')
+                        : `${claimed.kind}: ${claimed.reason}`}
+                  </Text>
+                )}
+              </View>
+            )}
 
           {/* Everything below is the instrument, not the product. It is what
               proves the increment on a device, and it goes when the product
@@ -1414,6 +1446,11 @@ function computePumpOneTimeKeysLabel(
 // scaffolding, not product surface. Anything that survives into a real screen
 // must come from design/tokens.json, per interface invariant 11.
 const styles = StyleSheet.create({
+  back: {
+    ...typeScale.bodySm,
+    color: color.brand.green700,
+    paddingVertical: space.s,
+  },
   // The launch frame's own colour, so the handover between them shows nothing.
   promiseGround: {
     flex: 1,

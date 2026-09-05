@@ -2,7 +2,7 @@ import { by, device, element, expect as detoxExpect, waitFor } from 'detox'
 
 import { IGNORING_THE_LIVE_POLL } from './longPoll'
 import { acceptThePromise } from './promise'
-import { SCROLL, seeId, seeText, seeTextWithin } from './readout'
+import { SCROLL, seeId, seeText } from './readout'
 
 describe('boot', () => {
   // Jest's per-test testTimeout (jest.config.js) does not cover beforeAll:
@@ -125,14 +125,7 @@ describe('boot', () => {
     // no "se présente comme" line accompanies it: nothing is claimed about a
     // message this device encrypted itself.
     //
-    // Scoped to the conversation, because the list above it carries the
-    // opening of the same message: one sentence in two places, and an
-    // unscoped matcher finds both and fails as ambiguous rather than as
-    // wrong.
-    await seeTextWithin(
-      'conversation',
-      'encrypted by the bridge, sent by the application',
-    )
+    await seeText('encrypted by the bridge, sent by the application')
   })
 
   it('lets a person write a message and see it arrive', async () => {
@@ -151,10 +144,10 @@ describe('boot', () => {
 
     // Generous: this encrypts, shares a room key if the session needs one,
     // sends, and then reads the room back.
-    await waitFor(element(by.text(written).withAncestor(by.id('conversation'))))
+    await waitFor(element(by.text(written)))
       .toExist()
       .withTimeout(60000)
-    await seeTextWithin('conversation', written)
+    await seeText(written)
   })
 
   it('carries the brand geometry at a size the device gave it', async () => {

@@ -63,9 +63,6 @@ export function Conversation({
   }
 
   return (
-    // Named, because the list above this screen shows the opening of the same
-    // message and a matcher that only says "this text is somewhere" now finds
-    // two of everything. An assertion has to be able to say *where*.
     <View testID="conversation" style={styles.screen}>
       {entries.length === 0 ? (
         <Text

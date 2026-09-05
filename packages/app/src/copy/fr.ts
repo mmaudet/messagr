@@ -282,6 +282,7 @@ export const fr = {
   list_name_placeholder: 'Un prénom, un surnom',
   list_name_confirm: 'Enregistrer',
   list_name_cancel: 'Annuler',
+  list_back: 'Conversations',
   list_name_not_kept:
     'Le nom n’a pas pu être conservé : il sera oublié au prochain démarrage.',
 } as const
