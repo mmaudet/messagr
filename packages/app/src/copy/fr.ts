@@ -211,6 +211,42 @@ export const fr = {
     'Quelqu’un a répondu de vous : le passé de cette conversation vous est désormais lisible.',
   vouch_history_untrusted:
     'Un passé vous a été proposé, depuis un appareil que celui-ci ne sait pas rattacher à son propriétaire. Il n’a pas été repris.',
+
+  // Eviction. `evict_` and not `revocation_`, which the copy spec refuses:
+  // that was the previous product's word for something else. What happens
+  // here is a person being put out of a conversation, and the key rotation
+  // that decides whether it means anything.
+  //
+  // **The third line is the one the ticket requires**, and it is the one a
+  // product is tempted to leave off. Removing somebody bounds the future and
+  // cannot touch the past: every message already delivered to their device,
+  // and every key that opened it, is theirs now and stays theirs. Saying it
+  // where the gesture is offered, rather than in a help page, is the
+  // difference between a person choosing this and a person discovering it.
+  evict_action: 'Retirer cette personne',
+  evict_hint: 'Elle ne pourra plus rien lire de ce qui sera dit ici ensuite.',
+  evict_explain_title: 'Ce que cela fait',
+  evict_explain_future:
+    'Elle sortira de la conversation et ne pourra plus lire ce qui s’y dira.',
+  evict_explain_past:
+    'Ce qu’elle a déjà lu, elle le garde. Rien ne peut le lui reprendre — ni cette application, ni le serveur.',
+  evict_explain_final:
+    'Cela ne s’annule pas : pour la faire revenir, il faudra une nouvelle invitation.',
+  evict_confirm: 'Oui, retirer cette personne',
+  evict_cancel: 'Annuler',
+  evict_working: 'En cours…',
+  evict_done: 'C’est fait. La clé a été remplacée.',
+  // Said apart, because it is a different fact and not a lesser success:
+  // this device had never encrypted here, so no key of its own was out there.
+  evict_done_no_key:
+    'C’est fait. Il n’y avait aucune clé de cet appareil à remplacer.',
+  evict_failed_nothing_changed:
+    'Cela n’a pas abouti, et rien n’a changé. Vous pouvez réessayer.',
+  // The half-state, and the only one worth a different sentence: she is out
+  // and still holds a working key. A person told merely "cela n'a pas abouti"
+  // would reasonably stop, which is exactly the wrong thing to do here.
+  evict_failed_key_still_valid:
+    'Elle est sortie, mais la clé n’a pas pu être remplacée : elle peut encore lire ce qui sera dit. Réessayez.',
 } as const
 
 /** Every key any screen may ask for. A typo is a compile error, not a blank. */

@@ -15,6 +15,7 @@ import {
   createCryptoMachine,
   createCrossSigningIdentity,
   decryptEvent,
+  discardScopeKey,
   encryptEvent,
   encryptionSlice,
   buildHistoryBundle,
@@ -41,6 +42,7 @@ import { logEvent } from './log'
 import { fetchJoinedRooms } from './encryptedSend'
 import { probeUnsettledEncrypt, type ProbeReport } from './panicProbe'
 import { claimHistory, type HistoryClaim } from './claimHistory'
+import { evictFrom, type EvictOutcome } from './evict'
 import { mediaRepository } from './mediaRepository'
 import { makePumpHttp } from './pump'
 import { vouchFor, type VouchOutcome } from './vouch'
@@ -340,6 +342,38 @@ export async function vouchForEntrant(
   // "c'est fait" either way. The log is where the level actually granted, and
   // the step that stopped, can be read back.
   logEvent(outcome.vouched ? 'info' : 'warn', 'MESSAGR_VOUCH', { ...outcome })
+  return outcome
+}
+
+/**
+ * Phase six: removing somebody, and the rotation that decides whether it
+ * meant anything.
+ *
+ * Pure glue. The sequence -- remove first, rotate second -- is `evict.ts`'s
+ * `evictFrom`, tested there against injected fakes.
+ */
+export async function evictMember(
+  sessionClient: ReturnType<typeof createClient>,
+  scope: string,
+  memberId: string,
+): Promise<EvictOutcome> {
+  const outcome = await evictFrom(
+    makePumpHttp(sessionClient),
+    {
+      takeOutgoingRequests,
+      markRequestSent,
+      markRequestFailed,
+      discardScopeKey: evictScope =>
+        discardScopeKey(asCryptoScopeId(evictScope)),
+    },
+    scope,
+    memberId,
+  )
+  // Logged as well as returned, for the reason #35 gives: the test must
+  // assert the rotation and not the membership change, and the membership
+  // change is the half a screen shows. `rotated` is the fact that decides
+  // whether this was an eviction or the appearance of one.
+  logEvent(outcome.evicted ? 'info' : 'warn', 'MESSAGR_EVICT', { ...outcome })
   return outcome
 }
 
