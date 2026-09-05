@@ -93,6 +93,34 @@ room_id="$(curl -sS -X POST "$MESSAGR_BENCH_HOMESERVER/_matrix/client/v3/createR
 # does before deciding to encrypt -- would be told no and send plaintext.
 # Set here rather than by a client, because the account that creates the room
 # is the one that has the power level to set its state.
+# THE ROOM MUST COST 50 TO INVITE, AND `createRoom` DOES NOT DO THAT.
+#
+# A conversation this product creates sets `invite` to 50 and admits members
+# at 0, which is what makes "an entrant cannot invite, a promoted member can"
+# true at all -- the invitation service reads this event rather than taking
+# the application's word for it. A plain `createRoom` leaves no `invite` key,
+# and the specification's default for a missing one is **0**: every member
+# may invite.
+#
+# Measured, on 5 September 2026, while proving #34 against the fork: the
+# bench room came back as `{"users": {}}`. A run against it would have shown
+# an entrant unable to invite for no reason at all, and a promoted one able
+# for no reason either -- the criterion passing while testing nothing. A
+# bench that does not reproduce what the product builds proves things about
+# a room nobody ships.
+echo "setting the invite cost the product sets" >&2
+levels="$(curl -sS "$MESSAGR_BENCH_HOMESERVER/_matrix/client/v3/rooms/$room_id/state/m.room.power_levels" \
+  -H "Authorization: Bearer $inviter_token")"
+curl -fsS -o /dev/null -X PUT \
+  "$MESSAGR_BENCH_HOMESERVER/_matrix/client/v3/rooms/$room_id/state/m.room.power_levels" \
+  -H "Authorization: Bearer $inviter_token" -H 'Content-Type: application/json' \
+  -d "$(printf '%s' "$levels" | python3 -c '
+import json, sys
+levels = json.load(sys.stdin)
+levels["invite"] = 50
+levels["users_default"] = 0
+print(json.dumps(levels))')"
+
 echo "marking the room encrypted" >&2
 # -f so a refusal is an error here. Without it curl exits 0 on a 403 and the
 # missed state event surfaces two CI jobs later, as a counterparty reporting

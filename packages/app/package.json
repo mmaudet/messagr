@@ -17,7 +17,7 @@
     "react-native": "0.87.1",
     "react-native-get-random-values": "^2.0.0",
     "react-native-keychain": "10",
-    "react-native-matrix-crypto": "^0.4.0",
+    "react-native-matrix-crypto": "file:/private/tmp/claude-501/-Users-mmaudet-work/9b568014-b3fa-4928-83f0-bd250f93af77/scratchpad/react-native-matrix-crypto-0.5.0-local.0.tgz",
     "react-native-safe-area-context": "^5.5.2",
     "react-native-svg": "15.15.5",
     "text-encoding-polyfill": "^0.6.7"

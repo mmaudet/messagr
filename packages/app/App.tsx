@@ -189,6 +189,7 @@ export function App({
       // How this application comes to have a session: one kept from a
       // previous launch, or one obtained by spending the invitation it was
       // opened with. Nothing arrives from the build any more.
+      let historyClaim: HistoryClaim | null = null
       const entered = await enterWithASession({
         secrets: sessionSecrets,
         poster: servicePoster,
@@ -322,13 +323,21 @@ export function App({
                 roomId,
               )
               const other = theOtherMember(members, credentials.userId)
+              // Reported in the launch log below, not only rendered. A gap
+              // that closed and a gap that never opened look identical on
+              // screen -- both show a readable conversation -- so the only
+              // way to tell "history arrived" from "the key came by some
+              // other route" is to say which one happened.
               if (other !== null) {
                 setParty({ scope: roomId, other })
                 // Never throws: see claimHistory.ts for why a history that
                 // did not arrive must not be a launch that did not finish.
-                setClaimed(
-                  await claimOfferedHistory(credentials, roomId, other),
+                historyClaim = await claimOfferedHistory(
+                  credentials,
+                  roomId,
+                  other,
                 )
+                setClaimed(historyClaim)
               }
 
               setConversation(
@@ -397,6 +406,7 @@ export function App({
         pump: pumpStatus,
         send: sendStatus,
         received: receiveStatus,
+        history: historyClaim,
       })
     }
 
