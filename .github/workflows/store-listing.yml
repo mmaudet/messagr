@@ -1,0 +1,58 @@
+# The Play store listing, pushed from this repository rather than typed.
+#
+# # Why a workflow and not a browser
+#
+# The listing is public text. Driving the Play Console through a headless
+# browser would mean automating a person's authenticated Google session on a
+# console where irreversible actions sit next to reversible ones, and a
+# selector that drifts does not fail loudly there -- it fills the wrong field
+# on a page users read. Google publishes an API for exactly this, and an API
+# has a contract where a page has a layout.
+#
+# Keeping the text in the repository has a second effect worth as much: the
+# listing gets reviewed like anything else, and a change to it shows up in a
+# diff instead of in somebody's memory of what they typed.
+#
+# # The permission this needs
+#
+# The service account must hold "Manage store presence" in the Play Console,
+# under Users and permissions. The account created for publishing holds
+# "Release to testing tracks" and "View app information", which are enough to
+# upload a build and not enough to describe it.
+name: Store listing
+
+on:
+  workflow_dispatch:
+
+jobs:
+  publish-listing:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      # Refused before anything is sent. A listing half-applied is worse than
+      # one not applied: the API commits an edit as a whole, and a run that
+      # died between two calls leaves an open edit nobody knows about.
+      - name: Assert the service account is present
+        env:
+          KEY: ${{ secrets.MESSAGR_PLAY_SERVICE_ACCOUNT_JSON }}
+        run: |
+          if [ -z "$KEY" ]; then
+            echo "MESSAGR_PLAY_SERVICE_ACCOUNT_JSON is not set." >&2
+            exit 1
+          fi
+
+      - name: Check the listing against Play's limits
+        run: python3 deploy/messagr-eu/play-listing/check.py
+
+      - run: pip install --quiet google-api-python-client google-auth
+
+      - name: Send the listing
+        env:
+          MESSAGR_PLAY_SERVICE_ACCOUNT_JSON: ${{ secrets.MESSAGR_PLAY_SERVICE_ACCOUNT_JSON }}
+        run: python3 deploy/messagr-eu/play-listing/publish.py
