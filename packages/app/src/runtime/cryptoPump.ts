@@ -33,7 +33,7 @@ import {
 
 import type { IdentityEntitlement } from './crossSigningIdentity'
 import { computeCryptoMachineConfig } from './cryptoMachineConfig'
-import { cryptoStoreSecrets } from './deviceSecrets'
+import { cryptoStoreSecrets, syncCursorSecrets } from './deviceSecrets'
 import { openStorePassphrase } from './storePassphrase'
 import type { DeviceIdentity } from './deviceIdentity'
 import { encryptAndSendOneMessage, type SendReport } from './encryptAndSend'
@@ -45,6 +45,12 @@ import { claimHistory, type HistoryClaim } from './claimHistory'
 import { evictFrom, type EvictOutcome } from './evict'
 import { mediaRepository } from './mediaRepository'
 import { makePumpHttp } from './pump'
+import {
+  startSyncLoop,
+  type RunningSyncLoop,
+  type SyncLoopState,
+  type SyncTick,
+} from './syncLoop'
 import { vouchFor, type VouchOutcome } from './vouch'
 import { receiveAndDecrypt, type ReceiveReport } from './receiveDecrypt'
 import {
@@ -59,6 +65,7 @@ export type { CryptoPumpReport } from './outgoingPumpCycle'
 export type { SendReport } from './encryptAndSend'
 export type { ReceiveReport } from './receiveDecrypt'
 export type { ProbeReport } from './panicProbe'
+export type { RunningSyncLoop, SyncLoopState, SyncTick } from './syncLoop'
 
 export type MachineStartResult =
   | {
@@ -401,4 +408,40 @@ export async function claimOfferedHistory(
     scope,
     voucherId,
   )
+}
+
+/**
+ * Phase seven: the live sync loop, bound to the real transport and the real
+ * crypto machine. ADR-0007.
+ *
+ * Pure glue, like every other phase here. What the loop does, and the
+ * ordering that makes it safe -- feed the machine, send what that queued,
+ * only then advance the cursor -- is `syncLoop.ts`'s `startSyncLoop`, tested
+ * there against injected fakes.
+ *
+ * Started after `runOutgoingPump`, which is after `fetchSessionSyncStatus`
+ * has stopped matrix-js-sdk's own loop. Two loops polling one account would
+ * race for the to-device messages that carry room keys, since a homeserver
+ * hands each of those to a device once and the cursor that acknowledged it
+ * decides which loop saw it.
+ */
+export function startLiveSync(
+  sessionClient: ReturnType<typeof createClient>,
+  onTick: (tick: SyncTick) => void,
+  onState: (state: SyncLoopState) => void,
+): RunningSyncLoop {
+  return startSyncLoop({
+    http: makePumpHttp(sessionClient),
+    machine: {
+      takeOutgoingRequests,
+      markRequestSent,
+      markRequestFailed,
+      receiveSyncChanges,
+    },
+    encryptionSlice,
+    cursorStore: syncCursorSecrets,
+    onTick,
+    onState,
+    sleep: ms => new Promise(resolve => setTimeout(resolve, ms)),
+  })
 }
