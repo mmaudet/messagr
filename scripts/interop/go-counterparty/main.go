@@ -270,6 +270,46 @@ func login() error {
 		return fmt.Errorf("publishing device and one-time keys: %w", err)
 	}
 
+	// AND THE ONE-TIME KEYS THIS UPLOADS DO NOT VERIFY, WHICH IS WHY
+	// `collect` STILL FAILS. Found by this counterparty, located to the line,
+	// and not worked around here -- see below for why not.
+	//
+	// `crypto/account.go:120-125` builds a `mautrix.OneTimeKey` with
+	// `IsSigned` still false, signs it, and sets `IsSigned = true`
+	// afterwards. `OneTimeKey.MarshalJSON` (`requests.go:277-283`) returns
+	// the BARE KEY STRING while that flag is false and the whole object once
+	// it is true. Measured against this module's own dependency:
+	//
+	//	what is signed : "AAAA…"
+	//	what is sent   : {"key":"AAAA…"}
+	//
+	// So the signature covers a different message than the object it is
+	// attached to, and a verifier that follows the specification rejects it.
+	// That is exactly what the application does: it claims a key, refuses the
+	// signature, cannot open an Olm session, and answers
+	// `m.room_key.withheld` with `m.no_olm`. It is right to.
+	// `scripts/interop/verify-signed-keys.py` settles it against a third
+	// Ed25519 implementation rather than either side's, checked on RFC 8032
+	// vectors first.
+	//
+	// THE WORKAROUND WAS TRIED AND ABANDONED, and the reason is worth having.
+	// Signing the keys correctly here is easy -- set `IsSigned` before
+	// signing, and every key verifies; measured, 22 of 22 good ones out of a
+	// mixed batch. What cannot be done from outside is stopping mautrix from
+	// uploading its own bad batch first. Passing a one-time key count at the
+	// ceiling does not help: `getOneTimeKeys` uploads whatever is
+	// unpublished regardless of how many it was asked to generate, and a
+	// freshly created account already holds some. Marking them published
+	// first does not help either -- measured, the server still received 101
+	// keys, 51 of them upstream's. And a homeserver has no way to delete a
+	// one-time key, so the bad batch stays until claimed, and continuwuity
+	// hands them out in insertion order: every claim draws a bad one until 51
+	// have been burned.
+	//
+	// The fix is one line moved, upstream. Anything short of that leaves a
+	// counterparty whose keys are half wrong, which proves less than one
+	// whose keys are wrong for a reason nobody has to guess at.
+
 	saved := session{
 		UserID:      client.UserID.String(),
 		DeviceID:    client.DeviceID.String(),
