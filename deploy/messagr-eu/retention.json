@@ -1,0 +1,26 @@
+{
+  "$note": "Les durées de conservation, écrites une fois. La page publiée et la configuration du serveur doivent toutes deux s'y accorder, et scripts/assert-retention.sh le vérifie. La politique a déjà affirmé une durée que le code ne pratiquait pas ; c'est ce fichier qui empêche que cela recommence.",
+  "journaux_techniques": {
+    "duree": "douze mois",
+    "jours": 366,
+    "impose_par": "décret n° 2021-1362",
+    "applique_par": [
+      "/etc/logrotate.d/nginx : rotate 366",
+      "/etc/systemd/journald.conf : MaxRetentionSec=1year"
+    ]
+  },
+  "graphe_invitations": {
+    "duree": "trente jours",
+    "jours": 30,
+    "applique_par": [
+      "services/invitations : EDGE_RETENTION_DAYS, défaut 30",
+      "purge_after IS NULL = gelé par un signalement, jamais purgé"
+    ]
+  },
+  "compte_supprime": {
+    "duree": "trente jours",
+    "jours": 30,
+    "applique_par": [],
+    "$manque": "Aucune purge automatique n'existe. À l'échelle de la bêta l'opération est manuelle ; elle doit être outillée avant la production. Voir #71."
+  }
+}
