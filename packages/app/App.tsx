@@ -356,12 +356,6 @@ export function App({
             // (ADR-0005) and `loadConversation` is the one thing that knows
             // how to build it: the loop's job is to say *when*, not *what*.
             //
-            // Started whether or not this launch resolved a conversation. An
-            // account in no room still has device lists and to-device messages
-            // to take, and a loop that existed only where there was already
-            // something to read would leave a device invited a minute later
-            // showing `not started` until somebody relaunched it.
-            //
             // ONE SCREEN, AND FOR A FEW SECONDS SOMETIMES TWO LOOPS. `stop`
             // does not cancel the poll in flight -- nothing here can, see
             // `RunningSyncLoop.stop` -- so a loop stopped on the way to the
@@ -422,8 +416,6 @@ export function App({
                 },
               )
             }
-            resumeSyncRef.current = beginLiveSync
-            beginLiveSync()
             if (roomId !== null) {
               receiveStatus = await receiveOneEncryptedMessage(
                 sessionClient,
@@ -498,6 +490,23 @@ export function App({
                 deliver().catch(() => setSending('failed'))
               })
             }
+
+            // Started last, after the `Received` probe above has had its
+            // rounds. That probe syncs with no cursor at all, so it cannot
+            // take anything from the loop -- but the loop advances a cursor,
+            // and a cursor moving past a to-device message is what tells the
+            // homeserver to stop offering it. Reading the diagnostic first
+            // keeps it a diagnostic. Outside the branch above, because an
+            // account in no room still has device lists and to-device
+            // messages to take, and a loop that only existed where there was
+            // already something to read would leave a device invited a minute
+            // later showing `not started` until somebody relaunched it.
+            //
+            // The delay costs nothing a person sees: the conversation on
+            // screen was just derived whole, and the loop only matters for
+            // what arrives after that.
+            resumeSyncRef.current = beginLiveSync
+            beginLiveSync()
           }
         } finally {
           // Nothing left to feed once this run is done: the sync above
