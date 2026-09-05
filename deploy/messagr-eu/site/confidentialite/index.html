@@ -190,9 +190,11 @@
       <h2>Qui traite vos données</h2>
       <p>
         Messagr est exploité par <b>RV Myriagone Holding</b>, dont le siège est
-        au 22 rue de la Garenne, 78130 Chapet, immatriculée au registre du
-        commerce et des sociétés de Versailles sous le numéro
-        <b>894&nbsp;754&nbsp;548</b>, représentée par Michel-Marie Maudet.
+        au 22 rue de la Garenne, 78130 Chapet, société à responsabilité limitée
+        à associé unique au capital de 5&nbsp;087&nbsp;000&nbsp;euros,
+        immatriculée au registre du commerce et des sociétés de Versailles sous
+        le numéro <b>894&nbsp;754&nbsp;548</b>, représentée par son gérant
+        Michel-Marie Maudet.
       </p>
       <p>
         RV Myriagone Holding est le responsable de ce traitement au sens du
@@ -305,20 +307,58 @@
       </p>
 
       <h2>Combien de temps</h2>
-      <div class="card">
-        <p>
-          <b>À arrêter avant la mise à disposition au public.</b> Les durées de
-          conservation des journaux techniques et des métadonnées de
-          conversation doivent être fixées, publiées ici, et appliquées par le
-          serveur. Elles ne figurent pas dans cette version parce qu'elles ne
-          sont pas encore décidées, et annoncer une durée que le service
-          n'applique pas serait pire que de reconnaître qu'elle manque.
-        </p>
+      <p>
+        <b>Les journaux techniques, douze mois.</b> Cette durée n'est pas un
+        choix&nbsp;: le décret n°&nbsp;2021-1362 l'impose aux fournisseurs
+        d'hébergement pour les données permettant d'identifier la source d'une
+        connexion, dont les adresses IP. Passé ce délai, elles sont effacées.
+      </p>
+      <p>
+        <b>Les données d'identité civile, sans objet.</b> La loi en prévoit la
+        conservation pendant cinq ans. Messagr n'en collecte aucune, donc il n'y
+        a rien à conserver.
+      </p>
+      <p>
+        <b
+          >Les métadonnées d'une conversation vivent aussi longtemps que le
+          compte.</b
+        >
+        À la suppression d'un compte, il est désactivé immédiatement et ses
+        données sont purgées sous trente jours.
+      </p>
+      <p>
+        <b>Le contenu chiffré vit aussi longtemps que la conversation.</b> Le
+        serveur ne peut pas le trier, puisqu'il ne peut pas le lire&nbsp;: il
+        disparaît avec le salon qui le portait.
+      </p>
+      <p>
+        <b
+          >Le graphe des invitations est conservé tant que les comptes qu'il
+          relie existent.</b
+        >
+        C'est ce qui permet de révoquer une branche d'invitation entière,
+        capacité que les conditions générales annoncent. Une invitation non
+        dépensée, elle, expire d'elle-même et ne vaut alors plus rien.
+      </p>
+
+      <h2>Ce que l'effacement peut, et ce qu'il ne peut pas</h2>
+      <div class="invite">
+        <b
+          >Une conversation Matrix ne s'efface pas comme un enregistrement dans
+          une base.</b
+        >
+        Le protocole ajoute des événements sans jamais en retirer. Supprimer un
+        message le vide de son contenu et laisse une trace de son passage&nbsp;;
+        supprimer un compte le désactive et empêche toute réutilisation de son
+        identifiant, mais les événements qu'il a produits restent des événements
+        du salon.
       </div>
       <p>
-        Ce qui est déjà vrai&nbsp;: une invitation est à usage unique et expire.
-        Une fois dépensée ou expirée, elle ne vaut plus rien et n'ouvre plus
-        aucun accès.
+        Nous le disons parce que promettre un effacement que le protocole ne
+        permet pas serait plus grave que de reconnaître cette limite. Elle vaut
+        pour tous les services bâtis sur Matrix, et elle est le revers de la
+        propriété qui protège vos messages&nbsp;: un serveur qui ne peut pas
+        lire ne peut pas trier non plus.
       </p>
 
       <h2>Vos droits</h2>
