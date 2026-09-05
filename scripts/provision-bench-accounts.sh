@@ -26,10 +26,27 @@ OUT="${MESSAGR_BENCH_OUT:-/tmp/messagr-bench-accounts.json}"
 # The production instance is refused by name rather than by convention. A
 # bench that ran against it would create accounts on localparts a homeserver
 # never releases, on the server meant to carry real conversations.
+# THIS REFUSAL IS ABOUT BENCH PROVISIONING, NOT ABOUT PRODUCTION.
+#
+# A bench provisions and discards accounts by the dozen, and a homeserver
+# never releases a localpart. So a bench pointed at production burns names,
+# permanently, on the instance meant to carry real conversations. That is
+# what this refuses, and it refuses it here rather than by convention.
+#
+# It is NOT a rule that production must never be touched. Tester builds use
+# production, and three named accounts hold its registration token on
+# purpose -- see docs/production-entry-point.md, which names all three and
+# says why each is allowed to. Somebody who reads this refusal as a general
+# prohibition, notices that production obviously IS used, and concludes the
+# refusal is stale would be drawing the wrong lesson from the right rule.
+# The scope is provisioning, and provisioning only.
 case "$MESSAGR_BENCH_HOMESERVER" in
   *messagr.eu*)
     echo "REFUSED: $MESSAGR_BENCH_HOMESERVER is the production instance." >&2
-    echo "A bench never creates an account there. Use the fork." >&2
+    echo "A bench never PROVISIONS accounts there: it creates and discards" >&2
+    echo "them by the dozen, and a homeserver never releases a localpart." >&2
+    echo "Use the fork. See docs/production-entry-point.md for what does" >&2
+    echo "legitimately run against production, and why." >&2
     exit 1
     ;;
 esac
