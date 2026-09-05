@@ -33,3 +33,23 @@ export async function seeId(id: string): Promise<void> {
     .whileElement(SCROLL)
     .scroll(300, 'down')
 }
+
+/**
+ * The same, scoped to one part of the screen.
+ *
+ * The conversation list shows the opening of the last message, and the
+ * conversation shows that message: one sentence, two places, and a matcher
+ * that only says "this text is on screen" matches both and fails as
+ * ambiguous. Anything asserted about a conversation says which conversation
+ * view it means.
+ */
+export async function seeTextWithin(
+  ancestorId: string,
+  text: string,
+): Promise<void> {
+  await element(SCROLL).scrollTo('top')
+  await waitFor(element(by.text(text).withAncestor(by.id(ancestorId))))
+    .toBeVisible()
+    .whileElement(SCROLL)
+    .scroll(300, 'down')
+}
