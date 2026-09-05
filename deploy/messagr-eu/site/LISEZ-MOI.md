@@ -19,18 +19,25 @@ Le texte des conditions est repris tel quel du document rédigé le 8 août 2026
 La politique est écrite d'après ce que le produit fait réellement, vérifié
 contre le code plutôt que contre une intention.
 
-## Deux choses manquent, et elles ne peuvent pas être inventées
+## Ce que les pages annoncent, et qu'il faut maintenant tenir
 
-**La forme sociale et le capital social.** L'article R123-237 du code de
-commerce les exige sur tout document destiné aux tiers. Elles ne peuvent venir
-que de l'extrait Kbis. Les deux pages nomment l'exploitant sans elles, ce qui
-est incomplet.
+L'identité de l'exploitant est complète : SARL à associé unique, capital de
+5 087 000 euros, tirés de l'extrait Kbis du 4 mars 2021.
 
-**Les durées de conservation.** Le RGPD, article 13.2.a, les exige. La page de
-confidentialité le dit à l'endroit où elles devraient figurer, plutôt que
-d'annoncer une durée que le serveur n'applique pas — ce qui serait pire que de
-reconnaître le manque. Il faut décider, publier, et configurer le serveur en
-conséquence.
+**Les durées de conservation sont publiées, donc elles engagent.** Une seule
+n'est pas un choix : le décret n° 2021-1362 impose douze mois pour les données
+permettant d'identifier la source d'une connexion, adresses IP comprises. Les
+autres sont des décisions, et le serveur doit désormais les appliquer :
+
+- journaux techniques : effacement à douze mois ;
+- compte supprimé : désactivation immédiate, purge sous trente jours ;
+- métadonnées : durée de vie du compte ;
+- contenu chiffré : durée de vie du salon ;
+- graphe des invitations : tant que les comptes qu'il relie existent, parce que
+  la révocation en cascade en dépend.
+
+Rien de tout cela n'est configuré aujourd'hui. Une politique publiée que le
+serveur n'applique pas est un manquement, pas une intention.
 
 ## Publier
 
