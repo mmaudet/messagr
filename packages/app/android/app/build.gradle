@@ -101,6 +101,11 @@ def enableProguardInReleaseBuilds = false
  */
 def jscFlavor = 'io.github.react-native-community:jsc-android:2026004.+'
 
+// Read once, and assigned rather than written inline: `versionCode (x) as
+// Integer` parses as `(versionCode(x)) as Integer` in Groovy, which passes a
+// string to the setter and casts the wrong thing.
+def messagrVersionCode = (System.getenv("MESSAGR_VERSION_CODE") ?: "1").toInteger()
+
 android {
     ndkVersion rootProject.ext.ndkVersion
     buildToolsVersion rootProject.ext.buildToolsVersion
@@ -120,7 +125,18 @@ android {
         applicationId "eu.messagr"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-        versionCode 1
+        // ONE UPLOAD, ONE CODE, AND PLAY NEVER FORGETS ONE.
+        //
+        // A version code can be used exactly once for an application, for
+        // ever: Play refuses a second upload carrying a code it has already
+        // seen, and the refusal comes at the end of a build rather than at
+        // the start. A constant here means the first upload works and every
+        // one after it is rejected.
+        //
+        // Supplied by whoever is publishing, so the number comes from
+        // something that only goes up. The default is for local builds,
+        // which never reach a store.
+        versionCode messagrVersionCode
         versionName "1.0"
 
         // Detox drives the app through an instrumentation test, so the app
