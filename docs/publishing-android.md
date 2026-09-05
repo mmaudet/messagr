@@ -85,8 +85,16 @@ consecutive runs, each after a change that seemed like the answer.
 the one you last granted anything to.** `MESSAGR_PLAY_SERVICE_ACCOUNT_JSON`
 carries a `client_email`, and that is the only account the API sees. Granting
 rights to a _different_ service account in the same Google Cloud project
-changes nothing and looks exactly like a propagation delay. Check the
-`client_email` in the JSON you uploaded, and grant to that address.
+changes nothing and looks exactly like a propagation delay.
+
+For this repository that account is
+**`messagr-publisher@messagr-reveil.iam.gserviceaccount.com`**, which is the
+name `scripts/setup-play-publishing.sh` asks you to create. It is written here
+because it was once established by hunting through `~/Downloads` for a JSON
+with a `client_email` in it, after two rounds of granting permissions to a
+different account in the same project on the strength of a name somebody
+remembered. The information was in this repository all along and was not
+consulted. A name nobody writes down is a name that gets remembered wrong.
 
 **And "Manage store presence" is not a release permission.** It covers the
 listing — the text, the screenshots, the graphics — which is a different group
