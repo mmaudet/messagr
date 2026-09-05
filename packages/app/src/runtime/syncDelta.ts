@@ -1,6 +1,7 @@
 import type { SyncDelta } from 'react-native-matrix-crypto'
 
 import type { HttpRequester } from './pump'
+import { fetchSync } from './syncResponse'
 
 /**
  * The documented workaround for ADR-0001's second named exposure.
@@ -31,27 +32,21 @@ export type EncryptionSliceFn = (sync: Record<string, unknown>) => SyncDelta
  * Fetches one raw `/sync` and reduces it to the crypto machine's slice via
  * `encryptionSlice`.
  *
- * `timeout=0` always: this is not the app's live sync loop (`sessionSync.ts`
- * already runs and stops one of those), it is a single, deliberately
- * non-blocking round trip whose only purpose is to recover the two fields
- * the SDK's own loop cannot hand back.
+ * `timeout=0` and no `since`, still: this is not the live sync loop.
+ * `syncLoop.ts` is, and it is the one that resumes from a persisted cursor.
+ * This stays a single, deliberately non-blocking round trip made once while
+ * the pump publishes this device's keys, before there is a loop running at
+ * all — its only purpose is to recover the two fields the SDK's own loop
+ * cannot hand back.
  *
- * No `since` token, and none returned: one fetch per pump cycle is all this
- * increment needs, and a continuation token nothing persists or reads back
- * would be plumbing for a caller that does not exist yet. The ticket that
- * first pumps more than once is the one that should decide where such a
- * token lives.
+ * Deliberately outside the cursor, too. This fetch is made before the
+ * machine has finished publishing, and a token advanced here would be a
+ * claim that everything it covered had been handled by a device that was
+ * still getting ready to handle anything.
  */
 export async function fetchEncryptionSyncDelta(
   http: HttpRequester,
   encryptionSlice: EncryptionSliceFn,
 ): Promise<SyncDelta> {
-  const responseJson = await http.authedRequest(
-    'GET',
-    '/_matrix/client/v3/sync',
-    { timeout: '0' },
-    undefined,
-  )
-  const sync = JSON.parse(responseJson) as Record<string, unknown>
-  return encryptionSlice(sync)
+  return encryptionSlice(await fetchSync(http, null, 0))
 }

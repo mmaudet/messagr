@@ -1,5 +1,6 @@
 import { by, device, element, expect as detoxExpect, waitFor } from 'detox'
 
+import { IGNORING_THE_LIVE_POLL } from './longPoll'
 import { SCROLL, seeId, seeText } from './readout'
 
 describe('boot', () => {
@@ -17,6 +18,9 @@ describe('boot', () => {
       newInstance: true,
       url: process.env.MESSAGR_INVITATION_LINK,
       delete: true,
+      // The live sync loop starts inside this launch and holds a poll open.
+      // See longPoll.ts: without this, `launchApp` never returns.
+      launchArgs: IGNORING_THE_LIVE_POLL,
     })
   }, 120000)
 
@@ -70,13 +74,17 @@ describe('boot', () => {
     // not a loose match, because scripts/provision-bench-accounts.sh always
     // invites the provisioned account into exactly one room.
     //
-    // This is also what keeps Detox's own synchronization usable at all:
-    // restoreAndSync stops the client once this first sync lands, rather
-    // than leaving matrix-js-sdk's long-polling loop running underneath it.
-    // Left running, Detox's network-idle tracker never sees the app go
-    // quiet, and launchApp above hangs forever on "Network is busy, with 1
-    // in-flight calls" instead of failing on anything the app did — watched
-    // failing exactly that way before the client was stopped.
+    // restoreAndSync still stops matrix-js-sdk's client once this first
+    // sync lands, and now for a second reason: the application's own loop
+    // (ADR-0007) takes over from here, and two loops polling one account
+    // would race for the to-device messages that carry room keys.
+    //
+    // Detox's network-idle tracker used to be the reason. It no longer is —
+    // `/sync` is blacklisted at launch (longPoll.ts) — but the failure it
+    // caused is worth keeping written down: with a long poll tracked,
+    // launchApp hangs forever on "Network is busy, with 1 in-flight calls"
+    // instead of failing on anything the app did, watched failing exactly
+    // that way.
     await waitFor(element(by.text('synced, 1 room(s)')))
       .toExist()
       .withTimeout(30000)

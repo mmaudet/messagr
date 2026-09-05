@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react'
-import { ScrollView, StyleSheet, Text, View } from 'react-native'
+import { AppState, ScrollView, StyleSheet, Text, View } from 'react-native'
 import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context'
 import { createClient } from 'matrix-js-sdk'
 
@@ -20,10 +20,13 @@ import {
   runOutgoingPump,
   sendOneEncryptedMessage,
   startCryptoMachine,
+  startLiveSync,
   vouchForEntrant,
   type CryptoPumpReport,
   type ReceiveReport,
+  type RunningSyncLoop,
   type SendReport,
+  type SyncLoopState,
 } from './src/runtime/cryptoPump'
 import { getErrorMessage } from './src/runtime/errors'
 import { computeHermesReport, type HermesReport } from './src/runtime/hermes'
@@ -104,6 +107,15 @@ export function App({
   // The conversation this application holds, derived from the room on every
   // launch rather than read from a copy on disk. See ADR-0006.
   const [conversation, setConversation] = useState<TimelineEntry[] | null>(null)
+  // What the live sync loop is doing, shown rather than assumed. ADR-0007
+  // names a loop that dies silently as worse than no loop, because the
+  // screen keeps looking live.
+  const [live, setLive] = useState<SyncLoopState | null>(null)
+  const runningSyncRef = useRef<RunningSyncLoop | null>(null)
+  // Set once by the launch effect, which is the only place that holds
+  // everything a loop needs. Read by the foreground handler below, which
+  // runs long after that effect has finished.
+  const resumeSyncRef = useRef<(() => void) | null>(null)
   // The other person in this conversation, and the two halves of #34's
   // gesture. `party` is `null` for anything that is not a conversation of
   // two: vouching names one person, so it has nothing to offer a group.
@@ -168,6 +180,32 @@ export function App({
   const [received, setReceived] = useState<ReceiveReport | 'not-run' | null>(
     null,
   )
+
+  // BACKGROUNDING, AND WHY IT IS NOT LEFT TO CHANCE.
+  //
+  // A held-open poll does not survive the process being suspended: the
+  // operating system takes the socket with it, and a loop left running comes
+  // back waiting on a connection that will never answer -- alive by every
+  // measure this code has, and receiving nothing. Ending the poll on the way
+  // out and starting a fresh one on the way back turns that into one extra
+  // round trip.
+  //
+  // The cleanup is also the unmount path, so a loop cannot outlive the screen
+  // that shows its state.
+  useEffect(() => {
+    const pause = () => {
+      runningSyncRef.current?.stop()
+      runningSyncRef.current = null
+    }
+    const subscription = AppState.addEventListener('change', state => {
+      if (state === 'active') resumeSyncRef.current?.()
+      else pause()
+    })
+    return () => {
+      subscription.remove()
+      pause()
+    }
+  }, [])
 
   useEffect(() => {
     const probeAndReport = async (): Promise<void> => {
@@ -352,6 +390,68 @@ export function App({
                   await loadConversation(sessionClient, roomId),
                 ),
               )
+
+              // THE LOOP THAT MAKES THIS A MESSENGER. ADR-0007.
+              //
+              // Started here, at the end of the launch path, for two reasons
+              // that are one reason: everything above had to happen first.
+              // matrix-js-sdk's own loop is stopped by now
+              // (`fetchSessionSyncStatus`), so nothing else is consuming the
+              // to-device messages that carry room keys; and this device's
+              // keys are published, so a key sent in answer to what arrives
+              // here can actually be claimed.
+              //
+              // The conversation is re-derived rather than merged out of the
+              // sync response. The timeline stays the application's own state
+              // (ADR-0005) and `loadConversation` is the one thing that knows
+              // how to build it: the loop's job is to say *when*, not *what*.
+              const beginLiveSync = () => {
+                if (runningSyncRef.current !== null) return
+                runningSyncRef.current = startLiveSync(
+                  sessionClient,
+                  tick => {
+                    if (!tick.cursorPersisted) {
+                      // Survivable -- this launch stays live off the token it
+                      // holds in memory -- but the next launch replays from
+                      // wherever the keystore last accepted one, and that is
+                      // not something to discover as a slow start.
+                      logEvent('warn', 'MESSAGR_LIVE_CURSOR_LOST', {})
+                    }
+                    if (!tick.changedScopes.includes(roomId)) return
+                    loadConversation(sessionClient, roomId)
+                      .then(fresh =>
+                        setConversation(held =>
+                          mergeTimeline(held ?? [], fresh),
+                        ),
+                      )
+                      .catch((cause: unknown) => {
+                        // The cursor has already advanced past this, but the
+                        // next poll that touches this conversation derives it
+                        // whole again, so nothing is lost for good. Reported
+                        // rather than swallowed: a screen that stopped
+                        // updating under a loop still saying `running` is
+                        // exactly the lie ADR-0007 names.
+                        logEvent('warn', 'MESSAGR_LIVE_DERIVE_FAILED', {
+                          reason: getErrorMessage(cause),
+                        })
+                      })
+                  },
+                  state => {
+                    setLive(state)
+                    // Logged as well as rendered, for the reason every other
+                    // probe here is: the emulator's screencap returns a blank
+                    // frame, so the log is the only machine-readable evidence
+                    // that the loop lived, reconnected, or stopped.
+                    logEvent(
+                      state === 'reconnecting' ? 'warn' : 'info',
+                      'MESSAGR_LIVE_STATE',
+                      { state },
+                    )
+                  },
+                )
+              }
+              resumeSyncRef.current = beginLiveSync
+              beginLiveSync()
               setSendMessage(() => (body: string) => {
                 setSending('sending')
                 const deliver = async () => {
@@ -683,6 +783,13 @@ export function App({
               {computeNotchLabel(geometry)}
             </Text>
           </View>
+
+          <View style={styles.block}>
+            <Text style={styles.heading}>Live sync</Text>
+            <Text testID="live-sync-status" style={styles.line}>
+              {computeLiveSyncLabel(live)}
+            </Text>
+          </View>
         </ScrollView>
       </SafeAreaView>
     </SafeAreaProvider>
@@ -694,6 +801,22 @@ export function App({
 // each is a pure derivation from a status already held in state, not a
 // generic formatter forcing three differently-shaped probes through one
 // abstraction.
+
+/**
+ * What the loop is doing, in the words ADR-0007 asks for. `not started` is
+ * its own answer rather than a synonym for stopped: a launch that never got
+ * far enough to start one and a loop that ended are different faults, and
+ * only the second one means something went wrong with the loop.
+ */
+function computeLiveSyncLabel(state: SyncLoopState | null): string {
+  if (state === null) return 'not started'
+  return {
+    starting: 'starting, no answer from the homeserver yet',
+    running: 'running',
+    reconnecting: 'reconnecting',
+    stopped: 'stopped',
+  }[state]
+}
 
 function computeTransportLabel(status: TransportStatus): string {
   return status.created
