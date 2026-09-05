@@ -74,6 +74,34 @@ The workflow refuses to start when the first is absent, by name, rather than
 producing an unsigned bundle and failing at the upload with a message about
 the bundle.
 
+## "The caller does not have permission", and the two ways to earn it
+
+The upload step fails with exactly that sentence and nothing else. It is the
+Play Developer API refusing `edits.insert`, and it says nothing about which of
+several unrelated causes applies. Measured on 5 September 2026, three
+consecutive runs, each after a change that seemed like the answer.
+
+**It is the service account named in the secret that needs the permission, not
+the one you last granted anything to.** `MESSAGR_PLAY_SERVICE_ACCOUNT_JSON`
+carries a `client_email`, and that is the only account the API sees. Granting
+rights to a _different_ service account in the same Google Cloud project
+changes nothing and looks exactly like a propagation delay. Check the
+`client_email` in the JSON you uploaded, and grant to that address.
+
+**And "Manage store presence" is not a release permission.** It covers the
+listing — the text, the screenshots, the graphics — which is a different group
+from publishing a build. The one the upload needs is under the release
+permissions: _Release apps to testing tracks_. Granting the first and
+retrying produces the same message as granting nothing.
+
+**A service account that was never invited has no permissions at all**, no
+matter what is ticked elsewhere. Play Console → Users and permissions lists
+the service accounts that have been invited; an account absent from that list
+is the first thing to check, because every other explanation assumes it is
+there.
+
+Two buttons, and the second is easy to miss: **Apply**, then **Save changes**.
+
 ## If the upload key is lost
 
 This is the recoverable half, and it is only recoverable if somebody knows
