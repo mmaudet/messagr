@@ -30,6 +30,36 @@
 // `matrix-sdk-crypto` but weaker than what this file claims -- so the tag is
 // checked at run time rather than trusted, below.
 //
+// # WHAT IT FOUND, AND WHY `collect` DOES NOT PASS YET
+//
+// This counterparty publishes an identity, signs its own device, uploads
+// one-time keys -- and the application still refuses to share, answering
+// `m.room_key.withheld` with `m.no_olm`. Every symptom points at the
+// identity, which is correct throughout.
+//
+// `scripts/interop/verify-signed-keys.py` asked a third opinion: it claims a
+// key the way any client would and verifies the signature by hand, with an
+// Ed25519 implementation checked against RFC 8032's own vectors first.
+// Measured on 5 September 2026 against the fork:
+//
+//	application  (matrix-sdk-crypto)  one-time key signature   VALID
+//	this         (mautrix-go/goolm)   device keys signature    VALID
+//	this         (mautrix-go/goolm)   one-time key signature   INVALID
+//
+// Same homeserver, same claim endpoint, same verifier, same signed object
+// shape. The homeserver mangles nothing, since the application's own key
+// round-trips and verifies. This counterparty's DEVICE keys sign correctly,
+// so its signing key and its canonical JSON are right for that object. Only
+// its one-time keys are wrong.
+//
+// So the application refusing to open an Olm session, and reporting
+// `m.no_olm`, is CORRECT BEHAVIOUR, and the fault is in mautrix-go's
+// one-time key signing path. Which is what an independent counterparty is
+// for: a second instance of matrix-sdk-crypto would have agreed with itself.
+//
+// `collect` therefore cannot pass until that is fixed upstream or worked
+// around here. It is left in, failing honestly, rather than removed.
+//
 // # The phases, and the one this exists for
 //
 //	login    creates the device, publishes a cross-signing identity, signs
@@ -49,8 +79,8 @@ import (
 	"path/filepath"
 	"time"
 
-	"go.mau.fi/util/dbutil"
 	_ "github.com/mattn/go-sqlite3"
+	"go.mau.fi/util/dbutil"
 	"maunium.net/go/mautrix"
 	"maunium.net/go/mautrix/crypto/cryptohelper"
 	"maunium.net/go/mautrix/event"
@@ -167,10 +197,10 @@ func login() error {
 		return err
 	}
 	helper.LoginAs = &mautrix.ReqLogin{
-		Type:       mautrix.AuthTypePassword,
-		Identifier: mautrix.UserIdentifier{Type: mautrix.IdentifierTypeUser, User: userID},
-		Password:   password,
-		DeviceID:   "",
+		Type:                     mautrix.AuthTypePassword,
+		Identifier:               mautrix.UserIdentifier{Type: mautrix.IdentifierTypeUser, User: userID},
+		Password:                 password,
+		DeviceID:                 "",
 		InitialDeviceDisplayName: "messagr-interop-counterparty-go",
 	}
 	if err := helper.Init(ctx); err != nil {
