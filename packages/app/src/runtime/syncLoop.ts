@@ -110,6 +110,21 @@ function nextBackoff(previous: number): number {
 }
 
 /**
+ * Whether a failure looks like the homeserver refusing the request rather
+ * than failing to answer it.
+ *
+ * Duck-typed on a numeric `status`, the same way `pump.ts`'s own adapter
+ * duck-types the SDK's `httpStatus`: `HttpRequester` is an interface, and a
+ * caller is entitled to supply a transport that throws something else.
+ *
+ * 400 only. A 401 or 403 is about who is asking, which no amount of dropping
+ * a cursor will fix; a 5xx is a server that is unwell and will recover.
+ */
+function isRefusedRequest(cause: unknown): boolean {
+  return (cause as { status?: unknown } | null)?.status === 400
+}
+
+/**
  * Starts polling. Returns immediately; the loop runs until `stop`.
  *
  * THE ORDER IS THE CORRECTNESS. Each poll feeds the machine, sends whatever
@@ -164,13 +179,36 @@ export function startSyncLoop(deps: SyncLoopDeps): RunningSyncLoop {
           backoff = 0
           onState('running')
           onTick({ changedScopes: readChangedScopes(sync), cursorPersisted })
-        } catch {
-          // Every failure is the same failure from here: nothing arrived and
-          // the cursor did not move, so the events this poll would have
-          // carried are still waiting on the server. Retrying from the same
-          // token is what makes that true.
+        } catch (cause: unknown) {
           if (stopping) break
           onState('reconnecting')
+
+          // A CURSOR THE HOMESERVER WILL NEVER ACCEPT.
+          //
+          // The only part of this request the loop chose is the cursor, so a
+          // refusal is first of all a claim about that. It happens for
+          // ordinary reasons: a homeserver restored from a backup no longer
+          // knows the token it issued, and a cursor outlives the account that
+          // earned it -- nothing clears the keystore entry when a second
+          // invitation is claimed on an install that already held a session.
+          //
+          // Retried unchanged, that is `reconnecting` for good on a device
+          // that is online with credentials that are fine: the loop would be
+          // alive, trying, and permanently wrong. Dropping the cursor costs
+          // one replay, which is the recoverable direction, and the next poll
+          // that works writes a good one over it. Exactly one immediate retry
+          // -- if the refusal was about something else, the retry carries no
+          // cursor, this branch does not fire again, and it backs off like
+          // any other failure.
+          if (cursor !== null && isRefusedRequest(cause)) {
+            cursor = null
+            continue
+          }
+
+          // Everything else is the same failure from here: nothing arrived
+          // and the cursor did not move, so the events this poll would have
+          // carried are still waiting on the server. Retrying from the same
+          // token is what makes that true.
           backoff = nextBackoff(backoff)
           await sleep(backoff)
         }

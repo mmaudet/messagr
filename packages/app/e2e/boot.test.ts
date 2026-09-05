@@ -216,4 +216,20 @@ describe('boot', () => {
       element(by.text('tampered ciphertext: ACCEPTED')),
     ).not.toBeVisible()
   })
+
+  it('runs a live sync loop, so a message can arrive without a relaunch', async () => {
+    // The one thing #79 changes about what the product *is*, asserted here
+    // because nothing else in this suite would notice the loop failing to
+    // start: every other line is written by the launch path, which finishes
+    // either way.
+    //
+    // On `running` rather than on the block merely existing. `starting` is
+    // what the line says before the homeserver has answered even once, so a
+    // loop that never got an answer would pass the weaker assertion while
+    // receiving nothing -- which is the failure worth catching.
+    await waitFor(element(by.text('live sync: running')))
+      .toExist()
+      .withTimeout(60000)
+    await seeText('live sync: running')
+  })
 })

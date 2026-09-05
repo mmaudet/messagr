@@ -27,9 +27,10 @@ import type { SecretStore } from './sessionStore'
  * the session, so that a cursor written every thirty seconds cannot corrupt
  * the credential whose loss is the loss of the account.
  *
- * When the application gains a store of its own — ADR-0010's given names are
- * the first thing that will need one — the cursor belongs there, and moving
- * it is one line in `deviceSecrets.ts`.
+ * When the application gains a store of its own -- the first thing to need
+ * one will be the name a person chooses for themselves, which is neither a
+ * secret nor something a keystore should be holding either -- the cursor
+ * belongs there, and moving it is one line in `deviceSecrets.ts`.
  */
 
 /**

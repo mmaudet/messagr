@@ -271,9 +271,63 @@ describe('startSyncLoop', () => {
     expect(harness.ticks).toEqual([])
   })
 
-  it('stops without waiting out a backoff it no longer needs', async () => {
+  it('begins no backoff for a failure that arrived after it was stopped', async () => {
+    // Only about a backoff not yet begun. One already under way is waited
+    // out: `sleep` is a plain promise with nothing to cancel it, so `stopped`
+    // can resolve up to the cap late. Nothing observes that but the promise
+    // itself -- a superseded loop's reports are dropped by whoever replaced
+    // it -- and making the wait interruptible would buy a faster resolution
+    // of a promise nothing is blocking on.
     const harness = drive({ responses: [new Error('down')] })
     await harness.loop.stopped
     expect(harness.waits).toEqual([])
+  })
+
+  it('drops a cursor the homeserver refuses, rather than retrying it for good', async () => {
+    const refused = Object.assign(new Error('unknown token'), { status: 400 })
+    const harness = drive({
+      responses: [refused, '{"next_batch":"s_fresh"}', '{}'],
+      storedCursor: 's_stale',
+    })
+    await harness.loop.stopped
+    // Refused once with the stale cursor, then from the beginning, and the
+    // poll after that carries the good one the full sync returned.
+    expect(harness.requests.map(r => r.since)).toEqual([
+      's_stale',
+      undefined,
+      's_fresh',
+    ])
+  })
+
+  it('retries a refused cursor at once, because the server is not the thing that failed', async () => {
+    const refused = Object.assign(new Error('unknown token'), { status: 400 })
+    const harness = drive({
+      responses: [refused, '{}', '{}'],
+      storedCursor: 's_stale',
+    })
+    await harness.loop.stopped
+    expect(harness.waits).toEqual([])
+  })
+
+  it('backs off normally when a refusal was not about the cursor after all', async () => {
+    const refused = Object.assign(new Error('malformed'), { status: 400 })
+    const harness = drive({
+      responses: [refused, refused, '{}'],
+      storedCursor: 's_stale',
+    })
+    await harness.loop.stopped
+    // The first refusal drops the cursor and retries at once; the second
+    // carries no cursor to drop, so it is an ordinary failure.
+    expect(harness.waits).toEqual([1_000])
+  })
+
+  it('does not drop a cursor for a server that is merely unwell', async () => {
+    const unwell = Object.assign(new Error('bad gateway'), { status: 502 })
+    const harness = drive({
+      responses: [unwell, '{}'],
+      storedCursor: 's_kept',
+    })
+    await harness.loop.stopped
+    expect(harness.requests.map(r => r.since)).toEqual(['s_kept', 's_kept'])
   })
 })

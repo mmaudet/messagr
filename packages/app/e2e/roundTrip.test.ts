@@ -157,7 +157,8 @@ describeRoundTrip('encrypted round trip', () => {
     // (ADR-0007), so waiting inside one launch is no longer a lie about the
     // product — but this block is skipped unless a counterparty is built,
     // and the counterparty has not run since the mautrix-go one-time-key
-    // signature bug was found (docs/interop-otk-bug). Rewriting a test that
+    // signature bug was found -- diagnosed on the docs/interop-otk-bug
+    // branch, which is not merged. Rewriting a test that
     // cannot be watched failing is how a suite acquires assertions nobody
     // has ever seen pass, so this keeps the retry it was proven with until
     // somebody can run it.
