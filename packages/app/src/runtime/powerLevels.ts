@@ -102,7 +102,26 @@ export async function fetchPowerContent(
   return content as PowerContent
 }
 
-/** What `userId` currently holds, and whether it is enough to invite. */
+/**
+ * What `userId` currently holds, and whether it is enough to invite.
+ *
+ * **It reads `users` and `users_default`, and nothing else — which is not the
+ * whole truth about power, and is enough for what this module is asked.** A
+ * room's creator holds power that is not in that map: newer room versions put
+ * it in `m.room.create` instead, and the invitation service models it
+ * separately for exactly that reason (`HeldPower::Creator`).
+ *
+ * Measured on `messagr.eu`, 5 September 2026: a room created seconds earlier
+ * came back with `"users": {}` while its creator could issue invitations.
+ * Asked about that creator, this function answers `held: 0` and
+ * `mayInvite: false`, and both are wrong.
+ *
+ * It is not wrong anywhere this product calls it. Vouching asks about the
+ * *entrant*, who is never the creator, and nothing in the application asks
+ * about its own power. The day something does — a screen that says what you
+ * may do here — this is the first thing to fix, and it should read
+ * `m.room.create` rather than guess.
+ */
 export function readPower(content: PowerContent, userId: string): PowerReading {
   const usersDefault = numberAt(content, 'users_default', SPEC_DEFAULT_USERS)
   const users = content.users
