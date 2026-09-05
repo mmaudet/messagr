@@ -146,6 +146,17 @@ export async function startCryptoMachine(
   const passphrase = await openStorePassphrase(cryptoStoreSecrets, byteLength =>
     crypto.getRandomValues(new Uint8Array(byteLength)),
   )
+  // Logged next to the migration above, and for the same reason: the pair is
+  // the only evidence that a launch could actually reach its own passphrase.
+  // ADR-0008's whole claim is that this read works while the screen is off,
+  // and the readout cannot show it -- a launch that never got here draws no
+  // screen at all.
+  logEvent(passphrase.held ? 'info' : 'warn', 'MESSAGR_STORE_PASSPHRASE', {
+    held: passphrase.held,
+    ...(passphrase.held
+      ? { minted: passphrase.minted }
+      : { reason: passphrase.reason }),
+  })
   if (!passphrase.held) {
     return { started: false, reason: passphrase.reason, passphraseForm }
   }
