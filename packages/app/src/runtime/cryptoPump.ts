@@ -15,13 +15,18 @@ import {
   createCryptoMachine,
   createCrossSigningIdentity,
   decryptEvent,
+  discardScopeKey,
   encryptEvent,
   encryptionSlice,
+  buildHistoryBundle,
   getDeviceIdentityKeys,
   getIdentityStatus,
   markRequestFailed,
   markRequestSent,
+  offeredHistoryBundle,
+  receiveHistoryBundle,
   receiveSyncChanges,
+  shareHistoryBundle,
   shareScopeKey,
   takeOutgoingRequests,
 } from 'react-native-matrix-crypto'
@@ -33,9 +38,14 @@ import { openStorePassphrase } from './storePassphrase'
 import type { DeviceIdentity } from './deviceIdentity'
 import { encryptAndSendOneMessage, type SendReport } from './encryptAndSend'
 import { getErrorMessage } from './errors'
+import { logEvent } from './log'
 import { fetchJoinedRooms } from './encryptedSend'
 import { probeUnsettledEncrypt, type ProbeReport } from './panicProbe'
+import { claimHistory, type HistoryClaim } from './claimHistory'
+import { evictFrom, type EvictOutcome } from './evict'
+import { mediaRepository } from './mediaRepository'
 import { makePumpHttp } from './pump'
+import { vouchFor, type VouchOutcome } from './vouch'
 import { receiveAndDecrypt, type ReceiveReport } from './receiveDecrypt'
 import {
   runOutgoingPumpCycle,
@@ -291,5 +301,104 @@ export async function runPanicProbe(
     },
     identity,
     storeDir,
+  )
+}
+
+/**
+ * Phase five: the inviter's gesture, bound to the real bridge and the real
+ * media repository.
+ *
+ * Pure glue, like everything else here. The sequence -- and the ordering that
+ * makes it worth anything -- is `vouch.ts`'s `vouchFor`, tested there against
+ * injected fakes.
+ *
+ * `fetch` is passed rather than reached for inside `mediaRepository`, which
+ * keeps that module testable without a server and keeps this file the only
+ * place a global is touched.
+ */
+export async function vouchForEntrant(
+  sessionClient: ReturnType<typeof createClient>,
+  credentials: { readonly baseUrl: string; readonly accessToken: string },
+  scope: string,
+  entrantId: string,
+): Promise<VouchOutcome> {
+  const outcome = await vouchFor(
+    makePumpHttp(sessionClient),
+    {
+      takeOutgoingRequests,
+      markRequestSent,
+      markRequestFailed,
+      buildHistoryBundle: bundleScope =>
+        buildHistoryBundle(asCryptoScopeId(bundleScope)),
+      shareHistoryBundle: (bundleScope, userId, url, secret) =>
+        shareHistoryBundle(asCryptoScopeId(bundleScope), userId, url, secret),
+    },
+    mediaRepository(credentials.baseUrl, credentials.accessToken, fetch),
+    scope,
+    entrantId,
+  )
+  // Logged as well as returned. The gesture's whole value is an ordering, and
+  // an ordering is not something a screen can show: what a person sees is
+  // "c'est fait" either way. The log is where the level actually granted, and
+  // the step that stopped, can be read back.
+  logEvent(outcome.vouched ? 'info' : 'warn', 'MESSAGR_VOUCH', { ...outcome })
+  return outcome
+}
+
+/**
+ * Phase six: removing somebody, and the rotation that decides whether it
+ * meant anything.
+ *
+ * Pure glue. The sequence -- remove first, rotate second -- is `evict.ts`'s
+ * `evictFrom`, tested there against injected fakes.
+ */
+export async function evictMember(
+  sessionClient: ReturnType<typeof createClient>,
+  scope: string,
+  memberId: string,
+): Promise<EvictOutcome> {
+  const outcome = await evictFrom(
+    makePumpHttp(sessionClient),
+    {
+      takeOutgoingRequests,
+      markRequestSent,
+      markRequestFailed,
+      discardScopeKey: evictScope =>
+        discardScopeKey(asCryptoScopeId(evictScope)),
+    },
+    scope,
+    memberId,
+  )
+  // Logged as well as returned, for the reason #35 gives: the test must
+  // assert the rotation and not the membership change, and the membership
+  // change is the half a screen shows. `rotated` is the fact that decides
+  // whether this was an eviction or the appearance of one.
+  logEvent(outcome.evicted ? 'info' : 'warn', 'MESSAGR_EVICT', { ...outcome })
+  return outcome
+}
+
+/**
+ * Phase five, the other side: taking history somebody vouched for you with.
+ *
+ * Called on launch after the sync, because the announcement is a to-device
+ * event and exists for this device only once a sync carrying it has been
+ * ingested. `claimHistory` never throws, which is what lets this sit in the
+ * launch path.
+ */
+export async function claimOfferedHistory(
+  credentials: { readonly baseUrl: string; readonly accessToken: string },
+  scope: string,
+  voucherId: string,
+): Promise<HistoryClaim> {
+  return claimHistory(
+    {
+      offeredHistoryBundle: (claimScope, senderId) =>
+        offeredHistoryBundle(asCryptoScopeId(claimScope), senderId),
+      receiveHistoryBundle: (claimScope, senderId, ciphertext) =>
+        receiveHistoryBundle(asCryptoScopeId(claimScope), senderId, ciphertext),
+    },
+    mediaRepository(credentials.baseUrl, credentials.accessToken, fetch),
+    scope,
+    voucherId,
   )
 }

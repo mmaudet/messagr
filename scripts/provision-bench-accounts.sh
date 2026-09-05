@@ -26,10 +26,27 @@ OUT="${MESSAGR_BENCH_OUT:-/tmp/messagr-bench-accounts.json}"
 # The production instance is refused by name rather than by convention. A
 # bench that ran against it would create accounts on localparts a homeserver
 # never releases, on the server meant to carry real conversations.
+# THIS REFUSAL IS ABOUT BENCH PROVISIONING, NOT ABOUT PRODUCTION.
+#
+# A bench provisions and discards accounts by the dozen, and a homeserver
+# never releases a localpart. So a bench pointed at production burns names,
+# permanently, on the instance meant to carry real conversations. That is
+# what this refuses, and it refuses it here rather than by convention.
+#
+# It is NOT a rule that production must never be touched. Tester builds use
+# production, and three named accounts hold its registration token on
+# purpose -- see docs/production-entry-point.md, which names all three and
+# says why each is allowed to. Somebody who reads this refusal as a general
+# prohibition, notices that production obviously IS used, and concludes the
+# refusal is stale would be drawing the wrong lesson from the right rule.
+# The scope is provisioning, and provisioning only.
 case "$MESSAGR_BENCH_HOMESERVER" in
   *messagr.eu*)
     echo "REFUSED: $MESSAGR_BENCH_HOMESERVER is the production instance." >&2
-    echo "A bench never creates an account there. Use the fork." >&2
+    echo "A bench never PROVISIONS accounts there: it creates and discards" >&2
+    echo "them by the dozen, and a homeserver never releases a localpart." >&2
+    echo "Use the fork. See docs/production-entry-point.md for what does" >&2
+    echo "legitimately run against production, and why." >&2
     exit 1
     ;;
 esac
@@ -93,6 +110,34 @@ room_id="$(curl -sS -X POST "$MESSAGR_BENCH_HOMESERVER/_matrix/client/v3/createR
 # does before deciding to encrypt -- would be told no and send plaintext.
 # Set here rather than by a client, because the account that creates the room
 # is the one that has the power level to set its state.
+# THE ROOM MUST COST 50 TO INVITE, AND `createRoom` DOES NOT DO THAT.
+#
+# A conversation this product creates sets `invite` to 50 and admits members
+# at 0, which is what makes "an entrant cannot invite, a promoted member can"
+# true at all -- the invitation service reads this event rather than taking
+# the application's word for it. A plain `createRoom` leaves no `invite` key,
+# and the specification's default for a missing one is **0**: every member
+# may invite.
+#
+# Measured, on 5 September 2026, while proving #34 against the fork: the
+# bench room came back as `{"users": {}}`. A run against it would have shown
+# an entrant unable to invite for no reason at all, and a promoted one able
+# for no reason either -- the criterion passing while testing nothing. A
+# bench that does not reproduce what the product builds proves things about
+# a room nobody ships.
+echo "setting the invite cost the product sets" >&2
+levels="$(curl -sS "$MESSAGR_BENCH_HOMESERVER/_matrix/client/v3/rooms/$room_id/state/m.room.power_levels" \
+  -H "Authorization: Bearer $inviter_token")"
+curl -fsS -o /dev/null -X PUT \
+  "$MESSAGR_BENCH_HOMESERVER/_matrix/client/v3/rooms/$room_id/state/m.room.power_levels" \
+  -H "Authorization: Bearer $inviter_token" -H 'Content-Type: application/json' \
+  -d "$(printf '%s' "$levels" | python3 -c '
+import json, sys
+levels = json.load(sys.stdin)
+levels["invite"] = 50
+levels["users_default"] = 0
+print(json.dumps(levels))')"
+
 echo "marking the room encrypted" >&2
 # -f so a refusal is an error here. Without it curl exits 0 on a 403 and the
 # missed state event surfaces two CI jobs later, as a counterparty reporting
