@@ -82,7 +82,19 @@ function Row({
   readonly name: string | undefined
   readonly onOpen: (scope: string) => void
 }) {
-  const shown = displayNameFor(summary.other, name)
+  // A CONVERSATION WITH NO SINGLE OTHER PARTICIPANT STILL NEEDS A LINE.
+  //
+  // `displayNameFor` names a participant, and there is no one participant to
+  // name here: a conversation of more than two is a channel, which this lot
+  // does not build. Watched on a device before it was caught -- a bench room
+  // of three rendered a row whose first line was empty, which is not "legible
+  // anyway", it is invisible. So the row falls back to the conversation's own
+  // identifier, in the same mono role an unnamed participant gets, because
+  // that is what it is: an identifier standing in for a name nobody has
+  // given yet.
+  const shown =
+    summary.other === null ? summary.scope : displayNameFor(summary.other, name)
+  const named = summary.other !== null && name !== undefined
   return (
     <Pressable
       testID={`conversation-row-${summary.scope}`}
@@ -95,9 +107,7 @@ function Row({
           not", and it is a typographic answer rather than a badge -- a badge
           would be a second thing on the row saying what the first already
           says. */}
-      <Text
-        numberOfLines={1}
-        style={name === undefined ? styles.identifier : styles.name}>
+      <Text numberOfLines={1} style={named ? styles.name : styles.identifier}>
         {shown}
       </Text>
       <Text numberOfLines={1} style={styles.preview}>
