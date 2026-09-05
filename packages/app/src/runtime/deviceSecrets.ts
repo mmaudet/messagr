@@ -30,5 +30,13 @@ function keychainStore(service: string): SecretStore {
 /** Where the restored session lives between launches. */
 export const sessionSecrets = keychainStore('eu.messagr.session')
 
+/**
+ * Where the sign-up marker lives. See signUpMarker.ts: it is the entitlement
+ * to make the one destructive call on the crypto library's surface, so it
+ * belongs beside the other secrets rather than in ordinary storage anything
+ * could write.
+ */
+export const signUpSecrets = keychainStore('eu.messagr.sign-up')
+
 /** Where the crypto store's passphrase lives. See cryptoMachineConfig.ts. */
 export const cryptoStoreSecrets = keychainStore('eu.messagr.crypto-store')

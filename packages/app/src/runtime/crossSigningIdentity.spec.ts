@@ -46,12 +46,23 @@ function machine(
     bootstrap?: () => Promise<void>
     create?: () => Promise<void>
     status?: Partial<IdentityStatus>
+    /**
+     * What the machine reports once `create` has been called. Real machines
+     * change: the batch a creation queues carries a confirming key query, so
+     * the pending flag clears when that answer comes back. A fake that never
+     * changed would make every creation look unacknowledged.
+     */
+    statusAfterCreate?: Partial<IdentityStatus>
   } = {},
 ): Recorder {
   const calls: string[] = []
   return {
     calls,
-    getIdentityStatus: async () => ({ ...SETTLED, ...behaviour.status }),
+    getIdentityStatus: async () => ({
+      ...SETTLED,
+      ...behaviour.status,
+      ...(calls.includes('create') ? (behaviour.statusAfterCreate ?? {}) : {}),
+    }),
     bootstrapCrossSigning: async () => {
       calls.push('bootstrap')
       await behaviour.bootstrap?.()
@@ -177,6 +188,34 @@ describe('establishCrossSigningIdentity', () => {
     expect(result.established).toBe(false)
     expect(m.calls).toEqual(['bootstrap'])
     expect(m.calls).not.toContain('create')
+  })
+
+  it('finishes a publication it created, when the device still carries the sign-up marker', async () => {
+    // The state #46 could see and would not act on: an identity created here
+    // and never acknowledged, which survives a relaunch because the identity
+    // is on disk and the publication was in memory.
+    //
+    // The library's remedy is the same create call again, which hands back
+    // the publication that was lost rather than minting a second identity.
+    // What made it unsafe was doing it on every launch; what makes it safe is
+    // the marker, and nothing else in this application can grant it.
+    const m = machine({
+      bootstrap: async () => {
+        throw crypto('identity_not_known')
+      },
+      status: { identityPublicationPending: true },
+      // The confirming key query the creation queues comes back, and the
+      // homeserver's answer carries the identity.
+      statusAfterCreate: { identityPublicationPending: false },
+    })
+    await expect(
+      establishCrossSigningIdentity(
+        m,
+        drainer([SENT_THE_BATCH]).drain,
+        'finishing-sign-up',
+      ),
+    ).resolves.toEqual({ established: true, how: 'resumed' })
+    expect(m.calls).toEqual(['bootstrap', 'create'])
   })
 
   it('reports a publication left unacknowledged without finishing it on a restore', async () => {

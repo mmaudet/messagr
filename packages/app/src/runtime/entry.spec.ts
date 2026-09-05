@@ -35,6 +35,20 @@ const refusing: ServicePoster = {
   post: async () => ({ status: 404, body: '{"errcode":"M_NOT_FOUND"}' }),
 }
 
+/** The sign-up marker's own store, which every entry now writes through. */
+function markerStore() {
+  const written: string[] = []
+  return {
+    written,
+    secrets: {
+      read: async () => written[written.length - 1] ?? null,
+      write: async (value: string) => {
+        written.push(value)
+      },
+    },
+  }
+}
+
 describe('enterWithASession', () => {
   it('uses the session it already has, without spending an invitation', async () => {
     let posted = false
@@ -48,6 +62,7 @@ describe('enterWithASession', () => {
       secrets: store(JSON.stringify(SESSION)),
       poster: watching,
       link: async () => 'https://messagr.eu/i/abc123',
+      signUp: markerStore().secrets,
     })
     expect(result).toEqual({ entered: true, session: SESSION, claimed: false })
     // An invitation is single-use. Spending one for an account that already
@@ -61,6 +76,7 @@ describe('enterWithASession', () => {
       secrets,
       poster: granting,
       link: async () => 'https://messagr.eu/i/abc123',
+      signUp: markerStore().secrets,
     })
     expect(result).toEqual({ entered: true, session: SESSION, claimed: true })
     // Kept, or the next launch claims again and finds the token spent.
@@ -72,6 +88,7 @@ describe('enterWithASession', () => {
       secrets: store(),
       poster: granting,
       link: async () => null,
+      signUp: markerStore().secrets,
     })
     expect(result).toEqual({
       entered: false,
@@ -85,6 +102,7 @@ describe('enterWithASession', () => {
       secrets: store(),
       poster: refusing,
       link: async () => 'https://messagr.eu/i/abc123',
+      signUp: markerStore().secrets,
     })
     expect(result.entered).toBe(false)
     if (!result.entered) {
@@ -97,6 +115,7 @@ describe('enterWithASession', () => {
       secrets: store(),
       poster: granting,
       link: async () => 'https://messagr.eu/about',
+      signUp: markerStore().secrets,
     })
     expect(result.entered).toBe(false)
   })
@@ -114,6 +133,7 @@ describe('enterWithASession', () => {
       secrets: unwritable,
       poster: granting,
       link: async () => 'https://messagr.eu/i/abc123',
+      signUp: markerStore().secrets,
     })
     expect(result).toEqual({
       entered: true,
@@ -121,5 +141,51 @@ describe('enterWithASession', () => {
       claimed: true,
       kept: false,
     })
+  })
+
+  it('records that a sign-up began, when one did', async () => {
+    // The entitlement a later launch needs to finish a publication this one
+    // may not complete. Written at the claim, because that is when the
+    // sign-up starts.
+    const marker = markerStore()
+    await enterWithASession({
+      secrets: store(),
+      poster: granting,
+      link: async () => 'https://messagr.eu/i/abc123',
+      signUp: marker.secrets,
+    })
+    expect(marker.written).toEqual(['signing-up'])
+  })
+
+  it('records nothing when a session was merely restored', async () => {
+    // A restore is not a sign-up. Marking one would hand a later launch the
+    // entitlement to overwrite an identity that is working.
+    const marker = markerStore()
+    await enterWithASession({
+      secrets: store(JSON.stringify(SESSION)),
+      poster: granting,
+      link: async () => null,
+      signUp: marker.secrets,
+    })
+    expect(marker.written).toEqual([])
+  })
+
+  it('enters even when the marker could not be written', async () => {
+    // The account exists and the token is spent. Refusing over a marker
+    // would throw away an invitation that cannot be spent again, and what is
+    // lost is smaller: a later launch's ability to finish an interrupted
+    // publication.
+    const result = await enterWithASession({
+      secrets: store(),
+      poster: granting,
+      link: async () => 'https://messagr.eu/i/abc123',
+      signUp: {
+        read: async () => null,
+        write: async () => {
+          throw new Error('keystore full')
+        },
+      },
+    })
+    expect(result.entered).toBe(true)
   })
 })
