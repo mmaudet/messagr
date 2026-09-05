@@ -188,12 +188,23 @@ jobs:
             mkdir -p android/app/src/main/assets
             npx react-native bundle --platform android --dev false --entry-file index.js --bundle-output android/app/src/main/assets/index.android.bundle --assets-dest android/app/src/main/res
             npx detox build --configuration android.emu.debug
-            ../../scripts/run-device-suite.sh
+            MESSAGR_CAPTURE_STORE=1 ../../scripts/run-device-suite.sh
 
       # Only on failure, and that is the point: a green run's logs are noise,
       # while a red one without the device's own log costs a whole run per
       # hypothesis. The application says what it decided; this is how that
       # reaches whoever is reading the failure.
+      # The listing's screenshots, taken from the run that just proved the
+      # application works. Kept whether or not anything failed, because a
+      # green run is exactly when they are worth having.
+      - name: Keep the store screenshots
+        if: always() && hashFiles('store-screenshots/**') != ''
+        uses: actions/upload-artifact@v4
+        with:
+          name: store-screenshots
+          path: store-screenshots
+          retention-days: 30
+
       # Conditioned on the suite itself having failed, not on the job having
       # failed. When something earlier goes wrong the suite never runs, there
       # are no artifacts to keep, and an empty upload erroring there shouts
