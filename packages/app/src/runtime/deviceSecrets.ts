@@ -83,3 +83,10 @@ export const syncCursorSecrets = keychainStore('eu.messagr.sync-cursor')
 export const cryptoStoreFormMarker = keychainStore(
   'eu.messagr.crypto-store-form',
 )
+
+/**
+ * Where the note saying this device has been shown the promise lives. See
+ * promiseSeen.ts: not a secret, and here only because `SecretStore` is the
+ * one durable per-device store this application has today.
+ */
+export const promiseSecrets = keychainStore('eu.messagr.promise')
