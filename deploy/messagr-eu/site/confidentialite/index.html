@@ -1,0 +1,365 @@
+<!doctype html>
+<html lang="fr">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Politique de confidentialité — Messagr</title>
+    <meta
+      name="description"
+      content="Ce que Messagr ne vous demande pas, ce que le service ne peut pas lire, et ce que le serveur voit malgré tout." />
+    <style>
+      :root {
+        --ground: #f7f5ef;
+        --surface: #ffffff;
+        --ink: #0c1f19;
+        --soft: #5a6b63;
+        --accent: #06614a;
+        --mark: #12b76a;
+        --bubble: #c9f2dc;
+        --rule: #e2ded2;
+      }
+      * {
+        box-sizing: border-box;
+      }
+      html,
+      body {
+        margin: 0;
+      }
+      body {
+        background: var(--ground);
+        color: var(--ink);
+        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+        line-height: 1.6;
+        -webkit-font-smoothing: antialiased;
+      }
+      main {
+        max-width: 640px;
+        margin: 0 auto;
+        padding: 56px 24px 80px;
+      }
+      .mark {
+        display: block;
+        margin-bottom: 40px;
+        width: max-content;
+      }
+      .mark:focus-visible {
+        outline: 3px solid var(--mark);
+        outline-offset: 4px;
+      }
+      .logotype {
+        display: block;
+        width: min(260px, 62vw);
+        height: auto;
+      }
+      .logotype.dark {
+        display: none;
+      }
+      h1 {
+        font-size: clamp(28px, 6vw, 38px);
+        line-height: 1.14;
+        letter-spacing: -0.025em;
+        font-weight: 650;
+        margin: 0 0 18px;
+        text-wrap: balance;
+      }
+      h2 {
+        font-size: 20px;
+        line-height: 1.25;
+        letter-spacing: -0.015em;
+        font-weight: 640;
+        margin: 38px 0 12px;
+      }
+      .lead {
+        font-size: 18px;
+        color: var(--soft);
+        margin: 0 0 8px;
+        text-wrap: pretty;
+      }
+      .stamp {
+        font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+        font-size: 11px;
+        letter-spacing: 0.13em;
+        text-transform: uppercase;
+        color: var(--soft);
+        margin: 0 0 34px;
+      }
+      p {
+        margin: 0 0 14px;
+      }
+      ul {
+        list-style: none;
+        padding: 0;
+        margin: 0 0 18px;
+        display: flex;
+        flex-direction: column;
+        gap: 9px;
+      }
+      li {
+        display: flex;
+        gap: 11px;
+        align-items: baseline;
+        font-size: 16px;
+      }
+      li::before {
+        content: '◆';
+        color: var(--mark);
+        font-size: 12px;
+        flex: 0 0 auto;
+      }
+      .card {
+        background: var(--surface);
+        border: 1px solid var(--rule);
+        border-radius: 4px;
+        padding: 22px 24px;
+        margin: 22px 0;
+      }
+      .card p:last-child {
+        margin-bottom: 0;
+      }
+      .invite {
+        background: var(--bubble);
+        border-radius: 4px;
+        padding: 18px 20px;
+        font-size: 15.5px;
+        margin: 22px 0;
+      }
+      .invite b {
+        font-weight: 640;
+      }
+      code {
+        font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+        font-size: 14px;
+        background: var(--surface);
+        border: 1px solid var(--rule);
+        border-radius: 3px;
+        padding: 1px 5px;
+      }
+      a {
+        color: var(--accent);
+      }
+      footer {
+        margin-top: 46px;
+        padding-top: 20px;
+        border-top: 1px solid var(--rule);
+        font-size: 13.5px;
+        color: var(--soft);
+      }
+      @media (prefers-color-scheme: dark) {
+        :root {
+          --ground: #0b1a15;
+          --surface: #11241d;
+          --ink: #e9f1ec;
+          --soft: #93a89e;
+          --accent: #4fd39b;
+          --rule: #23392f;
+          --bubble: #1c3d30;
+        }
+        .logotype.light {
+          display: none;
+        }
+        .logotype.dark {
+          display: block;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <a class="mark" href="/" aria-label="Messagr">
+        <img
+          class="logotype light"
+          src="/messagr-logotype-vert.svg"
+          alt="Messagr"
+          width="260"
+          height="60" />
+        <img
+          class="logotype dark"
+          src="/messagr-logotype-vert-inverse.svg"
+          alt="Messagr"
+          width="260"
+          height="60" />
+      </a>
+
+      <h1>Politique de confidentialité</h1>
+      <p class="lead">
+        Ce que Messagr ne vous demande pas, ce que le service ne peut pas lire,
+        et ce que le serveur voit malgré tout.
+      </p>
+      <p class="stamp">Version du 5 septembre 2026</p>
+
+      <h2>Qui traite vos données</h2>
+      <p>
+        Messagr est exploité par <b>RV Myriagone Holding</b>, dont le siège est
+        au 22 rue de la Garenne, 78130 Chapet, immatriculée au registre du
+        commerce et des sociétés de Versailles sous le numéro
+        <b>894&nbsp;754&nbsp;548</b>, représentée par Michel-Marie Maudet.
+      </p>
+      <p>
+        RV Myriagone Holding est le responsable de ce traitement au sens du
+        règlement (UE) 2016/679. Point de contact&nbsp;:
+        <a href="mailto:conformite@messagr.eu">conformite@messagr.eu</a>.
+      </p>
+
+      <h2>Ce que Messagr ne vous demande pas</h2>
+      <p>
+        Un compte Messagr ne porte aucune donnée d'identification que vous
+        auriez fournie, parce qu'aucune ne vous est demandée&nbsp;:
+      </p>
+      <ul>
+        <li>pas de numéro de téléphone&nbsp;;</li>
+        <li>pas d'adresse électronique&nbsp;;</li>
+        <li>pas de nom, réel ou déclaré&nbsp;;</li>
+        <li>
+          pas de carnet d'adresses, ni de contacts lus sur votre appareil.
+        </li>
+      </ul>
+      <p>
+        L'identifiant de votre compte est tiré au hasard au moment où vous
+        entrez. Il n'est rattaché à rien d'autre que lui-même.
+      </p>
+
+      <h2>Ce que le service ne peut pas lire</h2>
+      <p>
+        Le contenu de vos conversations est chiffré de bout en bout&nbsp;: il
+        est chiffré sur l'appareil qui l'écrit et déchiffré sur celui qui le
+        lit. Les clés ne quittent jamais les appareils.
+      </p>
+      <div class="invite">
+        <b
+          >Ce n'est pas une promesse de notre part, c'est une propriété du
+          chiffrement.</b
+        >
+        Le serveur ne détient pas les clés&nbsp;: il ne peut pas lire vos
+        messages, pas davantage sur réquisition que de sa propre initiative, et
+        nous ne pourrions pas les produire si on nous les demandait.
+      </div>
+
+      <h2>Ce que le serveur voit malgré tout</h2>
+      <p>
+        Le chiffrement protège le contenu, pas son existence. Faire circuler un
+        message suppose de savoir où l'envoyer, et le serveur conserve
+        donc&nbsp;:
+      </p>
+      <ul>
+        <li>les identifiants pseudonymes des comptes&nbsp;;</li>
+        <li>
+          l'appartenance aux conversations — donc qui échange avec qui&nbsp;;
+        </li>
+        <li>la date et l'heure de chaque événement&nbsp;;</li>
+        <li>
+          la liste des appareils d'un compte et leurs clés publiques&nbsp;;
+        </li>
+        <li>la taille approximative de ce qui transite&nbsp;;</li>
+        <li>
+          les adresses IP au moment des requêtes, dans les journaux techniques.
+        </li>
+      </ul>
+      <p>
+        Ces métadonnées sont nécessaires au fonctionnement d'une messagerie.
+        Nous ne les enrichissons pas, nous ne les croisons avec rien, et elles
+        ne servent à aucun autre usage que l'acheminement.
+      </p>
+
+      <h2>Ce qui reste sur votre appareil</h2>
+      <ul>
+        <li>
+          vos clés cryptographiques, dans un magasin chiffré par une phrase de
+          passe aléatoire tirée sur l'appareil et gardée dans le trousseau du
+          système d'exploitation&nbsp;;
+        </li>
+        <li>votre session, dans ce même trousseau&nbsp;;</li>
+        <li>
+          rien d'autre.
+          <b>Les messages déchiffrés ne sont pas écrits sur le disque</b>&nbsp;:
+          la conversation est reconstruite à chaque ouverture depuis le chiffré,
+          puis oubliée.
+        </li>
+      </ul>
+
+      <h2>Aucune mesure d'audience</h2>
+      <p>
+        L'application ne contient aucun outil de mesure, aucun traceur, aucune
+        bibliothèque tierce d'analyse, aucune publicité. Rien n'est envoyé à un
+        tiers pour observer votre usage, parce qu'il n'existe aucun tiers dans
+        cette application.
+      </p>
+      <p>
+        Il n'y a ni profilage ni décision automatisée. Les décisions de
+        modération sont prises par des personnes, comme l'expliquent les
+        <a href="/conditions-generales">conditions générales</a>.
+      </p>
+
+      <h2>Où vos données sont traitées</h2>
+      <p>
+        Le serveur est hébergé par Hetzner Online GmbH, à Helsinki, en Finlande
+        — donc au sein de l'Union européenne. Il n'y a aucun transfert hors de
+        l'Union.
+      </p>
+
+      <h2>Sur quelle base</h2>
+      <p>
+        Le traitement repose sur l'exécution du contrat qui nous lie lorsque
+        vous utilisez le service (article 6.1.b du règlement), et sur nos
+        obligations légales pour ce qui touche à la modération et aux
+        signalements.
+      </p>
+
+      <h2>Combien de temps</h2>
+      <div class="card">
+        <p>
+          <b>À arrêter avant la mise à disposition au public.</b> Les durées de
+          conservation des journaux techniques et des métadonnées de
+          conversation doivent être fixées, publiées ici, et appliquées par le
+          serveur. Elles ne figurent pas dans cette version parce qu'elles ne
+          sont pas encore décidées, et annoncer une durée que le service
+          n'applique pas serait pire que de reconnaître qu'elle manque.
+        </p>
+      </div>
+      <p>
+        Ce qui est déjà vrai&nbsp;: une invitation est à usage unique et expire.
+        Une fois dépensée ou expirée, elle ne vaut plus rien et n'ouvre plus
+        aucun accès.
+      </p>
+
+      <h2>Vos droits</h2>
+      <p>
+        Vous disposez des droits d'accès, de rectification, d'effacement, de
+        limitation, d'opposition et de portabilité. Écrivez à
+        <a href="mailto:conformite@messagr.eu">conformite@messagr.eu</a>.
+      </p>
+      <div class="invite">
+        <b>Une limite qu'il faut connaître avant de nous écrire.</b> Nous ne
+        pouvons pas vous restituer le contenu de vos messages, parce que nous ne
+        l'avons jamais eu en clair. Une demande d'accès ou de portabilité
+        portera sur les métadonnées décrites plus haut, et sur elles seules. Le
+        contenu, lui, est déjà chez vous.
+      </div>
+      <p>
+        Vous pouvez introduire une réclamation auprès de la Commission nationale
+        de l'informatique et des libertés,
+        <a href="https://www.cnil.fr">cnil.fr</a>.
+      </p>
+
+      <h2>Âge minimum</h2>
+      <p>
+        L'âge minimum est de quinze ans en France. Entre quinze ans et la
+        majorité, l'usage relève des règles décrites dans les
+        <a href="/conditions-generales">conditions générales</a>.
+      </p>
+
+      <h2>Modifications</h2>
+      <p>
+        Toute modification de cette politique est publiée sur cette page, avec
+        la date de version en tête. Nous ne modifions pas rétroactivement ce que
+        le service fait de vos données&nbsp;: un changement est annoncé avant
+        d'être appliqué.
+      </p>
+
+      <footer>
+        <a href="/">Messagr</a> ·
+        <a href="/conditions-generales">Conditions générales</a> ·
+        <a href="mailto:conformite@messagr.eu">conformite@messagr.eu</a>
+      </footer>
+    </main>
+  </body>
+</html>
