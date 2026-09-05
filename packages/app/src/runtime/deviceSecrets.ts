@@ -4,6 +4,7 @@
 // the tests drive with an ordinary object.
 import * as Keychain from 'react-native-keychain'
 
+import { CURRENT_FORM } from './keystoreForm'
 import type { SecretStore } from './sessionStore'
 
 /**
@@ -14,6 +15,23 @@ import type { SecretStore } from './sessionStore'
  * stored under a fixed username because there is exactly one of each per
  * device — this is not a credential the person chose, it is one the account
  * came with.
+ *
+ * EVERY WRITE CARRIES ITS ACCESSIBILITY, and the library's default is not
+ * kept as a fallback. ADR-0008: `WhenUnlocked`, which is what a write without
+ * the option gets, makes an entry unreadable while the screen is off — and a
+ * push that wakes the application to decrypt locally (ADR-0009) arrives
+ * exactly then. `AfterFirstUnlockThisDeviceOnly` is readable once the device
+ * has been unlocked since it was powered on, and never travels into a backup.
+ *
+ * The option is iOS-only in `react-native-keychain`: Android's own keystore
+ * asks no such question, its keys being usable while the screen is off unless
+ * something requires otherwise. Passing it unconditionally is deliberate all
+ * the same — a platform test here would be a second place for the two
+ * platforms to disagree about what this application intends, and the library
+ * ignores an option that does not apply.
+ *
+ * `CURRENT_FORM` is imported rather than restated, so the value written and
+ * the value the marker records cannot drift into two different strings.
  */
 function keychainStore(service: string): SecretStore {
   return {
@@ -22,7 +40,10 @@ function keychainStore(service: string): SecretStore {
       return held === false ? null : held.password
     },
     write: async value => {
-      await Keychain.setGenericPassword('messagr', value, { service })
+      await Keychain.setGenericPassword('messagr', value, {
+        service,
+        accessible: CURRENT_FORM as Keychain.ACCESSIBLE,
+      })
     },
   }
 }
@@ -49,3 +70,16 @@ export const cryptoStoreSecrets = keychainStore('eu.messagr.crypto-store')
  * cannot corrupt the credential whose loss is the loss of the account.
  */
 export const syncCursorSecrets = keychainStore('eu.messagr.sync-cursor')
+
+/**
+ * Where the note saying the passphrase has moved to the current accessibility
+ * lives. See keystoreForm.ts: a keystore cannot be asked what form an entry
+ * is in, so the answer is kept beside it.
+ *
+ * Its own entry rather than a field inside the passphrase, because the one
+ * value this application must never corrupt is not the place to keep
+ * bookkeeping.
+ */
+export const cryptoStoreFormMarker = keychainStore(
+  'eu.messagr.crypto-store-form',
+)
