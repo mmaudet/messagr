@@ -3,6 +3,7 @@ import type { LinkSource } from './incomingLink'
 import { parseInvitationLink } from './invitationLink'
 import type { RestoreCredentials } from './sessionCredentials'
 import { loadSession, saveSession, type SecretStore } from './sessionStore'
+import { markSignUpStarted } from './signUpMarker'
 
 /**
  * How this application comes to have a session at all.
@@ -24,6 +25,12 @@ export interface EntryDeps {
   readonly secrets: SecretStore
   readonly poster: ServicePoster
   readonly link: LinkSource
+  /**
+   * Where the sign-up marker is written. Claiming an invitation is the moment
+   * a sign-up begins, and the marker is what lets a later launch finish a
+   * publication this one might not complete. See signUpMarker.ts.
+   */
+  readonly signUp: SecretStore
 }
 
 export type EntryResult =
@@ -42,7 +49,7 @@ export type EntryResult =
   | { readonly entered: false; readonly reason: string }
 
 export async function enterWithASession(deps: EntryDeps): Promise<EntryResult> {
-  const { secrets, poster, link } = deps
+  const { secrets, poster, link, signUp } = deps
 
   const held = await loadSession(secrets)
   if (held !== null) {
@@ -67,6 +74,18 @@ export async function enterWithASession(deps: EntryDeps): Promise<EntryResult> {
   if (!claim.claimed) {
     return { entered: false, reason: claim.reason }
   }
+
+  // Before the session is kept, because this is the moment the sign-up
+  // began. A marker written after a crash that happened in between would be
+  // a marker for a sign-up nobody started; one written here covers the whole
+  // of what follows.
+  //
+  // Its failure is not reported upward. An account was just created and the
+  // token is spent, so refusing to enter over it would throw away an
+  // invitation that cannot be spent again. What is lost is the ability of a
+  // later launch to finish an interrupted publication, which is a smaller
+  // loss than the account.
+  await markSignUpStarted(signUp)
 
   const kept = await saveSession(secrets, claim.session)
   if (kept) {
