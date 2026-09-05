@@ -82,6 +82,11 @@ jobs:
       - name: Build the signed app bundle
         working-directory: packages/app/android
         env:
+          # Offset well clear of anything uploaded by hand while the listing
+          # was being set up, and monotonic afterwards because a run number
+          # only goes up. Play refuses a code it has seen before, so this is
+          # the field that must never repeat.
+          MESSAGR_VERSION_CODE: ${{ 100 + github.run_number }}
           MESSAGR_UPLOAD_KEYSTORE: ${{ runner.temp }}/upload.jks
           MESSAGR_UPLOAD_KEYSTORE_PASSWORD: ${{ secrets.MESSAGR_UPLOAD_KEYSTORE_PASSWORD }}
           MESSAGR_UPLOAD_KEY_ALIAS: ${{ secrets.MESSAGR_UPLOAD_KEY_ALIAS }}
