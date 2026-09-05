@@ -11,6 +11,7 @@ import {
 } from './src/runtime/cryptoBridge'
 import {
   claimOfferedHistory,
+  evictMember,
   firstJoinedRoom,
   receiveOneEncryptedMessage,
   runPanicProbe,
@@ -37,8 +38,10 @@ import { mergeTimeline, type TimelineEntry } from './src/timeline/mergeTimeline'
 import { makePumpHttp } from './src/runtime/pump'
 import { fetchJoinedMembers } from './src/runtime/encryptedSend'
 import { theOtherMember, type VouchOutcome } from './src/runtime/vouch'
+import type { EvictOutcome } from './src/runtime/evict'
 import type { HistoryClaim } from './src/runtime/claimHistory'
 import { Conversation } from './src/ui/Conversation'
+import { Evict } from './src/ui/Evict'
 import { Vouch } from './src/ui/Vouch'
 import { t } from './src/copy'
 import { NotchedButton } from './src/ui/NotchedButton'
@@ -118,6 +121,9 @@ export function App({
     readonly accessToken: string
   } | null>(null)
   const [claimed, setClaimed] = useState<HistoryClaim | null>(null)
+  const [evicted, setEvicted] = useState<'idle' | 'working' | EvictOutcome>(
+    'idle',
+  )
   const [selfUserId, setSelfUserId] = useState('')
   const [sending, setSending] = useState<'idle' | 'sending' | 'failed'>('idle')
   // Held rather than rebuilt: it closes over the session and the room, which
@@ -494,6 +500,33 @@ export function App({
                         promoted: false,
                       })
                     })
+                  }}
+                />
+              )}
+
+              {/* The mirror gesture, offered beside the one it undoes the
+                  effect of. Same two-step shape, because removing somebody
+                  cannot be undone either -- and the sentence it owes a
+                  person is a different one. */}
+              {party !== null && (
+                <Evict
+                  memberId={party.other}
+                  state={evicted}
+                  onEvict={() => {
+                    const evicting = sessionClientRef.current
+                    if (evicting === null) return
+                    setEvicted('working')
+                    evictMember(evicting, party.scope, party.other).then(
+                      setEvicted,
+                      () => {
+                        setEvicted({
+                          evicted: false,
+                          stage: 'removing',
+                          reason: 'the gesture could not be started',
+                          rotated: false,
+                        })
+                      },
+                    )
                   }}
                 />
               )}
