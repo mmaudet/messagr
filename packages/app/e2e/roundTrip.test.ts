@@ -127,6 +127,14 @@ describeRoundTrip('encrypted round trip', () => {
     // nothing. `published` rather than `created` or `resumed` is what says
     // the destructive call was not reached: the identity was republished,
     // not minted a second time.
+    //
+    // Existence first: the identity line is written when the pump finishes,
+    // and the two lines above are set long before that. Asserting visibility
+    // straight away read a readout still saying "signing identity: —" and
+    // failed on a screen that was simply not finished yet.
+    await waitFor(element(by.text('signing identity: published')))
+      .toExist()
+      .withTimeout(60000)
     await seeText('sign-up: complete, the marker is cleared')
     await seeText('signing identity: published')
   })
