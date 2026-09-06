@@ -881,6 +881,7 @@ mod tests {
                 edge_retention_days: 30,
                 bind_addr: String::new(),
                 max_reserved_accounts_per_inviter: ceiling,
+                push_gateway_url: None,
             },
         });
         (st, fake)

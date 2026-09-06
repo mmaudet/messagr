@@ -31,6 +31,10 @@ pub struct Config {
     /// section of `handlers::create` for the exact definition of "in its
     /// charge".
     pub max_reserved_accounts_per_inviter: i64,
+    /// Where a stripped push notification is forwarded. `None` on a
+    /// deployment that carries no push gateway, which is not an error --
+    /// `handlers::wake` says what it answers then and why.
+    pub push_gateway_url: Option<String>,
 }
 
 /// Reads the ceiling, or falls back to the conservative default.
@@ -72,6 +76,13 @@ impl Config {
             max_reserved_accounts_per_inviter: reserved_accounts_ceiling(
                 std::env::var("MAX_RESERVED_ACCOUNTS_PER_INVITER").ok(),
             ),
+            // Absent rather than defaulted. A default would point this at
+            // somewhere, and the somewhere a push gateway forwards to is not
+            // a thing to guess.
+            push_gateway_url: std::env::var("PUSH_GATEWAY_URL")
+                .ok()
+                .map(|url| url.trim().to_owned())
+                .filter(|url| !url.is_empty()),
         })
     }
 }

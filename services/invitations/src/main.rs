@@ -94,6 +94,10 @@ fn ask_on_the_terminal(plan: &str) -> Option<String> {
 fn router(state: Arc<AppState>) -> Router {
     Router::new()
         .route("/health", get(health))
+        // The Matrix push gateway path, verbatim: a homeserver's pusher URL
+        // is this and nothing else. See `handlers::wake` for why this
+        // deployment has one of its own rather than pointing at sygnal.
+        .route("/_matrix/push/v1/notify", post(handlers::wake::notify))
         .route("/invitations", post(handlers::create::create))
         .route("/invitations/claim", post(handlers::claim::claim))
         .route(
@@ -194,6 +198,10 @@ mod tests {
                 // reaches the ceiling check: the conservative default is fine
                 // and commits nothing.
                 max_reserved_accounts_per_inviter: config::DEFAULT_RESERVED_ACCOUNTS_CEILING,
+                // No gateway here, and that is the honest value: this state
+                // is inert on purpose, and a URL would invite a test to
+                // depend on something reachable.
+                push_gateway_url: None,
             },
         });
         let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
