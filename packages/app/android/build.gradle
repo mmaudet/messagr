@@ -15,6 +15,11 @@ buildscript {
         classpath("com.android.tools.build:gradle")
         classpath("com.facebook.react:react-native-gradle-plugin")
         classpath("org.jetbrains.kotlin:kotlin-gradle-plugin")
+        // Reads `google-services.json` and turns it into the resources
+        // Firebase looks for at runtime. Pinned rather than floating: this
+        // one writes generated resources into the build, and a version that
+        // moved under a release build would move them with it.
+        classpath("com.google.gms:google-services:4.4.2")
     }
 }
 

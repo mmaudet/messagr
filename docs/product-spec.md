@@ -705,7 +705,9 @@ These rules take precedence over aesthetic choices and are normative for any UI 
 
 1. A participant is never implicitly human. An agent says so visually every place it appears.
 2. Encryption is restated only where it adds information (first send, verification, call), not on every conversation screen.
-3. Green is a signal, not a decoration: it is used only for verified humans.
+3. Green is a signal, not a decoration. **`brand.green500`'s own token states what it means, and that list is the whole list**: *« Humain et vérifié. Action principale, accusé de lecture, marque. »* Nothing else may be green — not a list accent, not a heading, not a divider, not a state that merely happens to be positive. Wherever green appears, a reader must be able to name which of the four it is.
+
+   *This invariant used to read “it is used only for verified humans”, which was narrower than the token file it governs and which the product had never obeyed: the brand screen's action, its bullets and the mark were already green when it was written. Narrowed rules that the product contradicts are worse than no rule, because the next person resolves the contradiction by ignoring the rule. Reconciled with `tokens.json`, which is normative (invariant 11).*
 4. No “continue anyway” button crosses a security boundary (failed SAS, refused-origin code, ungranted external action, unrecognised new device).
 5. Recognising a contact ≠ being able to write to them. Discovery, trust, verification remain three distinct notions.
 6. Degraded states are stated in natural language, never with an error code or the word “federation”.
@@ -724,11 +726,24 @@ So this screen was designed against `design/tokens.json` and the invariants
 above, and is recorded here for the designer's next export rather than being
 drawn twice.
 
-**A row is two lines.** The first names the other participant, the second
-carries the opening of the last message. Nothing else: no avatar, no
-timestamp, no unread count. Each of those is a decision this lot has not
-taken, and a row that shows one before it is taken is a row that has to be
-redesigned rather than extended.
+**A row is an avatar, two lines, and a tail.** The avatar is a circle
+carrying initials — of the given name when there is one and of the identifier
+when there is not, which is the same rule the first line follows, so the two
+can never disagree. **No photographs**, and not because they are hard: a
+profile picture is a piece of content the homeserver would hold unencrypted
+and serve to anybody who knows the identifier, which is the shape of thing
+this product spends its design avoiding.
+
+The first line names the other participant, the second carries the opening of
+the last message. The tail carries when the conversation last moved and, when
+there is something waiting, how much.
+
+**The timestamp takes four forms**, because a row has room for about five
+characters and a person is asking a different question at each distance:
+`09:38` today, `hier`, a weekday within the week, a date beyond it. The
+comparison is on **local calendar days, not elapsed hours** — "yesterday" at
+one in the morning means the day before, and a rule written in milliseconds
+gets that exactly backwards.
 
 **The first line distinguishes a name from an identifier typographically, not
 with a badge.** A given name is set in `titleMd`; an identifier is set in
@@ -751,10 +766,36 @@ it does, the row must still be distinguishable rather than blank. This was
 found on a device, not in review: a bench room of three rendered a row whose
 first line was empty.
 
-**No padlock and no green** (invariants 2 and 3). Every conversation here is
-encrypted, so saying so on each row says nothing and trains a person to ignore
-the badge where it would matter; green is the signal reserved for a verified
-human and spending it as a list accent would answer a question nobody asked.
+**No padlock** (invariant 2). Every conversation here is encrypted, so saying
+so on each row says nothing and trains a person to ignore the badge where it
+would matter.
+
+**Green is spent once, on the unread badge** (invariant 3). Not as a list
+accent — the rows, the separators and the timestamps are neutral. Green is the
+signal reserved for a verified human, and what the badge marks is a human
+having spoken to you: the same claim, made about an event rather than about a
+person.
+
+**The unread count is a local mark, and that is the design rather than a
+shortcut.** Matrix computes an unread count of its own, from the read receipts
+a client publishes. This product will not lean on it: receipts are public
+metadata, they are off by default (§13.18), and a badge that only worked for
+people who had agreed to be observed would be a privacy setting that quietly
+costs a feature. So the mark is kept on the device, in the application's own
+encrypted notebook (ADR-0010, second table), and it means what a person means
+by it: *the newest thing that was on screen the last time you looked at this
+conversation, here.*
+
+Reading a conversation writes **two** marks, and they are not redundant. The
+local one is what the list draws. A **private read receipt** (`m.read.private`)
+is sent always — it says to the homeserver and to nobody else that the message
+has been read, which is what stops the server pushing a notification for
+something already read. The **public receipt** (`m.read`) is the courtesy, and
+goes only when the setting says so.
+
+The count is bounded by the window the list fetches. A conversation left alone
+for a hundred messages reports the window's size, and that is honest about a
+list built from a window; extrapolating past it would not be.
 
 **Naming is offered from inside the conversation, not from a row.** The list
 is where a name is read; the conversation is where you know whose it is. The
@@ -762,6 +803,149 @@ hint sits above the field rather than below it, because somebody typing a real
 name into a pseudonymous messenger is entitled to know where it goes before
 they type it: *« Ce nom reste sur cet appareil. Ni le serveur ni votre
 correspondant ne le voient. »* (ADR-0010.)
+
+
+### 13.22 Photographs (designed here)
+
+**Two encryptions, not one.** The bytes are sealed with a key of their own and
+uploaded to the media repository; that key travels inside the conversation's
+own encryption, in the event pointing at the upload. The homeserver ends up
+holding two things it cannot join — a file it has no key for, and a key it
+cannot decrypt. This is Matrix's design and not an invention here, and it is
+what lets the media repository be a store that never learns who may read what.
+
+**The upload declares `application/octet-stream`, and the photograph's type is
+not sent.** What goes to the repository is ciphertext. Declaring `image/jpeg`
+would be a claim about bytes nobody there can read, and it would tell the
+server what kind of thing was sent — which is precisely the metadata the
+encryption is for. The real type travels inside the event.
+
+**The event is an ordinary encrypted `m.image`**, with the address and the key
+material in one `file` object, which is the shape the specification already
+has. This costs reading a value the crypto bridge documents as opaque, and the
+reason is recorded where it is done: not reading it would produce an event only
+this application could open, in a protocol whose point is that it is not only
+this application.
+
+**Nothing touches a disk, in either direction.** The picker hands over bytes
+rather than a path — a path is a promise about a file in a cache the system may
+clear. Coming back, the plaintext reaches the view as a `data:` URI, because
+the obvious alternative is a path to a decrypted file and ADR-0006 forbids
+exactly that. The cost is stated where it is paid: a data URI is the image
+base64'd, so it lives as a string for as long as the view holds it, and that
+bounds how large a photograph can be shown. The same bound applies to sending,
+because the encryptor holds the plaintext and the ciphertext at once.
+
+**`body` is not the filename.** A name off somebody's camera roll carries a
+date, sometimes a place, occasionally a person's name — and while it does not
+reach the server, it reaches everybody in the conversation, who did not choose
+to receive it by being sent a photograph. `body` is the fallback a client shows
+when it cannot draw the picture, and `image.jpg` does that job.
+
+**Each photograph fetches itself when it is drawn**, not when the conversation
+is derived, and it fails on its own: a picture that will not download is a
+sentence in that message and not a conversation that failed. While it loads,
+the frame is drawn at the picture's own proportions rather than as a spinner,
+so the timeline does not reflow as photographs arrive.
+
+
+### 13.23 The first launch: a language, then an acceptance (designed here)
+
+Two gates, in that order, before anything else happens.
+
+**The language is chosen by dragging a thumb across flags.** Not a dropdown: a
+horizontally snapping strip, and whichever language is centred is the one the
+screen is speaking **while the drag is happening**. Trying a language costs a
+thumb movement rather than a decision, and somebody who cannot read the screen
+does not have to guess which menu holds the languages — the flags are visible
+at rest and the screen answers as they pass.
+
+**A flag and the language’s own name for itself**, never the flag alone. A flag
+names a country and not a language; the endonym settles that without giving up
+the recognisability that made the flag worth having, which matters when the
+strip has to be readable by somebody who cannot read the screen behind it.
+
+**Six languages: FR, EN, DE, ES, IT, NL**, each a complete catalogue. Complete
+is enforced by the compiler — a catalogue is `Record<CopyKey, string>`, which
+has no optional keys — and **there is no fallback to French**, because a
+fallback is how a half-translated language ships and nobody notices: the screen
+reads fine to whoever wrote it. Tests assert that every catalogue carries
+exactly French’s keys, has no empty string, and keeps every placeholder French
+has.
+
+**What an unset choice falls back to is the device’s own language**, when this
+application speaks it, and French otherwise. Not French unconditionally: a
+phone set to Dutch meeting a French screen for no reason its owner could act on
+is the failure this prevents.
+
+**Nothing starts until the terms are accepted.** A checkbox, unticked at first
+launch, with the conditions one tap away at the published address — so the
+acceptance is of a text somebody can read rather than of a sentence about a
+text. *« En continuant vous acceptez… »* is an acceptance nobody made; a tick
+is something a person did.
+
+**The action is not greyed out.** It is pressable, does nothing, and says what
+is missing. A disabled button gives no reason, and somebody who missed the box
+has no way to learn what is wrong with the screen — which is invariant 6’s rule
+about errors, applied to a gate.
+
+
+### 13.21 The bottom bar, the header and the floating action (designed here)
+
+**Four tabs: Discussions, Communautés, Appels, Réglages.** Icon above label.
+The active one carries a pale green pill behind its icon (`brand.green100`)
+and a green label (`brand.green700`); the others are neutral. The glyph is 20
+and the target is 44 — the size of the glyph is never the size of the button.
+
+**Two of the four are reserved before the thing they hold exists, and each
+says so on its own screen.** *« L'onglet est réservé dès la V1 pour ne pas
+déplacer la barre plus tard. »* Appels names what is coming and when — vocaux
+en V2, appels individuels puis de groupe en V3.
+
+**This is not the same rule as §13.18's "sections not built are absent rather
+than present and inert", and the two must not be confused.** A settings switch
+that toggles nothing is a lie about a capability somebody might rely on. A
+reserved tab carrying a screen that explains it is reserved is a promise with
+a date on it, and it buys something real: a navigation bar that does not move
+under people's thumbs the day calls arrive. The difference is whether the
+empty thing pretends.
+
+**The bar is hidden while a conversation is open.** A conversation is a place
+you leave, not a fifth tab.
+
+**Badges.** Discussions carries a count of **conversations with something
+waiting**, not of messages — a tab saying `47` for one chatty conversation
+would send somebody looking for forty-seven places to go.
+
+**Communautés carries nothing.** The mockup draws a dot there and this section
+used to describe one; the component carried a prop, a style and a test
+identifier for it, and nothing anywhere set them, so it could not render on
+any screen. Communities do not exist yet, so nothing can be waiting under that
+tab. A badge behind a flag nobody raises is the "number invented to fill a
+shape" this same paragraph refuses two sentences earlier. It comes back with
+communities.
+
+**The header is a dark band, and it is a security boundary rather than a title
+bar.** `brand.ink900` is *« fond des frontières de sécurité »* in the token's
+own words. It carries the mark and the wordmark, and on the right, in the mono
+role, the one fact about this instance nobody would guess: *« aucun annuaire
+»*. No screen title — the screen below already says which screen it is. The
+mockup suffixes the state with a phase marker; that marker is a reference to
+this specification for whoever reads the mockup, and does not belong on the
+screen of somebody reading their own messages.
+
+**A green circular + floats above the bar, and it is the only way to invite
+somebody.** The inline button under the list is gone. With four tabs, a
+control living inside one tab's content scrolls away with it, and inviting is
+the one thing a person opens this application to do that is not reading. Two
+entrances to the same gesture would also be two things to keep in step, and
+the second would be the one nobody updated. It is green because `green500` is
+*« action principale »* in the token's own words: if the floating action is
+not the principal action, nothing is. Its sign is ink, not paper — white on
+`green500` is about two to one, which fails AA.
+
+**The list or the invitation, never both** — the same rule the list and the
+conversation already follow, for the same reason.
 
 
 ## 14. Canonical glossary

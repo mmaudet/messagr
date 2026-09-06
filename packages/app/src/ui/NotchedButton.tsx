@@ -38,6 +38,15 @@ import { notchedRectPath, notchLegFor } from './notchGeometry'
  */
 export interface NotchedButtonProps {
   readonly label: string
+  /**
+   * Whether the button takes the width it is given.
+   *
+   * Inline by default, which is right for an action sitting beside text. The
+   * brand screen's own action is full width in the prototype, and a notch cut
+   * into a button that only wraps its label is a much smaller gesture than
+   * the one that mockup draws.
+   */
+  readonly wide?: boolean
   readonly onPress?: () => void
   /** Reported through `onGeometry` so a device test can assert the shape. */
   readonly testID?: string
@@ -51,6 +60,7 @@ export interface NotchedButtonProps {
 
 export function NotchedButton({
   label,
+  wide = false,
   onPress,
   testID,
   onGeometry,
@@ -72,7 +82,7 @@ export function NotchedButton({
       testID={testID}
       onPress={onPress}
       onLayout={measure}
-      style={styles.button}
+      style={[styles.button, wide && styles.wide]}
       accessibilityRole="button"
       accessibilityLabel={label}>
       {/* Behind the label rather than around it: the shape is painted, and a
@@ -117,6 +127,7 @@ const styles = StyleSheet.create({
     paddingVertical: space.m,
     alignSelf: 'flex-start',
   },
+  wide: { alignSelf: 'stretch' },
   // The prototype's fourteen primary buttons are all at 16, which is its own
   // role now rather than the nearest body size.
   label: typeScale.action,

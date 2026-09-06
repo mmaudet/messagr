@@ -92,6 +92,15 @@ export const cryptoStoreFormMarker = keychainStore(
 export const promiseSecrets = keychainStore('eu.messagr.promise')
 
 /**
+ * The language this device speaks. Not a secret, and kept here for the
+ * reason `promiseSeen.ts` gives about its own flag: this is the only durable
+ * per-device store that exists before the notebook opens, and the language
+ * has to be known before anything else is -- it is what the first screen is
+ * written in.
+ */
+export const languageSecrets = keychainStore('eu.messagr.language')
+
+/**
  * Where the given-names notebook's passphrase lives. See ADR-0010: its own
  * entry rather than the crypto store's, because one secret for two stores
  * means compromising either gives both.
@@ -103,3 +112,12 @@ export const givenNamesSecrets = keychainStore('eu.messagr.given-names')
  * and off unless somebody turned it on.
  */
 export const receiptSecrets = keychainStore('eu.messagr.read-receipts')
+
+/** Whether this device asks to be woken when a message arrives. */
+export const wakeSecrets = keychainStore('eu.messagr.wake')
+
+/**
+ * Which published conditions were accepted, by the date they carry. A version
+ * rather than a flag, so a revision can re-ask -- see `termsAccepted.ts`.
+ */
+export const termsSecrets = keychainStore('eu.messagr.terms')

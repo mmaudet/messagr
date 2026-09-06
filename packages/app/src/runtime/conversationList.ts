@@ -3,6 +3,7 @@ import { fetchRoomMessages, toTimelineEntries } from '../timeline/buildTimeline'
 import { fetchJoinedMembers, fetchJoinedRooms } from './encryptedSend'
 import { getErrorMessage } from './errors'
 import type { HttpRequester } from './pump'
+import { countUnread } from './unread'
 import { theOtherMember } from './vouch'
 
 /**
@@ -55,6 +56,16 @@ export interface ConversationSummary {
    * where it belongs — and it is a real answer rather than a missing one.
    */
   readonly lastAt: number
+  /**
+   * How much arrived since this device last looked at the conversation.
+   *
+   * Bounded by `LOOK_BACK`, and that bound is real rather than incidental:
+   * this counts what it fetched, so a conversation left alone for a hundred
+   * messages reports twelve. A row saying "at least twelve" is honest about a
+   * list that is built from a window; a row extrapolating past its window
+   * would not be. See `unread.ts` for where the mark comes from.
+   */
+  readonly unread: number
 }
 
 export interface ConversationListDeps {
@@ -76,6 +87,8 @@ const LOOK_BACK = 12
 export async function fetchConversationSummaries(
   deps: ConversationListDeps,
   selfUserId: string,
+  /** How far each conversation has been read here. Empty means none of them. */
+  lastRead: ReadonlyMap<string, number>,
 ): Promise<ConversationSummary[]> {
   const scopes = await fetchJoinedRooms(deps.http)
 
@@ -84,7 +97,9 @@ export async function fetchConversationSummaries(
   // list that failed. The whole point of a list is that it survives one of
   // its rows going wrong.
   const summaries = await Promise.all(
-    scopes.map(scope => summarise(deps, scope, selfUserId)),
+    scopes.map(scope =>
+      summarise(deps, scope, selfUserId, lastRead.get(scope) ?? 0),
+    ),
   )
 
   // Most recently active first. Ties broken by the identifier so that two
@@ -99,6 +114,7 @@ async function summarise(
   deps: ConversationListDeps,
   scope: string,
   selfUserId: string,
+  lastReadAt: number,
 ): Promise<ConversationSummary> {
   let other: string | null = null
   try {
@@ -142,6 +158,7 @@ async function summarise(
           }
         : {}),
       lastAt: newest[0]?.sentAt ?? 0,
+      unread: countUnread(entries, lastReadAt, selfUserId),
     }
   } catch (cause: unknown) {
     return {
@@ -150,6 +167,10 @@ async function summarise(
       preview: null,
       reason: getErrorMessage(cause),
       lastAt: 0,
+      // A conversation whose history could not be read has nothing this
+      // device can count. `0` rather than a guess: a badge invented from a
+      // failure is a number nobody can act on.
+      unread: 0,
     }
   }
 }

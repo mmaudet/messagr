@@ -17,9 +17,12 @@ import {
   stroke,
   type as typeScale,
 } from '../design/tokens'
+import type { ShownImage } from '../runtime/receiveImage'
+import type { ReadImage } from '../timeline/imageEvent'
 import type { TimelineEntry } from '../timeline/mergeTimeline'
 import type { ReactionTally } from '../timeline/reactions'
 import { NotchedButton } from './NotchedButton'
+import { Photograph } from './Photograph'
 
 /**
  * The 1:1 conversation, reduced to its bones.
@@ -62,6 +65,14 @@ export interface ConversationProps {
    * event, which is why it travels rather than being looked up again.
    */
   readonly onReact?: (target: string, key: string, own: string | null) => void
+  /**
+   * Choosing a photograph and sending it. Absent on a build with no picker,
+   * and the control is absent with it — a button that opens nothing is the
+   * inert control §13.18 refuses.
+   */
+  readonly onAttach?: () => void
+  /** Downloads and decrypts a photograph. Absent means none are drawn. */
+  readonly onLoadImage?: (image: ReadImage) => Promise<ShownImage>
 }
 
 export function Conversation({
@@ -72,6 +83,8 @@ export function Conversation({
   reactions = new Map(),
   read = new Set(),
   onReact,
+  onAttach,
+  onLoadImage,
 }: ConversationProps) {
   const [draft, setDraft] = useState('')
   const dark = useColorScheme() === 'dark'
@@ -102,6 +115,7 @@ export function Conversation({
             tallies={reactions.get(entry.eventId) ?? []}
             read={read.has(entry.eventId)}
             onReact={(key, own) => onReact?.(entry.eventId, key, own)}
+            onLoadImage={onLoadImage}
           />
         ))
       )}
@@ -123,6 +137,22 @@ export function Conversation({
             },
           ]}
         />
+        {onAttach !== undefined && (
+          // Beside the field rather than in a menu behind it. Sending a
+          // photograph is one of the two things a person does in a
+          // conversation, and the other one has a button.
+          <Pressable
+            testID="conversation-attach"
+            onPress={onAttach}
+            accessibilityRole="button"
+            accessibilityLabel={t('conversation_attach')}
+            style={styles.attach}>
+            <Text
+              style={[styles.attachSign, { color: palette.brand.green700 }]}>
+              +
+            </Text>
+          </Pressable>
+        )}
         <NotchedButton
           label={t('conversation_send')}
           testID="conversation-send"
@@ -160,6 +190,7 @@ function Message({
   tallies,
   onReact,
   read,
+  onLoadImage,
 }: {
   entry: TimelineEntry
   mine: boolean
@@ -169,6 +200,7 @@ function Message({
   read: boolean
   /** `mine` is the id of this account's own reaction, when it has one. */
   onReact: (key: string, mine: string | null) => void
+  readonly onLoadImage?: (image: ReadImage) => Promise<ShownImage>
 }) {
   const [offering, setOffering] = useState(false)
 
@@ -200,19 +232,31 @@ function Message({
               : palette.surface.sunk,
           },
         ]}>
-        <Text
-          testID={`body-${entry.eventId}`}
-          style={[
-            styles.body,
-            {
-              color:
-                entry.body === null
-                  ? palette.neutral['600']
-                  : palette.neutral['900'],
-            },
-          ]}>
-          {entry.body ?? t('conversation_unreadable')}
-        </Text>
+        {entry.image !== undefined && onLoadImage !== undefined ? (
+          // The photograph instead of the text, not beside it. An `m.image`
+          // carries a fallback name in `body` for clients that cannot draw
+          // the picture; this one can, and drawing both would put
+          // "image.jpg" under every photograph.
+          <Photograph
+            image={entry.image}
+            fetch={onLoadImage}
+            testID={`image-${entry.eventId}`}
+          />
+        ) : (
+          <Text
+            testID={`body-${entry.eventId}`}
+            style={[
+              styles.body,
+              {
+                color:
+                  entry.body === null
+                    ? palette.neutral['600']
+                    : palette.neutral['900'],
+              },
+            ]}>
+            {entry.body ?? t('conversation_unreadable')}
+          </Text>
+        )}
       </Pressable>
 
       {offering && (
@@ -303,6 +347,24 @@ const styles = StyleSheet.create({
     borderRadius: radius.pill,
   },
   chipKey: typeScale.bodySm,
+  actions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: space.s,
+  },
+  attach: {
+    minWidth: floors.touchTargetMin,
+    minHeight: floors.touchTargetMin,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  attachSign: {
+    ...typeScale.titleLg,
+    // The same correction the floating action needs, and the same reason not
+    // to make it by rewriting the ramp: see `FloatingAction.tsx`.
+    includeFontPadding: false,
+    textAlign: 'center',
+  },
   state: { ...typeScale.caption, marginTop: space.xs },
   bubble: {
     paddingHorizontal: space.m,

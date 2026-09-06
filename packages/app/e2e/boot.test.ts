@@ -2,6 +2,7 @@ import { by, device, element, expect as detoxExpect, waitFor } from 'detox'
 
 import { IGNORING_THE_LIVE_POLL } from './longPoll'
 import { acceptThePromise } from './promise'
+import { NOTIFICATIONS_GRANTED } from './permissions'
 import { SCROLL, seeId, seeText } from './readout'
 
 describe('boot', () => {
@@ -17,6 +18,9 @@ describe('boot', () => {
     // reason rather than for anything they are about.
     await device.launchApp({
       newInstance: true,
+      // See permissions.ts: a system dialog over the application would fail
+      // every assertion after it, for a reason none of them is about.
+      permissions: NOTIFICATIONS_GRANTED,
       url: process.env.MESSAGR_INVITATION_LINK,
       delete: true,
       // The live sync loop starts inside this launch and holds a poll open.

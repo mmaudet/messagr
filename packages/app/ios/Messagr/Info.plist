@@ -31,7 +31,7 @@
 	     nobody has answered.
 
 	     Without this, `messagr://` resolves to nothing on iOS and the
-	     application cannot be entered at all -- measured as
+	     application cannot be entered at all, measured as
 	     LSApplicationWorkspaceErrorDomain error 115 from `simctl openurl`. -->
 	<array>
 		<dict>
@@ -54,8 +54,8 @@
 		<key>NSAllowsLocalNetworking</key>
 		<true/>
 	</dict>
-	<key>NSLocationWhenInUseUsageDescription</key>
-	<string></string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>Pour choisir une image à envoyer dans une conversation. L’image est chiffrée sur cet appareil avant d’être envoyée : ni le serveur ni Messagr ne peuvent la lire.</string>
 	<key>RCTNewArchEnabled</key>
 	<true/>
 	<key>UILaunchStoryboardName</key>

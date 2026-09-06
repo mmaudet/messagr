@@ -5,6 +5,7 @@ import { by, device, element, waitFor } from 'detox'
 
 import { IGNORING_THE_LIVE_POLL } from './longPoll'
 import { acceptThePromise } from './promise'
+import { NOTIFICATIONS_GRANTED } from './permissions'
 import { seeText } from './readout'
 
 /**
@@ -96,6 +97,9 @@ describeRoundTrip('encrypted round trip', () => {
     // sends its own message.
     await device.launchApp({
       newInstance: true,
+      // See permissions.ts: a system dialog over the application would fail
+      // every assertion after it, for a reason none of them is about.
+      permissions: NOTIFICATIONS_GRANTED,
       delete: true,
       url: INVITATION,
       launchArgs: IGNORING_THE_LIVE_POLL,
@@ -125,6 +129,9 @@ describeRoundTrip('encrypted round trip', () => {
     // the account.
     await device.launchApp({
       newInstance: true,
+      // See permissions.ts: a system dialog over the application would fail
+      // every assertion after it, for a reason none of them is about.
+      permissions: NOTIFICATIONS_GRANTED,
       launchArgs: IGNORING_THE_LIVE_POLL,
     })
     await seeText('entry: session restored')
@@ -170,6 +177,7 @@ describeRoundTrip('encrypted round trip', () => {
     for (let attempt = 0; attempt < 4 && !seen; attempt += 1) {
       await device.launchApp({
         newInstance: true,
+        permissions: NOTIFICATIONS_GRANTED,
         launchArgs: IGNORING_THE_LIVE_POLL,
       })
       try {

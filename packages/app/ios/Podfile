@@ -14,8 +14,41 @@ if linkage != nil
   use_frameworks! :linkage => linkage.to_sym
 end
 
+# FIREBASE THROUGH COCOAPODS, NOT THROUGH SWIFT PACKAGE MANAGER.
+#
+# react-native-firebase resolves firebase-ios-sdk via SPM by default, and
+# firebase-ios-sdk's Swift Package products are automatic libraries rather than
+# dynamic ones -- so each react-native-firebase pod embeds its own copy, and
+# under static linkage those copies collide as duplicate symbols. CocoaPods
+# links statically by default, which is what this project does, so the check
+# fires whether or not `USE_FRAMEWORKS` is set.
+#
+# The alternative the error offers is dynamic linkage. That is a larger change
+# than it looks: the crypto bridge ships an xcframework and the whole project
+# is built and tested statically. Opting out of SPM keeps one dependency on the
+# path every other pod here already takes.
+#
+# WITH A DATE ON IT. `pod install` warns that Firebase stops publishing new
+# CocoaPods versions after October 2026, in favour of exactly the Swift Package
+# Manager route this line refuses. So this is a decision that expires: before
+# then, either this project moves to dynamic linkage or it pins the last
+# CocoaPods release. Written here rather than discovered when a version stops
+# resolving.
+$RNFirebaseDisableSPM = true
+
 target 'Messagr' do
   config = use_native_modules!
+
+  # MODULE MAPS FOR TWO PODS, AND NOT GLOBALLY.
+  #
+  # `FirebaseCoreInternal` is Swift and depends on `GoogleUtilities`, which is
+  # Objective-C and defines no modules -- so as a static library it cannot be
+  # imported from Swift. CocoaPods offers `use_modular_headers!` globally,
+  # which changes how *every* pod in the project is built, including the
+  # crypto bridge and React Native itself. Naming the two that need it keeps
+  # the blast radius to the two that need it.
+  pod 'GoogleUtilities', :modular_headers => true
+  pod 'FirebaseCoreInternal', :modular_headers => true
 
   use_react_native!(
     :path => config[:reactNativePath],

@@ -30,9 +30,19 @@ import { NotchedButton } from './NotchedButton'
  * It does not say the person has arrived. Handing over a link is where the
  * inviter's part ends; the rest happens without them, and telling them
  * otherwise would be inventing a confirmation nothing waits for.
+ *
+ * # `shut` is a state and not the absence of one
+ *
+ * Inviting is reached from the floating action now, not from a button under
+ * the list (`FloatingAction.tsx` says why). So the resting form is something
+ * a gesture opens rather than something the screen always carries, and the
+ * closed case is written into the stage rather than into a boolean beside it
+ * -- two ways of saying the same thing is how they come to disagree.
  */
 
 export type InviteStage =
+  /** Nothing on screen. What a launch starts in, and what closing returns to. */
+  | { readonly stage: 'shut' }
   | { readonly stage: 'resting' }
   | { readonly stage: 'working' }
   | { readonly stage: 'ready'; readonly link: string }
@@ -50,14 +60,14 @@ export interface InviteProps {
 export function Invite({ stage, onInvite, onClose, admission }: InviteProps) {
   const [draft, setDraft] = useState('')
 
+  if (stage.stage === 'shut') return null
+
   if (stage.stage === 'resting') {
     return (
-      <View style={styles.resting}>
-        <NotchedButton
-          label={t('invite_action')}
-          testID="invite"
-          onPress={() => onInvite(normaliseGivenName(draft))}
-        />
+      <View style={styles.resting} testID="invite-panel">
+        {/* The question before the field, and the action after both. The
+            first shape had the button above the question it answers, which
+            reads as a control with a stray form under it. */}
         <Text style={styles.who}>{t('invite_who')}</Text>
         <TextInput
           testID="invite-name"
@@ -68,6 +78,17 @@ export function Invite({ stage, onInvite, onClose, admission }: InviteProps) {
           style={styles.field}
         />
         <Text style={styles.hint}>{t('list_name_hint')}</Text>
+        <NotchedButton
+          label={t('invite_action')}
+          testID="invite"
+          onPress={() => onInvite(normaliseGivenName(draft))}
+        />
+        <Pressable
+          onPress={onClose}
+          style={styles.action}
+          testID="invite-cancel">
+          <Text style={styles.actionLabel}>{t('invite_close')}</Text>
+        </Pressable>
       </View>
     )
   }
