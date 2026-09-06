@@ -1886,6 +1886,28 @@ PODS:
     - ReactNativeDependencies
     - RNFBApp
     - Yoga
+  - RNGestureHandler (3.2.1):
+    - hermes-engine
+    - RCTRequired
+    - RCTTypeSafety
+    - React-bridging
+    - React-Core
+    - React-Core-prebuilt
+    - React-debug
+    - React-Fabric
+    - React-featureflags
+    - React-graphics
+    - React-ImageManager
+    - React-jsi
+    - React-NativeModulesApple
+    - React-RCTFabric
+    - React-renderercss
+    - React-rendererdebug
+    - React-utils
+    - ReactCodegen
+    - ReactCommon/turbomodule/core
+    - ReactNativeDependencies
+    - Yoga
   - RNKeychain (10.0.0):
     - hermes-engine
     - RCTRequired
@@ -2059,6 +2081,7 @@ DEPENDENCIES:
   - ReactNativeDependencies (from `../../../node_modules/react-native/third-party-podspecs/ReactNativeDependencies.podspec`)
   - "RNFBApp (from `../../../node_modules/@react-native-firebase/app`)"
   - "RNFBMessaging (from `../../../node_modules/@react-native-firebase/messaging`)"
+  - RNGestureHandler (from `../../../node_modules/react-native-gesture-handler`)
   - RNKeychain (from `../../../node_modules/react-native-keychain`)
   - "RNNotifee (from `../../../node_modules/@notifee/react-native`)"
   - RNSVG (from `../../../node_modules/react-native-svg`)
@@ -2261,6 +2284,8 @@ EXTERNAL SOURCES:
     :path: "../../../node_modules/@react-native-firebase/app"
   RNFBMessaging:
     :path: "../../../node_modules/@react-native-firebase/messaging"
+  RNGestureHandler:
+    :path: "../../../node_modules/react-native-gesture-handler"
   RNKeychain:
     :path: "../../../node_modules/react-native-keychain"
   RNNotifee:
@@ -2373,6 +2398,7 @@ SPEC CHECKSUMS:
   ReactNativeDependencies: 94c922c39e0e6150ee9ad05e2ca1946e0ef55783
   RNFBApp: 909622e738d3a923b670950f9cdc9aeac9b1e6cc
   RNFBMessaging: 5e7cd9fc16c49b0492121c1fa90c9b3aa35aaec6
+  RNGestureHandler: 63727d42f0b6ea951168615f8af3160ad7b57a57
   RNKeychain: 551d42b0ef53426f82551a0cc961cfa10ad33afa
   RNNotifee: 5e3b271e8ea7456a36eec994085543c9adca9168
   RNSVG: 6c9bcbf53822153be6f6c1484f6b0b57c0040d21
