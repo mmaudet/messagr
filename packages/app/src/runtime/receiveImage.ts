@@ -1,5 +1,6 @@
 import type { ReadImage } from '../timeline/imageEvent'
 import { getErrorMessage } from './errors'
+import { logEvent } from './log'
 
 /**
  * Getting a photograph back: download, decrypt, and hand a screen something
@@ -78,6 +79,64 @@ export function forgetShownImages(): void {
   SEEN.clear()
 }
 
+/**
+ * How many photographs are fetched at once.
+ *
+ * MEASURED, NOT CHOSEN. A conversation mounts every `Photograph` at once and
+ * each fetched on mount, so ten photographs meant ten simultaneous downloads
+ * -- and on a device the cost showed up as a queue rather than as bandwidth:
+ * the first image's download took 836ms and the tenth's 4341ms, for the same
+ * network and a smaller file. The 47kB thumbnail took 871ms behind others and
+ * 191ms when it went first.
+ *
+ * Nothing about that made the *total* faster or slower. What it changed was
+ * when anything appeared: with ten in flight, all ten arrive at the end. With
+ * three, the first three arrive in about a second and the screen stops being
+ * empty.
+ */
+const AT_ONCE = 3
+
+/**
+ * Waiting to be fetched, newest first.
+ *
+ * LAST IN, FIRST OUT, AND THAT IS THE WHOLE POINT. Children mount top to
+ * bottom, so a queue served in order would fetch the oldest messages first --
+ * and a conversation rests at its *newest* (§13.27), which is the part
+ * somebody is looking at. Serving the last request first serves the bottom of
+ * the screen first.
+ *
+ * It is a heuristic, not a viewport calculation: nothing here knows what is
+ * on screen. It is right for the case that matters -- opening a conversation
+ * -- and no worse than order for any other.
+ */
+const WAITING: (() => void)[] = []
+let running = 0
+
+function takeATurn(): Promise<void> {
+  if (running < AT_ONCE) {
+    running += 1
+    return Promise.resolve()
+  }
+  return new Promise<void>(resolve => {
+    WAITING.push(() => {
+      running += 1
+      resolve()
+    })
+  })
+}
+
+function giveItBack(): void {
+  running -= 1
+  const next = WAITING.pop()
+  if (next !== undefined) next()
+}
+
+/** Empties the queue. For tests, and for a conversation being left. */
+export function forgetWhatIsWaiting(): void {
+  WAITING.length = 0
+  running = 0
+}
+
 export async function fetchImage(
   source: ImageSource,
   image: ReadImage,
@@ -106,13 +165,46 @@ async function open(
   source: ImageSource,
   image: ReadImage,
 ): Promise<ShownImage> {
+  // The turn is taken around the whole thing rather than around the download
+  // alone: the decryption and the encoding contend too -- the same run showed
+  // decryption growing from 38ms to 993ms behind others -- and letting ten
+  // decryptions start because ten downloads finished would move the queue
+  // rather than remove it.
+  await takeATurn()
   try {
+    // TIMED, IN THREE PARTS, BECAUSE THEY ARE THREE DIFFERENT PROBLEMS.
+    //
+    // A cold launch shows nothing decrypted from disk (ADR-0006), so every
+    // photograph on screen is fetched, decrypted and encoded again -- and
+    // "it is slow" is not actionable until it says *which*. The network is
+    // one answer, the bridge is another, and `base64Of` running on the
+    // JavaScript thread is a third, which would also freeze the scroll while
+    // it ran.
+    //
+    // Kept rather than removed after measuring: it costs three `Date.now()`
+    // and one log line per photograph, and it is the only thing that will
+    // say whether a change made this faster on a device rather than on a
+    // laptop.
+    const began = Date.now()
     const ciphertext = await source.download(image.url)
+    const downloaded = Date.now()
     const plaintext = await source.open(ciphertext, image.secret)
+    const decrypted = Date.now()
     const type = image.mimeType ?? ASSUMED_TYPE
-    return { shown: true, uri: `data:${type};base64,${base64Of(plaintext)}` }
+    const uri = `data:${type};base64,${base64Of(plaintext)}`
+    const encoded = Date.now()
+    logEvent('info', 'MESSAGR_IMAGE_TIMING', {
+      bytes: plaintext.length,
+      downloadMs: downloaded - began,
+      decryptMs: decrypted - downloaded,
+      encodeMs: encoded - decrypted,
+      totalMs: encoded - began,
+    })
+    return { shown: true, uri }
   } catch (cause: unknown) {
     return { shown: false, reason: getErrorMessage(cause) }
+  } finally {
+    giveItBack()
   }
 }
 
