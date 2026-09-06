@@ -18,7 +18,19 @@
     line-height:1.6; -webkit-font-smoothing:antialiased;
   }
   main{max-width:640px; margin:0 auto; padding:56px 24px 80px}
-  .mark{display:block; margin-bottom:40px; width:max-content}
+  .bar{display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between;
+       gap:18px; margin-bottom:40px}
+  .mark{display:block; width:max-content}
+  .menu{display:flex; flex-wrap:wrap; align-items:center; gap:18px; font-size:14.5px}
+  .menu a{color:inherit; opacity:.72; text-decoration:none; border-bottom:1px solid transparent;
+          padding:6px 0}
+  .menu a:hover{opacity:1; border-bottom-color:currentColor}
+  /* Assez haut pour un pouce : 44 est le plancher que l'application tient
+     aussi, et une page qu'on lit sur un téléphone n'en mérite pas moins. */
+  .langue{font:inherit; font-size:14.5px; color:inherit; background:transparent;
+          border:1px solid currentColor; border-radius:8px; padding:9px 10px;
+          min-height:44px; opacity:.72}
+  .langue:hover{opacity:1}
   .mark:focus-visible{outline:3px solid var(--mark); outline-offset:4px}
   .logotype{display:block; width:min(260px,62vw); height:auto}
   .logotype.dark{display:none}
@@ -84,10 +96,34 @@
 <body>
 <main>
 
-  <a class="mark" href="/" aria-label="Messagr">
-    <img class="logotype light" src="/messagr-logotype-vert.svg" alt="Messagr" width="260" height="60">
-    <img class="logotype dark" src="/messagr-logotype-vert-inverse.svg" alt="Messagr" width="260" height="60">
-  </a>
+  <div class="bar">
+    <a class="mark" href="/" aria-label="Messagr">
+      <img class="logotype light" src="/messagr-logotype-vert.svg" alt="Messagr" width="260" height="60">
+      <img class="logotype dark" src="/messagr-logotype-vert-inverse.svg" alt="Messagr" width="260" height="60">
+    </a>
+    <!-- LES LIBELLÉS SE TRADUISENT, LES PAGES NON. Un texte juridique traduit
+         est un second texte, pas le même : celui qui engage est celui qui est
+         écrit. Nommer la porte dans la langue du lecteur reste utile — il sait
+         ce qu'il y a derrière avant de l'ouvrir. -->
+    <nav class="menu">
+      <a href="/conditions-generales/" data-t="menu-cgu">Conditions générales</a>
+      <a href="/confidentialite/" data-t="menu-confidentialite">Confidentialité</a>
+      <!-- LE SÉLECTEUR EST UN `select`, ET C'EST DÉLIBÉRÉ. Le navigateur en
+           dessine un que chaque système connaît déjà, accessible au clavier
+           et au lecteur d'écran sans qu'on l'écrive, et qui ne coûte aucun
+           script pour s'ouvrir. Une rangée de drapeaux serait plus jolie et
+           moins utilisable, sur une page dont le seul travail est d'être
+           comprise. -->
+      <select class="langue" id="langue" aria-label="Langue">
+        <option value="fr">Français</option>
+        <option value="en">English</option>
+        <option value="de">Deutsch</option>
+        <option value="es">Español</option>
+        <option value="it">Italiano</option>
+        <option value="nl">Nederlands</option>
+      </select>
+    </nav>
+  </div>
 
   <h1 data-t="titre">La messagerie qui ne vous demande rien.</h1>
   <p class="lead" data-t="chapo">Pas de numéro, pas de compte, pas de mot de passe. Quelqu'un vous invite, vous écrivez.</p>
@@ -160,6 +196,8 @@
   var T = {
     fr: null,
     en: {
+      'menu-cgu': 'Terms of use',
+      'menu-confidentialite': 'Privacy',
       titre: 'The messenger that asks you for nothing.',
       chapo: 'No number, no account, no password. Somebody invites you, you write.',
       point1: 'End-to-end encrypted, with nothing to set',
@@ -173,6 +211,8 @@
       'invitation-corps': 'The application alone is not enough: you need the link somebody sent you. Without it there is nothing to create and nothing to fill in.'
     },
     de: {
+      'menu-cgu': 'Nutzungsbedingungen',
+      'menu-confidentialite': 'Datenschutz',
       titre: 'Der Messenger, der nichts von Ihnen verlangt.',
       chapo: 'Keine Nummer, kein Konto, kein Passwort. Jemand lädt Sie ein, Sie schreiben.',
       point1: 'Ende-zu-Ende verschlüsselt, ohne Einstellung',
@@ -186,6 +226,8 @@
       'invitation-corps': 'Die Anwendung allein genügt nicht: Sie brauchen den Link, den Ihnen jemand geschickt hat. Ohne ihn gibt es nichts zu erstellen und nichts auszufüllen.'
     },
     es: {
+      'menu-cgu': 'Condiciones de uso',
+      'menu-confidentialite': 'Privacidad',
       titre: 'La mensajería que no le pide nada.',
       chapo: 'Sin número, sin cuenta, sin contraseña. Alguien le invita, usted escribe.',
       point1: 'Cifrada de extremo a extremo, sin ajustes',
@@ -199,6 +241,8 @@
       'invitation-corps': 'La aplicación por sí sola no basta: necesita el enlace que alguien le ha enviado. Sin él, nada que crear, nada que rellenar.'
     },
     it: {
+      'menu-cgu': 'Condizioni d\'uso',
+      'menu-confidentialite': 'Riservatezza',
       titre: 'La messaggistica che non ti chiede nulla.',
       chapo: 'Nessun numero, nessun account, nessuna password. Qualcuno ti invita, tu scrivi.',
       point1: 'Cifrata end-to-end, senza impostazioni',
@@ -212,6 +256,8 @@
       'invitation-corps': "L'applicazione da sola non basta: ti serve il link che qualcuno ti ha inviato. Senza, niente da creare e niente da compilare."
     },
     nl: {
+      'menu-cgu': 'Gebruiksvoorwaarden',
+      'menu-confidentialite': 'Privacy',
       titre: 'De berichtendienst die niets van u vraagt.',
       chapo: 'Geen nummer, geen account, geen wachtwoord. Iemand nodigt u uit, u schrijft.',
       point1: 'End-to-end versleuteld, zonder instellingen',

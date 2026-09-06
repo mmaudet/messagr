@@ -107,6 +107,7 @@ export function FirstLaunch({
           phone at the largest system text size, and a promise with its
           action below the fold is a promise nobody can accept. */}
       <ScrollView
+        testID="promise-scroll"
         contentContainerStyle={styles.content}
         showsVerticalScrollIndicator={false}>
         <View style={styles.mark}>

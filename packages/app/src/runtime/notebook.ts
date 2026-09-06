@@ -10,6 +10,11 @@ import { getErrorMessage } from './errors'
 import type { GivenNames } from './givenName'
 import { forgetfulGivenNames, openGivenNames } from './givenNameStore'
 import { forgetfulLastRead, openLastRead, type LastRead } from './lastReadStore'
+import {
+  forgetfulOutstanding,
+  openOutstanding,
+  type Outstanding,
+} from './outstandingStore'
 import { openStorePassphrase } from './storePassphrase'
 
 /** What became of the notebook on this launch. Reported, not assumed. */
@@ -17,6 +22,8 @@ export interface NotebookOpening {
   readonly names: GivenNames
   /** How far each conversation has been read here. */
   readonly lastRead: LastRead
+  /** Invitations issued here that nobody has been let in through yet. */
+  readonly outstanding: Outstanding
   readonly opened: boolean
   /** Why it did not open, when it did not. */
   readonly reason?: string
@@ -27,12 +34,20 @@ export interface NotebookOpening {
 /**
  * Opens the application's own encrypted notebook. ADR-0010.
  *
- * # Two pages, one file
+ * # Three pages, one file
  *
- * Who you call what (`given_names`) and how far you have read
- * (`last_read`). They are the same kind of fact -- a record of your
- * relationships that is as revealing as the messages themselves -- so they
- * share one encrypted file and one passphrase rather than multiplying either.
+ * Who you call what (`given_names`), how far you have read (`last_read`),
+ * and who you have invited and not yet let in
+ * (`outstanding_invitations`). They are the same kind of fact -- a record of
+ * your relationships that is as revealing as the messages themselves -- so
+ * they share one encrypted file and one passphrase rather than multiplying
+ * either.
+ *
+ * The third arrived with #118: admission used to be a poll that ran for one
+ * minute after a link was issued and then stopped, which made an invitation
+ * usable only if it was opened inside that minute. Asking again on the next
+ * launch needs the question to survive the launch, and this is where it
+ * survives.
  *
  * # A second passphrase, deliberately
  *
@@ -63,6 +78,7 @@ export async function openNotebook(storeDir: string): Promise<NotebookOpening> {
     return {
       names: forgetfulGivenNames(),
       lastRead: forgetfulLastRead(),
+      outstanding: forgetfulOutstanding(),
       opened: false,
       reason: 'no writable directory was supplied at launch',
     }
@@ -75,6 +91,7 @@ export async function openNotebook(storeDir: string): Promise<NotebookOpening> {
     return {
       names: forgetfulGivenNames(),
       lastRead: forgetfulLastRead(),
+      outstanding: forgetfulOutstanding(),
       opened: false,
       reason: passphrase.reason,
     }
@@ -96,6 +113,7 @@ export async function openNotebook(storeDir: string): Promise<NotebookOpening> {
     return {
       names: await openGivenNames(page),
       lastRead: await openLastRead(page),
+      outstanding: await openOutstanding(page),
       opened: true,
       minted: passphrase.minted,
     }
@@ -106,6 +124,7 @@ export async function openNotebook(storeDir: string): Promise<NotebookOpening> {
     return {
       names: forgetfulGivenNames(),
       lastRead: forgetfulLastRead(),
+      outstanding: forgetfulOutstanding(),
       opened: false,
       reason: getErrorMessage(cause),
       minted: passphrase.minted,

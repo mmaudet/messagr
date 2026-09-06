@@ -1,53 +1,54 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react'
-import { Animated, PanResponder, StyleSheet, View } from 'react-native'
+import React, { useEffect, useRef, useState } from 'react'
+import { Animated, StyleSheet, View } from 'react-native'
+import { Gesture, GestureDetector } from 'react-native-gesture-handler'
 
-import {
-  isZoomed,
-  LEAST,
-  middleOf,
-  panBound,
-  scaleFor,
-  spanOf,
-  within,
-} from './pinch'
+import { logEvent } from '../runtime/log'
+import { isZoomed, LEAST, MOST, panBound, within } from './pinch'
 
 /**
  * Two fingers, on whatever is inside it.
  *
- * Built for the full-screen photograph, which is the one place in this
- * product where a person needs to see more than the screen shows. The
- * arithmetic is in `pinch.ts` with its own spec; what is left here is the
- * part only a device can judge.
+ * # This took a dependency, and the device is why
+ *
+ * The first two versions used React Native's own `PanResponder`, on the
+ * argument that a gesture library is two native modules and a regenerated
+ * CocoaPods graph for one screen's gesture -- and that if a device said it
+ * was not good enough, *that* would be the argument for the dependency.
+ *
+ * The device said so twice, and not about smoothness: the pinch did nothing
+ * at all. A zoomable view nested in a paging `ScrollView` is a responder
+ * negotiation the JavaScript responder system cannot win. Asking in the
+ * capture phase fails because capture runs root-first and the pager is the
+ * ancestor; asking in the bubble phase fails because by the time a second
+ * finger lands the pager already owns the touch, and disabling it then does
+ * not take the gesture back. `react-native-gesture-handler` exists for
+ * exactly this: its handlers are native and negotiate with the scroll view
+ * where the scroll view actually lives.
+ *
+ * **It cost one module, not two.** The estimate that turned it down assumed
+ * `react-native-reanimated` came with it; 3.2.1 declares only `react` and
+ * `react-native` as peers, and without reanimated the callbacks simply run on
+ * the JavaScript thread -- which is where `PanResponder` ran them too. So the
+ * price was half what the refusal was priced against, and the refusal was
+ * wrong on its own terms as well as on the device's.
  *
  * # It tells the pager to stop
  *
  * A zoomed photograph and a pager want the same drag. `onZoomed` is how the
  * viewer above knows to stop paging: while somebody is inside a photograph,
- * a drag moves the photograph. Letting both have it would mean a swipe
- * sometimes moved the picture and sometimes changed it, which is the kind of
- * control a person stops trusting.
+ * a drag moves the photograph.
  *
  * # It springs back rather than staying wrong
  *
- * Let go while pinched below fit and it returns to fit; drag past an edge
- * and it comes back to the edge. Nothing here can be left in a state a
- * person cannot get out of, which is the same reason `MOST` exists.
+ * Let go while pinched below fit and it returns to fit; drag past an edge and
+ * it comes back to the edge. Nothing here can be left in a state a person
+ * cannot get out of, which is the same reason `MOST` exists.
  *
  * # The zoom is centred, not focal
  *
- * A pinch here grows the photograph about its middle; it does not keep the
- * point between the fingers still. Focal-point zoom is nicer and is a matrix
- * this does not carry -- reaching a corner is a pinch and then a drag rather
- * than one gesture. Written down as a known limit rather than left for
- * somebody to discover.
- *
- * # `useNativeDriver` is false, and it has to be
- *
- * The transform is driven from touch events, so the values are set from
- * JavaScript on every move -- a native-driven `Animated.Value` cannot be
- * `setValue`d from there. It is the honest cost of not taking the
- * gesture-handler dependency, written down where somebody measuring a
- * dropped frame will find it.
+ * A pinch grows the photograph about its middle; it does not keep the point
+ * between the fingers still. Written down as a known limit rather than left
+ * for somebody to discover.
  */
 export function Pinchable({
   children,
@@ -78,7 +79,7 @@ export function Pinchable({
   // What the animated values currently hold. `Animated.Value` will not be
   // read synchronously, and every sum here needs the number it has now.
   const held = useRef({ scale: 1, x: 0, y: 0 })
-  const began = useRef({ span: 0, scale: 1, x: 0, y: 0, dx: 0, dy: 0 })
+  const began = useRef({ scale: 1, x: 0, y: 0 })
   const [zoomed, setZoomed] = useState(false)
 
   function settle(next: { scale: number; x: number; y: number }) {
@@ -87,7 +88,7 @@ export function Pinchable({
       y: panBound(height, next.scale),
     }
     const put = {
-      scale: next.scale,
+      scale: within(next.scale, LEAST, MOST),
       x: within(next.x, -bound.x, bound.x),
       y: within(next.y, -bound.y, bound.y),
     }
@@ -117,107 +118,76 @@ export function Pinchable({
     }
   }
 
-  // IN AN EFFECT, NOT IN THE RENDER.
-  //
-  // This was `if (!active && ...) toFit()` in the component body, which calls
-  // `setZoomed` here and `onZoomed` on the pager above -- a state update on
-  // another component during this one's render, which React refuses outright.
-  // It would have thrown the first time somebody paged away from a photograph
-  // they had zoomed into, which is the one gesture this prop exists for.
+  // In an effect, not in the render: `toFit` updates this component's state
+  // and the pager's, and React refuses a state update on another component
+  // during a render. It would have thrown the first time somebody paged away
+  // from a photograph they had zoomed into.
   useEffect(() => {
     if (!active && held.current.scale !== LEAST) toFit()
-    // `toFit` is rebuilt every render and depends on nothing that changes
-    // what it does; listing it would run this on every render instead of on
-    // the one thing it is about.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [active])
 
-  const responder = useMemo(
-    () =>
-      PanResponder.create({
-        // CAPTURE, NOT BUBBLE. The pager above is a ScrollView, and it takes
-        // a drag before a child ever sees one. Claiming a second finger on
-        // the way down is what lets a pinch begin at all; a single finger is
-        // left alone unless there is a zoom to drag, so an unzoomed
-        // photograph still swipes to the next.
-        onStartShouldSetPanResponderCapture: event =>
-          event.nativeEvent.touches.length === 2,
-        onMoveShouldSetPanResponderCapture: event =>
-          event.nativeEvent.touches.length === 2 ||
-          isZoomed(held.current.scale),
+  // `e.scale` is the ratio since the gesture began, so it multiplies what the
+  // scale was then -- a second pinch continues the first rather than starting
+  // over.
+  const pinch = Gesture.Pinch()
+    .onStart(() => {
+      // SAID OUT LOUD, BECAUSE THREE THEORIES WERE WRONG.
+      //
+      // The pinch did nothing on a device three times, and each diagnosis was
+      // a guess about a layer. A line here answers the question that has to
+      // come first -- does the handler receive the gesture at all -- and
+      // separates "the fingers never arrive" from "they arrive and the
+      // transform does nothing".
+      logEvent('info', 'MESSAGR_PINCH', { began: true })
+      began.current = { ...held.current }
+    })
+    .onUpdate(event => {
+      settle({
+        scale: began.current.scale * event.scale,
+        x: held.current.x,
+        y: held.current.y,
+      })
+    })
+    .onEnd(() => {
+      logEvent('info', 'MESSAGR_PINCH', { ended: held.current.scale })
+      if (held.current.scale <= LEAST) toFit()
+    })
 
-        onPanResponderGrant: event => {
-          const touches = event.nativeEvent.touches
-          began.current = {
-            span: spanOf(touches),
-            scale: held.current.scale,
-            ...middleOf(touches),
-            dx: 0,
-            dy: 0,
-          }
-        },
-
-        onPanResponderMove: (event, gesture) => {
-          const touches = event.nativeEvent.touches
-          if (touches.length >= 2) {
-            const span = spanOf(touches)
-            const middle = middleOf(touches)
-            // The fingers may also travel while they spread, and a pinch
-            // that ignored that would slide out from under them.
-            settle({
-              scale: scaleFor(began.current.span, span, began.current.scale),
-              x: held.current.x + (middle.x - began.current.x),
-              y: held.current.y + (middle.y - began.current.y),
-            })
-            began.current = { ...began.current, span, ...middle }
-            return
-          }
-          if (isZoomed(held.current.scale)) {
-            // THE INCREMENT, NOT THE TOTAL. `dx` is the whole distance
-            // travelled since the gesture began, so adding it to a position
-            // that already contains it accelerates away on every frame --
-            // the photograph shoots off the screen. What moves it is the
-            // difference since the last report.
-            settle({
-              scale: held.current.scale,
-              x: held.current.x + (gesture.dx - began.current.dx),
-              y: held.current.y + (gesture.dy - began.current.dy),
-            })
-            began.current = { ...began.current, dx: gesture.dx, dy: gesture.dy }
-          }
-        },
-
-        onPanResponderRelease: () => {
-          if (held.current.scale <= LEAST) toFit()
-          else settle(held.current)
-        },
-        onPanResponderTerminationRequest: () => false,
-      }),
-    // Built once. It reads everything changeable through refs on purpose:
-    // rebuilding a responder mid-gesture is how a pinch loses its fingers.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [width, height],
-  )
+  // ONE FINGER, AND ONLY ONCE THERE IS SOMETHING TO DRAG. At fit the pager
+  // must keep the swipe, which is what `enabled` says -- a pan handler that
+  // claimed every drag would page nowhere.
+  const drag = Gesture.Pan()
+    .enabled(zoomed)
+    .onStart(() => {
+      began.current = { ...held.current }
+    })
+    .onUpdate(event => {
+      settle({
+        scale: held.current.scale,
+        x: began.current.x + event.translationX,
+        y: began.current.y + event.translationY,
+      })
+    })
 
   return (
-    <View
-      testID={testID}
-      style={[styles.frame, { width, height }]}
-      {...responder.panHandlers}>
-      <Animated.View
-        style={[
-          styles.content,
-          {
-            transform: [
-              { translateX: panX },
-              { translateY: panY },
-              { scale: scale },
-            ],
-          },
-        ]}>
-        {children}
-      </Animated.View>
-    </View>
+    <GestureDetector gesture={Gesture.Simultaneous(pinch, drag)}>
+      <View testID={testID} style={[styles.frame, { width, height }]}>
+        <Animated.View
+          style={[
+            styles.content,
+            {
+              transform: [
+                { translateX: panX },
+                { translateY: panY },
+                { scale: scale },
+              ],
+            },
+          ]}>
+          {children}
+        </Animated.View>
+      </View>
+    </GestureDetector>
   )
 }
 

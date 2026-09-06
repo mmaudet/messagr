@@ -199,10 +199,24 @@ export async function vouchFor(
     return {
       vouched: false,
       stage: 'sending',
+      // TWO FAILURES WEARING ONE SENTENCE, AND THEY WANT DIFFERENT THINGS.
+      //
+      // This said "nothing reported why" whenever the drain reported no
+      // failures, which is the commonest case and not a mystery: the machine
+      // produced no to-device request because it has no devices to send one
+      // to. That happens for a person who entered moments ago, before this
+      // device's machine has seen their keys -- and the honest answer is
+      // "wait a moment and try again", not "it failed".
+      //
+      // A drain that *did* report failures is the other thing entirely:
+      // something was refused, and trying again immediately will be refused
+      // the same way. Watched on two devices, where the first was reported
+      // as the second and sent me looking for a fault that was not there
+      // (#119).
       reason:
         refused === ''
-          ? 'the history announcement was not sent, and nothing reported why'
-          : `the history announcement was not sent: ${refused}`,
+          ? 'this device does not know that person’s devices yet, so there was nobody to announce to'
+          : `the history announcement was refused: ${refused}`,
       promoted: false,
     }
   }

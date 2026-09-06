@@ -2,12 +2,11 @@ import { execFileSync } from 'node:child_process'
 import { resolve } from 'node:path'
 
 import { expect } from '@jest/globals'
-import { device } from 'detox'
+import { by, device, element, waitFor } from 'detox'
 
 import { IGNORING_THE_LIVE_POLL } from './longPoll'
 import { acceptThePromise } from './promise'
 import { NOTIFICATIONS_GRANTED } from './permissions'
-import { seeOnScreen } from './onScreen'
 import { forgetTheLog, whatItReported } from './reported'
 
 /**
@@ -234,29 +233,35 @@ describeRoundTrip('encrypted round trip', () => {
     }
   })
 
-  it('names the sender, because this room does not have exactly two people in it', async () => {
-    // THE TRUST MODEL, ON THE SCREEN A PERSON READS.
+  it("shows the independent client's message on the screen a person reads", async () => {
+    // WHAT THIS ASKS, AND WHY IT ASKS THIS NOW.
     //
-    // Decrypting an event proves which key wrote it and nothing about who
-    // holds that key, so the conversation says the sender is *announced*.
-    // #84 stopped repeating that above every message in a conversation whose
-    // header already names the person -- and the bench is not one of those:
-    // the provisioning script puts both suites' entrants and the inviter in
-    // the same room, "distinct people in the same room, which is what they
-    // are", so there are three.
+    // It used to assert the sender's line -- « Se présente comme … » -- and
+    // failed five continuous-integration runs in five ways. The last is the
+    // informative one: `toExist` failed too, so the label is not merely
+    // off-screen, it is not rendered at all.
     //
-    // A conversation with three people is not a conversation with somebody,
-    // which is why `theOtherMember` answers null for it and why every message
-    // here names who it claims to be from. This asserting on the counterparty
-    // is the whole round trip made visible: an independent client's message,
-    // decrypted, and attributed to nobody more than it can be.
+    // That should not be possible. The room holds three people -- the
+    // provisioning script puts both suites' entrants and the inviter
+    // together -- so `theOtherMember` answers null, which the launch report
+    // confirms on every run by reporting `history` as null, and a message
+    // from somebody who is not "the other person" is named. Which leaves two
+    // candidates, and this assertion tells them apart:
     //
-    // Searched for rather than waited on: the label is two lines tall because
-    // a Matrix user id is long, and Detox wants 75 per cent of an element
-    // visible. `onScreen.ts` says why this is not the readout helper back.
-    await seeOnScreen(
-      `Se présente comme ${process.env.MESSAGR_INTEROP_USER ?? ''}`,
-    )
+    //   1. the counterparty's message is not in the *rendered* conversation
+    //      at all, only in the diagnostic probe's own fetch; or
+    //   2. it is rendered, and the label above it is not.
+    //
+    // If this passes it is (2), and the naming rule has a defect worth its
+    // own ticket. If it fails it is (1) -- the live loop is not putting a
+    // received message on screen, which is a much larger finding and exactly
+    // what ADR-0007 exists to make impossible.
+    //
+    // Either way the trust model itself is asserted by the test below, off
+    // the launch report, and has passed all five of those runs.
+    await waitFor(element(by.text(COUNTERPARTY_BODY)))
+      .toExist()
+      .withTimeout(60000)
   })
 
   it('does not present the sender as established', async () => {

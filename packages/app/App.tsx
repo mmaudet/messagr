@@ -8,6 +8,7 @@ import {
   Text,
   View,
 } from 'react-native'
+import { GestureHandlerRootView } from 'react-native-gesture-handler'
 import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context'
 import { createClient } from 'matrix-js-sdk'
 
@@ -77,6 +78,11 @@ import type { ConversationSummary } from './src/runtime/conversationList'
 import type { GivenNames } from './src/runtime/givenName'
 import { forgetfulGivenNames } from './src/runtime/givenNameStore'
 import { forgetfulLastRead, type LastRead } from './src/runtime/lastReadStore'
+import {
+  forgetfulOutstanding,
+  type Outstanding,
+} from './src/runtime/outstandingStore'
+import { admitAnyoneWaiting } from './src/runtime/admitAnyoneWaiting'
 import { displayNameFor } from './src/runtime/givenName'
 import { openNotebook } from './src/runtime/notebook'
 import {
@@ -265,6 +271,14 @@ export function App({
   // every conversation as unread rather than as read, since a badge that
   // should be there is a smaller lie than one that should not.
   const lastReadRef = useRef<LastRead>(forgetfulLastRead())
+  /**
+   * The invitations this device has issued and nobody has come through yet.
+   *
+   * A ref rather than state for the reason the other two pages are: it is
+   * read from a sync tick, and a re-render for its own sake would be a
+   * re-render per poll.
+   */
+  const outstandingRef = useRef<Outstanding>(forgetfulOutstanding())
   // Which conversation is open, held in a ref as well as in state: the live
   // sync loop's callbacks are created once and would otherwise keep deriving
   // whichever conversation was open when the loop started.
@@ -624,6 +638,7 @@ export function App({
             const opening = await openNotebook(storeDir)
             namesRef.current = opening.names
             lastReadRef.current = opening.lastRead
+            outstandingRef.current = opening.outstanding
             logEvent(opening.opened ? 'info' : 'warn', 'MESSAGR_GIVEN_NAMES', {
               opened: opening.opened,
               ...(opening.minted === undefined
@@ -951,6 +966,30 @@ export function App({
                 }
                 setInvite({ stage: 'ready', link: issued.link })
                 setAdmission('waiting')
+                // WRITTEN DOWN BEFORE ANYBODY IS ASKED ABOUT IT.
+                //
+                // The poll below runs for a minute and then stops, which is
+                // what makes two phones on a table instant and what made
+                // every other case impossible: an invitation opened later
+                // than that could never be walked through, on this launch or
+                // any other, while the screen said the link was good for an
+                // hour (#118). Remembering it here is what lets the question
+                // be asked again -- on the next tick, and on every launch
+                // after this one.
+                const remembered = await outstandingRef.current.remember({
+                  invitationId: issued.invitationId,
+                  scope: issued.scope,
+                  issuedAt: Date.now(),
+                })
+                if (!remembered) {
+                  // Not a failure of the invitation: the link is valid and
+                  // the minute below still runs. What is lost is the retry
+                  // after a relaunch, which is worth saying rather than
+                  // discovering.
+                  logEvent('warn', 'MESSAGR_OUTSTANDING_NOT_KEPT', {
+                    invitationId: issued.invitationId,
+                  })
+                }
                 // The conversation exists now, so it belongs on the list
                 // before anybody has claimed anything.
                 await refreshList().catch(() => {})
@@ -963,6 +1002,9 @@ export function App({
                 )
                 if (!admitted.admitted) return
                 setAdmission('admitted')
+                // Somebody came through inside the minute, so there is
+                // nothing left to ask about.
+                await outstandingRef.current.forget(issued.invitationId)
                 if (name !== null) {
                   const kept = await namesRef.current.set(
                     admitted.entrant,
@@ -1060,6 +1102,51 @@ export function App({
                       )
                     }
                   }
+
+                  // ASKED ON EVERY TICK, AND BEFORE THE EARLY RETURN.
+                  //
+                  // Nothing about somebody claiming an invitation changes a
+                  // scope this device is already in, so a tick that admits
+                  // the person waiting is exactly a tick with no changed
+                  // scopes. Putting this below the return would have made
+                  // admission depend on unrelated traffic -- which is the
+                  // shape of the defect it exists to fix.
+                  //
+                  // Not awaited: the loop's tick must not wait on a poll of
+                  // the invitation service, and nothing below depends on the
+                  // answer. The `.catch` at the end is what makes that safe
+                  // -- a floating promise with no rejection handler is an
+                  // unhandled rejection, which on Hermes is a warning nobody
+                  // reads and on some hosts is a crash.
+                  admitAnyoneWaiting({
+                    outstanding: outstandingRef.current,
+                    admit: invitation =>
+                      admitEntrant(
+                        sessionClient,
+                        credentials,
+                        invitation.invitationId,
+                        invitation.scope,
+                      ),
+                    now: () => Date.now(),
+                  })
+                    .then(round => {
+                      if (round.admitted.length === 0 && round.expired === 0) {
+                        return
+                      }
+                      // Only when something happened: a line per tick saying
+                      // "nobody yet" would bury the one that matters.
+                      logEvent('info', 'MESSAGR_ADMITTED_LATE', { ...round })
+                      // Somebody joined a room this device is in, so the list
+                      // has a row to redraw.
+                      if (round.admitted.length > 0) {
+                        refreshList().catch(() => {})
+                      }
+                    })
+                    .catch((cause: unknown) =>
+                      logEvent('warn', 'MESSAGR_ADMIT_ROUND_FAILED', {
+                        reason: getErrorMessage(cause),
+                      }),
+                    )
 
                   if (tick.changedScopes.length === 0) return
 
@@ -1338,117 +1425,122 @@ export function App({
   // who had not yet been told what this is.
   if (promiseSeen === null) {
     return (
-      <SafeAreaProvider>
-        <View style={styles.promiseGround} />
-      </SafeAreaProvider>
+      <GestureHandlerRootView style={styles.root}>
+        <SafeAreaProvider>
+          <View style={styles.promiseGround} />
+        </SafeAreaProvider>
+      </GestureHandlerRootView>
     )
   }
 
   if (!promiseSeen) {
     return (
-      <SafeAreaProvider>
-        <FirstLaunch
-          language={language}
-          onLanguage={chooseLanguage}
-          onLanguageSettled={keepLanguage}
-          // ITS OWN LINE, NOT PART OF THE LAUNCH REPORT.
-          //
-          // The launch report is written once, when the launch effect
-          // finishes; a layout has not happened yet, so the geometry would
-          // always be null in it. This says the fact when the fact exists.
-          onGeometry={shape =>
-            logEvent('info', 'MESSAGR_GEOMETRY', {
-              height: shape.height,
-              leg: shape.leg,
-              // The floor is geometry, which no provenance rule can reach --
-              // so it is asserted against the height the device actually
-              // gave the button rather than the height the style asked for.
-              touchTargetMet: shape.height >= floors.touchTargetMin,
-              floor: floors.touchTargetMin,
-            })
-          }
-          onBegin={() => {
-            // Set first, kept second. A keystore that refuses must not leave
-            // somebody stuck on a screen whose only action does nothing —
-            // being shown the promise twice is the cost, and `promiseSeen.ts`
-            // says why that is the right way round.
-            setPromiseSeen(true)
-            rememberPromiseSeen(promiseSecrets)
-              .then(kept => {
-                if (!kept) logEvent('warn', 'MESSAGR_PROMISE_NOT_KEPT', {})
-              })
-              .catch(() => logEvent('warn', 'MESSAGR_PROMISE_NOT_KEPT', {}))
-            // AND THE ACCEPTANCE ITSELF, WHICH WAS NOT BEING RECORDED.
+      <GestureHandlerRootView style={styles.root}>
+        <SafeAreaProvider>
+          <FirstLaunch
+            language={language}
+            onLanguage={chooseLanguage}
+            onLanguageSettled={keepLanguage}
+            // ITS OWN LINE, NOT PART OF THE LAUNCH REPORT.
             //
-            // Reaching this callback means the box was ticked -- the screen's
-            // action does nothing otherwise. Until a review said so, that was
-            // the only trace: a `useState` that died with the screen, while
-            // the comment beside it claimed a tick "can be shown to have
-            // happened". What is written is *which* conditions were accepted,
-            // so a revision re-asks rather than being assumed.
-            rememberTermsAccepted(termsSecrets)
-              .then(kept => {
-                if (!kept) logEvent('warn', 'MESSAGR_TERMS_NOT_KEPT', {})
+            // The launch report is written once, when the launch effect
+            // finishes; a layout has not happened yet, so the geometry would
+            // always be null in it. This says the fact when the fact exists.
+            onGeometry={shape =>
+              logEvent('info', 'MESSAGR_GEOMETRY', {
+                height: shape.height,
+                leg: shape.leg,
+                // The floor is geometry, which no provenance rule can reach --
+                // so it is asserted against the height the device actually
+                // gave the button rather than the height the style asked for.
+                touchTargetMet: shape.height >= floors.touchTargetMin,
+                floor: floors.touchTargetMin,
               })
-              .catch(() => logEvent('warn', 'MESSAGR_TERMS_NOT_KEPT', {}))
-          }}
-        />
-      </SafeAreaProvider>
+            }
+            onBegin={() => {
+              // Set first, kept second. A keystore that refuses must not leave
+              // somebody stuck on a screen whose only action does nothing —
+              // being shown the promise twice is the cost, and `promiseSeen.ts`
+              // says why that is the right way round.
+              setPromiseSeen(true)
+              rememberPromiseSeen(promiseSecrets)
+                .then(kept => {
+                  if (!kept) logEvent('warn', 'MESSAGR_PROMISE_NOT_KEPT', {})
+                })
+                .catch(() => logEvent('warn', 'MESSAGR_PROMISE_NOT_KEPT', {}))
+              // AND THE ACCEPTANCE ITSELF, WHICH WAS NOT BEING RECORDED.
+              //
+              // Reaching this callback means the box was ticked -- the screen's
+              // action does nothing otherwise. Until a review said so, that was
+              // the only trace: a `useState` that died with the screen, while
+              // the comment beside it claimed a tick "can be shown to have
+              // happened". What is written is *which* conditions were accepted,
+              // so a revision re-asks rather than being assumed.
+              rememberTermsAccepted(termsSecrets)
+                .then(kept => {
+                  if (!kept) logEvent('warn', 'MESSAGR_TERMS_NOT_KEPT', {})
+                })
+                .catch(() => logEvent('warn', 'MESSAGR_TERMS_NOT_KEPT', {}))
+            }}
+          />
+        </SafeAreaProvider>
+      </GestureHandlerRootView>
     )
   }
 
   return (
-    <SafeAreaProvider>
-      {openPlate !== null && (
-        <FullScreenPlate
-          plate={openPlate.plate}
-          at={openPlate.at}
-          fetch={loadImage}
-          onClose={() => setOpenPlate(null)}
-        />
-      )}
+    <GestureHandlerRootView style={styles.root}>
+      <SafeAreaProvider>
+        {openPlate !== null && (
+          <FullScreenPlate
+            plate={openPlate.plate}
+            at={openPlate.at}
+            fetch={loadImage}
+            onClose={() => setOpenPlate(null)}
+          />
+        )}
 
-      {/* NEITHER EDGE IS THIS VIEW'S. Both the header and the dock claim
+        {/* NEITHER EDGE IS THIS VIEW'S. Both the header and the dock claim
           their own inset, ground and all -- see each of them for why. An
           absolutely-positioned child is laid against the border box and not
           the padding box, so a dock at `bottom: 0` ignored the inset this
           view reserved; and a reserved top inset left a pale strip above the
           dark band, into which the system drew the clock and the battery in
           white. Whatever sits on an edge paints to it. */}
-      <SafeAreaView style={styles.screen} edges={['left', 'right']}>
-        {/* Outside the scroll view, like the tab bar and for the same reason:
+        <SafeAreaView style={styles.screen} edges={['left', 'right']}>
+          {/* Outside the scroll view, like the tab bar and for the same reason:
             what the band says is true of the instance rather than of the
             screen under it, and a fact about the instance that scrolls away
             is one nobody reads twice. */}
-        <Header />
+          <Header />
 
-        {/* THE CONVERSATION'S OWN BAR, and it is chrome rather than content.
+          {/* THE CONVERSATION'S OWN BAR, and it is chrome rather than content.
             It was inside the scroll view, so it inherited that view's 24pt
             padding and sat inset from both edges while the messages slid
             under it. Here it spans the screen and stays put, like the band
             above it and the dock below. */}
-        {openScope !== null && trust === null && !personOpen && (
-          <ConversationHeader
-            shown={
-              party === null
-                ? openScope
-                : displayNameFor(party.other, names.get(party.other))
-            }
-            named={party !== null && names.get(party.other) !== undefined}
-            identifier={party?.other}
-            onBack={() => {
-              setOpenScope(null)
-              openScopeRef.current = null
-              setTrust(null)
-              // Otherwise the next conversation opens on the person screen of
-              // the one before it.
-              setPersonOpen(false)
-            }}
-            onOpenPerson={() => setPersonOpen(true)}
-          />
-        )}
+          {openScope !== null && trust === null && !personOpen && (
+            <ConversationHeader
+              shown={
+                party === null
+                  ? openScope
+                  : displayNameFor(party.other, names.get(party.other))
+              }
+              named={party !== null && names.get(party.other) !== undefined}
+              identifier={party?.other}
+              onBack={() => {
+                setOpenScope(null)
+                openScopeRef.current = null
+                setTrust(null)
+                // Otherwise the next conversation opens on the person screen of
+                // the one before it.
+                setPersonOpen(false)
+              }}
+              onOpenPerson={() => setPersonOpen(true)}
+            />
+          )}
 
-        {/* ONE FRAME, AND A NEW ONE PER SCREEN.
+          {/* ONE FRAME, AND A NEW ONE PER SCREEN.
             It was `diagnostic-scroll` and it was honestly named: the readout
             was the thing that scrolled and the screens were rendered into it.
             With the readout gone (#105) it is the product's frame, and its
@@ -1461,48 +1553,48 @@ export function App({
             Réglages had been. Keying it on what it shows makes React build a
             new one per screen, which is what "each screen owns its own
             scrolling" means when no screen scrolls on its own. */}
-        <ScrollView
-          ref={frame}
-          key={openScope ?? tab}
-          testID="screen-scroll"
-          // A conversation rests at its newest message; a list rests where it
-          // was left. Nothing else in the product has a bottom worth being at.
-          onScroll={
-            openScope === null
-              ? undefined
-              : event => {
-                  const { contentOffset, layoutMeasurement, contentSize } =
-                    event.nativeEvent
-                  // A margin, because a scroll rarely stops on the exact
-                  // pixel and "within a message's height of the end" is what
-                  // a person means by being at the bottom.
-                  atBottom.current =
-                    contentOffset.y + layoutMeasurement.height >=
-                    contentSize.height - NEAR_THE_END
-                }
-          }
-          scrollEventThrottle={100}
-          onContentSizeChange={() => {
-            if (openScope === null) return
-            if (restedIn.current !== openScope) {
-              restedIn.current = openScope
-              atBottom.current = true
+          <ScrollView
+            ref={frame}
+            key={openScope ?? tab}
+            testID="screen-scroll"
+            // A conversation rests at its newest message; a list rests where it
+            // was left. Nothing else in the product has a bottom worth being at.
+            onScroll={
+              openScope === null
+                ? undefined
+                : event => {
+                    const { contentOffset, layoutMeasurement, contentSize } =
+                      event.nativeEvent
+                    // A margin, because a scroll rarely stops on the exact
+                    // pixel and "within a message's height of the end" is what
+                    // a person means by being at the bottom.
+                    atBottom.current =
+                      contentOffset.y + layoutMeasurement.height >=
+                      contentSize.height - NEAR_THE_END
+                  }
             }
-            if (!atBottom.current) return
-            // Not animated: on the first layout there is nothing to animate
-            // from, and a conversation that visibly scrolls itself on opening
-            // reads as a screen doing something rather than a screen arriving.
-            frame.current?.scrollToEnd({ animated: false })
-          }}
-          // Ends above the dock rather than under it. The dock is absolute,
-          // so without this the last row of whatever is on screen sits behind
-          // the tab bar -- which reads as content that will not scroll far
-          // enough, and is the reason a bottom bar usually costs a padding.
-          contentContainerStyle={[
-            styles.content,
-            { paddingBottom: dockHeight + space.l },
-          ]}>
-          {/* THE LIST **OR** THE CONVERSATION, never both.
+            scrollEventThrottle={100}
+            onContentSizeChange={() => {
+              if (openScope === null) return
+              if (restedIn.current !== openScope) {
+                restedIn.current = openScope
+                atBottom.current = true
+              }
+              if (!atBottom.current) return
+              // Not animated: on the first layout there is nothing to animate
+              // from, and a conversation that visibly scrolls itself on opening
+              // reads as a screen doing something rather than a screen arriving.
+              frame.current?.scrollToEnd({ animated: false })
+            }}
+            // Ends above the dock rather than under it. The dock is absolute,
+            // so without this the last row of whatever is on screen sits behind
+            // the tab bar -- which reads as content that will not scroll far
+            // enough, and is the reason a bottom bar usually costs a padding.
+            contentContainerStyle={[
+              styles.content,
+              { paddingBottom: dockHeight + space.l },
+            ]}>
+            {/* THE LIST **OR** THE CONVERSATION, never both.
               Stacking them was the first shape this took, and it was wrong
               twice over. On a phone nobody shows a list above the
               conversation it opens; and the end-to-end suite found the same
@@ -1512,116 +1604,120 @@ export function App({
               *where* is an assertion about a screen nobody would ship.
 
 */}
-          {openScope === null && tab === 'calls' && (
-            <View style={styles.block}>
-              <Reserved
-                testID="calls-reserved"
-                glyph="calls"
-                title="calls_soon_title"
-                why="calls_soon_why"
-                stages={['calls_soon_v2', 'calls_soon_v3']}
-              />
-            </View>
-          )}
+            {openScope === null && tab === 'calls' && (
+              <View style={styles.block}>
+                <Reserved
+                  testID="calls-reserved"
+                  glyph="calls"
+                  title="calls_soon_title"
+                  why="calls_soon_why"
+                  stages={['calls_soon_v2', 'calls_soon_v3']}
+                />
+              </View>
+            )}
 
-          {openScope === null && tab === 'community' && (
-            <View style={styles.block}>
-              <Reserved
-                testID="community-reserved"
-                glyph="community"
-                title="community_soon_title"
-                why="community_soon_why"
-              />
-            </View>
-          )}
+            {openScope === null && tab === 'community' && (
+              <View style={styles.block}>
+                <Reserved
+                  testID="community-reserved"
+                  glyph="community"
+                  title="community_soon_title"
+                  why="community_soon_why"
+                />
+              </View>
+            )}
 
-          {openScope === null && tab === 'settings' && !legalOpen && (
-            <View style={styles.block}>
-              <Settings
-                onBack={() => setTab('chat')}
-                onLegal={() => setLegalOpen(true)}
-                receipts={receipts}
-                receiptsNotKept={receiptsNotKept}
-                language={language}
-                onLanguage={chooseLanguage}
-                onLanguageSettled={keepLanguage}
-                wake={wake}
-                wakeNotKept={wakeNotKept}
-                onWake={on => {
-                  // Shown first, kept second, like the switch above.
-                  setWake(on)
-                  wakeRef.current = on
-                  allowWake(wakeSecrets, on)
-                    .then(kept => setWakeNotKept(!kept))
-                    .catch(() => setWakeNotKept(true))
-                  // AND THE PUSHER ITSELF, WHICH IS WHAT MAKES OFF MEAN OFF.
-                  //
-                  // Stopping the next launch registering one is not turning
-                  // notifications off: the pusher already on the homeserver
-                  // keeps firing, and the switch reads as off while it is on.
-                  // Caught in review, and the ticket says how -- the same
-                  // route with `kind: null`.
-                  wakeThisDeviceRef.current?.(on)
-                }}
-                onReceipts={on => {
-                  // Shown first, kept second. A switch that waited on a
-                  // keystore would feel broken; one that reverts silently at
-                  // the next launch would be worse, which is what the
-                  // sentence under it is for.
-                  setReceipts(on)
-                  publishReceipts(receiptSecrets, on)
-                    .then(kept => setReceiptsNotKept(!kept))
-                    .catch(() => setReceiptsNotKept(true))
-                }}
-              />
-            </View>
-          )}
+            {openScope === null && tab === 'settings' && !legalOpen && (
+              <View style={styles.block}>
+                <Settings
+                  onBack={() => setTab('chat')}
+                  onLegal={() => setLegalOpen(true)}
+                  receipts={receipts}
+                  receiptsNotKept={receiptsNotKept}
+                  language={language}
+                  onLanguage={chooseLanguage}
+                  onLanguageSettled={keepLanguage}
+                  wake={wake}
+                  wakeNotKept={wakeNotKept}
+                  onWake={on => {
+                    // Shown first, kept second, like the switch above.
+                    setWake(on)
+                    wakeRef.current = on
+                    allowWake(wakeSecrets, on)
+                      .then(kept => setWakeNotKept(!kept))
+                      .catch(() => setWakeNotKept(true))
+                    // AND THE PUSHER ITSELF, WHICH IS WHAT MAKES OFF MEAN OFF.
+                    //
+                    // Stopping the next launch registering one is not turning
+                    // notifications off: the pusher already on the homeserver
+                    // keeps firing, and the switch reads as off while it is on.
+                    // Caught in review, and the ticket says how -- the same
+                    // route with `kind: null`.
+                    wakeThisDeviceRef.current?.(on)
+                  }}
+                  onReceipts={on => {
+                    // Shown first, kept second. A switch that waited on a
+                    // keystore would feel broken; one that reverts silently at
+                    // the next launch would be worse, which is what the
+                    // sentence under it is for.
+                    setReceipts(on)
+                    publishReceipts(receiptSecrets, on)
+                      .then(kept => setReceiptsNotKept(!kept))
+                      .catch(() => setReceiptsNotKept(true))
+                  }}
+                />
+              </View>
+            )}
 
-          {openScope === null && tab === 'settings' && legalOpen && (
-            <View style={styles.block}>
-              <Legal onBack={() => setLegalOpen(false)} />
-            </View>
-          )}
+            {openScope === null && tab === 'settings' && legalOpen && (
+              <View style={styles.block}>
+                <Legal onBack={() => setLegalOpen(false)} />
+              </View>
+            )}
 
-          {/* THE LIST **OR** THE INVITATION, for the same reason as the
+            {/* THE LIST **OR** THE INVITATION, for the same reason as the
               conversation above: inviting is a place you go, not a form that
               lives under the list. */}
-          {openScope === null && tab === 'chat' && invite.stage === 'shut' && (
-            <View style={styles.block}>
-              <ConversationList
-                summaries={summaries}
-                names={names}
-                onOpen={scope => openConversationRef.current?.(scope)}
-              />
-            </View>
-          )}
+            {openScope === null &&
+              tab === 'chat' &&
+              invite.stage === 'shut' && (
+                <View style={styles.block}>
+                  <ConversationList
+                    summaries={summaries}
+                    names={names}
+                    onOpen={scope => openConversationRef.current?.(scope)}
+                  />
+                </View>
+              )}
 
-          {openScope === null && tab === 'chat' && invite.stage !== 'shut' && (
-            <View style={styles.block}>
-              <Invite
-                stage={invite}
-                admission={admission}
-                onInvite={name => inviteRef.current?.(name)}
-                onClose={() => {
-                  setInvite({ stage: 'shut' })
-                  setAdmission(null)
-                }}
-              />
-            </View>
-          )}
+            {openScope === null &&
+              tab === 'chat' &&
+              invite.stage !== 'shut' && (
+                <View style={styles.block}>
+                  <Invite
+                    stage={invite}
+                    admission={admission}
+                    onInvite={name => inviteRef.current?.(name)}
+                    onClose={() => {
+                      setInvite({ stage: 'shut' })
+                      setAdmission(null)
+                    }}
+                  />
+                </View>
+              )}
 
-          {openScope !== null && trust !== null && party !== null && (
-            <View style={styles.block}>
-              <Trust
-                participant={party.other}
-                given={names.get(party.other)}
-                reading={trust}
-                onBack={() => setTrust(null)}
-              />
-            </View>
-          )}
+            {openScope !== null && trust !== null && party !== null && (
+              <View style={styles.block}>
+                <Trust
+                  participant={party.other}
+                  given={names.get(party.other)}
+                  reading={trust}
+                  onBack={() => setTrust(null)}
+                />
+              </View>
+            )}
 
-          {/* THE CONVERSATION, AND ONLY THE CONVERSATION.
+            {/* THE CONVERSATION, AND ONLY THE CONVERSATION.
               Screen 21 is the reference screen, and its own note is the
               argument: "la spécificité de Messagr ne doit se voir que là où
               elle apporte quelque chose. Partout ailleurs, l'application
@@ -1633,30 +1729,30 @@ export function App({
               stacked around it. The rare gestures are one tap away now, on a
               screen about the person, which is where every messenger somebody
               has already used keeps them. */}
-          {openScope !== null &&
-            trust === null &&
-            !personOpen &&
-            conversation !== null &&
-            sendMessage !== null && (
-              <View style={styles.block}>
-                <Conversation
-                  reactions={reactions}
-                  read={readHere}
-                  onReact={(target, key, own) =>
-                    reactRef.current?.(target, key, own)
-                  }
-                  entries={conversation}
-                  selfUserId={selfUserId}
-                  sending={sending}
-                  onLoadImage={loadImage}
-                  otherParty={party?.other}
-                  onOpenPlate={(plate, at) => setOpenPlate({ plate, at })}
-                />
-                {/* What the passive half found, when it found anything. A
+            {openScope !== null &&
+              trust === null &&
+              !personOpen &&
+              conversation !== null &&
+              sendMessage !== null && (
+                <View style={styles.block}>
+                  <Conversation
+                    reactions={reactions}
+                    read={readHere}
+                    onReact={(target, key, own) =>
+                      reactRef.current?.(target, key, own)
+                    }
+                    entries={conversation}
+                    selfUserId={selfUserId}
+                    sending={sending}
+                    onLoadImage={loadImage}
+                    otherParty={party?.other}
+                    onOpenPlate={(plate, at) => setOpenPlate({ plate, at })}
+                  />
+                  {/* What the passive half found, when it found anything. A
                   refusal for an untrusted sender is the one worth saying:
                   what fixes it is verifying them, and this screen is where
                   somebody would otherwise just see a gap. */}
-                {/* TWO CASES, AND SILENCE FOR THE REST.
+                  {/* TWO CASES, AND SILENCE FOR THE REST.
                     It used to fall through to `${kind}: ${reason}` -- a
                     diagnostic string, in French copy, on a screen a person
                     reads. The two cases here are the two somebody can act
@@ -1666,141 +1762,142 @@ export function App({
                     Every other kind is a failure nobody on this screen can
                     do anything about, and it is in the launch report under
                     `history`, which is where somebody diagnosing it looks. */}
-                {claimed !== null && claimed.claimed === 'imported' && (
-                  <Text testID="history-claim" style={styles.historyNote}>
-                    {t('vouch_history_arrived')}
-                  </Text>
-                )}
-                {claimed !== null &&
-                  claimed.claimed !== 'none' &&
-                  claimed.claimed !== 'imported' &&
-                  claimed.kind === 'untrusted' && (
+                  {claimed !== null && claimed.claimed === 'imported' && (
                     <Text testID="history-claim" style={styles.historyNote}>
-                      {t('vouch_history_untrusted')}
+                      {t('vouch_history_arrived')}
                     </Text>
                   )}
-              </View>
-            )}
+                  {claimed !== null &&
+                    claimed.claimed !== 'none' &&
+                    claimed.claimed !== 'imported' &&
+                    claimed.kind === 'untrusted' && (
+                      <Text testID="history-claim" style={styles.historyNote}>
+                        {t('vouch_history_untrusted')}
+                      </Text>
+                    )}
+                </View>
+              )}
 
-          {/* THE PERSON, which is where what is specific to this product
+            {/* THE PERSON, which is where what is specific to this product
               lives: what is known about them, what you call them, and the two
               gestures that cannot be undone. One tap from the conversation
               and out of the way of reading it. */}
-          {openScope !== null && trust === null && personOpen && (
-            <View style={styles.block}>
-              <Pressable
-                testID="person-back"
-                onPress={() => setPersonOpen(false)}
-                accessibilityRole="button"
-                accessibilityLabel={t('person_back')}>
-                <Text style={styles.back}>{`\u2190 ${t('person_back')}`}</Text>
-              </Pressable>
+            {openScope !== null && trust === null && personOpen && (
+              <View style={styles.block}>
+                <Pressable
+                  testID="person-back"
+                  onPress={() => setPersonOpen(false)}
+                  accessibilityRole="button"
+                  accessibilityLabel={t('person_back')}>
+                  <Text
+                    style={styles.back}>{`\u2190 ${t('person_back')}`}</Text>
+                </Pressable>
 
-              {/* The way into the trust screen. "Who is this?" and "what do
+                {/* The way into the trust screen. "Who is this?" and "what do
                   we know of them?" are the same question asked twice, so they
                   are on the same screen. */}
-              {party !== null && (
-                <Pressable
-                  testID="open-trust"
-                  onPress={() =>
-                    readTrustRef.current?.(party.scope, party.other)
-                  }
-                  accessibilityRole="button"
-                  accessibilityLabel={t('trust_action')}>
-                  <Text style={styles.back}>{t('trust_action')}</Text>
-                </Pressable>
-              )}
-              <GiveName
-                participant={party?.other ?? null}
-                given={party === null ? undefined : names.get(party.other)}
-                onName={async (participant, name) => {
-                  const kept = await namesRef.current.set(participant, name)
-                  // Shown either way. A name held only in memory is still the
-                  // name on this screen, and `kept` is what says whether it
-                  // will survive the next launch.
-                  setNames(held => new Map(held).set(participant, name))
-                  if (!kept) {
-                    logEvent('warn', 'MESSAGR_GIVEN_NAME_NOT_KEPT', {})
-                  }
-                  return kept
-                }}
-              />
-
-              {/* #34's gesture, and only where it means something: a
-                conversation of two, where "the other person" names
-                somebody rather than being chosen by this application. */}
-              {party !== null && sessionClientRef.current !== null && (
-                <Vouch
-                  entrantId={party.other}
-                  // `?? []` because this screen is reachable while the
-                  // conversation is still deriving. "No history to hand over"
-                  // is the safe reading of not knowing yet: `Vouch` says a
-                  // different sentence for each, and the wrong one would
-                  // promise a past that had not been counted.
-                  hasHistory={(conversation ?? []).length > 0}
-                  state={vouch}
-                  onVouch={() => {
-                    const vouching = sessionClientRef.current
-                    const held = credentialsRef.current
-                    if (vouching === null || held === null) return
-                    setVouch('working')
-                    // The outcome is a value rather than a throw --
-                    // `vouchFor` reports which step stopped -- so there is
-                    // nothing here to catch, and the promise is deliberately
-                    // left to settle into state.
-                    vouchForEntrant(
-                      vouching,
-                      held,
-                      party.scope,
-                      party.other,
-                    ).then(setVouch, () => {
-                      setVouch({
-                        vouched: false,
-                        stage: 'assembling',
-                        reason: 'the gesture could not be started',
-                        promoted: false,
-                      })
-                    })
+                {party !== null && (
+                  <Pressable
+                    testID="open-trust"
+                    onPress={() =>
+                      readTrustRef.current?.(party.scope, party.other)
+                    }
+                    accessibilityRole="button"
+                    accessibilityLabel={t('trust_action')}>
+                    <Text style={styles.back}>{t('trust_action')}</Text>
+                  </Pressable>
+                )}
+                <GiveName
+                  participant={party?.other ?? null}
+                  given={party === null ? undefined : names.get(party.other)}
+                  onName={async (participant, name) => {
+                    const kept = await namesRef.current.set(participant, name)
+                    // Shown either way. A name held only in memory is still the
+                    // name on this screen, and `kept` is what says whether it
+                    // will survive the next launch.
+                    setNames(held => new Map(held).set(participant, name))
+                    if (!kept) {
+                      logEvent('warn', 'MESSAGR_GIVEN_NAME_NOT_KEPT', {})
+                    }
+                    return kept
                   }}
                 />
-              )}
 
-              {/* The mirror gesture, offered beside the one it undoes the
+                {/* #34's gesture, and only where it means something: a
+                conversation of two, where "the other person" names
+                somebody rather than being chosen by this application. */}
+                {party !== null && sessionClientRef.current !== null && (
+                  <Vouch
+                    entrantId={party.other}
+                    // `?? []` because this screen is reachable while the
+                    // conversation is still deriving. "No history to hand over"
+                    // is the safe reading of not knowing yet: `Vouch` says a
+                    // different sentence for each, and the wrong one would
+                    // promise a past that had not been counted.
+                    hasHistory={(conversation ?? []).length > 0}
+                    state={vouch}
+                    onVouch={() => {
+                      const vouching = sessionClientRef.current
+                      const held = credentialsRef.current
+                      if (vouching === null || held === null) return
+                      setVouch('working')
+                      // The outcome is a value rather than a throw --
+                      // `vouchFor` reports which step stopped -- so there is
+                      // nothing here to catch, and the promise is deliberately
+                      // left to settle into state.
+                      vouchForEntrant(
+                        vouching,
+                        held,
+                        party.scope,
+                        party.other,
+                      ).then(setVouch, () => {
+                        setVouch({
+                          vouched: false,
+                          stage: 'assembling',
+                          reason: 'the gesture could not be started',
+                          promoted: false,
+                        })
+                      })
+                    }}
+                  />
+                )}
+
+                {/* The mirror gesture, offered beside the one it undoes the
                 effect of. Same two-step shape, because removing somebody
                 cannot be undone either -- and the sentence it owes a
                 person is a different one. */}
-              {party !== null && (
-                <Evict
-                  memberId={party.other}
-                  state={evicted}
-                  onEvict={() => {
-                    const evicting = sessionClientRef.current
-                    if (evicting === null) return
-                    setEvicted('working')
-                    evictMember(evicting, party.scope, party.other).then(
-                      setEvicted,
-                      () => {
-                        setEvicted({
-                          evicted: false,
-                          stage: 'removing',
-                          reason: 'the gesture could not be started',
-                          rotated: false,
-                        })
-                      },
-                    )
-                  }}
-                />
-              )}
-            </View>
-          )}
-        </ScrollView>
+                {party !== null && (
+                  <Evict
+                    memberId={party.other}
+                    state={evicted}
+                    onEvict={() => {
+                      const evicting = sessionClientRef.current
+                      if (evicting === null) return
+                      setEvicted('working')
+                      evictMember(evicting, party.scope, party.other).then(
+                        setEvicted,
+                        () => {
+                          setEvicted({
+                            evicted: false,
+                            stage: 'removing',
+                            reason: 'the gesture could not be started',
+                            rotated: false,
+                          })
+                        },
+                      )
+                    }}
+                  />
+                )}
+              </View>
+            )}
+          </ScrollView>
 
-        {/* Outside the scroll view on purpose: a bar that scrolled away is a
+          {/* Outside the scroll view on purpose: a bar that scrolled away is a
             bar nobody can reach without scrolling back, and muscle memory is
             the whole point of a bottom bar. Hidden while a conversation is
             open, which is what the mockup draws -- a conversation is a place
             you leave rather than a fifth tab. */}
-        {/* THE DOCK: the action above the bar, in that order, anchored to the
+          {/* THE DOCK: the action above the bar, in that order, anchored to the
             bottom and outside the scroll view so both are where the thumb
             left them. `box-none` so the gap between them is not a surface
             that swallows taps meant for the list underneath.
@@ -1808,42 +1905,45 @@ export function App({
             The action shows only on the list, and only when the invitation
             panel is not already open: a control that opens what is on screen
             is a control that does nothing. */}
-        <View
-          style={styles.dock}
-          pointerEvents="box-none"
-          onLayout={event => setDockHeight(event.nativeEvent.layout.height)}>
-          {openScope === null && tab === 'chat' && invite.stage === 'shut' && (
-            <FloatingAction
-              testID="invite-open"
-              label={t('invite_open')}
-              onPress={() => setInvite({ stage: 'resting' })}
-            />
-          )}
+          <View
+            style={styles.dock}
+            pointerEvents="box-none"
+            onLayout={event => setDockHeight(event.nativeEvent.layout.height)}>
+            {openScope === null &&
+              tab === 'chat' &&
+              invite.stage === 'shut' && (
+                <FloatingAction
+                  testID="invite-open"
+                  label={t('invite_open')}
+                  onPress={() => setInvite({ stage: 'resting' })}
+                />
+              )}
 
-          {/* THE INPUT BAR IS PART OF THE DOCK, above the tabs.
+            {/* THE INPUT BAR IS PART OF THE DOCK, above the tabs.
               It was the last thing in the conversation's own scroll view, so
               it scrolled away with the messages and somebody had to reach the
               bottom of the thread to type. Here it is where the thumb left
               it. */}
-          {openScope !== null &&
-            trust === null &&
-            !personOpen &&
-            sendMessage !== null && (
-              <Composer
-                onSend={sendMessage}
-                onAttach={() => attachRef.current?.()}
-              />
-            )}
+            {openScope !== null &&
+              trust === null &&
+              !personOpen &&
+              sendMessage !== null && (
+                <Composer
+                  onSend={sendMessage}
+                  onAttach={() => attachRef.current?.()}
+                />
+              )}
 
-          {/* THE TABS STAY, EVEN INSIDE A CONVERSATION.
+            {/* THE TABS STAY, EVEN INSIDE A CONVERSATION.
               The mockup hides them there, which is what every other messenger
               does, and this used to. Changed at the account holder's request:
               the bar never moves, so muscle memory holds everywhere. Recorded
               as a decision rather than a drift. */}
-          <TabBar current={tab} onSelect={setTab} unread={unreadCount} />
-        </View>
-      </SafeAreaView>
-    </SafeAreaProvider>
+            <TabBar current={tab} onSelect={setTab} unread={unreadCount} />
+          </View>
+        </SafeAreaView>
+      </SafeAreaProvider>
+    </GestureHandlerRootView>
   )
 }
 
@@ -1866,6 +1966,11 @@ export function App({
 const NEAR_THE_END = 80
 
 const styles = StyleSheet.create({
+  // GESTURE HANDLER WANTS A ROOT, AND IT WANTS ONE THAT FILLS THE SCREEN.
+  // Its native handlers attach to this view; without `flex: 1` it lays out at
+  // zero height and every gesture below it is delivered to nothing -- which
+  // looks exactly like the library not working.
+  root: { flex: 1 },
   back: {
     ...typeScale.bodySm,
     color: color.brand.green700,
