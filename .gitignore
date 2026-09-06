@@ -17,3 +17,10 @@ packages/app/.artifacts/
 
 # Rust build output for the internalised service.
 services/**/target/
+
+# Agent worktrees. `Agent(isolation: "worktree")` checks a branch of this same
+# repository out under here, so everything below is a second copy of the tree:
+# git sees an embedded repository, eslint lints files that already have their
+# own configuration, and prettier reformats a checkout somebody is working in.
+# Scratch space, and none of the three should look at it.
+.claude/worktrees/

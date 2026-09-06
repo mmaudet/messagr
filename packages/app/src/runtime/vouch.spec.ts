@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import type { HttpRequester } from './pump'
+import { PumpHttpError, type HttpRequester } from './pump'
 import {
   PROMOTED_LEVEL,
   theOtherMember,
@@ -33,6 +33,12 @@ function world(
     readonly toDeviceSends?: boolean
     readonly uploadFails?: boolean
     readonly announceFails?: boolean
+    /**
+     * The drain has a request to send and the send is refused. Different
+     * from `toDeviceSends: false`, which is the machine having nothing to
+     * send at all -- and telling those two apart is what #119 is about.
+     */
+    readonly drainRefuses?: boolean
   } = {},
 ) {
   const log: string[] = []
@@ -43,6 +49,9 @@ function world(
   const http: HttpRequester = {
     authedRequest: async (method, path, _query, body) => {
       if (path.includes('/sendToDevice/')) {
+        if (overrides.drainRefuses === true) {
+          throw new PumpHttpError('the homeserver refused it', 502)
+        }
         log.push('to-device sent')
         return '{}'
       }
@@ -72,7 +81,7 @@ function world(
       announced.push({ url, secret, userId })
     },
     takeOutgoingRequests: async () =>
-      overrides.toDeviceSends === false
+      overrides.toDeviceSends === false && overrides.drainRefuses !== true
         ? []
         : [
             {
@@ -153,6 +162,38 @@ describe('vouching for an entrant', () => {
     expect(outcome.stage).toBe('sending')
     expect(outcome.promoted).toBe(false)
     expect(w.log).not.toContain('power level raised')
+  })
+
+  it('says the devices are not known yet, rather than that nothing reported why', async () => {
+    // TWO FAILURES USED TO WEAR ONE SENTENCE.
+    //
+    // A drain that sends no to-device request and reports no failure is not
+    // a mystery: the machine had no devices to send to. That is what happens
+    // to somebody who entered moments ago, before this device has seen their
+    // keys, and the honest answer is "wait and try again".
+    //
+    // It read "nothing reported why", which sent me looking for a fault that
+    // was not there, on two devices (#119). The distinction is pinned here
+    // because it is the difference between what the person should do next.
+    const w = world({ toDeviceSends: false })
+    const outcome = await vouchFor(w.http, w.machine, w.media, SCOPE, ENTRANT)
+
+    expect(outcome.vouched).toBe(false)
+    if (outcome.vouched) return
+    expect(outcome.reason).toContain('does not know')
+    expect(outcome.reason).not.toContain('refused')
+  })
+
+  it('says it was refused when something actually refused it', async () => {
+    // The other half, and the one that must not say "wait a moment": trying
+    // again immediately will be refused the same way.
+    const w = world({ toDeviceSends: false, drainRefuses: true })
+    const outcome = await vouchFor(w.http, w.machine, w.media, SCOPE, ENTRANT)
+
+    expect(outcome.vouched).toBe(false)
+    if (outcome.vouched) return
+    expect(outcome.reason).toContain('refused')
+    expect(outcome.reason).toContain('to_device')
   })
 
   it('uploads the ciphertext and never the secret', async () => {

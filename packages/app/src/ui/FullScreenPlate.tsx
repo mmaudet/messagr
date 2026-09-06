@@ -7,12 +7,15 @@ import {
   Text,
   useWindowDimensions,
   View,
+  type GestureResponderEvent,
   type NativeScrollEvent,
   type NativeSyntheticEvent,
 } from 'react-native'
 
+import { GestureHandlerRootView } from 'react-native-gesture-handler'
+
 import { t } from '../copy'
-import { color, floors, layout, space, type } from '../design/tokens'
+import { color, floors, layout, radius, space, type } from '../design/tokens'
 import type { ShownImage } from '../runtime/receiveImage'
 import type { ReadImage } from '../timeline/imageEvent'
 import type { Plate } from '../timeline/plates'
@@ -68,6 +71,34 @@ export function FullScreenPlate({
   // A zoomed photograph owns the drag. `Pinchable` says why the pager has to
   // give it up rather than the two of them sharing it.
   const [zoomed, setZoomed] = useState(false)
+  /**
+   * Whether two fingers are down anywhere on this screen.
+   *
+   * THE PAGER WAS WINNING THE PINCH, AND CAPTURE IS WHY.
+   *
+   * `Pinchable` asked for the gesture with `onMoveShouldSetPanResponder
+   * Capture`, on the reasoning that a ScrollView takes a drag before a child
+   * sees one. That reasoning is right and the remedy was backwards: React
+   * Native's capture phase runs from the root *towards* the target, so an
+   * ancestor captures first -- and the pager is the ancestor. Two fingers
+   * spreading move their centroid, the pager read that as a swipe and
+   * claimed, and the pinch never began. Reported from the device, where it
+   * simply did nothing.
+   *
+   * So the count is read here, above the pager, in the phase that runs before
+   * it, and the handlers decline every time -- they observe, they never
+   * claim. A pager that is not scrollable cannot take a drag, and `Pinchable`
+   * is then the only thing left asking for it.
+   */
+  const [twoFingers, setTwoFingers] = useState(false)
+  const watch = (event: GestureResponderEvent) => {
+    const two = event.nativeEvent.touches.length >= 2
+    // Only on a change: this runs on every touch move, and a `setState` per
+    // frame would re-render the whole viewer under the gesture it is trying
+    // to let through.
+    setTwoFingers(held => (held === two ? held : two))
+    return false
+  }
   const rail = useRef<React.ComponentRef<typeof ScrollView>>(null)
 
   function settled(event: NativeSyntheticEvent<NativeScrollEvent>) {
@@ -85,60 +116,96 @@ export function FullScreenPlate({
       animationType="fade"
       onRequestClose={onClose}
       testID="plate-full">
-      <View style={styles.ground}>
-        <View style={styles.bar}>
-          <Pressable
-            testID="plate-close"
-            onPress={onClose}
-            accessibilityRole="button"
-            accessibilityLabel={t('plate_close')}
-            style={styles.target}>
-            <Text style={styles.chevron}>{'←'}</Text>
-          </Pressable>
-          <Text style={styles.of} testID="plate-of">
-            {t('plate_of %1$d %2$d', showing + 1, entries.length)}
-          </Text>
-        </View>
+      {/* ITS OWN ROOT, BECAUSE A MODAL IS ITS OWN WINDOW.
+          React Native renders a `Modal` into a separate native view
+          hierarchy, so the `GestureHandlerRootView` at the application's root
+          does not reach inside it -- and a gesture handler with no root above
+          it receives nothing and reports nothing, which looks exactly like a
+          library that does not work. */}
+      <GestureHandlerRootView style={styles.ground}>
+        <View
+          style={styles.ground}
+          onStartShouldSetResponderCapture={watch}
+          onMoveShouldSetResponderCapture={watch}>
+          <View style={styles.bar}>
+            {/* A TARGET, NOT A GLYPH.
+                It was a bare arrow in the top-left corner. The touch area met
+                the 44pt floor, but on a photograph with nothing behind it
+                there was nothing to aim at -- and 44pt hard against the edge
+                of a screen shares its room with the system's own back
+                gesture. Reported from the device as small and unresponsive,
+                and both halves of that were true.
 
-        <ScrollView
-          ref={rail}
-          testID="plate-rail"
-          horizontal
-          pagingEnabled
-          showsHorizontalScrollIndicator={false}
-          scrollEnabled={!zoomed}
-          onMomentumScrollEnd={settled}
-          // Where it opens. `contentOffset` is honoured on iOS; Android wants
-          // the scroll after layout, which is what the callback does. Both,
-          // because each platform quietly ignores the other's.
-          contentOffset={{ x: opening * width, y: 0 }}
-          onLayout={() =>
-            rail.current?.scrollTo({ x: opening * width, animated: false })
-          }
-          style={styles.rail}>
-          {entries.map((entry, index) => (
-            <View key={entry.eventId} style={[styles.page, { width }]}>
-              {entry.image !== undefined && (
-                <Pinchable
-                  width={width}
-                  height={height}
-                  active={index === showing}
-                  onZoomed={setZoomed}
-                  testID={`pinch-${entry.eventId}`}>
-                  <Photograph
-                    image={entry.image}
-                    fetch={fetch}
-                    testID={`full-${entry.eventId}`}
-                  />
-                </Pinchable>
-              )}
-            </View>
-          ))}
-        </ScrollView>
-      </View>
+                So: a plate that says where to press, and `hitSlop` past it --
+                the same split the reaction chips use, where the drawn size
+                and the reachable size are allowed to differ. */}
+            <Pressable
+              testID="plate-close"
+              onPress={onClose}
+              accessibilityRole="button"
+              accessibilityLabel={t('plate_close')}
+              hitSlop={REACH}
+              style={({ pressed }) => [
+                styles.target,
+                pressed && styles.pressed,
+              ]}>
+              <Text style={styles.chevron}>{'←'}</Text>
+            </Pressable>
+            <Text style={styles.of} testID="plate-of">
+              {t('plate_of %1$d %2$d', showing + 1, entries.length)}
+            </Text>
+          </View>
+
+          <ScrollView
+            ref={rail}
+            testID="plate-rail"
+            horizontal
+            pagingEnabled
+            showsHorizontalScrollIndicator={false}
+            scrollEnabled={!zoomed && !twoFingers}
+            onMomentumScrollEnd={settled}
+            // Where it opens. `contentOffset` is honoured on iOS; Android wants
+            // the scroll after layout, which is what the callback does. Both,
+            // because each platform quietly ignores the other's.
+            contentOffset={{ x: opening * width, y: 0 }}
+            onLayout={() =>
+              rail.current?.scrollTo({ x: opening * width, animated: false })
+            }
+            style={styles.rail}>
+            {entries.map((entry, index) => (
+              <View key={entry.eventId} style={[styles.page, { width }]}>
+                {entry.image !== undefined && (
+                  <Pinchable
+                    width={width}
+                    height={height}
+                    active={index === showing}
+                    onZoomed={setZoomed}
+                    testID={`pinch-${entry.eventId}`}>
+                    <Photograph
+                      image={entry.image}
+                      fetch={fetch}
+                      testID={`full-${entry.eventId}`}
+                    />
+                  </Pinchable>
+                )}
+              </View>
+            ))}
+          </ScrollView>
+        </View>
+      </GestureHandlerRootView>
     </Modal>
   )
 }
+
+/**
+ * How far past its plate the close control answers.
+ *
+ * The plate is 44 and the floor is met without this; the slop is for where it
+ * sits. A control in the top-left corner of a phone shares that corner with
+ * the system's back gesture and with a hand's least accurate reach, and the
+ * cheapest answer to both is to make it answer sooner than it looks.
+ */
+const REACH = { top: space.m, bottom: space.m, left: space.m, right: space.m }
 
 const styles = StyleSheet.create({
   ground: {
@@ -159,11 +226,19 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   target: {
-    minWidth: floors.touchTargetMin,
-    minHeight: floors.touchTargetMin,
+    width: floors.touchTargetMin,
+    height: floors.touchTargetMin,
+    borderRadius: radius.pill,
+    // The one surface in the dark palette that is *lighter* than its ground,
+    // which is what a control on a photograph needs to be found at all.
+    backgroundColor: color.dark.surface.raised,
     alignItems: 'center',
     justifyContent: 'center',
   },
+  // Pressing says so. On a screen with no other chrome, a control that does
+  // not answer the finger reads as a control that did not receive it -- which
+  // is what "not responsive enough" meant.
+  pressed: { backgroundColor: color.dark.surface.paper },
   chevron: {
     ...type.titleLg,
     color: color.surface.paper,

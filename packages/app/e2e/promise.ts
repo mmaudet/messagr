@@ -25,5 +25,23 @@ export async function acceptThePromise(): Promise<void> {
     .toBeVisible()
     .withTimeout(30000)
   await element(by.id('promise-terms')).tap()
+
+  // SCROLLED TO, BECAUSE THIS SCREEN SAYS IT SCROLLS.
+  //
+  // `FirstLaunch` wraps itself in a ScrollView with its reason written down:
+  // the four points and the thesis do not fit a small phone at the largest
+  // system text size, and "a promise with its action below the fold is a
+  // promise nobody can accept". This helper tapped the action where it
+  // happened to be, which held only while the screen happened to be short.
+  //
+  // It stopped holding the day the language selector became a column -- four
+  // rows instead of one strip -- and every test in the suite failed at the
+  // hook, on a screen that was rendering correctly and an action Detox
+  // reported at y=2344 on a 2364-tall phone. Searching for it is what makes
+  // the helper honest about the screen it drives.
+  await waitFor(element(by.id('promise-action')))
+    .toBeVisible()
+    .whileElement(by.id('promise-scroll'))
+    .scroll(300, 'down')
   await element(by.id('promise-action')).tap()
 }
