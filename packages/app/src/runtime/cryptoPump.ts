@@ -65,6 +65,10 @@ import {
   type CryptoPumpReport,
 } from './outgoingPumpCycle'
 import { fetchRoomMessages, toTimelineEntries } from '../timeline/buildTimeline'
+import {
+  fetchConversationSummaries,
+  type ConversationSummary,
+} from './conversationList'
 import type { TimelineEntry } from '../timeline/mergeTimeline'
 import { makeToDeviceSource, subscribeToDeviceMessages } from './toDeviceBridge'
 
@@ -495,4 +499,29 @@ export function startLiveSync(
     onState,
     sleep: ms => new Promise(resolve => setTimeout(resolve, ms)),
   })
+}
+
+/**
+ * The list of conversations, bound to the real transport and the real crypto
+ * machine.
+ *
+ * Pure glue, like every other phase here. What it derives, and why it is not
+ * built out of the sync loop's own response, is `conversationList.ts`'s
+ * `fetchConversationSummaries`, tested there against injected fakes.
+ */
+export async function listConversations(
+  sessionClient: ReturnType<typeof createClient>,
+  selfUserId: string,
+): Promise<ConversationSummary[]> {
+  return fetchConversationSummaries(
+    {
+      http: makePumpHttp(sessionClient),
+      machine: {
+        decryptEvent: (scope, rawEvent) =>
+          decryptEvent(asCryptoScopeId(scope), rawEvent),
+      },
+      decodeUtf8: bytes => new TextDecoder().decode(bytes),
+    },
+    selfUserId,
+  )
 }
