@@ -2,12 +2,11 @@ import { execFileSync } from 'node:child_process'
 import { resolve } from 'node:path'
 
 import { expect } from '@jest/globals'
-import { device } from 'detox'
+import { by, device, element, waitFor } from 'detox'
 
 import { IGNORING_THE_LIVE_POLL } from './longPoll'
 import { acceptThePromise } from './promise'
 import { NOTIFICATIONS_GRANTED } from './permissions'
-import { seeOnScreen } from './onScreen'
 import { forgetTheLog, whatItReported } from './reported'
 
 /**
@@ -234,19 +233,38 @@ describeRoundTrip('encrypted round trip', () => {
     }
   })
 
-  it("shows the independent client's message as announced, not as known", async () => {
-    // The trust model, on the screen a person actually reads rather than on
-    // a diagnostic line. Decrypting proves which key wrote the message and
-    // nothing about who holds it, so the conversation says the sender is
-    // announced -- and the word "vérifier" appears nowhere on it.
-    // Searched for rather than merely waited on. The label is two lines tall
-    // because a Matrix user id is long, and Detox wants 75 per cent of an
-    // element visible: a plain `toBeVisible` timed out at sixty seconds
-    // against a screen rendering exactly the right words. `onScreen.ts` says
-    // why this is not the deleted readout helper returning.
-    await seeOnScreen(
-      `Se présente comme ${process.env.MESSAGR_INTEROP_USER ?? ''}`,
+  it('says outright that nothing establishes who the sender is', async () => {
+    // THE TRUST MODEL, ON THE SCREEN THAT NOW CARRIES IT.
+    //
+    // This used to be asserted on a line above every incoming message
+    // spelling out the sender's full identifier. #84 took that away on
+    // purpose: in a conversation whose header already names the person,
+    // repeating the identifier above every message taught nobody anything
+    // and broke the density screen 21 is the reference for. It appears now
+    // only when the sender is *not* the person the conversation is with --
+    // which is exactly when the distinction between "the account says" and
+    // "the person is" has something to tell.
+    //
+    // The claim itself did not go anywhere, and `Conversation.tsx`'s own
+    // note says where: « the trust screen carries the argument in full ».
+    // So the assertion followed it there rather than being dropped, because
+    // what it guards is the thing this whole product is about -- decrypting
+    // an event proves which key wrote it and nothing about who holds that
+    // key, and the day the product stops saying so is the day it starts
+    // implying otherwise.
+    await element(by.id('open-person-menu')).tap()
+    await element(by.id('open-trust')).tap()
+    await waitFor(element(by.id('trust-headline')))
+      .toBeVisible()
+      .withTimeout(30000)
+    // The counterparty is an independent client that logged in and sent one
+    // message. Nothing has been vouched and nothing confirmed in person, and
+    // this is the screen saying so in as many words.
+    await waitFor(
+      element(by.text('Rien n’établit encore qui est cette personne.')),
     )
+      .toBeVisible()
+      .withTimeout(30000)
   })
 
   it('does not present the sender as established', async () => {
