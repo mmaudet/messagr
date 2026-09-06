@@ -295,6 +295,11 @@ export const nl: Readonly<Record<CopyKey, string>> = {
   community_soon_why:
     'Een gemeenschap groepeert kamers onder een pseudoniem object. Het tabblad is gereserveerd om dezelfde reden als dat van de oproepen: de balk mag niet verschuiven wanneer ze er zijn.',
   brand_name: 'Messagr',
+  composer_emoji: 'Emoji',
+  composer_photo: 'Een foto toevoegen',
+  composer_record: 'Spraakbericht',
+  composer_record_soon:
+    'Spraakberichten komen in V2. De knop houdt zijn plek zodat de balk die dag niet verschuift.',
   person_open: 'Over deze persoon',
   person_title: 'Deze persoon',
   person_back: 'Terug',

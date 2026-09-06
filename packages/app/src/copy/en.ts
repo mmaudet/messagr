@@ -298,6 +298,11 @@ export const en: Readonly<Record<CopyKey, string>> = {
   community_soon_why:
     'A community groups rooms under a pseudonymous object. The tab is held for the same reason as the calls one: the bar must not move when they arrive.',
   brand_name: 'Messagr',
+  composer_emoji: 'Emoji',
+  composer_photo: 'Add a photo',
+  composer_record: 'Voice message',
+  composer_record_soon:
+    'Voice messages arrive in V2. The button holds its place so the bar does not move that day.',
   person_open: 'About this person',
   person_title: 'This person',
   person_back: 'Back',

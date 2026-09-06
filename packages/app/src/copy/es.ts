@@ -296,6 +296,11 @@ export const es: Readonly<Record<CopyKey, string>> = {
   community_soon_why:
     'Una comunidad agrupa salas bajo un objeto seudónimo. La pestaña está reservada por la misma razón que la de las llamadas: la barra no debe moverse cuando lleguen.',
   brand_name: 'Messagr',
+  composer_emoji: 'Emojis',
+  composer_photo: 'Añadir una foto',
+  composer_record: 'Nota de voz',
+  composer_record_soon:
+    'Las notas de voz llegan en la V2. El botón guarda su sitio para que la barra no se mueva ese día.',
   person_open: 'Sobre esta persona',
   person_title: 'Esta persona',
   person_back: 'Volver',

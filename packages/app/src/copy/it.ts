@@ -294,6 +294,11 @@ export const it: Readonly<Record<CopyKey, string>> = {
   community_soon_why:
     'Una comunità raggruppa stanze sotto un oggetto pseudonimo. La scheda è riservata per la stessa ragione di quella delle chiamate: la barra non deve spostarsi quando arriveranno.',
   brand_name: 'Messagr',
+  composer_emoji: 'Emoji',
+  composer_photo: 'Aggiungere una foto',
+  composer_record: 'Messaggio vocale',
+  composer_record_soon:
+    'I messaggi vocali arrivano in V2. Il pulsante tiene il suo posto perché la barra non si sposti quel giorno.',
   person_open: 'Su questa persona',
   person_title: 'Questa persona',
   person_back: 'Indietro',

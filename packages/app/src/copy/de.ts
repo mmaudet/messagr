@@ -302,6 +302,11 @@ export const de: Readonly<Record<CopyKey, string>> = {
   community_soon_why:
     'Eine Community fasst Räume unter einem pseudonymen Objekt zusammen. Der Reiter ist aus demselben Grund reserviert wie der für Anrufe: die Leiste darf sich nicht verschieben, wenn sie kommen.',
   brand_name: 'Messagr',
+  composer_emoji: 'Emojis',
+  composer_photo: 'Ein Foto hinzufügen',
+  composer_record: 'Sprachnachricht',
+  composer_record_soon:
+    'Sprachnachrichten kommen in V2. Der Knopf hält seinen Platz, damit sich die Leiste an dem Tag nicht verschiebt.',
   person_open: 'Über diese Person',
   person_title: 'Diese Person',
   person_back: 'Zurück',

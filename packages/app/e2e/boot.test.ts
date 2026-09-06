@@ -144,7 +144,11 @@ describe('boot', () => {
     // person does anyway -- nobody types a message one key event at a time
     // while a test watches.
     await element(by.id('conversation-input')).replaceText(written)
-    await element(by.id('conversation-send')).tap()
+    // THE RETURN KEY IS THE SEND KEY, and there is no other. The bar has no
+    // send button: its round green place belongs to recording, which is V2.
+    // A suite that tapped a button would be testing an application nobody
+    // ships.
+    await element(by.id('conversation-input')).tapReturnKey()
 
     // Generous: this encrypts, shares a room key if the session needs one,
     // sends, and then reads the room back.

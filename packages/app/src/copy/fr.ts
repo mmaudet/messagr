@@ -466,6 +466,11 @@ export const fr = {
   // `brand_name` is the product's own name and is not translated -- a name
   // that changes by language is a different product.
   brand_name: 'Messagr',
+  composer_emoji: 'Émojis',
+  composer_photo: 'Ajouter une photo',
+  composer_record: 'Message vocal',
+  composer_record_soon:
+    'Les messages vocaux arrivent en V2. Le bouton garde sa place pour que la barre ne bouge pas ce jour-là.',
 
   // L'écran de la personne, et l'en-tête qui y mène.
   person_open: 'À propos de cette personne',

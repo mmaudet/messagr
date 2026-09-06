@@ -1392,6 +1392,33 @@ export function App({
             screen under it, and a fact about the instance that scrolls away
             is one nobody reads twice. */}
         <Header />
+
+        {/* THE CONVERSATION'S OWN BAR, and it is chrome rather than content.
+            It was inside the scroll view, so it inherited that view's 24pt
+            padding and sat inset from both edges while the messages slid
+            under it. Here it spans the screen and stays put, like the band
+            above it and the dock below. */}
+        {openScope !== null && trust === null && !personOpen && (
+          <ConversationHeader
+            shown={
+              party === null
+                ? openScope
+                : displayNameFor(party.other, names.get(party.other))
+            }
+            named={party !== null && names.get(party.other) !== undefined}
+            identifier={party?.other}
+            onBack={() => {
+              setOpenScope(null)
+              openScopeRef.current = null
+              setTrust(null)
+              // Otherwise the next conversation opens on the person screen of
+              // the one before it.
+              setPersonOpen(false)
+            }}
+            onOpenPerson={() => setPersonOpen(true)}
+          />
+        )}
+
         <ScrollView
           testID="diagnostic-scroll"
           // Ends above the dock rather than under it. The dock is absolute,
@@ -1549,24 +1576,6 @@ export function App({
             conversation !== null &&
             sendMessage !== null && (
               <View style={styles.block}>
-                <ConversationHeader
-                  shown={
-                    party === null
-                      ? openScope
-                      : displayNameFor(party.other, names.get(party.other))
-                  }
-                  named={party !== null && names.get(party.other) !== undefined}
-                  onBack={() => {
-                    setOpenScope(null)
-                    openScopeRef.current = null
-                    setTrust(null)
-                    // Otherwise the next conversation opens on the person
-                    // screen of the one before it.
-                    setPersonOpen(false)
-                  }}
-                  onOpenPerson={() => setPersonOpen(true)}
-                />
-
                 <Conversation
                   reactions={reactions}
                   read={readHere}

@@ -4,7 +4,7 @@
 // `yarn tokens:check`, so a stale copy of this file fails the build rather
 // than drifting quietly away from the design it claims to carry.
 //
-// Source: Messagr Prototype V3.dc.html, tokens v3.3.0
+// Source: Messagr Prototype V3.dc.html, tokens v3.4.0
 
 /**
  * The spacing scale. Every margin, padding and gap comes from here.
@@ -148,6 +148,11 @@ export const type = {
     fontSize: 17,
     lineHeight: 22,
     fontWeight: '600',
+  },
+  titleMono: {
+    fontSize: 17,
+    lineHeight: 23,
+    fontWeight: '400',
   },
   body: {
     fontSize: 14.5,
