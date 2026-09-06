@@ -2,12 +2,11 @@ import { execFileSync } from 'node:child_process'
 import { resolve } from 'node:path'
 
 import { expect } from '@jest/globals'
-import { device } from 'detox'
+import { by, device, element, waitFor } from 'detox'
 
 import { IGNORING_THE_LIVE_POLL } from './longPoll'
 import { acceptThePromise } from './promise'
 import { NOTIFICATIONS_GRANTED } from './permissions'
-import { seeOnScreen } from './onScreen'
 import { forgetTheLog, whatItReported } from './reported'
 
 /**
@@ -251,12 +250,28 @@ describeRoundTrip('encrypted round trip', () => {
     // is the whole round trip made visible: an independent client's message,
     // decrypted, and attributed to nobody more than it can be.
     //
-    // Searched for rather than waited on: the label is two lines tall because
-    // a Matrix user id is long, and Detox wants 75 per cent of an element
-    // visible. `onScreen.ts` says why this is not the readout helper back.
-    await seeOnScreen(
-      `Se présente comme ${process.env.MESSAGR_INTEROP_USER ?? ''}`,
+    // NOT SEARCHED FOR. ASSERTED WHERE IT SHOULD ALREADY BE.
+    //
+    // This scrolled from the top and searched down, which worked until two
+    // other changes met each other: photographs are now fetched three at a
+    // time, so a conversation's height keeps growing for several seconds
+    // after it opens, and the frame follows its newest message while it
+    // does. A search that scrolls up and walks down is then racing a screen
+    // that keeps scrolling back to the bottom -- it timed out at three
+    // minutes against a label that was on the screen the whole time.
+    //
+    // The right assertion is the one that stopped being possible and became
+    // possible again: the counterparty's message IS the newest, the
+    // conversation rests at its newest (§13.27), so the label is on screen
+    // without anybody scrolling anywhere. If it is not, that is a defect in
+    // resting at the newest, and this is where it should be found.
+    await waitFor(
+      element(
+        by.text(`Se présente comme ${process.env.MESSAGR_INTEROP_USER ?? ''}`),
+      ),
     )
+      .toBeVisible()
+      .withTimeout(60000)
   })
 
   it('does not present the sender as established', async () => {
