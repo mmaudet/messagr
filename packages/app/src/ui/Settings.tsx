@@ -2,7 +2,9 @@ import React from 'react'
 import { Pressable, StyleSheet, Text, View } from 'react-native'
 
 import { t } from '../copy'
+import type { Language } from '../copy/languages'
 import { color, floors, layout, space, stroke, type } from '../design/tokens'
+import { LanguageStrip } from './LanguageStrip'
 
 /**
  * Settings.
@@ -34,6 +36,8 @@ export function Settings({
   receipts,
   onReceipts,
   receiptsNotKept,
+  language,
+  onLanguage,
   wake,
   onWake,
   wakeNotKept,
@@ -44,6 +48,9 @@ export function Settings({
   readonly onReceipts: (on: boolean) => void
   /** `true` when the last change could not be kept. */
   readonly receiptsNotKept: boolean
+  /** Which language is spoken, and changing it. Same control as #103's. */
+  readonly language: Language
+  readonly onLanguage: (language: Language) => void
   /** Whether this device asks to be woken. See `wakeSetting.ts`. */
   readonly wake: boolean
   readonly onWake: (on: boolean) => void
@@ -69,6 +76,20 @@ export function Settings({
         style={styles.row}>
         <Text style={styles.rowLabel}>{t('settings_legal')}</Text>
       </Pressable>
+
+      {/* THE SAME STRIP AS THE FIRST SCREEN, AND THE SAME GESTURE.
+          Choosing a language once and having no way to change it is a
+          reinstall as a correction. It is the same control rather than a
+          list, because a person who picked the wrong one is exactly the
+          person who cannot read a list of language names. */}
+      <View style={styles.setting} testID="setting-language">
+        <Text style={styles.rowLabel}>{t('settings_row_lang_label')}</Text>
+        <LanguageStrip
+          chosen={language}
+          onChoose={onLanguage}
+          testID="settings-language-strip"
+        />
+      </View>
 
       {/* The one setting this lot's own features need. Its hint says what
           turning it on costs rather than what it does: everybody knows what a

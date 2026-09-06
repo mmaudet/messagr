@@ -1372,6 +1372,8 @@ export function App({
                 onLegal={() => setLegalOpen(true)}
                 receipts={receipts}
                 receiptsNotKept={receiptsNotKept}
+                language={language}
+                onLanguage={chooseLanguage}
                 wake={wake}
                 wakeNotKept={wakeNotKept}
                 onWake={on => {
