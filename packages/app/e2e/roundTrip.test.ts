@@ -6,7 +6,7 @@ import { by, device, element, waitFor } from 'detox'
 import { IGNORING_THE_LIVE_POLL } from './longPoll'
 import { acceptThePromise } from './promise'
 import { NOTIFICATIONS_GRANTED } from './permissions'
-import { whatItReported } from './reported'
+import { forgetTheLog, whatItReported } from './reported'
 
 /**
  * WHAT THIS FILE READS, AND WHY IT CHANGED.
@@ -102,6 +102,12 @@ describeRoundTrip('encrypted round trip', () => {
     //
     // The first run claims the invitation, publishes this device's keys and
     // sends its own message.
+    // CLEARED FIRST, EVERY TIME. `whatItReported` takes the newest
+    // MESSAGR_RUNTIME line, and immediately after `launchApp` returns the
+    // newest one is still the *previous* launch's -- so a relaunch would be
+    // asserted against the launch it replaced. Clearing removes the race
+    // rather than sleeping through it.
+    forgetTheLog()
     await device.launchApp({
       newInstance: true,
       // See permissions.ts: a system dialog over the application would fail
@@ -138,6 +144,8 @@ describeRoundTrip('encrypted round trip', () => {
     // application that lost its session and claimed again would find the
     // token spent and the account unreachable -- losing a session is losing
     // the account.
+    // Cleared first: see the launch above for why every one of them is.
+    forgetTheLog()
     await device.launchApp({
       newInstance: true,
       // See permissions.ts: a system dialog over the application would fail
@@ -187,6 +195,10 @@ describeRoundTrip('encrypted round trip', () => {
     // somebody can run it.
     let seen = false
     for (let attempt = 0; attempt < 4 && !seen; attempt += 1) {
+      // Cleared first, and here it does more than remove a race: the loop
+      // asks the same question of each launch, so a line left by the one
+      // before would answer for it and the retry would prove nothing.
+      forgetTheLog()
       await device.launchApp({
         newInstance: true,
         permissions: NOTIFICATIONS_GRANTED,
