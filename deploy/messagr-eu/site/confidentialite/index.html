@@ -307,11 +307,19 @@
           >Ce qui traverse Google ne contient ni expéditeur, ni conversation, ni
           message.</strong
         >
-        Le signal envoyé porte exactement deux choses : l'identifiant technique
-        de votre appareil, et une priorité de remise. Rien d'autre — pas
-        d'identifiant de salon, pas d'identifiant d'événement, pas d'aperçu, pas
-        de compteur. C'est une passerelle écrite pour cela, et le contenu est
-        déchiffré par votre appareil, chez vous, après le réveil.
+        Le signal envoyé porte l'identifiant technique de votre appareil, une
+        priorité de remise, et un nombre tiré au hasard. Rien d'autre — pas
+        d'identifiant de salon, pas d'aperçu, pas de compteur. C'est une
+        passerelle écrite pour cela, et le contenu est déchiffré par votre
+        appareil, chez vous, après le réveil.
+      </p>
+      <p>
+        Le nombre tiré au hasard mérite une phrase, parce qu'il occupe un champ
+        dont le nom prête à confusion. Le système de notification refuse
+        d'acheminer un signal entièrement vide : il lui faut au moins un
+        identifiant. Nous lui en donnons donc un, tiré au hasard à chaque envoi,
+        sans aucun rapport avec le message. Il ne désigne rien, votre appareil
+        l'ignore, et deux envois n'ont jamais le même.
       </p>
       <p>
         Ce que Google détient donc, c'est un jeton d'appareil et le fait que
