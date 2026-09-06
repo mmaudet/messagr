@@ -92,7 +92,14 @@ export function NotchedButton({
           </Svg>
         </View>
       )}
-      <Text style={[styles.label, { color: palette.surface.paper }]}>
+      {/* INK ON GREEN, NOT PAPER ON GREEN.
+          Every one of the prototype's fourteen primary buttons is dark ink on
+          the brand green, and this was light on green until somebody compared
+          them. It is not only an off-brand button: paper on green500 measures
+          about 2:1, which fails the AA threshold for text, while ink on the
+          same green is comfortably above it. The mockup's choice was the
+          accessible one and this was not. */}
+      <Text style={[styles.label, { color: palette.brand.ink900 }]}>
         {label}
       </Text>
     </Pressable>
