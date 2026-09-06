@@ -29,6 +29,7 @@ import {
   admitEntrant,
   inviteSomebody,
   listConversations,
+  readTrust,
   startCryptoMachine,
   startLiveSync,
   vouchForEntrant,
@@ -36,6 +37,7 @@ import {
   type FormMigration,
   type ReceiveReport,
   type RunningSyncLoop,
+  type TrustReading,
   type SendReport,
   type SyncLoopState,
 } from './src/runtime/cryptoPump'
@@ -72,6 +74,9 @@ import type { HistoryClaim } from './src/runtime/claimHistory'
 import { Conversation } from './src/ui/Conversation'
 import { ConversationList } from './src/ui/ConversationList'
 import { Invite, type InviteStage } from './src/ui/Invite'
+import { Legal } from './src/ui/Legal'
+import { Settings } from './src/ui/Settings'
+import { Trust } from './src/ui/Trust'
 import { GiveName } from './src/ui/GiveName'
 import { FirstLaunch } from './src/ui/FirstLaunch'
 import { Evict } from './src/ui/Evict'
@@ -169,6 +174,17 @@ export function App({
   // Which conversation is open, held in a ref as well as in state: the live
   // sync loop's callbacks are created once and would otherwise keep deriving
   // whichever conversation was open when the loop started.
+  // Which panel the list side is showing. A conversation, when one is open,
+  // wins over all three: `openScope` is the deeper state and this is what sits
+  // behind it.
+  const [panel, setPanel] = useState<'list' | 'settings' | 'legal'>('list')
+  // What is known about the person on the other side. `null` until the screen
+  // is asked for: it costs a device-status call and a state fetch, and a
+  // conversation nobody opened that screen from should not pay for them.
+  const [trust, setTrust] = useState<TrustReading | null>(null)
+  const readTrustRef = useRef<((scope: string, other: string) => void) | null>(
+    null,
+  )
   const [openScope, setOpenScope] = useState<string | null>(null)
   const openScopeRef = useRef<string | null>(null)
   const openConversationRef = useRef<((scope: string) => void) | null>(null)
@@ -499,6 +515,18 @@ export function App({
               )
             }
             openConversationRef.current = showConversation
+
+            // Asked for rather than computed on every launch: it costs a
+            // device-status call and a state fetch per conversation.
+            readTrustRef.current = (scope: string, other: string) => {
+              readTrust(sessionClient, scope, other)
+                .then(setTrust)
+                .catch((cause: unknown) =>
+                  logEvent('warn', 'MESSAGR_TRUST_FAILED', {
+                    reason: getErrorMessage(cause),
+                  }),
+                )
+            }
 
             // INVITING, AND THE HALF NOBODY TAPS FOR.
             //
@@ -868,7 +896,22 @@ export function App({
 
               The instrument below stays on both, which is what a scaffold
               still needs and a product will not. */}
-          {openScope === null && (
+          {openScope === null && panel === 'settings' && (
+            <View style={styles.block}>
+              <Settings
+                onBack={() => setPanel('list')}
+                onLegal={() => setPanel('legal')}
+              />
+            </View>
+          )}
+
+          {openScope === null && panel === 'legal' && (
+            <View style={styles.block}>
+              <Legal onBack={() => setPanel('settings')} />
+            </View>
+          )}
+
+          {openScope === null && panel === 'list' && (
             <View style={styles.block}>
               <ConversationList
                 summaries={summaries}
@@ -884,10 +927,32 @@ export function App({
                   setAdmission(null)
                 }}
               />
+              {/* Reachable from the list, which is what the published terms
+                  promise: the article 14 information is on a screen
+                  "atteignable depuis les Réglages". */}
+              <Pressable
+                testID="open-settings"
+                onPress={() => setPanel('settings')}
+                accessibilityRole="button"
+                accessibilityLabel={t('settings_action')}>
+                <Text style={styles.back}>{t('settings_action')}</Text>
+              </Pressable>
+            </View>
+          )}
+
+          {openScope !== null && trust !== null && party !== null && (
+            <View style={styles.block}>
+              <Trust
+                participant={party.other}
+                given={names.get(party.other)}
+                reading={trust}
+                onBack={() => setTrust(null)}
+              />
             </View>
           )}
 
           {openScope !== null &&
+            trust === null &&
             conversation !== null &&
             sendMessage !== null && (
               <View style={styles.block}>
@@ -898,11 +963,27 @@ export function App({
                   onPress={() => {
                     setOpenScope(null)
                     openScopeRef.current = null
+                    setTrust(null)
                   }}
                   accessibilityRole="button"
                   accessibilityLabel={t('list_back')}>
                   <Text style={styles.back}>{`\u2190 ${t('list_back')}`}</Text>
                 </Pressable>
+
+                {/* The way into the trust screen, beside the name, because
+                  "who is this?" and "what do we know of them?" are the same
+                  question asked twice. */}
+                {party !== null && (
+                  <Pressable
+                    testID="open-trust"
+                    onPress={() =>
+                      readTrustRef.current?.(party.scope, party.other)
+                    }
+                    accessibilityRole="button"
+                    accessibilityLabel={t('trust_action')}>
+                    <Text style={styles.back}>{t('trust_action')}</Text>
+                  </Pressable>
+                )}
 
                 {/* Naming is offered here rather than on a row: the list is
                   where you read a name, the conversation is where you know
