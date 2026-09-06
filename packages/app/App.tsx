@@ -78,6 +78,11 @@ import type { ConversationSummary } from './src/runtime/conversationList'
 import type { GivenNames } from './src/runtime/givenName'
 import { forgetfulGivenNames } from './src/runtime/givenNameStore'
 import { forgetfulLastRead, type LastRead } from './src/runtime/lastReadStore'
+import {
+  forgetfulOutstanding,
+  type Outstanding,
+} from './src/runtime/outstandingStore'
+import { admitAnyoneWaiting } from './src/runtime/admitAnyoneWaiting'
 import { displayNameFor } from './src/runtime/givenName'
 import { openNotebook } from './src/runtime/notebook'
 import {
@@ -266,6 +271,14 @@ export function App({
   // every conversation as unread rather than as read, since a badge that
   // should be there is a smaller lie than one that should not.
   const lastReadRef = useRef<LastRead>(forgetfulLastRead())
+  /**
+   * The invitations this device has issued and nobody has come through yet.
+   *
+   * A ref rather than state for the reason the other two pages are: it is
+   * read from a sync tick, and a re-render for its own sake would be a
+   * re-render per poll.
+   */
+  const outstandingRef = useRef<Outstanding>(forgetfulOutstanding())
   // Which conversation is open, held in a ref as well as in state: the live
   // sync loop's callbacks are created once and would otherwise keep deriving
   // whichever conversation was open when the loop started.
@@ -625,6 +638,7 @@ export function App({
             const opening = await openNotebook(storeDir)
             namesRef.current = opening.names
             lastReadRef.current = opening.lastRead
+            outstandingRef.current = opening.outstanding
             logEvent(opening.opened ? 'info' : 'warn', 'MESSAGR_GIVEN_NAMES', {
               opened: opening.opened,
               ...(opening.minted === undefined
@@ -952,6 +966,30 @@ export function App({
                 }
                 setInvite({ stage: 'ready', link: issued.link })
                 setAdmission('waiting')
+                // WRITTEN DOWN BEFORE ANYBODY IS ASKED ABOUT IT.
+                //
+                // The poll below runs for a minute and then stops, which is
+                // what makes two phones on a table instant and what made
+                // every other case impossible: an invitation opened later
+                // than that could never be walked through, on this launch or
+                // any other, while the screen said the link was good for an
+                // hour (#118). Remembering it here is what lets the question
+                // be asked again -- on the next tick, and on every launch
+                // after this one.
+                const remembered = await outstandingRef.current.remember({
+                  invitationId: issued.invitationId,
+                  scope: issued.scope,
+                  issuedAt: Date.now(),
+                })
+                if (!remembered) {
+                  // Not a failure of the invitation: the link is valid and
+                  // the minute below still runs. What is lost is the retry
+                  // after a relaunch, which is worth saying rather than
+                  // discovering.
+                  logEvent('warn', 'MESSAGR_OUTSTANDING_NOT_KEPT', {
+                    invitationId: issued.invitationId,
+                  })
+                }
                 // The conversation exists now, so it belongs on the list
                 // before anybody has claimed anything.
                 await refreshList().catch(() => {})
@@ -964,6 +1002,9 @@ export function App({
                 )
                 if (!admitted.admitted) return
                 setAdmission('admitted')
+                // Somebody came through inside the minute, so there is
+                // nothing left to ask about.
+                await outstandingRef.current.forget(issued.invitationId)
                 if (name !== null) {
                   const kept = await namesRef.current.set(
                     admitted.entrant,
@@ -1061,6 +1102,51 @@ export function App({
                       )
                     }
                   }
+
+                  // ASKED ON EVERY TICK, AND BEFORE THE EARLY RETURN.
+                  //
+                  // Nothing about somebody claiming an invitation changes a
+                  // scope this device is already in, so a tick that admits
+                  // the person waiting is exactly a tick with no changed
+                  // scopes. Putting this below the return would have made
+                  // admission depend on unrelated traffic -- which is the
+                  // shape of the defect it exists to fix.
+                  //
+                  // Not awaited: the loop's tick must not wait on a poll of
+                  // the invitation service, and nothing below depends on the
+                  // answer. The `.catch` at the end is what makes that safe
+                  // -- a floating promise with no rejection handler is an
+                  // unhandled rejection, which on Hermes is a warning nobody
+                  // reads and on some hosts is a crash.
+                  admitAnyoneWaiting({
+                    outstanding: outstandingRef.current,
+                    admit: invitation =>
+                      admitEntrant(
+                        sessionClient,
+                        credentials,
+                        invitation.invitationId,
+                        invitation.scope,
+                      ),
+                    now: () => Date.now(),
+                  })
+                    .then(round => {
+                      if (round.admitted.length === 0 && round.expired === 0) {
+                        return
+                      }
+                      // Only when something happened: a line per tick saying
+                      // "nobody yet" would bury the one that matters.
+                      logEvent('info', 'MESSAGR_ADMITTED_LATE', { ...round })
+                      // Somebody joined a room this device is in, so the list
+                      // has a row to redraw.
+                      if (round.admitted.length > 0) {
+                        refreshList().catch(() => {})
+                      }
+                    })
+                    .catch((cause: unknown) =>
+                      logEvent('warn', 'MESSAGR_ADMIT_ROUND_FAILED', {
+                        reason: getErrorMessage(cause),
+                      }),
+                    )
 
                   if (tick.changedScopes.length === 0) return
 
