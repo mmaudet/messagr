@@ -124,6 +124,7 @@ describe('boot', () => {
     // empty by the time this looks. It is this account's own, which is why
     // no "se présente comme" line accompanies it: nothing is claimed about a
     // message this device encrypted itself.
+    //
     await seeText('encrypted by the bridge, sent by the application')
   })
 

@@ -63,7 +63,7 @@ export function Conversation({
   }
 
   return (
-    <View style={styles.screen}>
+    <View testID="conversation" style={styles.screen}>
       {entries.length === 0 ? (
         <Text
           testID="conversation-empty"
