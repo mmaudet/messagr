@@ -4,9 +4,11 @@ import { Pressable, StyleSheet, Text, useColorScheme, View } from 'react-native'
 import { t, type CopyKey } from '../copy'
 import {
   color,
+  elevation,
   floors,
   radius,
   space,
+  stroke,
   type as typeScale,
 } from '../design/tokens'
 import type { ShownImage } from '../runtime/receiveImage'
@@ -327,6 +329,53 @@ function Message({
         )}
       </Pressable>
 
+      {/* ON THE MESSAGE, NOT UNDER IT.
+          These sat below the timestamp, a full `space.m` from whatever came
+          next, which read as a small message of its own rather than as an
+          annotation on the one above -- reported from a device, on a plate of
+          photographs where the effect is worst: the chips looked like a reply
+          to the pictures.
+
+          So they hang on the bottom edge of the bubble, overlapping it, the
+          way every messenger draws this. Overlap by negative margin rather
+          than absolute position: the row still takes its own height in the
+          flow minus the overlap, so the next message is spaced from the chips
+          and not from the bubble behind them. Absolute would have lifted them
+          out of the flow and let the next message run underneath.
+
+          `surface.raised` and a hairline, because a chip on a photograph has
+          nothing behind it to sit against. */}
+      {tallies.length > 0 && (
+        <View style={styles.tallies} testID={`reactions-${entry.eventId}`}>
+          {tallies.map(tally => (
+            <Pressable
+              key={tally.key}
+              testID={`reaction-${entry.eventId}-${tally.key}`}
+              onPress={() => onReact(tally.key, tally.mine)}
+              accessibilityRole="button"
+              accessibilityLabel={`${tally.key} ${tally.count}`}
+              hitSlop={CHIP_REACH}
+              style={[
+                styles.chip,
+                styles.tally,
+                {
+                  // Green only where this account is among them: it is the
+                  // one place on a chip where the brand colour carries
+                  // information rather than decorating.
+                  backgroundColor:
+                    tally.mine !== null
+                      ? palette.brand.green100
+                      : palette.surface.raised,
+                  borderColor: palette.neutral['200'],
+                },
+              ]}>
+              <Text
+                style={styles.chipKey}>{`${tally.key} ${tally.count}`}</Text>
+            </Pressable>
+          ))}
+        </View>
+      )}
+
       {offering && (
         <View style={styles.offered} testID={`offer-${entry.eventId}`}>
           {OFFERED.map(key => (
@@ -382,36 +431,26 @@ function Message({
           </Text>
         )}
       </View>
-
-      {tallies.length > 0 && (
-        <View style={styles.tallies} testID={`reactions-${entry.eventId}`}>
-          {tallies.map(tally => (
-            <Pressable
-              key={tally.key}
-              testID={`reaction-${entry.eventId}-${tally.key}`}
-              onPress={() => onReact(tally.key, tally.mine)}
-              accessibilityRole="button"
-              accessibilityLabel={`${tally.key} ${tally.count}`}
-              style={[
-                styles.chip,
-                {
-                  // Green only where this account is among them: it is the
-                  // one place on a chip where the brand colour carries
-                  // information rather than decorating.
-                  backgroundColor:
-                    tally.mine !== null
-                      ? palette.brand.green100
-                      : palette.surface.sunk,
-                },
-              ]}>
-              <Text
-                style={styles.chipKey}>{`${tally.key} ${tally.count}`}</Text>
-            </Pressable>
-          ))}
-        </View>
-      )}
     </View>
   )
+}
+
+/**
+ * A tally chip's drawn height, and the reach that makes up the difference.
+ *
+ * `floors.touchTargetMin` is 44 and not negotiable, but a 44pt slab hanging
+ * off the corner of every message is not what the floor is for -- it is for
+ * what a thumb can hit. `hitSlop` grows the target without growing the pill,
+ * so the chip is 28 to the eye and 44 to a finger. The slop is computed from
+ * the two rather than written out, so the floor stays satisfied if either
+ * moves.
+ */
+const CHIP_HEIGHT = 28
+const CHIP_REACH = {
+  top: (floors.touchTargetMin - CHIP_HEIGHT) / 2,
+  bottom: (floors.touchTargetMin - CHIP_HEIGHT) / 2,
+  left: space.xs,
+  right: space.xs,
 }
 
 const styles = StyleSheet.create({
@@ -425,13 +464,29 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: space.xs,
-    marginTop: space.xs,
+    // UP, ONTO THE BUBBLE. Half the chip's own height, so it straddles the
+    // edge rather than touching it. The rest of the height still counts in
+    // the flow, which is what keeps the next message clear of the chips.
+    marginTop: -(CHIP_HEIGHT / 2),
+    // Inset from the corner, so the squared-off author corner stays legible:
+    // it is the one mark that says which side wrote a message without colour.
+    paddingHorizontal: space.m,
   },
   chip: {
     minHeight: floors.touchTargetMin,
     justifyContent: 'center',
     paddingHorizontal: space.s,
     borderRadius: radius.pill,
+  },
+  // A tally is the one chip that does not get the 44pt floor as its own
+  // height -- it would be a slab hanging off every message. `CHIP_REACH`
+  // gives back what the height gives up.
+  tally: {
+    minHeight: CHIP_HEIGHT,
+    height: CHIP_HEIGHT,
+    paddingHorizontal: space.s,
+    borderWidth: stroke.base,
+    ...elevation['1'],
   },
   chipKey: typeScale.bodySm,
   state: { ...typeScale.caption, marginTop: space.xs },
