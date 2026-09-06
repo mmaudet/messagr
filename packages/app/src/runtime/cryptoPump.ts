@@ -332,7 +332,7 @@ export async function loadConversation(
 ): Promise<TimelineEntry[]> {
   const http = makePumpHttp(sessionClient)
   const events = await fetchRoomMessages(http, roomId, limit)
-  return toTimelineEntries(
+  const { entries } = await toTimelineEntries(
     {
       decryptEvent: (scope, rawEvent) =>
         decryptEvent(asCryptoScopeId(scope), rawEvent),
@@ -341,6 +341,7 @@ export async function loadConversation(
     roomId,
     events,
   )
+  return entries
 }
 
 /**
