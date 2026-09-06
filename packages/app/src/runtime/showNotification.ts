@@ -4,6 +4,7 @@
 import notifee, { AndroidImportance, EventType } from '@notifee/react-native'
 
 import { t } from '../copy'
+import { color } from '../design/tokens'
 import { scopeOfPress, type Notification } from './notifying'
 
 /**
@@ -85,6 +86,19 @@ export async function drawNotification(
     id: notification.id,
     title: notification.title,
     body: notification.body,
-    android: { channelId, pressAction: { id: 'default' } },
+    android: {
+      channelId,
+      pressAction: { id: 'default' },
+      // THE MARK, NOT THE LAUNCHER ICON.
+      //
+      // Android renders a small icon as an alpha mask: everything opaque
+      // becomes white. The launcher icon is opaque throughout, so the status
+      // bar drew a plain white square -- reported from a lock screen, where
+      // it was the only thing on it. `ic_notification` is the identity's own
+      // monogram, whose holes are the drawing.
+      smallIcon: 'ic_notification',
+      // What the system tints the mask with, and the badge behind it.
+      color: color.brand.green500,
+    },
   })
 }
