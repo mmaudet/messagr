@@ -437,6 +437,19 @@ export const fr = {
   // La phrase qui explique le produit sous la liste. Sans le « (§8.2, P2,
   // P3) » de la maquette : les repères de spécification s'adressent au
   // relecteur, pas à la personne qui lit son écran.
+  // Les jours abrégés, pour l'horodatage d'une ligne de liste. Le catalogue
+  // hérité ne portait que « Dimanche » en toutes lettres, par accident : une
+  // ligne a la place de cinq caractères, pas de huit.
+  day_short_0: 'dim.',
+  day_short_1: 'lun.',
+  day_short_2: 'mar.',
+  day_short_3: 'mer.',
+  day_short_4: 'jeu.',
+  day_short_5: 'ven.',
+  day_short_6: 'sam.',
+  'when_time %1$d %2$d': '%1$d:%2$d',
+  'when_date %1$d %2$d': '%1$d/%2$d',
+
   list_no_directory:
     'Aucun numéro de téléphone n’apparaît nulle part dans le système. On n’entre en relation que par invitation.',
 

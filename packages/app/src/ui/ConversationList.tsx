@@ -1,10 +1,12 @@
 import React from 'react'
 import { Pressable, StyleSheet, Text, View } from 'react-native'
 
-import { t } from '../copy'
+import { t, type CopyKey } from '../copy'
 import { color, floors, layout, space, stroke, type } from '../design/tokens'
 import type { ConversationSummary } from '../runtime/conversationList'
 import { displayNameFor } from '../runtime/givenName'
+import { stampFor, type Stamp } from '../timeline/whenShown'
+import { Avatar } from './Avatar'
 
 /**
  * The list of conversations.
@@ -36,12 +38,18 @@ export interface ConversationListProps {
   /** Given names, keyed by participant. Absent means not named yet. */
   readonly names: ReadonlyMap<string, string>
   readonly onOpen: (scope: string) => void
+  /**
+   * The clock, injectable. A list reading `Date.now()` inside itself is one
+   * nothing can screenshot twice and get the same answer from.
+   */
+  readonly now?: number
 }
 
 export function ConversationList({
   summaries,
   names,
   onOpen,
+  now = Date.now(),
 }: ConversationListProps) {
   return (
     <View style={styles.screen} testID="conversation-list">
@@ -65,6 +73,7 @@ export function ConversationList({
                 summary.other === null ? undefined : names.get(summary.other)
               }
               onOpen={onOpen}
+              now={now}
             />
           </View>
         ))
@@ -78,14 +87,42 @@ export function ConversationList({
   )
 }
 
+/**
+ * The four forms a timestamp takes, put into words.
+ *
+ * Which form is `whenShown.ts` and is tested there; this is only the wording,
+ * which stays with every other string. Minutes are padded here rather than in
+ * a copy template, because two digits is not a question of language while the
+ * separator between them is.
+ */
+function whenLabel(stamp: Stamp): string {
+  switch (stamp.kind) {
+    case 'time':
+      return t(
+        'when_time %1$d %2$d',
+        stamp.hours,
+        String(stamp.minutes).padStart(2, '0'),
+      )
+    case 'yesterday':
+      return t('yesterday')
+    case 'weekday':
+      return t(`day_short_${stamp.day}` as CopyKey)
+    case 'date':
+      return t('when_date %1$d %2$d', stamp.day, stamp.month)
+  }
+}
+
 function Row({
   summary,
   name,
   onOpen,
+  now,
 }: {
   readonly summary: ConversationSummary
   readonly name: string | undefined
   readonly onOpen: (scope: string) => void
+  /** Passed in rather than read here, so a row is a pure function of it. */
+  readonly now: number
 }) {
   // A CONVERSATION WITH NO SINGLE OTHER PARTICIPANT STILL NEEDS A LINE.
   //
@@ -112,12 +149,23 @@ function Row({
           not", and it is a typographic answer rather than a badge -- a badge
           would be a second thing on the row saying what the first already
           says. */}
-      <Text numberOfLines={1} style={named ? styles.name : styles.identifier}>
-        {shown}
-      </Text>
-      <Text numberOfLines={1} style={styles.preview}>
-        {previewOf(summary)}
-      </Text>
+      <Avatar shown={shown} testID={`avatar-${summary.scope}`} />
+      <View style={styles.said}>
+        <Text numberOfLines={1} style={named ? styles.name : styles.identifier}>
+          {shown}
+        </Text>
+        <Text numberOfLines={1} style={styles.preview}>
+          {previewOf(summary)}
+        </Text>
+      </View>
+      {/* Nothing at all for a conversation that has never moved: `0` is not a
+          time, and drawing one would put 01/01/1970 on the row of somebody
+          who has just been invited. */}
+      {summary.lastAt > 0 && (
+        <Text style={styles.when} testID={`when-${summary.scope}`}>
+          {whenLabel(stampFor(summary.lastAt, now))}
+        </Text>
+      )}
     </Pressable>
   )
 }
@@ -159,13 +207,19 @@ const styles = StyleSheet.create({
     paddingBottom: space.l,
   },
   row: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: space.m,
     // The floor is geometry rather than a token, which is why it is asserted
     // here: no provenance rule can reach a touch target's height.
     minHeight: floors.touchTargetMin,
-    justifyContent: 'center',
-    gap: space.xs,
     paddingHorizontal: layout.screenGutter,
     paddingVertical: space.m,
+  },
+  said: { flex: 1, gap: space.xs },
+  when: {
+    ...type.caption,
+    color: color.neutral['600'],
   },
   name: {
     ...type.titleMd,
