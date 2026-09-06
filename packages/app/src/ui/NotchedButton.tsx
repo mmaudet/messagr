@@ -117,5 +117,7 @@ const styles = StyleSheet.create({
     paddingVertical: space.m,
     alignSelf: 'flex-start',
   },
-  label: typeScale.body,
+  // The prototype's fourteen primary buttons are all at 16, which is its own
+  // role now rather than the nearest body size.
+  label: typeScale.action,
 })
