@@ -1086,3 +1086,60 @@ promise — whose own rule (§13.23) is that it asks for nothing. A camera
 permission is asking for something. That is a decision about the promise
 screen's meaning, not a placement detail, and it is recorded as open rather
 than defaulted.
+
+### 13.26 The frame, and where the instrument went (designed here)
+
+**One scroll container per screen, and a new one each time.** Nothing in
+the product scrolls inside something that scrolls: no screen carries a
+scroll of its own, so the frame carries it for whichever is showing. A
+single shared container keeps its offset across whatever is rendered into
+it — leaving a long conversation for Réglages arrived scrolled into the
+middle of a short screen, and returning to the conversation arrived
+wherever Réglages had been. The container is keyed on what it shows, so
+each screen gets its own.
+
+**A conversation rests at its newest message.** It opened at its oldest
+and never moved, so a message somebody sent landed below the fold and the
+answer to "did it send?" was a scroll. Every messenger opens at the
+newest.
+
+The second half of that rule is the whole of it: following the newest on
+every content change would be a different defect, since a message
+arriving while somebody reads history would pull them back down. The
+frame follows only for somebody already resting within a message's height
+of the end.
+
+**The diagnostic readout is gone, and the log is not.** The application's
+screen carried a readout — New Architecture, Runtime gaps, Matrix
+transport, Entry, Session sync, Crypto bridge, Crypto pump, Encrypted
+send, Received, Brand geometry, Live sync, Given names, Keystore form —
+with the product's screens rendered into it as they were built. It *was*
+the application before there were screens. Nobody installing Messagr
+should ever have seen it.
+
+Every `logEvent` call stays. The readout was the dashboard; the log is
+the instrument, and it is the half that found the defects — an emulator
+with no network once reported thirteen crypto assertions failing for no
+stated reason, and the only account of what was really wrong was the
+application's own. Removing the log to remove the readout would have been
+removing the instrument to remove the dashboard.
+
+**No diagnostic text appears on any screen a person can reach**, and that
+includes fallbacks. A history claim that failed for a reason with no copy
+used to render `kind: reason` under the conversation — a diagnostic
+string, in French text, on a screen a person reads. The two cases
+somebody can act on say so; the rest are silent and are in the launch
+report.
+
+**The end-to-end suite reads that log rather than the screen.** Thirty-one
+assertions matched rendered sentences, so each was really an assertion
+about scroll position, and five continuous-integration failures were paid
+for it — every one of them correct behaviour reported as a product
+failure. A line of structured JSON cannot be scrolled off, cannot be
+truncated by a layout, and says the same thing whatever the screens
+become.
+
+Three assertions stay on the screen, and they are the right three: typing
+a message and seeing it arrive, a conversation being open and writable,
+and « Se présente comme » — the claim the product makes to a person about
+a sender it cannot authenticate. Nothing in a log can stand in for those.
