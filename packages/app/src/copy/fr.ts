@@ -353,6 +353,48 @@ export const fr = {
     'Messagr est un service d’hébergement et non une plateforme en ligne, le considérant 14 du DSA écartant les services de messagerie interpersonnelle. Les articles 20 et 21 ne s’appliquent donc pas, et ce texte ne prétend pas les offrir.',
 
   legal_full_terms: 'Conditions générales complètes : messagr.eu',
+
+  // LA CONFIANCE, EXPLIQUÉE PLUTÔT QUE SIGNALÉE.
+  //
+  // Le prototype (§4.4) est catégorique sur deux choses. Un écran dédié, pas
+  // une pastille que personne ne sait interpréter. Et aucun ton alarmiste :
+  // l'état de départ est normal, le chiffrement est déjà là, ce qui manque
+  // c'est la certitude sur la personne.
+  //
+  // Le mot que tout le monde attend ici est interdit par copy.spec.ts, et à
+  // raison : répondre de quelqu'un est un jugement humain, l'autre acte est
+  // cryptographique, et un écran qui emprunterait le même mot dirait à
+  // quelqu'un qu'il a fait l'un quand il a fait l'autre. Ce texte décrit donc
+  // des gestes -- comparer des mots, scanner un code -- au lieu de les
+  // nommer. C'est plus long et c'est plus vrai.
+  trust_action: 'Ce que l’on sait de cette personne',
+  trust_title: 'Ce que l’on sait de cette personne',
+  trust_calm:
+    'Ce n’est pas une alerte. Vos messages sont chiffrés de bout en bout depuis le premier, et cela ne dépend de rien de ce qui suit. Ce qui suit parle de la certitude sur la personne, pas du chiffrement.',
+
+  trust_state_nothing: 'Rien n’établit encore qui est cette personne.',
+  trust_state_vouched:
+    'Quelqu’un qui était déjà là a répondu de cette personne.',
+  trust_state_confirmed:
+    'Un de ses appareils a été confirmé depuis cet appareil-ci, en personne.',
+
+  trust_devices_title: 'Ses appareils',
+  'trust_devices %d': '%d appareil(s) connu(s) de ce compte.',
+  'trust_claimed %d':
+    'Cette personne a signé %d d’entre eux comme étant les siens. C’est ce que son compte affirme, et cela ne dit pas qui tient ce compte.',
+  'trust_confirmed %d': '%d ont été confirmés depuis ici, en personne.',
+  trust_none_confirmed:
+    'Aucun n’a été confirmé depuis ici. C’est l’état de départ normal.',
+
+  trust_vouch_title: 'Ce que « répondre de quelqu’un » établit',
+  trust_vouch_means:
+    'Une personne déjà présente a estimé savoir qui entrait, et lui a ouvert la porte. C’est un jugement humain, et c’est tout : rien n’a été établi par la cryptographie. Un compte peut être tenu par quelqu’un d’autre sans que ce jugement en sache rien.',
+
+  trust_raise_title: 'Ce qui lèverait le doute',
+  trust_raise_how:
+    'Comparer une courte suite de mots avec cette personne, de vive voix, ou scanner son code en sa présence. Deux minutes, une fois pour toutes.',
+  trust_raise_missing:
+    'Ce geste n’est pas encore construit dans cette application. Le dire vaut mieux que d’afficher un bouton qui ne ferait rien.',
 } as const
 
 /** Every key any screen may ask for. A typo is a compile error, not a blank. */
