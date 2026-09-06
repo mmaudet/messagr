@@ -261,13 +261,23 @@ describe('boot', () => {
 
   // ── And the two that are about the screen, which is the point of it ──
 
-  it("shows the conversation, with this account's own message in it", async () => {
-    // The pump sent one message during boot, so the conversation is not empty
-    // by the time this looks. On screen and not in the log: what is asserted
-    // is that a person sees it.
+  it('opens on a conversation somebody can write in', async () => {
+    // A launch into an account with one room opens that room, and the bar is
+    // in the dock rather than in the scroll -- so this is what "the
+    // application arrived somewhere usable" looks like from outside.
+    //
+    // `toExist` on the conversation and not `toBeVisible`: that node wraps
+    // the whole message list, which is taller than the phone as soon as
+    // there are a few, and Detox wants 75 per cent of an element's area
+    // visible. Asserting visibility on a container is asserting that the
+    // conversation is short.
+    //
+    // The message is the next test's business, and it asserts visibility
+    // there, on one line of text, where the word means something.
     await waitFor(element(by.id('conversation')))
-      .toBeVisible()
+      .toExist()
       .withTimeout(60000)
+    await detoxExpect(element(by.id('conversation-input'))).toBeVisible()
   })
 
   it('lets a person write a message and see it arrive', async () => {
