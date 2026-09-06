@@ -56,7 +56,12 @@ import { probeUnsettledEncrypt, type ProbeReport } from './panicProbe'
 import { claimHistory, type HistoryClaim } from './claimHistory'
 import { evictFrom, type EvictOutcome } from './evict'
 import { mediaRepository } from './mediaRepository'
-import { forgetPusher, registerPusher, type PusherRegistration } from './pusher'
+import {
+  forgetPusher,
+  registerPusher,
+  type PusherRegistration,
+  type Road,
+} from './pusher'
 import type { PickedImage } from './pickImage'
 import { fetchImage, type ShownImage } from './receiveImage'
 import { sendImage, sendingThrough, type ImageSent } from './sendImage'
@@ -747,12 +752,13 @@ export async function sendPhotograph(
 export async function stopWakingThisDevice(
   sessionClient: ReturnType<typeof createClient>,
   token: string,
+  road: Road,
 ): Promise<void> {
   await makePumpHttp(sessionClient).authedRequest(
     'POST',
     '/_matrix/client/v3/pushers/set',
     {},
-    JSON.stringify(forgetPusher(token)),
+    JSON.stringify(forgetPusher(token, road)),
   )
 }
 
@@ -790,6 +796,7 @@ export async function registerThisDeviceForWaking(
   sessionClient: ReturnType<typeof createClient>,
   credentials: { readonly baseUrl: string },
   token: string,
+  road: Road,
 ): Promise<PusherRegistration> {
   const http = makePumpHttp(sessionClient)
   return registerPusher(
@@ -803,6 +810,7 @@ export async function registerThisDeviceForWaking(
     },
     token,
     `${credentials.baseUrl.replace(/\/+$/, '')}/_messagr`,
+    road,
   )
 }
 

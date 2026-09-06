@@ -34,19 +34,38 @@ import { getErrorMessage } from './errors'
  */
 
 /**
- * The application this gateway should route to.
+ * Which `apps:` entry in `sygnal.yaml` should carry this device's pushes.
  *
- * **It must equal this build's Gradle `applicationId` and the key of the
- * `apps:` entry in `sygnal.yaml`, exactly.** Wildcards are accepted by
- * sygnal's matching and must not be used here.
+ * # Two, because the two platforms take different roads
  *
- * A disagreement produces **no error anywhere**: the homeserver finds no
- * pushkin and drops the notification, sygnal logs nothing, and the device is
- * simply never woken. It was `cloud.maudet.messagr` on this branch until a
- * review caught it -- the old applicationId, which sygnal does carry an entry
- * for and which this application is not.
+ * Android goes through Firebase, which is the only way to wake an Android
+ * phone. iOS goes to Apple **directly**, because an APNs key belongs to a
+ * team rather than to an application and this team already has one -- so
+ * routing iPhones through Google as well would have bought nothing and handed
+ * over a device token and the timing of every wake.
+ *
+ * The two roads need different tokens and different sygnal entries, so the
+ * `app_id` is not one value.
+ *
+ * # The disagreement that produces no error anywhere
+ *
+ * Each of these must equal the key of a sygnal `apps:` entry, **exactly**.
+ * Wildcards are accepted by sygnal's matching and must not appear. When they
+ * disagree the homeserver finds no pushkin, drops the notification, sygnal
+ * logs nothing, and the device is simply never woken.
+ *
+ * That is not hypothetical: this said `cloud.maudet.messagr` -- the previous
+ * product's Kotlin applicationId -- until a review caught it, and the bench
+ * then said it out loud: *"Got notification for unknown app ID eu.messagr"*.
  */
-const APP_ID = 'eu.messagr'
+const APP_IDS = {
+  /** Matches the Gradle `applicationId` and sygnal's `eu.messagr`. */
+  android: 'eu.messagr',
+  /** Matches the iOS bundle identifier and sygnal's `eu.messagr.apns`. */
+  ios: 'eu.messagr.apns',
+} as const
+
+export type Road = keyof typeof APP_IDS
 
 /** What the homeserver shows in the account's device list. */
 const SHOWN_AS = 'Messagr'
@@ -69,9 +88,13 @@ export interface PusherBody {
   readonly append: boolean
 }
 
-export function describePusher(token: string, gatewayBase: string): PusherBody {
+export function describePusher(
+  token: string,
+  gatewayBase: string,
+  road: Road,
+): PusherBody {
   return {
-    app_id: APP_ID,
+    app_id: APP_IDS[road],
     app_display_name: SHOWN_AS,
     // The product, not the person. A device list is a thing somebody may show
     // somebody else, and "Michel's phone" is a sentence about a person.
@@ -108,14 +131,18 @@ export type PusherRegistration =
  * is already there firing, which is a switch that reads as off and is on --
  * the exact shape of lie this product spends its design refusing.
  */
-export function forgetPusher(token: string): Record<string, unknown> {
-  return { app_id: APP_ID, pushkey: token, kind: null }
+export function forgetPusher(
+  token: string,
+  road: Road,
+): Record<string, unknown> {
+  return { app_id: APP_IDS[road], pushkey: token, kind: null }
 }
 
 export async function registerPusher(
   post: PusherPoster,
   token: string,
   gatewayBase: string,
+  road: Road,
 ): Promise<PusherRegistration> {
   if (token === '') {
     // Nothing to register, and nothing worth an attempt. A device with no
@@ -124,7 +151,7 @@ export async function registerPusher(
     return { registered: false, reason: 'this device has no push token' }
   }
   try {
-    await post(describePusher(token, gatewayBase))
+    await post(describePusher(token, gatewayBase, road))
     return { registered: true }
   } catch (cause: unknown) {
     return { registered: false, reason: getErrorMessage(cause) }

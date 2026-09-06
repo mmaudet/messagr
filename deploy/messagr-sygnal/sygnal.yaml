@@ -401,3 +401,35 @@ apps:
     send_badge_counts: false
 
     inflight_request_limit: 512
+
+  # L'APPLICATION iOS, PAR APPLE DIRECTEMENT ET NON PAR GOOGLE.
+  #
+  # Une cle APNs vaut pour toute l'equipe et non pour une application :
+  # c'est `topic` qui nomme le bundle. Le meme fichier que l'entree VoIP
+  # ci-dessus, donc, sans nouvelle cle a creer ni a deposer nulle part.
+  #
+  # Passer par Firebase aurait demande deux gestes en console au lieu
+  # d'un, et aurait fait detenir a Google un jeton d'appareil iOS et
+  # l'horaire de chaque reveil -- sur la seule plateforme ou le canal
+  # direct etait deja configure.
+  #
+  # push_type: background, et pas alert. Une notification `alert`
+  # s'afficherait d'elle-meme avec un texte fourni par le serveur, ce que
+  # ce produit ne peut pas faire : le serveur ne lit pas les messages. Un
+  # reveil silencieux laisse l'application dechiffrer et poser une
+  # notification locale, comme sur Android.
+  #
+  # platform: sandbox. A BASCULER SUR production LE JOUR DE LA PREMIERE
+  # BUILD SIGNEE. Un jeton produit par TestFlight ou l'App Store est un
+  # jeton production ; pousse vers sandbox, Apple repond BadDeviceToken et
+  # rien n'arrive, sans autre signe.
+  eu.messagr.apns:
+    type: apns
+    platform: sandbox
+    keyfile: /secrets/apns-messagr-voip.p8
+    key_id: YKZW452SYM
+    team_id: KUT463DS29
+    topic: eu.messagr
+    push_type: background
+    send_badge_counts: false
+    inflight_request_limit: 512

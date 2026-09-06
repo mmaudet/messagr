@@ -844,7 +844,11 @@ export function App({
                   // WHAT MAKES OFF MEAN OFF. Caught in review: stopping the
                   // next launch registering is not turning notifications off,
                   // because the pusher already on the homeserver keeps firing.
-                  await stopWakingThisDevice(sessionClient, answer.token)
+                  await stopWakingThisDevice(
+                    sessionClient,
+                    answer.token,
+                    answer.road,
+                  )
                   logEvent('info', 'MESSAGR_PUSH_REMOVED', {})
                   return
                 }
@@ -852,6 +856,7 @@ export function App({
                   sessionClient,
                   credentials,
                   answer.token,
+                  answer.road,
                 )
                 logEvent(
                   done.registered ? 'info' : 'warn',

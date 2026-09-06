@@ -70,3 +70,16 @@ jobs:
       # so the bundle is inspected rather than the intention trusted.
       - name: Assert the bundle carries no crypto WebAssembly module
         run: ./scripts/assert-no-crypto-wasm.sh
+
+      # HERE, AND NOT IN THE macOS JOB. All three are files in this
+      # repository, so a Linux runner reads them fine -- and the simulator
+      # job cannot catch any of this: a simulator build proves compilation,
+      # and an unentitled build compiles. It registers with Apple, is
+      # refused, and reports nothing.
+      - name: Assert an iPhone built from this tree could be woken
+        run: ./scripts/assert-ios-push.sh
+
+      # The privacy policy against what the push gateway forwards. The live
+      # half is binding only on a release; see the script.
+      - name: Assert the privacy policy and the push gateway agree
+        run: ./scripts/assert-push-payload.sh

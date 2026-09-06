@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<!-- WITHOUT THIS THE DEVICE NEVER GETS AN APNS TOKEN.
+	     `aps-environment` is what makes a build entitled to register with
+	     Apple's push service. A build without it registers, is refused, and
+	     reports nothing: `getAPNSToken` answers null for ever, which reads
+	     exactly like "Apple has not answered yet".
+
+	     `development` is the value for a build signed with a development
+	     profile, which is every build this repository makes today. A
+	     TestFlight or App Store build needs `production`, and the sygnal
+	     entry needs `platform: production` with it. The two go together,
+	     and a mismatch answers BadDeviceToken and delivers nothing. -->
+	<key>aps-environment</key>
+	<string>development</string>
+</dict>
+</plist>
