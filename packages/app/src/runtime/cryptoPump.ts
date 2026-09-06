@@ -53,6 +53,13 @@ import { evictFrom, type EvictOutcome } from './evict'
 import { mediaRepository } from './mediaRepository'
 import { makePumpHttp } from './pump'
 import {
+  admitDrawnEntrant,
+  issueInvitation,
+  type Admission,
+  type Issued,
+} from './issueInvitation'
+import { invitationService } from './servicePoster'
+import {
   startSyncLoop,
   type RunningSyncLoop,
   type SyncLoopState,
@@ -525,3 +532,65 @@ export async function listConversations(
     selfUserId,
   )
 }
+
+/**
+ * Phase eight: inviting somebody, which is the same gesture as starting a
+ * conversation with them.
+ *
+ * Pure glue. What it does, why the conversation and the invitation are one
+ * call, and why a minted invitation is not yet claimable is
+ * `issueInvitation.ts`, tested there against injected fakes.
+ *
+ * The link's host comes from the account's own homeserver rather than from
+ * anything configured here: an invitation into this instance is the only kind
+ * this application can issue, and a link naming another one would be a link
+ * nobody can claim.
+ */
+export async function inviteSomebody(
+  sessionClient: ReturnType<typeof createClient>,
+  credentials: { readonly baseUrl: string; readonly accessToken: string },
+): Promise<Issued> {
+  return issueInvitation(
+    {
+      http: makePumpHttp(sessionClient),
+      service: invitationService(credentials.baseUrl, credentials.accessToken),
+      newIdempotencyKey: () =>
+        `messagr-${Date.now()}-${Math.floor(Math.random() * 1e6)}`,
+      wait: ms => new Promise(resolve => setTimeout(resolve, ms)),
+    },
+    credentials.baseUrl.replace(/^https?:\/\//, ''),
+  )
+}
+
+/**
+ * The issuer's half of the claim, which nobody taps for.
+ *
+ * See `issueInvitation.ts`: the entrant's first claim draws an account and is
+ * answered 409, and the link keeps failing until that account is invited.
+ */
+export async function admitEntrant(
+  sessionClient: ReturnType<typeof createClient>,
+  credentials: { readonly baseUrl: string; readonly accessToken: string },
+  invitationId: string,
+  scope: string,
+): Promise<Admission> {
+  const admission = await admitDrawnEntrant(
+    {
+      http: makePumpHttp(sessionClient),
+      service: invitationService(credentials.baseUrl, credentials.accessToken),
+      newIdempotencyKey: () => '',
+      wait: ms => new Promise(resolve => setTimeout(resolve, ms)),
+    },
+    invitationId,
+    scope,
+  )
+  // Logged as well as returned: this runs with nobody watching, and whether
+  // somebody could enter is not otherwise visible until they say they could
+  // not.
+  logEvent(admission.admitted ? 'info' : 'warn', 'MESSAGR_ADMIT', {
+    ...admission,
+  })
+  return admission
+}
+
+export type { Issued, Admission } from './issueInvitation'
