@@ -803,6 +803,50 @@ they type it: *« Ce nom reste sur cet appareil. Ni le serveur ni votre
 correspondant ne le voient. »* (ADR-0010.)
 
 
+### 13.22 Photographs (designed here)
+
+**Two encryptions, not one.** The bytes are sealed with a key of their own and
+uploaded to the media repository; that key travels inside the conversation's
+own encryption, in the event pointing at the upload. The homeserver ends up
+holding two things it cannot join — a file it has no key for, and a key it
+cannot decrypt. This is Matrix's design and not an invention here, and it is
+what lets the media repository be a store that never learns who may read what.
+
+**The upload declares `application/octet-stream`, and the photograph's type is
+not sent.** What goes to the repository is ciphertext. Declaring `image/jpeg`
+would be a claim about bytes nobody there can read, and it would tell the
+server what kind of thing was sent — which is precisely the metadata the
+encryption is for. The real type travels inside the event.
+
+**The event is an ordinary encrypted `m.image`**, with the address and the key
+material in one `file` object, which is the shape the specification already
+has. This costs reading a value the crypto bridge documents as opaque, and the
+reason is recorded where it is done: not reading it would produce an event only
+this application could open, in a protocol whose point is that it is not only
+this application.
+
+**Nothing touches a disk, in either direction.** The picker hands over bytes
+rather than a path — a path is a promise about a file in a cache the system may
+clear. Coming back, the plaintext reaches the view as a `data:` URI, because
+the obvious alternative is a path to a decrypted file and ADR-0006 forbids
+exactly that. The cost is stated where it is paid: a data URI is the image
+base64'd, so it lives as a string for as long as the view holds it, and that
+bounds how large a photograph can be shown. The same bound applies to sending,
+because the encryptor holds the plaintext and the ciphertext at once.
+
+**`body` is not the filename.** A name off somebody's camera roll carries a
+date, sometimes a place, occasionally a person's name — and while it does not
+reach the server, it reaches everybody in the conversation, who did not choose
+to receive it by being sent a photograph. `body` is the fallback a client shows
+when it cannot draw the picture, and `image.jpg` does that job.
+
+**Each photograph fetches itself when it is drawn**, not when the conversation
+is derived, and it fails on its own: a picture that will not download is a
+sentence in that message and not a conversation that failed. While it loads,
+the frame is drawn at the picture's own proportions rather than as a spinner,
+so the timeline does not reflow as photographs arrive.
+
+
 ### 13.21 The bottom bar, the header and the floating action (designed here)
 
 **Four tabs: Discussions, Communautés, Appels, Réglages.** Icon above label.

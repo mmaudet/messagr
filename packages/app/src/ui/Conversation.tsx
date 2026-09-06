@@ -347,6 +347,11 @@ const styles = StyleSheet.create({
     borderRadius: radius.pill,
   },
   chipKey: typeScale.bodySm,
+  actions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: space.s,
+  },
   attach: {
     minWidth: floors.touchTargetMin,
     minHeight: floors.touchTargetMin,
