@@ -56,6 +56,7 @@ import { polyfillReport } from './src/runtime/bootstrap'
 import { computeRuntimeGapReport } from './src/runtime/runtimeGaps'
 import { computeNewArchitectureReport } from './src/runtime/newArchitecture'
 import {
+  languageSecrets,
   promiseSecrets,
   receiptSecrets,
   sessionSecrets,
@@ -84,6 +85,11 @@ import type { GivenNames } from './src/runtime/givenName'
 import { forgetfulGivenNames } from './src/runtime/givenNameStore'
 import { forgetfulLastRead, type LastRead } from './src/runtime/lastReadStore'
 import { openNotebook } from './src/runtime/notebook'
+import {
+  readChosenLanguage,
+  rememberLanguage,
+} from './src/runtime/chosenLanguage'
+import { deviceLocale } from './src/runtime/deviceLocale'
 import { pickFromLibrary } from './src/runtime/imageLibrary'
 import { pushTokenForThisDevice } from './src/runtime/pushDevice'
 import type { ShownImage } from './src/runtime/receiveImage'
@@ -104,7 +110,8 @@ import { GiveName } from './src/ui/GiveName'
 import { FirstLaunch } from './src/ui/FirstLaunch'
 import { Evict } from './src/ui/Evict'
 import { Vouch } from './src/ui/Vouch'
-import { t } from './src/copy'
+import { setCatalogue, t } from './src/copy'
+import type { Language } from './src/copy/languages'
 import { NotchedButton } from './src/ui/NotchedButton'
 import { notchLegFor } from './src/ui/notchGeometry'
 import { enterWithASession, type EntryResult } from './src/runtime/entry'
@@ -171,6 +178,21 @@ export function App({
   // unknown would flash it at every relaunch of a device that has long since
   // seen it.
   const [promiseSeen, setPromiseSeen] = useState<boolean | null>(null)
+  // WHICH LANGUAGE IS SPOKEN, AND WHY IT IS HELD HERE.
+  //
+  // `t()` reads a module variable, so switching the catalogue does not
+  // re-render anything on its own -- see `copy/index.ts`. This state is what
+  // does: the setter switches the catalogue and then changes the state, in
+  // that order, so the re-render this causes already reads the new one.
+  const [language, setLanguage] = useState<Language>('fr')
+  const chooseLanguage = (next: Language) => {
+    setCatalogue(next)
+    setLanguage(next)
+    // Kept second, and failure is silent on purpose: a language that did not
+    // persist is a screen in the right language now and the wrong one next
+    // launch, which is a smaller thing than a warning on a first screen.
+    rememberLanguage(languageSecrets, next).catch(() => {})
+  }
   const [bridge, setBridge] = useState<BridgeStatus | null>(null)
   const [entry, setEntry] = useState<EntryResult | null>(null)
   // The conversation this application holds, derived from the room on every
@@ -367,6 +389,15 @@ export function App({
     hasSeenPromise(promiseSecrets)
       .then(setPromiseSeen)
       .catch(() => setPromiseSeen(false))
+    // THE LANGUAGE, BEFORE THE FIRST SCREEN IS DRAWN.
+    //
+    // Read in the same pass as the promise flag and for the same reason: a
+    // keystore read and nothing more, so it can run under the promise rather
+    // than after it. Which locale the device is set to is what an unset
+    // choice falls back to -- see `chosenLanguage.ts`.
+    readChosenLanguage(languageSecrets, deviceLocale())
+      .then(chooseLanguage)
+      .catch(() => undefined)
     receiptsArePublished(receiptSecrets)
       .then(on => {
         setReceipts(on)
@@ -1222,6 +1253,8 @@ export function App({
     return (
       <SafeAreaProvider>
         <FirstLaunch
+          language={language}
+          onLanguage={chooseLanguage}
           onBegin={() => {
             // Set first, kept second. A keystore that refuses must not leave
             // somebody stuck on a screen whose only action does nothing —

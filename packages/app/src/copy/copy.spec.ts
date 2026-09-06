@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest'
 
 import { fr } from './fr'
-import { t } from './index'
+import { CATALOGUES, currentLanguage, setCatalogue, t } from './index'
+import { LANGUAGES } from './languages'
 
 describe('the copy catalogue', () => {
   it('reads a string by key', () => {
@@ -59,5 +60,81 @@ describe('the copy catalogue', () => {
   it('has no empty string, which would render as a missing label', () => {
     const blank = Object.entries(fr).filter(([, value]) => value.trim() === '')
     expect(blank).toEqual([])
+  })
+})
+
+describe('every catalogue', () => {
+  const catalogues = Object.entries(CATALOGUES)
+
+  it('exists for each language the strip offers', () => {
+    // The strip must never offer a language the catalogue map has no entry
+    // for: the picker would set a language and the screen would render
+    // `undefined` in every label.
+    expect(Object.keys(CATALOGUES).sort()).toEqual(
+      LANGUAGES.map(language => language.code).sort(),
+    )
+  })
+
+  it.each(catalogues)('%s carries exactly the keys French does', (_, book) => {
+    // The compiler already refuses a missing key, since a catalogue is typed
+    // `Record<CopyKey, string>`. This catches the other direction -- a key
+    // present here and gone from French, which types fine and renders
+    // nowhere.
+    expect(Object.keys(book).sort()).toEqual(Object.keys(fr).sort())
+  })
+
+  it.each(catalogues)('%s has no empty string', (_, book) => {
+    const blank = Object.entries(book).filter(
+      ([, value]) => value.trim() === '',
+    )
+    expect(blank).toEqual([])
+  })
+
+  it.each(catalogues)('%s keeps every placeholder French has', (_, book) => {
+    // A placeholder dropped in translation renders a sentence with a hole in
+    // it, and one invented renders a literal `%@` on somebody's screen.
+    // Compared as multisets, because a translation may move a placeholder
+    // within a sentence -- word order is the translator's business, and the
+    // set of holes to fill is not.
+    const holes = (value: string) =>
+      (value.match(/%(?:\d+\$)?[@ds]/g) ?? []).sort().join(' ')
+    for (const [key, french] of Object.entries(fr)) {
+      expect(`${key}: ${holes(book[key as keyof typeof fr])}`).toBe(
+        `${key}: ${holes(french)}`,
+      )
+    }
+  })
+})
+
+describe('choosing a language', () => {
+  it('changes what t answers, and says which is chosen', () => {
+    try {
+      setCatalogue('de')
+      expect(currentLanguage()).toBe('de')
+      expect(t('promise_action')).toBe('Beginnen')
+      setCatalogue('nl')
+      expect(t('promise_action')).toBe('Beginnen')
+      setCatalogue('it')
+      expect(t('promise_action')).toBe('Cominciare')
+    } finally {
+      // Module state. Left switched, it would leak into every test after
+      // this one -- which is the failure mode a module variable buys.
+      setCatalogue('fr')
+    }
+  })
+
+  it('starts on French', () => {
+    expect(currentLanguage()).toBe('fr')
+  })
+
+  it('names each language in itself, in its own catalogue', () => {
+    try {
+      for (const language of LANGUAGES) {
+        setCatalogue(language.code)
+        expect(t('language_endonym')).toBe(language.endonym)
+      }
+    } finally {
+      setCatalogue('fr')
+    }
   })
 })

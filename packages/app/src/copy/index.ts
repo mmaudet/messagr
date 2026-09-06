@@ -1,21 +1,50 @@
-import { fr, type CopyKey } from './fr'
 import { formatCopy } from './format'
+import { fr, type CopyKey } from './fr'
+import { en } from './en'
+import { de } from './de'
+import { es } from './es'
+import { it } from './it'
+import { nl } from './nl'
+import type { Language } from './languages'
 
 /**
  * Where every user-facing string in this application comes from.
  *
- * A screen holds no text. That is the whole property, and it is what makes
- * the other four languages -- already translated, already sitting in the
- * previous product -- droppable later without touching a screen.
+ * A screen holds no text. That is the whole property, and it is what made the
+ * other five languages a catalogue each rather than a rewrite.
  *
- * # Only French is here
+ * # Every catalogue is complete, and the compiler is what says so
  *
- * Not because five languages are hard, but because shipping five was never
- * the point of this. The point is that the fifth can arrive without a
- * rewrite. Selecting a language will mean choosing a catalogue here, and
- * nothing else will have to know.
+ * `Record<CopyKey, string>` has no optional keys, so a catalogue missing one
+ * fails to build. There is no fallback to French and there must not be: a
+ * fallback is how a half-translated language ships and nobody notices, because
+ * the screen reads fine to whoever wrote it.
+ *
+ * # Chosen at runtime, and this is a module variable
+ *
+ * `t` is a plain function, called from every screen. Making the language a
+ * React context would have meant touching every call site to read it. Instead
+ * the catalogue is a variable here, and the screen that changes it also holds
+ * the state whose change re-renders the tree -- so `setCatalogue` is always
+ * followed by a state change, and never relied on to cause one.
  */
-const catalogue: Readonly<Record<CopyKey, string>> = fr
+const CATALOGUES: Readonly<
+  Record<Language, Readonly<Record<CopyKey, string>>>
+> = { fr, en, de, es, it, nl }
+
+let chosen: Language = 'fr'
+let catalogue: Readonly<Record<CopyKey, string>> = fr
+
+/** Switches the catalogue. See the note above: this does not re-render. */
+export function setCatalogue(language: Language): void {
+  chosen = language
+  catalogue = CATALOGUES[language]
+}
+
+/** Which language is being spoken. */
+export function currentLanguage(): Language {
+  return chosen
+}
 
 /**
  * `t` takes a key the compiler knows, so a typo is a build failure rather
@@ -25,4 +54,5 @@ export function t(key: CopyKey, ...args: readonly (string | number)[]): string {
   return formatCopy(catalogue[key], args)
 }
 
+export { CATALOGUES }
 export type { CopyKey }

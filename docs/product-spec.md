@@ -847,6 +847,47 @@ the frame is drawn at the picture's own proportions rather than as a spinner,
 so the timeline does not reflow as photographs arrive.
 
 
+### 13.23 The first launch: a language, then an acceptance (designed here)
+
+Two gates, in that order, before anything else happens.
+
+**The language is chosen by dragging a thumb across flags.** Not a dropdown: a
+horizontally snapping strip, and whichever language is centred is the one the
+screen is speaking **while the drag is happening**. Trying a language costs a
+thumb movement rather than a decision, and somebody who cannot read the screen
+does not have to guess which menu holds the languages — the flags are visible
+at rest and the screen answers as they pass.
+
+**A flag and the language’s own name for itself**, never the flag alone. A flag
+names a country and not a language; the endonym settles that without giving up
+the recognisability that made the flag worth having, which matters when the
+strip has to be readable by somebody who cannot read the screen behind it.
+
+**Six languages: FR, EN, DE, ES, IT, NL**, each a complete catalogue. Complete
+is enforced by the compiler — a catalogue is `Record<CopyKey, string>`, which
+has no optional keys — and **there is no fallback to French**, because a
+fallback is how a half-translated language ships and nobody notices: the screen
+reads fine to whoever wrote it. Tests assert that every catalogue carries
+exactly French’s keys, has no empty string, and keeps every placeholder French
+has.
+
+**What an unset choice falls back to is the device’s own language**, when this
+application speaks it, and French otherwise. Not French unconditionally: a
+phone set to Dutch meeting a French screen for no reason its owner could act on
+is the failure this prevents.
+
+**Nothing starts until the terms are accepted.** A checkbox, unticked at first
+launch, with the conditions one tap away at the published address — so the
+acceptance is of a text somebody can read rather than of a sentence about a
+text. *« En continuant vous acceptez… »* is an acceptance nobody made; a tick
+is something a person did.
+
+**The action is not greyed out.** It is pressable, does nothing, and says what
+is missing. A disabled button gives no reason, and somebody who missed the box
+has no way to learn what is wrong with the screen — which is invariant 6’s rule
+about errors, applied to a gate.
+
+
 ### 13.21 The bottom bar, the header and the floating action (designed here)
 
 **Four tabs: Discussions, Communautés, Appels, Réglages.** Icon above label.

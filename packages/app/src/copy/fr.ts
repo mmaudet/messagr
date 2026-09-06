@@ -99,7 +99,7 @@ export const fr = {
     'Ce qui vous identifie, ce qui vous permet de revenir.',
   settings_row_lang_label: "Langue de l'application",
   settings_row_lang_hint:
-    'Français · deux langues livrées en V1, cinq possibles',
+    'Français · six langues, choisies au premier lancement',
   settings_row_recovery_label: 'Récupération de compte',
   settings_row_recovery_hint:
     "Clé de récupération · validation par un proche, coffre PIN (V1.1) · aucun séquestre : personne d'autre ne détient la clé de vos messages",
@@ -467,6 +467,13 @@ export const fr = {
   // own name and is not translated -- a name that changes by language is a
   // different product.
   brand_name: 'Messagr',
+
+  // Le premier lancement : la langue, puis l'acceptation.
+  promise_language: 'Choisissez votre langue',
+  promise_terms: 'J’accepte les conditions générales d’utilisation de Messagr.',
+  promise_terms_link: 'Lire les conditions',
+  promise_terms_required:
+    'Cochez la case pour continuer. Rien ne démarre avant.',
 
   // Notifications. The blind one is what a wake can say before anything is
   // decrypted: something arrived. It names nobody, because nothing naming
