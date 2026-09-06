@@ -67,6 +67,7 @@ export function FirstLaunch({ onBegin }: { readonly onBegin: () => void }) {
         </View>
 
         <NotchedButton
+          wide
           label={t('promise_action')}
           testID="promise-action"
           onPress={onBegin}
