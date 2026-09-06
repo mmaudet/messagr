@@ -45,13 +45,29 @@ export function whenNotificationPressed(
       // A launch is not worth losing over a notification that may not exist.
     })
 
-  const stopForeground = notifee.onForegroundEvent(({ type, detail }) => {
+  return notifee.onForegroundEvent(({ type, detail }) => {
     if (type === EventType.PRESS) open(scopeOfPress(detail.notification?.id))
   })
-  notifee.onBackgroundEvent(async ({ type, detail }) => {
-    if (type === EventType.PRESS) open(scopeOfPress(detail.notification?.id))
+}
+
+/**
+ * The background half, which has to be registered at module scope.
+ *
+ * notifee says so on the device rather than in a type: *"no background event
+ * handler has been set"*, logged the first time a notification is drawn from
+ * a headless context. A handler registered inside a component does not exist
+ * when there is no component -- which is every case this one is for.
+ *
+ * It records the tap rather than acting on it. There is no navigation in a
+ * headless process, and the application that starts afterwards reads the same
+ * notification through `getInitialNotification`. Answering here and there
+ * both would open the conversation twice.
+ */
+export function rememberBackgroundPresses(): void {
+  notifee.onBackgroundEvent(async () => {
+    // Nothing to do, and registering is the point: without a handler notifee
+    // warns and the press is dropped before the application can read it.
   })
-  return stopForeground
 }
 
 export async function drawNotification(

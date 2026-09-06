@@ -39,7 +39,10 @@ const {
 } = require('@react-native-firebase/messaging')
 const { wake } = require('./src/runtime/wake')
 const { readNotification } = require('./src/runtime/notifying')
-const { drawNotification } = require('./src/runtime/showNotification')
+const {
+  drawNotification,
+  rememberBackgroundPresses,
+} = require('./src/runtime/showNotification')
 const { logEvent } = require('./src/runtime/log')
 const { wakeIsAllowed } = require('./src/runtime/wakeSetting')
 const { wakeSecrets } = require('./src/runtime/deviceSecrets')
@@ -71,3 +74,11 @@ setBackgroundMessageHandler(getMessaging(), async () => {
   // The one line anybody debugging a push has. There is no screen here.
   logEvent('info', 'MESSAGR_WOKE', outcome)
 })
+
+// AT MODULE SCOPE, WHICH IS THE ONLY PLACE IT WORKS.
+//
+// notifee refuses to hold a press without a background handler, and said so
+// on a device: "no background event handler has been set". Registered inside
+// a component it does not exist when the process is headless -- which is
+// every case a background press happens in.
+rememberBackgroundPresses()
