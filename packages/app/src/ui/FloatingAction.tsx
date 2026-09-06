@@ -71,7 +71,10 @@ const styles = StyleSheet.create({
   circle: {
     width: SIZE,
     height: SIZE,
-    borderRadius: radius.pill,
+    // `avatar`, not `pill`. `pill` is 26 and this is 56 across, so a pill
+    // radius draws a squircle -- the token for a circle of any size is the
+    // one whose value is a percentage, and nothing was using it.
+    borderRadius: radius.avatar,
     backgroundColor: color.brand.green500,
     alignItems: 'center',
     justifyContent: 'center',
@@ -88,9 +91,17 @@ const styles = StyleSheet.create({
     // Ink rather than paper: `NotchedButton` learned this the hard way --
     // white on `green500` is about two to one, which fails AA.
     color: color.brand.ink900,
-    // The glyph's own bearing sits it low in its line box, and the title
-    // role's line height makes that worse. A line height equal to the size
-    // centres it in a circle that is not otherwise centred.
-    lineHeight: type.titleLg.fontSize,
+    // THE GLYPH IS CENTRED BY ITS FONT METRICS, NOT BY REWRITING THE RAMP.
+    //
+    // The first attempt set `lineHeight: type.titleLg.fontSize`, which turns
+    // 22/27 into 22/22 -- a ratio of 1.0 under a floor of 1.2, and exactly
+    // the move `tokens.ts` warns about: "Splitting them is how a line-height
+    // floor gets broken." It also passed provenance, because a member
+    // expression is not a literal. Found in review.
+    //
+    // Android's extra font padding is what actually sat the sign low; turning
+    // it off centres the glyph with the ramp intact.
+    includeFontPadding: false,
+    textAlign: 'center',
   },
 })

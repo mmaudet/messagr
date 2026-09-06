@@ -8,7 +8,11 @@
 # libssl/libcrypto. A debian-slim base provides them, and the root
 # certificates with them.
 
-FROM rust:1-bookworm AS builder
+# PINNED, FOR THE REASON THE ANDROID BUILD PINS ITS GRADLE PLUGIN: a base
+# image that moved under a release build would move the binary with it, and
+# "it built last week" would stop being a statement about anything. Raised
+# deliberately, not by a rebuild.
+FROM rust:1.98-bookworm AS builder
 WORKDIR /src
 # Served version, read at compile time by `option_env!` and returned in the
 # `X-Messagr-Version` header of /health. Worth "unknown" if not provided —
@@ -24,7 +28,7 @@ COPY migrations ./migrations
 COPY src ./src
 RUN cargo build --release --locked
 
-FROM debian:bookworm-slim
+FROM debian:bookworm-20251229-slim
 RUN apt-get update \
     && apt-get install -y --no-install-recommends ca-certificates libssl3 \
     && rm -rf /var/lib/apt/lists/*
@@ -34,5 +38,6 @@ RUN apt-get update \
 RUN mkdir -p /var/lib/messagr
 COPY --from=builder /src/target/release/messagr-invitations /usr/local/bin/messagr-invitations
 # No secret in the image: all configuration comes from the environment
-# (see deploy/invitations.service.env.exemple).
+# (see the deployment's own invitations.service.env; a redacted example lives
+# beside the compose file on the host, not in this image).
 ENTRYPOINT ["/usr/local/bin/messagr-invitations"]

@@ -1,6 +1,6 @@
-import { describe, expect, it } from 'vitest'
+import { beforeEach, describe, expect, it } from 'vitest'
 
-import { base64Of, fetchImage } from './receiveImage'
+import { base64Of, fetchImage, forgetShownImages } from './receiveImage'
 
 const READ = {
   url: 'mxc://h/abc',
@@ -34,6 +34,9 @@ describe('base64Of', () => {
 })
 
 describe('fetchImage', () => {
+  // Module state: without this, one test's answer is another's cache hit.
+  beforeEach(forgetShownImages)
+
   it('downloads the ciphertext and hands back what it decrypts to', async () => {
     const shown = await fetchImage(
       {
@@ -97,5 +100,62 @@ describe('fetchImage', () => {
         READ,
       ),
     ).toEqual({ shown: false, reason: 'the secret is malformed' })
+  })
+})
+
+describe('fetching the same photograph twice', () => {
+  it('downloads it once', async () => {
+    // Leaving a conversation and coming back -- switching tabs does it --
+    // remounted every Photograph and fetched the lot again. Found in review.
+    forgetShownImages()
+    let downloads = 0
+    const source = {
+      download: async () => {
+        downloads += 1
+        return new Uint8Array([1])
+      },
+      open: async () => new Uint8Array([77, 97, 110]),
+    }
+    const image = { ...READ, url: 'mxc://h/once' }
+    await fetchImage(source, image)
+    await fetchImage(source, image)
+    expect(downloads).toBe(1)
+  })
+
+  it('does not keep a failure, because a download can be worth retrying', async () => {
+    forgetShownImages()
+    let attempts = 0
+    const source = {
+      download: async () => {
+        attempts += 1
+        if (attempts === 1) throw new Error('the network went away')
+        return new Uint8Array([1])
+      },
+      open: async () => new Uint8Array([77, 97, 110]),
+    }
+    const image = { ...READ, url: 'mxc://h/flaky' }
+    expect((await fetchImage(source, image)).shown).toBe(false)
+    expect((await fetchImage(source, image)).shown).toBe(true)
+  })
+
+  it('holds a bounded number, so a long conversation is not an OOM', async () => {
+    forgetShownImages()
+    let downloads = 0
+    const source = {
+      download: async () => {
+        downloads += 1
+        return new Uint8Array([1])
+      },
+      open: async () => new Uint8Array([77, 97, 110]),
+    }
+    for (let at = 0; at < 20; at += 1) {
+      await fetchImage(source, { ...READ, url: `mxc://h/${at}` })
+    }
+    // The first is gone, so asking for it again fetches it again.
+    await fetchImage(source, { ...READ, url: 'mxc://h/0' })
+    expect(downloads).toBe(21)
+    // The most recent is still held.
+    await fetchImage(source, { ...READ, url: 'mxc://h/19' })
+    expect(downloads).toBe(21)
   })
 })

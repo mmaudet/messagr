@@ -2,7 +2,15 @@ import React from 'react'
 import { StyleSheet, Text, View } from 'react-native'
 
 import { t, type CopyKey } from '../copy'
-import { color, layout, radius, space, stroke, type } from '../design/tokens'
+import {
+  color,
+  icon,
+  layout,
+  radius,
+  space,
+  stroke,
+  type,
+} from '../design/tokens'
 import { TabIcon, type TabGlyph } from './TabIcon'
 
 /**
@@ -45,7 +53,15 @@ export function Reserved({
           the mockup's way of saying "a place kept" without drawing something
           that looks like a control. */}
       <View style={styles.ring}>
-        <TabIcon glyph={glyph} tint={color.neutral['400']} size={28} />
+        {/* `icon.size.lg`, not 28. The scale is 16/20/24 and 28 is an
+            intermediate the token file forbids outright -- it escaped the
+            provenance lint because that rule does not read JSX props. This is
+            the "action isolée" case the token names. */}
+        <TabIcon
+          glyph={glyph}
+          tint={color.neutral['400']}
+          size={icon.size.lg}
+        />
       </View>
 
       <Text style={styles.title}>{t(title)}</Text>
@@ -76,7 +92,9 @@ const styles = StyleSheet.create({
   ring: {
     width: space.xxl * 2,
     height: space.xxl * 2,
-    borderRadius: radius.pill,
+    // A circle of any size, not a 26pt pill on a 64pt box -- which drew a
+    // rounded square where the mockup draws a ring.
+    borderRadius: radius.avatar,
     borderWidth: stroke.base,
     borderStyle: 'dashed',
     borderColor: color.neutral['300'],

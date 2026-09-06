@@ -115,3 +115,9 @@ export const receiptSecrets = keychainStore('eu.messagr.read-receipts')
 
 /** Whether this device asks to be woken when a message arrives. */
 export const wakeSecrets = keychainStore('eu.messagr.wake')
+
+/**
+ * Which published conditions were accepted, by the date they carry. A version
+ * rather than a flag, so a revision can re-ask -- see `termsAccepted.ts`.
+ */
+export const termsSecrets = keychainStore('eu.messagr.terms')

@@ -44,7 +44,9 @@ const styles = StyleSheet.create({
     // rather than as part of it.
     width: space.xxl + space.m,
     height: space.xxl + space.m,
-    borderRadius: radius.pill,
+    // `avatar` rather than `pill`, which is what the token is named for: a
+    // 26pt radius on a 56pt round draws a squircle.
+    borderRadius: radius.avatar,
     backgroundColor: color.brand.green100,
     alignItems: 'center',
     justifyContent: 'center',

@@ -58,6 +58,7 @@ import { computeRuntimeGapReport } from './src/runtime/runtimeGaps'
 import { computeNewArchitectureReport } from './src/runtime/newArchitecture'
 import {
   languageSecrets,
+  termsSecrets,
   wakeSecrets,
   promiseSecrets,
   receiptSecrets,
@@ -91,6 +92,7 @@ import {
   readChosenLanguage,
   rememberLanguage,
 } from './src/runtime/chosenLanguage'
+import { rememberTermsAccepted } from './src/runtime/termsAccepted'
 import { allowWake, wakeIsAllowed } from './src/runtime/wakeSetting'
 import { deviceLocale } from './src/runtime/deviceLocale'
 import { pickFromLibrary } from './src/runtime/imageLibrary'
@@ -1324,6 +1326,19 @@ export function App({
                 if (!kept) logEvent('warn', 'MESSAGR_PROMISE_NOT_KEPT', {})
               })
               .catch(() => logEvent('warn', 'MESSAGR_PROMISE_NOT_KEPT', {}))
+            // AND THE ACCEPTANCE ITSELF, WHICH WAS NOT BEING RECORDED.
+            //
+            // Reaching this callback means the box was ticked -- the screen's
+            // action does nothing otherwise. Until a review said so, that was
+            // the only trace: a `useState` that died with the screen, while
+            // the comment beside it claimed a tick "can be shown to have
+            // happened". What is written is *which* conditions were accepted,
+            // so a revision re-asks rather than being assumed.
+            rememberTermsAccepted(termsSecrets)
+              .then(kept => {
+                if (!kept) logEvent('warn', 'MESSAGR_TERMS_NOT_KEPT', {})
+              })
+              .catch(() => logEvent('warn', 'MESSAGR_TERMS_NOT_KEPT', {}))
           }}
         />
       </SafeAreaProvider>

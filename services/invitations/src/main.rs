@@ -11,6 +11,7 @@ mod named_deactivation;
 mod util;
 
 use axum::{
+    extract::DefaultBodyLimit,
     http::StatusCode,
     response::{IntoResponse, Response},
     routing::{delete, get, post},
@@ -97,7 +98,20 @@ fn router(state: Arc<AppState>) -> Router {
         // The Matrix push gateway path, verbatim: a homeserver's pusher URL
         // is this and nothing else. See `handlers::wake` for why this
         // deployment has one of its own rather than pointing at sygnal.
-        .route("/_matrix/push/v1/notify", post(handlers::wake::notify))
+        //
+        // BOUNDED, BECAUSE IT IS THE ONE UNAUTHENTICATED POST HERE.
+        //
+        // Every other route authenticates before it does anything. This one
+        // cannot: a homeserver's pusher carries no credential of ours, which
+        // is the protocol's shape and not a gap. So what it will accept is
+        // bounded instead. A notification for a hundred devices is a few
+        // kilobytes; the limit is generous against that and still refuses a
+        // body sent to make this process hold megabytes and then make an
+        // outbound request about them.
+        .route(
+            "/_matrix/push/v1/notify",
+            post(handlers::wake::notify).layer(DefaultBodyLimit::max(256 * 1024)),
+        )
         .route("/invitations", post(handlers::create::create))
         .route("/invitations/claim", post(handlers::claim::claim))
         .route(

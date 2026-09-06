@@ -42,7 +42,67 @@ export type ShownImage =
 /** What a photograph is when its sender did not say. */
 const ASSUMED_TYPE = 'image/jpeg'
 
+/**
+ * What has already been fetched, so it is not fetched again.
+ *
+ * # Why a cache is not an optimisation here
+ *
+ * `Conversation` maps its entries and each `Photograph` fetches on mount, so
+ * leaving the conversation and coming back -- switching tabs does it --
+ * downloaded and decrypted every photograph in it again. Found in review, and
+ * it is a correctness problem rather than a slow one: the plaintext lives as
+ * a data URI for as long as a view holds it, so the un-cached version held
+ * several copies of the same image at once while the new ones arrived.
+ *
+ * # Bounded, and by count rather than by bytes
+ *
+ * A photograph is up to twelve megabytes, and its data URI a third more, so
+ * an unbounded map of them is an application the operating system kills. The
+ * oldest is dropped when the limit is reached: a conversation is read in
+ * order, and what is furthest up the screen is what is least likely to be
+ * looked at again.
+ *
+ * # It holds plaintext, in memory, and that is ADR-0006's whole line
+ *
+ * Decrypted images are held in memory and never written to disk -- which is
+ * what the data URI was chosen for. This cache changes how long they live in
+ * memory, not where they live. It is cleared when the process is.
+ */
+const SEEN = new Map<string, ShownImage>()
+
+/** How many decrypted photographs may be held at once. */
+const MOST_HELD = 12
+
+/** Forgets everything. For a device that has just been signed out. */
+export function forgetShownImages(): void {
+  SEEN.clear()
+}
+
 export async function fetchImage(
+  source: ImageSource,
+  image: ReadImage,
+): Promise<ShownImage> {
+  // Keyed by the address, which is what identifies the bytes. Not by the
+  // secret: the same upload referenced twice is the same picture, and the
+  // secret is the thing least worth putting in a map key.
+  const held = SEEN.get(image.url)
+  if (held !== undefined) return held
+
+  const answer = await open(source, image)
+  // Failures are not kept. A download worth making again is exactly what the
+  // bridge distinguishes, and caching a failure would turn a transient one
+  // into a permanent one for as long as the application runs.
+  if (answer.shown) {
+    if (SEEN.size >= MOST_HELD) {
+      const oldest = SEEN.keys().next().value
+      if (oldest !== undefined) SEEN.delete(oldest)
+    }
+    SEEN.set(image.url, answer)
+  }
+  return answer
+}
+
+async function open(
   source: ImageSource,
   image: ReadImage,
 ): Promise<ShownImage> {

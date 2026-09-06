@@ -360,10 +360,10 @@ const styles = StyleSheet.create({
   },
   attachSign: {
     ...typeScale.titleLg,
-    // The same correction the floating action needs: the glyph sits low in
-    // the title role's line box, and a line height equal to the size is what
-    // centres it.
-    lineHeight: typeScale.titleLg.fontSize,
+    // The same correction the floating action needs, and the same reason not
+    // to make it by rewriting the ramp: see `FloatingAction.tsx`.
+    includeFontPadding: false,
+    textAlign: 'center',
   },
   state: { ...typeScale.caption, marginTop: space.xs },
   bubble: {
