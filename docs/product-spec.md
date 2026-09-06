@@ -847,7 +847,7 @@ is derived, and it fails on its own: a picture that will not download is a
 sentence in that message and not a conversation that failed. While it loads,
 the frame is drawn at the picture's own proportions rather than as a spinner,
 so the timeline does not reflow as photographs arrive. What it fetches is the
-smallest copy the surface can use, which is §13.28.
+smallest copy the surface can use, which is §13.29.
 
 
 ### 13.24 Several photographs, read as one plate (designed here)

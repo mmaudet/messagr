@@ -171,6 +171,7 @@ PODS:
     - React-timing
     - ReactNativeDependencies
   - React-callinvoker (0.87.1)
+  - React-Codegen (0.1.0)
   - React-Core (0.87.1):
     - React-Core-prebuilt
     - React-Core/Default (= 0.87.1)
@@ -1411,6 +1412,30 @@ PODS:
     - ReactCommon/turbomodule/core
     - ReactNativeDependencies
     - Yoga
+  - react-native-image-resizer (3.0.11):
+    - hermes-engine
+    - RCT-Folly
+    - RCTRequired
+    - RCTTypeSafety
+    - React-bridging
+    - React-Codegen
+    - React-Core
+    - React-Core-prebuilt
+    - React-debug
+    - React-Fabric
+    - React-featureflags
+    - React-graphics
+    - React-ImageManager
+    - React-jsi
+    - React-NativeModulesApple
+    - React-RCTFabric
+    - React-renderercss
+    - React-rendererdebug
+    - React-utils
+    - ReactCodegen
+    - ReactCommon/turbomodule/core
+    - ReactNativeDependencies
+    - Yoga
   - react-native-safe-area-context (5.9.1):
     - hermes-engine
     - RCTRequired
@@ -1838,6 +1863,28 @@ PODS:
     - React-utils (= 0.87.1)
     - ReactNativeDependencies
   - ReactNativeDependencies (0.87.1)
+  - ReactNativeFs (2.40.2):
+    - hermes-engine
+    - RCTRequired
+    - RCTTypeSafety
+    - React-bridging
+    - React-Core
+    - React-Core-prebuilt
+    - React-debug
+    - React-Fabric
+    - React-featureflags
+    - React-graphics
+    - React-ImageManager
+    - React-jsi
+    - React-NativeModulesApple
+    - React-RCTFabric
+    - React-renderercss
+    - React-rendererdebug
+    - React-utils
+    - ReactCodegen
+    - ReactCommon/turbomodule/core
+    - ReactNativeDependencies
+    - Yoga
   - RNFBApp (26.4.0):
     - Firebase/CoreOnly (= 12.18.0)
     - hermes-engine
@@ -2042,6 +2089,7 @@ DEPENDENCIES:
   - React-mutationobservernativemodule (from `../../../node_modules/react-native/ReactCommon/react/nativemodule/mutationobserver`)
   - react-native-get-random-values (from `../../../node_modules/react-native-get-random-values`)
   - react-native-image-picker (from `../../../node_modules/react-native-image-picker`)
+  - "react-native-image-resizer (from `../../../node_modules/@bam.tech/react-native-image-resizer`)"
   - react-native-safe-area-context (from `../../../node_modules/react-native-safe-area-context`)
   - React-NativeModulesApple (from `../../../node_modules/react-native/ReactCommon/react/nativemodule/core/platform/ios`)
   - React-networking (from `../../../node_modules/react-native/ReactCommon/react/networking`)
@@ -2079,6 +2127,7 @@ DEPENDENCIES:
   - ReactCodegen (from `build/generated/ios/ReactCodegen`)
   - ReactCommon/turbomodule/core (from `../../../node_modules/react-native/ReactCommon`)
   - ReactNativeDependencies (from `../../../node_modules/react-native/third-party-podspecs/ReactNativeDependencies.podspec`)
+  - "ReactNativeFs (from `../../../node_modules/@dr.pogodin/react-native-fs`)"
   - "RNFBApp (from `../../../node_modules/@react-native-firebase/app`)"
   - "RNFBMessaging (from `../../../node_modules/@react-native-firebase/messaging`)"
   - RNGestureHandler (from `../../../node_modules/react-native-gesture-handler`)
@@ -2100,6 +2149,7 @@ SPEC REPOS:
     - GoogleUtilities
     - nanopb
     - PromisesObjC
+    - React-Codegen
     - uniffi-bindgen-react-native
 
 EXTERNAL SOURCES:
@@ -2206,6 +2256,8 @@ EXTERNAL SOURCES:
     :path: "../../../node_modules/react-native-get-random-values"
   react-native-image-picker:
     :path: "../../../node_modules/react-native-image-picker"
+  react-native-image-resizer:
+    :path: "../../../node_modules/@bam.tech/react-native-image-resizer"
   react-native-safe-area-context:
     :path: "../../../node_modules/react-native-safe-area-context"
   React-NativeModulesApple:
@@ -2280,6 +2332,8 @@ EXTERNAL SOURCES:
     :path: "../../../node_modules/react-native/ReactCommon"
   ReactNativeDependencies:
     :podspec: "../../../node_modules/react-native/third-party-podspecs/ReactNativeDependencies.podspec"
+  ReactNativeFs:
+    :path: "../../../node_modules/@dr.pogodin/react-native-fs"
   RNFBApp:
     :path: "../../../node_modules/@react-native-firebase/app"
   RNFBMessaging:
@@ -2326,6 +2380,7 @@ SPEC CHECKSUMS:
   React: 2de853bffdce9d79608a256892cadfdd42124fb1
   React-bridging: ad588ebf664b5339b159f7bb1076a52967a5e433
   React-callinvoker: 33c0c2c46a808f55ef5a2927fa373977a334ea3e
+  React-Codegen: 4b8b4817cea7a54b83851d4c1f91f79aa73de30a
   React-Core: 48305724ff82e5922efc52bf8d0e713fbf84be5a
   React-Core-prebuilt: cd44efd12c9bfad37c194372a6d3a18a6a6d5c00
   React-CoreModules: a190415306d55fbe58fb3d8eb045c0e46c5c8437
@@ -2359,6 +2414,7 @@ SPEC CHECKSUMS:
   React-mutationobservernativemodule: 877e9f730e0d8175c2e952901b55c170fc3d372f
   react-native-get-random-values: 4c923ad74f603ac6359e7990c36fd3af06f129b9
   react-native-image-picker: 870b31525256975a2d4b6b20a54db9b380cd725d
+  react-native-image-resizer: e27d74416398278e602d00b23b7ecc32acc03c32
   react-native-safe-area-context: f17f4ec987ecdd130820a4a850498b874fb70388
   React-NativeModulesApple: adb1dd8361dff80e9f6652fb3fdbf033cfbe2a89
   React-networking: c00b437c4408f0640ba0d4158357133488521eca
@@ -2396,6 +2452,7 @@ SPEC CHECKSUMS:
   ReactCodegen: f03daf0e1d33809884e7c018cdde02e96925fcb7
   ReactCommon: 749169e12aa3461a3df3656a00e48dbe0456b2d6
   ReactNativeDependencies: 94c922c39e0e6150ee9ad05e2ca1946e0ef55783
+  ReactNativeFs: cd0d0ea408c6ed53c692650747364d181b29db49
   RNFBApp: 909622e738d3a923b670950f9cdc9aeac9b1e6cc
   RNFBMessaging: 5e7cd9fc16c49b0492121c1fa90c9b3aa35aaec6
   RNGestureHandler: 63727d42f0b6ea951168615f8af3160ad7b57a57
