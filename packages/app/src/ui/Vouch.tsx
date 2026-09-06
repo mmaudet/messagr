@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Pressable, StyleSheet, Text, useColorScheme, View } from 'react-native'
+import { StyleSheet, Text, useColorScheme, View } from 'react-native'
 
 import { t } from '../copy'
 import {
@@ -143,20 +143,24 @@ export function Vouch({ entrantId, hasHistory, onVouch, state }: VouchProps) {
       </Text>
 
       <View style={styles.actions}>
+        {/* THE REFUSAL IS A BUTTON OF THE SAME RANK.
+            It was a grey text link beside a filled button -- on a gesture
+            that cannot be undone, which is exactly backwards. The prototype
+            states the rule on its verification screen and it applies here
+            with more force: "Le refus est un bouton de même rang que
+            l'acceptation." Same height, same target, same weight; the colour
+            is what distinguishes them, not the size. */}
         <NotchedButton
           label={t('vouch_confirm')}
           testID="vouch-confirm"
           onPress={onVouch}
         />
-        <Pressable
+        <NotchedButton
+          label={t('vouch_cancel')}
           testID="vouch-cancel"
+          tone="quiet"
           onPress={() => setAsked(false)}
-          accessibilityRole="button"
-          accessibilityLabel={t('vouch_cancel')}>
-          <Text style={[styles.cancel, { color: palette.neutral['600'] }]}>
-            {t('vouch_cancel')}
-          </Text>
-        </Pressable>
+        />
       </View>
     </View>
   )

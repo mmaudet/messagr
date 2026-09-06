@@ -5,6 +5,7 @@
 import { launchImageLibrary } from 'react-native-image-picker'
 
 import type { PickedImage } from './pickImage'
+import { MOST_AT_ONCE } from './sendImages'
 
 /**
  * Choosing a photograph from the library.
@@ -26,29 +27,39 @@ import type { PickedImage } from './pickImage'
  * Not `mixed`. A video would be picked, encrypted, uploaded and then shown as
  * a broken image, because nothing renders one — a control that accepts what
  * the product cannot display is worse than one that does not offer it.
+ *
+ * # It answers a list, and an empty one for a cancellation
+ *
+ * `null` said "nothing chosen" when there was one answer. With several there
+ * is a better shape: an empty list is nothing chosen, and every caller loops
+ * either way.
  */
-export async function pickFromLibrary(): Promise<PickedImage | null> {
+export async function pickFromLibrary(): Promise<readonly PickedImage[]> {
   const answer = await launchImageLibrary({
     mediaType: 'photo',
     includeBase64: true,
-    selectionLimit: 1,
+    // SEVERAL, AND A CAP. The cap is here and in `sendImages.ts` both, on
+    // purpose: a limit enforced in one place is a limit until somebody edits
+    // that place, and what stands behind it is a phone holding fifty
+    // photographs in memory twice over -- `encryptAttachment` keeps the
+    // plaintext and the ciphertext together.
+    selectionLimit: MOST_AT_ONCE,
   })
 
   // Cancelling is the commonest outcome of opening a picker and is not a
   // failure. `pickImage.ts` says why it must not read as one.
-  if (answer.didCancel === true) return null
+  if (answer.didCancel === true) return []
 
-  const asset = answer.assets?.[0]
-  if (asset?.base64 === undefined) return null
-
-  return {
-    bytes: bytesOf(asset.base64),
-    // The picker knows the type; when it does not, the send path assumes a
-    // photograph rather than refusing one.
-    mimeType: asset.type ?? 'image/jpeg',
-    width: asset.width ?? 0,
-    height: asset.height ?? 0,
-  }
+  return (answer.assets ?? [])
+    .filter(asset => asset.base64 !== undefined)
+    .map(asset => ({
+      bytes: bytesOf(asset.base64 ?? ''),
+      // The picker knows the type; when it does not, the send path assumes a
+      // photograph rather than refusing one.
+      mimeType: asset.type ?? 'image/jpeg',
+      width: asset.width ?? 0,
+      height: asset.height ?? 0,
+    }))
 }
 
 /**

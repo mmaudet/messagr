@@ -207,6 +207,8 @@ export const de: Readonly<Record<CopyKey, string>> = {
   invite_working: 'Unterhaltung wird erstellt …',
   invite_ready:
     'Senden Sie dieser Person diesen Link. Er gilt eine Stunde und funktioniert einmal.',
+  invite_qr: 'Oder lassen Sie diesen Code scannen.',
+  invite_qr_label: 'QR-Code des Einladungslinks',
   invite_share: 'Link teilen',
   invite_close: 'Schließen',
   invite_failed: 'Die Einladung konnte nicht erstellt werden.',
@@ -302,6 +304,23 @@ export const de: Readonly<Record<CopyKey, string>> = {
   community_soon_why:
     'Eine Community fasst Räume unter einem pseudonymen Objekt zusammen. Der Reiter ist aus demselben Grund reserviert wie der für Anrufe: die Leiste darf sich nicht verschieben, wenn sie kommen.',
   brand_name: 'Messagr',
+  'plate_more %1$d': '+ %1$d',
+  plate_open: 'Foto ansehen',
+  plate_close: 'Schließen',
+  'plate_of %1$d %2$d': '%1$d von %2$d',
+  'plate_sending %1$d %2$d': '%1$d von %2$d wird gesendet …',
+  'plate_partly %1$d': '%1$d Fotos gesendet. Die übrigen konnten nicht weg.',
+  plate_too_many: 'Zu viele Fotos auf einmal. Höchstens fünfzig.',
+  composer_emoji: 'Emojis',
+  composer_photo: 'Ein Foto hinzufügen',
+  composer_record: 'Sprachnachricht',
+  composer_record_soon:
+    'Sprachnachrichten kommen in V2. Der Knopf hält seinen Platz, damit sich die Leiste an dem Tag nicht verschiebt.',
+  person_open: 'Über diese Person',
+  person_title: 'Diese Person',
+  person_back: 'Zurück',
+  message_delivered_hint: 'An den Server übergeben',
+  message_read_hint: 'Gelesen',
   settings_wake: 'Benachrichtigungen',
   settings_wake_hint:
     'An. Was Google durchquert, enthält weder Absender noch Unterhaltung noch Nachricht: nur ein Wecksignal. Das Gerät entschlüsselt danach selbst, hier. Sie auszuschalten meldet dem Server keinen Empfänger: er hat nichts mehr, wohin er senden könnte.',
@@ -322,7 +341,6 @@ export const de: Readonly<Record<CopyKey, string>> = {
     'Dieses Foto konnte auf diesem Gerät nicht geöffnet werden.',
   conversation_attach: 'Ein Foto senden',
   conversation_attaching: 'Foto wird verschlüsselt und gesendet …',
-  header_no_directory: 'kein Verzeichnis',
   'list_unread %1$d': '%1$d ungelesene Nachrichten',
   invite_open: 'Jemanden einladen',
 }

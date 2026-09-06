@@ -1,21 +1,34 @@
 import { execFileSync } from 'node:child_process'
 import { resolve } from 'node:path'
 
-import { by, device, element, waitFor } from 'detox'
+import { expect } from '@jest/globals'
+import { device } from 'detox'
 
 import { IGNORING_THE_LIVE_POLL } from './longPoll'
 import { acceptThePromise } from './promise'
 import { NOTIFICATIONS_GRANTED } from './permissions'
-import { seeText } from './readout'
+import { seeOnScreen } from './onScreen'
+import { forgetTheLog, whatItReported } from './reported'
 
 /**
- * Everything this file asserts sits at the bottom of a readout that has
- * grown past one screen, so every assertion has to scroll to reach it.
- * Detox does not scroll on its own: an element below the fold is reported
- * absent, which is indistinguishable from an element that was never
- * rendered. That cost five continuous-integration runs and a wrong theory
- * about key delivery -- the application had decrypted the message correctly
- * every single time.
+ * WHAT THIS FILE READS, AND WHY IT CHANGED.
+ *
+ * It used to assert on a readout that had grown past one screen, so every
+ * assertion had to scroll to reach it -- and Detox does not scroll on its
+ * own, so an element below the fold is reported absent, which is
+ * indistinguishable from one that was never rendered. That cost five
+ * continuous-integration runs and a wrong theory about key delivery: the
+ * application had decrypted the message correctly every single time.
+ *
+ * `expect` is imported by name, and that is not decoration: Detox's test
+ * environment puts its own in the global scope, which takes an element
+ * matcher and refuses a value. See boot.test.ts.
+ *
+ * The readout is gone with #105. What each launch says about itself is one
+ * line of structured JSON, which cannot be scrolled off. The two assertions
+ * that are genuinely about the screen -- what the conversation says about a
+ * sender it cannot authenticate -- are still made on the screen, because
+ * that is where the claim is made to a person.
  */
 
 /**
@@ -95,6 +108,12 @@ describeRoundTrip('encrypted round trip', () => {
     //
     // The first run claims the invitation, publishes this device's keys and
     // sends its own message.
+    // CLEARED FIRST, EVERY TIME. `whatItReported` takes the newest
+    // MESSAGR_RUNTIME line, and immediately after `launchApp` returns the
+    // newest one is still the *previous* launch's -- so a relaunch would be
+    // asserted against the launch it replaced. Clearing removes the race
+    // rather than sleeping through it.
+    forgetTheLog()
     await device.launchApp({
       newInstance: true,
       // See permissions.ts: a system dialog over the application would fail
@@ -112,10 +131,14 @@ describeRoundTrip('encrypted round trip', () => {
     // line be seen -- and the conversation screen rendering above the readout
     // pushed the line below the fold, which failed as if the send had never
     // happened.
-    await waitFor(element(by.text('encrypted send: sent')))
-      .toExist()
-      .withTimeout(60000)
-    await seeText('encrypted send: sent')
+    const first = await whatItReported(120000)
+    if (first.send === 'not-run' || !first.send.sent) {
+      throw new Error(
+        `the first launch never sent: ${JSON.stringify(first.send)}. Nothing
+         below can pass without it -- the counterparty has nothing to read
+         and no key to be shared with.`,
+      )
+    }
   }, 180000)
 
   it('restores its session on relaunch instead of claiming again', async () => {
@@ -127,6 +150,8 @@ describeRoundTrip('encrypted round trip', () => {
     // application that lost its session and claimed again would find the
     // token spent and the account unreachable -- losing a session is losing
     // the account.
+    // Cleared first: see the launch above for why every one of them is.
+    forgetTheLog()
     await device.launchApp({
       newInstance: true,
       // See permissions.ts: a system dialog over the application would fail
@@ -134,29 +159,30 @@ describeRoundTrip('encrypted round trip', () => {
       permissions: NOTIFICATIONS_GRANTED,
       launchArgs: IGNORING_THE_LIVE_POLL,
     })
-    await seeText('entry: session restored')
+    // The last report is this relaunch's: `whatItReported` takes the newest
+    // line, and the launch above wrote its own before this one started.
+    const again = await whatItReported(120000)
+    expect(again.entry.entered).toBe(true)
+    expect(again.entry.claimed).toBe(false)
 
     // The store's passphrase survived too, and that is a separate claim from
     // the session's. A relaunch that minted a new one would have opened a
     // new, empty store and lost every room key the old one held -- which the
     // decryption below would then fail on, several minutes later and looking
     // like a key-delivery problem rather than a storage one.
-    await seeText('store passphrase: reused, the store reopened')
+    expect(again.passphrase).toBe('reused')
 
     // And the sign-up marker is still cleared, so this relaunch created
     // nothing. `published` rather than `created` or `resumed` is what says
     // the destructive call was not reached: the identity was republished,
     // not minted a second time.
-    //
-    // Existence first: the identity line is written when the pump finishes,
-    // and the two lines above are set long before that. Asserting visibility
-    // straight away read a readout still saying "signing identity: —" and
-    // failed on a screen that was simply not finished yet.
-    await waitFor(element(by.text('signing identity: published')))
-      .toExist()
-      .withTimeout(60000)
-    await seeText('sign-up: complete, the marker is cleared')
-    await seeText('signing identity: published')
+    expect(again.signUp).toBe('complete')
+    const pump = again.pump
+    if (pump === 'not-configured' || pump.outcome !== 'ran') {
+      throw new Error(`the relaunch ran no pump: ${JSON.stringify(pump)}`)
+    }
+    expect(pump.report.identity.established).toBe(true)
+    expect(pump.report.identity.how).toBe('published')
   })
 
   it('reads a message an independent client encrypted for it', async () => {
@@ -175,14 +201,26 @@ describeRoundTrip('encrypted round trip', () => {
     // somebody can run it.
     let seen = false
     for (let attempt = 0; attempt < 4 && !seen; attempt += 1) {
+      // Cleared first, and here it does more than remove a race: the loop
+      // asks the same question of each launch, so a line left by the one
+      // before would answer for it and the retry would prove nothing.
+      forgetTheLog()
       await device.launchApp({
         newInstance: true,
         permissions: NOTIFICATIONS_GRANTED,
         launchArgs: IGNORING_THE_LIVE_POLL,
       })
       try {
-        await seeText(`decrypted: ${COUNTERPARTY_BODY}`)
-        seen = true
+        const read = await whatItReported(60000)
+        if (
+          read.received !== 'not-run' &&
+          read.received.received &&
+          read.received.body === COUNTERPARTY_BODY
+        ) {
+          seen = true
+        } else {
+          throw new Error('not this launch')
+        }
       } catch {
         // The room key had not arrived within this launch's own attempt.
         // Another launch asks again.
@@ -196,25 +234,45 @@ describeRoundTrip('encrypted round trip', () => {
     }
   })
 
-  it("shows the independent client's message as announced, not as known", async () => {
-    // The trust model, on the screen a person actually reads rather than on
-    // a diagnostic line. Decrypting proves which key wrote the message and
-    // nothing about who holds it, so the conversation says the sender is
-    // announced -- and the word "vérifier" appears nowhere on it.
-    // The label is two lines tall, because a Matrix user id is long. A
-    // scroll that merely reached it left it 60 per cent visible and the
-    // assertion failed on a screen that was rendering exactly the right
-    // words. Going to the top first lands it properly.
-    await seeText(`Se présente comme ${process.env.MESSAGR_INTEROP_USER ?? ''}`)
+  it('names the sender, because this room does not have exactly two people in it', async () => {
+    // THE TRUST MODEL, ON THE SCREEN A PERSON READS.
+    //
+    // Decrypting an event proves which key wrote it and nothing about who
+    // holds that key, so the conversation says the sender is *announced*.
+    // #84 stopped repeating that above every message in a conversation whose
+    // header already names the person -- and the bench is not one of those:
+    // the provisioning script puts both suites' entrants and the inviter in
+    // the same room, "distinct people in the same room, which is what they
+    // are", so there are three.
+    //
+    // A conversation with three people is not a conversation with somebody,
+    // which is why `theOtherMember` answers null for it and why every message
+    // here names who it claims to be from. This asserting on the counterparty
+    // is the whole round trip made visible: an independent client's message,
+    // decrypted, and attributed to nobody more than it can be.
+    //
+    // Searched for rather than waited on: the label is two lines tall because
+    // a Matrix user id is long, and Detox wants 75 per cent of an element
+    // visible. `onScreen.ts` says why this is not the readout helper back.
+    await seeOnScreen(
+      `Se présente comme ${process.env.MESSAGR_INTEROP_USER ?? ''}`,
+    )
   })
 
   it('does not present the sender as established', async () => {
-    // The trust model, asserted on screen rather than trusted to a comment.
-    // Decrypting an event does not establish who wrote it, and the day this
-    // line loses the word "unauthenticated" is the day the product starts
-    // implying otherwise.
-    await seeText(
-      `claims to be from: ${process.env.MESSAGR_INTEROP_USER ?? ''} (unauthenticated)`,
-    )
+    // Decrypting an event proves which key wrote it and nothing about who
+    // holds that key. The readout used to say so in the word
+    // "unauthenticated"; the report says it in the field's name, which is
+    // `claimedSender` everywhere it is carried -- and the screen above says
+    // it to a person, in « Se présente comme ».
+    //
+    // Asserted here as the sender the application *claims*, matching the
+    // counterparty the harness actually ran, so a report that named somebody
+    // else -- or named nobody -- fails rather than passing by absence.
+    const read = await whatItReported(60000)
+    if (read.received === 'not-run' || !read.received.received) {
+      throw new Error('nothing was received, so there is no sender to check')
+    }
+    expect(read.received.claimedSender).toBe(process.env.MESSAGR_INTEROP_USER)
   })
 })

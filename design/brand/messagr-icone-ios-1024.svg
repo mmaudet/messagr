@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024" role="img" aria-label="Messagr">
+  <title>Messagr — icône iOS 1024</title>
+  <rect width="1024" height="1024" rx="224" fill="#12B76A"></rect>
+  <g transform="translate(217.6 217.6) scale(5.888)">
+    <path d="M 30 12 H 70 A 18 18 0 0 1 88 30 V 70 A 18 18 0 0 1 70 88 H 30 A 18 18 0 0 1 12 70 V 30 A 18 18 0 0 1 30 12 Z M 54 12 L 88 46 L 88 58 L 42 12 Z" fill="#F2FBF6" fill-rule="evenodd"></path>
+  </g>
+</svg>

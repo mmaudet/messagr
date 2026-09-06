@@ -28,18 +28,23 @@ AppRegistry.registerComponent(appName, () => App)
 // push carried `{"prio":"high"}` and nothing else, on purpose, so there is no
 // message here to show -- only the knowledge that one exists.
 //
-// So this draws the blind notification: something arrived, named nobody. A
-// device that has been unlocked could open its store, sync and say who and
-// what, and that is issue #107 rather than a line missing here; the shape
-// this calls is already the one that supports it, and the fallback is the
-// behaviour #90 asks to be pinned rather than a stand-in for it.
+// So it goes and looks: it opens the store, syncs from its own cursor,
+// decrypts what changed and says who and what. Everything that can stop it --
+// no session, a keystore that will not answer because the screen has not been
+// unlocked since the phone was switched on -- answers `null`, and `null`
+// draws the notification that names nobody. That fallback is #90's own
+// criterion, not a stand-in for this.
 const {
   setBackgroundMessageHandler,
   getMessaging,
 } = require('@react-native-firebase/messaging')
 const { wake } = require('./src/runtime/wake')
+const { lookForWhatArrivedHere } = require('./src/runtime/wakeAndLook')
 const { readNotification } = require('./src/runtime/notifying')
-const { drawNotification } = require('./src/runtime/showNotification')
+const {
+  drawNotification,
+  rememberBackgroundPresses,
+} = require('./src/runtime/showNotification')
 const { logEvent } = require('./src/runtime/log')
 const { wakeIsAllowed } = require('./src/runtime/wakeSetting')
 const { wakeSecrets } = require('./src/runtime/deviceSecrets')
@@ -61,9 +66,7 @@ setBackgroundMessageHandler(getMessaging(), async () => {
   }
 
   const outcome = await wake({
-    // `null` is "this device could not open its store", which is exactly the
-    // truth in a headless context that has bootstrapped nothing.
-    lookForWhatArrived: async () => null,
+    lookForWhatArrived: lookForWhatArrivedHere,
     draw: drawNotification,
     describe: arrival =>
       readNotification(arrival.scope, arrival.shown, arrival.preview),
@@ -71,3 +74,11 @@ setBackgroundMessageHandler(getMessaging(), async () => {
   // The one line anybody debugging a push has. There is no screen here.
   logEvent('info', 'MESSAGR_WOKE', outcome)
 })
+
+// AT MODULE SCOPE, WHICH IS THE ONLY PLACE IT WORKS.
+//
+// notifee refuses to hold a press without a background handler, and said so
+// on a device: "no background event handler has been set". Registered inside
+// a component it does not exist when the process is headless -- which is
+// every case a background press happens in.
+rememberBackgroundPresses()

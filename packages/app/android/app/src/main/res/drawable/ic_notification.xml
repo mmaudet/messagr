@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    The mark, as a notification icon.
+
+    WHY IT IS NOT THE LAUNCHER ICON. Android renders a notification's small
+    icon as an alpha mask: every pixel that is not transparent becomes white,
+    and the rest disappears. The launcher icon is opaque throughout, so the
+    status bar drew a plain white square — reported from a lock screen, where
+    it was the only thing visible.
+
+    THE PATH IS THE IDENTITY'S OWN, copied from messagr-monogramme-r-vert.svg
+    as served by messagr.eu, not redrawn. Three subpaths under `evenOdd`: the
+    rounded square, the 45° cut across its top-right corner, and the `r`. Under
+    even-odd both the cut and the `r` are removed from the square rather than
+    added to it, which is what makes the mark a mark and not a blob — and it
+    is exactly what an alpha mask needs, since the holes are the drawing.
+
+    `fillColor` is white because a mask has no colour of its own. The tint the
+    system applies is the notification's `color`, which `showNotification.ts`
+    sets to the brand green.
+-->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="100"
+    android:viewportHeight="100">
+    <path
+        android:fillColor="#FFFFFF"
+        android:fillType="evenOdd"
+        android:pathData="M 30 12 H 70 A 18 18 0 0 1 88 30 V 70 A 18 18 0 0 1 70 88 H 30 A 18 18 0 0 1 12 70 V 30 A 18 18 0 0 1 30 12 Z M 54 12 L 88 46 L 88 58 L 42 12 Z M 36 72 V 36 H 46 V 43 A 15 15 0 0 1 61 36 V 47 A 7 7 0 0 0 46 52 V 72 Z" />
+</vector>

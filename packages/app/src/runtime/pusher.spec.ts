@@ -11,14 +11,14 @@ const TOKEN = 'fcm-token-abc'
 
 describe('describePusher', () => {
   it('points the homeserver at this deployment’s own gateway', () => {
-    const body = describePusher(TOKEN, 'https://messagr.eu/_messagr')
+    const body = describePusher(TOKEN, 'https://messagr.eu/_messagr', 'android')
     expect(body.data.url).toBe(
       'https://messagr.eu/_messagr/_matrix/push/v1/notify',
     )
   })
 
   it('is keyed by the device token, which is what identifies the device', () => {
-    const body = describePusher(TOKEN, 'https://messagr.eu/_messagr')
+    const body = describePusher(TOKEN, 'https://messagr.eu/_messagr', 'android')
     expect(body.pushkey).toBe(TOKEN)
     expect(body.kind).toBe('http')
   })
@@ -27,7 +27,7 @@ describe('describePusher', () => {
     // Belt as well as braces. The gateway strips everything regardless, but a
     // homeserver that sends less has less to be stripped, and one day this
     // pusher may point at a gateway somebody else runs.
-    expect(describePusher(TOKEN, 'https://h/_m').data.format).toBe(
+    expect(describePusher(TOKEN, 'https://h/_m', 'android').data.format).toBe(
       'event_id_only',
     )
   })
@@ -37,13 +37,27 @@ describe('describePusher', () => {
     // would be content this application put on the wire itself, which is the
     // one leak the gateway cannot prevent on its own behalf.
     expect(
-      'default_payload' in describePusher(TOKEN, 'https://h/_m').data,
+      'default_payload' in
+        describePusher(TOKEN, 'https://h/_m', 'android').data,
     ).toBe(false)
   })
 
   it('appends the gateway path exactly once, whatever the base looks like', () => {
-    expect(describePusher(TOKEN, 'https://h/_m/').data.url).toBe(
+    expect(describePusher(TOKEN, 'https://h/_m/', 'android').data.url).toBe(
       'https://h/_m/_matrix/push/v1/notify',
+    )
+  })
+
+  it('names a different sygnal entry per platform', () => {
+    // The two roads need different tokens and different pushkins: Android
+    // through Firebase, iOS to Apple directly. One `app_id` for both would
+    // route iPhones to a Firebase pushkin holding no APNs key, and sygnal
+    // would say nothing about it.
+    expect(describePusher(TOKEN, 'https://h/_m', 'ios').app_id).toBe(
+      'eu.messagr.apns',
+    )
+    expect(describePusher(TOKEN, 'https://h/_m', 'android').app_id).toBe(
+      'eu.messagr',
     )
   })
 
@@ -52,11 +66,13 @@ describe('describePusher', () => {
     // `apps:` key produces no error anywhere -- the homeserver finds no
     // pushkin and drops the notification. Pinned here because nothing else
     // would notice.
-    expect(describePusher(TOKEN, 'https://h/_m').app_id).toBe('eu.messagr')
+    expect(describePusher(TOKEN, 'https://h/_m', 'android').app_id).toBe(
+      'eu.messagr',
+    )
   })
 
   it('carries no wildcard, which sygnal’s matching would accept', () => {
-    const body = describePusher(TOKEN, 'https://h/_m')
+    const body = describePusher(TOKEN, 'https://h/_m', 'android')
     expect(body.app_id).not.toMatch(/[*?]/)
   })
 
@@ -65,7 +81,7 @@ describe('describePusher', () => {
     // list, and it crosses no push infrastructure. It still says the product
     // and not the person, because a device list is a thing somebody may show
     // somebody else.
-    const body = describePusher(TOKEN, 'https://h/_m')
+    const body = describePusher(TOKEN, 'https://h/_m', 'android')
     expect(body.device_display_name).toBe('Messagr')
     expect(body.app_display_name).toBe('Messagr')
   })
@@ -77,7 +93,9 @@ describe('registerPusher', () => {
     const poster: PusherPoster = async body => {
       sent = body
     }
-    expect(await registerPusher(poster, TOKEN, 'https://h/_m')).toEqual({
+    expect(
+      await registerPusher(poster, TOKEN, 'https://h/_m', 'android'),
+    ).toEqual({
       registered: true,
     })
     expect((sent as { pushkey: string }).pushkey).toBe(TOKEN)
@@ -89,7 +107,9 @@ describe('registerPusher', () => {
     const poster: PusherPoster = async () => {
       throw new Error('the homeserver refused')
     }
-    expect(await registerPusher(poster, TOKEN, 'https://h/_m')).toEqual({
+    expect(
+      await registerPusher(poster, TOKEN, 'https://h/_m', 'android'),
+    ).toEqual({
       registered: false,
       reason: 'the homeserver refused',
     })
@@ -100,10 +120,12 @@ describe('registerPusher', () => {
     const poster: PusherPoster = async () => {
       called = true
     }
-    expect(await registerPusher(poster, '', 'https://h/_m')).toEqual({
-      registered: false,
-      reason: 'this device has no push token',
-    })
+    expect(await registerPusher(poster, '', 'https://h/_m', 'android')).toEqual(
+      {
+        registered: false,
+        reason: 'this device has no push token',
+      },
+    )
     expect(called).toBe(false)
   })
 })
@@ -113,7 +135,7 @@ describe('forgetPusher', () => {
     // How a pusher is taken away: same route, `kind: null`. Without it,
     // turning notifications off would only stop the next launch registering
     // and the existing pusher would keep firing.
-    expect(forgetPusher(TOKEN)).toEqual({
+    expect(forgetPusher(TOKEN, 'android')).toEqual({
       app_id: 'eu.messagr',
       pushkey: TOKEN,
       kind: null,

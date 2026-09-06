@@ -58,6 +58,15 @@
 	<string>Pour choisir une image à envoyer dans une conversation. L’image est chiffrée sur cet appareil avant d’être envoyée : ni le serveur ni Messagr ne peuvent la lire.</string>
 	<key>RCTNewArchEnabled</key>
 	<true/>
+	<!-- WAKING A CLOSED APPLICATION.
+	     Without this, iOS drops a content-available push instead of deferring
+	     it: the application is never started and the notification is never
+	     drawn. It cannot fail on a simulator, and it fails silently on a
+	     device, so `assert-ios-push.sh` is what actually notices. -->
+	<key>UIBackgroundModes</key>
+	<array>
+		<string>remote-notification</string>
+	</array>
 	<key>UILaunchStoryboardName</key>
 	<string>LaunchScreen</string>
 	<key>UIRequiredDeviceCapabilities</key>

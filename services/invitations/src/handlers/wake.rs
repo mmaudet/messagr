@@ -1,6 +1,7 @@
 use std::sync::{Arc, OnceLock};
 
 use axum::{extract::State, Json};
+use rand::RngCore;
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 
@@ -37,6 +38,35 @@ use crate::{error::AppError, AppState};
 /// the guarantee above would hold only as long as every client chose to let it.
 /// Dropping `data` makes it hold by construction.
 ///
+/// # SYGNAL WILL NOT SEND NOTHING, SO IT IS GIVEN NOISE
+///
+/// The first version of this forwarded a notification carrying only its
+/// devices. Sygnal accepted it, logged nothing alarming, and **discarded it**:
+///
+/// ```text
+/// if not data.get("room_id") and not data.get("event_id") and not counts:
+///     return {}
+/// ```
+///
+/// -- and an empty payload is then dropped with *"Discarding notification
+/// since it contains no data."* Measured against the real deployment, not
+/// read out of the source: the request answered `200 {"rejected":[]}` and no
+/// push was ever sent. A gateway that silently delivers nothing is worse than
+/// one that refuses.
+///
+/// So it is given an `event_id`, and the `event_id` is **a fresh random value
+/// with no relation to the event**. Sygnal is satisfied, the device ignores
+/// it, and nothing about the message crosses. Passing the real one through
+/// would have been the leak this module exists to prevent: two devices
+/// receiving the same event id is two devices in the same conversation, which
+/// is a social graph handed over one message at a time.
+///
+/// One value per notification, not per device. A homeserver's notify request
+/// is for one account's own pushers, so what a shared value could correlate
+/// is a person's own devices with each other -- which arriving in the same
+/// millisecond already suggests. Across people the values are unrelated,
+/// because their notifications are separate requests.
+///
 /// # Rejections are passed back verbatim
 ///
 /// A pushkey Firebase says is gone must reach the homeserver, or it keeps
@@ -65,6 +95,21 @@ pub struct Device {
 #[derive(Serialize)]
 pub struct Rejected {
     pub rejected: Vec<String>,
+}
+
+/// A value shaped like an event id and carrying nothing.
+///
+/// Sixteen random bytes, hex. Not derived from anything: derivation is how a
+/// value that was meant to be opaque turns out to be a stable identifier for
+/// whatever it was derived from.
+fn meaningless_id() -> String {
+    let mut raw = [0u8; 16];
+    rand::thread_rng().fill_bytes(&mut raw);
+    let mut out = String::from("$");
+    for byte in raw {
+        out.push_str(&format!("{byte:02x}"));
+    }
+    out
 }
 
 /// The client this forwards with, made once.
@@ -132,6 +177,10 @@ pub async fn notify(
 pub fn strip(notification: &Notification) -> Value {
     json!({
         "notification": {
+            // Noise, and required. See the module header: sygnal drops a
+            // notification carrying no `room_id`, no `event_id` and no
+            // counts, so this carries an `event_id` that is not one.
+            "event_id": meaningless_id(),
             "devices": notification
                 .devices
                 .iter()
@@ -194,7 +243,7 @@ mod tests {
 
         let mut keys: Vec<&str> = inner.keys().map(String::as_str).collect();
         keys.sort_unstable();
-        assert_eq!(keys, vec!["devices", "prio"]);
+        assert_eq!(keys, vec!["devices", "event_id", "prio"]);
 
         let device = inner["devices"][0].as_object().unwrap();
         let mut device_keys: Vec<&str> = device.keys().map(String::as_str).collect();
@@ -222,6 +271,47 @@ mod tests {
     /// `default_payload` is written by the client that registered the pusher,
     /// and sygnal merges it into what it sends. Dropping the whole `data`
     /// object is what makes the guarantee hold however a client registered.
+    /// The easiest mistake to make here, now that an `event_id` is sent at
+    /// all: passing the real one through. Two devices receiving the same
+    /// event id are two devices in the same conversation, which is a social
+    /// graph handed over one message at a time.
+    #[test]
+    fn the_event_id_that_goes_out_is_not_the_one_that_came_in() {
+        let real = notification(
+            r##"{"notification":{"event_id":"$realeventid:messagr.eu",
+                "devices":[{"app_id":"a","pushkey":"K"}]}}"##,
+        );
+        let sent = strip(&real);
+        assert_ne!(sent["notification"]["event_id"], "$realeventid:messagr.eu");
+        assert!(!sent.to_string().contains("realeventid"));
+    }
+
+    /// And it is different every time, so it cannot become a handle for
+    /// anything. A constant would satisfy sygnal and correlate every push
+    /// this deployment ever sent.
+    #[test]
+    fn two_notifications_do_not_share_an_event_id() {
+        let one = notification(r##"{"notification":{"devices":[{"app_id":"a","pushkey":"K"}]}}"##);
+        let two = notification(r##"{"notification":{"devices":[{"app_id":"a","pushkey":"K"}]}}"##);
+        assert_ne!(
+            strip(&one)["notification"]["event_id"],
+            strip(&two)["notification"]["event_id"]
+        );
+    }
+
+    /// Sygnal drops a notification with no `room_id`, no `event_id` and no
+    /// counts -- measured against the real deployment, where it answered 200
+    /// and sent nothing. Whatever else changes here, one of those has to
+    /// survive, and `event_id` is the only one that can be made meaningless.
+    #[test]
+    fn something_survives_that_sygnal_will_accept() {
+        let bare = notification(r##"{"notification":{"devices":[{"app_id":"a","pushkey":"K"}]}}"##);
+        let sent = strip(&bare);
+        let has_something = sent["notification"].get("event_id").is_some()
+            || sent["notification"].get("room_id").is_some();
+        assert!(has_something, "sygnal would discard this and say nothing");
+    }
+
     #[test]
     fn a_client_cannot_smuggle_content_back_in() {
         let smuggled = notification(

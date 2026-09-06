@@ -51,7 +51,8 @@ jobs:
       # every script here is a second and catches that class outright.
       - name: Parse every shell script
         run: |
-          for script in scripts/*.sh .githooks/*; do
+          for script in scripts/*.sh .githooks/* deploy/messagr-eu/*.sh \
+                        deploy/messagr-eu/tests/*.sh; do
             [ -f "$script" ] || continue
             bash -n "$script" || { echo "$script does not parse" >&2; exit 1; }
           done
@@ -70,3 +71,42 @@ jobs:
       # so the bundle is inspected rather than the intention trusted.
       - name: Assert the bundle carries no crypto WebAssembly module
         run: ./scripts/assert-no-crypto-wasm.sh
+
+      # HERE, AND NOT IN THE macOS JOB. All three are files in this
+      # repository, so a Linux runner reads them fine -- and the simulator
+      # job cannot catch any of this: a simulator build proves compilation,
+      # and an unentitled build compiles. It registers with Apple, is
+      # refused, and reports nothing.
+      - name: Assert an iPhone built from this tree could be woken
+        run: ./scripts/assert-ios-push.sh
+
+      # THE SITE, BUILT AND THEN CHECKED -- not the committed pages.
+      #
+      # `build-site.sh` exists because the substitution it performs used to
+      # live in `deploy.sh`, where `sed` exits zero having substituted
+      # nothing: a renamed slot served "the application is not published yet"
+      # to everybody holding a working invitation, with a green deployment.
+      # Running it here means the page a person would actually be served is
+      # the page these tests read.
+      #
+      # The two properties the invitation page holds are the reason it is
+      # written the way it is: its response is byte-identical for every token,
+      # valid or not, so the page cannot reveal whether an invitation exists;
+      # and it never claims the token itself.
+      - name: Build the site and hold it to its own doctrine
+        run: |
+          rm -rf /tmp/messagr-site
+          deploy/messagr-eu/build-site.sh deploy/messagr-eu/site /tmp/messagr-site
+          for check in deploy/messagr-eu/tests/*.js; do
+            echo "-- $(basename "$check")"
+            node "$check"
+          done
+          # The live half wants the network and is not binding here; the
+          # offline half reads the built tree and the vhost, and is.
+          deploy/messagr-eu/tests/identical-page-invitation.sh \
+            /tmp/messagr-site deploy/messagr-eu/nginx-messagr-eu.conf
+
+      # The privacy policy against what the push gateway forwards. The live
+      # half is binding only on a release; see the script.
+      - name: Assert the privacy policy and the push gateway agree
+        run: ./scripts/assert-push-payload.sh

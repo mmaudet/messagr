@@ -1,0 +1,248 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Messagr</title>
+<meta name="description" content="La messagerie qui ne vous demande rien. Pas de numéro, pas de compte, pas de mot de passe.">
+<style>
+  :root{
+    --ground:#F7F5EF; --surface:#ffffff; --ink:#0C1F19; --soft:#5A6B63;
+    --accent:#06614A; --mark:#12B76A; --bubble:#C9F2DC; --rule:#E2DED2;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0}
+  body{
+    background:var(--ground); color:var(--ink);
+    font-family:-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    line-height:1.6; -webkit-font-smoothing:antialiased;
+  }
+  main{max-width:640px; margin:0 auto; padding:56px 24px 80px}
+  .mark{display:block; margin-bottom:40px; width:max-content}
+  .mark:focus-visible{outline:3px solid var(--mark); outline-offset:4px}
+  .logotype{display:block; width:min(260px,62vw); height:auto}
+  .logotype.dark{display:none}
+  .getline{display:flex; align-items:center; gap:14px; margin-bottom:16px}
+  .getline .label{margin:0}
+  .appicon{flex:0 0 52px; width:52px; height:52px; display:block}
+  h1{
+    font-size:clamp(30px,7vw,42px); line-height:1.12; letter-spacing:-0.025em;
+    font-weight:650; margin:0 0 18px; text-wrap:balance;
+  }
+  .lead{font-size:18px; color:var(--soft); margin:0 0 34px; text-wrap:pretty}
+  ul{list-style:none; padding:0; margin:0 0 40px; display:flex; flex-direction:column; gap:11px}
+  li{display:flex; gap:11px; align-items:baseline; font-size:16px}
+  li::before{content:"◆"; color:var(--mark); font-size:12px; flex:0 0 auto}
+  .card{
+    background:var(--surface); border:1px solid var(--rule); border-radius:4px;
+    padding:26px 24px; margin-bottom:22px;
+  }
+  .label{
+    font-family:ui-monospace,SFMono-Regular,Menlo,monospace; font-size:11px;
+    letter-spacing:.13em; text-transform:uppercase; color:var(--soft); margin:0 0 16px;
+  }
+  .stores{display:flex; flex-wrap:wrap; gap:16px}
+  .store{flex:1 1 210px; display:flex; flex-direction:column; gap:7px}
+  .badge{
+    display:flex; align-items:center; gap:13px; padding:13px 18px;
+    background:var(--ink); color:#fff; text-decoration:none;
+    clip-path:polygon(0 0, calc(100% - 14px) 0, 100% 14px, 100% 100%, 0 100%);
+  }
+  .badge:hover{background:var(--accent)}
+  .badge:focus-visible{outline:3px solid var(--mark); outline-offset:2px}
+  .badge.off{background:#DAD6CA; color:#6E7A73; pointer-events:none}
+  .badge svg{flex:0 0 24px}
+  .badge b{display:block; font-size:15px; font-weight:620; line-height:1.25}
+  .badge em{display:block; font-style:normal; font-size:11.5px; opacity:.75}
+  .under{
+    font-family:ui-monospace,SFMono-Regular,Menlo,monospace; font-size:11px;
+    letter-spacing:.09em; text-transform:uppercase; color:var(--soft); padding-left:2px;
+  }
+  .invite{
+    background:var(--bubble); border-radius:4px; padding:18px 20px;
+    font-size:15.5px; margin-top:26px;
+  }
+  .invite b{font-weight:640}
+  footer{
+    margin-top:46px; padding-top:20px; border-top:1px solid var(--rule);
+    font-size:13.5px; color:var(--soft);
+  }
+  footer a{color:var(--accent)}
+  @media (prefers-color-scheme:dark){
+    :root{
+      --ground:#0B1A15; --surface:#11241D; --ink:#E9F1EC; --soft:#93A89E;
+      --accent:#4FD39B; --rule:#23392F; --bubble:#1C3D30;
+    }
+    .logotype.light{display:none}
+    .logotype.dark{display:block}
+    .badge{background:var(--mark); color:#06251B}
+    .badge:hover{background:var(--accent); color:#06251B}
+    .badge.off{background:#1E3229; color:#7C9084}
+  }
+</style>
+</head>
+<body>
+<main>
+
+  <a class="mark" href="/" aria-label="Messagr">
+    <img class="logotype light" src="/messagr-logotype-vert.svg" alt="Messagr" width="260" height="60">
+    <img class="logotype dark" src="/messagr-logotype-vert-inverse.svg" alt="Messagr" width="260" height="60">
+  </a>
+
+  <h1 data-t="titre">La messagerie qui ne vous demande rien.</h1>
+  <p class="lead" data-t="chapo">Pas de numéro, pas de compte, pas de mot de passe. Quelqu'un vous invite, vous écrivez.</p>
+
+  <ul>
+    <li data-t="point1">Chiffrée de bout en bout, sans réglage</li>
+    <li data-t="point2">Aucun carnet d'adresses aspiré, aucune publicité</li>
+    <li data-t="point3">Vos messages exportables à tout moment</li>
+  </ul>
+
+  <div class="card">
+    <div class="getline">
+      <img class="appicon" src="/messagr-monogramme-r-vert.svg" alt="" width="52" height="52" aria-hidden="true">
+      <p class="label" data-t="obtenir">Obtenir l'application</p>
+    </div>
+    <div class="stores">
+
+      <div class="store">
+        <a class="badge" href="/messagr.apk">
+          <svg viewBox="0 0 24 27" aria-hidden="true" width="24" height="27">
+            <path d="M1.6 1.1 14 13.5 1.6 25.9A2.4 2.4 0 0 1 1 24.3V2.7c0-.6.2-1.2.6-1.6z" fill="currentColor"/>
+            <path d="M17.4 10 3.5.3l12.2 12.2z" fill="currentColor" opacity=".85"/>
+            <path d="M17.4 17 3.5 26.7l12.2-12.2z" fill="currentColor" opacity=".85"/>
+            <path d="M21.9 12.1c1.4.8 1.4 2.5 0 3.3l-3 1.7-3.2-3.3 3.2-3.3z" fill="currentColor" opacity=".7"/>
+          </svg>
+          <span><b>Android</b><em data-t="direct">Téléchargement direct</em></span>
+        </a>
+        <div class="under" data-t="bientot-play">Bientôt sur Google Play</div>
+      </div>
+
+      <div class="store">
+        <span class="badge off" aria-disabled="true">
+          <svg viewBox="0 0 24 27" aria-hidden="true" width="24" height="27">
+            <path d="M17.6 14.2c0-2.6 2.1-3.8 2.2-3.9-1.2-1.8-3.1-2-3.8-2-1.6-.2-3.1.9-3.9.9-.8 0-2.1-.9-3.4-.9-1.8 0-3.4 1-4.3 2.6-1.8 3.2-.5 7.9 1.3 10.5.9 1.3 1.9 2.7 3.2 2.6 1.3-.1 1.8-.8 3.3-.8 1.5 0 2 .8 3.4.8 1.4 0 2.3-1.3 3.1-2.6.6-.9.9-1.4 1.3-2.4-3.3-1.2-3.4-4.7-3.4-4.8z" fill="currentColor"/>
+            <path d="M15.1 4.6c.7-.9 1.2-2.1 1.1-3.3-1 0-2.3.7-3 1.6-.7.8-1.3 2-1.1 3.2 1.1.1 2.3-.6 3-1.5z" fill="currentColor"/>
+          </svg>
+          <span><b>iPhone</b><em>App Store</em></span>
+        </span>
+        <div class="under" data-t="bientot">Bientôt</div>
+      </div>
+
+    </div>
+
+    <div class="invite">
+      <b data-t="invitation-titre">On n'entre dans Messagr que sur invitation.</b>
+      <span data-t="invitation-corps">L'application seule ne suffit pas : il vous faut le lien
+      que quelqu'un vous a envoyé. Sans lui, rien à créer, rien à remplir.</span>
+    </div>
+  </div>
+
+  <footer>
+    Messagr est exploité par RV Myriagone Holding, 22 rue de la Garenne, 78130 Chapet,
+    RCS Versailles 894&nbsp;754&nbsp;548. Écrire à <a href="mailto:conformite@messagr.eu">conformite@messagr.eu</a>.
+  </footer>
+
+</main>
+<script>
+// LA LANGUE, ET RIEN D'AUTRE.
+//
+// Cette page n'avait aucun script, et c'était une propriété : elle
+// fonctionne avec JavaScript coupé. Elle la garde -- le français est dans le
+// balisage, ce bloc ne fait que le REMPLACER pour un navigateur qui lit
+// autre chose. Coupé, la page reste française et entière.
+//
+// Pourquoi elle est traduite du tout : l'application embarque six langues
+// et n'a aucun repli (#103), et la moitié de cet argument se perdait sur les
+// écrans qui précèdent l'application. Voir #115 et
+// `tests/langues-page-invitation.js`, qui tient les deux pages.
+(function () {
+  var T = {
+    fr: null,
+    en: {
+      titre: 'The messenger that asks you for nothing.',
+      chapo: 'No number, no account, no password. Somebody invites you, you write.',
+      point1: 'End-to-end encrypted, with nothing to set',
+      point2: 'No address book harvested, no advertising',
+      point3: 'Your messages exportable at any time',
+      obtenir: 'Get the application',
+      direct: 'Direct download',
+      'bientot-play': 'Coming to Google Play',
+      bientot: 'Coming soon',
+      'invitation-titre': 'Messagr is entered by invitation only.',
+      'invitation-corps': 'The application alone is not enough: you need the link somebody sent you. Without it there is nothing to create and nothing to fill in.'
+    },
+    de: {
+      titre: 'Der Messenger, der nichts von Ihnen verlangt.',
+      chapo: 'Keine Nummer, kein Konto, kein Passwort. Jemand lädt Sie ein, Sie schreiben.',
+      point1: 'Ende-zu-Ende verschlüsselt, ohne Einstellung',
+      point2: 'Kein Adressbuch abgesaugt, keine Werbung',
+      point3: 'Ihre Nachrichten jederzeit exportierbar',
+      obtenir: 'Anwendung holen',
+      direct: 'Direkter Download',
+      'bientot-play': 'Bald bei Google Play',
+      bientot: 'Demnächst',
+      'invitation-titre': 'In Messagr kommt man nur auf Einladung.',
+      'invitation-corps': 'Die Anwendung allein genügt nicht: Sie brauchen den Link, den Ihnen jemand geschickt hat. Ohne ihn gibt es nichts zu erstellen und nichts auszufüllen.'
+    },
+    es: {
+      titre: 'La mensajería que no le pide nada.',
+      chapo: 'Sin número, sin cuenta, sin contraseña. Alguien le invita, usted escribe.',
+      point1: 'Cifrada de extremo a extremo, sin ajustes',
+      point2: 'Ninguna agenda aspirada, ninguna publicidad',
+      point3: 'Sus mensajes exportables en cualquier momento',
+      obtenir: 'Obtener la aplicación',
+      direct: 'Descarga directa',
+      'bientot-play': 'Pronto en Google Play',
+      bientot: 'Pronto',
+      'invitation-titre': 'A Messagr solo se entra por invitación.',
+      'invitation-corps': 'La aplicación por sí sola no basta: necesita el enlace que alguien le ha enviado. Sin él, nada que crear, nada que rellenar.'
+    },
+    it: {
+      titre: 'La messaggistica che non ti chiede nulla.',
+      chapo: 'Nessun numero, nessun account, nessuna password. Qualcuno ti invita, tu scrivi.',
+      point1: 'Cifrata end-to-end, senza impostazioni',
+      point2: 'Nessuna rubrica aspirata, nessuna pubblicità',
+      point3: 'I tuoi messaggi esportabili in qualsiasi momento',
+      obtenir: "Ottenere l'applicazione",
+      direct: 'Download diretto',
+      'bientot-play': 'Presto su Google Play',
+      bientot: 'Presto',
+      'invitation-titre': 'In Messagr si entra solo su invito.',
+      'invitation-corps': "L'applicazione da sola non basta: ti serve il link che qualcuno ti ha inviato. Senza, niente da creare e niente da compilare."
+    },
+    nl: {
+      titre: 'De berichtendienst die niets van u vraagt.',
+      chapo: 'Geen nummer, geen account, geen wachtwoord. Iemand nodigt u uit, u schrijft.',
+      point1: 'End-to-end versleuteld, zonder instellingen',
+      point2: 'Geen adresboek opgezogen, geen reclame',
+      point3: 'Uw berichten op elk moment exporteerbaar',
+      obtenir: 'De applicatie halen',
+      direct: 'Directe download',
+      'bientot-play': 'Binnenkort in Google Play',
+      bientot: 'Binnenkort',
+      'invitation-titre': 'Messagr betreedt men alleen op uitnodiging.',
+      'invitation-corps': 'De applicatie alleen is niet genoeg: u hebt de link nodig die iemand u heeft gestuurd. Zonder die link valt er niets te maken en niets in te vullen.'
+    }
+  };
+  var demandees = (navigator.languages && navigator.languages.length)
+    ? navigator.languages : [navigator.language || 'fr'];
+  var code = 'fr';
+  for (var i = 0; i < demandees.length; i++) {
+    // `de-AT` compte comme `de` : la sous-étiquette régionale ne change
+    // aucune de ces phrases.
+    var court = String(demandees[i]).toLowerCase().split('-')[0];
+    if (Object.prototype.hasOwnProperty.call(T, court)) { code = court; break; }
+  }
+  var mots = T[code];
+  if (!mots) { return; }
+  document.documentElement.lang = code;
+  var marques = document.querySelectorAll('[data-t]');
+  for (var m = 0; m < marques.length; m++) {
+    var cle = marques[m].getAttribute('data-t');
+    if (mots[cle]) { marques[m].textContent = mots[cle]; }
+  }
+})();
+</script>
+</body>
+</html>

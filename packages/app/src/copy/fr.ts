@@ -294,6 +294,8 @@ export const fr = {
   invite_working: 'Création de la conversation…',
   invite_ready:
     'Envoyez ce lien à cette personne. Il est valable une heure et ne sert qu’une fois.',
+  invite_qr: 'Ou faites-le scanner ce code.',
+  invite_qr_label: 'Code QR du lien d’invitation',
   invite_share: 'Partager le lien',
   invite_close: 'Fermer',
   invite_failed: 'L’invitation n’a pas pu être créée.',
@@ -463,10 +465,29 @@ export const fr = {
   community_soon_why:
     'Une communauté regroupe des salons sous un objet pseudonyme. L’onglet est réservé pour la même raison que celui des appels : la barre ne doit pas bouger quand ils arriveront.',
 
-  // The band across the top of every screen. `brand_name` is the product's
-  // own name and is not translated -- a name that changes by language is a
-  // different product.
+  // `brand_name` is the product's own name and is not translated -- a name
+  // that changes by language is a different product.
   brand_name: 'Messagr',
+  'plate_more %1$d': '+ %1$d',
+  plate_open: 'Voir la photo',
+  plate_close: 'Fermer',
+  'plate_of %1$d %2$d': '%1$d sur %2$d',
+  'plate_sending %1$d %2$d': 'Envoi %1$d sur %2$d…',
+  'plate_partly %1$d':
+    '%1$d photos envoyées. Les suivantes n’ont pas pu partir.',
+  plate_too_many: 'Trop de photos d’un coup. Cinquante au plus.',
+  composer_emoji: 'Émojis',
+  composer_photo: 'Ajouter une photo',
+  composer_record: 'Message vocal',
+  composer_record_soon:
+    'Les messages vocaux arrivent en V2. Le bouton garde sa place pour que la barre ne bouge pas ce jour-là.',
+
+  // L'écran de la personne, et l'en-tête qui y mène.
+  person_open: 'À propos de cette personne',
+  person_title: 'Cette personne',
+  person_back: 'Retour',
+  message_delivered_hint: 'Remis au serveur',
+  message_read_hint: 'Lu',
   settings_wake: 'Notifications',
   settings_wake_hint:
     'Activées. Ce qui traverse Google ne contient ni expéditeur, ni conversation, ni message : seulement un signal de réveil. L’appareil déchiffre ensuite lui-même, ici. Les désactiver n’enregistre aucun destinataire auprès du serveur : il n’a plus où envoyer.',
@@ -495,7 +516,6 @@ export const fr = {
   image_unreadable: 'Cette photo n’a pas pu être ouverte sur cet appareil.',
   conversation_attach: 'Envoyer une photo',
   conversation_attaching: 'Chiffrement et envoi de la photo…',
-  header_no_directory: 'aucun annuaire',
 
   // The list's own furniture. The badge itself draws a bare number, which
   // needs no translation; what needs one is what a screen reader says about

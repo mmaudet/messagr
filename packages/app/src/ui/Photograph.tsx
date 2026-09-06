@@ -37,10 +37,20 @@ export function Photograph({
   image,
   fetch,
   testID,
+  fill = false,
 }: {
   readonly image: ReadImage
   readonly fetch: (image: ReadImage) => Promise<ShownImage>
   readonly testID: string
+  /**
+   * Fill the space given rather than take the picture's own proportions.
+   *
+   * A plate's tiles are square and the pictures are not; a grid of
+   * differently-shaped tiles is a grid nobody can scan. So a tile crops,
+   * which is what a thumbnail is for, and full screen shows the whole
+   * picture.
+   */
+  readonly fill?: boolean
 }) {
   const [shown, setShown] = useState<ShownImage | null>(null)
 
@@ -71,7 +81,11 @@ export function Photograph({
     return (
       <View
         testID={`${testID}-waiting`}
-        style={[styles.frame, styles.waiting, { aspectRatio: ratio }]}
+        style={[
+          styles.frame,
+          styles.waiting,
+          fill ? styles.filling : { aspectRatio: ratio },
+        ]}
       />
     )
   }
@@ -88,10 +102,12 @@ export function Photograph({
     <Image
       testID={testID}
       source={{ uri: shown.uri }}
-      style={[styles.frame, { aspectRatio: ratio }]}
-      // `cover` would crop somebody's photograph to fit a box this
-      // application chose. The box is the photograph's shape instead.
-      resizeMode="contain"
+      style={[styles.frame, fill ? styles.filling : { aspectRatio: ratio }]}
+      // On its own, `contain`: cropping somebody's photograph to fit a box
+      // this application chose is not this application's decision. In a
+      // plate's tile, `cover`, because the tile is a thumbnail and a
+      // thumbnail's whole job is to be the same shape as its neighbours.
+      resizeMode={fill ? 'cover' : 'contain'}
       accessibilityLabel={t('image_alt')}
     />
   )
@@ -104,6 +120,10 @@ const styles = StyleSheet.create({
   },
   waiting: {
     backgroundColor: color.neutral['200'],
+  },
+  filling: {
+    width: '100%',
+    height: '100%',
   },
   failed: {
     ...type.body,
