@@ -294,6 +294,13 @@ export const it: Readonly<Record<CopyKey, string>> = {
   community_soon_why:
     'Una comunità raggruppa stanze sotto un oggetto pseudonimo. La scheda è riservata per la stessa ragione di quella delle chiamate: la barra non deve spostarsi quando arriveranno.',
   brand_name: 'Messagr',
+  settings_wake: 'Notifiche',
+  settings_wake_hint:
+    'Attive. Ciò che attraversa Google non contiene né mittente, né conversazione, né messaggio: soltanto un segnale di risveglio. Il dispositivo decifra poi da sé, qui. Disattivarle non registra alcun destinatario presso il server: non ha più dove inviare.',
+  settings_wake_on: 'Attive',
+  settings_wake_off: 'Disattivate',
+  settings_wake_not_kept:
+    'Questa scelta non è stata conservata: tornerà allo stato precedente al prossimo avvio.',
   promise_language: 'Scelga la sua lingua',
   promise_terms: 'Accetto le condizioni generali d’uso di Messagr.',
   promise_terms_link: 'Leggere le condizioni',

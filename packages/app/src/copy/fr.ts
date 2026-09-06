@@ -467,6 +467,13 @@ export const fr = {
   // own name and is not translated -- a name that changes by language is a
   // different product.
   brand_name: 'Messagr',
+  settings_wake: 'Notifications',
+  settings_wake_hint:
+    'Activées. Ce qui traverse Google ne contient ni expéditeur, ni conversation, ni message : seulement un signal de réveil. L’appareil déchiffre ensuite lui-même, ici. Les désactiver n’enregistre aucun destinataire auprès du serveur : il n’a plus où envoyer.',
+  settings_wake_on: 'Activées',
+  settings_wake_off: 'Désactivées',
+  settings_wake_not_kept:
+    'Ce choix n’a pas pu être conservé : il reviendra à son état précédent au prochain démarrage.',
 
   // Le premier lancement : la langue, puis l'acceptation.
   promise_language: 'Choisissez votre langue',

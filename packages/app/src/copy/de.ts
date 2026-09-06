@@ -302,6 +302,13 @@ export const de: Readonly<Record<CopyKey, string>> = {
   community_soon_why:
     'Eine Community fasst Räume unter einem pseudonymen Objekt zusammen. Der Reiter ist aus demselben Grund reserviert wie der für Anrufe: die Leiste darf sich nicht verschieben, wenn sie kommen.',
   brand_name: 'Messagr',
+  settings_wake: 'Benachrichtigungen',
+  settings_wake_hint:
+    'An. Was Google durchquert, enthält weder Absender noch Unterhaltung noch Nachricht: nur ein Wecksignal. Das Gerät entschlüsselt danach selbst, hier. Sie auszuschalten meldet dem Server keinen Empfänger: er hat nichts mehr, wohin er senden könnte.',
+  settings_wake_on: 'An',
+  settings_wake_off: 'Aus',
+  settings_wake_not_kept:
+    'Diese Wahl konnte nicht behalten werden: beim nächsten Start gilt wieder der vorherige Zustand.',
   promise_language: 'Wählen Sie Ihre Sprache',
   promise_terms: 'Ich akzeptiere die Nutzungsbedingungen von Messagr.',
   promise_terms_link: 'Bedingungen lesen',

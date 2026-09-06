@@ -112,3 +112,6 @@ export const givenNamesSecrets = keychainStore('eu.messagr.given-names')
  * and off unless somebody turned it on.
  */
 export const receiptSecrets = keychainStore('eu.messagr.read-receipts')
+
+/** Whether this device asks to be woken when a message arrives. */
+export const wakeSecrets = keychainStore('eu.messagr.wake')

@@ -4,6 +4,7 @@ import {
   ScrollView,
   StyleSheet,
   Text,
+  useWindowDimensions,
   View,
   type NativeScrollEvent,
   type NativeSyntheticEvent,
@@ -55,6 +56,16 @@ export function LanguageStrip({
   // the comparison's own sake would be a re-render per frame.
   const reported = useRef<Language>(chosen)
 
+  // HALF A VIEWPORT AT EACH END, MEASURED RATHER THAN GUESSED.
+  //
+  // Without it the last items cannot reach the centre, so they cannot be
+  // chosen by dragging at all -- watched on a device: the strip stopped at
+  // Español and Italiano and Nederlands were reachable only by tapping,
+  // which is the gesture this control exists to replace. The first attempt
+  // used a fixed gutter, which is the same bug with a smaller number.
+  const { width } = useWindowDimensions()
+  const rail = Math.max(0, (width - ITEM) / 2)
+
   const onScroll = (event: NativeSyntheticEvent<NativeScrollEvent>) => {
     const at = event.nativeEvent.contentOffset.x
     // Rounded rather than floored: the item under the centre of the viewport
@@ -77,9 +88,7 @@ export function LanguageStrip({
       decelerationRate="fast"
       scrollEventThrottle={16}
       onScroll={onScroll}
-      // Half an item of padding at each end, so the first and the last can
-      // reach the centre. Without it neither is choosable by dragging.
-      contentContainerStyle={styles.rail}>
+      contentContainerStyle={{ paddingHorizontal: rail }}>
       {LANGUAGES.map(language => {
         const active = language.code === chosen
         return (
@@ -105,9 +114,6 @@ export function LanguageStrip({
 }
 
 const styles = StyleSheet.create({
-  rail: {
-    paddingHorizontal: space.xl,
-  },
   slot: {
     width: ITEM,
     alignItems: 'center',

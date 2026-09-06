@@ -57,6 +57,7 @@ import { computeRuntimeGapReport } from './src/runtime/runtimeGaps'
 import { computeNewArchitectureReport } from './src/runtime/newArchitecture'
 import {
   languageSecrets,
+  wakeSecrets,
   promiseSecrets,
   receiptSecrets,
   sessionSecrets,
@@ -89,6 +90,7 @@ import {
   readChosenLanguage,
   rememberLanguage,
 } from './src/runtime/chosenLanguage'
+import { allowWake, wakeIsAllowed } from './src/runtime/wakeSetting'
 import { deviceLocale } from './src/runtime/deviceLocale'
 import { pickFromLibrary } from './src/runtime/imageLibrary'
 import { pushTokenForThisDevice } from './src/runtime/pushDevice'
@@ -262,6 +264,11 @@ export function App({
   // see receiptSetting.ts.
   const [receipts, setReceipts] = useState(false)
   const [receiptsNotKept, setReceiptsNotKept] = useState(false)
+  // Whether this device asks to be woken. On unless somebody says otherwise,
+  // which is the opposite of the switch above -- `wakeSetting.ts` says why.
+  const [wake, setWake] = useState(true)
+  const [wakeNotKept, setWakeNotKept] = useState(false)
+  const wakeRef = useRef(true)
   const [readHere, setReadHere] = useState<ReadonlySet<string>>(new Set())
   const receiptsRef = useRef(false)
   // The conversation as the loop's callbacks can see it: they are made once,
@@ -402,6 +409,12 @@ export function App({
       .then(on => {
         setReceipts(on)
         receiptsRef.current = on
+      })
+      .catch(() => undefined)
+    wakeIsAllowed(wakeSecrets)
+      .then(on => {
+        setWake(on)
+        wakeRef.current = on
       })
       .catch(() => undefined)
   }, [])
@@ -800,7 +813,19 @@ export function App({
             // pusher keyed by a token nobody holds any more is a device that
             // silently stopped being notified. Re-registering the same token
             // is what the endpoint is for.
-            pushTokenForThisDevice()
+            if (!wakeRef.current) {
+              logEvent('info', 'MESSAGR_PUSH_NOT_REGISTERED', {
+                reason: 'this device does not ask to be woken',
+              })
+            }
+            const askToBeWoken = wakeRef.current
+            ;(askToBeWoken
+              ? pushTokenForThisDevice()
+              : Promise.resolve({
+                  token: null,
+                  reason: 'switched off',
+                } as const)
+            )
               .then(async answer => {
                 if (answer.token === null) {
                   logEvent('info', 'MESSAGR_PUSH_NOT_REGISTERED', {
@@ -1347,6 +1372,20 @@ export function App({
                 onLegal={() => setLegalOpen(true)}
                 receipts={receipts}
                 receiptsNotKept={receiptsNotKept}
+                wake={wake}
+                wakeNotKept={wakeNotKept}
+                onWake={on => {
+                  // Shown first, kept second, like the switch above. Turning
+                  // it off does not unregister the pusher that is already
+                  // there -- that is #90's own work and needs the gateway
+                  // deployed; what it does today is stop the next launch
+                  // registering one.
+                  setWake(on)
+                  wakeRef.current = on
+                  allowWake(wakeSecrets, on)
+                    .then(kept => setWakeNotKept(!kept))
+                    .catch(() => setWakeNotKept(true))
+                }}
                 onReceipts={on => {
                   // Shown first, kept second. A switch that waited on a
                   // keystore would feel broken; one that reverts silently at

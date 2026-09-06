@@ -298,6 +298,13 @@ export const en: Readonly<Record<CopyKey, string>> = {
   community_soon_why:
     'A community groups rooms under a pseudonymous object. The tab is held for the same reason as the calls one: the bar must not move when they arrive.',
   brand_name: 'Messagr',
+  settings_wake: 'Notifications',
+  settings_wake_hint:
+    'On. What crosses Google contains no sender, no conversation and no message: only a wake-up signal. The device then decrypts here, itself. Turning them off registers no recipient with the server: it has nowhere left to send.',
+  settings_wake_on: 'On',
+  settings_wake_off: 'Off',
+  settings_wake_not_kept:
+    'This choice could not be kept: it will return to its previous state at the next launch.',
   promise_language: 'Choose your language',
   promise_terms: 'I accept Messagr’s terms and conditions of use.',
   promise_terms_link: 'Read the terms',

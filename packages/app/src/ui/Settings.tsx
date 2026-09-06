@@ -34,6 +34,9 @@ export function Settings({
   receipts,
   onReceipts,
   receiptsNotKept,
+  wake,
+  onWake,
+  wakeNotKept,
 }: {
   readonly onBack: () => void
   readonly onLegal: () => void
@@ -41,6 +44,10 @@ export function Settings({
   readonly onReceipts: (on: boolean) => void
   /** `true` when the last change could not be kept. */
   readonly receiptsNotKept: boolean
+  /** Whether this device asks to be woken. See `wakeSetting.ts`. */
+  readonly wake: boolean
+  readonly onWake: (on: boolean) => void
+  readonly wakeNotKept: boolean
 }) {
   return (
     <View style={styles.screen} testID="settings">
@@ -82,6 +89,31 @@ export function Settings({
         <Text style={styles.hint}>{t('settings_receipts_hint')}</Text>
         {receiptsNotKept && (
           <Text style={styles.notKept}>{t('settings_receipts_not_kept')}</Text>
+        )}
+      </View>
+
+      {/* THE OPPOSITE DEFAULT FROM THE ONE ABOVE, AND FOR THE OPPOSITE
+          REASON. A read receipt publishes something about a person; a wake
+          publishes nothing -- `wakeSetting.ts` sets out why one is off and
+          the other on. The hint says what crosses and what does not, because
+          "notifications" is the setting people most reasonably assume leaks
+          their messages. */}
+      <View style={styles.setting} testID="setting-wake">
+        <Pressable
+          testID="toggle-wake"
+          onPress={() => onWake(!wake)}
+          accessibilityRole="switch"
+          accessibilityState={{ checked: wake }}
+          accessibilityLabel={t('settings_wake')}
+          style={styles.row}>
+          <Text style={styles.rowLabel}>{t('settings_wake')}</Text>
+          <Text style={styles.rowValue}>
+            {wake ? t('settings_wake_on') : t('settings_wake_off')}
+          </Text>
+        </Pressable>
+        <Text style={styles.hint}>{t('settings_wake_hint')}</Text>
+        {wakeNotKept && (
+          <Text style={styles.notKept}>{t('settings_wake_not_kept')}</Text>
         )}
       </View>
 
