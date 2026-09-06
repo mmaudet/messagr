@@ -31,6 +31,14 @@ export interface EntryDeps {
    * publication this one might not complete. See signUpMarker.ts.
    */
   readonly signUp: SecretStore
+  /**
+   * Awaited between claim attempts. Absent in tests, which should not sleep.
+   *
+   * A claim is two calls with somebody else's application in between: see
+   * `claimInvitation.ts`. Passing nothing makes it try once and give up,
+   * which is right for a test and wrong on a device.
+   */
+  readonly wait?: (ms: number) => Promise<void>
 }
 
 export type EntryResult =
@@ -49,7 +57,7 @@ export type EntryResult =
   | { readonly entered: false; readonly reason: string }
 
 export async function enterWithASession(deps: EntryDeps): Promise<EntryResult> {
-  const { secrets, poster, link, signUp } = deps
+  const { secrets, poster, link, signUp, wait } = deps
 
   const held = await loadSession(secrets)
   if (held !== null) {
@@ -70,7 +78,7 @@ export async function enterWithASession(deps: EntryDeps): Promise<EntryResult> {
     return { entered: false, reason: 'this link is not an invitation' }
   }
 
-  const claim = await claimInvitation(poster, invitation)
+  const claim = await claimInvitation(poster, invitation, wait)
   if (!claim.claimed) {
     return { entered: false, reason: claim.reason }
   }

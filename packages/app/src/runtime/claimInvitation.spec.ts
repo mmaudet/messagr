@@ -106,3 +106,83 @@ describe('claimInvitation', () => {
     )
   })
 })
+
+describe('claimInvitation, the two-call handshake', () => {
+  const HANDSHAKE_LINK = {
+    token: 'a-token',
+    homeserver: 'https://messagr.eu',
+    service: 'https://messagr.eu/_messagr',
+  }
+  const SESSION = JSON.stringify({
+    user_id: '@her:messagr.eu',
+    device_id: 'DEV',
+    access_token: 'tok',
+  })
+
+  function scriptedPoster(
+    answers: readonly { status: number; body: string }[],
+  ) {
+    let asked = 0
+    return {
+      calls: () => asked,
+      post: async () => {
+        const answer = answers[Math.min(asked, answers.length - 1)]!
+        asked += 1
+        return answer
+      },
+    }
+  }
+
+  it('claims again after a 409, which is the middle of the handshake', async () => {
+    // The service draws an account on the first claim and answers 409 because
+    // that account is in no conversation yet. The issuer's application invites
+    // it; the second claim is what turns that into a session.
+    const service = scriptedPoster([
+      { status: 409, body: '{"errcode":"MESSAGR_NOT_YET_INVITED"}' },
+      { status: 200, body: SESSION },
+    ])
+    const claim = await claimInvitation(service, HANDSHAKE_LINK, async () => {})
+    expect(claim.claimed).toBe(true)
+    expect(service.calls()).toBe(2)
+  })
+
+  it('keeps asking while nobody has let the account in', async () => {
+    const service = scriptedPoster([
+      { status: 409, body: '{}' },
+      { status: 409, body: '{}' },
+      { status: 409, body: '{}' },
+      { status: 200, body: SESSION },
+    ])
+    expect(
+      (await claimInvitation(service, HANDSHAKE_LINK, async () => {})).claimed,
+    ).toBe(true)
+    expect(service.calls()).toBe(4)
+  })
+
+  it('gives up saying nobody let it in, not that the link is unusable', async () => {
+    // The distinction is what a person does next. A refused link means ask
+    // for another one; this means the other person's application has not
+    // finished, and another link would fail the same way.
+    const service = scriptedPoster([{ status: 409, body: '{}' }])
+    const claim = await claimInvitation(service, HANDSHAKE_LINK, async () => {})
+    expect(claim).toEqual({
+      claimed: false,
+      reason: 'nobody has let this account in yet',
+    })
+  })
+
+  it('does not retry a refusal, which is final', async () => {
+    const service = scriptedPoster([{ status: 403, body: '{}' }])
+    await claimInvitation(service, HANDSHAKE_LINK, async () => {})
+    expect(service.calls()).toBe(1)
+  })
+
+  it('asks once when given no way to wait, rather than bursting', async () => {
+    // A caller with nothing to pause with cannot mean to keep asking:
+    // fifteen calls in as many milliseconds is not patience. `entry.ts`
+    // passes a real wait on a device and nothing in a test does.
+    const service = scriptedPoster([{ status: 409, body: '{}' }])
+    await claimInvitation(service, HANDSHAKE_LINK)
+    expect(service.calls()).toBe(1)
+  })
+})

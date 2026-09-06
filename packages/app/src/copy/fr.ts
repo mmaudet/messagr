@@ -283,6 +283,22 @@ export const fr = {
   list_name_confirm: 'Enregistrer',
   list_name_cancel: 'Annuler',
   list_back: 'Conversations',
+
+  // INVITER, qui est le même geste que commencer une conversation.
+  //
+  // Le nom se donne avant que le compte existe : le service tire un compte au
+  // moment où la personne ouvre le lien, donc ce que l'inviteur tape est mis
+  // de côté et écrit quand on sait à qui il s'applique.
+  invite_action: 'Inviter quelqu’un',
+  invite_who: 'Qui invitez-vous ?',
+  invite_working: 'Création de la conversation…',
+  invite_ready:
+    'Envoyez ce lien à cette personne. Il est valable une heure et ne sert qu’une fois.',
+  invite_share: 'Partager le lien',
+  invite_close: 'Fermer',
+  invite_failed: 'L’invitation n’a pas pu être créée.',
+  invite_waiting: 'Personne n’a encore ouvert le lien.',
+  invite_admitted: 'C’est fait : cette personne peut entrer.',
   list_name_not_kept:
     'Le nom n’a pas pu être conservé : il sera oublié au prochain démarrage.',
 } as const
