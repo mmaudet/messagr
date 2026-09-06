@@ -111,14 +111,34 @@ jobs:
           RCT_NEW_ARCH_ENABLED: '1'
         run: pod install
 
+      # SPEC CHECKSUMS IS EXCLUDED, AND NOT AS A CONVENIENCE.
+      #
+      # The first run of this job failed on eighty checksums with an
+      # unchanged dependency graph, on the same CocoaPods (1.17.0) as the
+      # machine that wrote the lock. The reason is that a `SPEC CHECKSUMS`
+      # entry is not the hash of the podspec: CocoaPods renders each spec to
+      # `Pods/Local Podspecs/<name>.podspec.json` and hashes *that*, and the
+      # rendering is not byte-reproducible across machines. Comparing them is
+      # comparing two Ruby installations, which is not a fact about this
+      # repository.
+      #
+      # What is a fact about this repository is everything above that
+      # section: DEPENDENCIES, PODS with their versions, EXTERNAL SOURCES,
+      # and `PODFILE CHECKSUM` -- which is a hash of the Podfile itself and
+      # so is stable. A native dependency added to `package.json` and not
+      # locked shows up there, which is the failure this job exists to catch.
       - name: Assert the pod lock was already in step with the manifest
         working-directory: packages/app/ios
         run: |
-          if ! git diff --quiet -- Podfile.lock; then
+          graph() {
+            sed '/^SPEC CHECKSUMS:/,/^PODFILE CHECKSUM:/ { /^PODFILE CHECKSUM:/!d; }' "$1"
+          }
+          git show HEAD:./Podfile.lock > /tmp/committed.lock
+          graph /tmp/committed.lock > /tmp/committed.graph
+          graph Podfile.lock > /tmp/installed.graph
+          if ! diff -u /tmp/committed.graph /tmp/installed.graph > /tmp/graph.diff; then
             echo "Podfile.lock moved during install: it was behind package.json." >&2
-            git --no-pager diff --stat -- Podfile.lock >&2
-            echo "--- what moved (first 120 lines) ---" >&2
-            git --no-pager diff -U0 -- Podfile.lock | head -120 >&2
+            head -60 /tmp/graph.diff >&2
             exit 1
           fi
 
