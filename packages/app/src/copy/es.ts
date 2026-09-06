@@ -296,6 +296,11 @@ export const es: Readonly<Record<CopyKey, string>> = {
   community_soon_why:
     'Una comunidad agrupa salas bajo un objeto seudónimo. La pestaña está reservada por la misma razón que la de las llamadas: la barra no debe moverse cuando lleguen.',
   brand_name: 'Messagr',
+  person_open: 'Sobre esta persona',
+  person_title: 'Esta persona',
+  person_back: 'Volver',
+  message_delivered_hint: 'Entregado al servidor',
+  message_read_hint: 'Leído',
   settings_wake: 'Notificaciones',
   settings_wake_hint:
     'Activadas. Lo que atraviesa Google no contiene remitente, ni conversación, ni mensaje: solo una señal de despertar. Después el dispositivo descifra aquí, por sí mismo. Desactivarlas no registra ningún destinatario en el servidor: ya no tiene adónde enviar.',

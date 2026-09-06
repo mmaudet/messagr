@@ -298,6 +298,11 @@ export const en: Readonly<Record<CopyKey, string>> = {
   community_soon_why:
     'A community groups rooms under a pseudonymous object. The tab is held for the same reason as the calls one: the bar must not move when they arrive.',
   brand_name: 'Messagr',
+  person_open: 'About this person',
+  person_title: 'This person',
+  person_back: 'Back',
+  message_delivered_hint: 'Handed to the server',
+  message_read_hint: 'Read',
   settings_wake: 'Notifications',
   settings_wake_hint:
     'On. What crosses Google contains no sender, no conversation and no message: only a wake-up signal. The device then decrypts here, itself. Turning them off registers no recipient with the server: it has nowhere left to send.',

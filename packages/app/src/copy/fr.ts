@@ -467,6 +467,13 @@ export const fr = {
   // own name and is not translated -- a name that changes by language is a
   // different product.
   brand_name: 'Messagr',
+
+  // L'écran de la personne, et l'en-tête qui y mène.
+  person_open: 'À propos de cette personne',
+  person_title: 'Cette personne',
+  person_back: 'Retour',
+  message_delivered_hint: 'Remis au serveur',
+  message_read_hint: 'Lu',
   settings_wake: 'Notifications',
   settings_wake_hint:
     'Activées. Ce qui traverse Google ne contient ni expéditeur, ni conversation, ni message : seulement un signal de réveil. L’appareil déchiffre ensuite lui-même, ici. Les désactiver n’enregistre aucun destinataire auprès du serveur : il n’a plus où envoyer.',

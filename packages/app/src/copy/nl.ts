@@ -295,6 +295,11 @@ export const nl: Readonly<Record<CopyKey, string>> = {
   community_soon_why:
     'Een gemeenschap groepeert kamers onder een pseudoniem object. Het tabblad is gereserveerd om dezelfde reden als dat van de oproepen: de balk mag niet verschuiven wanneer ze er zijn.',
   brand_name: 'Messagr',
+  person_open: 'Over deze persoon',
+  person_title: 'Deze persoon',
+  person_back: 'Terug',
+  message_delivered_hint: 'Aan de server afgegeven',
+  message_read_hint: 'Gelezen',
   settings_wake: 'Meldingen',
   settings_wake_hint:
     'Aan. Wat Google passeert bevat geen afzender, geen gesprek en geen bericht: alleen een wekseintje. Het apparaat ontsleutelt daarna zelf, hier. Ze uitzetten registreert geen ontvanger bij de server: hij heeft nergens meer heen te sturen.',

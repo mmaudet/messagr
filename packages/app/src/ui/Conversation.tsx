@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import React, { useState } from 'react'
 import {
   Pressable,
   StyleSheet,
@@ -8,7 +8,7 @@ import {
   View,
 } from 'react-native'
 
-import { t } from '../copy'
+import { t, type CopyKey } from '../copy'
 import {
   color,
   floors,
@@ -19,6 +19,7 @@ import {
 } from '../design/tokens'
 import type { ShownImage } from '../runtime/receiveImage'
 import type { ReadImage } from '../timeline/imageEvent'
+import { separatorsFor, type DayMark } from '../timeline/daySeparators'
 import type { TimelineEntry } from '../timeline/mergeTimeline'
 import type { ReactionTally } from '../timeline/reactions'
 import { NotchedButton } from './NotchedButton'
@@ -73,6 +74,12 @@ export interface ConversationProps {
   readonly onAttach?: () => void
   /** Downloads and decrypts a photograph. Absent means none are drawn. */
   readonly onLoadImage?: (image: ReadImage) => Promise<ShownImage>
+  /**
+   * The clock, injectable, for the same reason `ConversationList` takes one:
+   * a screen reading `Date.now()` inside itself is one nothing can screenshot
+   * twice and get the same answer from.
+   */
+  readonly now?: number
 }
 
 export function Conversation({
@@ -85,10 +92,14 @@ export function Conversation({
   onReact,
   onAttach,
   onLoadImage,
+  now = Date.now(),
 }: ConversationProps) {
   const [draft, setDraft] = useState('')
   const dark = useColorScheme() === 'dark'
   const palette = dark ? color.dark : color
+  // Which entries open a new day. Computed once per render rather than per
+  // message: a separator is a property of the sequence, not of an entry.
+  const days = separatorsFor(entries, now)
 
   function send() {
     const body = draft.trim()
@@ -107,20 +118,55 @@ export function Conversation({
         </Text>
       ) : (
         entries.map(entry => (
-          <Message
-            key={entry.eventId}
-            entry={entry}
-            mine={entry.claimedSender === selfUserId}
-            palette={palette}
-            tallies={reactions.get(entry.eventId) ?? []}
-            read={read.has(entry.eventId)}
-            onReact={(key, own) => onReact?.(entry.eventId, key, own)}
-            onLoadImage={onLoadImage}
-          />
+          <React.Fragment key={entry.eventId}>
+            {days.get(entry.eventId) !== undefined && (
+              <View
+                testID={`day-${entry.eventId}`}
+                style={[
+                  styles.separator,
+                  { backgroundColor: palette.surface.sunk },
+                ]}>
+                <Text
+                  style={[
+                    styles.separatorLabel,
+                    { color: palette.neutral['600'] },
+                  ]}>
+                  {dayLabel(days.get(entry.eventId)!)}
+                </Text>
+              </View>
+            )}
+            <Message
+              entry={entry}
+              mine={entry.claimedSender === selfUserId}
+              palette={palette}
+              tallies={reactions.get(entry.eventId) ?? []}
+              read={read.has(entry.eventId)}
+              onReact={(key, own) => onReact?.(entry.eventId, key, own)}
+              onLoadImage={onLoadImage}
+            />
+          </React.Fragment>
         ))
       )}
 
+      {/* ONE ROW, NOT A STACK. Screen 21 asks for a full input bar, and what
+          was here was a field with two full-width buttons under it -- which
+          reads as a form rather than as a place to type. The attachment sits
+          before the field and sending after it, which is the order every
+          messenger somebody has already used puts them in. */}
       <View style={styles.composer}>
+        {onAttach !== undefined && (
+          <Pressable
+            testID="conversation-attach"
+            onPress={onAttach}
+            accessibilityRole="button"
+            accessibilityLabel={t('conversation_attach')}
+            style={styles.attach}>
+            <Text
+              style={[styles.attachSign, { color: palette.brand.green700 }]}>
+              +
+            </Text>
+          </Pressable>
+        )}
         <TextInput
           testID="conversation-input"
           value={draft}
@@ -137,22 +183,6 @@ export function Conversation({
             },
           ]}
         />
-        {onAttach !== undefined && (
-          // Beside the field rather than in a menu behind it. Sending a
-          // photograph is one of the two things a person does in a
-          // conversation, and the other one has a button.
-          <Pressable
-            testID="conversation-attach"
-            onPress={onAttach}
-            accessibilityRole="button"
-            accessibilityLabel={t('conversation_attach')}
-            style={styles.attach}>
-            <Text
-              style={[styles.attachSign, { color: palette.brand.green700 }]}>
-              +
-            </Text>
-          </Pressable>
-        )}
         <NotchedButton
           label={t('conversation_send')}
           testID="conversation-send"
@@ -171,6 +201,50 @@ export function Conversation({
       )}
     </View>
   )
+}
+
+/**
+ * The clock on a bubble.
+ *
+ * Hours and minutes, padded, in the device's own 24-hour reading. Not
+ * `whenShown.ts`, which answers a different question -- a list row asks *how
+ * long ago*, and a bubble already sits under a date separator that answers
+ * *which day*, so all it needs is the time.
+ */
+function clockOf(sentAt: number): string {
+  const when = new Date(sentAt)
+  return t(
+    'when_time %1$d %2$d',
+    when.getHours(),
+    String(when.getMinutes()).padStart(2, '0'),
+  )
+}
+
+/**
+ * What a date separator says.
+ *
+ * Which separator and where is `daySeparators.ts` and is tested there; this
+ * is the wording, which stays with every other string.
+ */
+function dayLabel(mark: DayMark): string {
+  switch (mark.kind) {
+    case 'today':
+      return t('today')
+    case 'yesterday':
+      return t('yesterday')
+    case 'date':
+      // The key is `date_separator`, and its placeholders live in the value
+      // rather than in the name -- unlike most of this catalogue, which
+      // carries them in the key. Inherited from the previous product, kept
+      // rather than renamed: the shape is what makes the other catalogues
+      // drop in unmodified.
+      return t(
+        'date_separator',
+        mark.day,
+        t(`month_${mark.month}` as CopyKey),
+        mark.year,
+      )
+  }
 }
 
 /**
@@ -281,20 +355,39 @@ function Message({
         </View>
       )}
 
-      {/* SENT, OR READ. There is no third state, and inventing one would be
-          a guess drawn as a fact -- Matrix reports the homeserver accepting
-          an event and somebody's client saying it was read, and nothing in
-          between. See receipts.ts.
+      {/* THE TIME, AND ON THIS ACCOUNT'S OWN MESSAGES THE TICKS.
+          Screen 21 asks for timestamps and double read receipts, and both are
+          things people read without noticing -- which is the whole argument
+          of that screen: look like what they already know.
 
-          Only on this account's own messages: "read" on somebody else's says
-          that you read it, which they can see for themselves. */}
-      {mine && (
+          ONE TICK OR TWO, AND NEVER THREE. Matrix reports the homeserver
+          accepting an event, and somebody's client saying it was read.
+          Nothing between them. The familiar third state -- "delivered to the
+          device" -- does not exist in this protocol, and drawing it would be
+          a guess presented as a fact. See receipts.ts.
+
+          Only on this account's own messages: a tick on somebody else's would
+          say that *you* read it, which they can see for themselves. */}
+      <View style={styles.stamp}>
         <Text
-          testID={`state-${entry.eventId}`}
+          testID={`when-${entry.eventId}`}
           style={[styles.state, { color: palette.neutral['600'] }]}>
-          {read ? t('message_read') : t('message_sent')}
+          {clockOf(entry.sentAt)}
         </Text>
-      )}
+        {mine && (
+          <Text
+            testID={`state-${entry.eventId}`}
+            accessibilityLabel={
+              read ? t('message_read_hint') : t('message_delivered_hint')
+            }
+            style={[
+              styles.ticks,
+              { color: read ? palette.brand.green700 : palette.neutral['600'] },
+            ]}>
+            {read ? '✓✓' : '✓'}
+          </Text>
+        )}
+      </View>
 
       {tallies.length > 0 && (
         <View style={styles.tallies} testID={`reactions-${entry.eventId}`}>
@@ -347,11 +440,6 @@ const styles = StyleSheet.create({
     borderRadius: radius.pill,
   },
   chipKey: typeScale.bodySm,
-  actions: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: space.s,
-  },
   attach: {
     minWidth: floors.touchTargetMin,
     minHeight: floors.touchTargetMin,
@@ -369,9 +457,30 @@ const styles = StyleSheet.create({
   bubble: {
     paddingHorizontal: space.m,
     paddingVertical: space.s,
+    // ROUNDED THROUGHOUT. The 45-degree notch is the identity's accent, and
+    // screen 21 says where it belongs: "L'entaille à 45° de l'identité
+    // redevient un accent -- marqueur d'agent et boutons -- au lieu d'être
+    // portée par chaque bulle." A mark on everything marks nothing.
     borderRadius: radius.bubble,
     maxWidth: '80%',
   },
+  stamp: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: space.xs,
+    marginTop: space.xs,
+  },
+  ticks: {
+    ...typeScale.caption,
+  },
+  separator: {
+    alignSelf: 'center',
+    paddingHorizontal: space.m,
+    paddingVertical: space.xs,
+    marginVertical: space.m,
+    borderRadius: radius.pill,
+  },
+  separatorLabel: typeScale.caption,
   // The author's own corner is squared off. It is in the token file as
   // `bubbleAuthorCorner`, and it is the one asymmetry that says which side
   // wrote a message without colour having to carry it alone.
@@ -379,8 +488,14 @@ const styles = StyleSheet.create({
   bubbleTheirs: { borderBottomLeftRadius: radius.bubbleAuthorCorner },
   body: typeScale.body,
   note: typeScale.caption,
-  composer: { gap: space.s, marginTop: space.m },
+  composer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: space.s,
+    marginTop: space.m,
+  },
   input: {
+    flex: 1,
     ...typeScale.body,
     paddingHorizontal: space.m,
     paddingVertical: space.s,

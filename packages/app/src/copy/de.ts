@@ -302,6 +302,11 @@ export const de: Readonly<Record<CopyKey, string>> = {
   community_soon_why:
     'Eine Community fasst Räume unter einem pseudonymen Objekt zusammen. Der Reiter ist aus demselben Grund reserviert wie der für Anrufe: die Leiste darf sich nicht verschieben, wenn sie kommen.',
   brand_name: 'Messagr',
+  person_open: 'Über diese Person',
+  person_title: 'Diese Person',
+  person_back: 'Zurück',
+  message_delivered_hint: 'An den Server übergeben',
+  message_read_hint: 'Gelesen',
   settings_wake: 'Benachrichtigungen',
   settings_wake_hint:
     'An. Was Google durchquert, enthält weder Absender noch Unterhaltung noch Nachricht: nur ein Wecksignal. Das Gerät entschlüsselt danach selbst, hier. Sie auszuschalten meldet dem Server keinen Empfänger: er hat nichts mehr, wohin er senden könnte.',

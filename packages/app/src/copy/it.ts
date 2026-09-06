@@ -294,6 +294,11 @@ export const it: Readonly<Record<CopyKey, string>> = {
   community_soon_why:
     'Una comunità raggruppa stanze sotto un oggetto pseudonimo. La scheda è riservata per la stessa ragione di quella delle chiamate: la barra non deve spostarsi quando arriveranno.',
   brand_name: 'Messagr',
+  person_open: 'Su questa persona',
+  person_title: 'Questa persona',
+  person_back: 'Indietro',
+  message_delivered_hint: 'Consegnato al server',
+  message_read_hint: 'Letto',
   settings_wake: 'Notifiche',
   settings_wake_hint:
     'Attive. Ciò che attraversa Google non contiene né mittente, né conversazione, né messaggio: soltanto un segnale di risveglio. Il dispositivo decifra poi da sé, qui. Disattivarle non registra alcun destinatario presso il server: non ha più dove inviare.',
