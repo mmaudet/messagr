@@ -724,11 +724,24 @@ So this screen was designed against `design/tokens.json` and the invariants
 above, and is recorded here for the designer's next export rather than being
 drawn twice.
 
-**A row is two lines.** The first names the other participant, the second
-carries the opening of the last message. Nothing else: no avatar, no
-timestamp, no unread count. Each of those is a decision this lot has not
-taken, and a row that shows one before it is taken is a row that has to be
-redesigned rather than extended.
+**A row is an avatar, two lines, and a tail.** The avatar is a circle
+carrying initials — of the given name when there is one and of the identifier
+when there is not, which is the same rule the first line follows, so the two
+can never disagree. **No photographs**, and not because they are hard: a
+profile picture is a piece of content the homeserver would hold unencrypted
+and serve to anybody who knows the identifier, which is the shape of thing
+this product spends its design avoiding.
+
+The first line names the other participant, the second carries the opening of
+the last message. The tail carries when the conversation last moved and, when
+there is something waiting, how much.
+
+**The timestamp takes four forms**, because a row has room for about five
+characters and a person is asking a different question at each distance:
+`09:38` today, `hier`, a weekday within the week, a date beyond it. The
+comparison is on **local calendar days, not elapsed hours** — "yesterday" at
+one in the morning means the day before, and a rule written in milliseconds
+gets that exactly backwards.
 
 **The first line distinguishes a name from an identifier typographically, not
 with a badge.** A given name is set in `titleMd`; an identifier is set in
@@ -751,10 +764,36 @@ it does, the row must still be distinguishable rather than blank. This was
 found on a device, not in review: a bench room of three rendered a row whose
 first line was empty.
 
-**No padlock and no green** (invariants 2 and 3). Every conversation here is
-encrypted, so saying so on each row says nothing and trains a person to ignore
-the badge where it would matter; green is the signal reserved for a verified
-human and spending it as a list accent would answer a question nobody asked.
+**No padlock** (invariant 2). Every conversation here is encrypted, so saying
+so on each row says nothing and trains a person to ignore the badge where it
+would matter.
+
+**Green is spent once, on the unread badge** (invariant 3). Not as a list
+accent — the rows, the separators and the timestamps are neutral. Green is the
+signal reserved for a verified human, and what the badge marks is a human
+having spoken to you: the same claim, made about an event rather than about a
+person.
+
+**The unread count is a local mark, and that is the design rather than a
+shortcut.** Matrix computes an unread count of its own, from the read receipts
+a client publishes. This product will not lean on it: receipts are public
+metadata, they are off by default (§13.18), and a badge that only worked for
+people who had agreed to be observed would be a privacy setting that quietly
+costs a feature. So the mark is kept on the device, in the application's own
+encrypted notebook (ADR-0010, second table), and it means what a person means
+by it: *the newest thing that was on screen the last time you looked at this
+conversation, here.*
+
+Reading a conversation writes **two** marks, and they are not redundant. The
+local one is what the list draws. A **private read receipt** (`m.read.private`)
+is sent always — it says to the homeserver and to nobody else that the message
+has been read, which is what stops the server pushing a notification for
+something already read. The **public receipt** (`m.read`) is the courtesy, and
+goes only when the setting says so.
+
+The count is bounded by the window the list fetches. A conversation left alone
+for a hundred messages reports the window's size, and that is honest about a
+list built from a window; extrapolating past it would not be.
 
 **Naming is offered from inside the conversation, not from a row.** The list
 is where a name is read; the conversation is where you know whose it is. The
@@ -762,6 +801,59 @@ hint sits above the field rather than below it, because somebody typing a real
 name into a pseudonymous messenger is entitled to know where it goes before
 they type it: *« Ce nom reste sur cet appareil. Ni le serveur ni votre
 correspondant ne le voient. »* (ADR-0010.)
+
+
+### 13.21 The bottom bar, the header and the floating action (designed here)
+
+**Four tabs: Discussions, Communautés, Appels, Réglages.** Icon above label.
+The active one carries a pale green pill behind its icon (`brand.green100`)
+and a green label (`brand.green700`); the others are neutral. The glyph is 20
+and the target is 44 — the size of the glyph is never the size of the button.
+
+**Two of the four are reserved before the thing they hold exists, and each
+says so on its own screen.** *« L'onglet est réservé dès la V1 pour ne pas
+déplacer la barre plus tard. »* Appels names what is coming and when — vocaux
+en V2, appels individuels puis de groupe en V3.
+
+**This is not the same rule as §13.18's "sections not built are absent rather
+than present and inert", and the two must not be confused.** A settings switch
+that toggles nothing is a lie about a capability somebody might rely on. A
+reserved tab carrying a screen that explains it is reserved is a promise with
+a date on it, and it buys something real: a navigation bar that does not move
+under people's thumbs the day calls arrive. The difference is whether the
+empty thing pretends.
+
+**The bar is hidden while a conversation is open.** A conversation is a place
+you leave, not a fifth tab.
+
+**Badges.** Discussions carries a count of **conversations with something
+waiting**, not of messages — a tab saying `47` for one chatty conversation
+would send somebody looking for forty-seven places to go. Communautés carries
+a **dot** rather than a count, because nothing counts anything there yet and a
+number invented to fill a shape is worse than a mark that only says
+"something".
+
+**The header is a dark band, and it is a security boundary rather than a title
+bar.** `brand.ink900` is *« fond des frontières de sécurité »* in the token's
+own words. It carries the mark and the wordmark, and on the right, in the mono
+role, the one fact about this instance nobody would guess: *« aucun annuaire
+»*. No screen title — the screen below already says which screen it is. The
+mockup suffixes the state with a phase marker; that marker is a reference to
+this specification for whoever reads the mockup, and does not belong on the
+screen of somebody reading their own messages.
+
+**A green circular + floats above the bar, and it is the only way to invite
+somebody.** The inline button under the list is gone. With four tabs, a
+control living inside one tab's content scrolls away with it, and inviting is
+the one thing a person opens this application to do that is not reading. Two
+entrances to the same gesture would also be two things to keep in step, and
+the second would be the one nobody updated. It is green because `green500` is
+*« action principale »* in the token's own words: if the floating action is
+not the principal action, nothing is. Its sign is ink, not paper — white on
+`green500` is about two to one, which fails AA.
+
+**The list or the invitation, never both** — the same rule the list and the
+conversation already follow, for the same reason.
 
 
 ## 14. Canonical glossary

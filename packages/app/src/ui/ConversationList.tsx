@@ -2,7 +2,15 @@ import React from 'react'
 import { Pressable, StyleSheet, Text, View } from 'react-native'
 
 import { t, type CopyKey } from '../copy'
-import { color, floors, layout, space, stroke, type } from '../design/tokens'
+import {
+  color,
+  floors,
+  layout,
+  radius,
+  space,
+  stroke,
+  type,
+} from '../design/tokens'
 import type { ConversationSummary } from '../runtime/conversationList'
 import { displayNameFor } from '../runtime/givenName'
 import { stampFor, type Stamp } from '../timeline/whenShown'
@@ -25,9 +33,12 @@ import { Avatar } from './Avatar'
  *   adds information. Every conversation here is encrypted, so a badge saying
  *   so on each row says nothing and trains a person to ignore it where it
  *   would matter.
- * - **No green** (§13.19.3). Green is the signal for a verified human. Using
- *   it as a list accent would spend the one colour the product reserves for
- *   an answer nobody asked here.
+ * - **Green means a human, and it is spent exactly once** (§13.19.3). Not as
+ *   a list accent -- the rows, the separators and the timestamps are all
+ *   neutral -- but on the unread badge, which marks somebody having spoken to
+ *   you. That is the invariant's own claim made about an event rather than
+ *   about a person, and it is the only green on the screen apart from the
+ *   floating action, which the token calls *« action principale »* outright.
  * - **Natural language for what went wrong** (§13.19.6). A row that could not
  *   be read says so in a sentence. The technical reason goes to the log,
  *   which is where somebody debugging looks and where nobody else does.
@@ -53,7 +64,6 @@ export function ConversationList({
 }: ConversationListProps) {
   return (
     <View style={styles.screen} testID="conversation-list">
-      <Text style={styles.title}>{t('list_title')}</Text>
       {/* Plain rows rather than a `FlatList`, because this sits inside the
           screen's own scroll view. A list that scrolls inside something that
           scrolls is the defect that reports as "the list will not move", and
@@ -161,11 +171,27 @@ function Row({
       {/* Nothing at all for a conversation that has never moved: `0` is not a
           time, and drawing one would put 01/01/1970 on the row of somebody
           who has just been invited. */}
-      {summary.lastAt > 0 && (
-        <Text style={styles.when} testID={`when-${summary.scope}`}>
-          {whenLabel(stampFor(summary.lastAt, now))}
-        </Text>
-      )}
+      <View style={styles.tail}>
+        {summary.lastAt > 0 && (
+          <Text style={styles.when} testID={`when-${summary.scope}`}>
+            {whenLabel(stampFor(summary.lastAt, now))}
+          </Text>
+        )}
+        {/* THE ONE GREEN THING ON A ROW, AND IT IS NOT AN EXCEPTION.
+            Invariant 3 reserves green for a verified human, and what this
+            marks is a human having said something -- which is the same
+            claim, made about an event rather than about a person. A grey
+            badge would say "a number" where the product means "somebody
+            spoke to you". */}
+        {summary.unread > 0 && (
+          <View
+            style={styles.unread}
+            testID={`unread-${summary.scope}`}
+            accessibilityLabel={t('list_unread %1$d', summary.unread)}>
+            <Text style={styles.unreadCount}>{summary.unread}</Text>
+          </View>
+        )}
+      </View>
     </Pressable>
   )
 }
@@ -198,13 +224,7 @@ const styles = StyleSheet.create({
   screen: {
     flex: 1,
     backgroundColor: color.surface.paper,
-  },
-  title: {
-    ...type.titleLg,
-    color: color.neutral['900'],
-    paddingHorizontal: layout.screenGutter,
-    paddingTop: space.xl,
-    paddingBottom: space.l,
+    paddingTop: space.s,
   },
   row: {
     flexDirection: 'row',
@@ -217,6 +237,23 @@ const styles = StyleSheet.create({
     paddingVertical: space.m,
   },
   said: { flex: 1, gap: space.xs },
+  tail: {
+    alignItems: 'flex-end',
+    gap: space.xs,
+  },
+  unread: {
+    minWidth: space.l,
+    height: space.l,
+    borderRadius: radius.pill,
+    paddingHorizontal: space.xs,
+    backgroundColor: color.brand.green500,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  unreadCount: {
+    ...type.monoLabel,
+    color: color.brand.ink900,
+  },
   when: {
     ...type.caption,
     color: color.neutral['600'],

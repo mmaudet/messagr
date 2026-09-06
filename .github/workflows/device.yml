@@ -117,6 +117,8 @@ jobs:
           if ! git diff --quiet -- Podfile.lock; then
             echo "Podfile.lock moved during install: it was behind package.json." >&2
             git --no-pager diff --stat -- Podfile.lock >&2
+            echo "--- what moved (first 120 lines) ---" >&2
+            git --no-pager diff -U0 -- Podfile.lock | head -120 >&2
             exit 1
           fi
 

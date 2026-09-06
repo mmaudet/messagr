@@ -78,12 +78,15 @@ function fakeHomeserver(
 }
 
 const ME = '@me:example.org'
+/** A device that has never opened any of them, which is a first launch. */
+const NOTHING_READ = new Map<string, number>()
 
 describe('fetchConversationSummaries', () => {
   it('lists every conversation this account is in', async () => {
     const summaries = await fetchConversationSummaries(
       fakeHomeserver({ '!a:x': {}, '!b:x': {} }),
       ME,
+      NOTHING_READ,
     )
     expect(summaries.map(s => s.scope).sort()).toEqual(['!a:x', '!b:x'])
   })
@@ -92,6 +95,7 @@ describe('fetchConversationSummaries', () => {
     const summaries = await fetchConversationSummaries(
       fakeHomeserver({ '!a:x': { members: [ME, '@her:example.org'] } }),
       ME,
+      NOTHING_READ,
     )
     expect(summaries[0]?.other).toBe('@her:example.org')
   })
@@ -102,6 +106,7 @@ describe('fetchConversationSummaries', () => {
         '!a:x': { members: [ME, '@her:example.org', '@him:example.org'] },
       }),
       ME,
+      NOTHING_READ,
     )
     expect(summaries[0]?.other).toBeNull()
   })
@@ -117,6 +122,7 @@ describe('fetchConversationSummaries', () => {
         },
       }),
       ME,
+      NOTHING_READ,
     )
     expect(summaries[0]?.preview).toBe('the newer one')
     expect(summaries[0]?.lastAt).toBe(200)
@@ -129,6 +135,7 @@ describe('fetchConversationSummaries', () => {
         '!a:x': { events: [{ id: '$1', sender: ME, ts: 1, plain: long }] },
       }),
       ME,
+      NOTHING_READ,
     )
     expect(summaries[0]?.preview).toBe(long)
   })
@@ -144,6 +151,7 @@ describe('fetchConversationSummaries', () => {
         },
       }),
       ME,
+      NOTHING_READ,
     )
     expect(summaries[0]?.preview).toBe('readable')
     // The timestamp is still the newest event's: the conversation moved then,
@@ -155,6 +163,7 @@ describe('fetchConversationSummaries', () => {
     const summaries = await fetchConversationSummaries(
       fakeHomeserver({ '!a:x': { events: [] } }),
       ME,
+      NOTHING_READ,
     )
     expect(summaries[0]?.preview).toBeNull()
     expect(summaries[0]?.reason).toBe('nothing has been said yet')
@@ -167,6 +176,7 @@ describe('fetchConversationSummaries', () => {
         '!a:x': { events: [{ id: '$1', sender: ME, ts: 100 }] },
       }),
       ME,
+      NOTHING_READ,
     )
     expect(summaries[0]?.preview).toBeNull()
     expect(summaries[0]?.reason).not.toBe('nothing has been said yet')
@@ -180,6 +190,7 @@ describe('fetchConversationSummaries', () => {
         '!empty:x': { events: [] },
       }),
       ME,
+      NOTHING_READ,
     )
     expect(summaries.map(s => s.scope)).toEqual([
       '!loud:x',
@@ -193,8 +204,16 @@ describe('fetchConversationSummaries', () => {
       '!b:x': { events: [{ id: '$1', sender: ME, ts: 500, plain: 'x' }] },
       '!a:x': { events: [{ id: '$2', sender: ME, ts: 500, plain: 'y' }] },
     }
-    const once = await fetchConversationSummaries(fakeHomeserver(rooms), ME)
-    const twice = await fetchConversationSummaries(fakeHomeserver(rooms), ME)
+    const once = await fetchConversationSummaries(
+      fakeHomeserver(rooms),
+      ME,
+      NOTHING_READ,
+    )
+    const twice = await fetchConversationSummaries(
+      fakeHomeserver(rooms),
+      ME,
+      NOTHING_READ,
+    )
     expect(once.map(s => s.scope)).toEqual(['!a:x', '!b:x'])
     expect(twice.map(s => s.scope)).toEqual(once.map(s => s.scope))
   })
@@ -208,6 +227,7 @@ describe('fetchConversationSummaries', () => {
         },
       }),
       ME,
+      NOTHING_READ,
     )
     expect(summaries).toHaveLength(2)
     expect(summaries.find(s => s.scope === '!fine:x')?.preview).toBe('here')
@@ -225,12 +245,66 @@ describe('fetchConversationSummaries', () => {
         },
       }),
       ME,
+      NOTHING_READ,
     )
     expect(summaries[0]?.other).toBeNull()
     expect(summaries[0]?.preview).toBe('here')
   })
 
   it('is an empty list, not a failure, for an account in no conversation', async () => {
-    expect(await fetchConversationSummaries(fakeHomeserver({}), ME)).toEqual([])
+    expect(
+      await fetchConversationSummaries(fakeHomeserver({}), ME, NOTHING_READ),
+    ).toEqual([])
+  })
+
+  it('counts what arrived since this device last looked', async () => {
+    const summaries = await fetchConversationSummaries(
+      fakeHomeserver({
+        '!a:x': {
+          events: [
+            { id: '$1', sender: '@her:example.org', ts: 100, plain: 'one' },
+            { id: '$2', sender: '@her:example.org', ts: 200, plain: 'two' },
+            { id: '$3', sender: '@her:example.org', ts: 300, plain: 'three' },
+          ],
+        },
+      }),
+      ME,
+      new Map([['!a:x', 100]]),
+    )
+    expect(summaries[0]?.unread).toBe(2)
+  })
+
+  it('counts a message it cannot read, because it still arrived', async () => {
+    // The row will say it cannot be read. The badge says something is there
+    // to read, which is true and is the more useful of the two.
+    const summaries = await fetchConversationSummaries(
+      fakeHomeserver({
+        '!a:x': { events: [{ id: '$1', sender: '@her:example.org', ts: 300 }] },
+      }),
+      ME,
+      NOTHING_READ,
+    )
+    expect(summaries[0]?.unread).toBe(1)
+    expect(summaries[0]?.preview).toBeNull()
+  })
+
+  it('shows nothing unread on a conversation only this account has spoken in', async () => {
+    const summaries = await fetchConversationSummaries(
+      fakeHomeserver({
+        '!a:x': { events: [{ id: '$1', sender: ME, ts: 300, plain: 'hello' }] },
+      }),
+      ME,
+      NOTHING_READ,
+    )
+    expect(summaries[0]?.unread).toBe(0)
+  })
+
+  it('counts nothing on a conversation whose history refused', async () => {
+    const summaries = await fetchConversationSummaries(
+      fakeHomeserver({ '!a:x': { events: 'unreadable' } }),
+      ME,
+      NOTHING_READ,
+    )
+    expect(summaries[0]?.unread).toBe(0)
   })
 })

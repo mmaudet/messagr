@@ -534,6 +534,8 @@ export function startLiveSync(
 export async function listConversations(
   sessionClient: ReturnType<typeof createClient>,
   selfUserId: string,
+  /** How far each conversation has been read on this device. */
+  lastRead: ReadonlyMap<string, number>,
 ): Promise<ConversationSummary[]> {
   return fetchConversationSummaries(
     {
@@ -545,6 +547,7 @@ export async function listConversations(
       decodeUtf8: bytes => new TextDecoder().decode(bytes),
     },
     selfUserId,
+    lastRead,
   )
 }
 
@@ -683,9 +686,21 @@ export type { ReactionTally } from '../timeline/reactions'
 /**
  * Tells the homeserver this account has read up to `eventId`.
  *
- * Called only when the setting says so. See `receiptSetting.ts`: a receipt is
- * public metadata, and a product that refuses to let a server read content
- * and then publishes the hour somebody read it contradicts itself.
+ * # Two receipts, and only one of them is a courtesy
+ *
+ * `m.read` is public metadata: it tells the other party, and the server, the
+ * hour somebody read them. It is off unless the setting says otherwise, for
+ * the reason `receiptSetting.ts` gives -- a product that refuses to let a
+ * server read content and then publishes when it was read contradicts
+ * itself.
+ *
+ * `m.read.private` (MSC2285) says the same thing to the homeserver and to
+ * nobody else. It is sent **always**, and it is not a courtesy: it is what
+ * stops the server counting a message as unread, which is what stops it
+ * pushing a notification for something already read. Without it every
+ * conversation would keep notifying until the person turned on the setting
+ * that watches them, which would make a privacy choice cost a working
+ * product.
  *
  * Failure is swallowed on purpose, and this is the one place in this file
  * where that is right: a receipt that did not go is invisible to the person
@@ -696,12 +711,13 @@ export async function sendReadReceipt(
   sessionClient: ReturnType<typeof createClient>,
   scope: string,
   eventId: string,
+  kind: 'm.read' | 'm.read.private',
 ): Promise<void> {
   try {
     await makePumpHttp(sessionClient).authedRequest(
       'POST',
       `/_matrix/client/v3/rooms/${encodeURIComponent(scope)}/receipt/` +
-        `m.read/${encodeURIComponent(eventId)}`,
+        `${kind}/${encodeURIComponent(eventId)}`,
       {},
       JSON.stringify({}),
     )

@@ -9,11 +9,14 @@ import { givenNamesSecrets } from './deviceSecrets'
 import { getErrorMessage } from './errors'
 import type { GivenNames } from './givenName'
 import { forgetfulGivenNames, openGivenNames } from './givenNameStore'
+import { forgetfulLastRead, openLastRead, type LastRead } from './lastReadStore'
 import { openStorePassphrase } from './storePassphrase'
 
 /** What became of the notebook on this launch. Reported, not assumed. */
-export interface GivenNamesOpening {
+export interface NotebookOpening {
   readonly names: GivenNames
+  /** How far each conversation has been read here. */
+  readonly lastRead: LastRead
   readonly opened: boolean
   /** Why it did not open, when it did not. */
   readonly reason?: string
@@ -23,6 +26,13 @@ export interface GivenNamesOpening {
 
 /**
  * Opens the application's own encrypted notebook. ADR-0010.
+ *
+ * # Two pages, one file
+ *
+ * Who you call what (`given_names`) and how far you have read
+ * (`last_read`). They are the same kind of fact -- a record of your
+ * relationships that is as revealing as the messages themselves -- so they
+ * share one encrypted file and one passphrase rather than multiplying either.
  *
  * # A second passphrase, deliberately
  *
@@ -48,12 +58,11 @@ export interface GivenNamesOpening {
  * `false` to every write, so the naming gesture says at the time that it did
  * not hold.
  */
-export async function openGivenNamesDatabase(
-  storeDir: string,
-): Promise<GivenNamesOpening> {
+export async function openNotebook(storeDir: string): Promise<NotebookOpening> {
   if (storeDir === '') {
     return {
       names: forgetfulGivenNames(),
+      lastRead: forgetfulLastRead(),
       opened: false,
       reason: 'no writable directory was supplied at launch',
     }
@@ -65,6 +74,7 @@ export async function openGivenNamesDatabase(
   if (!passphrase.held) {
     return {
       names: forgetfulGivenNames(),
+      lastRead: forgetfulLastRead(),
       opened: false,
       reason: passphrase.reason,
     }
@@ -72,15 +82,20 @@ export async function openGivenNamesDatabase(
 
   try {
     const database = open({
+      // The file keeps its first page's name. Renaming it would leave every
+      // device that has one holding a notebook nothing opens any more, which
+      // is a data migration wearing a tidy-up's clothes.
       name: 'given-names.sqlite',
       location: storeDir,
       encryptionKey: passphrase.passphrase,
     })
+    const page = {
+      execute: async (sql: string, params?: readonly (string | number)[]) =>
+        database.execute(sql, params === undefined ? undefined : [...params]),
+    }
     return {
-      names: await openGivenNames({
-        execute: async (sql, params) =>
-          database.execute(sql, params === undefined ? undefined : [...params]),
-      }),
+      names: await openGivenNames(page),
+      lastRead: await openLastRead(page),
       opened: true,
       minted: passphrase.minted,
     }
@@ -90,6 +105,7 @@ export async function openGivenNamesDatabase(
     // "fixed" by deleting the database. Somebody's notebook is in it.
     return {
       names: forgetfulGivenNames(),
+      lastRead: forgetfulLastRead(),
       opened: false,
       reason: getErrorMessage(cause),
       minted: passphrase.minted,

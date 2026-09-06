@@ -78,12 +78,15 @@ import { theOtherMember, type VouchOutcome } from './src/runtime/vouch'
 import type { ConversationSummary } from './src/runtime/conversationList'
 import type { GivenNames } from './src/runtime/givenName'
 import { forgetfulGivenNames } from './src/runtime/givenNameStore'
-import { openGivenNamesDatabase } from './src/runtime/givenNamesDatabase'
+import { forgetfulLastRead, type LastRead } from './src/runtime/lastReadStore'
+import { openNotebook } from './src/runtime/notebook'
 import type { EvictOutcome } from './src/runtime/evict'
 import type { HistoryClaim } from './src/runtime/claimHistory'
 import { Conversation } from './src/ui/Conversation'
 import { ConversationList } from './src/ui/ConversationList'
 import { Invite, type InviteStage } from './src/ui/Invite'
+import { FloatingAction } from './src/ui/FloatingAction'
+import { Header } from './src/ui/Header'
 import { Legal } from './src/ui/Legal'
 import { Reserved } from './src/ui/Reserved'
 import { TabBar, type Tab } from './src/ui/TabBar'
@@ -177,12 +180,17 @@ export function App({
   const [notebook, setNotebook] = useState<string | null>(null)
   // Inviting somebody, which is the same gesture as starting a conversation
   // with them. See issueInvitation.ts.
-  const [invite, setInvite] = useState<InviteStage>({ stage: 'resting' })
+  const [invite, setInvite] = useState<InviteStage>({ stage: 'shut' })
   const [admission, setAdmission] = useState<'waiting' | 'admitted' | null>(
     null,
   )
   const inviteRef = useRef<((name: string | null) => void) | null>(null)
   const namesRef = useRef<GivenNames>(forgetfulGivenNames())
+  // How far each conversation has been read here. Forgetful until the
+  // notebook opens, and forgetful for good if it does not -- which shows
+  // every conversation as unread rather than as read, since a badge that
+  // should be there is a smaller lie than one that should not.
+  const lastReadRef = useRef<LastRead>(forgetfulLastRead())
   // Which conversation is open, held in a ref as well as in state: the live
   // sync loop's callbacks are created once and would otherwise keep deriving
   // whichever conversation was open when the loop started.
@@ -194,13 +202,13 @@ export function App({
   // they hold exists -- see `Reserved`: a bar that gains an item later moves
   // every other item under people's thumbs.
   const [tab, setTab] = useState<Tab>('chat')
-  // NOTHING COUNTS UNREAD YET, and the badge is off rather than showing a
-  // zero. Counting needs a per-conversation mark of what this account has
-  // read, which is the read-receipt machinery pointed the other way round and
-  // is not built. A badge fed by a placeholder would be a number invented to
-  // fill a shape, which is exactly what `TabBar` refuses for the Communautés
-  // dot.
-  const unreadCount = 0
+  // CONVERSATIONS, NOT MESSAGES.
+  //
+  // The tab's badge counts how many conversations have something waiting; the
+  // rows carry how much is waiting in each. That is the division a person
+  // reads without being told -- a tab saying `47` for one chatty conversation
+  // would send somebody looking for forty-seven places to go.
+  const unreadCount = summaries.filter(summary => summary.unread > 0).length
   const [legalOpen, setLegalOpen] = useState(false)
   // What is known about the person on the other side. `null` until the screen
   // is asked for: it costs a device-status call and a state fetch, and a
@@ -511,8 +519,9 @@ export function App({
             // with a passphrase of its own. It degrades rather than failing --
             // a launch that cannot open it shows conversations as identifiers,
             // which is what an unnamed conversation looks like anyway.
-            const opening = await openGivenNamesDatabase(storeDir)
+            const opening = await openNotebook(storeDir)
             namesRef.current = opening.names
+            lastReadRef.current = opening.lastRead
             setNotebook(opening.opened ? 'open' : (opening.reason ?? 'closed'))
             logEvent(opening.opened ? 'info' : 'warn', 'MESSAGR_GIVEN_NAMES', {
               opened: opening.opened,
@@ -524,6 +533,39 @@ export function App({
                 : { reason: opening.reason }),
             })
             setNames(await opening.names.all())
+
+            // READING IS WHAT CLEARS A BADGE.
+            //
+            // Two marks for one act, and they are not redundant. The local
+            // one (`unread.ts`) is what the list draws, and it works whether
+            // or not this account has agreed to be observed. The private
+            // receipt is what stops the homeserver counting the message as
+            // unread, which is what stops it pushing a notification for
+            // something already read -- and it says that to the server and to
+            // nobody else. The public receipt is the courtesy, and only if
+            // somebody turned it on: see receiptSetting.ts.
+            const markRead = async (
+              scope: string,
+              entries: readonly TimelineEntry[],
+            ) => {
+              const newest = entries[entries.length - 1]
+              if (newest === undefined) return
+              await lastReadRef.current.set(scope, newest.sentAt)
+              await sendReadReceipt(
+                sessionClient,
+                scope,
+                newest.eventId,
+                'm.read.private',
+              )
+              if (receiptsRef.current) {
+                await sendReadReceipt(
+                  sessionClient,
+                  scope,
+                  newest.eventId,
+                  'm.read',
+                )
+              }
+            }
 
             // OPENING A CONVERSATION, from the list or from the launch.
             //
@@ -582,13 +624,7 @@ export function App({
                 const other = theOtherMember(members, credentials.userId)
                 setParty(other === null ? null : { scope, other })
 
-                // Only if somebody turned it on. A receipt is public
-                // metadata, and the default is the quiet one -- see
-                // receiptSetting.ts.
-                const newest = fresh.entries[fresh.entries.length - 1]
-                if (receiptsRef.current && newest !== undefined) {
-                  await sendReadReceipt(sessionClient, scope, newest.eventId)
-                }
+                await markRead(scope, fresh.entries)
               }
               derive().catch((cause: unknown) =>
                 logEvent('warn', 'MESSAGR_OPEN_CONVERSATION_FAILED', {
@@ -710,7 +746,13 @@ export function App({
             // the sync loop's own response.
             const refreshList = async () => {
               setSummaries(
-                await listConversations(sessionClient, credentials.userId),
+                await listConversations(
+                  sessionClient,
+                  credentials.userId,
+                  // Read fresh rather than held: `markRead` has just written
+                  // to it, and a held map would redraw the badge it cleared.
+                  await lastReadRef.current.all(),
+                ),
               )
             }
             await refreshList().catch((cause: unknown) =>
@@ -800,11 +842,16 @@ export function App({
                     return
                   }
                   loadConversation(sessionClient, open, credentials.userId)
-                    .then(fresh => {
+                    .then(async fresh => {
                       setConversation(held =>
                         mergeTimeline(held ?? [], fresh.entries),
                       )
                       setReactions(fresh.reactions)
+                      // Somebody watching a conversation has read what lands
+                      // in it. A badge that appeared on the screen the person
+                      // is already looking at would be the clearest possible
+                      // way of saying the count means nothing.
+                      await markRead(open, fresh.entries)
                     })
                     .catch((cause: unknown) => {
                       // The cursor has already advanced past this, but the
@@ -1019,6 +1066,11 @@ export function App({
   return (
     <SafeAreaProvider>
       <SafeAreaView style={styles.screen}>
+        {/* Outside the scroll view, like the tab bar and for the same reason:
+            what the band says is true of the instance rather than of the
+            screen under it, and a fact about the instance that scrolls away
+            is one nobody reads twice. */}
+        <Header />
         <ScrollView
           testID="diagnostic-scroll"
           contentContainerStyle={styles.content}>
@@ -1092,19 +1144,27 @@ export function App({
             </View>
           )}
 
-          {openScope === null && tab === 'chat' && (
+          {/* THE LIST **OR** THE INVITATION, for the same reason as the
+              conversation above: inviting is a place you go, not a form that
+              lives under the list. */}
+          {openScope === null && tab === 'chat' && invite.stage === 'shut' && (
             <View style={styles.block}>
               <ConversationList
                 summaries={summaries}
                 names={names}
                 onOpen={scope => openConversationRef.current?.(scope)}
               />
+            </View>
+          )}
+
+          {openScope === null && tab === 'chat' && invite.stage !== 'shut' && (
+            <View style={styles.block}>
               <Invite
                 stage={invite}
                 admission={admission}
                 onInvite={name => inviteRef.current?.(name)}
                 onClose={() => {
-                  setInvite({ stage: 'resting' })
+                  setInvite({ stage: 'shut' })
                   setAdmission(null)
                 }}
               />
@@ -1427,6 +1487,18 @@ export function App({
             the whole point of a bottom bar. Hidden while a conversation is
             open, which is what the mockup draws -- a conversation is a place
             you leave rather than a fifth tab. */}
+        {/* Above the tab bar and outside the scroll view, so it is where the
+            thumb left it. Only on the list, and only when the invitation
+            panel is not already open: a control that opens what is on screen
+            is a control that does nothing. */}
+        {openScope === null && tab === 'chat' && invite.stage === 'shut' && (
+          <FloatingAction
+            testID="invite-open"
+            label={t('invite_open')}
+            onPress={() => setInvite({ stage: 'resting' })}
+          />
+        )}
+
         {openScope === null && (
           <TabBar current={tab} onSelect={setTab} unread={unreadCount} />
         )}

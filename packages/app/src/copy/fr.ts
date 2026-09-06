@@ -462,6 +462,18 @@ export const fr = {
   community_soon_title: 'Bientôt : communautés et salons',
   community_soon_why:
     'Une communauté regroupe des salons sous un objet pseudonyme. L’onglet est réservé pour la même raison que celui des appels : la barre ne doit pas bouger quand ils arriveront.',
+
+  // The band across the top of every screen. `brand_name` is the product's
+  // own name and is not translated -- a name that changes by language is a
+  // different product.
+  brand_name: 'Messagr',
+  header_no_directory: 'aucun annuaire',
+
+  // The list's own furniture. The badge itself draws a bare number, which
+  // needs no translation; what needs one is what a screen reader says about
+  // it, since "3" alone tells somebody nothing.
+  'list_unread %1$d': '%1$d messages non lus',
+  invite_open: 'Inviter quelqu’un',
 } as const
 
 /** Every key any screen may ask for. A typo is a compile error, not a blank. */
