@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react'
 import {
   AppState,
+  BackHandler,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -210,6 +211,10 @@ export function App({
   // would send somebody looking for forty-seven places to go.
   const unreadCount = summaries.filter(summary => summary.unread > 0).length
   const [legalOpen, setLegalOpen] = useState(false)
+  // How tall the bar and the action came out together. Not for positioning
+  // them -- they are laid out, not offset -- but so the scroll view can end
+  // above them rather than under them.
+  const [dockHeight, setDockHeight] = useState(0)
   // What is known about the person on the other side. `null` until the screen
   // is asked for: it costs a device-status call and a state fetch, and a
   // conversation nobody opened that screen from should not pay for them.
@@ -1012,6 +1017,48 @@ export function App({
     promiseSeen,
   ])
 
+  // THE HARDWARE BACK BUTTON, WHICH WAS CLOSING THE APPLICATION.
+  //
+  // Found on a device: from inside a conversation, Android's back gesture
+  // left Messagr entirely rather than returning to the list. Every screen
+  // here already has its own way back; none of them was wired to the one
+  // gesture an Android user makes without thinking.
+  //
+  // The order is the order things were opened in, innermost first, and the
+  // last case is the important one: when there is nothing left to close this
+  // answers `false` and the system does what it always did. A handler that
+  // answered `true` unconditionally would trap somebody in the application,
+  // which is a worse bug than the one it fixes.
+  useEffect(() => {
+    const back = () => {
+      if (trust !== null) {
+        setTrust(null)
+        return true
+      }
+      if (openScope !== null) {
+        setOpenScope(null)
+        openScopeRef.current = null
+        return true
+      }
+      if (legalOpen) {
+        setLegalOpen(false)
+        return true
+      }
+      if (invite.stage !== 'shut') {
+        setInvite({ stage: 'shut' })
+        setAdmission(null)
+        return true
+      }
+      if (tab !== 'chat') {
+        setTab('chat')
+        return true
+      }
+      return false
+    }
+    const subscription = BackHandler.addEventListener('hardwareBackPress', back)
+    return () => subscription.remove()
+  }, [trust, openScope, legalOpen, invite.stage, tab])
+
   // The synced case computed once rather than repeated at each of its two
   // uses below: narrowing `session` inline in both the status and the
   // duration text was the same three-part guard written out twice.
@@ -1065,7 +1112,15 @@ export function App({
 
   return (
     <SafeAreaProvider>
-      <SafeAreaView style={styles.screen}>
+      {/* THE BOTTOM EDGE IS THE DOCK'S, NOT THIS ONE'S.
+          An absolutely-positioned child is laid out against the border box
+          and not the padding box, so a dock at `bottom: 0` ignores whatever
+          inset this view reserved -- watched on a device, with the system's
+          gesture bar drawn straight across "Communautés" and "Appels". So
+          this view stops padding the bottom and the dock claims that inset
+          itself, which is the ordinary shape for a bar that has to sit on
+          the edge. */}
+      <SafeAreaView style={styles.screen} edges={['top', 'left', 'right']}>
         {/* Outside the scroll view, like the tab bar and for the same reason:
             what the band says is true of the instance rather than of the
             screen under it, and a fact about the instance that scrolls away
@@ -1073,7 +1128,14 @@ export function App({
         <Header />
         <ScrollView
           testID="diagnostic-scroll"
-          contentContainerStyle={styles.content}>
+          // Ends above the dock rather than under it. The dock is absolute,
+          // so without this the last row of whatever is on screen sits behind
+          // the tab bar -- which reads as content that will not scroll far
+          // enough, and is the reason a bottom bar usually costs a padding.
+          contentContainerStyle={[
+            styles.content,
+            { paddingBottom: dockHeight + space.l },
+          ]}>
           {probe !== null && (
             <View style={styles.block}>
               <Text style={styles.heading}>Panic probe (#27)</Text>
@@ -1487,21 +1549,30 @@ export function App({
             the whole point of a bottom bar. Hidden while a conversation is
             open, which is what the mockup draws -- a conversation is a place
             you leave rather than a fifth tab. */}
-        {/* Above the tab bar and outside the scroll view, so it is where the
-            thumb left it. Only on the list, and only when the invitation
+        {/* THE DOCK: the action above the bar, in that order, anchored to the
+            bottom and outside the scroll view so both are where the thumb
+            left them. `box-none` so the gap between them is not a surface
+            that swallows taps meant for the list underneath.
+
+            The action shows only on the list, and only when the invitation
             panel is not already open: a control that opens what is on screen
             is a control that does nothing. */}
-        {openScope === null && tab === 'chat' && invite.stage === 'shut' && (
-          <FloatingAction
-            testID="invite-open"
-            label={t('invite_open')}
-            onPress={() => setInvite({ stage: 'resting' })}
-          />
-        )}
+        <View
+          style={styles.dock}
+          pointerEvents="box-none"
+          onLayout={event => setDockHeight(event.nativeEvent.layout.height)}>
+          {openScope === null && tab === 'chat' && invite.stage === 'shut' && (
+            <FloatingAction
+              testID="invite-open"
+              label={t('invite_open')}
+              onPress={() => setInvite({ stage: 'resting' })}
+            />
+          )}
 
-        {openScope === null && (
-          <TabBar current={tab} onSelect={setTab} unread={unreadCount} />
-        )}
+          {openScope === null && (
+            <TabBar current={tab} onSelect={setTab} unread={unreadCount} />
+          )}
+        </View>
       </SafeAreaView>
     </SafeAreaProvider>
   )
@@ -1881,7 +1952,9 @@ const styles = StyleSheet.create({
   // the file forbids its own intermediate values outright. `xxl` is the
   // answer the scale gives, and a screen that needed more would be a
   // composition error rather than a missing token.
-  content: { padding: space.xl, paddingBottom: space.xxl },
+  content: { padding: space.xl },
+  // Anchored to the bottom, over whatever is scrolling behind it.
+  dock: { position: 'absolute', left: 0, right: 0, bottom: 0 },
   block: { marginBottom: space.xxl },
   // Spread rather than picked apart: size, leading, weight and tracking
   // travel together, and separating them is how a line-height floor gets

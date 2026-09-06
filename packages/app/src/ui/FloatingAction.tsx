@@ -32,8 +32,17 @@ export function FloatingAction({
   readonly testID: string
 }) {
   return (
-    // The wrapper is what floats; the button is what is pressed. Kept apart
-    // so the touch target is the circle and not the empty corner beside it.
+    // LAID OUT ABOVE THE BAR, NOT POSITIONED OVER IT.
+    //
+    // Two attempts placed this absolutely and offset it by the bar's height
+    // -- first computed from tokens, then measured with `onLayout`. Both came
+    // out on a device with the circle's bottom painted over by the bar, and
+    // the second was worse than the first because it looked principled. The
+    // caller puts this in a column above the bar now, so there is no offset
+    // to get wrong: a thing laid out above another thing cannot overlap it.
+    //
+    // The wrapper is what takes the row; the button is what is pressed. Kept
+    // apart so the touch target is the circle and not the corner beside it.
     <View style={styles.hover} pointerEvents="box-none">
       <Pressable
         testID={testID}
@@ -55,10 +64,9 @@ const SIZE = floors.touchTargetMin + space.m
 
 const styles = StyleSheet.create({
   hover: {
-    position: 'absolute',
-    right: space.l,
-    bottom: space.l,
     alignItems: 'flex-end',
+    paddingRight: space.l,
+    paddingBottom: space.l,
   },
   circle: {
     width: SIZE,

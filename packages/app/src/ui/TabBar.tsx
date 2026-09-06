@@ -1,5 +1,6 @@
 import React from 'react'
 import { Pressable, StyleSheet, Text, View } from 'react-native'
+import { SafeAreaView } from 'react-native-safe-area-context'
 
 import { t, type CopyKey } from '../copy'
 import { color, floors, radius, space, type } from '../design/tokens'
@@ -56,7 +57,14 @@ export function TabBar({
   communityWaiting = false,
 }: TabBarProps) {
   return (
-    <View style={styles.bar} testID="tab-bar">
+    // THE BAR OWNS ITS OWN BOTTOM INSET, GROUND AND ALL.
+    //
+    // A screen that reserved the inset for it left the strip under the bar
+    // transparent, and the list scrolled through it -- watched on a device,
+    // with a heading from the readout showing below the tabs. The inset is
+    // part of the bar: whatever sits on a screen's bottom edge has to paint
+    // down to the edge, or it is a bar with a window under it.
+    <SafeAreaView edges={['bottom']} style={styles.bar} testID="tab-bar">
       {TABS.map(({ tab, glyph, label }) => {
         const active = tab === current
         const tint = active ? color.brand.green700 : color.neutral['600']
@@ -87,7 +95,7 @@ export function TabBar({
           </Pressable>
         )
       })}
-    </View>
+    </SafeAreaView>
   )
 }
 
