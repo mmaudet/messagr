@@ -227,6 +227,33 @@ export function App({
   const [names, setNames] = useState<ReadonlyMap<string, string>>(new Map())
   // Inviting somebody, which is the same gesture as starting a conversation
   // with them. See issueInvitation.ts.
+  /**
+   * The frame, and whether it is resting at the newest message.
+   *
+   * A conversation opened at the top, on its oldest message, and a message
+   * somebody sent landed below the fold -- so the answer to "did it send?"
+   * was a scroll. Every messenger opens at the newest, and this one did not.
+   *
+   * `atBottom` is what stops the fix from becoming a second defect: scrolling
+   * to the end on every content change would yank somebody reading history
+   * back down the moment a message arrived. It starts true, so opening a
+   * conversation lands at the newest; it goes false the moment somebody
+   * scrolls up, and comes back when they return.
+   */
+  const frame = useRef<React.ComponentRef<typeof ScrollView>>(null)
+  const atBottom = useRef(true)
+  /**
+   * Which screen `atBottom` is an answer about.
+   *
+   * The flag is a ref, so it outlives the container `key` rebuilds: scrolling
+   * up in one conversation and then opening another would open the second
+   * wherever the first was left -- the same defect, moved one conversation
+   * along. Resolved where it is read rather than on arrival: an `onLayout`
+   * reset looked right and fires again whenever the keyboard resizes the
+   * frame, which would yank a person reading history back down.
+   */
+  const restedIn = useRef<string | null>(null)
+
   const [invite, setInvite] = useState<InviteStage>({ stage: 'shut' })
   const [admission, setAdmission] = useState<'waiting' | 'admitted' | null>(
     null,
@@ -1429,8 +1456,38 @@ export function App({
             new one per screen, which is what "each screen owns its own
             scrolling" means when no screen scrolls on its own. */}
         <ScrollView
+          ref={frame}
           key={openScope ?? tab}
           testID="screen-scroll"
+          // A conversation rests at its newest message; a list rests where it
+          // was left. Nothing else in the product has a bottom worth being at.
+          onScroll={
+            openScope === null
+              ? undefined
+              : event => {
+                  const { contentOffset, layoutMeasurement, contentSize } =
+                    event.nativeEvent
+                  // A margin, because a scroll rarely stops on the exact
+                  // pixel and "within a message's height of the end" is what
+                  // a person means by being at the bottom.
+                  atBottom.current =
+                    contentOffset.y + layoutMeasurement.height >=
+                    contentSize.height - NEAR_THE_END
+                }
+          }
+          scrollEventThrottle={100}
+          onContentSizeChange={() => {
+            if (openScope === null) return
+            if (restedIn.current !== openScope) {
+              restedIn.current = openScope
+              atBottom.current = true
+            }
+            if (!atBottom.current) return
+            // Not animated: on the first layout there is nothing to animate
+            // from, and a conversation that visibly scrolls itself on opening
+            // reads as a screen doing something rather than a screen arriving.
+            frame.current?.scrollToEnd({ animated: false })
+          }}
           // Ends above the dock rather than under it. The dock is absolute,
           // so without this the last row of whatever is on screen sits behind
           // the tab bar -- which reads as content that will not scroll far
@@ -1793,6 +1850,15 @@ export function App({
 // Values are literal rather than tokenised on purpose: this screen is
 // scaffolding, not product surface. Anything that survives into a real screen
 // must come from design/tokens.json, per interface invariant 11.
+/**
+ * How far from the end still counts as being at it.
+ *
+ * A scroll rarely stops on the exact pixel, and a person who is one line
+ * short of the bottom means the same thing by it as one who is exactly there.
+ * Roughly a message's height.
+ */
+const NEAR_THE_END = 80
+
 const styles = StyleSheet.create({
   back: {
     ...typeScale.bodySm,

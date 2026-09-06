@@ -270,6 +270,12 @@ describe('boot', () => {
     // ships.
     await element(by.id('conversation-input')).tapReturnKey()
 
+    // VISIBLE, NOT MERELY PRESENT. A conversation that rendered the message
+    // below the fold would satisfy `toExist` while the person who sent it saw
+    // nothing -- and that is exactly what happened until the frame was made
+    // to rest at its newest message. Asserting visibility is what keeps that
+    // fixed.
+    //
     // Generous: this encrypts, shares a room key if the session needs one,
     // sends, and then reads the room back.
     await waitFor(element(by.text(written)))
