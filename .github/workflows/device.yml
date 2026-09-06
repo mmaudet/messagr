@@ -69,6 +69,75 @@ jobs:
       - name: Assert the release bundle is Hermes bytecode
         run: ./scripts/assert-hermes-bytecode.sh
 
+  ios-simulator:
+    # WHY THIS JOB EXISTS, AND WHAT IT ALREADY WOULD HAVE CAUGHT.
+    #
+    # Android is built and exercised on every pull request; iOS was built by
+    # nobody. That is not a theoretical gap: by the time it was noticed,
+    # `Podfile.lock` knew neither of the two native dependencies added since
+    # it was written, the only declared permission was a location one the
+    # template left behind and nothing uses, and `Info.plist` had not been
+    # valid XML since the URL scheme was added. None of it could fail, because
+    # nothing ran.
+    #
+    # A simulator build rather than a device one: signing needs a certificate
+    # this repository does not hold, and what has been going wrong is
+    # compilation and configuration, which a simulator proves just as well.
+    #
+    # macOS runners cost roughly ten times a Linux minute, so this asserts
+    # that the application builds and nothing more. Behaviour is the Android
+    # end-to-end job's, and the platform-specific behaviour that only iOS can
+    # answer for -- keychain accessibility above all -- needs a real locked
+    # device and is not something a runner can hold.
+    runs-on: macos-15
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: yarn
+
+      - run: yarn install --frozen-lockfile
+
+      # Regenerated rather than trusted. A committed lock file that has fallen
+      # behind `package.json` is exactly the failure this job is here for, and
+      # `pod install` reconciling them silently would hide it -- so the lock is
+      # checked afterwards for having moved.
+      - name: Install the pods
+        working-directory: packages/app/ios
+        env:
+          RCT_NEW_ARCH_ENABLED: '1'
+        run: pod install
+
+      - name: Assert the pod lock was already in step with the manifest
+        working-directory: packages/app/ios
+        run: |
+          if ! git diff --quiet -- Podfile.lock; then
+            echo "Podfile.lock moved during install: it was behind package.json." >&2
+            git --no-pager diff --stat -- Podfile.lock >&2
+            exit 1
+          fi
+
+      # `plutil -lint` accepts what Apple's own lenient parser accepts, which
+      # is how a comment containing `--` survived in there. Python's parser is
+      # strict, and the file should be readable by any XML tool and not only
+      # by Xcode.
+      - name: Assert Info.plist is valid XML, strictly
+        working-directory: packages/app/ios
+        run: |
+          plutil -lint Messagr/Info.plist
+          python3 -c "import plistlib, sys; plistlib.load(open('Messagr/Info.plist','rb'))"
+
+      - name: Build for the simulator
+        working-directory: packages/app/ios
+        run: |
+          xcodebuild -workspace Messagr.xcworkspace -scheme Messagr \
+            -configuration Debug -sdk iphonesimulator \
+            -destination 'generic/platform=iOS Simulator' \
+            -quiet build
+
   end-to-end:
     # The boot contract is a claim about a device, so it is asserted on one.
     # Android on an Ubuntu runner rather than iOS on macOS: same assertions,
