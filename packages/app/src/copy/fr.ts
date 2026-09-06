@@ -395,6 +395,11 @@ export const fr = {
     'Comparer une courte suite de mots avec cette personne, de vive voix, ou scanner son code en sa présence. Deux minutes, une fois pour toutes.',
   trust_raise_missing:
     'Ce geste n’est pas encore construit dans cette application. Le dire vaut mieux que d’afficher un bouton qui ne ferait rien.',
+
+  // Une réaction. Le geste est une pression longue : une pression simple sur
+  // un message, c'''est ce qu'''on fait pour le lire, et voler ce geste pour
+  // ouvrir un menu, c'''est une conversation qui ne défile plus.
+  reaction_offer: 'Réagir à ce message',
 } as const
 
 /** Every key any screen may ask for. A typo is a compile error, not a blank. */

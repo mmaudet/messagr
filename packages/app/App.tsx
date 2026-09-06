@@ -29,12 +29,15 @@ import {
   admitEntrant,
   inviteSomebody,
   listConversations,
+  reactToMessage,
   readTrust,
+  removeReaction,
   startCryptoMachine,
   startLiveSync,
   vouchForEntrant,
   type CryptoPumpReport,
   type FormMigration,
+  type ReactionTally,
   type ReceiveReport,
   type RunningSyncLoop,
   type TrustReading,
@@ -185,8 +188,17 @@ export function App({
   const readTrustRef = useRef<((scope: string, other: string) => void) | null>(
     null,
   )
+  // Reactions, grouped by the message they point at. ADR-0011: this
+  // application aggregates its own, because a server cannot aggregate what it
+  // cannot read.
+  const [reactions, setReactions] = useState<
+    ReadonlyMap<string, readonly ReactionTally[]>
+  >(new Map())
   const [openScope, setOpenScope] = useState<string | null>(null)
   const openScopeRef = useRef<string | null>(null)
+  const reactRef = useRef<
+    ((target: string, key: string, own: string | null) => void) | null
+  >(null)
   const openConversationRef = useRef<((scope: string) => void) | null>(null)
   const runningSyncRef = useRef<RunningSyncLoop | null>(null)
   // Set once by the launch effect, which is the only place that holds
@@ -489,8 +501,15 @@ export function App({
                     return
                   }
                   setSending('idle')
-                  const fresh = await loadConversation(sessionClient, scope)
-                  setConversation(held => mergeTimeline(held ?? [], fresh))
+                  const fresh = await loadConversation(
+                    sessionClient,
+                    scope,
+                    credentials.userId,
+                  )
+                  setConversation(held =>
+                    mergeTimeline(held ?? [], fresh.entries),
+                  )
+                  setReactions(fresh.reactions)
                 }
                 // A send that failed for a reason nothing here anticipated
                 // still has to leave the composer usable. Reported on the
@@ -499,8 +518,15 @@ export function App({
               })
 
               const derive = async () => {
-                const fresh = await loadConversation(sessionClient, scope)
-                setConversation(held => mergeTimeline(held ?? [], fresh))
+                const fresh = await loadConversation(
+                  sessionClient,
+                  scope,
+                  credentials.userId,
+                )
+                setConversation(held =>
+                  mergeTimeline(held ?? [], fresh.entries),
+                )
+                setReactions(fresh.reactions)
                 const members = await fetchJoinedMembers(
                   makePumpHttp(sessionClient),
                   scope,
@@ -515,6 +541,50 @@ export function App({
               )
             }
             openConversationRef.current = showConversation
+
+            // REACTING, AND TAKING IT BACK. ADR-0011.
+            //
+            // A key this account already used is removed rather than added
+            // again: tapping a chip one is in is how a person takes a
+            // reaction back, and offering the same key twice would make a
+            // count of two from one person.
+            reactRef.current = (target, key, own) => {
+              const scope = openScopeRef.current
+              if (scope === null) return
+              const gesture = async () => {
+                const done =
+                  own === null
+                    ? await reactToMessage(sessionClient, scope, target, key)
+                    : await removeReaction(sessionClient, scope, own)
+                if ('reacted' in done && !done.reacted) {
+                  logEvent('warn', 'MESSAGR_REACT_FAILED', {
+                    reason: done.reason,
+                  })
+                } else if ('removed' in done && !done.removed) {
+                  logEvent('warn', 'MESSAGR_UNREACT_FAILED', {
+                    reason: done.reason ?? 'no reason given',
+                  })
+                }
+                // Re-derived rather than guessed at: the tally is built from
+                // what the homeserver holds, and a chip drawn from a local
+                // guess would disagree with it the moment anything else
+                // changed.
+                const fresh = await loadConversation(
+                  sessionClient,
+                  scope,
+                  credentials.userId,
+                )
+                setConversation(held =>
+                  mergeTimeline(held ?? [], fresh.entries),
+                )
+                setReactions(fresh.reactions)
+              }
+              gesture().catch((cause: unknown) =>
+                logEvent('warn', 'MESSAGR_REACT_FAILED', {
+                  reason: getErrorMessage(cause),
+                }),
+              )
+            }
 
             // Asked for rather than computed on every launch: it costs a
             // device-status call and a state fetch per conversation.
@@ -656,10 +726,13 @@ export function App({
                   if (open === null || !tick.changedScopes.includes(open)) {
                     return
                   }
-                  loadConversation(sessionClient, open)
-                    .then(fresh =>
-                      setConversation(held => mergeTimeline(held ?? [], fresh)),
-                    )
+                  loadConversation(sessionClient, open, credentials.userId)
+                    .then(fresh => {
+                      setConversation(held =>
+                        mergeTimeline(held ?? [], fresh.entries),
+                      )
+                      setReactions(fresh.reactions)
+                    })
                     .catch((cause: unknown) => {
                       // The cursor has already advanced past this, but the
                       // next poll that touches this conversation derives it
@@ -1004,6 +1077,10 @@ export function App({
                   }}
                 />
                 <Conversation
+                  reactions={reactions}
+                  onReact={(target, key, own) =>
+                    reactRef.current?.(target, key, own)
+                  }
                   entries={conversation}
                   selfUserId={selfUserId}
                   onSend={sendMessage}
