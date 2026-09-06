@@ -75,10 +75,13 @@ export function FirstLaunch({
   onBegin,
   language,
   onLanguage,
+  onLanguageSettled,
 }: {
   readonly onBegin: () => void
   readonly language: Language
   readonly onLanguage: (language: Language) => void
+  /** Called when the strip stops. Only this one persists. */
+  readonly onLanguageSettled: (language: Language) => void
 }) {
   const [accepted, setAccepted] = useState(false)
   const [nagged, setNagged] = useState(false)
@@ -116,7 +119,12 @@ export function FirstLaunch({
 
         <View style={styles.gate}>
           <Text style={styles.gateHeading}>{t('promise_language')}</Text>
-          <LanguageStrip chosen={language} onChoose={onLanguage} />
+          <LanguageStrip
+            onDark
+            chosen={language}
+            onChoose={onLanguage}
+            onSettle={onLanguageSettled}
+          />
 
           {/* THE BOX, AND WHY IT IS A BOX AND NOT A SENTENCE UNDER A BUTTON.
               "By continuing you accept…" is an acceptance nobody made. A tick
@@ -245,8 +253,14 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   boxTicked: {
-    backgroundColor: color.brand.green500,
-    borderColor: color.brand.green500,
+    // THE DARK PALETTE, ON A SCREEN THAT IS ALWAYS DARK.
+    //
+    // `color.brand.green500` is the light-ground green, and the token file
+    // says outright why it will not do here: the dark palette's own green500
+    // is *« remonté en clarté pour tenir sur fond sombre »*. Using the light
+    // one on `ink900` is a contrast decision made by accident.
+    backgroundColor: color.dark.brand.green500,
+    borderColor: color.dark.brand.green500,
   },
   tick: {
     ...type.monoLabel,
@@ -263,7 +277,10 @@ const styles = StyleSheet.create({
   },
   link: {
     ...type.bodySm,
-    color: color.brand.green500,
+    // The "text, border, link" role, in the dark palette where it is
+    // *lighter* than green500 rather than darker. That inversion is the
+    // token's own note, and it is exactly what a link on `ink900` needs.
+    color: color.dark.brand.green700,
     textDecorationLine: 'underline',
   },
   required: {
@@ -272,7 +289,7 @@ const styles = StyleSheet.create({
   },
   bullet: {
     ...type.caption,
-    color: color.brand.green500,
+    color: color.dark.brand.green500,
   },
   pointLabel: {
     ...type.brandPoint,

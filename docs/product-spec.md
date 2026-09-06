@@ -705,7 +705,9 @@ These rules take precedence over aesthetic choices and are normative for any UI 
 
 1. A participant is never implicitly human. An agent says so visually every place it appears.
 2. Encryption is restated only where it adds information (first send, verification, call), not on every conversation screen.
-3. Green is a signal, not a decoration: it is used only for verified humans.
+3. Green is a signal, not a decoration. **`brand.green500`'s own token states what it means, and that list is the whole list**: *« Humain et vérifié. Action principale, accusé de lecture, marque. »* Nothing else may be green — not a list accent, not a heading, not a divider, not a state that merely happens to be positive. Wherever green appears, a reader must be able to name which of the four it is.
+
+   *This invariant used to read “it is used only for verified humans”, which was narrower than the token file it governs and which the product had never obeyed: the brand screen's action, its bullets and the mark were already green when it was written. Narrowed rules that the product contradicts are worse than no rule, because the next person resolves the contradiction by ignoring the rule. Reconciled with `tokens.json`, which is normative (invariant 11).*
 4. No “continue anyway” button crosses a security boundary (failed SAS, refused-origin code, ungranted external action, unrecognised new device).
 5. Recognising a contact ≠ being able to write to them. Discovery, trust, verification remain three distinct notions.
 6. Degraded states are stated in natural language, never with an error code or the word “federation”.
@@ -913,10 +915,15 @@ you leave, not a fifth tab.
 
 **Badges.** Discussions carries a count of **conversations with something
 waiting**, not of messages — a tab saying `47` for one chatty conversation
-would send somebody looking for forty-seven places to go. Communautés carries
-a **dot** rather than a count, because nothing counts anything there yet and a
-number invented to fill a shape is worse than a mark that only says
-"something".
+would send somebody looking for forty-seven places to go.
+
+**Communautés carries nothing.** The mockup draws a dot there and this section
+used to describe one; the component carried a prop, a style and a test
+identifier for it, and nothing anywhere set them, so it could not render on
+any screen. Communities do not exist yet, so nothing can be waiting under that
+tab. A badge behind a flag nobody raises is the "number invented to fill a
+shape" this same paragraph refuses two sentences earlier. It comes back with
+communities.
 
 **The header is a dark band, and it is a security boundary rather than a title
 bar.** `brand.ink900` is *« fond des frontières de sécurité »* in the token's

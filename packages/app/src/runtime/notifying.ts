@@ -56,3 +56,21 @@ export function readNotification(
 ): Notification {
   return { id: scope, title: shown, body: preview }
 }
+
+/**
+ * Which conversation a notification was about, when a person taps it.
+ *
+ * # The identifier is the conversation, and that is not a coincidence
+ *
+ * `readNotification` keys by the scope so a second message replaces the
+ * first rather than stacking. The same key is what routes the tap: there is
+ * no separate payload to carry, and nothing to keep in step.
+ *
+ * `null` for the blind notification, which has no conversation to open --
+ * nothing that woke this device said which one. Tapping it opens the
+ * application, which then syncs and shows the list with something waiting.
+ * That is the honest destination, not a fallback.
+ */
+export function scopeOfPress(id: string | undefined): string | null {
+  return id === undefined || id === BLIND_ID ? null : id
+}

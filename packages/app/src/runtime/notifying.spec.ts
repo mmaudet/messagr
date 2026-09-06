@@ -1,6 +1,11 @@
 import { describe, expect, it } from 'vitest'
 
-import { blindNotification, readNotification } from './notifying'
+import {
+  BLIND_ID,
+  blindNotification,
+  readNotification,
+  scopeOfPress,
+} from './notifying'
 
 describe('blindNotification', () => {
   it('names nobody and quotes nothing', () => {
@@ -41,5 +46,22 @@ describe('readNotification', () => {
     const read = readNotification('!a:x', 'Maria', 'see you at eight')
     expect(read.title).toBe('Maria')
     expect(read.body).toBe('see you at eight')
+  })
+})
+
+describe('scopeOfPress', () => {
+  it('routes a read notification to its conversation', () => {
+    expect(scopeOfPress('!a:messagr.eu')).toBe('!a:messagr.eu')
+  })
+
+  it('routes the blind one nowhere', () => {
+    // Nothing that woke the device said which conversation, so there is none
+    // to open. Tapping it opens the application, which then syncs and shows
+    // the list with something waiting -- the honest destination.
+    expect(scopeOfPress(BLIND_ID)).toBeNull()
+  })
+
+  it('routes a notification with no id nowhere either', () => {
+    expect(scopeOfPress(undefined)).toBeNull()
   })
 })

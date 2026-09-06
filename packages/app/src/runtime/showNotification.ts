@@ -1,10 +1,10 @@
 // The one module that names `@notifee/react-native`. See `pushDevice.ts` for
 // the rule; what this adapts is `notifying.ts`, which decides what a
 // notification says and is tested without a device.
-import notifee, { AndroidImportance } from '@notifee/react-native'
+import notifee, { AndroidImportance, EventType } from '@notifee/react-native'
 
 import { t } from '../copy'
-import type { Notification } from './notifying'
+import { scopeOfPress, type Notification } from './notifying'
 
 /**
  * Drawing a notification.
@@ -24,6 +24,35 @@ import type { Notification } from './notifying'
 
 /** Android needs a channel before anything can be shown on it. */
 const CHANNEL = 'messages'
+
+/**
+ * What a tap does, wired once at launch.
+ *
+ * Three ways in, and a notification tapped from a cold start arrives by the
+ * third: `getInitialNotification` is the only one that fires when the press
+ * is what started the process, and a handler that registered only the other
+ * two would work everywhere except the case people actually complain about.
+ */
+export function whenNotificationPressed(
+  open: (scope: string | null) => void,
+): () => void {
+  notifee
+    .getInitialNotification()
+    .then(initial => {
+      if (initial !== null) open(scopeOfPress(initial.notification.id))
+    })
+    .catch(() => {
+      // A launch is not worth losing over a notification that may not exist.
+    })
+
+  const stopForeground = notifee.onForegroundEvent(({ type, detail }) => {
+    if (type === EventType.PRESS) open(scopeOfPress(detail.notification?.id))
+  })
+  notifee.onBackgroundEvent(async ({ type, detail }) => {
+    if (type === EventType.PRESS) open(scopeOfPress(detail.notification?.id))
+  })
+  return stopForeground
+}
 
 export async function drawNotification(
   notification: Notification,

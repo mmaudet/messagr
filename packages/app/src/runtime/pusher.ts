@@ -33,8 +33,20 @@ import { getErrorMessage } from './errors'
  * messages from.
  */
 
-/** The application this gateway should route to. Matches sygnal's own key. */
-const APP_ID = 'cloud.maudet.messagr'
+/**
+ * The application this gateway should route to.
+ *
+ * **It must equal this build's Gradle `applicationId` and the key of the
+ * `apps:` entry in `sygnal.yaml`, exactly.** Wildcards are accepted by
+ * sygnal's matching and must not be used here.
+ *
+ * A disagreement produces **no error anywhere**: the homeserver finds no
+ * pushkin and drops the notification, sygnal logs nothing, and the device is
+ * simply never woken. It was `cloud.maudet.messagr` on this branch until a
+ * review caught it -- the old applicationId, which sygnal does carry an entry
+ * for and which this application is not.
+ */
+const APP_ID = 'eu.messagr'
 
 /** What the homeserver shows in the account's device list. */
 const SHOWN_AS = 'Messagr'
@@ -86,6 +98,19 @@ export type PusherPoster = (body: PusherBody) => Promise<void>
 export type PusherRegistration =
   | { readonly registered: true }
   | { readonly registered: false; readonly reason: string }
+
+/**
+ * What is sent to take a pusher away: the same route, `kind: null`, with the
+ * application and the key and nothing else.
+ *
+ * Needed because turning notifications off must actually stop them. A setting
+ * that only stopped the *next* launch registering would leave the pusher that
+ * is already there firing, which is a switch that reads as off and is on --
+ * the exact shape of lie this product spends its design refusing.
+ */
+export function forgetPusher(token: string): Record<string, unknown> {
+  return { app_id: APP_ID, pushkey: token, kind: null }
+}
 
 export async function registerPusher(
   post: PusherPoster,

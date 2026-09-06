@@ -41,8 +41,25 @@ const { wake } = require('./src/runtime/wake')
 const { readNotification } = require('./src/runtime/notifying')
 const { drawNotification } = require('./src/runtime/showNotification')
 const { logEvent } = require('./src/runtime/log')
+const { wakeIsAllowed } = require('./src/runtime/wakeSetting')
+const { wakeSecrets } = require('./src/runtime/deviceSecrets')
 
 setBackgroundMessageHandler(getMessaging(), async () => {
+  // THE SETTING IS CHECKED HERE TOO, AND NOT ONLY AT REGISTRATION.
+  //
+  // Turning notifications off removes the pusher, so in the ordinary case
+  // nothing arrives to be handled. This is the case where something does
+  // anyway: a push already in flight, or a homeserver that has not yet
+  // stopped. Drawing it would be the switch reading as off while a
+  // notification appears, which is the thing the switch exists to prevent.
+  if (!(await wakeIsAllowed(wakeSecrets))) {
+    logEvent('info', 'MESSAGR_WOKE', {
+      drew: 'nothing',
+      reason: 'switched off',
+    })
+    return
+  }
+
   const outcome = await wake({
     // `null` is "this device could not open its store", which is exactly the
     // truth in a headless context that has bootstrapped nothing.

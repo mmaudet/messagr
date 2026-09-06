@@ -26,6 +26,15 @@ import { TabIcon, type TabGlyph } from './TabIcon'
  * it. The unread badge is the one that is not obviously any of the four, and
  * it is green because the mockup draws it green — recorded here rather than
  * smuggled, so that whoever revisits invariant 3 knows where to look.
+ *
+ * # There is no dot on Communautés, and there was one that could never appear
+ *
+ * #101 asks for a dot there. This carried the prop, the style and the testID
+ * for it, and nothing anywhere set it — so it could not render, on any screen,
+ * ever. A review found it. Communities do not exist yet, so nothing can be
+ * waiting under that tab; the honest shape is no dot rather than a dot behind
+ * a flag nobody raises, which is exactly the "number invented to fill a shape"
+ * this component refuses elsewhere. It comes back with communities.
  */
 
 export type Tab = 'chat' | 'community' | 'calls' | 'settings'
@@ -46,16 +55,9 @@ export interface TabBarProps {
   readonly onSelect: (tab: Tab) => void
   /** Unread conversations, shown as a count on the first tab. */
   readonly unread?: number
-  /** Something waiting under Communautés, shown as a dot rather than a count. */
-  readonly communityWaiting?: boolean
 }
 
-export function TabBar({
-  current,
-  onSelect,
-  unread = 0,
-  communityWaiting = false,
-}: TabBarProps) {
+export function TabBar({ current, onSelect, unread = 0 }: TabBarProps) {
   return (
     // THE BAR OWNS ITS OWN BOTTOM INSET, GROUND AND ALL.
     //
@@ -83,12 +85,6 @@ export function TabBar({
                 <View style={styles.badge} testID="tab-unread">
                   <Text style={styles.badgeCount}>{unread}</Text>
                 </View>
-              )}
-              {tab === 'community' && communityWaiting && (
-                // A dot, not a count. Nothing here counts anything yet, and a
-                // number invented to fill a shape is worse than a mark that
-                // only says "something".
-                <View style={styles.dot} testID="tab-community-dot" />
               )}
             </View>
             <Text style={[styles.label, { color: tint }]}>{t(label)}</Text>
@@ -137,14 +133,5 @@ const styles = StyleSheet.create({
   badgeCount: {
     ...type.monoLabel,
     color: color.brand.ink900,
-  },
-  dot: {
-    position: 'absolute',
-    top: space.xs,
-    right: space.m,
-    width: space.s,
-    height: space.s,
-    borderRadius: radius.pill,
-    backgroundColor: color.brand.green500,
   },
 })

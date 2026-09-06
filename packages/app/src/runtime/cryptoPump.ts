@@ -56,7 +56,7 @@ import { probeUnsettledEncrypt, type ProbeReport } from './panicProbe'
 import { claimHistory, type HistoryClaim } from './claimHistory'
 import { evictFrom, type EvictOutcome } from './evict'
 import { mediaRepository } from './mediaRepository'
-import { registerPusher, type PusherRegistration } from './pusher'
+import { forgetPusher, registerPusher, type PusherRegistration } from './pusher'
 import type { PickedImage } from './pickImage'
 import { fetchImage, type ShownImage } from './receiveImage'
 import { sendImage, sendingThrough, type ImageSent } from './sendImage'
@@ -734,6 +734,25 @@ export async function sendPhotograph(
     },
     scope,
     image,
+  )
+}
+
+/**
+ * Taking the pusher away, which is what turning notifications off must do.
+ *
+ * The same route with `kind: null`. A setting that only stopped the *next*
+ * launch registering would leave the pusher already there firing, which is a
+ * switch that reads as off and is on.
+ */
+export async function stopWakingThisDevice(
+  sessionClient: ReturnType<typeof createClient>,
+  token: string,
+): Promise<void> {
+  await makePumpHttp(sessionClient).authedRequest(
+    'POST',
+    '/_matrix/client/v3/pushers/set',
+    {},
+    JSON.stringify(forgetPusher(token)),
   )
 }
 

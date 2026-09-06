@@ -33,6 +33,7 @@ import {
   openPhotograph,
   reactToMessage,
   registerThisDeviceForWaking,
+  stopWakingThisDevice,
   sendPhotograph,
   sendReadReceipt,
   readTrust,
@@ -94,6 +95,7 @@ import { allowWake, wakeIsAllowed } from './src/runtime/wakeSetting'
 import { deviceLocale } from './src/runtime/deviceLocale'
 import { pickFromLibrary } from './src/runtime/imageLibrary'
 import { pushTokenForThisDevice } from './src/runtime/pushDevice'
+import { whenNotificationPressed } from './src/runtime/showNotification'
 import type { ShownImage } from './src/runtime/receiveImage'
 import type { ReadImage } from './src/timeline/imageEvent'
 import type { EvictOutcome } from './src/runtime/evict'
@@ -190,9 +192,17 @@ export function App({
   const chooseLanguage = (next: Language) => {
     setCatalogue(next)
     setLanguage(next)
-    // Kept second, and failure is silent on purpose: a language that did not
-    // persist is a screen in the right language now and the wrong one next
-    // launch, which is a smaller thing than a warning on a first screen.
+  }
+  /**
+   * What settling on a language writes down, as opposed to what passing over
+   * one shows. Separated after a review: one callback doing both wrote a
+   * keystore entry per language crossed mid-drag.
+   *
+   * Failure is silent on purpose: a language that did not persist is a screen
+   * in the right language now and the wrong one next launch, which is a
+   * smaller thing than a warning on a first screen.
+   */
+  const keepLanguage = (next: Language) => {
     rememberLanguage(languageSecrets, next).catch(() => {})
   }
   const [bridge, setBridge] = useState<BridgeStatus | null>(null)
@@ -280,6 +290,9 @@ export function App({
   // Choosing and sending a photograph, and opening one that arrived. Held in
   // refs like every other gesture the launch effect binds.
   const attachRef = useRef<(() => void) | null>(null)
+  // Registering or removing this device's pusher. Held in a ref because the
+  // settings switch is rendered outside the launch effect that binds it.
+  const wakeThisDeviceRef = useRef<((on: boolean) => void) | null>(null)
   const openImageRef = useRef<
     ((image: ReadImage) => Promise<ShownImage>) | null
   >(null)
@@ -813,24 +826,24 @@ export function App({
             // pusher keyed by a token nobody holds any more is a device that
             // silently stopped being notified. Re-registering the same token
             // is what the endpoint is for.
-            if (!wakeRef.current) {
-              logEvent('info', 'MESSAGR_PUSH_NOT_REGISTERED', {
-                reason: 'this device does not ask to be woken',
-              })
-            }
-            const askToBeWoken = wakeRef.current
-            ;(askToBeWoken
-              ? pushTokenForThisDevice()
-              : Promise.resolve({
-                  token: null,
-                  reason: 'switched off',
-                } as const)
-            )
-              .then(async answer => {
+            const wakeThisDevice = (on: boolean) => {
+              const settle = async () => {
+                // The token is asked for either way. Removing a pusher needs
+                // the key it was registered under, and this device's token is
+                // the only thing that is -- so "off" needs it as much as "on".
+                const answer = await pushTokenForThisDevice()
                 if (answer.token === null) {
                   logEvent('info', 'MESSAGR_PUSH_NOT_REGISTERED', {
                     reason: answer.reason,
                   })
+                  return
+                }
+                if (!on) {
+                  // WHAT MAKES OFF MEAN OFF. Caught in review: stopping the
+                  // next launch registering is not turning notifications off,
+                  // because the pusher already on the homeserver keeps firing.
+                  await stopWakingThisDevice(sessionClient, answer.token)
+                  logEvent('info', 'MESSAGR_PUSH_REMOVED', {})
                   return
                 }
                 const done = await registerThisDeviceForWaking(
@@ -845,12 +858,31 @@ export function App({
                     : 'MESSAGR_PUSH_NOT_REGISTERED',
                   done.registered ? {} : { reason: done.reason },
                 )
-              })
-              .catch((cause: unknown) =>
+              }
+              settle().catch((cause: unknown) =>
                 logEvent('warn', 'MESSAGR_PUSH_NOT_REGISTERED', {
                   reason: getErrorMessage(cause),
                 }),
               )
+            }
+            wakeThisDeviceRef.current = wakeThisDevice
+            wakeThisDevice(wakeRef.current)
+
+            // TAPPING A NOTIFICATION LANDS IN THE CONVERSATION.
+            //
+            // #90's other half, and it was missing until a review said so:
+            // the notification was drawn and the tap resumed the application
+            // on whichever tab it had been left on. The identifier a
+            // notification is keyed by *is* the conversation, so there is no
+            // payload to carry and nothing to keep in step.
+            //
+            // The blind notification routes nowhere, because nothing that
+            // woke this device said which conversation. It lands on the list,
+            // which then shows what is waiting.
+            whenNotificationPressed(scope => {
+              setTab('chat')
+              if (scope !== null) showConversation(scope)
+            })
 
             // Asked for rather than computed on every launch: it costs a
             // device-status call and a state fetch per conversation.
@@ -1280,6 +1312,7 @@ export function App({
         <FirstLaunch
           language={language}
           onLanguage={chooseLanguage}
+          onLanguageSettled={keepLanguage}
           onBegin={() => {
             // Set first, kept second. A keystore that refuses must not leave
             // somebody stuck on a screen whose only action does nothing —
@@ -1374,19 +1407,24 @@ export function App({
                 receiptsNotKept={receiptsNotKept}
                 language={language}
                 onLanguage={chooseLanguage}
+                onLanguageSettled={keepLanguage}
                 wake={wake}
                 wakeNotKept={wakeNotKept}
                 onWake={on => {
-                  // Shown first, kept second, like the switch above. Turning
-                  // it off does not unregister the pusher that is already
-                  // there -- that is #90's own work and needs the gateway
-                  // deployed; what it does today is stop the next launch
-                  // registering one.
+                  // Shown first, kept second, like the switch above.
                   setWake(on)
                   wakeRef.current = on
                   allowWake(wakeSecrets, on)
                     .then(kept => setWakeNotKept(!kept))
                     .catch(() => setWakeNotKept(true))
+                  // AND THE PUSHER ITSELF, WHICH IS WHAT MAKES OFF MEAN OFF.
+                  //
+                  // Stopping the next launch registering one is not turning
+                  // notifications off: the pusher already on the homeserver
+                  // keeps firing, and the switch reads as off while it is on.
+                  // Caught in review, and the ticket says how -- the same
+                  // route with `kind: null`.
+                  wakeThisDeviceRef.current?.(on)
                 }}
                 onReceipts={on => {
                   // Shown first, kept second. A switch that waited on a

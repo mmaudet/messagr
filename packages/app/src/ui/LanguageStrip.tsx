@@ -31,12 +31,32 @@ import { color, floors, radius, space, type } from '../design/tokens'
  * having — which matters here, since the strip has to be readable by somebody
  * who cannot read the screen behind it. `languages.ts` says the rest.
  *
- * # It reports on every frame of the drag, and that is deliberate
+ * # It appears on two opposite grounds, and marks the chosen one differently
  *
- * `scrollEventThrottle` is 16, so this fires about sixty times a second and
- * calls `onChoose` each time the centred item changes — which re-renders the
- * screen in another language mid-gesture. That is the feature. It is guarded
- * by only reporting *changes*, so a drag within one item costs nothing.
+ * The promise screen is `ink900` and the settings screen is paper. The same
+ * pale pill on both would be a pale blob on the dark one, and the same dark
+ * text on both would be invisible there. So the dark ground marks the chosen
+ * language with `dark.brand.green700` — the token whose role is *« texte et
+ * bordure »*, and which the dark palette makes *lighter* than green500 rather
+ * than darker, exactly for this — and the light ground keeps the pale pill the
+ * active tab already wears.
+ *
+ * Two treatments rather than one because there are two grounds, not because
+ * one of them was got wrong: `tokens.json` carries a dark palette precisely so
+ * that "the same colour" is a question with two answers.
+ *
+ * # Two callbacks, because a drag is not a decision
+ *
+ * `onChoose` fires each time the centred item changes — about sixty times a
+ * second while the thumb moves, guarded so a drag within one item costs
+ * nothing. That is the feature: the screen retranslates as the flags pass.
+ *
+ * `onSettle` fires once, when the strip stops. **Only what settles is
+ * written down.** The first version had one callback doing both, so crossing
+ * from Français to Nederlands wrote five values into the keystore on the way
+ * — five writes for one decision, and the module's own comment claimed
+ * nothing was committed until you let go. A review caught the contradiction.
+ * Retranslating is free; remembering is not.
  */
 
 /** How wide one item is. Fixed, because the snap interval has to be. */
@@ -45,10 +65,17 @@ const ITEM = 132
 export function LanguageStrip({
   chosen,
   onChoose,
+  onSettle,
+  onDark = false,
   testID = 'language-strip',
 }: {
   readonly chosen: Language
+  /** Fires while the thumb moves. Retranslates; does not persist. */
   readonly onChoose: (language: Language) => void
+  /** Fires when the strip stops. This is the one that persists. */
+  readonly onSettle?: (language: Language) => void
+  /** Whether the ground behind it is `ink900`. See the note above. */
+  readonly onDark?: boolean
   readonly testID?: string
 }) {
   // The last one reported, so a drag inside one item reports nothing. A ref
@@ -88,6 +115,11 @@ export function LanguageStrip({
       decelerationRate="fast"
       scrollEventThrottle={16}
       onScroll={onScroll}
+      // Both, because a flick ends in momentum and a slow drag does not.
+      // Either one is the moment the strip stopped, and only one of them
+      // fires for any given gesture.
+      onMomentumScrollEnd={() => onSettle?.(reported.current)}
+      onScrollEndDrag={() => onSettle?.(reported.current)}
       contentContainerStyle={{ paddingHorizontal: rail }}>
       {LANGUAGES.map(language => {
         const active = language.code === chosen
@@ -95,14 +127,26 @@ export function LanguageStrip({
           <Pressable
             key={language.code}
             testID={`language-${language.code}`}
-            onPress={() => onChoose(language.code)}
+            onPress={() => {
+              // A tap is a decision the moment it happens: nothing to settle
+              // afterwards, so both callbacks fire together.
+              reported.current = language.code
+              onChoose(language.code)
+              onSettle?.(language.code)
+            }}
             accessibilityRole="radio"
             accessibilityState={{ selected: active }}
             accessibilityLabel={language.endonym}
             style={styles.slot}>
-            <View style={[styles.card, active && styles.cardActive]}>
+            <View style={[styles.card, active && !onDark && styles.cardActive]}>
               <Text style={styles.flag}>{language.flag}</Text>
-              <Text style={[styles.endonym, active && styles.endonymActive]}>
+              <Text
+                style={[
+                  styles.endonym,
+                  onDark ? styles.endonymOnDark : styles.endonymOnPaper,
+                  active &&
+                    (onDark ? styles.chosenOnDark : styles.chosenOnPaper),
+                ]}>
                 {language.endonym}
               </Text>
             </View>
@@ -136,13 +180,18 @@ const styles = StyleSheet.create({
     // and the word is what confirms it.
     ...type.titleLg,
   },
-  endonym: {
-    ...type.caption,
-    // On the dark promise screen. `agent.400` is the token whose stated use
-    // is exactly this: readable on `ink900` at AA.
+  endonym: type.caption,
+  endonymOnDark: {
+    // `agent.400`'s stated use is exactly this: readable on `ink900` at AA.
     color: color.agent['400'],
   },
-  endonymActive: {
+  endonymOnPaper: {
+    color: color.neutral['600'],
+  },
+  chosenOnDark: {
+    color: color.dark.brand.green700,
+  },
+  chosenOnPaper: {
     color: color.brand.green700,
   },
 })

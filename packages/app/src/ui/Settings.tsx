@@ -38,6 +38,7 @@ export function Settings({
   receiptsNotKept,
   language,
   onLanguage,
+  onLanguageSettled,
   wake,
   onWake,
   wakeNotKept,
@@ -51,6 +52,8 @@ export function Settings({
   /** Which language is spoken, and changing it. Same control as #103's. */
   readonly language: Language
   readonly onLanguage: (language: Language) => void
+  /** Called when the strip stops. Only this one persists. */
+  readonly onLanguageSettled: (language: Language) => void
   /** Whether this device asks to be woken. See `wakeSetting.ts`. */
   readonly wake: boolean
   readonly onWake: (on: boolean) => void
@@ -87,6 +90,7 @@ export function Settings({
         <LanguageStrip
           chosen={language}
           onChoose={onLanguage}
+          onSettle={onLanguageSettled}
           testID="settings-language-strip"
         />
       </View>

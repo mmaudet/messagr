@@ -1,6 +1,11 @@
 import { describe, expect, it } from 'vitest'
 
-import { describePusher, registerPusher, type PusherPoster } from './pusher'
+import {
+  describePusher,
+  forgetPusher,
+  registerPusher,
+  type PusherPoster,
+} from './pusher'
 
 const TOKEN = 'fcm-token-abc'
 
@@ -42,10 +47,17 @@ describe('describePusher', () => {
     )
   })
 
-  it('says which application this is, because one gateway serves several', () => {
-    expect(describePusher(TOKEN, 'https://h/_m').app_id).toBe(
-      'cloud.maudet.messagr',
-    )
+  it('names this build’s own application id, which sygnal keys on', () => {
+    // A disagreement between this, the Gradle applicationId and sygnal's
+    // `apps:` key produces no error anywhere -- the homeserver finds no
+    // pushkin and drops the notification. Pinned here because nothing else
+    // would notice.
+    expect(describePusher(TOKEN, 'https://h/_m').app_id).toBe('eu.messagr')
+  })
+
+  it('carries no wildcard, which sygnal’s matching would accept', () => {
+    const body = describePusher(TOKEN, 'https://h/_m')
+    expect(body.app_id).not.toMatch(/[*?]/)
   })
 
   it('names the device in a way that names nobody', () => {
@@ -93,5 +105,18 @@ describe('registerPusher', () => {
       reason: 'this device has no push token',
     })
     expect(called).toBe(false)
+  })
+})
+
+describe('forgetPusher', () => {
+  it('is the same application and key, with no kind', () => {
+    // How a pusher is taken away: same route, `kind: null`. Without it,
+    // turning notifications off would only stop the next launch registering
+    // and the existing pusher would keep firing.
+    expect(forgetPusher(TOKEN)).toEqual({
+      app_id: 'eu.messagr',
+      pushkey: TOKEN,
+      kind: null,
+    })
   })
 })
