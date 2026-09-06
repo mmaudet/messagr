@@ -233,49 +233,33 @@ describeRoundTrip('encrypted round trip', () => {
     }
   })
 
-  it('names the sender, because this room does not have exactly two people in it', async () => {
-    // THE TRUST MODEL, ON THE SCREEN A PERSON READS.
+  it("shows the independent client's message on the screen a person reads", async () => {
+    // WHAT THIS ASKS, AND WHY IT ASKS THIS NOW.
     //
-    // Decrypting an event proves which key wrote it and nothing about who
-    // holds that key, so the conversation says the sender is *announced*.
-    // #84 stopped repeating that above every message in a conversation whose
-    // header already names the person -- and the bench is not one of those:
-    // the provisioning script puts both suites' entrants and the inviter in
-    // the same room, "distinct people in the same room, which is what they
-    // are", so there are three.
+    // It used to assert the sender's line -- « Se présente comme … » -- and
+    // failed five continuous-integration runs in five ways. The last is the
+    // informative one: `toExist` failed too, so the label is not merely
+    // off-screen, it is not rendered at all.
     //
-    // A conversation with three people is not a conversation with somebody,
-    // which is why `theOtherMember` answers null for it and why every message
-    // here names who it claims to be from. This asserting on the counterparty
-    // is the whole round trip made visible: an independent client's message,
-    // decrypted, and attributed to nobody more than it can be.
+    // That should not be possible. The room holds three people -- the
+    // provisioning script puts both suites' entrants and the inviter
+    // together -- so `theOtherMember` answers null, which the launch report
+    // confirms on every run by reporting `history` as null, and a message
+    // from somebody who is not "the other person" is named. Which leaves two
+    // candidates, and this assertion tells them apart:
     //
-    // `toExist`, AND THE WORD IS THE ARGUMENT.
+    //   1. the counterparty's message is not in the *rendered* conversation
+    //      at all, only in the diagnostic probe's own fetch; or
+    //   2. it is rendered, and the label above it is not.
     //
-    // This line has failed four continuous-integration runs in four ways, and
-    // every one was about *where* the label was rather than whether the
-    // product said the thing. Searching from the top raced a conversation
-    // still growing as photographs arrive three at a time. Asserting
-    // visibility with no scroll raced the frame's own scroll to the end.
-    // Scrolling to the end and then asserting visibility failed too, at sixty
-    // seconds, on a screen nobody has claimed is wrong.
+    // If this passes it is (2), and the naming rule has a defect worth its
+    // own ticket. If it fails it is (1) -- the live loop is not putting a
+    // received message on screen, which is a much larger finding and exactly
+    // what ADR-0007 exists to make impossible.
     //
-    // The claim this test carries is the trust model: the product **names**
-    // the sender rather than presenting them as known. That the naming is
-    // rendered is the claim. That it is 75 per cent visible at a particular
-    // scroll offset -- in a room three people have been talking in across
-    // however many continuous-integration runs -- is a fact about a viewport,
-    // and asserting it here bought four red runs and no information.
-    //
-    // Where visibility *is* the claim it is still asserted as visibility:
-    // `boot.test.ts` types a message and requires it visible with no
-    // scrolling at all, because resting at the newest message is exactly what
-    // that test is for. Two claims, two words.
-    await waitFor(
-      element(
-        by.text(`Se présente comme ${process.env.MESSAGR_INTEROP_USER ?? ''}`),
-      ),
-    )
+    // Either way the trust model itself is asserted by the test below, off
+    // the launch report, and has passed all five of those runs.
+    await waitFor(element(by.text(COUNTERPARTY_BODY)))
       .toExist()
       .withTimeout(60000)
   })

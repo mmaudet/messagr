@@ -28,6 +28,10 @@ export default [
     ignores: [
       'node_modules/',
       '**/node_modules/',
+      // Agent worktrees: `Agent(isolation: "worktree")` checks a branch of
+      // this same repository out under here, so linting it lints a second
+      // copy of the tree -- with its own configuration, which this one is not.
+      '.claude/worktrees/',
 
       // The React Native template's native projects and build outputs.
       'packages/app/ios/',
