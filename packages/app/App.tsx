@@ -72,6 +72,8 @@ import type { HistoryClaim } from './src/runtime/claimHistory'
 import { Conversation } from './src/ui/Conversation'
 import { ConversationList } from './src/ui/ConversationList'
 import { Invite, type InviteStage } from './src/ui/Invite'
+import { Legal } from './src/ui/Legal'
+import { Settings } from './src/ui/Settings'
 import { GiveName } from './src/ui/GiveName'
 import { FirstLaunch } from './src/ui/FirstLaunch'
 import { Evict } from './src/ui/Evict'
@@ -169,6 +171,10 @@ export function App({
   // Which conversation is open, held in a ref as well as in state: the live
   // sync loop's callbacks are created once and would otherwise keep deriving
   // whichever conversation was open when the loop started.
+  // Which panel the list side is showing. A conversation, when one is open,
+  // wins over all three: `openScope` is the deeper state and this is what sits
+  // behind it.
+  const [panel, setPanel] = useState<'list' | 'settings' | 'legal'>('list')
   const [openScope, setOpenScope] = useState<string | null>(null)
   const openScopeRef = useRef<string | null>(null)
   const openConversationRef = useRef<((scope: string) => void) | null>(null)
@@ -868,7 +874,22 @@ export function App({
 
               The instrument below stays on both, which is what a scaffold
               still needs and a product will not. */}
-          {openScope === null && (
+          {openScope === null && panel === 'settings' && (
+            <View style={styles.block}>
+              <Settings
+                onBack={() => setPanel('list')}
+                onLegal={() => setPanel('legal')}
+              />
+            </View>
+          )}
+
+          {openScope === null && panel === 'legal' && (
+            <View style={styles.block}>
+              <Legal onBack={() => setPanel('settings')} />
+            </View>
+          )}
+
+          {openScope === null && panel === 'list' && (
             <View style={styles.block}>
               <ConversationList
                 summaries={summaries}
@@ -884,6 +905,16 @@ export function App({
                   setAdmission(null)
                 }}
               />
+              {/* Reachable from the list, which is what the published terms
+                  promise: the article 14 information is on a screen
+                  "atteignable depuis les Réglages". */}
+              <Pressable
+                testID="open-settings"
+                onPress={() => setPanel('settings')}
+                accessibilityRole="button"
+                accessibilityLabel={t('settings_action')}>
+                <Text style={styles.back}>{t('settings_action')}</Text>
+              </Pressable>
             </View>
           )}
 

@@ -64,6 +64,16 @@ jobs:
       - name: Assert the legal pages are being served
         run: ./scripts/assert-legal-pages.sh
 
+      # And that they say what the application says. The published terms
+      # promise that the article 14 information is carried by a screen
+      # reachable from Settings; a build that shipped without it would make
+      # that page false, and a page that claims something the application does
+      # not do is the failure this checks for. Here rather than in the
+      # ordinary checks because it fetches a live site, and a site being down
+      # must not fail a pull request that touched nothing legal.
+      - name: Assert the legal screen and the published terms agree
+        run: ./scripts/assert-legal-screen.sh
+
       - name: Assert the upload key is present
         env:
           KEYSTORE: ${{ secrets.MESSAGR_UPLOAD_KEYSTORE_BASE64 }}

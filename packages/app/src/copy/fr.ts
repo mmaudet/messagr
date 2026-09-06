@@ -301,6 +301,58 @@ export const fr = {
   invite_admitted: 'C’est fait : cette personne peut entrer.',
   list_name_not_kept:
     'Le nom n’a pas pu être conservé : il sera oublié au prochain démarrage.',
+
+  // LES RÉGLAGES, et dedans l'écran que les conditions publiées promettent.
+  //
+  // Ce n'est pas une décoration. Les CGU publiées sur messagr.eu disent que
+  // « les trois points exigés par l'article 14 sont portés par l'écran
+  // "Informations légales", atteignable depuis les Réglages ». Ou l'écran
+  // existe, ou la page est fausse — et ces textes ont déjà eu à corriger une
+  // fausse affirmation sur la rétention, ce qui est toute la raison d'être de
+  // scripts/assert-retention.sh.
+  //
+  // Le rapprochement des deux n'est pas laissé à la bonne foi :
+  // scripts/assert-legal-screen.sh va chercher la page en ligne et vérifie
+  // que ce qu'elle engage se retrouve ici.
+  settings_action: 'Réglages',
+  settings_title: 'Réglages',
+  settings_legal: 'Informations légales',
+  settings_nothing_else:
+    'Il n’y a rien d’autre ici pour l’instant. Les réglages que cette version ne porte pas encore sont absents plutôt que présents et inertes.',
+
+  legal_title: 'Informations légales',
+  legal_intro:
+    'Ce que cette application affiche fait foi. Les conditions publiées sur messagr.eu reprennent ce qui suit et ajoutent ce qu’un écran ne peut pas porter : qui exploite le service, et sous quel droit.',
+
+  legal_forbidden_title: 'Ce qui est interdit',
+  legal_forbidden_body:
+    'Les contenus pédocriminels, les menaces contre la vie ou la sécurité d’une personne, le harcèlement, l’usurpation d’identité, et tout autre contenu illégal au regard du droit français ou européen.',
+  legal_forbidden_entry:
+    'On n’entre que sur invitation nominative. Une invitation est personnelle, à usage limité, et elle ne se revend pas. L’âge minimum est de quinze ans.',
+
+  legal_moderation_title: 'Comment la modération fonctionne réellement',
+  legal_moderation_human:
+    'La modération est celle des administrateurs du serveur. Ce sont des personnes. Toute décision est prise par une personne, jamais par un automatisme.',
+  legal_moderation_no_tools:
+    'Il n’existe aucun outil automatique de détection, aucun filtre, aucune analyse de contenu, et il ne peut pas en exister : le contenu est chiffré de bout en bout et l’exploitant détient des messages qu’il lui est cryptographiquement impossible de lire.',
+  legal_moderation_reported:
+    'Rien n’est examiné qui n’ait été signalé par une personne. Il n’y a ni surveillance générale, ni détection proactive, ni classement algorithmique.',
+  legal_moderation_can:
+    'Ce que l’exploitant peut décider sans lire : suspendre un compte, lui retirer sa capacité d’émettre des invitations, l’exclure d’un groupe, révoquer une branche d’invitation.',
+  legal_moderation_cannot:
+    'Ce qu’il ne peut pas faire : retirer un message précis, qualifier un contenu, établir qu’une règle a été enfreinte par la lecture.',
+
+  legal_report_title: 'Signaler, et ce qui suit',
+  legal_report_how:
+    'Le signalement se fait par courriel à conformite@messagr.eu. Le geste depuis l’application n’existe pas encore, et le dire vaut mieux que le promettre.',
+  legal_report_delay:
+    'Un signalement produit une référence. Il reçoit un accusé de réception, puis une décision motivée au plus tard trente jours après sa réception, avec la voie pour la contester. Le signalement d’une menace pour la vie ou la sécurité aux autorités ne suit pas ce délai : il part sans attendre.',
+  legal_report_review:
+    'Une décision peut être contestée auprès de conformite@messagr.eu, en citant la référence. Elle est réexaminée par une personne autre que celle qui l’a prise chaque fois que l’organisation le permet. Sur un service exploité par une ou deux personnes, cette condition ne peut pas toujours être tenue, et l’écrire vaut mieux que de promettre une séparation qui n’existerait pas.',
+  legal_report_scope:
+    'Messagr est un service d’hébergement et non une plateforme en ligne, le considérant 14 du DSA écartant les services de messagerie interpersonnelle. Les articles 20 et 21 ne s’appliquent donc pas, et ce texte ne prétend pas les offrir.',
+
+  legal_full_terms: 'Conditions générales complètes : messagr.eu',
 } as const
 
 /** Every key any screen may ask for. A typo is a compile error, not a blank. */
