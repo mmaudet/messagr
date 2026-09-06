@@ -9,6 +9,7 @@ import {
   type CryptoMachine,
   type HttpRequester,
 } from './pump'
+import { readAllReceipts, type Receipt } from './receipts'
 import type { SecretStore } from './sessionStore'
 import { readSyncCursor, writeSyncCursor } from './syncCursor'
 import type { EncryptionSliceFn } from './syncDelta'
@@ -53,6 +54,15 @@ export type SyncLoopState = 'starting' | 'running' | 'reconnecting' | 'stopped'
 export interface SyncTick {
   /** The joined conversation spaces that moved, possibly none. */
   readonly changedScopes: readonly string[]
+  /**
+   * Read receipts this poll observed, by conversation.
+   *
+   * They arrive in the ephemeral section of a sync and nowhere else: there is
+   * no endpoint to ask for somebody else's receipts, so a loop that did not
+   * report them would leave them unreachable. Which conversation is on screen
+   * is the caller's question, not this loop's, so all of them come back.
+   */
+  readonly receipts: ReadonlyMap<string, readonly Receipt[]>
   /**
    * Whether the cursor this poll ended at reached the keystore. `false` is
    * survivable — the loop carries on from the token it holds in memory, and
@@ -178,7 +188,11 @@ export function startSyncLoop(deps: SyncLoopDeps): RunningSyncLoop {
 
           backoff = 0
           onState('running')
-          onTick({ changedScopes: readChangedScopes(sync), cursorPersisted })
+          onTick({
+            changedScopes: readChangedScopes(sync),
+            receipts: readAllReceipts(sync),
+            cursorPersisted,
+          })
         } catch (cause: unknown) {
           if (stopping) break
           onState('reconnecting')

@@ -48,6 +48,8 @@ import { encryptAndSendOneMessage, type SendReport } from './encryptAndSend'
 import { getErrorMessage } from './errors'
 import { logEvent } from './log'
 import { fetchJoinedRooms } from './encryptedSend'
+import { reactTo, unreact, type ReactingDeps } from './react'
+import { tallyReactions, type ReactionTally } from '../timeline/reactions'
 import { probeUnsettledEncrypt, type ProbeReport } from './panicProbe'
 import { claimHistory, type HistoryClaim } from './claimHistory'
 import { evictFrom, type EvictOutcome } from './evict'
@@ -325,14 +327,21 @@ export async function receiveOneEncryptedMessage(
  * decrypts everything that device ever had a session for, and reports the
  * rest as unreadable rather than hiding it.
  */
+export interface LoadedConversation {
+  readonly entries: TimelineEntry[]
+  /** Reactions, already grouped by the message they point at. */
+  readonly reactions: ReadonlyMap<string, readonly ReactionTally[]>
+}
+
 export async function loadConversation(
   sessionClient: ReturnType<typeof createClient>,
   roomId: string,
+  selfUserId: string,
   limit = 40,
-): Promise<TimelineEntry[]> {
+): Promise<LoadedConversation> {
   const http = makePumpHttp(sessionClient)
   const events = await fetchRoomMessages(http, roomId, limit)
-  return toTimelineEntries(
+  const { entries, reactions } = await toTimelineEntries(
     {
       decryptEvent: (scope, rawEvent) =>
         decryptEvent(asCryptoScopeId(scope), rawEvent),
@@ -341,6 +350,9 @@ export async function loadConversation(
     roomId,
     events,
   )
+  // Both, from one pass. ADR-0011: reactions come out of the same door the
+  // messages do, and the aggregation the server would have done happens here.
+  return { entries, reactions: tallyReactions(reactions, selfUserId) }
 }
 
 /**
@@ -625,3 +637,75 @@ export async function readTrust(
 }
 
 export type { TrustReading } from './trustReading'
+
+/** What this application needs to make and unmake a reaction. */
+function reacting(
+  sessionClient: ReturnType<typeof createClient>,
+): ReactingDeps {
+  return {
+    http: makePumpHttp(sessionClient),
+    machine: {
+      encryptEvent: (scope, eventType, payload) =>
+        encryptEvent(asCryptoScopeId(scope), eventType, payload),
+    },
+    decodeUtf8: bytes => new TextDecoder().decode(bytes),
+    newTransactionId: () =>
+      `messagr-${Date.now()}-${Math.floor(Math.random() * 1e6)}`,
+  }
+}
+
+/**
+ * Phase ten: reacting to a message, and taking it back.
+ *
+ * Pure glue. ADR-0011 and `react.ts` carry the reasoning: a reaction is an
+ * encrypted event like any other here, and removing one is a redaction, which
+ * is why the two are not symmetrical.
+ */
+export async function reactToMessage(
+  sessionClient: ReturnType<typeof createClient>,
+  scope: string,
+  target: string,
+  key: string,
+) {
+  return reactTo(reacting(sessionClient), scope, target, key)
+}
+
+export async function removeReaction(
+  sessionClient: ReturnType<typeof createClient>,
+  scope: string,
+  reactionEventId: string,
+) {
+  return unreact(reacting(sessionClient), scope, reactionEventId)
+}
+
+export type { ReactionTally } from '../timeline/reactions'
+
+/**
+ * Tells the homeserver this account has read up to `eventId`.
+ *
+ * Called only when the setting says so. See `receiptSetting.ts`: a receipt is
+ * public metadata, and a product that refuses to let a server read content
+ * and then publishes the hour somebody read it contradicts itself.
+ *
+ * Failure is swallowed on purpose, and this is the one place in this file
+ * where that is right: a receipt that did not go is invisible to the person
+ * who sent it and changes nothing they can act on. Reporting it would put a
+ * warning on a screen about a courtesy.
+ */
+export async function sendReadReceipt(
+  sessionClient: ReturnType<typeof createClient>,
+  scope: string,
+  eventId: string,
+): Promise<void> {
+  try {
+    await makePumpHttp(sessionClient).authedRequest(
+      'POST',
+      `/_matrix/client/v3/rooms/${encodeURIComponent(scope)}/receipt/` +
+        `m.read/${encodeURIComponent(eventId)}`,
+      {},
+      JSON.stringify({}),
+    )
+  } catch {
+    // See above.
+  }
+}

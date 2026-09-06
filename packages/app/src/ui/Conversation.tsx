@@ -1,15 +1,24 @@
 import { useState } from 'react'
-import { StyleSheet, Text, TextInput, useColorScheme, View } from 'react-native'
+import {
+  Pressable,
+  StyleSheet,
+  Text,
+  TextInput,
+  useColorScheme,
+  View,
+} from 'react-native'
 
 import { t } from '../copy'
 import {
   color,
+  floors,
   radius,
   space,
   stroke,
   type as typeScale,
 } from '../design/tokens'
 import type { TimelineEntry } from '../timeline/mergeTimeline'
+import type { ReactionTally } from '../timeline/reactions'
 import { NotchedButton } from './NotchedButton'
 
 /**
@@ -43,6 +52,16 @@ export interface ConversationProps {
   readonly selfUserId: string
   readonly onSend: (body: string) => void
   readonly sending: 'idle' | 'sending' | 'failed'
+  /** Reactions, grouped by the message they point at. */
+  readonly reactions?: ReadonlyMap<string, readonly ReactionTally[]>
+  /** This account's own messages somebody else has read. */
+  readonly read?: ReadonlySet<string>
+  /**
+   * Add or remove a reaction. `own` is the id of this account's own reaction
+   * on that key, when it has one -- removing is a redaction and needs the
+   * event, which is why it travels rather than being looked up again.
+   */
+  readonly onReact?: (target: string, key: string, own: string | null) => void
 }
 
 export function Conversation({
@@ -50,6 +69,9 @@ export function Conversation({
   selfUserId,
   onSend,
   sending,
+  reactions = new Map(),
+  read = new Set(),
+  onReact,
 }: ConversationProps) {
   const [draft, setDraft] = useState('')
   const dark = useColorScheme() === 'dark'
@@ -77,6 +99,9 @@ export function Conversation({
             entry={entry}
             mine={entry.claimedSender === selfUserId}
             palette={palette}
+            tallies={reactions.get(entry.eventId) ?? []}
+            read={read.has(entry.eventId)}
+            onReact={(key, own) => onReact?.(entry.eventId, key, own)}
           />
         ))
       )}
@@ -118,15 +143,35 @@ export function Conversation({
   )
 }
 
+/**
+ * The keys offered on a long press.
+ *
+ * Six, and no picker. A full emoji keyboard is a different screen and a
+ * different ticket; six covers what a reaction is for -- agreeing, laughing,
+ * saying "seen" without saying anything -- and a person who wants a seventh
+ * can say it in words, which this application is rather good at.
+ */
+const OFFERED = ['👍', '❤️', '😂', '😮', '😢', '🙏'] as const
+
 function Message({
   entry,
   mine,
   palette,
+  tallies,
+  onReact,
+  read,
 }: {
   entry: TimelineEntry
   mine: boolean
   palette: typeof color | typeof color.dark
+  tallies: readonly ReactionTally[]
+  /** Whether somebody else has read this one. Only meaningful for `mine`. */
+  read: boolean
+  /** `mine` is the id of this account's own reaction, when it has one. */
+  onReact: (key: string, mine: string | null) => void
 }) {
+  const [offering, setOffering] = useState(false)
+
   return (
     <View style={mine ? styles.mine : styles.theirs}>
       {!mine && (
@@ -136,7 +181,16 @@ function Message({
           {t('conversation_sender_claimed %@', entry.claimedSender)}
         </Text>
       )}
-      <View
+      {/* The bubble is pressable only to offer a reaction. A long press
+          rather than a tap: a tap on a message is what a person does to read
+          it, and stealing that gesture for a menu is how a conversation stops
+          being scrollable. */}
+      <Pressable
+        onLongPress={() => setOffering(held => !held)}
+        delayLongPress={350}
+        accessibilityRole="button"
+        accessibilityLabel={t('reaction_offer')}
+        testID={`bubble-${entry.eventId}`}
         style={[
           styles.bubble,
           mine ? styles.bubbleMine : styles.bubbleTheirs,
@@ -159,7 +213,72 @@ function Message({
           ]}>
           {entry.body ?? t('conversation_unreadable')}
         </Text>
-      </View>
+      </Pressable>
+
+      {offering && (
+        <View style={styles.offered} testID={`offer-${entry.eventId}`}>
+          {OFFERED.map(key => (
+            <Pressable
+              key={key}
+              testID={`offer-${entry.eventId}-${key}`}
+              onPress={() => {
+                setOffering(false)
+                onReact(
+                  key,
+                  tallies.find(tally => tally.key === key)?.mine ?? null,
+                )
+              }}
+              accessibilityRole="button"
+              accessibilityLabel={key}
+              style={styles.chip}>
+              <Text style={styles.chipKey}>{key}</Text>
+            </Pressable>
+          ))}
+        </View>
+      )}
+
+      {/* SENT, OR READ. There is no third state, and inventing one would be
+          a guess drawn as a fact -- Matrix reports the homeserver accepting
+          an event and somebody's client saying it was read, and nothing in
+          between. See receipts.ts.
+
+          Only on this account's own messages: "read" on somebody else's says
+          that you read it, which they can see for themselves. */}
+      {mine && (
+        <Text
+          testID={`state-${entry.eventId}`}
+          style={[styles.state, { color: palette.neutral['600'] }]}>
+          {read ? t('message_read') : t('message_sent')}
+        </Text>
+      )}
+
+      {tallies.length > 0 && (
+        <View style={styles.tallies} testID={`reactions-${entry.eventId}`}>
+          {tallies.map(tally => (
+            <Pressable
+              key={tally.key}
+              testID={`reaction-${entry.eventId}-${tally.key}`}
+              onPress={() => onReact(tally.key, tally.mine)}
+              accessibilityRole="button"
+              accessibilityLabel={`${tally.key} ${tally.count}`}
+              style={[
+                styles.chip,
+                {
+                  // Green only where this account is among them: it is the
+                  // one place on a chip where the brand colour carries
+                  // information rather than decorating.
+                  backgroundColor:
+                    tally.mine !== null
+                      ? palette.brand.green100
+                      : palette.surface.sunk,
+                },
+              ]}>
+              <Text
+                style={styles.chipKey}>{`${tally.key} ${tally.count}`}</Text>
+            </Pressable>
+          ))}
+        </View>
+      )}
     </View>
   )
 }
@@ -170,6 +289,21 @@ const styles = StyleSheet.create({
   mine: { alignItems: 'flex-end' },
   theirs: { alignItems: 'flex-start' },
   claimed: { ...typeScale.caption, marginBottom: space.xs },
+  offered: { flexDirection: 'row', gap: space.xs, marginTop: space.xs },
+  tallies: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: space.xs,
+    marginTop: space.xs,
+  },
+  chip: {
+    minHeight: floors.touchTargetMin,
+    justifyContent: 'center',
+    paddingHorizontal: space.s,
+    borderRadius: radius.pill,
+  },
+  chipKey: typeScale.bodySm,
+  state: { ...typeScale.caption, marginTop: space.xs },
   bubble: {
     paddingHorizontal: space.m,
     paddingVertical: space.s,

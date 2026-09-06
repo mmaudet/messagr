@@ -6,6 +6,15 @@ import {
   type TimelineMachine,
 } from './buildTimeline'
 
+/**
+ * The messages alone. `toTimelineEntries` now returns reactions beside them
+ * (ADR-0011), and every assertion in this file is about the messages.
+ */
+const entriesOf = async (
+  ...args: Parameters<typeof toTimelineEntries>
+): Promise<Awaited<ReturnType<typeof toTimelineEntries>>['entries']> =>
+  (await toTimelineEntries(...args)).entries
+
 const decodeUtf8 = (bytes: Uint8Array) => new TextDecoder().decode(bytes)
 const encode = (text: string) => new TextEncoder().encode(text)
 
@@ -80,7 +89,7 @@ describe('fetchRoomMessages', () => {
 
 describe('toTimelineEntries', () => {
   it('decrypts what it can and reports what it cannot', async () => {
-    const entries = await toTimelineEntries(
+    const entries = await entriesOf(
       machine({ $a: 'lisible' }),
       decodeUtf8,
       '!room:messagr.eu',
@@ -93,7 +102,7 @@ describe('toTimelineEntries', () => {
   })
 
   it('keeps the sender the event claims, and calls it claimed', async () => {
-    const [entry] = await toTimelineEntries(
+    const [entry] = await entriesOf(
       machine({ $a: 'x' }),
       decodeUtf8,
       '!room:messagr.eu',
@@ -106,7 +115,7 @@ describe('toTimelineEntries', () => {
     // A room can carry an unencrypted event -- an older one, or one a
     // misconfigured client sent. Hiding it would be a gap nobody could see,
     // and decrypting it would fail for the wrong reason.
-    const [entry] = await toTimelineEntries(
+    const [entry] = await entriesOf(
       machine({}),
       decodeUtf8,
       '!room:messagr.eu',
@@ -126,7 +135,7 @@ describe('toTimelineEntries', () => {
   it('skips an event that is neither a message nor encrypted', async () => {
     // Membership changes, topic edits, receipts. A timeline of everything the
     // room ever recorded is not a conversation.
-    const entries = await toTimelineEntries(
+    const entries = await entriesOf(
       machine({}),
       decodeUtf8,
       '!room:messagr.eu',
@@ -144,7 +153,7 @@ describe('toTimelineEntries', () => {
   })
 
   it('skips an event with no identifier, which nothing could deduplicate', async () => {
-    const entries = await toTimelineEntries(
+    const entries = await entriesOf(
       machine({}),
       decodeUtf8,
       '!room:messagr.eu',
@@ -155,15 +164,13 @@ describe('toTimelineEntries', () => {
 
   it('decrypts against the room it was given, not against a scope guessed here', async () => {
     const m = machine({ $a: 'x' })
-    await toTimelineEntries(m, decodeUtf8, '!room:messagr.eu', [
-      encrypted('$a', 1000),
-    ])
+    await entriesOf(m, decodeUtf8, '!room:messagr.eu', [encrypted('$a', 1000)])
     expect(m.scopes).toEqual(['!room:messagr.eu'])
   })
 
   it('never logs what it decrypted', async () => {
     const spy = vi.spyOn(console, 'log')
-    await toTimelineEntries(machine({ $a: 'secret' }), decodeUtf8, '!r:m', [
+    await entriesOf(machine({ $a: 'secret' }), decodeUtf8, '!r:m', [
       encrypted('$a', 1000),
     ])
     expect(spy).not.toHaveBeenCalled()

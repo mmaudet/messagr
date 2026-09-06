@@ -4,7 +4,7 @@
 // `yarn tokens:check`, so a stale copy of this file fails the build rather
 // than drifting quietly away from the design it claims to carry.
 //
-// Source: Messagr Prototype V3.dc.html, tokens v3.1.0
+// Source: Messagr Prototype V3.dc.html, tokens v3.2.0
 
 /**
  * The spacing scale. Every margin, padding and gap comes from here.
@@ -111,6 +111,28 @@ export const type = {
     lineHeight: 36,
     fontWeight: '600',
     letterSpacing: -0.9,
+  },
+  brandWordmark: {
+    fontSize: 36,
+    lineHeight: 44,
+    fontWeight: '600',
+    letterSpacing: -1.08,
+  },
+  brandThesis: {
+    fontSize: 26,
+    lineHeight: 32,
+    fontWeight: '600',
+    letterSpacing: -0.65,
+  },
+  brandPoint: {
+    fontSize: 13.5,
+    lineHeight: 20,
+    fontWeight: '400',
+  },
+  action: {
+    fontSize: 16,
+    lineHeight: 22,
+    fontWeight: '600',
   },
   titleLg: {
     fontSize: 22,

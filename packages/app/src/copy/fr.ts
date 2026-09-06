@@ -395,6 +395,32 @@ export const fr = {
     'Comparer une courte suite de mots avec cette personne, de vive voix, ou scanner son code en sa présence. Deux minutes, une fois pour toutes.',
   trust_raise_missing:
     'Ce geste n’est pas encore construit dans cette application. Le dire vaut mieux que d’afficher un bouton qui ne ferait rien.',
+
+  // Une réaction. Le geste est une pression longue : une pression simple sur
+  // un message, c'''est ce qu'''on fait pour le lire, et voler ce geste pour
+  // ouvrir un menu, c'''est une conversation qui ne défile plus.
+  reaction_offer: 'Réagir à ce message',
+
+  // ENVOYÉ, LU — et pas de « remis ».
+  //
+  // Matrix ne donne pas trois états mais deux : le serveur accepte
+  // l'événement, et un client dit qu'il a été lu. Rien entre les deux. Une
+  // coche qui voudrait dire « sans doute arrivé » serait une supposition
+  // dessinée comme un fait, et la seule chose pire que d'ignorer si un
+  // message est arrivé, c'est de s'entendre dire qu'il l'est quand personne
+  // ne le sait.
+  message_sent: 'Envoyé',
+  message_read: 'Lu',
+
+  // Le réglage. Un accusé de lecture est une métadonnée publique : qui a lu
+  // quoi, et quand, lisible par le serveur.
+  settings_receipts: 'Accusés de lecture',
+  settings_receipts_hint:
+    'Désactivés. Un accusé de lecture est public : le serveur apprend qui a lu quoi, et à quelle heure. Les activer prévient votre correspondant que vous avez lu — et le serveur en même temps.',
+  settings_receipts_on: 'Activés',
+  settings_receipts_off: 'Désactivés',
+  settings_receipts_not_kept:
+    'Ce choix n’a pas pu être conservé : il reviendra à son état précédent au prochain démarrage.',
 } as const
 
 /** Every key any screen may ask for. A typo is a compile error, not a blank. */

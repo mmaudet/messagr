@@ -176,7 +176,7 @@ describe('startSyncLoop', () => {
     const harness = drive({ responses: ['{"next_batch":"s_2"}', '{}'] })
     await harness.loop.stopped
     expect(harness.ticks).toEqual([
-      { changedScopes: [], cursorPersisted: true },
+      { changedScopes: [], receipts: new Map(), cursorPersisted: true },
     ])
   })
 
