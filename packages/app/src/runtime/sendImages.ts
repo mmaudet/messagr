@@ -13,6 +13,11 @@ import type { ImageSent } from './sendImage'
  * else's phone, on a good connection, with a full camera roll. There is a
  * test whose only job is to keep one from creeping back.
  *
+ * A photograph is now two sealings rather than one, since #117 gave it a
+ * thumbnail. It does not move the peak: `sendImage` seals the thumbnail,
+ * uploads it and lets it go before it touches the photograph, so what is held
+ * at once is still one picture and its ciphertext.
+ *
  * # It stops at the first failure
  *
  * Carrying on would send the fourth after the third failed, leaving a hole

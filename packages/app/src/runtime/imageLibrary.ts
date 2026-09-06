@@ -33,6 +33,40 @@ import { MOST_AT_ONCE } from './sendImages'
  * `null` said "nothing chosen" when there was one answer. With several there
  * is a better shape: an empty list is nothing chosen, and every caller loops
  * either way.
+ *
+ * # No thumbnail comes out of here yet, and the reason is not an oversight
+ *
+ * `PickedImage.thumbnail` is the seam #117 needs filled, and everything above
+ * it is built: `sendImage` seals and uploads a thumbnail with a key of its
+ * own, and every surface but the full-screen viewer already draws the
+ * smallest copy it is offered. What is missing is the downscaling, which is
+ * the one step React Native cannot do in JavaScript, and none of what is in
+ * this tree can do it either:
+ *
+ * - **The picker itself.** `maxWidth`/`maxHeight` do resize — but they resize
+ *   *the asset the call returns*, and a call returns one asset per photograph
+ *   chosen. Two sizes is two calls, and a second `launchImageLibrary` presents
+ *   the library again: it would ask somebody to find and choose the same
+ *   photographs twice for a saving they were never told about.
+ * - **React Native's own `ImageEditingManager`.** It is still declared in
+ *   0.87's deprecated specs and implemented on iOS, and it is gone from
+ *   Android, where `getEnforcing` throws — so it is absent on the platform
+ *   the ticket's measurements came from.
+ * - **Reading the picker's `originalPath` back.** `fetch` resolves `file:`
+ *   URLs on iOS through `RCTFileRequestHandler` and on Android through
+ *   nothing at all: OkHttp is the whole of the transport there.
+ * - **`react-native-svg`'s `toDataURL`.** It really does rasterise a view to
+ *   bytes, and it rasterises to PNG. A photograph at 800 pixels is most of a
+ *   megabyte as a PNG where it is around a hundred kilobytes as a JPEG: three
+ *   or four times smaller than the file it replaces, where #117 wants an
+ *   order of magnitude. It would also make sending depend on a mounted view.
+ *   Rejected on the arithmetic before the taste.
+ *
+ * So this returns photographs with no thumbnail, `sendImage` sends them as it
+ * always did, and a reader draws them from the full file as it always did.
+ * Closing it wants a resizer — `@react-native-community/image-editor` is the
+ * narrowest one, being the Android half that used to be core — and adding a
+ * dependency is not this ticket's to take.
  */
 export async function pickFromLibrary(): Promise<readonly PickedImage[]> {
   const answer = await launchImageLibrary({

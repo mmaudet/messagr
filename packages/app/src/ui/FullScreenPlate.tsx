@@ -17,7 +17,7 @@ import { GestureHandlerRootView } from 'react-native-gesture-handler'
 import { t } from '../copy'
 import { color, floors, layout, radius, space, type } from '../design/tokens'
 import type { ShownImage } from '../runtime/receiveImage'
-import type { ReadImage } from '../timeline/imageEvent'
+import type { ReadFile } from '../timeline/imageEvent'
 import type { Plate } from '../timeline/plates'
 import { Photograph } from './Photograph'
 import { Pinchable } from './Pinchable'
@@ -50,6 +50,13 @@ import { Pinchable } from './Pinchable'
  * here because a photograph is the content, and a pale ground around it
  * changes how the photograph reads. Recorded rather than smuggled: a reader
  * revisiting invariant 11 should find the reason next to the use.
+ *
+ * # The one surface that asks for the photograph itself
+ *
+ * Everywhere else draws the sender's thumbnail (#117). Here the picture is
+ * the screen, so a thumbnail upscaled to it would be visibly soft -- and here
+ * the photograph is affordable, because it is one at a time and its quarter
+ * second of base64 blocks a thread nothing else is drawing on.
  */
 
 export function FullScreenPlate({
@@ -61,7 +68,7 @@ export function FullScreenPlate({
   readonly plate: Plate
   /** Which photograph to open on. */
   readonly at: number
-  readonly fetch: (image: ReadImage) => Promise<ShownImage>
+  readonly fetch: (file: ReadFile) => Promise<ShownImage>
   readonly onClose: () => void
 }) {
   const entries = plate.entries
@@ -184,6 +191,7 @@ export function FullScreenPlate({
                     <Photograph
                       image={entry.image}
                       fetch={fetch}
+                      full
                       testID={`full-${entry.eventId}`}
                     />
                   </Pinchable>
