@@ -207,6 +207,8 @@ export const de: Readonly<Record<CopyKey, string>> = {
   invite_working: 'Unterhaltung wird erstellt …',
   invite_ready:
     'Senden Sie dieser Person diesen Link. Er gilt eine Stunde und funktioniert einmal.',
+  invite_qr: 'Oder lassen Sie diesen Code scannen.',
+  invite_qr_label: 'QR-Code des Einladungslinks',
   invite_share: 'Link teilen',
   invite_close: 'Schließen',
   invite_failed: 'Die Einladung konnte nicht erstellt werden.',

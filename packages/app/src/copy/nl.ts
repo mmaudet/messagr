@@ -200,6 +200,8 @@ export const nl: Readonly<Record<CopyKey, string>> = {
   invite_working: 'Het gesprek wordt aangemaakt…',
   invite_ready:
     'Stuur deze link naar die persoon. Hij is een uur geldig en werkt één keer.',
+  invite_qr: 'Of laat deze code scannen.',
+  invite_qr_label: 'QR-code van de uitnodigingslink',
   invite_share: 'De link delen',
   invite_close: 'Sluiten',
   invite_failed: 'De uitnodiging kon niet worden aangemaakt.',

@@ -294,6 +294,8 @@ export const fr = {
   invite_working: 'Création de la conversation…',
   invite_ready:
     'Envoyez ce lien à cette personne. Il est valable une heure et ne sert qu’une fois.',
+  invite_qr: 'Ou faites-le scanner ce code.',
+  invite_qr_label: 'Code QR du lien d’invitation',
   invite_share: 'Partager le lien',
   invite_close: 'Fermer',
   invite_failed: 'L’invitation n’a pas pu être créée.',

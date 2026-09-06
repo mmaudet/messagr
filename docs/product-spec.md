@@ -1037,3 +1037,52 @@ This version integrates:
 - the cross-cutting decisions on groups (pseudonymous community, capability links, client-signed roles, anonymous channel), anonymity (identity/discovery split, metadata minimization, explicit recovery choice), encryption (product positioning, MLS target for communities), and inter-instance federation (UX invisibility + explicit Product API handling, multi-instance topology, health, cross-instance tests).
 
 The standalone formalization document is no longer the source of truth for this portion and remains only as a migration note.
+
+### 13.25 An invitation is a picture as well as a link (designed here)
+
+**Beside the link, never instead of it.** The invitation screen draws the
+link as a QR code under the link itself. The two people an invitation
+matters most for are the ones standing next to each other — which, in a
+product entered only by invitation, is the ordinary case rather than an
+edge one — and a camera is the gesture for that. But the link stays
+readable and selectable: reading it aloud is the path that has to work when
+a camera does not, and it is the only path for somebody with one phone.
+
+**The symbol is the same one the website draws.** `messagr.eu/i/<token>`
+has drawn a QR since before the application could, for the desktop case
+— *« Ouvrez ce lien depuis votre téléphone… Scannez ce code »*. Its
+encoder exists because that page's content security policy forbids an
+external script. The application's encoder is a port of it rather than a
+package: one encoder rather than two is what the page's own note asks for,
+since a symbol written at one error-correction level and read at another
+is not the same symbol.
+
+**Level M, byte mode, versions 1 to 20.** The level is a constant shared
+with the page and not a setting. Twenty versions cover an invitation link
+with room to spare and stop short of the versions whose modules are finer
+than a phone screen draws honestly.
+
+**The encoder is verified by decoding, not by looking.** The website's copy
+is checked by eye, which catches a symbol that is obviously wrong and
+passes one that is subtly wrong — and a subtly wrong QR is one that simply
+does not scan, with nothing on screen to say so. In the application, the
+tests paint the symbol into pixels and read it back the way a camera would,
+including the SVG path a screen is actually given, so an off-by-one in the
+drawing fails a test rather than a person.
+
+**The quiet zone is part of the symbol.** Four modules of light on every
+side, inside the drawing rather than around the component, so no layout can
+take it away. A symbol flush against a coloured screen does not scan, and
+nothing on screen says why.
+
+**A symbol that cannot be drawn draws nothing.** Not an empty frame, which
+reads as a broken code. The link is still there, which is the path that has
+to keep working.
+
+**Scanning is the other half and is not settled here.** An application
+entered only by invitation has nowhere obvious to put a camera before
+entry: there is no account yet, and the only screen before one is the
+promise — whose own rule (§13.23) is that it asks for nothing. A camera
+permission is asking for something. That is a decision about the promise
+screen's meaning, not a placement detail, and it is recorded as open rather
+than defaulted.

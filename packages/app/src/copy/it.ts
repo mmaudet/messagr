@@ -199,6 +199,8 @@ export const it: Readonly<Record<CopyKey, string>> = {
   invite_working: 'Creazione della conversazione…',
   invite_ready:
     'Invii questo link a questa persona. Vale un’ora e serve una volta sola.',
+  invite_qr: 'Oppure fagli scansionare questo codice.',
+  invite_qr_label: 'Codice QR del link di invito',
   invite_share: 'Condividere il link',
   invite_close: 'Chiudere',
   invite_failed: 'Non è stato possibile creare l’invito.',
