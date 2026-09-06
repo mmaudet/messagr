@@ -58,6 +58,7 @@ import { computeRuntimeGapReport } from './src/runtime/runtimeGaps'
 import { computeNewArchitectureReport } from './src/runtime/newArchitecture'
 import {
   languageSecrets,
+  storeDirectorySecrets,
   termsSecrets,
   wakeSecrets,
   promiseSecrets,
@@ -92,6 +93,7 @@ import {
   readChosenLanguage,
   rememberLanguage,
 } from './src/runtime/chosenLanguage'
+import { rememberStoreDirectory } from './src/runtime/storeDirectory'
 import { rememberTermsAccepted } from './src/runtime/termsAccepted'
 import { allowWake, wakeIsAllowed } from './src/runtime/wakeSetting'
 import { deviceLocale } from './src/runtime/deviceLocale'
@@ -596,6 +598,20 @@ export function App({
             // with a passphrase of its own. It degrades rather than failing --
             // a launch that cannot open it shows conversations as identifiers,
             // which is what an unnamed conversation looks like anyway.
+            // WHERE THE STORES ARE, WRITTEN DOWN FOR THE WAKE.
+            //
+            // This path arrives as an initial property from MainActivity, and
+            // a headless context is handed no properties -- so without this
+            // the wake cannot open anything and is blind for ever.
+            // `storeDirectory.ts` says why the keystore is where it goes and
+            // why that is a workaround rather than a design.
+            rememberStoreDirectory(storeDirectorySecrets, storeDir).catch(
+              () => {
+                // A wake that stays blind is a smaller thing than a launch
+                // that failed over it.
+              },
+            )
+
             const opening = await openNotebook(storeDir)
             namesRef.current = opening.names
             lastReadRef.current = opening.lastRead

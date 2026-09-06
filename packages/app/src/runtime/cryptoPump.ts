@@ -141,6 +141,32 @@ export type MachineStartResult = {
  * `fetchSessionSyncStatus`, the subscription is live for the one sync that
  * is about to happen, not after it.
  */
+/**
+ * Whether a crypto machine has already been created in this JavaScript
+ * context, and for which device.
+ *
+ * # Why this is not paranoia
+ *
+ * `computeCryptoMachineConfig` says it outright: *"the first launch to open a
+ * second store loses every room key the first one held."* Until #107 there
+ * was one caller and no way to reach two. There are two now -- the launch,
+ * and the headless wake -- and React Native runs a background handler in the
+ * **same** JavaScript context when the application is warm. Starting again
+ * there would be the second open, against the same file, with the
+ * conversation on screen holding the first.
+ *
+ * So the machine is created once and the second caller is told so. The device
+ * id is kept rather than a boolean, because "already started" is only an
+ * answer if it is the same device -- and a device id changing under a running
+ * process is a thing to refuse loudly rather than to reuse.
+ */
+let machineStartedFor: string | null = null
+
+/** Whether this context already holds a machine for `deviceId`. */
+export function cryptoMachineIsRunning(deviceId: string): boolean {
+  return machineStartedFor === deviceId
+}
+
 export async function startCryptoMachine(
   sessionClient: ReturnType<typeof createClient>,
   credentials: DeviceIdentity,
@@ -202,10 +228,26 @@ export async function startCryptoMachine(
     }
   }
 
-  try {
-    await createCryptoMachine(config)
-  } catch (cause: unknown) {
-    return { started: false, reason: getErrorMessage(cause), passphraseForm }
+  // ONE MACHINE PER CONTEXT. See `machineStartedFor`: the wake and the launch
+  // share a JavaScript context when the application is warm, and a second
+  // `createCryptoMachine` against the same file is how room keys are lost.
+  if (
+    machineStartedFor !== null &&
+    machineStartedFor !== credentials.deviceId
+  ) {
+    return {
+      started: false,
+      reason: `this context already holds a machine for ${machineStartedFor}`,
+      passphraseForm,
+    }
+  }
+  if (machineStartedFor === null) {
+    try {
+      await createCryptoMachine(config)
+    } catch (cause: unknown) {
+      return { started: false, reason: getErrorMessage(cause), passphraseForm }
+    }
+    machineStartedFor = credentials.deviceId
   }
 
   const unsubscribeToDevice = subscribeToDeviceMessages(
