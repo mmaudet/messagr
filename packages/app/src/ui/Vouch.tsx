@@ -69,17 +69,55 @@ export function Vouch({ entrantId, hasHistory, onVouch, state }: VouchProps) {
   const dark = useColorScheme() === 'dark'
   const palette = dark ? color.dark : color
 
-  if (state !== 'idle' && state !== 'working') {
+  // `!asked` GUARDS THIS, AND WITHOUT IT THE BUTTON BELOW IS A LIE.
+  //
+  // The outcome outlives the gesture -- it is held above, in `App.tsx` --
+  // so somebody pressing "try again" would set `asked` and then be shown
+  // this same outcome, because `state` had not changed. A control that
+  // answers the finger and changes nothing is worse than no control.
+  if (!asked && state !== 'idle' && state !== 'working') {
+    // A FAILURE IS A STATE YOU CAN LEAVE. A SUCCESS IS NOT.
+    //
+    // This rendered the outcome and nothing else, whichever it was -- so a
+    // failed vouch said « Vous pouvez réessayer » and took the button away,
+    // permanently: leaving the person screen and coming back did not bring
+    // it back, and only a relaunch did. A screen that names an action and
+    // then withholds it is worse than one that says nothing, because the
+    // person now knows what to do and cannot find it (#119).
+    //
+    // Success keeps the old shape, and that is not an oversight: what was
+    // handed over cannot be taken back, so there is nothing to offer again.
+    const failed = !state.vouched
     return (
-      <Text
-        testID="vouch-outcome"
-        style={[styles.outcome, { color: palette.neutral['600'] }]}>
-        {!state.vouched
-          ? t('vouch_failed_nothing_changed')
-          : state.shared === 0
-            ? t('vouch_done_no_history')
-            : t('vouch_done')}
-      </Text>
+      <View style={styles.block}>
+        <Text
+          testID="vouch-outcome"
+          style={[styles.outcome, { color: palette.neutral['600'] }]}>
+          {failed
+            ? t('vouch_failed_nothing_changed')
+            : state.shared === 0
+              ? t('vouch_done_no_history')
+              : t('vouch_done')}
+        </Text>
+        {failed && (
+          <>
+            {/* The reason, under the sentence rather than instead of it.
+                Invariant 6 governs what a person is told; it does not
+                require hiding what somebody diagnosing it would need -- and
+                "not yet" and "refused" want different things from them. */}
+            <Text
+              testID="vouch-failed-reason"
+              style={[styles.hint, { color: palette.neutral['600'] }]}>
+              {state.reason}
+            </Text>
+            <NotchedButton
+              label={t('vouch_action')}
+              testID="vouch-open"
+              onPress={() => setAsked(true)}
+            />
+          </>
+        )}
+      </View>
     )
   }
 
