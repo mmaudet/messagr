@@ -295,6 +295,13 @@ export const nl: Readonly<Record<CopyKey, string>> = {
   community_soon_why:
     'Een gemeenschap groepeert kamers onder een pseudoniem object. Het tabblad is gereserveerd om dezelfde reden als dat van de oproepen: de balk mag niet verschuiven wanneer ze er zijn.',
   brand_name: 'Messagr',
+  'plate_more %1$d': '+ %1$d',
+  plate_open: 'Foto bekijken',
+  plate_close: 'Sluiten',
+  'plate_of %1$d %2$d': '%1$d van %2$d',
+  'plate_sending %1$d %2$d': '%1$d van %2$d wordt verstuurd…',
+  'plate_partly %1$d': '%1$d foto’s verstuurd. De rest kon niet weg.',
+  plate_too_many: 'Te veel foto’s tegelijk. Hooguit vijftig.',
   composer_emoji: 'Emoji',
   composer_photo: 'Een foto toevoegen',
   composer_record: 'Spraakbericht',

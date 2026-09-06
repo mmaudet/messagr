@@ -302,6 +302,13 @@ export const de: Readonly<Record<CopyKey, string>> = {
   community_soon_why:
     'Eine Community fasst Räume unter einem pseudonymen Objekt zusammen. Der Reiter ist aus demselben Grund reserviert wie der für Anrufe: die Leiste darf sich nicht verschieben, wenn sie kommen.',
   brand_name: 'Messagr',
+  'plate_more %1$d': '+ %1$d',
+  plate_open: 'Foto ansehen',
+  plate_close: 'Schließen',
+  'plate_of %1$d %2$d': '%1$d von %2$d',
+  'plate_sending %1$d %2$d': '%1$d von %2$d wird gesendet …',
+  'plate_partly %1$d': '%1$d Fotos gesendet. Die übrigen konnten nicht weg.',
+  plate_too_many: 'Zu viele Fotos auf einmal. Höchstens fünfzig.',
   composer_emoji: 'Emojis',
   composer_photo: 'Ein Foto hinzufügen',
   composer_record: 'Sprachnachricht',

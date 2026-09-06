@@ -298,6 +298,13 @@ export const en: Readonly<Record<CopyKey, string>> = {
   community_soon_why:
     'A community groups rooms under a pseudonymous object. The tab is held for the same reason as the calls one: the bar must not move when they arrive.',
   brand_name: 'Messagr',
+  'plate_more %1$d': '+ %1$d',
+  plate_open: 'View photo',
+  plate_close: 'Close',
+  'plate_of %1$d %2$d': '%1$d of %2$d',
+  'plate_sending %1$d %2$d': 'Sending %1$d of %2$d…',
+  'plate_partly %1$d': '%1$d photos sent. The rest could not go.',
+  plate_too_many: 'Too many photos at once. Fifty at most.',
   composer_emoji: 'Emoji',
   composer_photo: 'Add a photo',
   composer_record: 'Voice message',

@@ -294,6 +294,13 @@ export const it: Readonly<Record<CopyKey, string>> = {
   community_soon_why:
     'Una comunità raggruppa stanze sotto un oggetto pseudonimo. La scheda è riservata per la stessa ragione di quella delle chiamate: la barra non deve spostarsi quando arriveranno.',
   brand_name: 'Messagr',
+  'plate_more %1$d': '+ %1$d',
+  plate_open: 'Vedere la foto',
+  plate_close: 'Chiudere',
+  'plate_of %1$d %2$d': '%1$d di %2$d',
+  'plate_sending %1$d %2$d': 'Invio %1$d di %2$d…',
+  'plate_partly %1$d': '%1$d foto inviate. Le altre non sono potute partire.',
+  plate_too_many: 'Troppe foto in una volta. Cinquanta al massimo.',
   composer_emoji: 'Emoji',
   composer_photo: 'Aggiungere una foto',
   composer_record: 'Messaggio vocale',

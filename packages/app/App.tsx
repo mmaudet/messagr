@@ -99,10 +99,12 @@ import { rememberTermsAccepted } from './src/runtime/termsAccepted'
 import { allowWake, wakeIsAllowed } from './src/runtime/wakeSetting'
 import { deviceLocale } from './src/runtime/deviceLocale'
 import { pickFromLibrary } from './src/runtime/imageLibrary'
+import { sendImages } from './src/runtime/sendImages'
 import { pushTokenForThisDevice } from './src/runtime/pushDevice'
 import { whenNotificationPressed } from './src/runtime/showNotification'
 import type { ShownImage } from './src/runtime/receiveImage'
 import type { ReadImage } from './src/timeline/imageEvent'
+import type { Plate as Grouping } from './src/timeline/plates'
 import type { EvictOutcome } from './src/runtime/evict'
 import type { HistoryClaim } from './src/runtime/claimHistory'
 import { Conversation } from './src/ui/Conversation'
@@ -111,6 +113,7 @@ import { Invite, type InviteStage } from './src/ui/Invite'
 import { FloatingAction } from './src/ui/FloatingAction'
 import { Header } from './src/ui/Header'
 import { Composer } from './src/ui/Composer'
+import { FullScreenPlate } from './src/ui/FullScreenPlate'
 import { ConversationHeader } from './src/ui/ConversationHeader'
 import { Legal } from './src/ui/Legal'
 import { Reserved } from './src/ui/Reserved'
@@ -263,6 +266,12 @@ export function App({
   // The rare gestures live there rather than in the message flow -- see the
   // conversation's own comment for why.
   const [personOpen, setPersonOpen] = useState(false)
+  // Which plate is open full screen, and at which photograph. `null` when
+  // none is -- the viewer is a modal, so it is either there or it is not.
+  const [openPlate, setOpenPlate] = useState<{
+    readonly plate: Grouping
+    readonly at: number
+  } | null>(null)
   // How tall the bar and the action came out together. Not for positioning
   // them -- they are laid out, not offset -- but so the scroll view can end
   // above them rather than under them.
@@ -793,28 +802,33 @@ export function App({
               const scope = openScopeRef.current
               if (scope === null) return
               const gesture = async () => {
-                const image = await pickFromLibrary()
+                const chosen = await pickFromLibrary()
                 // Nothing chosen. Not a failure, and it must not read as one.
-                if (image === null) return
+                if (chosen.length === 0) return
 
                 setSending('sending')
-                const done = await sendPhotograph(
-                  sessionClient,
-                  credentials,
-                  scope,
-                  image,
+                // ONE AT A TIME. `sendImages` says why a `Promise.all` here
+                // is a crash on somebody else's phone: the encryptor holds
+                // the plaintext and the ciphertext together, so thirty at
+                // once is sixty copies in memory.
+                const done = await sendImages(
+                  image =>
+                    sendPhotograph(sessionClient, credentials, scope, image),
+                  chosen,
+                  progress =>
+                    logEvent('info', 'MESSAGR_IMAGES_SENDING', { ...progress }),
                 )
-                if (!done.sent) {
+                if ('reason' in done) {
                   setSending('failed')
                   logEvent('warn', 'MESSAGR_IMAGE_SEND_FAILED', {
                     reason: done.reason,
+                    sent: done.sent,
+                    remaining: done.remaining,
                   })
                   return
                 }
                 setSending('idle')
-                logEvent('info', 'MESSAGR_IMAGE_SENT', {
-                  eventId: done.eventId,
-                })
+                logEvent('info', 'MESSAGR_IMAGES_SENT', { sent: done.sent })
                 const fresh = await loadConversation(
                   sessionClient,
                   scope,
@@ -1266,6 +1280,11 @@ export function App({
         setTrust(null)
         return true
       }
+      // The viewer is a modal over everything, so it closes first.
+      if (openPlate !== null) {
+        setOpenPlate(null)
+        return true
+      }
       if (personOpen) {
         setPersonOpen(false)
         return true
@@ -1292,7 +1311,7 @@ export function App({
     }
     const subscription = BackHandler.addEventListener('hardwareBackPress', back)
     return () => subscription.remove()
-  }, [trust, personOpen, openScope, legalOpen, invite.stage, tab])
+  }, [trust, openPlate, personOpen, openScope, legalOpen, invite.stage, tab])
 
   // STABLE ACROSS RENDERS, AND THAT IS THE WHOLE POINT.
   //
@@ -1379,6 +1398,15 @@ export function App({
 
   return (
     <SafeAreaProvider>
+      {openPlate !== null && (
+        <FullScreenPlate
+          plate={openPlate.plate}
+          at={openPlate.at}
+          fetch={loadImage}
+          onClose={() => setOpenPlate(null)}
+        />
+      )}
+
       {/* NEITHER EDGE IS THIS VIEW'S. Both the header and the dock claim
           their own inset, ground and all -- see each of them for why. An
           absolutely-positioned child is laid against the border box and not
@@ -1587,6 +1615,7 @@ export function App({
                   sending={sending}
                   onLoadImage={loadImage}
                   otherParty={party?.other}
+                  onOpenPlate={(plate, at) => setOpenPlate({ plate, at })}
                 />
                 {/* What the passive half found, when it found anything. A
                   refusal for an untrusted sender is the one worth saying:

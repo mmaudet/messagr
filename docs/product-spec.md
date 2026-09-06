@@ -849,6 +849,50 @@ the frame is drawn at the picture's own proportions rather than as a spinner,
 so the timeline does not reflow as photographs arrive.
 
 
+### 13.24 Several photographs, read as one plate (designed here)
+
+**Matrix has no album event, and this does not invent one.** Each photograph
+is its own `m.image`, which is what every other client reads. What makes
+several read as one thing is a **reading of the timeline**: consecutive
+images, from one sender, within five minutes. An album event would be a shape
+only this application could open, in a protocol whose point is that it is not
+only this application — the same argument §13.22 makes about the attachment
+secret.
+
+**All three conditions, and each earns its place.** One sender, because two
+people posting at once is two plates and merging them attributes one person's
+photographs to the other. Nothing said in between, because a sentence between
+two pictures means they were not one gesture. Within five minutes, because
+consecutive in a timeline is not the same as sent together.
+
+**A plate of one is still a plate**, so a screen has one shape to draw rather
+than two.
+
+**Four tiles, square, and a count on the fourth.** The pictures are not square
+and the tiles are: a grid of differently-shaped tiles is a grid nobody can
+scan, so a tile crops, which is what a thumbnail is for. Beyond four the last
+tile carries `+ N` and opens at the **fifth** — the first photograph it stands
+for, not one already on screen.
+
+**Full screen pages through the whole plate**, not the four that were drawn.
+Somebody who taps the count is asking to see what the count stands for.
+
+**Sent one at a time, never at once.** `encryptAttachment` holds the plaintext
+and the ciphertext together, so thirty concurrent is sixty copies in memory
+and a phone killed by the operating system rather than slowed. Fifty at most,
+and that cap is enforced twice — in the picker and in the send path — because
+a limit enforced in one place is a limit until somebody edits that place.
+
+**A failure stops the run and names the boundary.** Carrying on would send the
+fourth after the third failed, leaving a hole a person cannot see; stopping
+says how many went and how many are still there to send.
+
+**No view-once, and no disappearing media.** The reference for this screen has
+it; this product does not support it and will not pretend to. A control
+promising a photograph would vanish, on a protocol with no such guarantee,
+would be the worst kind of lie this product can tell.
+
+
 ### 13.23 The first launch: a language, then an acceptance (designed here)
 
 Two gates, in that order, before anything else happens.

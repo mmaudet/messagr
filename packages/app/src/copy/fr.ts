@@ -466,6 +466,14 @@ export const fr = {
   // `brand_name` is the product's own name and is not translated -- a name
   // that changes by language is a different product.
   brand_name: 'Messagr',
+  'plate_more %1$d': '+ %1$d',
+  plate_open: 'Voir la photo',
+  plate_close: 'Fermer',
+  'plate_of %1$d %2$d': '%1$d sur %2$d',
+  'plate_sending %1$d %2$d': 'Envoi %1$d sur %2$d…',
+  'plate_partly %1$d':
+    '%1$d photos envoyées. Les suivantes n’ont pas pu partir.',
+  plate_too_many: 'Trop de photos d’un coup. Cinquante au plus.',
   composer_emoji: 'Émojis',
   composer_photo: 'Ajouter une photo',
   composer_record: 'Message vocal',

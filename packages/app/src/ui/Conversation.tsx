@@ -12,9 +12,11 @@ import {
 import type { ShownImage } from '../runtime/receiveImage'
 import type { ReadImage } from '../timeline/imageEvent'
 import { separatorsFor, type DayMark } from '../timeline/daySeparators'
+import { platesIn, type Plate as Grouping } from '../timeline/plates'
 import type { TimelineEntry } from '../timeline/mergeTimeline'
 import type { ReactionTally } from '../timeline/reactions'
 import { Photograph } from './Photograph'
+import { Plate } from './Plate'
 
 /**
  * The 1:1 conversation, reduced to its bones.
@@ -70,6 +72,8 @@ export interface ConversationProps {
    * note where it is read.
    */
   readonly otherParty?: string
+  /** Opens a plate full screen, at the photograph tapped. */
+  readonly onOpenPlate?: (plate: Grouping, at: number) => void
 }
 
 export function Conversation({
@@ -82,12 +86,19 @@ export function Conversation({
   onLoadImage,
   now = Date.now(),
   otherParty,
+  onOpenPlate,
 }: ConversationProps) {
   const dark = useColorScheme() === 'dark'
   const palette = dark ? color.dark : color
   // Which entries open a new day. Computed once per render rather than per
   // message: a separator is a property of the sequence, not of an entry.
   const days = separatorsFor(entries, now)
+  // Photographs sent together, read as one thing. A reading of the timeline
+  // rather than something sent -- see `plates.ts`, and `imageEvent.ts` for
+  // the same argument about not inventing a shape only this client can open.
+  const plates = platesIn(entries)
+  const plateAt = new Map(plates.map(plate => [plate.at, plate]))
+  const swallowed = new Set(plates.flatMap(plate => [...plate.swallowed]))
 
   return (
     <View testID="conversation" style={styles.screen}>
@@ -100,6 +111,8 @@ export function Conversation({
       ) : (
         entries.map(entry => (
           <React.Fragment key={entry.eventId}>
+            {/* Drawn inside the plate that gathered it, and so not here. A
+                screen that drew both would show every photograph twice. */}
             {days.get(entry.eventId) !== undefined && (
               <View
                 testID={`day-${entry.eventId}`}
@@ -116,18 +129,22 @@ export function Conversation({
                 </Text>
               </View>
             )}
-            <Message
-              entry={entry}
-              mine={entry.claimedSender === selfUserId}
-              palette={palette}
-              tallies={reactions.get(entry.eventId) ?? []}
-              read={read.has(entry.eventId)}
-              onReact={(key, own) => onReact?.(entry.eventId, key, own)}
-              onLoadImage={onLoadImage}
-              unexpected={
-                otherParty !== undefined && entry.claimedSender !== otherParty
-              }
-            />
+            {!swallowed.has(entry.eventId) && (
+              <Message
+                entry={entry}
+                plate={plateAt.get(entry.eventId)}
+                onOpenPlate={onOpenPlate}
+                mine={entry.claimedSender === selfUserId}
+                palette={palette}
+                tallies={reactions.get(entry.eventId) ?? []}
+                read={read.has(entry.eventId)}
+                onReact={(key, own) => onReact?.(entry.eventId, key, own)}
+                onLoadImage={onLoadImage}
+                unexpected={
+                  otherParty !== undefined && entry.claimedSender !== otherParty
+                }
+              />
+            )}
           </React.Fragment>
         ))
       )}
@@ -208,8 +225,13 @@ function Message({
   read,
   onLoadImage,
   unexpected,
+  plate,
+  onOpenPlate,
 }: {
   entry: TimelineEntry
+  /** The plate this entry opens, when it opens one. */
+  plate?: Grouping
+  readonly onOpenPlate?: (plate: Grouping, at: number) => void
   mine: boolean
   /** Whether this came from somebody other than the conversation's party. */
   unexpected: boolean
@@ -266,7 +288,15 @@ function Message({
               : palette.surface.sunk,
           },
         ]}>
-        {entry.image !== undefined && onLoadImage !== undefined ? (
+        {plate !== undefined &&
+        onLoadImage !== undefined &&
+        onOpenPlate !== undefined ? (
+          <Plate
+            plate={plate}
+            fetch={onLoadImage}
+            onOpen={at => onOpenPlate(plate, at)}
+          />
+        ) : entry.image !== undefined && onLoadImage !== undefined ? (
           // The photograph instead of the text, not beside it. An `m.image`
           // carries a fallback name in `body` for clients that cannot draw
           // the picture; this one can, and drawing both would put
