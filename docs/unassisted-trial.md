@@ -30,12 +30,22 @@ ten and #91 is.
       configuration is missing registers no pusher and fails silently, so
       step 5 would measure the wrong thing. Confirm a notification arrives on
       the test device with the application closed _before_ the day.
-- [ ] **The invitation link opens the application.** Android App Links verify
-      against `/.well-known/assetlinks.json`, which declared a dead package
-      name until 6 September 2026 — with it wrong, the link opens a browser
-      and step 1 measures a website. The app-links doctrine test under
-      `deploy/messagr-eu/tests/` holds the declaration against the build;
-      run it, and then tap a real link on the test device.
+- [ ] **The invitation link opens the application _on a build from the
+      track_.** The item most likely to be ticked wrongly. Android App Links
+      verify against `/.well-known/assetlinks.json`, which declared a dead
+      package name until 6 September 2026 — and which today names the
+      fingerprint of a build installed **by hand**. Play App Signing re-signs
+      the upload with a certificate Google holds, and that is what reaches a
+      device from the internal testing track, so a link that opens the
+      application on the observer's own phone may still open a browser on the
+      participant's (**#114**, which needs Play Console access). Tap a real
+      link on a device that installed from the track, not on one that was
+      sideloaded. If it opens a browser the trial is still runnable — the
+      landing page offers **Copy the link**, which is what carries an
+      invitation across an install — but write down that step 1 measured
+      that path rather than the other one. It is a different finding, not
+      the same step gone badly.
+
 - [ ] **The language the person reads is one of the six.** French, English,
       German, Spanish, Italian, Dutch. The first screen offers the choice
       (#103) and there is no fallback: a seventh language is a person meeting
