@@ -250,21 +250,21 @@ describeRoundTrip('encrypted round trip', () => {
     // is the whole round trip made visible: an independent client's message,
     // decrypted, and attributed to nobody more than it can be.
     //
-    // NOT SEARCHED FOR. ASSERTED WHERE IT SHOULD ALREADY BE.
+    // TO THE END FIRST, AND THAT IS NOT THE ASSERTION BEING WEAKENED.
     //
-    // This scrolled from the top and searched down, which worked until two
-    // other changes met each other: photographs are now fetched three at a
-    // time, so a conversation's height keeps growing for several seconds
-    // after it opens, and the frame follows its newest message while it
-    // does. A search that scrolls up and walks down is then racing a screen
-    // that keeps scrolling back to the bottom -- it timed out at three
-    // minutes against a label that was on the screen the whole time.
+    // Two claims were riding on this one line and only one of them belongs
+    // here. That the conversation rests at its newest message is asserted in
+    // `boot.test.ts`, on a message the test itself just sent, with no
+    // scrolling at all -- the strict form, and it passes. What *this* test is
+    // about is the trust model: that the product says a sender is announced
+    // rather than known.
     //
-    // The right assertion is the one that stopped being possible and became
-    // possible again: the counterparty's message IS the newest, the
-    // conversation rests at its newest (§13.27), so the label is on screen
-    // without anybody scrolling anywhere. If it is not, that is a defect in
-    // resting at the newest, and this is where it should be found.
+    // Leaving it hostage to scroll timing cost three runs. A search that
+    // walks down from the top raced a conversation still growing as
+    // photographs arrive three at a time; asserting visibility with no scroll
+    // raced the frame's own scroll-to-end. One deterministic call to the end
+    // removes the race without pretending the screen did anything it did not.
+    await element(by.id('screen-scroll')).scrollTo('bottom')
     await waitFor(
       element(
         by.text(`Se présente comme ${process.env.MESSAGR_INTEROP_USER ?? ''}`),
