@@ -16,8 +16,10 @@ import {
   bootstrapCrossSigning,
   createCryptoMachine,
   createCrossSigningIdentity,
+  decryptAttachment,
   decryptEvent,
   discardScopeKey,
+  encryptAttachment,
   encryptEvent,
   encryptionSlice,
   buildHistoryBundle,
@@ -54,6 +56,10 @@ import { probeUnsettledEncrypt, type ProbeReport } from './panicProbe'
 import { claimHistory, type HistoryClaim } from './claimHistory'
 import { evictFrom, type EvictOutcome } from './evict'
 import { mediaRepository } from './mediaRepository'
+import type { PickedImage } from './pickImage'
+import { fetchImage, type ShownImage } from './receiveImage'
+import { sendImage, sendingThrough, type ImageSent } from './sendImage'
+import type { ReadImage } from '../timeline/imageEvent'
 import { makePumpHttp } from './pump'
 import {
   admitDrawnEntrant,
@@ -679,6 +685,74 @@ export async function removeReaction(
   reactionEventId: string,
 ) {
   return unreact(reacting(sessionClient), scope, reactionEventId)
+}
+
+/**
+ * Phase eleven: sending a photograph, and getting one back.
+ *
+ * Pure glue, and it names two library functions nothing else does:
+ * `encryptAttachment` and `decryptAttachment`. The bytes never touch a
+ * filesystem on either side -- see `sendImage.ts` and `receiveImage.ts` for
+ * why that is ADR-0006 rather than a preference.
+ *
+ * `fetch` is passed rather than reached for inside `mediaRepository`, the way
+ * `vouchForEntrant` does it and for the same reason: this file stays the only
+ * place a global is touched.
+ */
+export async function sendPhotograph(
+  sessionClient: ReturnType<typeof createClient>,
+  credentials: { readonly baseUrl: string; readonly accessToken: string },
+  scope: string,
+  image: PickedImage,
+): Promise<ImageSent> {
+  const http = makePumpHttp(sessionClient)
+  const media = mediaRepository(
+    credentials.baseUrl,
+    credentials.accessToken,
+    fetch,
+  )
+  return sendImage(
+    {
+      seal: plaintext => encryptAttachment(plaintext),
+      // OCTET-STREAM, AND THE PHOTOGRAPH'S OWN TYPE IS NOT SENT.
+      // What goes to the repository is ciphertext, not a JPEG. Declaring
+      // `image/jpeg` would be a claim about bytes nobody there can read, and
+      // it would tell the server what kind of thing somebody sent -- which is
+      // exactly the metadata the encryption is for. The real type travels
+      // inside the event, where only a participant sees it.
+      upload: ciphertext =>
+        media.upload(ciphertext, 'application/octet-stream'),
+      machine: {
+        encryptEvent: (encryptScope, eventType, payload) =>
+          encryptEvent(asCryptoScopeId(encryptScope), eventType, payload),
+      },
+      send: sendingThrough(
+        http,
+        () => `messagr-${Date.now()}-${Math.floor(Math.random() * 1e6)}`,
+      ),
+    },
+    scope,
+    image,
+  )
+}
+
+/** The other half: what a screen calls to draw a photograph it received. */
+export async function openPhotograph(
+  credentials: { readonly baseUrl: string; readonly accessToken: string },
+  image: ReadImage,
+): Promise<ShownImage> {
+  const media = mediaRepository(
+    credentials.baseUrl,
+    credentials.accessToken,
+    fetch,
+  )
+  return fetchImage(
+    {
+      download: url => media.download(url),
+      open: (ciphertext, secret) => decryptAttachment(ciphertext, secret),
+    },
+    image,
+  )
 }
 
 export type { ReactionTally } from '../timeline/reactions'

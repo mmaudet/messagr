@@ -5,9 +5,11 @@ import type { MediaUploader } from './vouch'
  * Putting bytes into the homeserver's media repository, and getting them
  * back.
  *
- * The only thing this application uploads is an encrypted history bundle, so
- * this module is narrow on purpose: raw bytes in, an `mxc://` URI out, and
- * the reverse.
+ * Two things go through here, and both are ciphertext: the history bundle a
+ * voucher builds, and a photograph somebody sends. So this module is narrow
+ * on purpose: raw bytes in, an `mxc://` URI out, and the reverse. It never
+ * learns what the bytes are, which is the same thing the repository never
+ * learns.
  *
  * # Why not the pump's `authedRequest`
  *

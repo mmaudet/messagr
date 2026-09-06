@@ -1,3 +1,5 @@
+import type { ReadImage } from './imageEvent'
+
 /**
  * The conversation, as this application holds it.
  *
@@ -23,6 +25,16 @@ export interface TimelineEntry {
   readonly body: string | null
   /** Why it could not be read, when it could not. */
   readonly reason?: string
+  /**
+   * The photograph this entry carries, when it carries one.
+   *
+   * Present alongside `body` rather than instead of it: an `m.image` has a
+   * fallback name in `body`, and a client that cannot render the picture
+   * shows that. This application can render it, so the screen shows the
+   * picture and ignores the name -- but the name stays in the entry, because
+   * dropping it would leave nothing to say when the download fails.
+   */
+  readonly image?: ReadImage
 }
 
 /**

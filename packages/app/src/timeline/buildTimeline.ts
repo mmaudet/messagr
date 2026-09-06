@@ -1,6 +1,7 @@
 import { getErrorMessage } from '../runtime/errors'
 import type { HttpRequester } from '../runtime/pump'
 import type { TimelineEntry } from './mergeTimeline'
+import { readImageEvent } from './imageEvent'
 import { readReaction, type LooseReaction } from './reactions'
 
 /**
@@ -136,12 +137,18 @@ export async function toTimelineEntries(
         continue
       }
 
+      // A photograph before a text, because an `m.image` has a `body` too:
+      // read as a message it would be an entry whose text is "image.jpg",
+      // which is a filename drawn where a sentence goes.
+      const image = readImageEvent(content as Record<string, unknown>)
+
       entries.push({
         eventId,
         claimedSender: sender,
         sentAt,
         body: typeof content.body === 'string' ? content.body : null,
-        ...(typeof content.body === 'string'
+        ...(image === null ? {} : { image }),
+        ...(typeof content.body === 'string' || image !== null
           ? {}
           : { reason: 'this message carried no text' }),
       })

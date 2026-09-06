@@ -30,7 +30,9 @@ import {
   admitEntrant,
   inviteSomebody,
   listConversations,
+  openPhotograph,
   reactToMessage,
+  sendPhotograph,
   sendReadReceipt,
   readTrust,
   removeReaction,
@@ -81,6 +83,9 @@ import type { GivenNames } from './src/runtime/givenName'
 import { forgetfulGivenNames } from './src/runtime/givenNameStore'
 import { forgetfulLastRead, type LastRead } from './src/runtime/lastReadStore'
 import { openNotebook } from './src/runtime/notebook'
+import { pickFromLibrary } from './src/runtime/imageLibrary'
+import type { ShownImage } from './src/runtime/receiveImage'
+import type { ReadImage } from './src/timeline/imageEvent'
 import type { EvictOutcome } from './src/runtime/evict'
 import type { HistoryClaim } from './src/runtime/claimHistory'
 import { Conversation } from './src/ui/Conversation'
@@ -241,6 +246,12 @@ export function App({
   const conversationRef = useRef<readonly TimelineEntry[]>([])
   const [openScope, setOpenScope] = useState<string | null>(null)
   const openScopeRef = useRef<string | null>(null)
+  // Choosing and sending a photograph, and opening one that arrived. Held in
+  // refs like every other gesture the launch effect binds.
+  const attachRef = useRef<(() => void) | null>(null)
+  const openImageRef = useRef<
+    ((image: ReadImage) => Promise<ShownImage>) | null
+  >(null)
   const reactRef = useRef<
     ((target: string, key: string, own: string | null) => void) | null
   >(null)
@@ -683,6 +694,67 @@ export function App({
               )
             }
 
+            // SENDING A PHOTOGRAPH.
+            //
+            // The picker is opened here rather than inside the screen, for
+            // the reason every native seam in this application is bound in
+            // one place: a screen that imported the picker could not be
+            // rendered by anything without it.
+            //
+            // The whole thing is one gesture from a person's point of view --
+            // choose, and it is on its way -- so the screen shows one state
+            // for the choosing, the sealing, the upload and the send. They
+            // are four steps and none of them is separately actionable.
+            attachRef.current = () => {
+              const scope = openScopeRef.current
+              if (scope === null) return
+              const gesture = async () => {
+                const image = await pickFromLibrary()
+                // Nothing chosen. Not a failure, and it must not read as one.
+                if (image === null) return
+
+                setSending('sending')
+                const done = await sendPhotograph(
+                  sessionClient,
+                  credentials,
+                  scope,
+                  image,
+                )
+                if (!done.sent) {
+                  setSending('failed')
+                  logEvent('warn', 'MESSAGR_IMAGE_SEND_FAILED', {
+                    reason: done.reason,
+                  })
+                  return
+                }
+                setSending('idle')
+                logEvent('info', 'MESSAGR_IMAGE_SENT', {
+                  eventId: done.eventId,
+                })
+                const fresh = await loadConversation(
+                  sessionClient,
+                  scope,
+                  credentials.userId,
+                )
+                setConversation(held =>
+                  mergeTimeline(held ?? [], fresh.entries),
+                )
+                setReactions(fresh.reactions)
+              }
+              gesture().catch((cause: unknown) => {
+                setSending('failed')
+                logEvent('warn', 'MESSAGR_IMAGE_SEND_FAILED', {
+                  reason: getErrorMessage(cause),
+                })
+              })
+            }
+
+            // Drawing one that arrived. Bound here for the same reason, and
+            // held in a ref because `Photograph` keeps it in an effect's
+            // dependency list -- a function rebuilt on every render would
+            // make it re-download the picture on every render.
+            openImageRef.current = image => openPhotograph(credentials, image)
+
             // Asked for rather than computed on every launch: it costs a
             // device-status call and a state fetch per conversation.
             readTrustRef.current = (scope: string, other: string) => {
@@ -1059,6 +1131,22 @@ export function App({
     return () => subscription.remove()
   }, [trust, openScope, legalOpen, invite.stage, tab])
 
+  // STABLE ACROSS RENDERS, AND THAT IS THE WHOLE POINT.
+  //
+  // `Photograph` fetches inside an effect that depends on this function. An
+  // arrow built in the JSX would be a new value every render, so every render
+  // would download and decrypt the picture again.
+  const loadImage = useMemo(
+    () => (image: ReadImage) =>
+      openImageRef.current === null
+        ? Promise.resolve<ShownImage>({
+            shown: false,
+            reason: 'the application is not ready to fetch media yet',
+          })
+        : openImageRef.current(image),
+    [],
+  )
+
   // The synced case computed once rather than repeated at each of its two
   // uses below: narrowing `session` inline in both the status and the
   // duration text was the same three-part guard written out twice.
@@ -1306,6 +1394,8 @@ export function App({
                   selfUserId={selfUserId}
                   onSend={sendMessage}
                   sending={sending}
+                  onAttach={() => attachRef.current?.()}
+                  onLoadImage={loadImage}
                 />
 
                 {/* #34's gesture, and only where it means something: a
