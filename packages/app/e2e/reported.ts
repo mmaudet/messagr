@@ -121,9 +121,29 @@ export interface GeometryReport {
   readonly floor: number
 }
 
+/**
+ * The device Detox is driving, named rather than assumed.
+ *
+ * The serial matters: a developer with a phone plugged in and two emulators
+ * running would otherwise read whichever one adb picked. And when it is
+ * missing, `adb -s undefined` fails with a message about a device that does
+ * not exist, which is a long way from what actually went wrong.
+ */
+function driving(): string {
+  const id: unknown = device.id
+  if (typeof id !== 'string' || id === '') {
+    throw new Error(
+      'Detox has not allocated a device yet, so there is no log to read. ' +
+        'Every call here belongs inside a hook or a test, after the runner ' +
+        'has a device.',
+    )
+  }
+  return id
+}
+
 /** Empties the device's log, so a relaunch cannot read the run before it. */
 export function forgetTheLog(): void {
-  execFileSync('adb', ['-s', device.id, 'logcat', '-c'])
+  execFileSync('adb', ['-s', driving(), 'logcat', '-c'])
 }
 
 /**
@@ -139,7 +159,7 @@ export async function whatItReported(
   const until = Date.now() + timeoutMs
   let lastError = 'nothing was read'
   while (Date.now() < until) {
-    const dumped = execFileSync('adb', ['-s', device.id, 'logcat', '-d'], {
+    const dumped = execFileSync('adb', ['-s', driving(), 'logcat', '-d'], {
       maxBuffer: 64 * 1024 * 1024,
     }).toString()
     // The last one, not the first: a relaunch inside one test file logs
@@ -193,7 +213,7 @@ async function lastLineOf<T>(
   const until = Date.now() + timeoutMs
   let lastError = `no ${tag} line was read`
   while (Date.now() < until) {
-    const dumped = execFileSync('adb', ['-s', device.id, 'logcat', '-d'], {
+    const dumped = execFileSync('adb', ['-s', driving(), 'logcat', '-d'], {
       maxBuffer: 64 * 1024 * 1024,
     }).toString()
     // Newest first: a state that changes reports more than once, and the
