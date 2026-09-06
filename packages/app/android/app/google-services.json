@@ -1,0 +1,67 @@
+{
+  "project_info": {
+    "project_number": "381527082537",
+    "project_id": "messagr-reveil",
+    "storage_bucket": "messagr-reveil.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:381527082537:android:c4b16def48ac76f7de7e38",
+        "android_client_info": {
+          "package_name": "cloud.maudet.messagr"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBpTdYiuQjiH57GDhCR6etAttb2Q04D_Yo"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:381527082537:android:49351ee16509c464de7e38",
+        "android_client_info": {
+          "package_name": "cloud.maudet.reveil"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBpTdYiuQjiH57GDhCR6etAttb2Q04D_Yo"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:381527082537:android:cb57d505a35fb8a3de7e38",
+        "android_client_info": {
+          "package_name": "eu.messagr"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBpTdYiuQjiH57GDhCR6etAttb2Q04D_Yo"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

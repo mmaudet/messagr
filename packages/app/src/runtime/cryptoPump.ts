@@ -22,6 +22,7 @@ import {
   encryptionSlice,
   buildHistoryBundle,
   getDeviceIdentityKeys,
+  getDeviceStatuses,
   getIdentityStatus,
   markRequestFailed,
   markRequestSent,
@@ -65,7 +66,9 @@ import {
   type SyncLoopState,
   type SyncTick,
 } from './syncLoop'
-import { vouchFor, type VouchOutcome } from './vouch'
+import { PROMOTED_LEVEL, vouchFor, type VouchOutcome } from './vouch'
+import { fetchPowerContent, readPower } from './powerLevels'
+import { readWhatIsKnown, type TrustReading } from './trustReading'
 import { receiveAndDecrypt, type ReceiveReport } from './receiveDecrypt'
 import {
   runOutgoingPumpCycle,
@@ -594,3 +597,31 @@ export async function admitEntrant(
 }
 
 export type { Issued, Admission } from './issueInvitation'
+
+/**
+ * Phase nine: what is known about the person on the other side.
+ *
+ * Pure glue. What the three counts mean, and why they are three rather than
+ * one scale, is `trustReading.ts`, tested there against injected values.
+ *
+ * The vouch is read from the conversation's power levels rather than
+ * remembered anywhere: `vouchFor` grants the level, so the room state is the
+ * record, and a second copy could only disagree with it.
+ */
+export async function readTrust(
+  sessionClient: ReturnType<typeof createClient>,
+  scope: string,
+  participant: string,
+): Promise<TrustReading> {
+  const http = makePumpHttp(sessionClient)
+  const [statuses, levels] = await Promise.all([
+    getDeviceStatuses(participant),
+    fetchPowerContent(http, scope),
+  ])
+  return readWhatIsKnown(
+    statuses,
+    readPower(levels, participant).held >= PROMOTED_LEVEL,
+  )
+}
+
+export type { TrustReading } from './trustReading'
