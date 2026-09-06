@@ -69,6 +69,11 @@ export function ConversationList({
           </View>
         ))
       )}
+
+      {/* What the product is, in one sentence, under the list. The mockup
+          suffixes it with a specification reference; that reference is for a
+          reviewer and not for somebody reading their own screen. */}
+      <Text style={styles.noDirectory}>{t('list_no_directory')}</Text>
     </View>
   )
 }
@@ -178,6 +183,12 @@ const styles = StyleSheet.create({
     height: stroke.hairline.value,
     marginHorizontal: layout.screenGutter,
     backgroundColor: color.neutral['200'],
+  },
+  noDirectory: {
+    ...type.caption,
+    color: color.neutral['600'],
+    paddingHorizontal: layout.screenGutter,
+    paddingTop: space.xl,
   },
   empty: {
     ...type.body,

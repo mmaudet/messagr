@@ -85,6 +85,8 @@ import { Conversation } from './src/ui/Conversation'
 import { ConversationList } from './src/ui/ConversationList'
 import { Invite, type InviteStage } from './src/ui/Invite'
 import { Legal } from './src/ui/Legal'
+import { Reserved } from './src/ui/Reserved'
+import { TabBar, type Tab } from './src/ui/TabBar'
 import { Settings } from './src/ui/Settings'
 import { Trust } from './src/ui/Trust'
 import { GiveName } from './src/ui/GiveName'
@@ -187,7 +189,19 @@ export function App({
   // Which panel the list side is showing. A conversation, when one is open,
   // wins over all three: `openScope` is the deeper state and this is what sits
   // behind it.
-  const [panel, setPanel] = useState<'list' | 'settings' | 'legal'>('list')
+  // Which tab is showing, and whether Settings has pushed the legal screen
+  // over itself. Four tabs, and two of them are reserved before the thing
+  // they hold exists -- see `Reserved`: a bar that gains an item later moves
+  // every other item under people's thumbs.
+  const [tab, setTab] = useState<Tab>('chat')
+  // NOTHING COUNTS UNREAD YET, and the badge is off rather than showing a
+  // zero. Counting needs a per-conversation mark of what this account has
+  // read, which is the read-receipt machinery pointed the other way round and
+  // is not built. A badge fed by a placeholder would be a number invented to
+  // fill a shape, which is exactly what `TabBar` refuses for the Communautés
+  // dot.
+  const unreadCount = 0
+  const [legalOpen, setLegalOpen] = useState(false)
   // What is known about the person on the other side. `null` until the screen
   // is asked for: it costs a device-status call and a state fetch, and a
   // conversation nobody opened that screen from should not pay for them.
@@ -1028,11 +1042,34 @@ export function App({
 
               The instrument below stays on both, which is what a scaffold
               still needs and a product will not. */}
-          {openScope === null && panel === 'settings' && (
+          {openScope === null && tab === 'calls' && (
+            <View style={styles.block}>
+              <Reserved
+                testID="calls-reserved"
+                glyph="calls"
+                title="calls_soon_title"
+                why="calls_soon_why"
+                stages={['calls_soon_v2', 'calls_soon_v3']}
+              />
+            </View>
+          )}
+
+          {openScope === null && tab === 'community' && (
+            <View style={styles.block}>
+              <Reserved
+                testID="community-reserved"
+                glyph="community"
+                title="community_soon_title"
+                why="community_soon_why"
+              />
+            </View>
+          )}
+
+          {openScope === null && tab === 'settings' && !legalOpen && (
             <View style={styles.block}>
               <Settings
-                onBack={() => setPanel('list')}
-                onLegal={() => setPanel('legal')}
+                onBack={() => setTab('chat')}
+                onLegal={() => setLegalOpen(true)}
                 receipts={receipts}
                 receiptsNotKept={receiptsNotKept}
                 onReceipts={on => {
@@ -1049,13 +1086,13 @@ export function App({
             </View>
           )}
 
-          {openScope === null && panel === 'legal' && (
+          {openScope === null && tab === 'settings' && legalOpen && (
             <View style={styles.block}>
-              <Legal onBack={() => setPanel('settings')} />
+              <Legal onBack={() => setLegalOpen(false)} />
             </View>
           )}
 
-          {openScope === null && panel === 'list' && (
+          {openScope === null && tab === 'chat' && (
             <View style={styles.block}>
               <ConversationList
                 summaries={summaries}
@@ -1071,16 +1108,6 @@ export function App({
                   setAdmission(null)
                 }}
               />
-              {/* Reachable from the list, which is what the published terms
-                  promise: the article 14 information is on a screen
-                  "atteignable depuis les Réglages". */}
-              <Pressable
-                testID="open-settings"
-                onPress={() => setPanel('settings')}
-                accessibilityRole="button"
-                accessibilityLabel={t('settings_action')}>
-                <Text style={styles.back}>{t('settings_action')}</Text>
-              </Pressable>
             </View>
           )}
 
@@ -1394,6 +1421,15 @@ export function App({
             </Text>
           </View>
         </ScrollView>
+
+        {/* Outside the scroll view on purpose: a bar that scrolled away is a
+            bar nobody can reach without scrolling back, and muscle memory is
+            the whole point of a bottom bar. Hidden while a conversation is
+            open, which is what the mockup draws -- a conversation is a place
+            you leave rather than a fifth tab. */}
+        {openScope === null && (
+          <TabBar current={tab} onSelect={setTab} unread={unreadCount} />
+        )}
       </SafeAreaView>
     </SafeAreaProvider>
   )

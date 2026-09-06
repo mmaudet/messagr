@@ -421,6 +421,34 @@ export const fr = {
   settings_receipts_off: 'Désactivés',
   settings_receipts_not_kept:
     'Ce choix n’a pas pu être conservé : il reviendra à son état précédent au prochain démarrage.',
+
+  // LA BARRE D'ONGLETS. Quatre, et le troisième est réservé.
+  //
+  // L'onglet Appels existe dès la V1 alors que les appels n'y sont pas, et sa
+  // maquette dit pourquoi : « pour ne pas déplacer la barre plus tard ». Ce
+  // n'est pas la règle de settings_nothing_else -- un interrupteur qui ne
+  // commande rien ment sur une capacité, un onglet réservé qui explique qu'il
+  // l'est est une promesse datée, et il achète une barre qui ne bouge pas
+  // sous le pouce des gens le jour où les appels arrivent.
+  // Les quatre libellés existaient déjà, hérités du produit précédent et
+  // identiques à ceux de la maquette : tab_discussions, tab_communities,
+  // tab_calls, tab_settings. Rien à ajouter ici.
+
+  // La phrase qui explique le produit sous la liste. Sans le « (§8.2, P2,
+  // P3) » de la maquette : les repères de spécification s'adressent au
+  // relecteur, pas à la personne qui lit son écran.
+  list_no_directory:
+    'Aucun numéro de téléphone n’apparaît nulle part dans le système. On n’entre en relation que par invitation.',
+
+  calls_soon_title: 'Bientôt : appels audio, puis vidéo',
+  calls_soon_why:
+    'L’onglet est réservé dès la V1 pour ne pas déplacer la barre plus tard. La V1 ne transporte que texte, liens et images statiques ; vocaux en V2, appels individuels puis de groupe en V3.',
+  calls_soon_v2: 'V2 · messages vocaux',
+  calls_soon_v3: 'V3 · audio + vidéo',
+
+  community_soon_title: 'Bientôt : communautés et salons',
+  community_soon_why:
+    'Une communauté regroupe des salons sous un objet pseudonyme. L’onglet est réservé pour la même raison que celui des appels : la barre ne doit pas bouger quand ils arriveront.',
 } as const
 
 /** Every key any screen may ask for. A typo is a compile error, not a blank. */
