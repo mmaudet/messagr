@@ -82,7 +82,12 @@ describe('boot', () => {
     await acceptThePromise()
     shape = await whatItMeasured()
     report = await whatItReported()
-  }, 180000)
+    // Wide enough for the three waits inside it end to end: the promise
+    // screen appearing (30s), the geometry line (60s), and the launch report
+    // (90s). At 180000 those add up to exactly the budget, which is a hook
+    // that fails on a slow runner rather than on anything the application
+    // did.
+  }, 240000)
 
   it('enters by spending the invitation it was opened with', () => {
     // The first launch of a freshly installed application: no session kept,
