@@ -468,6 +468,13 @@ export const fr = {
   // different product.
   brand_name: 'Messagr',
 
+  // Notifications. The blind one is what a wake can say before anything is
+  // decrypted: something arrived. It names nobody, because nothing naming
+  // anybody crossed the push infrastructure.
+  notify_blind_title: 'Messagr',
+  notify_blind_body: 'Quelque chose est arrivé.',
+  notify_channel: 'Messages',
+
   // Photographs. `image_alt` is what a screen reader says: not a description
   // of the picture, which nothing here can produce, but what the thing is.
   image_alt: 'Photo',

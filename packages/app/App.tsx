@@ -32,6 +32,7 @@ import {
   listConversations,
   openPhotograph,
   reactToMessage,
+  registerThisDeviceForWaking,
   sendPhotograph,
   sendReadReceipt,
   readTrust,
@@ -84,6 +85,7 @@ import { forgetfulGivenNames } from './src/runtime/givenNameStore'
 import { forgetfulLastRead, type LastRead } from './src/runtime/lastReadStore'
 import { openNotebook } from './src/runtime/notebook'
 import { pickFromLibrary } from './src/runtime/imageLibrary'
+import { pushTokenForThisDevice } from './src/runtime/pushDevice'
 import type { ShownImage } from './src/runtime/receiveImage'
 import type { ReadImage } from './src/timeline/imageEvent'
 import type { EvictOutcome } from './src/runtime/evict'
@@ -755,6 +757,45 @@ export function App({
             // make it re-download the picture on every render.
             openImageRef.current = image => openPhotograph(credentials, image)
 
+            // TELLING THE HOMESERVER WHERE TO WAKE THIS DEVICE.
+            //
+            // After the session exists and not before: a pusher is registered
+            // against an account. Failure is reported and nothing else --
+            // a device that could not register one still works while it is
+            // open, and a launch that failed over a notification would be a
+            // launch nobody can read their messages from.
+            //
+            // Every launch rather than once. Firebase rotates tokens, and a
+            // pusher keyed by a token nobody holds any more is a device that
+            // silently stopped being notified. Re-registering the same token
+            // is what the endpoint is for.
+            pushTokenForThisDevice()
+              .then(async answer => {
+                if (answer.token === null) {
+                  logEvent('info', 'MESSAGR_PUSH_NOT_REGISTERED', {
+                    reason: answer.reason,
+                  })
+                  return
+                }
+                const done = await registerThisDeviceForWaking(
+                  sessionClient,
+                  credentials,
+                  answer.token,
+                )
+                logEvent(
+                  done.registered ? 'info' : 'warn',
+                  done.registered
+                    ? 'MESSAGR_PUSH_REGISTERED'
+                    : 'MESSAGR_PUSH_NOT_REGISTERED',
+                  done.registered ? {} : { reason: done.reason },
+                )
+              })
+              .catch((cause: unknown) =>
+                logEvent('warn', 'MESSAGR_PUSH_NOT_REGISTERED', {
+                  reason: getErrorMessage(cause),
+                }),
+              )
+
             // Asked for rather than computed on every launch: it costs a
             // device-status call and a state fetch per conversation.
             readTrustRef.current = (scope: string, other: string) => {
@@ -1200,15 +1241,14 @@ export function App({
 
   return (
     <SafeAreaProvider>
-      {/* THE BOTTOM EDGE IS THE DOCK'S, NOT THIS ONE'S.
-          An absolutely-positioned child is laid out against the border box
-          and not the padding box, so a dock at `bottom: 0` ignores whatever
-          inset this view reserved -- watched on a device, with the system's
-          gesture bar drawn straight across "Communautés" and "Appels". So
-          this view stops padding the bottom and the dock claims that inset
-          itself, which is the ordinary shape for a bar that has to sit on
-          the edge. */}
-      <SafeAreaView style={styles.screen} edges={['top', 'left', 'right']}>
+      {/* NEITHER EDGE IS THIS VIEW'S. Both the header and the dock claim
+          their own inset, ground and all -- see each of them for why. An
+          absolutely-positioned child is laid against the border box and not
+          the padding box, so a dock at `bottom: 0` ignored the inset this
+          view reserved; and a reserved top inset left a pale strip above the
+          dark band, into which the system drew the clock and the battery in
+          white. Whatever sits on an edge paints to it. */}
+      <SafeAreaView style={styles.screen} edges={['left', 'right']}>
         {/* Outside the scroll view, like the tab bar and for the same reason:
             what the band says is true of the instance rather than of the
             screen under it, and a fact about the instance that scrolls away

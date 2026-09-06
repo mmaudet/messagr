@@ -56,6 +56,7 @@ import { probeUnsettledEncrypt, type ProbeReport } from './panicProbe'
 import { claimHistory, type HistoryClaim } from './claimHistory'
 import { evictFrom, type EvictOutcome } from './evict'
 import { mediaRepository } from './mediaRepository'
+import { registerPusher, type PusherRegistration } from './pusher'
 import type { PickedImage } from './pickImage'
 import { fetchImage, type ShownImage } from './receiveImage'
 import { sendImage, sendingThrough, type ImageSent } from './sendImage'
@@ -752,6 +753,37 @@ export async function openPhotograph(
       open: (ciphertext, secret) => decryptAttachment(ciphertext, secret),
     },
     image,
+  )
+}
+
+/**
+ * Phase twelve: telling the homeserver where to wake this device.
+ *
+ * Pure glue. What the pusher says, and why it points at this deployment's own
+ * gateway rather than at sygnal, is `pusher.ts`.
+ *
+ * The gateway base is derived from the account's own homeserver, the way
+ * `issueInvitation`'s link host is: a device pushes through the deployment it
+ * belongs to, and a configured URL would be one more thing that can point
+ * somewhere else.
+ */
+export async function registerThisDeviceForWaking(
+  sessionClient: ReturnType<typeof createClient>,
+  credentials: { readonly baseUrl: string },
+  token: string,
+): Promise<PusherRegistration> {
+  const http = makePumpHttp(sessionClient)
+  return registerPusher(
+    async body => {
+      await http.authedRequest(
+        'POST',
+        '/_matrix/client/v3/pushers/set',
+        {},
+        JSON.stringify(body),
+      )
+    },
+    token,
+    `${credentials.baseUrl.replace(/\/+$/, '')}/_messagr`,
   )
 }
 

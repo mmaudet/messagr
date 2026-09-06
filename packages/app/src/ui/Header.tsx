@@ -1,5 +1,6 @@
 import React from 'react'
-import { StyleSheet, Text, View } from 'react-native'
+import { StatusBar, StyleSheet, Text, View } from 'react-native'
+import { SafeAreaView } from 'react-native-safe-area-context'
 
 import { t, type CopyKey } from '../copy'
 import { color, layout, space, type } from '../design/tokens'
@@ -28,6 +29,19 @@ import { BrandMark } from './BrandMark'
  * The mono role, because it is a machine fact about this instance and not a
  * sentence addressed to anybody — the same distinction `ConversationList`
  * draws between a name and an identifier.
+ *
+ * # It owns the top inset, and the status bar with it
+ *
+ * The screen used to reserve that inset, which left a pale strip above the
+ * band — and the system drew the clock, the signal and the battery into it in
+ * white, because the promise screen before it is dark. Reported from a device:
+ * *« le bandeau sup de l'android avec le réseau, le niveau de batterie n'est
+ * plus visible »*.
+ *
+ * The band runs to the top of the screen instead, and `light-content` is then
+ * simply true: everything behind the status bar in this application is
+ * `ink900`, on this screen and on the promise screen both. Same rule as
+ * `TabBar` at the other edge — whatever sits on an edge paints to it.
  */
 
 export function Header({
@@ -39,7 +53,12 @@ export function Header({
   readonly testID?: string
 }) {
   return (
-    <View style={styles.band} testID={testID}>
+    <SafeAreaView edges={['top']} style={styles.band} testID={testID}>
+      {/* No `backgroundColor`: React Native 0.87 dropped it, because
+          Android 15 draws edge-to-edge and the bar has no ground of its own
+          any more. It does not need one -- the band behind it is `ink900`,
+          which is exactly what a background colour would have painted. */}
+      <StatusBar barStyle="light-content" />
       <View style={styles.mark}>
         <BrandMark size={space.xl} tint={color.surface.paper} />
         <Text style={styles.wordmark}>{t('brand_name')}</Text>
@@ -47,7 +66,7 @@ export function Header({
       <Text style={styles.state} testID={`${testID}-state`}>
         {t(state)}
       </Text>
-    </View>
+    </SafeAreaView>
   )
 }
 

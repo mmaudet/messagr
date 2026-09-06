@@ -12,7 +12,10 @@
     "e2e:android": "detox test --configuration android.emu.debug"
   },
   "dependencies": {
+    "@notifee/react-native": "^9.1.8",
     "@op-engineering/op-sqlite": "18.2.0",
+    "@react-native-firebase/app": "^26.4.0",
+    "@react-native-firebase/messaging": "^26.4.0",
     "matrix-js-sdk": "^42.3.0",
     "react": "19.2.3",
     "react-native": "0.87.1",
