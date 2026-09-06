@@ -76,12 +76,24 @@ export function FirstLaunch({
   language,
   onLanguage,
   onLanguageSettled,
+  onGeometry,
 }: {
   readonly onBegin: () => void
   readonly language: Language
   readonly onLanguage: (language: Language) => void
   /** Called when the strip stops. Only this one persists. */
   readonly onLanguageSettled: (language: Language) => void
+  /**
+   * The shape this screen's action actually laid out at.
+   *
+   * The notch is the identity's, and the product has to be able to check it
+   * on a device rather than only in a unit test -- `NotchedButton` says so.
+   * It used to be checked on a button rendered into the diagnostic readout
+   * for no other purpose, which measured the right arithmetic on the wrong
+   * button. This is a real one, on the first screen of the journey, so what
+   * is measured is what somebody presses.
+   */
+  readonly onGeometry?: (geometry: { height: number; leg: number }) => void
 }) {
   const [accepted, setAccepted] = useState(false)
   const [nagged, setNagged] = useState(false)
@@ -168,6 +180,7 @@ export function FirstLaunch({
             wide
             label={t('promise_action')}
             testID="promise-action"
+            onGeometry={onGeometry}
             // NOT DISABLED, AND SAYING WHY WHEN PRESSED.
             //
             // A greyed button is a control that gives no reason, and somebody

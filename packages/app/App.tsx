@@ -13,17 +13,13 @@ import { createClient } from 'matrix-js-sdk'
 
 import { runProbe } from 'react-native-matrix-crypto'
 
-import {
-  fetchBridgeStatus,
-  type BridgeStatus,
-} from './src/runtime/cryptoBridge'
+import { fetchBridgeStatus } from './src/runtime/cryptoBridge'
 import {
   claimOfferedHistory,
   evictMember,
   firstJoinedRoom,
   receiveOneEncryptedMessage,
   runPanicProbe,
-  type ProbeReport,
   loadConversation,
   runOutgoingPump,
   sendOneEncryptedMessage,
@@ -48,10 +44,9 @@ import {
   type RunningSyncLoop,
   type TrustReading,
   type SendReport,
-  type SyncLoopState,
 } from './src/runtime/cryptoPump'
 import { getErrorMessage } from './src/runtime/errors'
-import { computeHermesReport, type HermesReport } from './src/runtime/hermes'
+import { computeHermesReport } from './src/runtime/hermes'
 import { logEvent } from './src/runtime/log'
 import { polyfillReport } from './src/runtime/bootstrap'
 import { computeRuntimeGapReport } from './src/runtime/runtimeGaps'
@@ -73,13 +68,7 @@ import {
 import { readUpTo } from './src/runtime/receipts'
 import { hasSeenPromise, rememberPromiseSeen } from './src/runtime/promiseSeen'
 import { clearSignUp, isSignUpUnfinished } from './src/runtime/signUpMarker'
-import {
-  color,
-  floors,
-  notch,
-  space,
-  type as typeScale,
-} from './src/design/tokens'
+import { color, floors, space, type as typeScale } from './src/design/tokens'
 import { mergeTimeline, type TimelineEntry } from './src/timeline/mergeTimeline'
 import { makePumpHttp } from './src/runtime/pump'
 import { fetchJoinedMembers } from './src/runtime/encryptedSend'
@@ -126,9 +115,7 @@ import { Evict } from './src/ui/Evict'
 import { Vouch } from './src/ui/Vouch'
 import { setCatalogue, t } from './src/copy'
 import type { Language } from './src/copy/languages'
-import { NotchedButton } from './src/ui/NotchedButton'
-import { notchLegFor } from './src/ui/notchGeometry'
-import { enterWithASession, type EntryResult } from './src/runtime/entry'
+import { enterWithASession } from './src/runtime/entry'
 import { initialLink } from './src/runtime/incomingLink'
 import { servicePoster } from './src/runtime/servicePoster'
 import {
@@ -136,10 +123,7 @@ import {
   makeSyncClient,
   type SessionSyncStatus,
 } from './src/runtime/sessionSync'
-import {
-  computeTransportStatus,
-  type TransportStatus,
-} from './src/runtime/transportStatus'
+import { computeTransportStatus } from './src/runtime/transportStatus'
 
 /**
  * The pump's outcome, folded in at screen level exactly as `session` already
@@ -155,10 +139,28 @@ type PumpStatus =
   | { readonly outcome: 'ran'; readonly report: CryptoPumpReport }
 
 /**
- * The scaffold's only screen. It exists to answer the two questions this
- * milestone has to answer on a device rather than in configuration: is the New
- * Architecture actually running, and does the crypto bridge actually load.
- * Nothing here is product surface, so the design tokens do not govern it yet.
+ * The application: a frame, four tabs, and whatever one of them is showing.
+ *
+ * # What used to be here
+ *
+ * A diagnostic readout -- New Architecture, Runtime gaps, Matrix transport,
+ * Entry, Session sync, Crypto bridge, Crypto pump, Encrypted send, Given
+ * names, Keystore form -- with the screens rendered into it as they were
+ * built. That readout *was* the application before there were screens, and it
+ * is gone with #105: nobody installing Messagr should ever have seen it.
+ *
+ * # The instrument stayed, and the distinction is the whole point
+ *
+ * Every `logEvent` call is still here. The readout was the dashboard; the log
+ * is the instrument, and it is the half that actually found the defects -- an
+ * emulator with no network once reported thirteen crypto assertions failing
+ * for no stated reason, and the only account of what was really wrong was the
+ * application's own. Removing the log to remove the readout would have been
+ * removing the instrument to remove the dashboard.
+ *
+ * The end-to-end suite reads that log now (`e2e/reported.ts`), which is what
+ * it should have read all along: a line of JSON cannot be scrolled off, and
+ * it says the same thing whatever the screens become.
  */
 export function App({
   // Absent on any host that has not been updated to supply it (iOS has not
@@ -215,21 +217,14 @@ export function App({
   const keepLanguage = (next: Language) => {
     rememberLanguage(languageSecrets, next).catch(() => {})
   }
-  const [bridge, setBridge] = useState<BridgeStatus | null>(null)
-  const [entry, setEntry] = useState<EntryResult | null>(null)
   // The conversation this application holds, derived from the room on every
   // launch rather than read from a copy on disk. See ADR-0006.
   const [conversation, setConversation] = useState<TimelineEntry[] | null>(null)
-  // What the live sync loop is doing, shown rather than assumed. ADR-0007
-  // names a loop that dies silently as worse than no loop, because the
-  // screen keeps looking live.
-  const [live, setLive] = useState<SyncLoopState | null>(null)
   // The conversations this account is in, and the names this device gives
   // their other participants. ADR-0010: the names are held here and nowhere
   // else -- not on the homeserver, not with the other participant.
   const [summaries, setSummaries] = useState<readonly ConversationSummary[]>([])
   const [names, setNames] = useState<ReadonlyMap<string, string>>(new Map())
-  const [notebook, setNotebook] = useState<string | null>(null)
   // Inviting somebody, which is the same gesture as starting a conversation
   // with them. See issueInvitation.ts.
   const [invite, setInvite] = useState<InviteStage>({ stage: 'shut' })
@@ -355,46 +350,12 @@ export function App({
   const [sendMessage, setSendMessage] = useState<
     ((body: string) => void) | null
   >(null)
-  // Whether this launch minted the crypto store's passphrase or reopened
-  // with the one it already held -- never the passphrase itself. A relaunch
-  // that mints is a relaunch that lost every room key it had.
-  // Whether the passphrase sits at the accessibility a background wake needs.
-  // ADR-0008. Reported whether or not the machine then started: it is the
-  // difference between a device that can decrypt while its screen is off and
-  // one that cannot, and it is invisible everywhere else.
-  const [keystoreForm, setKeystoreForm] = useState<FormMigration | null>(null)
-  const [storePassphrase, setStorePassphrase] = useState<
-    'minted' | 'reused' | null
-  >(null)
-  // Whether this device still carries the marker saying its sign-up never
-  // finished. Reported because it is the entitlement to the one destructive
-  // call on the crypto surface, and a marker that never clears would leave
-  // that call armed on every launch, forever.
-  const [signUpState, setSignUpState] = useState<
-    'unfinished' | 'complete' | null
-  >(null)
-  // What the notched button actually laid out at, reported from the device.
-  // The shape is the brand's, so something has to be able to check it where
-  // it renders rather than only where it is computed.
-  const [geometry, setGeometry] = useState<{
-    height: number
-    leg: number
-  } | null>(null)
   // #27's diagnostic, off in every ordinary build. A static read, because
   // that is the only shape babel's inliner replaces (sessionCredentials.ts
   // says the same about its four).
   const panicProbeRequested = useMemo(
     () => process.env.MESSAGR_PANIC_PROBE === '1',
     [],
-  )
-  const [probe, setProbe] = useState<ProbeReport | null>(null)
-  const [session, setSession] = useState<
-    SessionSyncStatus | 'not-configured' | null
-  >(null)
-  const [pump, setPump] = useState<PumpStatus | null>(null)
-  const [send, setSend] = useState<SendReport | 'not-run' | null>(null)
-  const [received, setReceived] = useState<ReceiveReport | 'not-run' | null>(
-    null,
   )
 
   // BACKGROUNDING, AND WHY IT IS NOT LEFT TO CHANCE.
@@ -470,19 +431,16 @@ export function App({
 
     const probeAndReport = async (): Promise<void> => {
       const status = await fetchBridgeStatus(runProbe)
-      setBridge(status)
 
       // Answers one question and does nothing else. The machine it creates
       // carries a made-up identity and its own store, so letting the normal
       // flow run afterwards would be driving a bridge configured for
       // somebody who does not exist.
       if (panicProbeRequested) {
-        setProbe({ outcome: 'attempting', detail: 'calling encryptEvent' })
         const report = await runPanicProbe(
           { userId: '@probe:example.invalid', deviceId: 'PROBEDEVICE' },
           storeDir,
         )
-        setProbe(report)
         logEvent('info', 'MESSAGR_PANIC_PROBE', { ...report })
         return
       }
@@ -505,13 +463,23 @@ export function App({
         // a device with nothing else changed.
         wait: ms => new Promise(resolve => setTimeout(resolve, ms)),
       })
-      setEntry(entered)
       const credentials = entered.entered ? entered.session : null
 
       let sessionStatus: SessionSyncStatus | 'not-configured'
       let pumpStatus: PumpStatus
       let sendStatus: SendReport | 'not-run' = 'not-run'
       let receiveStatus: ReceiveReport | 'not-run' = 'not-run'
+      // THREE FACTS THAT ONLY THE READOUT USED TO CARRY.
+      //
+      // They were held in state and rendered, and #105 takes the rendering
+      // away. Held as locals here as well so the launch report says them:
+      // `passphrase` is the store's own continuity -- a relaunch reporting
+      // `minted` means the passphrase did not survive and this device opened
+      // a new, empty store, losing every room key the old one held -- and
+      // there is nothing else anywhere that would say so.
+      let passphrase: 'minted' | 'reused' | null = null
+      let signUp: 'unfinished' | 'complete' | null = null
+      let form: FormMigration | null = null
       if (credentials === null) {
         sessionStatus = 'not-configured'
         pumpStatus = 'not-configured'
@@ -534,7 +502,7 @@ export function App({
         // Outside the `started` test below, deliberately: the migration runs
         // before the store is opened, so it has an answer even on a launch
         // that then fails to start a machine at all.
-        setKeystoreForm(start.passphraseForm)
+        form = start.passphraseForm
 
         try {
           sessionStatus = await fetchSessionSyncStatus(
@@ -542,7 +510,7 @@ export function App({
           )
 
           if (start.started) {
-            setStorePassphrase(start.passphraseMinted ? 'minted' : 'reused')
+            passphrase = start.passphraseMinted ? 'minted' : 'reused'
           }
 
           if (!start.started) {
@@ -589,11 +557,9 @@ export function App({
             if (report.identity.established) {
               await clearSignUp(signUpSecrets)
             }
-            setSignUpState(
-              (await isSignUpUnfinished(signUpSecrets))
-                ? 'unfinished'
-                : 'complete',
-            )
+            signUp = (await isSignUpUnfinished(signUpSecrets))
+              ? 'unfinished'
+              : 'complete'
             // Only once the keys are published: a message encrypted before
             // this device's own keys are on the server is one nobody can
             // ask about, let alone decrypt.
@@ -631,7 +597,6 @@ export function App({
             const opening = await openNotebook(storeDir)
             namesRef.current = opening.names
             lastReadRef.current = opening.lastRead
-            setNotebook(opening.opened ? 'open' : (opening.reason ?? 'closed'))
             logEvent(opening.opened ? 'info' : 'warn', 'MESSAGR_GIVEN_NAMES', {
               opened: opening.opened,
               ...(opening.minted === undefined
@@ -1117,7 +1082,6 @@ export function App({
                 },
                 state => {
                   if (generation !== liveGenerationRef.current) return
-                  setLive(state)
                   // Logged as well as rendered, for the reason every other
                   // probe here is: the emulator's screencap returns a blank
                   // frame, so the log is the only machine-readable evidence
@@ -1205,10 +1169,6 @@ export function App({
           if (start.started) start.unsubscribeToDevice()
         }
       }
-      setSession(sessionStatus)
-      setPump(pumpStatus)
-      setSend(sendStatus)
-      setReceived(receiveStatus)
 
       // Logged as well as rendered. The Android emulator's screencap returns a
       // blank frame regardless of what is on screen, so the log is the only
@@ -1236,6 +1196,13 @@ export function App({
         send: sendStatus,
         received: receiveStatus,
         history: historyClaim,
+        // The three the readout used to be the only witness for. `form` is
+        // the keystore migration, which answers even on a launch that then
+        // fails to start a machine at all -- so it is reported outside every
+        // branch above, the way it is computed.
+        passphrase,
+        signUp,
+        keystoreForm: form,
       })
     }
 
@@ -1329,21 +1296,6 @@ export function App({
     [],
   )
 
-  // The synced case computed once rather than repeated at each of its two
-  // uses below: narrowing `session` inline in both the status and the
-  // duration text was the same three-part guard written out twice.
-  const synced =
-    session !== null && session !== 'not-configured' && session.synced
-      ? session
-      : null
-
-  // Same idiom as `synced` above: narrowed once rather than repeated at each
-  // of this block's two uses.
-  const ranPump =
-    pump !== null && pump !== 'not-configured' && pump.outcome === 'ran'
-      ? pump
-      : null
-
   // BEFORE ANYTHING ELSE, AND WITHOUT A FLASH BETWEEN.
   //
   // While the keystore has not answered, the same ground the launch frame
@@ -1366,6 +1318,22 @@ export function App({
           language={language}
           onLanguage={chooseLanguage}
           onLanguageSettled={keepLanguage}
+          // ITS OWN LINE, NOT PART OF THE LAUNCH REPORT.
+          //
+          // The launch report is written once, when the launch effect
+          // finishes; a layout has not happened yet, so the geometry would
+          // always be null in it. This says the fact when the fact exists.
+          onGeometry={shape =>
+            logEvent('info', 'MESSAGR_GEOMETRY', {
+              height: shape.height,
+              leg: shape.leg,
+              // The floor is geometry, which no provenance rule can reach --
+              // so it is asserted against the height the device actually
+              // gave the button rather than the height the style asked for.
+              touchTargetMet: shape.height >= floors.touchTargetMin,
+              floor: floors.touchTargetMin,
+            })
+          }
           onBegin={() => {
             // Set first, kept second. A keystore that refuses must not leave
             // somebody stuck on a screen whose only action does nothing —
@@ -1447,8 +1415,22 @@ export function App({
           />
         )}
 
+        {/* ONE FRAME, AND A NEW ONE PER SCREEN.
+            It was `diagnostic-scroll` and it was honestly named: the readout
+            was the thing that scrolled and the screens were rendered into it.
+            With the readout gone (#105) it is the product's frame, and its
+            name said otherwise.
+
+            `key` is the substance of the rename. A single container keeps its
+            offset across whatever is rendered into it, so leaving a long
+            conversation for Réglages arrived scrolled into the middle of a
+            short screen -- and returning to the conversation arrived wherever
+            Réglages had been. Keying it on what it shows makes React build a
+            new one per screen, which is what "each screen owns its own
+            scrolling" means when no screen scrolls on its own. */}
         <ScrollView
-          testID="diagnostic-scroll"
+          key={openScope ?? tab}
+          testID="screen-scroll"
           // Ends above the dock rather than under it. The dock is absolute,
           // so without this the last row of whatever is on screen sits behind
           // the tab bar -- which reads as content that will not scroll far
@@ -1457,15 +1439,6 @@ export function App({
             styles.content,
             { paddingBottom: dockHeight + space.l },
           ]}>
-          {probe !== null && (
-            <View style={styles.block}>
-              <Text style={styles.heading}>Panic probe (#27)</Text>
-              <Text testID="panic-probe" style={styles.line}>
-                {`${probe.outcome}: ${probe.detail}`}
-              </Text>
-            </View>
-          )}
-
           {/* THE LIST **OR** THE CONVERSATION, never both.
               Stacking them was the first shape this took, and it was wrong
               twice over. On a phone nobody shows a list above the
@@ -1475,8 +1448,7 @@ export function App({
               conversation carries that message. An assertion that has to say
               *where* is an assertion about a screen nobody would ship.
 
-              The instrument below stays on both, which is what a scaffold
-              still needs and a product will not. */}
+*/}
           {openScope === null && tab === 'calls' && (
             <View style={styles.block}>
               <Reserved
@@ -1621,15 +1593,29 @@ export function App({
                   refusal for an untrusted sender is the one worth saying:
                   what fixes it is verifying them, and this screen is where
                   somebody would otherwise just see a gap. */}
-                {claimed !== null && claimed.claimed !== 'none' && (
-                  <Text testID="history-claim" style={styles.line}>
-                    {claimed.claimed === 'imported'
-                      ? t('vouch_history_arrived')
-                      : claimed.kind === 'untrusted'
-                        ? t('vouch_history_untrusted')
-                        : `${claimed.kind}: ${claimed.reason}`}
+                {/* TWO CASES, AND SILENCE FOR THE REST.
+                    It used to fall through to `${kind}: ${reason}` -- a
+                    diagnostic string, in French copy, on a screen a person
+                    reads. The two cases here are the two somebody can act
+                    on: history arrived, or it was refused because the sender
+                    is not verified, which is fixed by verifying them.
+
+                    Every other kind is a failure nobody on this screen can
+                    do anything about, and it is in the launch report under
+                    `history`, which is where somebody diagnosing it looks. */}
+                {claimed !== null && claimed.claimed === 'imported' && (
+                  <Text testID="history-claim" style={styles.historyNote}>
+                    {t('vouch_history_arrived')}
                   </Text>
                 )}
+                {claimed !== null &&
+                  claimed.claimed !== 'none' &&
+                  claimed.claimed !== 'imported' &&
+                  claimed.kind === 'untrusted' && (
+                    <Text testID="history-claim" style={styles.historyNote}>
+                      {t('vouch_history_untrusted')}
+                    </Text>
+                  )}
               </View>
             )}
 
@@ -1744,164 +1730,6 @@ export function App({
               )}
             </View>
           )}
-
-          {/* Everything below is the instrument, not the product. It is what
-              proves the increment on a device, and it goes when the product
-              has screens of its own to prove it. */}
-          <View style={styles.block}>
-            <Text style={styles.heading}>New Architecture</Text>
-            <Text testID="arch-enabled" style={styles.line}>
-              {`enabled: ${architecture.enabled}`}
-            </Text>
-            <Text testID="arch-bridgeless" style={styles.line}>
-              {`bridgeless: ${architecture.bridgeless}`}
-            </Text>
-            <Text testID="arch-turbomodules" style={styles.line}>
-              {`turboModules: ${architecture.turboModules}`}
-            </Text>
-            <Text testID="arch-fabric" style={styles.line}>
-              {`fabric: ${architecture.fabric}`}
-            </Text>
-            <Text testID="js-engine" style={styles.line}>
-              {computeEngineLabel(hermes)}
-            </Text>
-          </View>
-
-          <View style={styles.block}>
-            <Text style={styles.heading}>Runtime gaps</Text>
-            <Text testID="runtime-gaps" style={styles.line}>
-              {gaps.missing.length === 0
-                ? 'none'
-                : // The reason, not just the name: a gap that stayed open
-                  // because a module would not load reads differently from one
-                  // no provider covers, and the difference is what gets fixed.
-                  polyfillReport.stillMissing
-                    .map(gap => `${gap.name} (${gap.reason})`)
-                    .join(', ')}
-            </Text>
-          </View>
-
-          <View style={styles.block}>
-            <Text style={styles.heading}>Matrix transport</Text>
-            <Text testID="client-status" style={styles.line}>
-              {computeTransportLabel(client)}
-            </Text>
-          </View>
-
-          <View style={styles.block}>
-            <Text style={styles.heading}>Entry</Text>
-            <Text testID="entry-status" style={styles.line}>
-              {computeEntryLabel(entry)}
-            </Text>
-          </View>
-
-          <View style={styles.block}>
-            <Text style={styles.heading}>Session sync</Text>
-            <Text testID="session-status" style={styles.line}>
-              {computeSessionLabel(session)}
-            </Text>
-            <Text testID="session-sync-duration" style={styles.line}>
-              {computeSyncDurationLabel(synced)}
-            </Text>
-          </View>
-
-          <View style={styles.block}>
-            <Text style={styles.heading}>Crypto bridge</Text>
-            <Text testID="bridge-status" style={styles.line}>
-              {computeBridgeLabel(bridge)}
-            </Text>
-            <Text testID="crypto-store" style={styles.line}>
-              {computeStoreLabel(storePassphrase)}
-            </Text>
-          </View>
-
-          <View style={styles.block}>
-            <Text style={styles.heading}>Crypto pump</Text>
-            <Text testID="pump-status" style={styles.line}>
-              {computePumpStatusLabel(pump)}
-            </Text>
-            <Text testID="pump-device-keys" style={styles.line}>
-              {computePumpDeviceKeysLabel(ranPump)}
-            </Text>
-            <Text testID="pump-one-time-keys" style={styles.line}>
-              {computePumpOneTimeKeysLabel(ranPump)}
-            </Text>
-            <Text testID="pump-sharing-strategy" style={styles.line}>
-              {computeSharingStrategyLabel(ranPump)}
-            </Text>
-            <Text testID="pump-identity" style={styles.line}>
-              {computeIdentityLabel(ranPump)}
-            </Text>
-            <Text testID="pump-signup" style={styles.line}>
-              {computeSignUpLabel(signUpState)}
-            </Text>
-          </View>
-
-          <View style={styles.block}>
-            <Text style={styles.heading}>Encrypted send</Text>
-            <Text testID="send-status" style={styles.line}>
-              {computeSendLabel(send)}
-            </Text>
-            <Text testID="send-event" style={styles.line}>
-              {computeSendEventLabel(send)}
-            </Text>
-            <Text testID="send-control" style={styles.line}>
-              {computeControlLabel(send)}
-            </Text>
-            <Text testID="send-tamper" style={styles.line}>
-              {computeTamperLabel(send)}
-            </Text>
-          </View>
-
-          <View style={styles.block}>
-            <Text style={styles.heading}>Received</Text>
-            <Text testID="received-body" style={styles.line}>
-              {computeReceivedLabel(received)}
-            </Text>
-            <Text testID="received-sender" style={styles.line}>
-              {computeClaimedSenderLabel(received)}
-            </Text>
-          </View>
-          {/* Appended, and new blocks must be. Every block here was added at
-              the end of the readout, and the suite's assertions assume that
-              order: Detox does not scroll on its own, so inserting this one
-              in the middle pushed the crypto readout below the fold and
-              failed six assertions on a change that touched none of them. */}
-          <View style={styles.block}>
-            <Text style={styles.heading}>Brand geometry</Text>
-            <NotchedButton
-              label="Action principale"
-              testID="notched-button"
-              onGeometry={setGeometry}
-            />
-            <Text testID="notch-touch-target" style={styles.line}>
-              {computeTouchTargetLabel(geometry)}
-            </Text>
-            <Text testID="notch-proportion" style={styles.line}>
-              {computeNotchLabel(geometry)}
-            </Text>
-          </View>
-
-          <View style={styles.block}>
-            <Text style={styles.heading}>Live sync</Text>
-            <Text testID="live-sync-status" style={styles.line}>
-              {computeLiveSyncLabel(live)}
-            </Text>
-          </View>
-
-          <View style={styles.block}>
-            <Text style={styles.heading}>Given names</Text>
-            <Text testID="given-names" style={styles.line}>
-              {computeNotebookLabel(notebook, summaries.length, openScope)}
-            </Text>
-          </View>
-
-          <View style={styles.block}>
-            <Text style={styles.heading}>Keystore form</Text>
-            <Text testID="keystore-form" style={styles.line}>
-              {computeKeystoreFormLabel(keystoreForm)}
-            </Text>
-          </View>
         </ScrollView>
 
         {/* Outside the scroll view on purpose: a bar that scrolled away is a
@@ -1962,348 +1790,6 @@ export function App({
 // generic formatter forcing three differently-shaped probes through one
 // abstraction.
 
-/**
- * The notebook, the list it names, and which conversation is open.
- *
- * Three facts on one line because they fail together: a notebook that did not
- * open shows a list of identifiers, and a list that came back empty makes the
- * open conversation the only thing on screen. Read separately they each look
- * like a different bug.
- */
-function computeNotebookLabel(
-  notebook: string | null,
-  listed: number,
-  openScope: string | null,
-): string {
-  const store =
-    notebook === null
-      ? 'not opened yet'
-      : notebook === 'open'
-        ? 'open'
-        : `CLOSED: ${notebook}`
-  return `given names: ${store}, ${listed} conversation(s)${
-    openScope === null ? ', none open' : ''
-  }`
-}
-
-/**
- * Where the passphrase's keystore accessibility stands. ADR-0008.
- *
- * The five outcomes are not five ways of saying the same thing, so none of
- * them collapses into another: `current` and `rewritten` both end at the
- * right place but only one of them touched a secret; `deferred` is a launch
- * that was right not to try; `failed` is the one that leaves a device unable
- * to decrypt while its screen is off, and it is the only one worth an alarm.
- */
-function computeKeystoreFormLabel(migration: FormMigration | null): string {
-  if (migration === null) return 'keystore form: —'
-  const said = {
-    current: 'already after first unlock',
-    rewritten: 'moved to after first unlock',
-    'nothing-stored': 'nothing stored yet, the first write moves it',
-    deferred: 'not attempted, this launch could not read the old form',
-    failed: `NOT MOVED: ${migration.reason ?? 'no reason given'}`,
-  }[migration.outcome]
-  // Whether it will be attempted again, said only when it will be: a settled
-  // migration that also says "settled" is noise on a line read at a glance.
-  return `keystore form: ${said}${migration.marked ? '' : ', unmarked'}`
-}
-
-/**
- * What the loop is doing, in the words ADR-0007 asks for. `not started` is
- * its own answer rather than a synonym for stopped: a launch that never got
- * far enough to start one and a loop that ended are different faults, and
- * only the second one means something went wrong with the loop.
- */
-function computeLiveSyncLabel(state: SyncLoopState | null): string {
-  if (state === null) return 'live sync: not started'
-  return `live sync: ${
-    {
-      starting: 'starting, no answer from the homeserver yet',
-      running: 'running',
-      reconnecting: 'reconnecting',
-      stopped: 'stopped',
-    }[state]
-  }`
-}
-
-function computeTransportLabel(status: TransportStatus): string {
-  return status.created
-    ? `client created, ${status.homeserver}`
-    : `not created: ${status.reason}`
-}
-
-/**
- * Says which of the three ways in produced this session, because they are
- * not interchangeable: an invitation is single-use, so "restored" and
- * "claimed" describe different amounts of remaining road.
- */
-function computeEntryLabel(entry: EntryResult | null): string {
-  if (entry === null) {
-    return 'entry: probing'
-  }
-  if (!entry.entered) {
-    return `entry: none (${entry.reason})`
-  }
-  if (!entry.claimed) {
-    return 'entry: session restored'
-  }
-  return entry.kept === false
-    ? 'entry: invitation claimed, BUT THE SESSION WAS NOT KEPT'
-    : 'entry: invitation claimed'
-}
-
-function computeSessionLabel(
-  status: SessionSyncStatus | 'not-configured' | null,
-): string {
-  if (status === null) {
-    return 'probing'
-  }
-  if (status === 'not-configured') {
-    return 'no session: see Entry above'
-  }
-  return status.synced
-    ? `synced, ${status.roomCount} room(s)`
-    : `not synced: ${status.reason}`
-}
-
-function computeSyncDurationLabel(
-  synced: Extract<SessionSyncStatus, { synced: true }> | null,
-): string {
-  return synced === null
-    ? 'cold-start sync: —'
-    : `cold-start sync: ${synced.durationMs}ms`
-}
-
-function computeBridgeLabel(status: BridgeStatus | null): string {
-  if (status === null) {
-    return 'probing'
-  }
-  return status.loaded
-    ? `loaded, core ${status.coreVersion}`
-    : `absent: ${status.reason}`
-}
-
-function computeEngineLabel(report: HermesReport): string {
-  if (!report.present) {
-    // Named rather than left blank: a release build that quietly fell back to
-    // JSC is exactly what this line exists to catch.
-    return 'engine: not Hermes'
-  }
-  return report.version === null
-    ? 'engine: Hermes'
-    : `engine: Hermes ${report.version}`
-}
-
-/**
- * Deliberately a fixed string in the case that matters. Detox matches on
- * rendered text (see e2e/boot.test.ts on why not testIDs), so a verdict that
- * embedded the event id would be unassertable: the homeserver mints a
- * different one every run. The id goes on its own line below.
- */
-function computeSendLabel(status: SendReport | 'not-run' | null): string {
-  if (status === null) {
-    return 'encrypted send: probing'
-  }
-  if (status === 'not-run') {
-    return 'encrypted send: not run'
-  }
-  return status.sent
-    ? 'encrypted send: sent'
-    : `encrypted send: not sent (${status.reason})`
-}
-
-function computeSendEventLabel(status: SendReport | 'not-run' | null): string {
-  if (status === null || status === 'not-run' || !status.sent) {
-    return 'event: —'
-  }
-  return `event: ${status.eventId} in ${status.roomId}`
-}
-
-/**
- * The positive control, and the line below is worth nothing without it: a
- * machine that cannot decrypt anything refuses a tampered ciphertext for a
- * reason that has nothing to do with the tampering.
- */
-function computeControlLabel(status: SendReport | 'not-run' | null): string {
-  if (status === null || status === 'not-run' || !status.sent) {
-    return 'intact ciphertext: —'
-  }
-  return status.intactDecrypted
-    ? 'intact ciphertext: decrypted'
-    : 'intact ciphertext: NOT decrypted'
-}
-
-function computeTamperLabel(status: SendReport | 'not-run' | null): string {
-  if (status === null || status === 'not-run' || !status.sent) {
-    return 'tampered ciphertext: —'
-  }
-  // The word this line exists for is "refused". A product that encrypts
-  // correctly and accepts anything on the way back has built an expensive
-  // encoding, and nothing on this screen would otherwise say so.
-  if (status.tamper === 'not-attempted') {
-    return 'tampered ciphertext: not attempted'
-  }
-  return status.tamper === 'refused'
-    ? 'tampered ciphertext: refused'
-    : 'tampered ciphertext: ACCEPTED'
-}
-
-function computeReceivedLabel(
-  status: ReceiveReport | 'not-run' | null,
-): string {
-  if (status === null) {
-    return 'decrypted: probing'
-  }
-  if (status === 'not-run') {
-    return 'decrypted: not run'
-  }
-  return status.received
-    ? `decrypted: ${status.body}`
-    : `decrypted: nothing (${status.reason})`
-}
-
-/**
- * Says "claims", and says it every time, because decrypting an event does
- * not establish who wrote it. The sender is transport metadata read off the
- * event; verifying a device would not change that, and a screen that printed
- * it as a fact would be the first place this product started lying about its
- * own trust model.
- */
-function computeClaimedSenderLabel(
-  status: ReceiveReport | 'not-run' | null,
-): string {
-  if (status === null || status === 'not-run' || !status.received) {
-    return 'claims to be from: —'
-  }
-  return `claims to be from: ${status.claimedSender} (unauthenticated)`
-}
-
-/**
- * Read out of the machine, not out of a changelog. 0.4.0 shares room keys by
- * identity once a machine holds a cross-signing identity of its own, and a
- * device no identity vouches for then stops receiving keys entirely. This
- * application creates no such identity, so it should say device-based — and
- * saying it on screen is what makes that a fact continuous integration
- * checks rather than an assumption.
- */
-function computeSharingStrategyLabel(
-  ran: Extract<PumpStatus, { outcome: 'ran' }> | null,
-): string {
-  return ran === null
-    ? 'room keys shared: —'
-    : `room keys shared: ${ran.report.sharingStrategy}`
-}
-
-function computeIdentityLabel(
-  ran: Extract<PumpStatus, { outcome: 'ran' }> | null,
-): string {
-  if (ran === null) {
-    return 'signing identity: —'
-  }
-  const { identity } = ran.report
-  return identity.established
-    ? `signing identity: ${identity.how}`
-    : `signing identity: none (${identity.reason})`
-}
-
-/**
- * The store's own continuity, which nothing else on this readout shows. A
- * relaunch reporting "minted" would mean the passphrase did not survive, and
- * therefore that this device opened a new, empty store and lost every room
- * key the old one held.
- */
-function computeStoreLabel(state: 'minted' | 'reused' | null): string {
-  if (state === null) return 'store passphrase: —'
-  return state === 'minted'
-    ? 'store passphrase: minted for this device'
-    : 'store passphrase: reused, the store reopened'
-}
-
-/**
- * The touch-target floor is the one floor no provenance rule can reach: a
- * button's height is geometry, not a token. So it is asserted here, against
- * the height the device actually gave it rather than the height the style
- * asked for.
- */
-function computeTouchTargetLabel(
-  geometry: { height: number; leg: number } | null,
-): string {
-  if (geometry === null) return 'touch target: —'
-  return geometry.height >= floors.touchTargetMin
-    ? 'touch target: met'
-    : `touch target: MISSED (${geometry.height.toFixed(1)}pt)`
-}
-
-/**
- * That the cut followed the height rather than a constant. A fixed leg looks
- * deliberate at one size and like a mistake at every other, and a screenshot
- * would not tell the two apart.
- */
-function computeNotchLabel(
-  geometry: { height: number; leg: number } | null,
-): string {
-  if (geometry === null) return 'notch: —'
-  const expected = notchLegFor(geometry.height)
-  const held = Math.abs(geometry.leg - expected) < 0.01
-  return held
-    ? `notch: derived from height (${notch.button.size}pt at 48pt)`
-    : `notch: WRONG (${geometry.leg.toFixed(2)} where ${expected.toFixed(2)} was due)`
-}
-
-/**
- * Whether the entitlement to create an identity is still on this device.
- *
- * "unfinished" after a launch that published successfully would mean the
- * marker did not clear, and that every later launch stays entitled to the one
- * destructive call on the crypto surface -- which is the failure this whole
- * mechanism exists to prevent, so it is worth being able to see.
- */
-function computeSignUpLabel(state: 'unfinished' | 'complete' | null): string {
-  if (state === null) return 'sign-up: —'
-  return state === 'complete'
-    ? 'sign-up: complete, the marker is cleared'
-    : 'sign-up: unfinished, this device may still finish it'
-}
-
-function computePumpStatusLabel(status: PumpStatus | null): string {
-  if (status === null) {
-    return 'probing'
-  }
-  if (status === 'not-configured') {
-    return 'no session: see Entry above'
-  }
-  if (status.outcome === 'ran') {
-    return 'ran'
-  }
-  return `not started: ${status.reason}`
-}
-
-function computePumpDeviceKeysLabel(
-  ran: Extract<PumpStatus, { outcome: 'ran' }> | null,
-): string {
-  return ran === null
-    ? 'device keys published: —'
-    : `device keys published: ${ran.report.deviceKeysVerified}`
-}
-
-/**
- * Counted on the server rather than inferred from this run's own uploads: a
- * warm store queues none because it needs none, and the old signal read
- * false there while the server held a full set.
- */
-function computePumpOneTimeKeysLabel(
-  ran: Extract<PumpStatus, { outcome: 'ran' }> | null,
-): string {
-  if (ran === null) {
-    return 'one-time keys on server: —'
-  }
-  const count = ran.report.oneTimeKeysOnServer
-  return count === null
-    ? 'one-time keys on server: unknown'
-    : `one-time keys on server: ${count > 0 ? 'yes' : 'none'}`
-}
-
 // Values are literal rather than tokenised on purpose: this screen is
 // scaffolding, not product surface. Anything that survives into a real screen
 // must come from design/tokens.json, per interface invariant 11.
@@ -2337,6 +1823,5 @@ const styles = StyleSheet.create({
   // Spread rather than picked apart: size, leading, weight and tracking
   // travel together, and separating them is how a line-height floor gets
   // broken without anyone deciding to break it.
-  heading: { ...typeScale.titleMd, marginBottom: space.s },
-  line: typeScale.body,
+  historyNote: typeScale.body,
 })
