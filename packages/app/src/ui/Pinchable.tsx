@@ -1,4 +1,4 @@
-import React, { useMemo, useRef, useState } from 'react'
+import React, { useEffect, useMemo, useRef, useState } from 'react'
 import { Animated, PanResponder, StyleSheet, View } from 'react-native'
 
 import {
@@ -117,7 +117,20 @@ export function Pinchable({
     }
   }
 
-  if (!active && held.current.scale !== LEAST) toFit()
+  // IN AN EFFECT, NOT IN THE RENDER.
+  //
+  // This was `if (!active && ...) toFit()` in the component body, which calls
+  // `setZoomed` here and `onZoomed` on the pager above -- a state update on
+  // another component during this one's render, which React refuses outright.
+  // It would have thrown the first time somebody paged away from a photograph
+  // they had zoomed into, which is the one gesture this prop exists for.
+  useEffect(() => {
+    if (!active && held.current.scale !== LEAST) toFit()
+    // `toFit` is rebuilt every render and depends on nothing that changes
+    // what it does; listing it would run this on every render instead of on
+    // the one thing it is about.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [active])
 
   const responder = useMemo(
     () =>
