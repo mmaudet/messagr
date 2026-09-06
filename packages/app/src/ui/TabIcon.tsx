@@ -43,6 +43,7 @@ export type TabGlyph =
   | 'cam'
   | 'mic'
   | 'plus'
+  | 'camera'
 
 const STROKE = {
   fill: 'none' as const,
@@ -104,6 +105,22 @@ export function TabIcon({
               rings, and stroking them would close them. */}
           <Circle cx={9.2} cy={9.8} r={0.9} fill={tint} />
           <Circle cx={14.8} cy={9.8} r={0.9} fill={tint} />
+        </>
+      )}
+
+      {glyph === 'camera' && (
+        <>
+          {/* The body with the viewfinder's bump, and the lens. Given by the
+              account holder on 6 September 2026 and transcribed at the set's
+              own 1.5 rather than the 1.6 it arrived at: an icon that is a
+              tenth heavier than its twenty-two neighbours reads as a
+              different weight of line, not as a different icon. */}
+          <Path
+            d="M4 8.5a2 2 0 0 1 2-2h2.2l1.2-1.6a1.2 1.2 0 0 1 1-.5h3.2a1.2 1.2 0 0 1 1 .5l1.2 1.6H18a2 2 0 0 1 2 2v8.5a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2z"
+            stroke={tint}
+            {...STROKE}
+          />
+          <Circle cx={12} cy={13} r={3.6} stroke={tint} {...STROKE} />
         </>
       )}
 

@@ -186,18 +186,19 @@ export function Composer({
               accessibilityRole="button"
               accessibilityLabel={t('composer_photo')}
               style={styles.inField}>
-              {/* `plus`, not `cam`. The identity's `cam` is a camcorder --
-                  a body and a lens triangle -- and this control sends a
-                  photograph and nothing else: the picker is `mediaType:
-                  'photo'` with `selectionLimit: 1`. An icon promising video
-                  would be a control lying about what it does.
+              {/* A STILL CAMERA, WHICH THE SET DID NOT HAVE UNTIL TODAY.
+                  The identity's `cam` is a camcorder -- it belongs to the
+                  call screens -- and this control opens a photograph picker:
+                  `launchImageLibrary` with `mediaType: 'photo'`. An icon
+                  promising video for a control that cannot take one is a
+                  promise the product breaks on the next tap.
 
-                  The set has twenty-two icons and no still camera. Drawing
-                  one here would put this repository's hand into an identity
-                  with a deliberate voice, which is what #101 refused for the
-                  four tab icons -- it waited for the designer instead, and
-                  so does this. #112. */}
-              <TabIcon glyph="plus" tint={palette.neutral['600']} />
+                  It stood in as `plus` while the set had no still camera
+                  (#112) rather than being drawn here beside the four tab
+                  glyphs: an icon invented in a component is one the identity
+                  never agreed to. The account holder drew it on 6 September
+                  2026 and it is in `design/icons/` now, like the rest. */}
+              <TabIcon glyph="camera" tint={palette.neutral['600']} />
             </Pressable>
           )}
         </View>
