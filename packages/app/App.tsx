@@ -26,6 +26,8 @@ import {
   loadConversation,
   runOutgoingPump,
   sendOneEncryptedMessage,
+  admitEntrant,
+  inviteSomebody,
   listConversations,
   startCryptoMachine,
   startLiveSync,
@@ -69,6 +71,7 @@ import type { EvictOutcome } from './src/runtime/evict'
 import type { HistoryClaim } from './src/runtime/claimHistory'
 import { Conversation } from './src/ui/Conversation'
 import { ConversationList } from './src/ui/ConversationList'
+import { Invite, type InviteStage } from './src/ui/Invite'
 import { GiveName } from './src/ui/GiveName'
 import { FirstLaunch } from './src/ui/FirstLaunch'
 import { Evict } from './src/ui/Evict'
@@ -155,6 +158,13 @@ export function App({
   const [summaries, setSummaries] = useState<readonly ConversationSummary[]>([])
   const [names, setNames] = useState<ReadonlyMap<string, string>>(new Map())
   const [notebook, setNotebook] = useState<string | null>(null)
+  // Inviting somebody, which is the same gesture as starting a conversation
+  // with them. See issueInvitation.ts.
+  const [invite, setInvite] = useState<InviteStage>({ stage: 'resting' })
+  const [admission, setAdmission] = useState<'waiting' | 'admitted' | null>(
+    null,
+  )
+  const inviteRef = useRef<((name: string | null) => void) | null>(null)
   const namesRef = useRef<GivenNames>(forgetfulGivenNames())
   // Which conversation is open, held in a ref as well as in state: the live
   // sync loop's callbacks are created once and would otherwise keep deriving
@@ -485,6 +495,57 @@ export function App({
             }
             openConversationRef.current = showConversation
 
+            // INVITING, AND THE HALF NOBODY TAPS FOR.
+            //
+            // The service draws an account when somebody opens the link, so
+            // the name typed at invite time has nobody to belong to yet. It
+            // is held here and written when the account is drawn -- the only
+            // ordering the protocol allows, and the right one: the inviter
+            // knows who they are inviting now and will not come back later
+            // to say.
+            inviteRef.current = (name: string | null) => {
+              setInvite({ stage: 'working' })
+              setAdmission(null)
+              const gesture = async () => {
+                const issued = await inviteSomebody(sessionClient, credentials)
+                if (!issued.issued) {
+                  setInvite({ stage: 'failed', reason: issued.reason })
+                  return
+                }
+                setInvite({ stage: 'ready', link: issued.link })
+                setAdmission('waiting')
+                // The conversation exists now, so it belongs on the list
+                // before anybody has claimed anything.
+                await refreshList().catch(() => {})
+
+                const admitted = await admitEntrant(
+                  sessionClient,
+                  credentials,
+                  issued.invitationId,
+                  issued.scope,
+                )
+                if (!admitted.admitted) return
+                setAdmission('admitted')
+                if (name !== null) {
+                  const kept = await namesRef.current.set(
+                    admitted.entrant,
+                    name,
+                  )
+                  setNames(held => new Map(held).set(admitted.entrant, name))
+                  if (!kept) {
+                    logEvent('warn', 'MESSAGR_GIVEN_NAME_NOT_KEPT', {})
+                  }
+                }
+                await refreshList().catch(() => {})
+              }
+              gesture().catch((cause: unknown) =>
+                setInvite({
+                  stage: 'failed',
+                  reason: getErrorMessage(cause),
+                }),
+              )
+            }
+
             // THE LIST. Derived rather than stored, like the conversation
             // itself: see conversationList.ts for why it is not built out of
             // the sync loop's own response.
@@ -808,6 +869,15 @@ export function App({
                 summaries={summaries}
                 names={names}
                 onOpen={scope => openConversationRef.current?.(scope)}
+              />
+              <Invite
+                stage={invite}
+                admission={admission}
+                onInvite={name => inviteRef.current?.(name)}
+                onClose={() => {
+                  setInvite({ stage: 'resting' })
+                  setAdmission(null)
+                }}
               />
             </View>
           )}
