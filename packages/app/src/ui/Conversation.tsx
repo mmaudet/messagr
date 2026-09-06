@@ -54,6 +54,8 @@ export interface ConversationProps {
   readonly sending: 'idle' | 'sending' | 'failed'
   /** Reactions, grouped by the message they point at. */
   readonly reactions?: ReadonlyMap<string, readonly ReactionTally[]>
+  /** This account's own messages somebody else has read. */
+  readonly read?: ReadonlySet<string>
   /**
    * Add or remove a reaction. `own` is the id of this account's own reaction
    * on that key, when it has one -- removing is a redaction and needs the
@@ -68,6 +70,7 @@ export function Conversation({
   onSend,
   sending,
   reactions = new Map(),
+  read = new Set(),
   onReact,
 }: ConversationProps) {
   const [draft, setDraft] = useState('')
@@ -97,6 +100,7 @@ export function Conversation({
             mine={entry.claimedSender === selfUserId}
             palette={palette}
             tallies={reactions.get(entry.eventId) ?? []}
+            read={read.has(entry.eventId)}
             onReact={(key, own) => onReact?.(entry.eventId, key, own)}
           />
         ))
@@ -155,11 +159,14 @@ function Message({
   palette,
   tallies,
   onReact,
+  read,
 }: {
   entry: TimelineEntry
   mine: boolean
   palette: typeof color | typeof color.dark
   tallies: readonly ReactionTally[]
+  /** Whether somebody else has read this one. Only meaningful for `mine`. */
+  read: boolean
   /** `mine` is the id of this account's own reaction, when it has one. */
   onReact: (key: string, mine: string | null) => void
 }) {
@@ -230,6 +237,21 @@ function Message({
         </View>
       )}
 
+      {/* SENT, OR READ. There is no third state, and inventing one would be
+          a guess drawn as a fact -- Matrix reports the homeserver accepting
+          an event and somebody's client saying it was read, and nothing in
+          between. See receipts.ts.
+
+          Only on this account's own messages: "read" on somebody else's says
+          that you read it, which they can see for themselves. */}
+      {mine && (
+        <Text
+          testID={`state-${entry.eventId}`}
+          style={[styles.state, { color: palette.neutral['600'] }]}>
+          {read ? t('message_read') : t('message_sent')}
+        </Text>
+      )}
+
       {tallies.length > 0 && (
         <View style={styles.tallies} testID={`reactions-${entry.eventId}`}>
           {tallies.map(tally => (
@@ -281,6 +303,7 @@ const styles = StyleSheet.create({
     borderRadius: radius.pill,
   },
   chipKey: typeScale.bodySm,
+  state: { ...typeScale.caption, marginTop: space.xs },
   bubble: {
     paddingHorizontal: space.m,
     paddingVertical: space.s,

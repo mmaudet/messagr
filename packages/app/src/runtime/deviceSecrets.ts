@@ -97,3 +97,9 @@ export const promiseSecrets = keychainStore('eu.messagr.promise')
  * means compromising either gives both.
  */
 export const givenNamesSecrets = keychainStore('eu.messagr.given-names')
+
+/**
+ * Where the read-receipt choice lives. See receiptSetting.ts: not a secret,
+ * and off unless somebody turned it on.
+ */
+export const receiptSecrets = keychainStore('eu.messagr.read-receipts')

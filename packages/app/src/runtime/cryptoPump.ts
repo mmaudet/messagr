@@ -679,3 +679,33 @@ export async function removeReaction(
 }
 
 export type { ReactionTally } from '../timeline/reactions'
+
+/**
+ * Tells the homeserver this account has read up to `eventId`.
+ *
+ * Called only when the setting says so. See `receiptSetting.ts`: a receipt is
+ * public metadata, and a product that refuses to let a server read content
+ * and then publishes the hour somebody read it contradicts itself.
+ *
+ * Failure is swallowed on purpose, and this is the one place in this file
+ * where that is right: a receipt that did not go is invisible to the person
+ * who sent it and changes nothing they can act on. Reporting it would put a
+ * warning on a screen about a courtesy.
+ */
+export async function sendReadReceipt(
+  sessionClient: ReturnType<typeof createClient>,
+  scope: string,
+  eventId: string,
+): Promise<void> {
+  try {
+    await makePumpHttp(sessionClient).authedRequest(
+      'POST',
+      `/_matrix/client/v3/rooms/${encodeURIComponent(scope)}/receipt/` +
+        `m.read/${encodeURIComponent(eventId)}`,
+      {},
+      JSON.stringify({}),
+    )
+  } catch {
+    // See above.
+  }
+}

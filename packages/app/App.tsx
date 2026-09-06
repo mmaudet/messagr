@@ -30,6 +30,7 @@ import {
   inviteSomebody,
   listConversations,
   reactToMessage,
+  sendReadReceipt,
   readTrust,
   removeReaction,
   startCryptoMachine,
@@ -52,9 +53,15 @@ import { computeRuntimeGapReport } from './src/runtime/runtimeGaps'
 import { computeNewArchitectureReport } from './src/runtime/newArchitecture'
 import {
   promiseSecrets,
+  receiptSecrets,
   sessionSecrets,
   signUpSecrets,
 } from './src/runtime/deviceSecrets'
+import {
+  publishReceipts,
+  receiptsArePublished,
+} from './src/runtime/receiptSetting'
+import { readUpTo } from './src/runtime/receipts'
 import { hasSeenPromise, rememberPromiseSeen } from './src/runtime/promiseSeen'
 import { clearSignUp, isSignUpUnfinished } from './src/runtime/signUpMarker'
 import {
@@ -194,6 +201,17 @@ export function App({
   const [reactions, setReactions] = useState<
     ReadonlyMap<string, readonly ReactionTally[]>
   >(new Map())
+  // Whether this device publishes read receipts, and which of this account's
+  // own messages somebody else has read. Off unless somebody turned it on:
+  // see receiptSetting.ts.
+  const [receipts, setReceipts] = useState(false)
+  const [receiptsNotKept, setReceiptsNotKept] = useState(false)
+  const [readHere, setReadHere] = useState<ReadonlySet<string>>(new Set())
+  const receiptsRef = useRef(false)
+  // The conversation as the loop's callbacks can see it: they are made once,
+  // and a receipt arriving names an event that has to be found among the
+  // entries held right now.
+  const conversationRef = useRef<readonly TimelineEntry[]>([])
   const [openScope, setOpenScope] = useState<string | null>(null)
   const openScopeRef = useRef<string | null>(null)
   const reactRef = useRef<
@@ -309,7 +327,23 @@ export function App({
     hasSeenPromise(promiseSecrets)
       .then(setPromiseSeen)
       .catch(() => setPromiseSeen(false))
+    receiptsArePublished(receiptSecrets)
+      .then(on => {
+        setReceipts(on)
+        receiptsRef.current = on
+      })
+      .catch(() => undefined)
   }, [])
+
+  // Held in a ref as well as in state: the live loop's callbacks are made
+  // once, and whether receipts are published can change while it runs.
+  useEffect(() => {
+    receiptsRef.current = receipts
+  }, [receipts])
+
+  useEffect(() => {
+    conversationRef.current = conversation ?? []
+  }, [conversation])
 
   useEffect(() => {
     // Not started until the promise has been accepted. The effect re-runs when
@@ -533,6 +567,14 @@ export function App({
                 )
                 const other = theOtherMember(members, credentials.userId)
                 setParty(other === null ? null : { scope, other })
+
+                // Only if somebody turned it on. A receipt is public
+                // metadata, and the default is the quiet one -- see
+                // receiptSetting.ts.
+                const newest = fresh.entries[fresh.entries.length - 1]
+                if (receiptsRef.current && newest !== undefined) {
+                  await sendReadReceipt(sessionClient, scope, newest.eventId)
+                }
               }
               derive().catch((cause: unknown) =>
                 logEvent('warn', 'MESSAGR_OPEN_CONVERSATION_FAILED', {
@@ -704,6 +746,23 @@ export function App({
                     // not something to discover as a slow start.
                     logEvent('warn', 'MESSAGR_LIVE_CURSOR_LOST', {})
                   }
+                  // Before the early return below: a poll can carry a
+                  // receipt for a conversation whose timeline did not move --
+                  // somebody reading is not somebody writing.
+                  const openNow = openScopeRef.current
+                  if (openNow !== null) {
+                    const seen = tick.receipts.get(openNow)
+                    if (seen !== undefined && seen.length > 0) {
+                      setReadHere(
+                        readUpTo(
+                          conversationRef.current,
+                          seen,
+                          credentials.userId,
+                        ),
+                      )
+                    }
+                  }
+
                   if (tick.changedScopes.length === 0) return
 
                   // The list first, because a row moving is what a person
@@ -974,6 +1033,18 @@ export function App({
               <Settings
                 onBack={() => setPanel('list')}
                 onLegal={() => setPanel('legal')}
+                receipts={receipts}
+                receiptsNotKept={receiptsNotKept}
+                onReceipts={on => {
+                  // Shown first, kept second. A switch that waited on a
+                  // keystore would feel broken; one that reverts silently at
+                  // the next launch would be worse, which is what the
+                  // sentence under it is for.
+                  setReceipts(on)
+                  publishReceipts(receiptSecrets, on)
+                    .then(kept => setReceiptsNotKept(!kept))
+                    .catch(() => setReceiptsNotKept(true))
+                }}
               />
             </View>
           )}
@@ -1078,6 +1149,7 @@ export function App({
                 />
                 <Conversation
                   reactions={reactions}
+                  read={readHere}
                   onReact={(target, key, own) =>
                     reactRef.current?.(target, key, own)
                   }
