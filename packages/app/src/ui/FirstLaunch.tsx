@@ -1,10 +1,28 @@
-import React from 'react'
-import { ScrollView, StyleSheet, Text, View } from 'react-native'
+import React, { useState } from 'react'
+import {
+  Linking,
+  Pressable,
+  ScrollView,
+  StatusBar,
+  StyleSheet,
+  Text,
+  View,
+} from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 
 import { t, type CopyKey } from '../copy'
-import { color, layout, space, type } from '../design/tokens'
+import type { Language } from '../copy/languages'
+import {
+  color,
+  floors,
+  layout,
+  radius,
+  space,
+  stroke,
+  type,
+} from '../design/tokens'
 import { BrandMark } from './BrandMark'
+import { LanguageStrip } from './LanguageStrip'
 import { NotchedButton } from './NotchedButton'
 
 /**
@@ -17,10 +35,23 @@ import { NotchedButton } from './NotchedButton'
  * ce qu'elle promet."
  *
  * So nothing here reads a store, asks a permission, or touches the network.
- * The component takes one callback and no data at all, which is not
- * minimalism: it is the property, expressed in a signature. A screen that
- * cannot fetch cannot leak, and a reviewer can see that in three lines rather
- * than by reading the body.
+ * The component takes callbacks and no data at all, which is not minimalism:
+ * it is the property, expressed in a signature. A screen that cannot fetch
+ * cannot leak, and a reviewer can see that in three lines rather than by
+ * reading the body.
+ *
+ * # Two things happen here before anything else can
+ *
+ * **The language.** Somebody who does not read French met a French screen and
+ * had no way out of it. Now the strip is under the thumb and the screen
+ * retranslates as it moves — `LanguageStrip` says why the gesture is the
+ * design rather than a dropdown.
+ *
+ * **The terms.** The action does nothing until the box is ticked, and a gate
+ * that can be walked past is not a gate. The conditions themselves are one tap
+ * away, at the address the published page and `assert-legal-screen.sh` already
+ * agree on — the acceptance is of a text somebody can read, not of a sentence
+ * about a text.
  *
  * THE DARK GROUND IS THE MARK'S, NOT A THEME. `ink900` is the token for "fond
  * des frontières de sécurité", and the prototype puts this screen among the
@@ -37,9 +68,29 @@ const POINTS: readonly CopyKey[] = [
   'promise_point_invitation',
 ]
 
-export function FirstLaunch({ onBegin }: { readonly onBegin: () => void }) {
+/** Where the conditions are published. The one `assert-legal-screen.sh` reads. */
+const TERMS = 'https://messagr.eu/conditions-generales/'
+
+export function FirstLaunch({
+  onBegin,
+  language,
+  onLanguage,
+  onLanguageSettled,
+}: {
+  readonly onBegin: () => void
+  readonly language: Language
+  readonly onLanguage: (language: Language) => void
+  /** Called when the strip stops. Only this one persists. */
+  readonly onLanguageSettled: (language: Language) => void
+}) {
+  const [accepted, setAccepted] = useState(false)
+  const [nagged, setNagged] = useState(false)
+
   return (
     <SafeAreaView style={styles.ground} testID="first-launch">
+      {/* The ground is `ink900` on this screen whatever the phone is set to,
+          so the clock and the battery beside it have to be light. */}
+      <StatusBar barStyle="light-content" />
       {/* Scrolls, because the four points and the thesis do not fit a small
           phone at the largest system text size, and a promise with its
           action below the fold is a promise nobody can accept. */}
@@ -66,11 +117,66 @@ export function FirstLaunch({ onBegin }: { readonly onBegin: () => void }) {
           </View>
         </View>
 
-        <NotchedButton
-          label={t('promise_action')}
-          testID="promise-action"
-          onPress={onBegin}
-        />
+        <View style={styles.gate}>
+          <Text style={styles.gateHeading}>{t('promise_language')}</Text>
+          <LanguageStrip
+            onDark
+            chosen={language}
+            onChoose={onLanguage}
+            onSettle={onLanguageSettled}
+          />
+
+          {/* THE BOX, AND WHY IT IS A BOX AND NOT A SENTENCE UNDER A BUTTON.
+              "By continuing you accept…" is an acceptance nobody made. A tick
+              is a thing a person did, and it is the only shape of this that
+              can be shown to have happened. */}
+          <Pressable
+            testID="promise-terms"
+            onPress={() => {
+              setAccepted(held => !held)
+              setNagged(false)
+            }}
+            accessibilityRole="checkbox"
+            accessibilityState={{ checked: accepted }}
+            accessibilityLabel={t('promise_terms')}
+            style={styles.terms}>
+            <View style={[styles.box, accepted && styles.boxTicked]}>
+              {accepted && <Text style={styles.tick}>✓</Text>}
+            </View>
+            <Text style={styles.termsLabel}>{t('promise_terms')}</Text>
+          </Pressable>
+
+          <Pressable
+            testID="promise-terms-link"
+            onPress={() => {
+              // Failure is ordinary: no browser, or somebody dismissed it.
+              // There is nothing to report and nothing to retry.
+              Linking.openURL(TERMS).catch(() => {})
+            }}
+            accessibilityRole="link"
+            style={styles.linkRow}>
+            <Text style={styles.link}>{t('promise_terms_link')}</Text>
+          </Pressable>
+
+          {nagged && (
+            <Text testID="promise-terms-required" style={styles.required}>
+              {t('promise_terms_required')}
+            </Text>
+          )}
+
+          <NotchedButton
+            wide
+            label={t('promise_action')}
+            testID="promise-action"
+            // NOT DISABLED, AND SAYING WHY WHEN PRESSED.
+            //
+            // A greyed button is a control that gives no reason, and somebody
+            // who missed the box has no way to learn what is wrong with the
+            // screen. This one is pressable, does nothing, and says what is
+            // missing -- which is the same rule §13.19.6 puts on errors.
+            onPress={() => (accepted ? onBegin() : setNagged(true))}
+          />
+        </View>
       </ScrollView>
     </SafeAreaView>
   )
@@ -124,9 +230,66 @@ const styles = StyleSheet.create({
     alignItems: 'baseline',
     gap: space.m,
   },
+  gate: {
+    gap: space.l,
+  },
+  gateHeading: {
+    ...type.caption,
+    color: color.agent['400'],
+  },
+  terms: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: space.m,
+    minHeight: floors.touchTargetMin,
+  },
+  box: {
+    width: space.l,
+    height: space.l,
+    borderRadius: radius.bubbleAuthorCorner,
+    borderWidth: stroke.base,
+    borderColor: color.agent['400'],
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  boxTicked: {
+    // THE DARK PALETTE, ON A SCREEN THAT IS ALWAYS DARK.
+    //
+    // `color.brand.green500` is the light-ground green, and the token file
+    // says outright why it will not do here: the dark palette's own green500
+    // is *« remonté en clarté pour tenir sur fond sombre »*. Using the light
+    // one on `ink900` is a contrast decision made by accident.
+    backgroundColor: color.dark.brand.green500,
+    borderColor: color.dark.brand.green500,
+  },
+  tick: {
+    ...type.monoLabel,
+    color: color.brand.ink900,
+  },
+  termsLabel: {
+    ...type.bodySm,
+    color: color.surface.paper,
+    flexShrink: 1,
+  },
+  linkRow: {
+    minHeight: floors.touchTargetMin,
+    justifyContent: 'center',
+  },
+  link: {
+    ...type.bodySm,
+    // The "text, border, link" role, in the dark palette where it is
+    // *lighter* than green500 rather than darker. That inversion is the
+    // token's own note, and it is exactly what a link on `ink900` needs.
+    color: color.dark.brand.green700,
+    textDecorationLine: 'underline',
+  },
+  required: {
+    ...type.caption,
+    color: color.wait['500'],
+  },
   bullet: {
     ...type.caption,
-    color: color.brand.green500,
+    color: color.dark.brand.green500,
   },
   pointLabel: {
     ...type.brandPoint,

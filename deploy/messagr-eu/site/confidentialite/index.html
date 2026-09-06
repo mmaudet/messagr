@@ -282,13 +282,48 @@
       <p>
         L'application ne contient aucun outil de mesure, aucun traceur, aucune
         bibliothèque tierce d'analyse, aucune publicité. Rien n'est envoyé à un
-        tiers pour observer votre usage, parce qu'il n'existe aucun tiers dans
-        cette application.
+        tiers pour observer votre usage.
+      </p>
+      <p>
+        Elle contient <strong>une</strong> bibliothèque tierce, et elle ne sert
+        qu'à une chose : recevoir le signal qui réveille votre téléphone quand
+        un message arrive. La section suivante dit exactement ce qui traverse.
       </p>
       <p>
         Il n'y a ni profilage ni décision automatisée. Les décisions de
         modération sont prises par des personnes, comme l'expliquent les
         <a href="/conditions-generales">conditions générales</a>.
+      </p>
+
+      <h2>Les notifications, et ce que Google en apprend</h2>
+      <p>
+        Pour qu'un message vous parvienne quand l'application est fermée, votre
+        téléphone doit être réveillé par le système de notifications de son
+        fabricant. Sur Android c'est Firebase Cloud Messaging, de Google. Aucune
+        application ne peut s'en passer sur cette plateforme.
+      </p>
+      <p>
+        <strong
+          >Ce qui traverse Google ne contient ni expéditeur, ni conversation, ni
+          message.</strong
+        >
+        Le signal envoyé porte exactement deux choses : l'identifiant technique
+        de votre appareil, et une priorité de remise. Rien d'autre — pas
+        d'identifiant de salon, pas d'identifiant d'événement, pas d'aperçu, pas
+        de compteur. C'est une passerelle écrite pour cela, et le contenu est
+        déchiffré par votre appareil, chez vous, après le réveil.
+      </p>
+      <p>
+        Ce que Google détient donc, c'est un jeton d'appareil et le fait que
+        quelque chose est arrivé à un moment donné. Le jeton est un identifiant
+        d'installation, renouvelé par Google, conservé tant que l'application
+        est installée. Sur iOS le même rôle est tenu par le service de
+        notifications d'Apple.
+      </p>
+      <p>
+        Les notifications se désactivent dans les réglages de l'application. Le
+        réglage retire l'enregistrement auprès du serveur : celui-ci n'a alors
+        plus où envoyer, et plus rien ne part.
       </p>
 
       <h2>Où vos données sont traitées</h2>

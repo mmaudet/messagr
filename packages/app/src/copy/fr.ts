@@ -99,7 +99,7 @@ export const fr = {
     'Ce qui vous identifie, ce qui vous permet de revenir.',
   settings_row_lang_label: "Langue de l'application",
   settings_row_lang_hint:
-    'Français · deux langues livrées en V1, cinq possibles',
+    'Français · six langues, choisies au premier lancement',
   settings_row_recovery_label: 'Récupération de compte',
   settings_row_recovery_hint:
     "Clé de récupération · validation par un proche, coffre PIN (V1.1) · aucun séquestre : personne d'autre ne détient la clé de vos messages",
@@ -421,6 +421,87 @@ export const fr = {
   settings_receipts_off: 'Désactivés',
   settings_receipts_not_kept:
     'Ce choix n’a pas pu être conservé : il reviendra à son état précédent au prochain démarrage.',
+
+  // LA BARRE D'ONGLETS. Quatre, et le troisième est réservé.
+  //
+  // L'onglet Appels existe dès la V1 alors que les appels n'y sont pas, et sa
+  // maquette dit pourquoi : « pour ne pas déplacer la barre plus tard ». Ce
+  // n'est pas la règle de settings_nothing_else -- un interrupteur qui ne
+  // commande rien ment sur une capacité, un onglet réservé qui explique qu'il
+  // l'est est une promesse datée, et il achète une barre qui ne bouge pas
+  // sous le pouce des gens le jour où les appels arrivent.
+  // Les quatre libellés existaient déjà, hérités du produit précédent et
+  // identiques à ceux de la maquette : tab_discussions, tab_communities,
+  // tab_calls, tab_settings. Rien à ajouter ici.
+
+  // La phrase qui explique le produit sous la liste. Sans le « (§8.2, P2,
+  // P3) » de la maquette : les repères de spécification s'adressent au
+  // relecteur, pas à la personne qui lit son écran.
+  // Les jours abrégés, pour l'horodatage d'une ligne de liste. Le catalogue
+  // hérité ne portait que « Dimanche » en toutes lettres, par accident : une
+  // ligne a la place de cinq caractères, pas de huit.
+  day_short_0: 'dim.',
+  day_short_1: 'lun.',
+  day_short_2: 'mar.',
+  day_short_3: 'mer.',
+  day_short_4: 'jeu.',
+  day_short_5: 'ven.',
+  day_short_6: 'sam.',
+  'when_time %1$d %2$d': '%1$d:%2$d',
+  'when_date %1$d %2$d': '%1$d/%2$d',
+
+  list_no_directory:
+    'Aucun numéro de téléphone n’apparaît nulle part dans le système. On n’entre en relation que par invitation.',
+
+  calls_soon_title: 'Bientôt : appels audio, puis vidéo',
+  calls_soon_why:
+    'L’onglet est réservé dès la V1 pour ne pas déplacer la barre plus tard. La V1 ne transporte que texte, liens et images statiques ; vocaux en V2, appels individuels puis de groupe en V3.',
+  calls_soon_v2: 'V2 · messages vocaux',
+  calls_soon_v3: 'V3 · audio + vidéo',
+
+  community_soon_title: 'Bientôt : communautés et salons',
+  community_soon_why:
+    'Une communauté regroupe des salons sous un objet pseudonyme. L’onglet est réservé pour la même raison que celui des appels : la barre ne doit pas bouger quand ils arriveront.',
+
+  // The band across the top of every screen. `brand_name` is the product's
+  // own name and is not translated -- a name that changes by language is a
+  // different product.
+  brand_name: 'Messagr',
+  settings_wake: 'Notifications',
+  settings_wake_hint:
+    'Activées. Ce qui traverse Google ne contient ni expéditeur, ni conversation, ni message : seulement un signal de réveil. L’appareil déchiffre ensuite lui-même, ici. Les désactiver n’enregistre aucun destinataire auprès du serveur : il n’a plus où envoyer.',
+  settings_wake_on: 'Activées',
+  settings_wake_off: 'Désactivées',
+  settings_wake_not_kept:
+    'Ce choix n’a pas pu être conservé : il reviendra à son état précédent au prochain démarrage.',
+
+  // Le premier lancement : la langue, puis l'acceptation.
+  promise_language: 'Choisissez votre langue',
+  promise_terms: 'J’accepte les conditions générales d’utilisation de Messagr.',
+  promise_terms_link: 'Lire les conditions',
+  promise_terms_required:
+    'Cochez la case pour continuer. Rien ne démarre avant.',
+
+  // Notifications. The blind one is what a wake can say before anything is
+  // decrypted: something arrived. It names nobody, because nothing naming
+  // anybody crossed the push infrastructure.
+  notify_blind_title: 'Messagr',
+  notify_blind_body: 'Quelque chose est arrivé.',
+  notify_channel: 'Messages',
+
+  // Photographs. `image_alt` is what a screen reader says: not a description
+  // of the picture, which nothing here can produce, but what the thing is.
+  image_alt: 'Photo',
+  image_unreadable: 'Cette photo n’a pas pu être ouverte sur cet appareil.',
+  conversation_attach: 'Envoyer une photo',
+  conversation_attaching: 'Chiffrement et envoi de la photo…',
+  header_no_directory: 'aucun annuaire',
+
+  // The list's own furniture. The badge itself draws a bare number, which
+  // needs no translation; what needs one is what a screen reader says about
+  // it, since "3" alone tells somebody nothing.
+  'list_unread %1$d': '%1$d messages non lus',
+  invite_open: 'Inviter quelqu’un',
 } as const
 
 /** Every key any screen may ask for. A typo is a compile error, not a blank. */

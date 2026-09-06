@@ -11,6 +11,7 @@ mod named_deactivation;
 mod util;
 
 use axum::{
+    extract::DefaultBodyLimit,
     http::StatusCode,
     response::{IntoResponse, Response},
     routing::{delete, get, post},
@@ -94,6 +95,23 @@ fn ask_on_the_terminal(plan: &str) -> Option<String> {
 fn router(state: Arc<AppState>) -> Router {
     Router::new()
         .route("/health", get(health))
+        // The Matrix push gateway path, verbatim: a homeserver's pusher URL
+        // is this and nothing else. See `handlers::wake` for why this
+        // deployment has one of its own rather than pointing at sygnal.
+        //
+        // BOUNDED, BECAUSE IT IS THE ONE UNAUTHENTICATED POST HERE.
+        //
+        // Every other route authenticates before it does anything. This one
+        // cannot: a homeserver's pusher carries no credential of ours, which
+        // is the protocol's shape and not a gap. So what it will accept is
+        // bounded instead. A notification for a hundred devices is a few
+        // kilobytes; the limit is generous against that and still refuses a
+        // body sent to make this process hold megabytes and then make an
+        // outbound request about them.
+        .route(
+            "/_matrix/push/v1/notify",
+            post(handlers::wake::notify).layer(DefaultBodyLimit::max(256 * 1024)),
+        )
         .route("/invitations", post(handlers::create::create))
         .route("/invitations/claim", post(handlers::claim::claim))
         .route(
@@ -194,6 +212,10 @@ mod tests {
                 // reaches the ceiling check: the conservative default is fine
                 // and commits nothing.
                 max_reserved_accounts_per_inviter: config::DEFAULT_RESERVED_ACCOUNTS_CEILING,
+                // No gateway here, and that is the honest value: this state
+                // is inert on purpose, and a URL would invite a test to
+                // depend on something reachable.
+                push_gateway_url: None,
             },
         });
         let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();

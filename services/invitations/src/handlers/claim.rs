@@ -1865,6 +1865,7 @@ mod tests {
                 edge_retention_days: 30,
                 bind_addr: String::new(),
                 max_reserved_accounts_per_inviter: crate::config::DEFAULT_RESERVED_ACCOUNTS_CEILING,
+                push_gateway_url: None,
             },
         });
         (st, fake)
@@ -3321,6 +3322,7 @@ mod tests {
                 edge_retention_days: 30,
                 bind_addr: String::new(),
                 max_reserved_accounts_per_inviter: crate::config::DEFAULT_RESERVED_ACCOUNTS_CEILING,
+                push_gateway_url: None,
             },
         })
     }

@@ -1,0 +1,403 @@
+# Messagr — passerelle de réveil Sygnal. FICHIER RÉELLEMENT DÉPLOYÉ sur hermes.
+#
+# Identique à deploy/sygnal/sygnal.yaml.exemple du dépôt, à DEUX endroits près :
+# cette en-tête, et la valeur de `project_id` (l'exemple porte un gabarit). Le
+# compte de service lui-même n'est pas ici : il est monté depuis
+# /opt/messagr-sygnal/secrets/, en 0600 root:root, hors dépôt.
+#
+# CE FICHIER EST ÉCRIT D'APRÈS LE CODE DE L'IMAGE DÉPLOYÉE, pas d'après la
+# documentation en ligne. Version lue :
+#   matrixdotorg/sygnal@sha256:141f5e72fdf99a28e29ca87f3a46c19ed1cf21d5074aa3ef9df7c067e0c1c46a
+#   matrix-sygnal 0.17.0 (image construite le 10 décembre 2025)
+# L'image ne contient PAS de sygnal.yaml.sample ; les champs ci-dessous sont
+# relevés dans sygnal/sygnal.py (CONFIG_DEFAULTS, check_config) et
+# sygnal/gcmpushkin.py (UNDERSTOOD_CONFIG_FIELDS, GcmPushkin.__init__).
+# Toute clé inconnue est acceptée en silence et seulement signalée par un
+# WARNING au démarrage — se relire ne suffit pas, il faut lire le journal.
+
+# ---------------------------------------------------------------------- http
+# Le seul écouteur de Sygnal. Il sert exactement deux routes, et rien d'autre
+# (sygnal/http.py, PushGatewayApiServer) :
+#   POST /_matrix/push/v1/notify   API Push Gateway de Matrix
+#   GET  /health                   corps vide, 200, non journalisé en INFO
+http:
+  # Port DANS le conteneur. La publication vers l'extérieur est décidée par
+  # docker-compose (127.0.0.1:8092) puis par nginx : ce port-ci ne doit pas
+  # être changé sans changer les deux autres.
+  port: 5000
+  # 0.0.0.0 dans le conteneur, et c'est délibéré. Le défaut de Sygnal est
+  # 127.0.0.1, qui rendrait le service injoignable depuis l'hôte : docker-proxy
+  # se connecte à l'ADRESSE DU CONTENEUR, pas à sa boucle locale. L'exposition
+  # publique reste nulle — le port n'est publié que sur 127.0.0.1 de l'hôte.
+  bind_addresses: ['0.0.0.0']
+
+# ----------------------------------------------------------------------- log
+log:
+  # `setup` est passé tel quel à logging.config.dictConfig de Python. Ce n'est
+  # pas un format inventé par Sygnal : toute la grammaire de dictConfig est
+  # disponible, et une erreur ici fait échouer le démarrage avant tout le reste.
+  setup:
+    version: 1
+    # `false` : ne pas éteindre les journaux des bibliothèques (twisted,
+    # google.auth). C'est par eux que passent les échecs d'authentification FCM.
+    disable_existing_loggers: false
+    formatters:
+      normal:
+        format: '%(asctime)s [%(process)d] %(levelname)-5s %(name)s %(message)s'
+    handlers:
+      # stderr et non un fichier : en conteneur, c'est `docker compose logs`
+      # qui collecte. Un handler `file` écrirait dans le conteneur, donc nulle
+      # part de durable.
+      stderr:
+        class: 'logging.StreamHandler'
+        formatter: 'normal'
+        stream: 'ext://sys.stderr'
+    loggers:
+      # Journal d'accès HTTP, au format combiné d'Apache. C'est LUI qui prouve
+      # qu'une notification est arrivée, et sur quel chemin exactement.
+      sygnal.access:
+        propagate: false
+        handlers: ['stderr']
+        level: 'INFO'
+      sygnal:
+        propagate: false
+        handlers: ['stderr']
+        level: 'INFO'
+    root:
+      handlers: ['stderr']
+      level: 'INFO'
+  access:
+    # true ferait journaliser l'IP lue dans X-Forwarded-For au lieu de celle du
+    # pair TCP. Sygnal est derrière le nginx de hermes, donc le pair est
+    # toujours 127.0.0.1 et l'IP utile est celle de l'en-tête.
+    #
+    # NE PAS METTRE true SANS Y PENSER : Sygnal fait confiance à l'en-tête sans
+    # la moindre vérification (twisted proxiedLogFormatter). Ici c'est sans
+    # risque parce que nginx RÉÉCRIT X-Forwarded-For, donc un client ne peut pas
+    # l'usurper ; exposer Sygnal en direct rendrait le journal d'accès
+    # falsifiable par n'importe qui.
+    x_forwarded_for: true
+
+# ------------------------------------------------------------------- metrics
+metrics:
+  prometheus:
+    # Désactivé : personne ne collecte encore. L'activer ouvre un SECOND
+    # écouteur HTTP, non authentifié, qu'il faudrait publier ou non
+    # délibérément — et qui n'est pas couvert par le bloc nginx de ce service.
+    enabled: false
+    address: '127.0.0.1'
+    port: 8000
+  opentracing:
+    # Traçage réparti Jaeger. Sans intérêt pour un service à une seule pièce, et
+    # il exige le paquet jaeger_client, absent de l'image.
+    enabled: false
+    implementation: null
+    service_name: 'sygnal'
+  sentry:
+    # Remontée d'erreurs vers un tiers. Laissé fermé : une trace d'exception de
+    # passerelle push porte des identifiants de salon et d'événement (§4.5).
+    enabled: false
+
+# ----------------------------------------------------------------------- proxy
+# Proxy HTTP sortant vers FCM/APNs. hermes sort en direct : null.
+# À défaut, Sygnal reprendrait la variable d'environnement HTTPS_PROXY.
+proxy: null
+
+# ------------------------------------------------------------------------ apps
+# Un pushkin par `app_id`. L'`app_id` est celui que le CLIENT déclare en
+# enregistrant son pusher (POST /_matrix/client/v3/pushers/set) ; le homeserver
+# le recopie tel quel dans la notification. La clé ci-dessous doit donc
+# correspondre EXACTEMENT à ce que l'application Android envoie.
+#
+# La correspondance accepte les jokers (sygnal/notifications.py, handles_appid →
+# glob_to_regex) : un `app_id` contenant * ou ? se comporterait en motif. Les
+# noms employés ici n'en contiennent pas.
+#
+# SI AUCUN PUSHKIN NE CORRESPOND, Sygnal ne se plante pas : il journalise
+#   WARNING sygnal.http Got notification for unknown app ID <app_id>
+#   INFO    sygnal.http Successfully delivered notifications with 1 rejected pushkeys
+# et répond 200 avec {"rejected": ["<pushkey>"]}. La seconde ligne est un piège
+# de lecture : « Successfully delivered » alors que RIEN n'a été livré. C'est
+# l'état nominal tant que FCM n'existe pas ; ne pas le confondre plus tard avec
+# une panne. Vérifié le 6 août 2026, homeserver réel, message réel.
+#
+# Le prototype Continuwuity 26.7.2, lui, IGNORE la liste « rejected » : le
+# pusher survit au rejet (relu par GET /v3/pushers après coup). Synapse, à
+# l'inverse, supprime un pushkey rejeté. Conséquence pratique : l'absence de
+# transporteur ne détruit rien côté Continuwuity.
+#
+# ═══ CE QUE SYGNAL REÇOIT NE DÉPEND PAS DE CE FICHIER, MAIS DU CLIENT ═══
+# C'est le pusher enregistré par l'application qui décide, par son champ
+# `data.format`, de ce que le homeserver met dans la notification. Relevé sur
+# le prototype avec un message réel, deux pushers côte à côte :
+#
+#   format: event_id_only  →  event_id, room_id, counts.unread, devices
+#                             et RIEN D'AUTRE. 268 octets.
+#   (champ absent)         →  tout ce qui précède PLUS content.body EN CLAIR,
+#                             sender, sender_display_name, room_name, type.
+#                             503 octets.
+#
+# Le §4.5 — « la passerelle ne voit jamais de clair » — ne tient donc PAS par
+# construction : il tient uniquement si l'application Android écrit
+# `format: "event_id_only"` dans son pusher. L'oublier ne produit aucune erreur,
+# nulle part : le pusher s'enregistre, la notification part, elle est livrée, et
+# le corps du message traverse la passerelle puis Google.
+#
+# Le corps exact du POST /_matrix/client/v3/pushers/set que l'application doit
+# émettre — app_id, URL complète, format — est écrit mot pour mot dans
+# RETOUR-ARRIERE.md §5, à côté de ce fichier.
+apps:
+  # ---------------------------------------------------------------------
+  # LE TRANSPORTEUR — actif depuis le 6 août 2026.
+  # ---------------------------------------------------------------------
+  # La clé DOIT être exactement l'`app_id` que l'application Android déclare
+  # dans son pusher, c'est-à-dire son `applicationId` : cloud.maudet.reveil.
+  cloud.maudet.reveil:
+    # `gcm` est le nom historique du pushkin Firebase. Il n'existe pas de type
+    # `fcm` : sygnal.sygnal._make_pushkin construit le nom de module par
+    # `sygnal.{type}pushkin` → sygnal/gcmpushkin.py.
+    type: gcm
+
+    # ═══ LE CHAMP LE PLUS IMPORTANT DE CE FICHIER ═══
+    # Deux valeurs possibles, `legacy` et `v1` (gcmpushkin.APIVersion).
+    #   legacy → POST https://fcm.googleapis.com/fcm/send, en-tête
+    #            « Authorization: key=<clé serveur> ». API RETIRÉE PAR GOOGLE
+    #            en juin 2024 : elle ne répond plus. Sygnal 0.17.0 la propose
+    #            encore et, PIRE, y retombe SILENCIEUSEMENT si `api_version`
+    #            est absent — un simple WARNING dans le journal, aucun refus
+    #            de démarrage. Un fichier oublieux de cette ligne donne une
+    #            passerelle qui démarre, reçoit, et n'envoie jamais rien.
+    #   v1     → POST https://fcm.googleapis.com/v1/projects/<project_id>/
+    #            messages:send, en-tête « Authorization: Bearer <jeton> », le
+    #            jeton étant obtenu par google-auth à partir du compte de
+    #            service, pour le périmètre
+    #            https://www.googleapis.com/auth/firebase.messaging
+    # C'est `v1` qu'il faut, et il faut l'écrire.
+    api_version: v1
+
+    # Identifiant TEXTUEL du projet Firebase, recopié tel quel dans l'URL
+    # d'envoi. Où le trouver : console Firebase → ⚙ Paramètres du projet →
+    # Général → « ID du projet ». C'est aussi le champ `project_id` du fichier
+    # JSON ci-dessous, et les deux doivent désigner le même projet.
+    #
+    # Le « numéro de projet » (suite de chiffres) désigne le MÊME projet et est
+    # accepté par FCM : les deux formes ont rendu strictement la même réponse
+    # lors de la recette. Ce n'est donc pas un piège — mais l'identifiant
+    # textuel se relit, pas le numéro.
+    #
+    # Un projet auquel le compte de service n'a pas accès, lui, donne un
+    # 403 PERMISSION_DENIED / CONSUMER_INVALID, très reconnaissable.
+    #
+    project_id: messagr-reveil
+
+    # Chemin, DANS LE CONTENEUR, du fichier JSON de clé d'un compte de service
+    # Google ayant le droit d'envoyer des messages FCM.
+    # Où l'obtenir : console Firebase → ⚙ Paramètres du projet → onglet
+    # « Comptes de service » → « Générer une nouvelle clé privée ». Le fichier
+    # téléchargé est un JSON `"type": "service_account"` contenant `project_id`,
+    # `client_email`, `private_key_id` et une clé privée RSA EN CLAIR. Rôle
+    # minimal côté IAM : Firebase Cloud Messaging API Admin
+    # (roles/firebasemessaging.admin) ; le compte « firebase-adminsdk » créé par
+    # défaut le porte déjà — vérifié par l'envoi réel de la recette, qui aurait
+    # rendu 403 si le rôle avait manqué.
+    #
+    # Sygnal le lit UNE FOIS AU DÉMARRAGE (google.auth
+    # load_credentials_from_file) : le remplacer exige un redémarrage. Le
+    # rafraîchissement du jeton d'accès, lui, est automatique et permanent — le
+    # jeton délivré vaut une heure.
+    #
+    # Le fichier est monté depuis /opt/messagr-sygnal/secrets/ (0700 root:root,
+    # fichier en 0600) et n'entre JAMAIS au dépôt.
+    service_account_file: /secrets/fcm-compte-de-service.json
+
+    # Options FCM brutes recopiées à la racine du champ `message` de la requête
+    # v1. Le vide est le bon réglage pour Messagr : Sygnal n'envoie alors QUE
+    # `message.data`, `message.token` et `message.android.priority` — un message
+    # « data-only », que l'application reçoit dans onMessageReceived même en
+    # arrière-plan, et qui n'affiche RIEN de lui-même. Y ajouter un bloc
+    # `notification:` ferait afficher une bulle par le système Android sans
+    # passer par notre code, et donnerait à Google un titre et un corps à lire :
+    # exactement ce que le §4.5 interdit.
+    fcm_options: {}
+
+    # `false` retire `unread` et `missed_calls` de la charge utile. Ce sont des
+    # ENTIERS, pas du contenu, mais ils fuitent un volume d'activité vers
+    # Google. Le défaut du code est `true` ; on le ferme, cohérent avec §4.5.
+    # Conséquence assumée : l'application ne peut pas afficher de pastille avant
+    # d'avoir synchronisé — ce qu'elle doit faire de toute façon pour déchiffrer.
+    #
+    # ATTENTION à ne pas le fermer en même temps qu'un pusher qui n'enverrait
+    # ni event_id ni room_id : `_build_data` jette alors la notification
+    # (« badge-only mais sans compteur ») et Sygnal répond 200 avec un
+    # `rejected` VIDE — une notification perdue sans la moindre trace d'erreur.
+    # Avec `format: event_id_only`, event_id est toujours présent : le cas ne
+    # se produit pas.
+    send_badge_counts: false
+
+    # Nombre maximal de requêtes HTTP simultanées vers FCM (défaut 20).
+    max_connections: 20
+
+    # Nombre maximal de notifications en cours de traitement pour ce pushkin
+    # (défaut 512). Au-delà, Sygnal répond 502 au homeserver plutôt que de
+    # s'effondrer.
+    inflight_request_limit: 512
+
+  # ---------------------------------------------------------------------
+  # SENTINELLE DE DÉMARRAGE — retirée le 6 août 2026, CONSERVÉE ICI.
+  # ---------------------------------------------------------------------
+  # Elle n'a plus lieu d'être tant que le bloc ci-dessus est valide. Elle est
+  # gardée en commentaire parce qu'elle est la CONFIGURATION D'ATTENTE : si le
+  # compte de service devait être révoqué ou retiré, Sygnal refuserait de
+  # démarrer et il faudrait la remettre pour que la passerelle reste joignable
+  # (voir RETOUR-ARRIERE.md).
+  #
+  # Sygnal refuse de démarrer si `apps` est vide :
+  #   RuntimeError: No app IDs are configured. Edit sygnal.yaml to define some.
+  #   (sygnal/sygnal.py, make_pushkins_then_start)
+  # Et le pushkin FCM v1 refuse de se construire sans compte de service valide.
+  # Il faut donc au moins une entrée qui se construise sans fichier de clé sur
+  # le disque — apns exige un certificat, webpush une clé VAPID ; `gcm`/`legacy`
+  # est le seul cas.
+  #
+  # Elle est INERTE PAR CONSTRUCTION : son `app_id` ne contient aucun joker et
+  # ne correspond à celui d'aucun client. `api_version: legacy` y est écrit
+  # explicitement pour ne pas déclencher le repli silencieux décrit plus haut.
+  #
+  # sentinelle-demarrage-sans-transporteur:
+  #   type: gcm
+  #   api_version: legacy
+  #   api_key: VALEUR-FACTICE-JAMAIS-EMPLOYEE
+
+  # ═══════════════════════════════════════════════════════════════════════════
+  # ANNEXE — CE QUE REND FCM v1, MESURÉ LE 6 AOÛT 2026 SUR CE PROJET
+  # ═══════════════════════════════════════════════════════════════════════════
+  # Relevé par envois réels vers fcm.googleapis.com depuis le conteneur, avec le
+  # compte de service déployé. Le but est de savoir, plus tard, distinguer d'un
+  # coup d'œil « les identifiants sont mauvais » de « le destinataire est mort ».
+  # Les deux ne se ressemblent pas du tout — encore faut-il l'avoir vu une fois.
+  #
+  #  Cause                          HTTP  status FCM        errorCode
+  #  -----------------------------  ----  ----------------  ---------------------
+  #  destinataire non conforme       400  INVALID_ARGUMENT  INVALID_ARGUMENT
+  #    « The registration token is not a valid FCM registration token »,
+  #    avec fieldViolations[0].field = "message.token"
+  #  destinataire bien formé mais    404  NOT_FOUND         UNREGISTERED
+  #  inconnu / désinstallé                message « NotRegistered »
+  #  jeton porteur invalide ou       401  UNAUTHENTICATED   (aucun)
+  #  expiré  ← IDENTIFIANTS               « Request had invalid authentication
+  #                                       credentials… »
+  #  projet inaccessible au compte   403  PERMISSION_DENIED CONSUMER_INVALID
+  #  de service                           « Permission denied on resource
+  #                                       project <nom> »
+  #
+  # LA LECTURE QUI COMPTE : 400 et 404 portent sur `message.token`, donc sur
+  # l'APPAREIL. 401 et 403 portent sur l'appelant, donc sur NOS identifiants. Un
+  # 404 ne veut jamais dire « la passerelle est mal configurée ».
+  #
+  # CE QUE SYGNAL EN FAIT (gcmpushkin._handle_v1_response) :
+  #   404 → le pushkey part dans la liste `rejected`, réponse 200 au homeserver.
+  #         Aucun réessai : c'est un échec définitif et normal.
+  #   400 → NotificationDispatchException, réponse 502 au homeserver, RIEN dans
+  #         `rejected`. Le homeserver réessaiera plus tard, indéfiniment, sur un
+  #         jeton qui ne sera jamais valide.
+  #   401 → NotificationDispatchException « Not authorised to push » → 502.
+  #   403 → NotificationDispatchException « Sender ID mismatch » → 502.
+  #   429 et 5xx → réessai, 3 tentatives au plus (10 s puis 20 s ; 60 s puis
+  #         120 s en cas de quota), puis abandon.
+
+  # ---------------------------------------------------------------------
+  # LA V1, ajoutée le 7 août 2026.
+  # ---------------------------------------------------------------------
+  # Même projet Firebase que le banc de réveil, donc AUCUN nouveau
+  # justificatif : le compte de service ci-dessus couvre déjà ce paquet, et
+  # `project_id` est inchangé. L'API v1 envoie vers un JETON D'APPAREIL et non
+  # vers une application, ce qui est la raison pour laquelle une seule clé sert
+  # deux paquets.
+  #
+  # La clé DOIT être exactement l'`applicationId` Gradle de l'application. Un
+  # désaccord ne produit aucune erreur : le homeserver ne trouve simplement
+  # aucun pushkin pour ce paquet, et la notification est jetée.
+  #
+  # `api_version: v1` est écrit, et doit le rester. Sans cette ligne, Sygnal
+  # retombe SILENCIEUSEMENT sur l'API retirée par Google en juin 2024 : la
+  # passerelle démarre, reçoit, et n'envoie jamais rien.
+  cloud.maudet.messagr:
+    type: gcm
+    api_version: v1
+    project_id: messagr-reveil
+    service_account_file: /secrets/fcm-compte-de-service.json
+    # Vide : Sygnal n'envoie alors que `message.data`, `message.token` et la
+    # priorité. Message « data-only », reçu dans onMessageReceived même en
+    # arrière-plan, qui n'affiche RIEN de lui-même. Un bloc `notification:`
+    # ferait afficher une bulle par le système sans passer par notre code, et
+    # donnerait à Google un titre et un corps à lire (§4.5).
+    fcm_options: {}
+    # Retire `unread` et `missed_calls` : des entiers, pas du contenu, mais ils
+    # fuitent un volume d'activité vers Google.
+    send_badge_counts: false
+    max_connections: 20
+    inflight_request_limit: 512
+
+  # ---------------------------------------------------------------------
+  # VoIP pushes for iOS, added on 23 August 2026. APNs token auth, PushKit
+  # topic, voip push type: this entry exists so an incoming call can ring a
+  # killed iOS application. `platform: sandbox` matches developer-signed
+  # builds; flip to `prod` the day the application ships a release build.
+  # The .p8 is single-download: a lost key is revoked and recreated, never
+  # re-downloaded. No `max_connections` here: ApnsPushkin does not
+  # understand that field (it warns) — only `inflight_request_limit`.
+  # ---------------------------------------------------------------------
+
+  # L'APPLICATION REACT NATIVE, dont l'applicationId Gradle est eu.messagr.
+  #
+  # La cle doit etre exactement l'app_id que le client declare dans son
+  # pusher. Un desaccord ne produit AUCUNE erreur : le homeserver ne trouve
+  # pas de pushkin et laisse tomber la notification, sygnal ne journalise
+  # rien, et l'appareil n'est simplement jamais reveille. Le client a
+  # declare cloud.maudet.messagr -- l'ancien applicationId -- jusqu'a ce
+  # qu'une relecture l'attrape.
+  #
+  # Meme projet et meme compte de service que l'entree ci-dessus : FCM v1
+  # envoie vers un jeton d'appareil et non vers une application, donc un
+  # seul compte de service couvre tous les paquets du projet.
+  eu.messagr:
+    type: gcm
+    api_version: v1
+    project_id: messagr-reveil
+    service_account_file: /secrets/fcm-compte-de-service.json
+    # Vide : Sygnal n'envoie alors que `message.data`, `message.token` et la
+    # priorité. Message « data-only », reçu dans onMessageReceived même en
+    # arrière-plan, qui n'affiche RIEN de lui-même. Un bloc `notification:`
+    # ferait afficher une bulle par le système sans passer par notre code, et
+    # donnerait à Google un titre et un corps à lire (§4.5).
+    fcm_options: {}
+    # Retire `unread` et `missed_calls` : des entiers, pas du contenu, mais ils
+    # fuitent un volume d'activité vers Google.
+    send_badge_counts: false
+    max_connections: 20
+    inflight_request_limit: 512
+
+  # ---------------------------------------------------------------------
+  # VoIP pushes for iOS, added on 23 August 2026. APNs token auth, PushKit
+  # topic, voip push type: this entry exists so an incoming call can ring a
+  # killed iOS application. `platform: sandbox` matches developer-signed
+  # builds; flip to `prod` the day the application ships a release build.
+  # The .p8 is single-download: a lost key is revoked and recreated, never
+  # re-downloaded. No `max_connections` here: ApnsPushkin does not
+  # understand that field (it warns) — only `inflight_request_limit`.
+  # ---------------------------------------------------------------------
+  cloud.maudet.messagr.voip:
+    type: apns
+    platform: sandbox
+    keyfile: /secrets/apns-messagr-voip.p8
+    key_id: YKZW452SYM
+    team_id: KUT463DS29
+    topic: cloud.maudet.messagr.voip
+    push_type: voip
+
+    # Same privacy stance as the two gcm entries above: no activity volume
+    # toward Apple. With `format: event_id_only` the payload reduces to
+    # room_id + event_id.
+    send_badge_counts: false
+
+    inflight_request_limit: 512

@@ -16,8 +16,10 @@ import {
   bootstrapCrossSigning,
   createCryptoMachine,
   createCrossSigningIdentity,
+  decryptAttachment,
   decryptEvent,
   discardScopeKey,
+  encryptAttachment,
   encryptEvent,
   encryptionSlice,
   buildHistoryBundle,
@@ -54,6 +56,11 @@ import { probeUnsettledEncrypt, type ProbeReport } from './panicProbe'
 import { claimHistory, type HistoryClaim } from './claimHistory'
 import { evictFrom, type EvictOutcome } from './evict'
 import { mediaRepository } from './mediaRepository'
+import { forgetPusher, registerPusher, type PusherRegistration } from './pusher'
+import type { PickedImage } from './pickImage'
+import { fetchImage, type ShownImage } from './receiveImage'
+import { sendImage, sendingThrough, type ImageSent } from './sendImage'
+import type { ReadImage } from '../timeline/imageEvent'
 import { makePumpHttp } from './pump'
 import {
   admitDrawnEntrant,
@@ -534,6 +541,8 @@ export function startLiveSync(
 export async function listConversations(
   sessionClient: ReturnType<typeof createClient>,
   selfUserId: string,
+  /** How far each conversation has been read on this device. */
+  lastRead: ReadonlyMap<string, number>,
 ): Promise<ConversationSummary[]> {
   return fetchConversationSummaries(
     {
@@ -545,6 +554,7 @@ export async function listConversations(
       decodeUtf8: bytes => new TextDecoder().decode(bytes),
     },
     selfUserId,
+    lastRead,
   )
 }
 
@@ -678,14 +688,144 @@ export async function removeReaction(
   return unreact(reacting(sessionClient), scope, reactionEventId)
 }
 
+/**
+ * Phase eleven: sending a photograph, and getting one back.
+ *
+ * Pure glue, and it names two library functions nothing else does:
+ * `encryptAttachment` and `decryptAttachment`. The bytes never touch a
+ * filesystem on either side -- see `sendImage.ts` and `receiveImage.ts` for
+ * why that is ADR-0006 rather than a preference.
+ *
+ * `fetch` is passed rather than reached for inside `mediaRepository`, the way
+ * `vouchForEntrant` does it and for the same reason: this file stays the only
+ * place a global is touched.
+ */
+export async function sendPhotograph(
+  sessionClient: ReturnType<typeof createClient>,
+  credentials: { readonly baseUrl: string; readonly accessToken: string },
+  scope: string,
+  image: PickedImage,
+): Promise<ImageSent> {
+  const http = makePumpHttp(sessionClient)
+  const media = mediaRepository(
+    credentials.baseUrl,
+    credentials.accessToken,
+    fetch,
+  )
+  return sendImage(
+    {
+      seal: plaintext => encryptAttachment(plaintext),
+      // OCTET-STREAM, AND THE PHOTOGRAPH'S OWN TYPE IS NOT SENT.
+      // What goes to the repository is ciphertext, not a JPEG. Declaring
+      // `image/jpeg` would be a claim about bytes nobody there can read, and
+      // it would tell the server what kind of thing somebody sent -- which is
+      // exactly the metadata the encryption is for. The real type travels
+      // inside the event, where only a participant sees it.
+      upload: ciphertext =>
+        media.upload(ciphertext, 'application/octet-stream'),
+      machine: {
+        encryptEvent: (encryptScope, eventType, payload) =>
+          encryptEvent(asCryptoScopeId(encryptScope), eventType, payload),
+      },
+      send: sendingThrough(
+        http,
+        () => `messagr-${Date.now()}-${Math.floor(Math.random() * 1e6)}`,
+      ),
+    },
+    scope,
+    image,
+  )
+}
+
+/**
+ * Taking the pusher away, which is what turning notifications off must do.
+ *
+ * The same route with `kind: null`. A setting that only stopped the *next*
+ * launch registering would leave the pusher already there firing, which is a
+ * switch that reads as off and is on.
+ */
+export async function stopWakingThisDevice(
+  sessionClient: ReturnType<typeof createClient>,
+  token: string,
+): Promise<void> {
+  await makePumpHttp(sessionClient).authedRequest(
+    'POST',
+    '/_matrix/client/v3/pushers/set',
+    {},
+    JSON.stringify(forgetPusher(token)),
+  )
+}
+
+/** The other half: what a screen calls to draw a photograph it received. */
+export async function openPhotograph(
+  credentials: { readonly baseUrl: string; readonly accessToken: string },
+  image: ReadImage,
+): Promise<ShownImage> {
+  const media = mediaRepository(
+    credentials.baseUrl,
+    credentials.accessToken,
+    fetch,
+  )
+  return fetchImage(
+    {
+      download: url => media.download(url),
+      open: (ciphertext, secret) => decryptAttachment(ciphertext, secret),
+    },
+    image,
+  )
+}
+
+/**
+ * Phase twelve: telling the homeserver where to wake this device.
+ *
+ * Pure glue. What the pusher says, and why it points at this deployment's own
+ * gateway rather than at sygnal, is `pusher.ts`.
+ *
+ * The gateway base is derived from the account's own homeserver, the way
+ * `issueInvitation`'s link host is: a device pushes through the deployment it
+ * belongs to, and a configured URL would be one more thing that can point
+ * somewhere else.
+ */
+export async function registerThisDeviceForWaking(
+  sessionClient: ReturnType<typeof createClient>,
+  credentials: { readonly baseUrl: string },
+  token: string,
+): Promise<PusherRegistration> {
+  const http = makePumpHttp(sessionClient)
+  return registerPusher(
+    async body => {
+      await http.authedRequest(
+        'POST',
+        '/_matrix/client/v3/pushers/set',
+        {},
+        JSON.stringify(body),
+      )
+    },
+    token,
+    `${credentials.baseUrl.replace(/\/+$/, '')}/_messagr`,
+  )
+}
+
 export type { ReactionTally } from '../timeline/reactions'
 
 /**
  * Tells the homeserver this account has read up to `eventId`.
  *
- * Called only when the setting says so. See `receiptSetting.ts`: a receipt is
- * public metadata, and a product that refuses to let a server read content
- * and then publishes the hour somebody read it contradicts itself.
+ * # Two receipts, and only one of them is a courtesy
+ *
+ * `m.read` is public metadata: it tells the other party, and the server, the
+ * hour somebody read them. It is off unless the setting says otherwise, for
+ * the reason `receiptSetting.ts` gives -- a product that refuses to let a
+ * server read content and then publishes when it was read contradicts
+ * itself.
+ *
+ * `m.read.private` (MSC2285) says the same thing to the homeserver and to
+ * nobody else. It is sent **always**, and it is not a courtesy: it is what
+ * stops the server counting a message as unread, which is what stops it
+ * pushing a notification for something already read. Without it every
+ * conversation would keep notifying until the person turned on the setting
+ * that watches them, which would make a privacy choice cost a working
+ * product.
  *
  * Failure is swallowed on purpose, and this is the one place in this file
  * where that is right: a receipt that did not go is invisible to the person
@@ -696,12 +836,13 @@ export async function sendReadReceipt(
   sessionClient: ReturnType<typeof createClient>,
   scope: string,
   eventId: string,
+  kind: 'm.read' | 'm.read.private',
 ): Promise<void> {
   try {
     await makePumpHttp(sessionClient).authedRequest(
       'POST',
       `/_matrix/client/v3/rooms/${encodeURIComponent(scope)}/receipt/` +
-        `m.read/${encodeURIComponent(eventId)}`,
+        `${kind}/${encodeURIComponent(eventId)}`,
       {},
       JSON.stringify({}),
     )

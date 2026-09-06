@@ -74,6 +74,16 @@ jobs:
       - name: Assert the legal screen and the published terms agree
         run: ./scripts/assert-legal-screen.sh
 
+      # And that the privacy policy says what the push gateway actually
+      # forwards. `--live` here and nowhere else: between writing the page and
+      # shipping the build that makes it true the two disagree on purpose, so
+      # the ordinary run reports the gap and this one refuses it. A build that
+      # went out with the policy still saying the application contains no
+      # third-party library would be shipping a false statement about what
+      # Google receives.
+      - name: Assert the privacy policy and the push gateway agree
+        run: ./scripts/assert-push-payload.sh --live
+
       - name: Assert the upload key is present
         env:
           KEYSTORE: ${{ secrets.MESSAGR_UPLOAD_KEYSTORE_BASE64 }}

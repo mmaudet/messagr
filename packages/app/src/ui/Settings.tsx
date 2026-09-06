@@ -2,7 +2,9 @@ import React from 'react'
 import { Pressable, StyleSheet, Text, View } from 'react-native'
 
 import { t } from '../copy'
+import type { Language } from '../copy/languages'
 import { color, floors, layout, space, stroke, type } from '../design/tokens'
+import { LanguageStrip } from './LanguageStrip'
 
 /**
  * Settings.
@@ -34,6 +36,12 @@ export function Settings({
   receipts,
   onReceipts,
   receiptsNotKept,
+  language,
+  onLanguage,
+  onLanguageSettled,
+  wake,
+  onWake,
+  wakeNotKept,
 }: {
   readonly onBack: () => void
   readonly onLegal: () => void
@@ -41,6 +49,15 @@ export function Settings({
   readonly onReceipts: (on: boolean) => void
   /** `true` when the last change could not be kept. */
   readonly receiptsNotKept: boolean
+  /** Which language is spoken, and changing it. Same control as #103's. */
+  readonly language: Language
+  readonly onLanguage: (language: Language) => void
+  /** Called when the strip stops. Only this one persists. */
+  readonly onLanguageSettled: (language: Language) => void
+  /** Whether this device asks to be woken. See `wakeSetting.ts`. */
+  readonly wake: boolean
+  readonly onWake: (on: boolean) => void
+  readonly wakeNotKept: boolean
 }) {
   return (
     <View style={styles.screen} testID="settings">
@@ -63,6 +80,21 @@ export function Settings({
         <Text style={styles.rowLabel}>{t('settings_legal')}</Text>
       </Pressable>
 
+      {/* THE SAME STRIP AS THE FIRST SCREEN, AND THE SAME GESTURE.
+          Choosing a language once and having no way to change it is a
+          reinstall as a correction. It is the same control rather than a
+          list, because a person who picked the wrong one is exactly the
+          person who cannot read a list of language names. */}
+      <View style={styles.setting} testID="setting-language">
+        <Text style={styles.rowLabel}>{t('settings_row_lang_label')}</Text>
+        <LanguageStrip
+          chosen={language}
+          onChoose={onLanguage}
+          onSettle={onLanguageSettled}
+          testID="settings-language-strip"
+        />
+      </View>
+
       {/* The one setting this lot's own features need. Its hint says what
           turning it on costs rather than what it does: everybody knows what a
           read receipt does, and nobody is told who else finds out. */}
@@ -82,6 +114,31 @@ export function Settings({
         <Text style={styles.hint}>{t('settings_receipts_hint')}</Text>
         {receiptsNotKept && (
           <Text style={styles.notKept}>{t('settings_receipts_not_kept')}</Text>
+        )}
+      </View>
+
+      {/* THE OPPOSITE DEFAULT FROM THE ONE ABOVE, AND FOR THE OPPOSITE
+          REASON. A read receipt publishes something about a person; a wake
+          publishes nothing -- `wakeSetting.ts` sets out why one is off and
+          the other on. The hint says what crosses and what does not, because
+          "notifications" is the setting people most reasonably assume leaks
+          their messages. */}
+      <View style={styles.setting} testID="setting-wake">
+        <Pressable
+          testID="toggle-wake"
+          onPress={() => onWake(!wake)}
+          accessibilityRole="switch"
+          accessibilityState={{ checked: wake }}
+          accessibilityLabel={t('settings_wake')}
+          style={styles.row}>
+          <Text style={styles.rowLabel}>{t('settings_wake')}</Text>
+          <Text style={styles.rowValue}>
+            {wake ? t('settings_wake_on') : t('settings_wake_off')}
+          </Text>
+        </Pressable>
+        <Text style={styles.hint}>{t('settings_wake_hint')}</Text>
+        {wakeNotKept && (
+          <Text style={styles.notKept}>{t('settings_wake_not_kept')}</Text>
         )}
       </View>
 

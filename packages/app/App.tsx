@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react'
 import {
   AppState,
+  BackHandler,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -29,7 +30,11 @@ import {
   admitEntrant,
   inviteSomebody,
   listConversations,
+  openPhotograph,
   reactToMessage,
+  registerThisDeviceForWaking,
+  stopWakingThisDevice,
+  sendPhotograph,
   sendReadReceipt,
   readTrust,
   removeReaction,
@@ -52,6 +57,9 @@ import { polyfillReport } from './src/runtime/bootstrap'
 import { computeRuntimeGapReport } from './src/runtime/runtimeGaps'
 import { computeNewArchitectureReport } from './src/runtime/newArchitecture'
 import {
+  languageSecrets,
+  termsSecrets,
+  wakeSecrets,
   promiseSecrets,
   receiptSecrets,
   sessionSecrets,
@@ -78,20 +86,38 @@ import { theOtherMember, type VouchOutcome } from './src/runtime/vouch'
 import type { ConversationSummary } from './src/runtime/conversationList'
 import type { GivenNames } from './src/runtime/givenName'
 import { forgetfulGivenNames } from './src/runtime/givenNameStore'
-import { openGivenNamesDatabase } from './src/runtime/givenNamesDatabase'
+import { forgetfulLastRead, type LastRead } from './src/runtime/lastReadStore'
+import { openNotebook } from './src/runtime/notebook'
+import {
+  readChosenLanguage,
+  rememberLanguage,
+} from './src/runtime/chosenLanguage'
+import { rememberTermsAccepted } from './src/runtime/termsAccepted'
+import { allowWake, wakeIsAllowed } from './src/runtime/wakeSetting'
+import { deviceLocale } from './src/runtime/deviceLocale'
+import { pickFromLibrary } from './src/runtime/imageLibrary'
+import { pushTokenForThisDevice } from './src/runtime/pushDevice'
+import { whenNotificationPressed } from './src/runtime/showNotification'
+import type { ShownImage } from './src/runtime/receiveImage'
+import type { ReadImage } from './src/timeline/imageEvent'
 import type { EvictOutcome } from './src/runtime/evict'
 import type { HistoryClaim } from './src/runtime/claimHistory'
 import { Conversation } from './src/ui/Conversation'
 import { ConversationList } from './src/ui/ConversationList'
 import { Invite, type InviteStage } from './src/ui/Invite'
+import { FloatingAction } from './src/ui/FloatingAction'
+import { Header } from './src/ui/Header'
 import { Legal } from './src/ui/Legal'
+import { Reserved } from './src/ui/Reserved'
+import { TabBar, type Tab } from './src/ui/TabBar'
 import { Settings } from './src/ui/Settings'
 import { Trust } from './src/ui/Trust'
 import { GiveName } from './src/ui/GiveName'
 import { FirstLaunch } from './src/ui/FirstLaunch'
 import { Evict } from './src/ui/Evict'
 import { Vouch } from './src/ui/Vouch'
-import { t } from './src/copy'
+import { setCatalogue, t } from './src/copy'
+import type { Language } from './src/copy/languages'
 import { NotchedButton } from './src/ui/NotchedButton'
 import { notchLegFor } from './src/ui/notchGeometry'
 import { enterWithASession, type EntryResult } from './src/runtime/entry'
@@ -158,6 +184,29 @@ export function App({
   // unknown would flash it at every relaunch of a device that has long since
   // seen it.
   const [promiseSeen, setPromiseSeen] = useState<boolean | null>(null)
+  // WHICH LANGUAGE IS SPOKEN, AND WHY IT IS HELD HERE.
+  //
+  // `t()` reads a module variable, so switching the catalogue does not
+  // re-render anything on its own -- see `copy/index.ts`. This state is what
+  // does: the setter switches the catalogue and then changes the state, in
+  // that order, so the re-render this causes already reads the new one.
+  const [language, setLanguage] = useState<Language>('fr')
+  const chooseLanguage = (next: Language) => {
+    setCatalogue(next)
+    setLanguage(next)
+  }
+  /**
+   * What settling on a language writes down, as opposed to what passing over
+   * one shows. Separated after a review: one callback doing both wrote a
+   * keystore entry per language crossed mid-drag.
+   *
+   * Failure is silent on purpose: a language that did not persist is a screen
+   * in the right language now and the wrong one next launch, which is a
+   * smaller thing than a warning on a first screen.
+   */
+  const keepLanguage = (next: Language) => {
+    rememberLanguage(languageSecrets, next).catch(() => {})
+  }
   const [bridge, setBridge] = useState<BridgeStatus | null>(null)
   const [entry, setEntry] = useState<EntryResult | null>(null)
   // The conversation this application holds, derived from the room on every
@@ -175,19 +224,40 @@ export function App({
   const [notebook, setNotebook] = useState<string | null>(null)
   // Inviting somebody, which is the same gesture as starting a conversation
   // with them. See issueInvitation.ts.
-  const [invite, setInvite] = useState<InviteStage>({ stage: 'resting' })
+  const [invite, setInvite] = useState<InviteStage>({ stage: 'shut' })
   const [admission, setAdmission] = useState<'waiting' | 'admitted' | null>(
     null,
   )
   const inviteRef = useRef<((name: string | null) => void) | null>(null)
   const namesRef = useRef<GivenNames>(forgetfulGivenNames())
+  // How far each conversation has been read here. Forgetful until the
+  // notebook opens, and forgetful for good if it does not -- which shows
+  // every conversation as unread rather than as read, since a badge that
+  // should be there is a smaller lie than one that should not.
+  const lastReadRef = useRef<LastRead>(forgetfulLastRead())
   // Which conversation is open, held in a ref as well as in state: the live
   // sync loop's callbacks are created once and would otherwise keep deriving
   // whichever conversation was open when the loop started.
   // Which panel the list side is showing. A conversation, when one is open,
   // wins over all three: `openScope` is the deeper state and this is what sits
   // behind it.
-  const [panel, setPanel] = useState<'list' | 'settings' | 'legal'>('list')
+  // Which tab is showing, and whether Settings has pushed the legal screen
+  // over itself. Four tabs, and two of them are reserved before the thing
+  // they hold exists -- see `Reserved`: a bar that gains an item later moves
+  // every other item under people's thumbs.
+  const [tab, setTab] = useState<Tab>('chat')
+  // CONVERSATIONS, NOT MESSAGES.
+  //
+  // The tab's badge counts how many conversations have something waiting; the
+  // rows carry how much is waiting in each. That is the division a person
+  // reads without being told -- a tab saying `47` for one chatty conversation
+  // would send somebody looking for forty-seven places to go.
+  const unreadCount = summaries.filter(summary => summary.unread > 0).length
+  const [legalOpen, setLegalOpen] = useState(false)
+  // How tall the bar and the action came out together. Not for positioning
+  // them -- they are laid out, not offset -- but so the scroll view can end
+  // above them rather than under them.
+  const [dockHeight, setDockHeight] = useState(0)
   // What is known about the person on the other side. `null` until the screen
   // is asked for: it costs a device-status call and a state fetch, and a
   // conversation nobody opened that screen from should not pay for them.
@@ -206,6 +276,11 @@ export function App({
   // see receiptSetting.ts.
   const [receipts, setReceipts] = useState(false)
   const [receiptsNotKept, setReceiptsNotKept] = useState(false)
+  // Whether this device asks to be woken. On unless somebody says otherwise,
+  // which is the opposite of the switch above -- `wakeSetting.ts` says why.
+  const [wake, setWake] = useState(true)
+  const [wakeNotKept, setWakeNotKept] = useState(false)
+  const wakeRef = useRef(true)
   const [readHere, setReadHere] = useState<ReadonlySet<string>>(new Set())
   const receiptsRef = useRef(false)
   // The conversation as the loop's callbacks can see it: they are made once,
@@ -214,6 +289,15 @@ export function App({
   const conversationRef = useRef<readonly TimelineEntry[]>([])
   const [openScope, setOpenScope] = useState<string | null>(null)
   const openScopeRef = useRef<string | null>(null)
+  // Choosing and sending a photograph, and opening one that arrived. Held in
+  // refs like every other gesture the launch effect binds.
+  const attachRef = useRef<(() => void) | null>(null)
+  // Registering or removing this device's pusher. Held in a ref because the
+  // settings switch is rendered outside the launch effect that binds it.
+  const wakeThisDeviceRef = useRef<((on: boolean) => void) | null>(null)
+  const openImageRef = useRef<
+    ((image: ReadImage) => Promise<ShownImage>) | null
+  >(null)
   const reactRef = useRef<
     ((target: string, key: string, own: string | null) => void) | null
   >(null)
@@ -327,10 +411,25 @@ export function App({
     hasSeenPromise(promiseSecrets)
       .then(setPromiseSeen)
       .catch(() => setPromiseSeen(false))
+    // THE LANGUAGE, BEFORE THE FIRST SCREEN IS DRAWN.
+    //
+    // Read in the same pass as the promise flag and for the same reason: a
+    // keystore read and nothing more, so it can run under the promise rather
+    // than after it. Which locale the device is set to is what an unset
+    // choice falls back to -- see `chosenLanguage.ts`.
+    readChosenLanguage(languageSecrets, deviceLocale())
+      .then(chooseLanguage)
+      .catch(() => undefined)
     receiptsArePublished(receiptSecrets)
       .then(on => {
         setReceipts(on)
         receiptsRef.current = on
+      })
+      .catch(() => undefined)
+    wakeIsAllowed(wakeSecrets)
+      .then(on => {
+        setWake(on)
+        wakeRef.current = on
       })
       .catch(() => undefined)
   }, [])
@@ -497,8 +596,9 @@ export function App({
             // with a passphrase of its own. It degrades rather than failing --
             // a launch that cannot open it shows conversations as identifiers,
             // which is what an unnamed conversation looks like anyway.
-            const opening = await openGivenNamesDatabase(storeDir)
+            const opening = await openNotebook(storeDir)
             namesRef.current = opening.names
+            lastReadRef.current = opening.lastRead
             setNotebook(opening.opened ? 'open' : (opening.reason ?? 'closed'))
             logEvent(opening.opened ? 'info' : 'warn', 'MESSAGR_GIVEN_NAMES', {
               opened: opening.opened,
@@ -510,6 +610,39 @@ export function App({
                 : { reason: opening.reason }),
             })
             setNames(await opening.names.all())
+
+            // READING IS WHAT CLEARS A BADGE.
+            //
+            // Two marks for one act, and they are not redundant. The local
+            // one (`unread.ts`) is what the list draws, and it works whether
+            // or not this account has agreed to be observed. The private
+            // receipt is what stops the homeserver counting the message as
+            // unread, which is what stops it pushing a notification for
+            // something already read -- and it says that to the server and to
+            // nobody else. The public receipt is the courtesy, and only if
+            // somebody turned it on: see receiptSetting.ts.
+            const markRead = async (
+              scope: string,
+              entries: readonly TimelineEntry[],
+            ) => {
+              const newest = entries[entries.length - 1]
+              if (newest === undefined) return
+              await lastReadRef.current.set(scope, newest.sentAt)
+              await sendReadReceipt(
+                sessionClient,
+                scope,
+                newest.eventId,
+                'm.read.private',
+              )
+              if (receiptsRef.current) {
+                await sendReadReceipt(
+                  sessionClient,
+                  scope,
+                  newest.eventId,
+                  'm.read',
+                )
+              }
+            }
 
             // OPENING A CONVERSATION, from the list or from the launch.
             //
@@ -568,13 +701,7 @@ export function App({
                 const other = theOtherMember(members, credentials.userId)
                 setParty(other === null ? null : { scope, other })
 
-                // Only if somebody turned it on. A receipt is public
-                // metadata, and the default is the quiet one -- see
-                // receiptSetting.ts.
-                const newest = fresh.entries[fresh.entries.length - 1]
-                if (receiptsRef.current && newest !== undefined) {
-                  await sendReadReceipt(sessionClient, scope, newest.eventId)
-                }
+                await markRead(scope, fresh.entries)
               }
               derive().catch((cause: unknown) =>
                 logEvent('warn', 'MESSAGR_OPEN_CONVERSATION_FAILED', {
@@ -627,6 +754,137 @@ export function App({
                 }),
               )
             }
+
+            // SENDING A PHOTOGRAPH.
+            //
+            // The picker is opened here rather than inside the screen, for
+            // the reason every native seam in this application is bound in
+            // one place: a screen that imported the picker could not be
+            // rendered by anything without it.
+            //
+            // The whole thing is one gesture from a person's point of view --
+            // choose, and it is on its way -- so the screen shows one state
+            // for the choosing, the sealing, the upload and the send. They
+            // are four steps and none of them is separately actionable.
+            attachRef.current = () => {
+              const scope = openScopeRef.current
+              if (scope === null) return
+              const gesture = async () => {
+                const image = await pickFromLibrary()
+                // Nothing chosen. Not a failure, and it must not read as one.
+                if (image === null) return
+
+                setSending('sending')
+                const done = await sendPhotograph(
+                  sessionClient,
+                  credentials,
+                  scope,
+                  image,
+                )
+                if (!done.sent) {
+                  setSending('failed')
+                  logEvent('warn', 'MESSAGR_IMAGE_SEND_FAILED', {
+                    reason: done.reason,
+                  })
+                  return
+                }
+                setSending('idle')
+                logEvent('info', 'MESSAGR_IMAGE_SENT', {
+                  eventId: done.eventId,
+                })
+                const fresh = await loadConversation(
+                  sessionClient,
+                  scope,
+                  credentials.userId,
+                )
+                setConversation(held =>
+                  mergeTimeline(held ?? [], fresh.entries),
+                )
+                setReactions(fresh.reactions)
+              }
+              gesture().catch((cause: unknown) => {
+                setSending('failed')
+                logEvent('warn', 'MESSAGR_IMAGE_SEND_FAILED', {
+                  reason: getErrorMessage(cause),
+                })
+              })
+            }
+
+            // Drawing one that arrived. Bound here for the same reason, and
+            // held in a ref because `Photograph` keeps it in an effect's
+            // dependency list -- a function rebuilt on every render would
+            // make it re-download the picture on every render.
+            openImageRef.current = image => openPhotograph(credentials, image)
+
+            // TELLING THE HOMESERVER WHERE TO WAKE THIS DEVICE.
+            //
+            // After the session exists and not before: a pusher is registered
+            // against an account. Failure is reported and nothing else --
+            // a device that could not register one still works while it is
+            // open, and a launch that failed over a notification would be a
+            // launch nobody can read their messages from.
+            //
+            // Every launch rather than once. Firebase rotates tokens, and a
+            // pusher keyed by a token nobody holds any more is a device that
+            // silently stopped being notified. Re-registering the same token
+            // is what the endpoint is for.
+            const wakeThisDevice = (on: boolean) => {
+              const settle = async () => {
+                // The token is asked for either way. Removing a pusher needs
+                // the key it was registered under, and this device's token is
+                // the only thing that is -- so "off" needs it as much as "on".
+                const answer = await pushTokenForThisDevice()
+                if (answer.token === null) {
+                  logEvent('info', 'MESSAGR_PUSH_NOT_REGISTERED', {
+                    reason: answer.reason,
+                  })
+                  return
+                }
+                if (!on) {
+                  // WHAT MAKES OFF MEAN OFF. Caught in review: stopping the
+                  // next launch registering is not turning notifications off,
+                  // because the pusher already on the homeserver keeps firing.
+                  await stopWakingThisDevice(sessionClient, answer.token)
+                  logEvent('info', 'MESSAGR_PUSH_REMOVED', {})
+                  return
+                }
+                const done = await registerThisDeviceForWaking(
+                  sessionClient,
+                  credentials,
+                  answer.token,
+                )
+                logEvent(
+                  done.registered ? 'info' : 'warn',
+                  done.registered
+                    ? 'MESSAGR_PUSH_REGISTERED'
+                    : 'MESSAGR_PUSH_NOT_REGISTERED',
+                  done.registered ? {} : { reason: done.reason },
+                )
+              }
+              settle().catch((cause: unknown) =>
+                logEvent('warn', 'MESSAGR_PUSH_NOT_REGISTERED', {
+                  reason: getErrorMessage(cause),
+                }),
+              )
+            }
+            wakeThisDeviceRef.current = wakeThisDevice
+            wakeThisDevice(wakeRef.current)
+
+            // TAPPING A NOTIFICATION LANDS IN THE CONVERSATION.
+            //
+            // #90's other half, and it was missing until a review said so:
+            // the notification was drawn and the tap resumed the application
+            // on whichever tab it had been left on. The identifier a
+            // notification is keyed by *is* the conversation, so there is no
+            // payload to carry and nothing to keep in step.
+            //
+            // The blind notification routes nowhere, because nothing that
+            // woke this device said which conversation. It lands on the list,
+            // which then shows what is waiting.
+            whenNotificationPressed(scope => {
+              setTab('chat')
+              if (scope !== null) showConversation(scope)
+            })
 
             // Asked for rather than computed on every launch: it costs a
             // device-status call and a state fetch per conversation.
@@ -696,7 +954,13 @@ export function App({
             // the sync loop's own response.
             const refreshList = async () => {
               setSummaries(
-                await listConversations(sessionClient, credentials.userId),
+                await listConversations(
+                  sessionClient,
+                  credentials.userId,
+                  // Read fresh rather than held: `markRead` has just written
+                  // to it, and a held map would redraw the badge it cleared.
+                  await lastReadRef.current.all(),
+                ),
               )
             }
             await refreshList().catch((cause: unknown) =>
@@ -786,11 +1050,16 @@ export function App({
                     return
                   }
                   loadConversation(sessionClient, open, credentials.userId)
-                    .then(fresh => {
+                    .then(async fresh => {
                       setConversation(held =>
                         mergeTimeline(held ?? [], fresh.entries),
                       )
                       setReactions(fresh.reactions)
+                      // Somebody watching a conversation has read what lands
+                      // in it. A badge that appeared on the screen the person
+                      // is already looking at would be the clearest possible
+                      // way of saying the count means nothing.
+                      await markRead(open, fresh.entries)
                     })
                     .catch((cause: unknown) => {
                       // The cursor has already advanced past this, but the
@@ -951,6 +1220,64 @@ export function App({
     promiseSeen,
   ])
 
+  // THE HARDWARE BACK BUTTON, WHICH WAS CLOSING THE APPLICATION.
+  //
+  // Found on a device: from inside a conversation, Android's back gesture
+  // left Messagr entirely rather than returning to the list. Every screen
+  // here already has its own way back; none of them was wired to the one
+  // gesture an Android user makes without thinking.
+  //
+  // The order is the order things were opened in, innermost first, and the
+  // last case is the important one: when there is nothing left to close this
+  // answers `false` and the system does what it always did. A handler that
+  // answered `true` unconditionally would trap somebody in the application,
+  // which is a worse bug than the one it fixes.
+  useEffect(() => {
+    const back = () => {
+      if (trust !== null) {
+        setTrust(null)
+        return true
+      }
+      if (openScope !== null) {
+        setOpenScope(null)
+        openScopeRef.current = null
+        return true
+      }
+      if (legalOpen) {
+        setLegalOpen(false)
+        return true
+      }
+      if (invite.stage !== 'shut') {
+        setInvite({ stage: 'shut' })
+        setAdmission(null)
+        return true
+      }
+      if (tab !== 'chat') {
+        setTab('chat')
+        return true
+      }
+      return false
+    }
+    const subscription = BackHandler.addEventListener('hardwareBackPress', back)
+    return () => subscription.remove()
+  }, [trust, openScope, legalOpen, invite.stage, tab])
+
+  // STABLE ACROSS RENDERS, AND THAT IS THE WHOLE POINT.
+  //
+  // `Photograph` fetches inside an effect that depends on this function. An
+  // arrow built in the JSX would be a new value every render, so every render
+  // would download and decrypt the picture again.
+  const loadImage = useMemo(
+    () => (image: ReadImage) =>
+      openImageRef.current === null
+        ? Promise.resolve<ShownImage>({
+            shown: false,
+            reason: 'the application is not ready to fetch media yet',
+          })
+        : openImageRef.current(image),
+    [],
+  )
+
   // The synced case computed once rather than repeated at each of its two
   // uses below: narrowing `session` inline in both the status and the
   // duration text was the same three-part guard written out twice.
@@ -985,6 +1312,9 @@ export function App({
     return (
       <SafeAreaProvider>
         <FirstLaunch
+          language={language}
+          onLanguage={chooseLanguage}
+          onLanguageSettled={keepLanguage}
           onBegin={() => {
             // Set first, kept second. A keystore that refuses must not leave
             // somebody stuck on a screen whose only action does nothing —
@@ -996,6 +1326,19 @@ export function App({
                 if (!kept) logEvent('warn', 'MESSAGR_PROMISE_NOT_KEPT', {})
               })
               .catch(() => logEvent('warn', 'MESSAGR_PROMISE_NOT_KEPT', {}))
+            // AND THE ACCEPTANCE ITSELF, WHICH WAS NOT BEING RECORDED.
+            //
+            // Reaching this callback means the box was ticked -- the screen's
+            // action does nothing otherwise. Until a review said so, that was
+            // the only trace: a `useState` that died with the screen, while
+            // the comment beside it claimed a tick "can be shown to have
+            // happened". What is written is *which* conditions were accepted,
+            // so a revision re-asks rather than being assumed.
+            rememberTermsAccepted(termsSecrets)
+              .then(kept => {
+                if (!kept) logEvent('warn', 'MESSAGR_TERMS_NOT_KEPT', {})
+              })
+              .catch(() => logEvent('warn', 'MESSAGR_TERMS_NOT_KEPT', {}))
           }}
         />
       </SafeAreaProvider>
@@ -1004,10 +1347,29 @@ export function App({
 
   return (
     <SafeAreaProvider>
-      <SafeAreaView style={styles.screen}>
+      {/* NEITHER EDGE IS THIS VIEW'S. Both the header and the dock claim
+          their own inset, ground and all -- see each of them for why. An
+          absolutely-positioned child is laid against the border box and not
+          the padding box, so a dock at `bottom: 0` ignored the inset this
+          view reserved; and a reserved top inset left a pale strip above the
+          dark band, into which the system drew the clock and the battery in
+          white. Whatever sits on an edge paints to it. */}
+      <SafeAreaView style={styles.screen} edges={['left', 'right']}>
+        {/* Outside the scroll view, like the tab bar and for the same reason:
+            what the band says is true of the instance rather than of the
+            screen under it, and a fact about the instance that scrolls away
+            is one nobody reads twice. */}
+        <Header />
         <ScrollView
           testID="diagnostic-scroll"
-          contentContainerStyle={styles.content}>
+          // Ends above the dock rather than under it. The dock is absolute,
+          // so without this the last row of whatever is on screen sits behind
+          // the tab bar -- which reads as content that will not scroll far
+          // enough, and is the reason a bottom bar usually costs a padding.
+          contentContainerStyle={[
+            styles.content,
+            { paddingBottom: dockHeight + space.l },
+          ]}>
           {probe !== null && (
             <View style={styles.block}>
               <Text style={styles.heading}>Panic probe (#27)</Text>
@@ -1028,13 +1390,57 @@ export function App({
 
               The instrument below stays on both, which is what a scaffold
               still needs and a product will not. */}
-          {openScope === null && panel === 'settings' && (
+          {openScope === null && tab === 'calls' && (
+            <View style={styles.block}>
+              <Reserved
+                testID="calls-reserved"
+                glyph="calls"
+                title="calls_soon_title"
+                why="calls_soon_why"
+                stages={['calls_soon_v2', 'calls_soon_v3']}
+              />
+            </View>
+          )}
+
+          {openScope === null && tab === 'community' && (
+            <View style={styles.block}>
+              <Reserved
+                testID="community-reserved"
+                glyph="community"
+                title="community_soon_title"
+                why="community_soon_why"
+              />
+            </View>
+          )}
+
+          {openScope === null && tab === 'settings' && !legalOpen && (
             <View style={styles.block}>
               <Settings
-                onBack={() => setPanel('list')}
-                onLegal={() => setPanel('legal')}
+                onBack={() => setTab('chat')}
+                onLegal={() => setLegalOpen(true)}
                 receipts={receipts}
                 receiptsNotKept={receiptsNotKept}
+                language={language}
+                onLanguage={chooseLanguage}
+                onLanguageSettled={keepLanguage}
+                wake={wake}
+                wakeNotKept={wakeNotKept}
+                onWake={on => {
+                  // Shown first, kept second, like the switch above.
+                  setWake(on)
+                  wakeRef.current = on
+                  allowWake(wakeSecrets, on)
+                    .then(kept => setWakeNotKept(!kept))
+                    .catch(() => setWakeNotKept(true))
+                  // AND THE PUSHER ITSELF, WHICH IS WHAT MAKES OFF MEAN OFF.
+                  //
+                  // Stopping the next launch registering one is not turning
+                  // notifications off: the pusher already on the homeserver
+                  // keeps firing, and the switch reads as off while it is on.
+                  // Caught in review, and the ticket says how -- the same
+                  // route with `kind: null`.
+                  wakeThisDeviceRef.current?.(on)
+                }}
                 onReceipts={on => {
                   // Shown first, kept second. A switch that waited on a
                   // keystore would feel broken; one that reverts silently at
@@ -1049,38 +1455,36 @@ export function App({
             </View>
           )}
 
-          {openScope === null && panel === 'legal' && (
+          {openScope === null && tab === 'settings' && legalOpen && (
             <View style={styles.block}>
-              <Legal onBack={() => setPanel('settings')} />
+              <Legal onBack={() => setLegalOpen(false)} />
             </View>
           )}
 
-          {openScope === null && panel === 'list' && (
+          {/* THE LIST **OR** THE INVITATION, for the same reason as the
+              conversation above: inviting is a place you go, not a form that
+              lives under the list. */}
+          {openScope === null && tab === 'chat' && invite.stage === 'shut' && (
             <View style={styles.block}>
               <ConversationList
                 summaries={summaries}
                 names={names}
                 onOpen={scope => openConversationRef.current?.(scope)}
               />
+            </View>
+          )}
+
+          {openScope === null && tab === 'chat' && invite.stage !== 'shut' && (
+            <View style={styles.block}>
               <Invite
                 stage={invite}
                 admission={admission}
                 onInvite={name => inviteRef.current?.(name)}
                 onClose={() => {
-                  setInvite({ stage: 'resting' })
+                  setInvite({ stage: 'shut' })
                   setAdmission(null)
                 }}
               />
-              {/* Reachable from the list, which is what the published terms
-                  promise: the article 14 information is on a screen
-                  "atteignable depuis les Réglages". */}
-              <Pressable
-                testID="open-settings"
-                onPress={() => setPanel('settings')}
-                accessibilityRole="button"
-                accessibilityLabel={t('settings_action')}>
-                <Text style={styles.back}>{t('settings_action')}</Text>
-              </Pressable>
             </View>
           )}
 
@@ -1157,6 +1561,8 @@ export function App({
                   selfUserId={selfUserId}
                   onSend={sendMessage}
                   sending={sending}
+                  onAttach={() => attachRef.current?.()}
+                  onLoadImage={loadImage}
                 />
 
                 {/* #34's gesture, and only where it means something: a
@@ -1394,6 +1800,36 @@ export function App({
             </Text>
           </View>
         </ScrollView>
+
+        {/* Outside the scroll view on purpose: a bar that scrolled away is a
+            bar nobody can reach without scrolling back, and muscle memory is
+            the whole point of a bottom bar. Hidden while a conversation is
+            open, which is what the mockup draws -- a conversation is a place
+            you leave rather than a fifth tab. */}
+        {/* THE DOCK: the action above the bar, in that order, anchored to the
+            bottom and outside the scroll view so both are where the thumb
+            left them. `box-none` so the gap between them is not a surface
+            that swallows taps meant for the list underneath.
+
+            The action shows only on the list, and only when the invitation
+            panel is not already open: a control that opens what is on screen
+            is a control that does nothing. */}
+        <View
+          style={styles.dock}
+          pointerEvents="box-none"
+          onLayout={event => setDockHeight(event.nativeEvent.layout.height)}>
+          {openScope === null && tab === 'chat' && invite.stage === 'shut' && (
+            <FloatingAction
+              testID="invite-open"
+              label={t('invite_open')}
+              onPress={() => setInvite({ stage: 'resting' })}
+            />
+          )}
+
+          {openScope === null && (
+            <TabBar current={tab} onSelect={setTab} unread={unreadCount} />
+          )}
+        </View>
       </SafeAreaView>
     </SafeAreaProvider>
   )
@@ -1773,7 +2209,9 @@ const styles = StyleSheet.create({
   // the file forbids its own intermediate values outright. `xxl` is the
   // answer the scale gives, and a screen that needed more would be a
   // composition error rather than a missing token.
-  content: { padding: space.xl, paddingBottom: space.xxl },
+  content: { padding: space.xl },
+  // Anchored to the bottom, over whatever is scrolling behind it.
+  dock: { position: 'absolute', left: 0, right: 0, bottom: 0 },
   block: { marginBottom: space.xxl },
   // Spread rather than picked apart: size, leading, weight and tracking
   // travel together, and separating them is how a line-height floor gets
