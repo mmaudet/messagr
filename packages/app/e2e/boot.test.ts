@@ -1,3 +1,4 @@
+import { expect } from '@jest/globals'
 import { by, device, element, expect as detoxExpect, waitFor } from 'detox'
 
 import { IGNORING_THE_LIVE_POLL } from './longPoll'
@@ -38,6 +39,17 @@ import {
  * The report is written when the launch effect finishes, so there is one of
  * it. Reading it per test would be re-parsing the same line and would let a
  * test pass against a *later* launch than the one its neighbours saw.
+ *
+ * # TWO `expect`s, AND THEY ARE NOT THE SAME FUNCTION
+ *
+ * Detox's test environment puts *its* `expect` in the global scope, and that
+ * one takes an element matcher and nothing else. `expect(report.entry.entered)`
+ * therefore reached `AndroidExpect.expect` with a boolean and failed every
+ * test in this file with "expected a native or web matcher, but got boolean" --
+ * on a suite whose assertions were all correct.
+ *
+ * So both are imported by name and neither is the ambient one: `expect` from
+ * `@jest/globals` for values, `detoxExpect` for what is on screen.
  *
  * # Two tests still read the screen, and they are the right two
  *

@@ -1,11 +1,13 @@
 import { execFileSync } from 'node:child_process'
 import { resolve } from 'node:path'
 
-import { by, device, element, waitFor } from 'detox'
+import { expect } from '@jest/globals'
+import { device } from 'detox'
 
 import { IGNORING_THE_LIVE_POLL } from './longPoll'
 import { acceptThePromise } from './promise'
 import { NOTIFICATIONS_GRANTED } from './permissions'
+import { seeOnScreen } from './onScreen'
 import { forgetTheLog, whatItReported } from './reported'
 
 /**
@@ -17,6 +19,10 @@ import { forgetTheLog, whatItReported } from './reported'
  * indistinguishable from one that was never rendered. That cost five
  * continuous-integration runs and a wrong theory about key delivery: the
  * application had decrypted the message correctly every single time.
+ *
+ * `expect` is imported by name, and that is not decoration: Detox's test
+ * environment puts its own in the global scope, which takes an element
+ * matcher and refuses a value. See boot.test.ts.
  *
  * The readout is gone with #105. What each launch says about itself is one
  * line of structured JSON, which cannot be scrolled off. The two assertions
@@ -233,13 +239,14 @@ describeRoundTrip('encrypted round trip', () => {
     // a diagnostic line. Decrypting proves which key wrote the message and
     // nothing about who holds it, so the conversation says the sender is
     // announced -- and the word "vérifier" appears nowhere on it.
-    await waitFor(
-      element(
-        by.text(`Se présente comme ${process.env.MESSAGR_INTEROP_USER ?? ''}`),
-      ),
+    // Searched for rather than merely waited on. The label is two lines tall
+    // because a Matrix user id is long, and Detox wants 75 per cent of an
+    // element visible: a plain `toBeVisible` timed out at sixty seconds
+    // against a screen rendering exactly the right words. `onScreen.ts` says
+    // why this is not the deleted readout helper returning.
+    await seeOnScreen(
+      `Se présente comme ${process.env.MESSAGR_INTEROP_USER ?? ''}`,
     )
-      .toBeVisible()
-      .withTimeout(60000)
   })
 
   it('does not present the sender as established', async () => {
