@@ -463,9 +463,8 @@ export const fr = {
   community_soon_why:
     'Une communauté regroupe des salons sous un objet pseudonyme. L’onglet est réservé pour la même raison que celui des appels : la barre ne doit pas bouger quand ils arriveront.',
 
-  // The band across the top of every screen. `brand_name` is the product's
-  // own name and is not translated -- a name that changes by language is a
-  // different product.
+  // `brand_name` is the product's own name and is not translated -- a name
+  // that changes by language is a different product.
   brand_name: 'Messagr',
 
   // L'écran de la personne, et l'en-tête qui y mène.
@@ -502,7 +501,6 @@ export const fr = {
   image_unreadable: 'Cette photo n’a pas pu être ouverte sur cet appareil.',
   conversation_attach: 'Envoyer une photo',
   conversation_attaching: 'Chiffrement et envoi de la photo…',
-  header_no_directory: 'aucun annuaire',
 
   // The list's own furniture. The badge itself draws a bare number, which
   // needs no translation; what needs one is what a screen reader says about

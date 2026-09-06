@@ -1,12 +1,5 @@
 import React, { useState } from 'react'
-import {
-  Pressable,
-  StyleSheet,
-  Text,
-  TextInput,
-  useColorScheme,
-  View,
-} from 'react-native'
+import { Pressable, StyleSheet, Text, useColorScheme, View } from 'react-native'
 
 import { t, type CopyKey } from '../copy'
 import {
@@ -14,7 +7,6 @@ import {
   floors,
   radius,
   space,
-  stroke,
   type as typeScale,
 } from '../design/tokens'
 import type { ShownImage } from '../runtime/receiveImage'
@@ -22,7 +14,6 @@ import type { ReadImage } from '../timeline/imageEvent'
 import { separatorsFor, type DayMark } from '../timeline/daySeparators'
 import type { TimelineEntry } from '../timeline/mergeTimeline'
 import type { ReactionTally } from '../timeline/reactions'
-import { NotchedButton } from './NotchedButton'
 import { Photograph } from './Photograph'
 
 /**
@@ -54,7 +45,6 @@ export interface ConversationProps {
   readonly entries: readonly TimelineEntry[]
   /** Used only to tell this account's own messages from everyone else's. */
   readonly selfUserId: string
-  readonly onSend: (body: string) => void
   readonly sending: 'idle' | 'sending' | 'failed'
   /** Reactions, grouped by the message they point at. */
   readonly reactions?: ReadonlyMap<string, readonly ReactionTally[]>
@@ -66,12 +56,6 @@ export interface ConversationProps {
    * event, which is why it travels rather than being looked up again.
    */
   readonly onReact?: (target: string, key: string, own: string | null) => void
-  /**
-   * Choosing a photograph and sending it. Absent on a build with no picker,
-   * and the control is absent with it — a button that opens nothing is the
-   * inert control §13.18 refuses.
-   */
-  readonly onAttach?: () => void
   /** Downloads and decrypts a photograph. Absent means none are drawn. */
   readonly onLoadImage?: (image: ReadImage) => Promise<ShownImage>
   /**
@@ -80,33 +64,30 @@ export interface ConversationProps {
    * twice and get the same answer from.
    */
   readonly now?: number
+  /**
+   * Who this conversation is with, when there is one such person. Used only
+   * to decide whether a message's claimed sender is worth naming -- see the
+   * note where it is read.
+   */
+  readonly otherParty?: string
 }
 
 export function Conversation({
   entries,
   selfUserId,
-  onSend,
   sending,
   reactions = new Map(),
   read = new Set(),
   onReact,
-  onAttach,
   onLoadImage,
   now = Date.now(),
+  otherParty,
 }: ConversationProps) {
-  const [draft, setDraft] = useState('')
   const dark = useColorScheme() === 'dark'
   const palette = dark ? color.dark : color
   // Which entries open a new day. Computed once per render rather than per
   // message: a separator is a property of the sequence, not of an entry.
   const days = separatorsFor(entries, now)
-
-  function send() {
-    const body = draft.trim()
-    if (body === '') return
-    setDraft('')
-    onSend(body)
-  }
 
   return (
     <View testID="conversation" style={styles.screen}>
@@ -143,52 +124,13 @@ export function Conversation({
               read={read.has(entry.eventId)}
               onReact={(key, own) => onReact?.(entry.eventId, key, own)}
               onLoadImage={onLoadImage}
+              unexpected={
+                otherParty !== undefined && entry.claimedSender !== otherParty
+              }
             />
           </React.Fragment>
         ))
       )}
-
-      {/* ONE ROW, NOT A STACK. Screen 21 asks for a full input bar, and what
-          was here was a field with two full-width buttons under it -- which
-          reads as a form rather than as a place to type. The attachment sits
-          before the field and sending after it, which is the order every
-          messenger somebody has already used puts them in. */}
-      <View style={styles.composer}>
-        {onAttach !== undefined && (
-          <Pressable
-            testID="conversation-attach"
-            onPress={onAttach}
-            accessibilityRole="button"
-            accessibilityLabel={t('conversation_attach')}
-            style={styles.attach}>
-            <Text
-              style={[styles.attachSign, { color: palette.brand.green700 }]}>
-              +
-            </Text>
-          </Pressable>
-        )}
-        <TextInput
-          testID="conversation-input"
-          value={draft}
-          onChangeText={setDraft}
-          onSubmitEditing={send}
-          placeholder={t('message_placeholder')}
-          placeholderTextColor={palette.neutral['400']}
-          style={[
-            styles.input,
-            {
-              color: palette.neutral['900'],
-              backgroundColor: palette.surface.raised,
-              borderColor: palette.neutral['300'],
-            },
-          ]}
-        />
-        <NotchedButton
-          label={t('conversation_send')}
-          testID="conversation-send"
-          onPress={send}
-        />
-      </View>
 
       {sending !== 'idle' && (
         <Text
@@ -265,9 +207,12 @@ function Message({
   onReact,
   read,
   onLoadImage,
+  unexpected,
 }: {
   entry: TimelineEntry
   mine: boolean
+  /** Whether this came from somebody other than the conversation's party. */
+  unexpected: boolean
   palette: typeof color | typeof color.dark
   tallies: readonly ReactionTally[]
   /** Whether somebody else has read this one. Only meaningful for `mine`. */
@@ -280,7 +225,19 @@ function Message({
 
   return (
     <View style={mine ? styles.mine : styles.theirs}>
-      {!mine && (
+      {/* WHO IT CLAIMS TO BE FROM, AND ONLY WHEN THAT IS NEWS.
+          `claimedSender` is unauthenticated by construction: decrypting an
+          event proves which key wrote it and nothing about who holds that
+          key. That is worth saying -- and it was said above every incoming
+          message, spelling out a full identifier with its homeserver, in a
+          conversation whose header already names the person.
+
+          Repeating it there taught nobody anything and broke the density
+          screen 21 is the reference for. It appears when the sender is *not*
+          the person this conversation is with, which is exactly when the
+          distinction between "the account says" and "the person is" has
+          something to tell. The trust screen carries the argument in full. */}
+      {!mine && unexpected && (
         <Text
           testID={`claimed-${entry.eventId}`}
           style={[styles.claimed, { color: palette.neutral['600'] }]}>
@@ -301,8 +258,11 @@ function Message({
           styles.bubble,
           mine ? styles.bubbleMine : styles.bubbleTheirs,
           {
+            // `green200` rather than `green100`: the pale one is a label
+            // tint, and a message is not a label -- below that saturation it
+            // stops reading as green at all. Reported from a device.
             backgroundColor: mine
-              ? palette.brand.green100
+              ? palette.brand.green200
               : palette.surface.sunk,
           },
         ]}>
@@ -440,19 +400,6 @@ const styles = StyleSheet.create({
     borderRadius: radius.pill,
   },
   chipKey: typeScale.bodySm,
-  attach: {
-    minWidth: floors.touchTargetMin,
-    minHeight: floors.touchTargetMin,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  attachSign: {
-    ...typeScale.titleLg,
-    // The same correction the floating action needs, and the same reason not
-    // to make it by rewriting the ramp: see `FloatingAction.tsx`.
-    includeFontPadding: false,
-    textAlign: 'center',
-  },
   state: { ...typeScale.caption, marginTop: space.xs },
   bubble: {
     paddingHorizontal: space.m,
@@ -488,18 +435,4 @@ const styles = StyleSheet.create({
   bubbleTheirs: { borderBottomLeftRadius: radius.bubbleAuthorCorner },
   body: typeScale.body,
   note: typeScale.caption,
-  composer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: space.s,
-    marginTop: space.m,
-  },
-  input: {
-    flex: 1,
-    ...typeScale.body,
-    paddingHorizontal: space.m,
-    paddingVertical: space.s,
-    borderRadius: radius.bubble,
-    borderWidth: stroke.base,
-  },
 })

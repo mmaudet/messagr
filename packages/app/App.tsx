@@ -110,6 +110,7 @@ import { ConversationList } from './src/ui/ConversationList'
 import { Invite, type InviteStage } from './src/ui/Invite'
 import { FloatingAction } from './src/ui/FloatingAction'
 import { Header } from './src/ui/Header'
+import { Composer } from './src/ui/Composer'
 import { ConversationHeader } from './src/ui/ConversationHeader'
 import { Legal } from './src/ui/Legal'
 import { Reserved } from './src/ui/Reserved'
@@ -1574,10 +1575,9 @@ export function App({
                   }
                   entries={conversation}
                   selfUserId={selfUserId}
-                  onSend={sendMessage}
                   sending={sending}
-                  onAttach={() => attachRef.current?.()}
                   onLoadImage={loadImage}
+                  otherParty={party?.other}
                 />
                 {/* What the passive half found, when it found anything. A
                   refusal for an untrusted sender is the one worth saying:
@@ -1891,9 +1891,27 @@ export function App({
             />
           )}
 
-          {openScope === null && (
-            <TabBar current={tab} onSelect={setTab} unread={unreadCount} />
-          )}
+          {/* THE INPUT BAR IS PART OF THE DOCK, above the tabs.
+              It was the last thing in the conversation's own scroll view, so
+              it scrolled away with the messages and somebody had to reach the
+              bottom of the thread to type. Here it is where the thumb left
+              it. */}
+          {openScope !== null &&
+            trust === null &&
+            !personOpen &&
+            sendMessage !== null && (
+              <Composer
+                onSend={sendMessage}
+                onAttach={() => attachRef.current?.()}
+              />
+            )}
+
+          {/* THE TABS STAY, EVEN INSIDE A CONVERSATION.
+              The mockup hides them there, which is what every other messenger
+              does, and this used to. Changed at the account holder's request:
+              the bar never moves, so muscle memory holds everywhere. Recorded
+              as a decision rather than a drift. */}
+          <TabBar current={tab} onSelect={setTab} unread={unreadCount} />
         </View>
       </SafeAreaView>
     </SafeAreaProvider>

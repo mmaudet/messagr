@@ -327,7 +327,6 @@ export const de: Readonly<Record<CopyKey, string>> = {
     'Dieses Foto konnte auf diesem Gerät nicht geöffnet werden.',
   conversation_attach: 'Ein Foto senden',
   conversation_attaching: 'Foto wird verschlüsselt und gesendet …',
-  header_no_directory: 'kein Verzeichnis',
   'list_unread %1$d': '%1$d ungelesene Nachrichten',
   invite_open: 'Jemanden einladen',
 }

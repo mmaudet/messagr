@@ -319,7 +319,6 @@ export const nl: Readonly<Record<CopyKey, string>> = {
   image_unreadable: 'Deze foto kon op dit apparaat niet worden geopend.',
   conversation_attach: 'Een foto versturen',
   conversation_attaching: 'De foto wordt versleuteld en verstuurd…',
-  header_no_directory: 'geen adresboek',
   'list_unread %1$d': '%1$d ongelezen berichten',
   invite_open: 'Iemand uitnodigen',
 }

@@ -320,7 +320,6 @@ export const es: Readonly<Record<CopyKey, string>> = {
   image_unreadable: 'Esta foto no se ha podido abrir en este dispositivo.',
   conversation_attach: 'Enviar una foto',
   conversation_attaching: 'Cifrando y enviando la foto…',
-  header_no_directory: 'sin directorio',
   'list_unread %1$d': '%1$d mensajes sin leer',
   invite_open: 'Invitar a alguien',
 }
