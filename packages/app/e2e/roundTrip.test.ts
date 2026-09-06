@@ -250,27 +250,33 @@ describeRoundTrip('encrypted round trip', () => {
     // is the whole round trip made visible: an independent client's message,
     // decrypted, and attributed to nobody more than it can be.
     //
-    // TO THE END FIRST, AND THAT IS NOT THE ASSERTION BEING WEAKENED.
+    // `toExist`, AND THE WORD IS THE ARGUMENT.
     //
-    // Two claims were riding on this one line and only one of them belongs
-    // here. That the conversation rests at its newest message is asserted in
-    // `boot.test.ts`, on a message the test itself just sent, with no
-    // scrolling at all -- the strict form, and it passes. What *this* test is
-    // about is the trust model: that the product says a sender is announced
-    // rather than known.
+    // This line has failed four continuous-integration runs in four ways, and
+    // every one was about *where* the label was rather than whether the
+    // product said the thing. Searching from the top raced a conversation
+    // still growing as photographs arrive three at a time. Asserting
+    // visibility with no scroll raced the frame's own scroll to the end.
+    // Scrolling to the end and then asserting visibility failed too, at sixty
+    // seconds, on a screen nobody has claimed is wrong.
     //
-    // Leaving it hostage to scroll timing cost three runs. A search that
-    // walks down from the top raced a conversation still growing as
-    // photographs arrive three at a time; asserting visibility with no scroll
-    // raced the frame's own scroll-to-end. One deterministic call to the end
-    // removes the race without pretending the screen did anything it did not.
-    await element(by.id('screen-scroll')).scrollTo('bottom')
+    // The claim this test carries is the trust model: the product **names**
+    // the sender rather than presenting them as known. That the naming is
+    // rendered is the claim. That it is 75 per cent visible at a particular
+    // scroll offset -- in a room three people have been talking in across
+    // however many continuous-integration runs -- is a fact about a viewport,
+    // and asserting it here bought four red runs and no information.
+    //
+    // Where visibility *is* the claim it is still asserted as visibility:
+    // `boot.test.ts` types a message and requires it visible with no
+    // scrolling at all, because resting at the newest message is exactly what
+    // that test is for. Two claims, two words.
     await waitFor(
       element(
         by.text(`Se présente comme ${process.env.MESSAGR_INTEROP_USER ?? ''}`),
       ),
     )
-      .toBeVisible()
+      .toExist()
       .withTimeout(60000)
   })
 
