@@ -53,6 +53,16 @@
       "withdraw_when": "NOT YET, AND THE DECISION WAS TAKEN ON 6 SEPTEMBER 2026 RATHER THAN DEFERRED BY ACCIDENT. Both Play App Signing certificates are vouched above from that date, which is the day this file's own note said the choice would have to be made rather than described. It was made: the debug key stays served, the publication keys stay vouched and unserved, until the field allows otherwise. WHAT THIS KEY PROTECTS IS STILL LOAD-BEARING: the APK the maintainer hands his friend is signed with it, and so is the demonstration Pixel, which AGENTS.md 7.2 freezes on that signature and forbids uninstalling. Taking it out of assetlinks.json would stop https://messagr.eu/i/<token> from opening the application on the only two phones that carry it, which is the entry path to the product; and no publication build can replace those installs, because Android refuses an update signed by another key and the uninstall that would be needed erases the account, the Megolm keys and the history of 11 August. WHAT IT COSTS TO WAIT, stated so the choice is not free: anybody installing from the internal testing track gets no App Links verification, so an invitation link opens a browser rather than the application. The landing page carries that case -- it offers Copy the link, which is what carries an invitation across an install -- and docs/unassisted-trial.md records it as a different finding rather than a step gone badly. THE CONDITION IS THE FIELD, NOT THE KEYRING: this goes when no install signed by it is still in use -- when the friend's phone has been migrated to a publication build and the Pixel has been retired or exempted by a decision that says so in writing. #114 holds it."
     },
     {
+      "name": "debug-machine",
+      "kind": "debug",
+      "sha256": "4B:19:FF:28:78:AE:D8:72:D8:89:A9:F1:98:2D:35:2C:25:1E:7B:09:92:DC:0B:44:85:29:3D:9A:28:86:5C:A6",
+      "status": "vouched",
+      "measured_on": "2026-08-16",
+      "origin": "The maintainer's own ~/.android/debug.keystore, which is what signed builds installed by hand before 6 September 2026. IT IS BACK BECAUSE OF A PHONE NOBODY CAN ASK. This registry named it alone until today, when the served value was corrected to the keystore committed in this repository -- the one every build here is actually signed with, measured off the Pixel. But the APK the maintainer handed his friend predates that correction and may carry either. Serving one and not the other would leave that phone's invitation links opening a browser, and there is no way to find out which it holds without asking somebody to check. Both are debug keys, so the rule that refuses a debug key beside a publication key is untouched: this widens nothing.",
+      "reproduce": "keytool -list -v -keystore ~/.android/debug.keystore -storepass android | grep SHA256: -- on the maintainer's machine and nowhere else, which is half of why it stopped being the value this file served.",
+      "withdraw_when": "The friend's phone is known to carry a build signed by the repository's keystore, or has been migrated to a publication build. It goes before the other debug key, not after: it is the one nothing in this repository can reproduce."
+    },
+    {
       "name": "release",
       "kind": "release",
       "sha256": "B6:6F:5A:6D:7F:D3:9A:AB:EF:C9:7E:56:80:8E:73:22:37:65:7B:15:58:B8:9C:C4:56:8C:5F:6D:49:7E:14:30",

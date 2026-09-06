@@ -4,7 +4,6 @@ import {
   ScrollView,
   StyleSheet,
   Text,
-  useWindowDimensions,
   View,
   type NativeScrollEvent,
   type NativeSyntheticEvent,
@@ -14,7 +13,7 @@ import { LANGUAGES, type Language } from '../copy/languages'
 import { color, floors, radius, space, type } from '../design/tokens'
 
 /**
- * Choosing a language by dragging a thumb across flags.
+ * Choosing a language by running a thumb down a list of flags.
  *
  * # The gesture is the point
  *
@@ -59,8 +58,20 @@ import { color, floors, radius, space, type } from '../design/tokens'
  * Retranslating is free; remembering is not.
  */
 
-/** How wide one item is. Fixed, because the snap interval has to be. */
-const ITEM = 132
+/**
+ * How tall one row is. Fixed, because the snap interval has to be.
+ *
+ * IT WAS A HORIZONTAL STRIP, AND THE ACCOUNT HOLDER ASKED FOR A COLUMN. The
+ * strip was his own idea and it worked on the screen it was drawn for -- the
+ * first launch, full width, nothing beside it. In Réglages it sat between two
+ * sections and was cut off at the right edge: « Englis… ». A column is what
+ * every operating system does with a language list, and it is what a thumb
+ * does without being taught -- up and down, one language to a line.
+ *
+ * Both screens now, at his word. One shape rather than two: a selector that
+ * behaved differently in the two places it appears would be two selectors.
+ */
+const ITEM = 56
 
 export function LanguageStrip({
   chosen,
@@ -83,20 +94,21 @@ export function LanguageStrip({
   // the comparison's own sake would be a re-render per frame.
   const reported = useRef<Language>(chosen)
 
-  // HALF A VIEWPORT AT EACH END, MEASURED RATHER THAN GUESSED.
+  // NO RAIL, AND THE HORIZONTAL VERSION NEEDED ONE.
   //
-  // Without it the last items cannot reach the centre, so they cannot be
-  // chosen by dragging at all -- watched on a device: the strip stopped at
-  // Español and Italiano and Nederlands were reachable only by tapping,
-  // which is the gesture this control exists to replace. The first attempt
-  // used a fixed gutter, which is the same bug with a smaller number.
-  const { width } = useWindowDimensions()
-  const rail = Math.max(0, (width - ITEM) / 2)
-
+  // Across, half a viewport of padding at each end was load-bearing: without
+  // it the last flags could not reach the centre and could not be chosen by
+  // dragging at all -- watched on a device, where the strip stopped at
+  // Español and the last two were reachable only by tapping, which is the
+  // gesture the control exists to replace.
+  //
+  // Down, the row under the *top* of the frame is the one being offered, not
+  // the row under the middle, so every row can reach that position by itself
+  // and padding would only push the first one out of view.
   const onScroll = (event: NativeSyntheticEvent<NativeScrollEvent>) => {
-    const at = event.nativeEvent.contentOffset.x
-    // Rounded rather than floored: the item under the centre of the viewport
-    // is the one being offered, and flooring would switch a full item early.
+    const at = event.nativeEvent.contentOffset.y
+    // Rounded rather than floored: a row is offered from halfway through its
+    // own height, so a thumb that has moved most of a row has chosen it.
     const index = Math.round(at / ITEM)
     const language =
       LANGUAGES[Math.max(0, Math.min(index, LANGUAGES.length - 1))]
@@ -109,8 +121,13 @@ export function LanguageStrip({
   return (
     <ScrollView
       testID={testID}
-      horizontal
-      showsHorizontalScrollIndicator={false}
+      // Bounded, because a column inside a screen that scrolls must not
+      // scroll the screen instead. Four rows of room and six languages, so
+      // the list is visibly a list -- something that can be moved -- rather
+      // than a stack that happens to be cut off.
+      style={styles.rail}
+      showsVerticalScrollIndicator={false}
+      nestedScrollEnabled
       snapToInterval={ITEM}
       decelerationRate="fast"
       scrollEventThrottle={16}
@@ -119,8 +136,7 @@ export function LanguageStrip({
       // Either one is the moment the strip stopped, and only one of them
       // fires for any given gesture.
       onMomentumScrollEnd={() => onSettle?.(reported.current)}
-      onScrollEndDrag={() => onSettle?.(reported.current)}
-      contentContainerStyle={{ paddingHorizontal: rail }}>
+      onScrollEndDrag={() => onSettle?.(reported.current)}>
       {LANGUAGES.map(language => {
         const active = language.code === chosen
         return (
@@ -158,17 +174,24 @@ export function LanguageStrip({
 }
 
 const styles = StyleSheet.create({
+  // Four rows deep. Six languages do not fit, and that is the point: a list
+  // that ends inside the frame gives no reason to move it.
+  rail: { maxHeight: ITEM * 4 },
   slot: {
-    width: ITEM,
-    alignItems: 'center',
+    height: ITEM,
+    justifyContent: 'center',
   },
   card: {
     minHeight: floors.touchTargetMin,
+    // A ROW, NOT A CARD. The flag and the name sit side by side and the row
+    // fills the width, so the whole line is the target -- which is what a
+    // thumb aims at in a column, rather than a pill in the middle of it.
+    flexDirection: 'row',
+    alignItems: 'center',
     paddingHorizontal: space.m,
     paddingVertical: space.s,
     borderRadius: radius.pill,
-    alignItems: 'center',
-    gap: space.xs,
+    gap: space.m,
   },
   cardActive: {
     // The same pale-green pill the active tab wears. One idiom for "this is
@@ -180,7 +203,10 @@ const styles = StyleSheet.create({
     // and the word is what confirms it.
     ...type.titleLg,
   },
-  endonym: type.caption,
+  // `body` rather than `caption` now. In a column the name is read, not
+  // glanced at beside a flag, and a caption-sized word on a full-width row
+  // reads as a footnote to the flag rather than as the choice.
+  endonym: type.body,
   endonymOnDark: {
     // `agent.400`'s stated use is exactly this: readable on `ink900` at AA.
     color: color.agent['400'],
