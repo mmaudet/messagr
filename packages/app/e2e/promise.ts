@@ -24,6 +24,26 @@ export async function acceptThePromise(): Promise<void> {
   await waitFor(element(by.id('promise-terms')))
     .toBeVisible()
     .withTimeout(30000)
+  // THE LANGUAGE IS PINNED, AND SIX RUNS WERE PAID TO LEARN WHY.
+  //
+  // Every text this suite asserts is French, and the application follows the
+  // device unless somebody chooses -- so a suite that chose nothing was
+  // asserting French against whatever locale the emulator happened to carry.
+  // It got away with it while nothing scrolled.
+  //
+  // Then the language selector became a column (#115's sibling), the promise
+  // screen grew past one screen, and this helper was taught to scroll to
+  // reach the action. Detox scrolls a container at its centre -- and the
+  // centre of that screen is now the language column, a nested scrollable.
+  // The gesture dragged the languages instead of the page, the strip settled
+  // on a neighbour, and the application rendered « Presents itself as »
+  // where the suite wanted « Se présente comme ». Five earlier runs were
+  // spent theorising about scroll offsets and visibility thresholds; the
+  // label was never there to be found.
+  //
+  // Choosing explicitly is also what a person does, so this is not a test
+  // accommodating a defect: it is the test stopping being accidental.
+  await element(by.id('language-fr')).tap()
   await element(by.id('promise-terms')).tap()
 
   // SCROLLED TO, BECAUSE THIS SCREEN SAYS IT SCROLLS.

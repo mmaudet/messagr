@@ -233,33 +233,27 @@ describeRoundTrip('encrypted round trip', () => {
     }
   })
 
-  it("shows the independent client's message on the screen a person reads", async () => {
-    // WHAT THIS ASKS, AND WHY IT ASKS THIS NOW.
+  it('names the sender, because this room does not have exactly two people in it', async () => {
+    // THE TRUST MODEL, ON THE SCREEN A PERSON READS.
     //
-    // It used to assert the sender's line -- « Se présente comme … » -- and
-    // failed five continuous-integration runs in five ways. The last is the
-    // informative one: `toExist` failed too, so the label is not merely
-    // off-screen, it is not rendered at all.
+    // Decrypting an event proves which key wrote it and nothing about who
+    // holds that key, so the conversation says the sender is *announced*.
+    // #84 stopped repeating that above every message in a conversation whose
+    // header already names the person -- and this room is not one of those:
+    // the provisioning script puts both suites' entrants and the inviter
+    // together, so there are three, `theOtherMember` answers null, and every
+    // message names who it claims to be from (§13.26).
     //
-    // That should not be possible. The room holds three people -- the
-    // provisioning script puts both suites' entrants and the inviter
-    // together -- so `theOtherMember` answers null, which the launch report
-    // confirms on every run by reporting `history` as null, and a message
-    // from somebody who is not "the other person" is named. Which leaves two
-    // candidates, and this assertion tells them apart:
-    //
-    //   1. the counterparty's message is not in the *rendered* conversation
-    //      at all, only in the diagnostic probe's own fetch; or
-    //   2. it is rendered, and the label above it is not.
-    //
-    // If this passes it is (2), and the naming rule has a defect worth its
-    // own ticket. If it fails it is (1) -- the live loop is not putting a
-    // received message on screen, which is a much larger finding and exactly
-    // what ADR-0007 exists to make impossible.
-    //
-    // Either way the trust model itself is asserted by the test below, off
-    // the launch report, and has passed all five of those runs.
-    await waitFor(element(by.text(COUNTERPARTY_BODY)))
+    // SIX RUNS WERE SPENT ON THIS LINE, AND NONE OF THEM WAS ABOUT IT.
+    // The application was rendering « Presents itself as » because the suite
+    // never chose a language and a scroll gesture had begun dragging the
+    // language column. `promise.ts` carries that account. The assertion here
+    // was right the whole time.
+    await waitFor(
+      element(
+        by.text(`Se présente comme ${process.env.MESSAGR_INTEROP_USER ?? ''}`),
+      ),
+    )
       .toExist()
       .withTimeout(60000)
   })
