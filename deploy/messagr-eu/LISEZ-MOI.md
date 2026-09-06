@@ -54,13 +54,30 @@ test failing.
 
 ## What still needs a person
 
-**The Play App Signing fingerprint.** `android-fingerprints.json` carries the
-slot as `awaited`. Until it is measured in the Play Console (Setup → App
-signing → App signing key certificate, SHA-256) and vouched here,
-`assetlinks.json` serves the debug key — which is right for installing builds
-by hand and wrong the day the store carries the application. The registry's
-own rule refuses both at once, so the swap is a decision somebody makes rather
-than one that happens quietly.
+**The Play App Signing fingerprints — measured, vouched, and deliberately
+not served.** Both were read off the console on 6 September 2026: Play now
+generates a _classic_ certificate and a _post-quantum_ one, and the registry
+carries both, because which of the two a device presents to Digital Asset
+Links verification is not something this project decides.
+
+They are not in `assetlinks.json`, and that is a decision rather than an
+omission. `tests/doctrine-app-links.js` refuses to serve a debug key
+alongside a publication key — one file with a documented password must not be
+able to claim messagr.eu links once something else can — and withdrawing the
+debug key would stop `https://messagr.eu/i/<token>` opening the application on
+the two phones that carry an install signed by it. Android refuses an update
+signed by another key, and the uninstall that migration would need erases the
+account, the Megolm keys and the history.
+
+**What waiting costs, so the choice is not free:** anybody installing from the
+internal testing track gets no App Links verification, so an invitation link
+opens a browser. The landing page is written for exactly that — it offers
+_Copy the link_, which is what carries an invitation across an install — and
+`docs/unassisted-trial.md` records it as a different finding rather than a
+step gone badly.
+
+The condition is the field, not the keyring: the debug key goes when no
+install signed by it is still in use. #114 holds it.
 
 **The iPhone destination.** `DESTINATIONS.ios` is empty and the page says so
 honestly, because no iOS build is published anywhere. It wants a TestFlight
