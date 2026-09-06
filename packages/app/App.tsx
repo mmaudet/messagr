@@ -1109,10 +1109,12 @@ export function App({
                 },
                 state => {
                   if (generation !== liveGenerationRef.current) return
-                  // Logged as well as rendered, for the reason every other
-                  // probe here is: the emulator's screencap returns a blank
-                  // frame, so the log is the only machine-readable evidence
-                  // that the loop lived, reconnected, or stopped.
+                  // The only place this is said. It used to be rendered as
+                  // well, on a readout #105 removed -- and the log was
+                  // already the half that mattered, because the emulator's
+                  // screencap returns a blank frame whatever is on screen.
+                  // This is the evidence that the loop lived, reconnected,
+                  // or stopped.
                   logEvent(
                     state === 'reconnecting' ? 'warn' : 'info',
                     'MESSAGR_LIVE_STATE',
@@ -1149,11 +1151,11 @@ export function App({
                 roomId,
               )
               const other = theOtherMember(members, credentials.userId)
-              // Reported in the launch log below, not only rendered. A gap
-              // that closed and a gap that never opened look identical on
-              // screen -- both show a readable conversation -- so the only
-              // way to tell "history arrived" from "the key came by some
-              // other route" is to say which one happened.
+              // Reported in the launch log below. A gap that closed and a
+              // gap that never opened look identical on screen -- both show
+              // a readable conversation -- so the only way to tell "history
+              // arrived" from "the key came by some other route" is to say
+              // which one happened, and the log is where that is said.
               if (other !== null) {
                 setParty({ scope: roomId, other })
                 // Never throws: see claimHistory.ts for why a history that
@@ -1197,10 +1199,13 @@ export function App({
         }
       }
 
-      // Logged as well as rendered. The Android emulator's screencap returns a
-      // blank frame regardless of what is on screen, so the log is the only
-      // machine-readable evidence there, and it is what the Detox harness will
-      // read rather than pixels.
+      // WHAT THE LAUNCH SAYS ABOUT ITSELF, AND THE ONLY PLACE IT SAYS IT.
+      //
+      // This was logged *and* rendered, on a readout #105 removed. The log
+      // was always the half that mattered: the Android emulator's screencap
+      // returns a blank frame regardless of what is on screen, so this is
+      // the only machine-readable evidence there is -- and it is what the
+      // Detox suite reads, rather than pixels or the words in a layout.
       logEvent('info', 'MESSAGR_RUNTIME', {
         architecture,
         hermes,
@@ -1326,10 +1331,11 @@ export function App({
   // BEFORE ANYTHING ELSE, AND WITHOUT A FLASH BETWEEN.
   //
   // While the keystore has not answered, the same ground the launch frame
-  // paints, and nothing on it. The alternative — rendering the readout for the
-  // handful of frames it takes to read one keystore entry — is precisely the
-  // flash the launch frame exists to prevent, and it would show the diagnostic
-  // screen to somebody who has not yet been told what this is.
+  // paints, and nothing on it. The alternative — rendering the application
+  // for the handful of frames it takes to read one keystore entry — is
+  // precisely the flash the launch frame exists to prevent, and before #105
+  // it was worse than a flash: it showed the diagnostic readout to somebody
+  // who had not yet been told what this is.
   if (promiseSeen === null) {
     return (
       <SafeAreaProvider>
