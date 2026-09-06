@@ -108,7 +108,7 @@ export function FullScreenPlate({
             accessibilityState={{ disabled: showing >= entries.length - 1 }}
             accessibilityLabel={t(
               'plate_of %1$d %2$d',
-              showing + 2,
+              Math.min(entries.length, showing + 2),
               entries.length,
             )}
             style={styles.target}>

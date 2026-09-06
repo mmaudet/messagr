@@ -23,6 +23,17 @@ import { Photograph } from './Photograph'
  * handle rather than two. Here is where that choice is paid back: one entry
  * draws as it always did, at its own proportions, without a grid around it.
  *
+ * # The tiles pass a long press up, and they have to
+ *
+ * Each tile is a `Pressable`, and a `Pressable` inside a `Pressable` takes
+ * the touch: the message's own long press -- the one that offers a reaction
+ * -- never fired, so a plate could not be reacted to at all. Found by long
+ * pressing one on a device and watching nothing happen.
+ *
+ * So a tile handles both: a tap opens it, and a long press does what a long
+ * press on any other message does. The handler is the message's, passed
+ * down, so there is one place that decides what a long press means.
+ *
  * # Every tile is square, and the pictures are not
  *
  * A grid of differently-shaped tiles is a grid nobody can scan. The tiles are
@@ -37,11 +48,14 @@ export function Plate({
   plate,
   fetch,
   onOpen,
+  onLongPress,
 }: {
   readonly plate: Grouping
   readonly fetch: (image: ReadImage) => Promise<ShownImage>
   /** Opens the plate full screen, at the index tapped. */
   readonly onOpen: (at: number) => void
+  /** What a long press does. The message's own, so there is one answer. */
+  readonly onLongPress?: () => void
 }) {
   const entries = plate.entries
   const first = entries[0]
@@ -52,6 +66,8 @@ export function Plate({
       <Pressable
         testID={`plate-${plate.at}`}
         onPress={() => onOpen(0)}
+        onLongPress={onLongPress}
+        delayLongPress={350}
         accessibilityRole="button"
         accessibilityLabel={t('plate_open')}>
         <Photograph
@@ -78,6 +94,8 @@ export function Plate({
             // stands for. Opening at the fourth would show a picture already
             // on screen.
             onPress={() => onOpen(last ? TILES : at)}
+            onLongPress={onLongPress}
+            delayLongPress={350}
             accessibilityRole="button"
             accessibilityLabel={
               last ? t('plate_more %1$d', hidden) : t('plate_open')

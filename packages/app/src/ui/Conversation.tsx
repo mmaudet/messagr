@@ -295,6 +295,10 @@ function Message({
             plate={plate}
             fetch={onLoadImage}
             onOpen={at => onOpenPlate(plate, at)}
+            // The same gesture the bubble above it answers. A plate's
+            // reactions annotate its first event, which is the event this
+            // `Message` is: one plate, one place they attach.
+            onLongPress={() => setOffering(held => !held)}
           />
         ) : entry.image !== undefined && onLoadImage !== undefined ? (
           // The photograph instead of the text, not beside it. An `m.image`
