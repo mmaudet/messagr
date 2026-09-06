@@ -1,0 +1,147 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Messagr</title>
+<meta name="description" content="La messagerie qui ne vous demande rien. Pas de numéro, pas de compte, pas de mot de passe.">
+<style>
+  :root{
+    --ground:#F7F5EF; --surface:#ffffff; --ink:#0C1F19; --soft:#5A6B63;
+    --accent:#06614A; --mark:#12B76A; --bubble:#C9F2DC; --rule:#E2DED2;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0}
+  body{
+    background:var(--ground); color:var(--ink);
+    font-family:-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    line-height:1.6; -webkit-font-smoothing:antialiased;
+  }
+  main{max-width:640px; margin:0 auto; padding:56px 24px 80px}
+  .mark{display:block; margin-bottom:40px; width:max-content}
+  .mark:focus-visible{outline:3px solid var(--mark); outline-offset:4px}
+  .logotype{display:block; width:min(260px,62vw); height:auto}
+  .logotype.dark{display:none}
+  .getline{display:flex; align-items:center; gap:14px; margin-bottom:16px}
+  .getline .label{margin:0}
+  .appicon{flex:0 0 52px; width:52px; height:52px; display:block}
+  h1{
+    font-size:clamp(30px,7vw,42px); line-height:1.12; letter-spacing:-0.025em;
+    font-weight:650; margin:0 0 18px; text-wrap:balance;
+  }
+  .lead{font-size:18px; color:var(--soft); margin:0 0 34px; text-wrap:pretty}
+  ul{list-style:none; padding:0; margin:0 0 40px; display:flex; flex-direction:column; gap:11px}
+  li{display:flex; gap:11px; align-items:baseline; font-size:16px}
+  li::before{content:"◆"; color:var(--mark); font-size:12px; flex:0 0 auto}
+  .card{
+    background:var(--surface); border:1px solid var(--rule); border-radius:4px;
+    padding:26px 24px; margin-bottom:22px;
+  }
+  .label{
+    font-family:ui-monospace,SFMono-Regular,Menlo,monospace; font-size:11px;
+    letter-spacing:.13em; text-transform:uppercase; color:var(--soft); margin:0 0 16px;
+  }
+  .stores{display:flex; flex-wrap:wrap; gap:16px}
+  .store{flex:1 1 210px; display:flex; flex-direction:column; gap:7px}
+  .badge{
+    display:flex; align-items:center; gap:13px; padding:13px 18px;
+    background:var(--ink); color:#fff; text-decoration:none;
+    clip-path:polygon(0 0, calc(100% - 14px) 0, 100% 14px, 100% 100%, 0 100%);
+  }
+  .badge:hover{background:var(--accent)}
+  .badge:focus-visible{outline:3px solid var(--mark); outline-offset:2px}
+  .badge.off{background:#DAD6CA; color:#6E7A73; pointer-events:none}
+  .badge svg{flex:0 0 24px}
+  .badge b{display:block; font-size:15px; font-weight:620; line-height:1.25}
+  .badge em{display:block; font-style:normal; font-size:11.5px; opacity:.75}
+  .under{
+    font-family:ui-monospace,SFMono-Regular,Menlo,monospace; font-size:11px;
+    letter-spacing:.09em; text-transform:uppercase; color:var(--soft); padding-left:2px;
+  }
+  .invite{
+    background:var(--bubble); border-radius:4px; padding:18px 20px;
+    font-size:15.5px; margin-top:26px;
+  }
+  .invite b{font-weight:640}
+  footer{
+    margin-top:46px; padding-top:20px; border-top:1px solid var(--rule);
+    font-size:13.5px; color:var(--soft);
+  }
+  footer a{color:var(--accent)}
+  @media (prefers-color-scheme:dark){
+    :root{
+      --ground:#0B1A15; --surface:#11241D; --ink:#E9F1EC; --soft:#93A89E;
+      --accent:#4FD39B; --rule:#23392F; --bubble:#1C3D30;
+    }
+    .logotype.light{display:none}
+    .logotype.dark{display:block}
+    .badge{background:var(--mark); color:#06251B}
+    .badge:hover{background:var(--accent); color:#06251B}
+    .badge.off{background:#1E3229; color:#7C9084}
+  }
+</style>
+</head>
+<body>
+<main>
+
+  <a class="mark" href="/" aria-label="Messagr">
+    <img class="logotype light" src="/messagr-logotype-vert.svg" alt="Messagr" width="260" height="60">
+    <img class="logotype dark" src="/messagr-logotype-vert-inverse.svg" alt="Messagr" width="260" height="60">
+  </a>
+
+  <h1>La messagerie qui ne vous demande rien.</h1>
+  <p class="lead">Pas de numéro, pas de compte, pas de mot de passe. Quelqu'un vous invite, vous écrivez.</p>
+
+  <ul>
+    <li>Chiffrée de bout en bout, sans réglage</li>
+    <li>Aucun carnet d'adresses aspiré, aucune publicité</li>
+    <li>Vos messages exportables à tout moment</li>
+  </ul>
+
+  <div class="card">
+    <div class="getline">
+      <img class="appicon" src="/messagr-monogramme-r-vert.svg" alt="" width="52" height="52" aria-hidden="true">
+      <p class="label">Obtenir l'application</p>
+    </div>
+    <div class="stores">
+
+      <div class="store">
+        <a class="badge" href="/messagr.apk">
+          <svg viewBox="0 0 24 27" aria-hidden="true" width="24" height="27">
+            <path d="M1.6 1.1 14 13.5 1.6 25.9A2.4 2.4 0 0 1 1 24.3V2.7c0-.6.2-1.2.6-1.6z" fill="currentColor"/>
+            <path d="M17.4 10 3.5.3l12.2 12.2z" fill="currentColor" opacity=".85"/>
+            <path d="M17.4 17 3.5 26.7l12.2-12.2z" fill="currentColor" opacity=".85"/>
+            <path d="M21.9 12.1c1.4.8 1.4 2.5 0 3.3l-3 1.7-3.2-3.3 3.2-3.3z" fill="currentColor" opacity=".7"/>
+          </svg>
+          <span><b>Android</b><em>Téléchargement direct</em></span>
+        </a>
+        <div class="under">Bientôt sur Google Play</div>
+      </div>
+
+      <div class="store">
+        <span class="badge off" aria-disabled="true">
+          <svg viewBox="0 0 24 27" aria-hidden="true" width="24" height="27">
+            <path d="M17.6 14.2c0-2.6 2.1-3.8 2.2-3.9-1.2-1.8-3.1-2-3.8-2-1.6-.2-3.1.9-3.9.9-.8 0-2.1-.9-3.4-.9-1.8 0-3.4 1-4.3 2.6-1.8 3.2-.5 7.9 1.3 10.5.9 1.3 1.9 2.7 3.2 2.6 1.3-.1 1.8-.8 3.3-.8 1.5 0 2 .8 3.4.8 1.4 0 2.3-1.3 3.1-2.6.6-.9.9-1.4 1.3-2.4-3.3-1.2-3.4-4.7-3.4-4.8z" fill="currentColor"/>
+            <path d="M15.1 4.6c.7-.9 1.2-2.1 1.1-3.3-1 0-2.3.7-3 1.6-.7.8-1.3 2-1.1 3.2 1.1.1 2.3-.6 3-1.5z" fill="currentColor"/>
+          </svg>
+          <span><b>iPhone</b><em>App Store</em></span>
+        </span>
+        <div class="under">Bientôt</div>
+      </div>
+
+    </div>
+
+    <div class="invite">
+      <b>On n'entre dans Messagr que sur invitation.</b> L'application seule ne suffit pas :
+      il vous faut le lien que quelqu'un vous a envoyé. Sans lui, rien à créer, rien à remplir.
+    </div>
+  </div>
+
+  <footer>
+    Messagr est exploité par RV Myriagone Holding, 22 rue de la Garenne, 78130 Chapet,
+    RCS Versailles 894&nbsp;754&nbsp;548. Écrire à <a href="mailto:conformite@messagr.eu">conformite@messagr.eu</a>.
+  </footer>
+
+</main>
+</body>
+</html>

@@ -1,3 +1,6 @@
+import { readFileSync } from 'node:fs'
+import { join } from 'node:path'
+
 import jsQR from 'jsqr'
 import { describe, expect, it } from 'vitest'
 
@@ -216,5 +219,49 @@ describe('pathOf', () => {
       expect(Number(x)).toBeGreaterThanOrEqual(QUIET)
       expect(Number(y)).toBeGreaterThanOrEqual(QUIET)
     }
+  })
+})
+
+describe('the same symbol as the website', () => {
+  /**
+   * The claim this port rests on, checked rather than asserted in a comment.
+   *
+   * `messagr.eu/i/<token>` has drawn a QR since before the application could,
+   * and its encoder is pinned against a vector that was verified end to end:
+   * rendered to pixels and read by an independent decoder. The vector is in
+   * the repository now, beside the page it guards, so this can compare
+   * against it module by module.
+   *
+   * Module by module and not "both decode to the same link", because both
+   * would: two encoders may choose different masks or different versions and
+   * still be readable. The claim is stronger than readability -- it is that
+   * somebody scanning a printed invitation and somebody scanning a phone are
+   * looking at the same picture, so an error-correction level or a mask rule
+   * cannot drift apart between them without this failing.
+   */
+  const VECTOR = join(
+    __dirname,
+    '../../../../deploy/messagr-eu/tests/qr-vecteur-attendu.txt',
+  )
+
+  // The link the website's own test pins, character for character.
+  const PINNED =
+    'https://messagr.eu/i/eyJ2IjoxLCJzIjoiaHR0cHM6Ly9tZXNzYWdyLmV1L19tZX' +
+    'NzYWdyIiwidCI6IjAxMjM0NTY3ODlhYmNkZWYwMTIzNDU2Nzg5YWJjZGVmMDEyMzQ1NjciLCJjIj' +
+    'oiIUFiQ2RFZkdoSWpLbE1uT3BRcjptZXNzYWdyLmV1IiwiZiI6IldOaFJaZ3RWNk5wRVFIVWVFdl' +
+    'VCdjkyY2lpZEdGR1crREV6blhlV2pzZXciLCJuIjoiQ2FtaWxsZSJ9'
+
+  it('draws the pinned symbol, module for module', () => {
+    const expected = readFileSync(VECTOR, 'utf8').trim().split('\n')
+    const symbol = qrOf(PINNED)
+    expect(symbol).not.toBeNull()
+    expect(symbol?.side).toBe(expected.length)
+    for (let row = 0; row < expected.length; row += 1) {
+      expect(symbol?.modules[row]?.join('')).toBe(expected[row])
+    }
+  })
+
+  it('and that symbol reads back as the link, so the vector is not just agreed nonsense', () => {
+    expect(scanned(PINNED)).toBe(PINNED)
   })
 })

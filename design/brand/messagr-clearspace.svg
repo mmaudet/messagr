@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 124 124" width="620" height="620">
+  <title>Messagr — zone de protection</title>
+  <desc>Clearspace = 12 u sur les quatre côtés, soit la largeur de l&#39;entaille du pli.</desc>
+  <rect width="124" height="124" fill="#F2FBF6"></rect>
+  <rect x="0" y="0" width="124" height="124" fill="none" stroke="#06614A" stroke-opacity="0.5" stroke-width="0.5" stroke-dasharray="2 2"></rect>
+  <g transform="translate(12 12)">
+    <path d="M 30 12 H 70 A 18 18 0 0 1 88 30 V 70 A 18 18 0 0 1 70 88 H 30 A 18 18 0 0 1 12 70 V 30 A 18 18 0 0 1 30 12 Z M 54 12 L 88 46 L 88 58 L 42 12 Z" fill="#12B76A" fill-rule="evenodd"></path>
+  </g>
+  <g font-family="monospace" font-size="4" fill="#06614A">
+    <text x="4" y="8">clearspace 12 u</text>
+    <text x="4" y="120">taille min. 16 px écran · 6 mm impression</text>
+  </g>
+</svg>
