@@ -320,6 +320,11 @@ export function App({
         poster: servicePoster,
         link: initialLink,
         signUp: signUpSecrets,
+        // A claim is two calls with the issuer's application in between. See
+        // claimInvitation.ts: without a wait this tries once, is told 409,
+        // and reports a link that cannot be used -- which is what it does on
+        // a device with nothing else changed.
+        wait: ms => new Promise(resolve => setTimeout(resolve, ms)),
       })
       setEntry(entered)
       const credentials = entered.entered ? entered.session : null
