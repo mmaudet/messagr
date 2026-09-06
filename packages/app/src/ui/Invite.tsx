@@ -12,6 +12,7 @@ import { t } from '../copy'
 import { color, floors, radius, space, stroke, type } from '../design/tokens'
 import { normaliseGivenName } from '../runtime/givenName'
 import { NotchedButton } from './NotchedButton'
+import { QrCode } from './QrCode'
 
 /**
  * Inviting somebody, which is the same gesture as starting a conversation
@@ -39,6 +40,17 @@ import { NotchedButton } from './NotchedButton'
  * closed case is written into the stage rather than into a boolean beside it
  * -- two ways of saying the same thing is how they come to disagree.
  */
+
+/**
+ * How wide the symbol is drawn.
+ *
+ * Not a token: it is neither a space nor a size on the type scale, it is how
+ * much of a screen a picture takes -- and the constraint behind it is a
+ * camera's, which no palette knows about. A version-4 symbol is 33 modules
+ * across, so this leaves each one a little over six points: comfortably above
+ * what a phone resolves at arm's length.
+ */
+const QR_SIZE = 220
 
 export type InviteStage =
   /** Nothing on screen. What a launch starts in, and what closing returns to. */
@@ -130,6 +142,25 @@ export function Invite({ stage, onInvite, onClose, admission }: InviteProps) {
       <Text testID="invite-link" selectable style={styles.link}>
         {stage.link}
       </Text>
+      {/* BESIDE THE LINK, NEVER INSTEAD OF IT.
+          The two people an invitation matters most for are the ones standing
+          next to each other -- which, in a product entered only by
+          invitation, is the ordinary case. A camera is the gesture for that.
+
+          But the link stays. Reading it out loud is the path that has to work
+          when a camera does not, and `invite_ready` above already promises it
+          is valid for an hour and works once. A screen that replaced the link
+          with a picture would take that promise away from anybody without a
+          second phone in front of them. */}
+      <View style={styles.symbol}>
+        <QrCode
+          text={stage.link}
+          size={QR_SIZE}
+          testID="invite-qr"
+          accessibilityLabel={t('invite_qr_label')}
+        />
+        <Text style={styles.hint}>{t('invite_qr')}</Text>
+      </View>
       <NotchedButton
         label={t('invite_share')}
         testID="invite-share"
@@ -154,6 +185,10 @@ export function Invite({ stage, onInvite, onClose, admission }: InviteProps) {
 }
 
 const styles = StyleSheet.create({
+  symbol: {
+    alignItems: 'center',
+    gap: space.s,
+  },
   resting: {
     gap: space.m,
     paddingVertical: space.m,

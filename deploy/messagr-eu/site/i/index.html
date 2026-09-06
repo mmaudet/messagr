@@ -1,0 +1,829 @@
+<!DOCTYPE html>
+<!--
+  Page d'atterrissage des liens d'invitation Messagr (/i/<jeton>).
+
+  DEUX PROPRIÉTÉS LA DÉFINISSENT, et toute modification doit les conserver :
+
+  1. Elle est IDENTIQUE pour tout jeton, valide ou non. Aucun appel réseau,
+     aucun script, aucune variation : la réponse ne peut pas révéler si un
+     jeton a existé, par construction et non par discipline.
+
+  2. Elle ne réclame JAMAIS le jeton. Le jeton reste dans l'URL, sur
+     l'appareil ; c'est l'application, et elle seule, qui le réclame auprès
+     du service.
+
+     La page porte du script depuis le 11 août 2026 — détection de
+     plateforme et copie du lien. La garantie a donc été DÉPLACÉE, pas
+     abandonnée : la politique de sécurité de contenu ci-dessous rend
+     l'exfiltration impossible même si ce script était malveillant ou
+     compromis, et c'est le NAVIGATEUR qui l'applique, plus la discipline
+     du rédacteur.
+
+     deploy/messagr-eu/tests/doctrine-page-invitation.sh en fait un essai,
+     lancé par « make check ». Une règle non testée finit par se faire
+     enfreindre.
+
+  Les couleurs sont celles de l'identité (identite/lisez-moi.md) : marque
+  #12B76A, appuis #06614A, bulle sortante #C9F2DC, texte #0C1F19 ; rayon
+  d'angle 18 sur la grille de 100.
+-->
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="referrer" content="no-referrer">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; img-src data:; connect-src 'none'; form-action 'none'; base-uri 'none'">
+<title>Messagr — invitation</title>
+<style>
+  :root { color-scheme: light; }
+  body {
+    margin: 0;
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: #C9F2DC;
+    color: #0C1F19;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  }
+  main {
+    background: #ffffff;
+    border: 1px solid #06614A;
+    border-radius: 18px;
+    margin: 12px;
+    padding: 24px;
+    max-width: 28rem;
+  }
+  h1 { font-size: 1.4rem; margin: 0 0 12px; color: #06614A; }
+  p  { line-height: 1.5; margin: 0 0 16px; }
+  a.ouvrir {
+    display: block;
+    text-align: center;
+    background: #12B76A;
+    color: #ffffff;
+    text-decoration: none;
+    font-weight: 600;
+    padding: 14px;
+    border-radius: 18px;
+    margin-bottom: 16px;
+  }
+  p.note { font-size: 0.85rem; color: #06614A; margin: 0; }
+  p.destination { font-size: 0.95rem; }
+  p.destination a { color: #06614A; }
+  canvas#qr {
+    display: block;
+    width: 100%;
+    max-width: 330px;
+    height: auto;
+    margin: 0 auto 16px;
+    image-rendering: pixelated;
+    background: #ffffff;
+  }
+  button.copier {
+    display: block;
+    width: 100%;
+    background: #ffffff;
+    color: #06614A;
+    border: 1px solid #06614A;
+    border-radius: 18px;
+    font: inherit;
+    font-weight: 600;
+    padding: 13px;
+    margin-bottom: 16px;
+    cursor: pointer;
+  }
+</style>
+</head>
+<body>
+<main>
+  <h1>Messagr</h1>
+  <p data-t="recue">Vous avez reçu une invitation à rejoindre Messagr.</p>
+  <!-- Lien vide : il renvoie vers cette même URL. Si l'application est
+       installée et les liens universels en place, iOS/Android l'ouvre dans
+       l'application ; sinon, on reste ici et le texte ci-dessous explique
+       pourquoi. Aucun script n'est nécessaire à ce comportement. -->
+  <a class="ouvrir" href="" data-t="ouvrir">Ouvrir dans Messagr</a>
+  <p data-t="rien">Si rien ne se passe, Messagr n'est pas installé sur cet appareil.</p>
+
+  <!-- LES TROIS DESTINATIONS SONT DANS LE HTML DÈS LE DÉPART, et le script
+       n'en RÉVÈLE qu'une. Rien n'est construit, rien n'est demandé au
+       réseau : sans script, la page reste celle d'avant, avec son texte de
+       repli ci-dessus. -->
+  <p class="destination" id="dest-ios" hidden></p>
+  <p class="destination" id="dest-android" hidden></p>
+  <!-- L'AVERTISSEMENT NE PARAÎT QU'AVEC LE FICHIER, jamais avec le magasin
+       ni avec la phrase d'attente : `montrer` ne le dévoile que lorsqu'elle
+       a posé un lien. Sans lui, la personne clique, le téléphone refuse en
+       silence et la page a menti par omission. -->
+  <p class="note" id="apk-avertissement" hidden data-t="apk">Votre téléphone
+     demandera l'autorisation d'installer une application de sources
+     inconnues : c'est normal pour un fichier obtenu hors magasin.</p>
+  <p class="destination" id="dest-autre" hidden></p>
+
+  <!-- LE QR N'EXISTE QUE SUR ORDINATEUR. Sur telephone, l'application
+       s'ouvre ou le magasin repond ; ici, le seul chemin vers le telephone
+       est de faire scanner l'ecran. -->
+  <canvas id="qr" width="330" height="330" hidden data-t-label="qr-label"
+          aria-label="Code QR du lien d'invitation, a scanner avec le telephone"></canvas>
+
+  <button class="copier" id="copier" hidden type="button" data-t="copier">Copier le lien</button>
+  <p class="note" id="copie-faite" hidden data-t="copie">Lien copié. Ouvrez
+     Messagr après l'installation : il vous proposera de le coller.</p>
+
+  <p class="note" data-t="rien-verifie">Cette page ne vérifie ni n'utilise
+     votre invitation : seule l'application peut la réclamer.</p>
+</main>
+<script>
+// CE SCRIPT NE LIT JAMAIS L'INVITATION.
+//
+// Il manipule `location.href` EN BLOC et ne le découpe pas : ni `hash`, ni
+// `search`, ni `pathname`. C'est ce qui le rend indifférent au format du
+// lien — chemin aujourd'hui, fragment demain — et c'est la ligne que
+// doctrine-page-invitation.sh interdit de franchir.
+//
+// La politique de sécurité de contenu lui interdit par ailleurs toute
+// sortie : `connect-src 'none'` coupe TOUTES les API de requête, et c'est le
+// navigateur qui l'applique.
+//
+// Leurs noms ne sont pas écrits ici, et ce n'est pas un oubli : l'essai de
+// doctrine les cherche par sous-chaîne dans le fichier ENTIER, commentaires
+// compris. Un analyseur qui saurait distinguer code et commentaire serait
+// plus fin et plus fragile ; on préfère paraphraser.
+(function () {
+  // Encodeur QR, mode octet, niveau M, versions 1 a 20.
+  //
+  // POURQUOI UN SECOND ENCODEUR. Le noyau en porte deja un, et la spec du
+  // partage l'y a mis pour qu'il n'y en ait qu'un. Une page web n'a pas acces
+  // au noyau, et la politique de securite de contenu lui interdit tout script
+  // externe : celui-ci est le prix du QR sur ordinateur. Il est valide contre
+  // la matrice du noyau, module par module, et cette validation est la seule
+  // chose qui justifie de le garder.
+  //
+  // Le niveau M est celui de `QR_ERROR_CORRECTION` dans core/src/qr.rs. Les
+  // deux doivent bouger ensemble, sinon les deux symboles cessent d'etre le
+  // meme symbole.
+
+  // ── LA LANGUE ─────────────────────────────────────────────────────────
+  //
+  // L'application embarque six catalogues et n'a aucun repli : #103 le dit
+  // sans détour, un repli est la manière dont une langue à moitié traduite
+  // part en production sans que personne ne s'en aperçoive. Cette page était
+  // en français seul — donc quelqu'un qui ne lit que l'allemand rencontrait
+  // deux écrans français avant celui qui lui demande enfin quelle langue il
+  // lit.
+  //
+  // TOUT EST ICI, ET C'EST OBLIGATOIRE. La politique de sécurité de contenu
+  // interdit tout script externe et toute requête : c'est ce qui empêche
+  // cette page de dire si une invitation existe. Une traduction chargée au
+  // moment de l'affichage la briserait.
+  //
+  // LA PROPRIÉTÉ « OCTET POUR OCTET IDENTIQUE » Y SURVIT, et la distinction
+  // vaut d'être écrite : elle porte sur le JETON. Tous les jetons reçoivent
+  // les mêmes octets, donc la page n'est pas un oracle d'existence. Elle ne
+  // dit rien du lecteur. Six traductions embarquées et une choisie dans le
+  // navigateur, ce sont les mêmes octets pour tout le monde.
+  //
+  // LE FRANÇAIS RESTE DANS LE HTML. Sans script, la page est celle d'avant
+  // avec son texte de repli — c'est la propriété dont le commentaire des
+  // trois destinations est déjà fier, et une traduction qui la retirerait
+  // coûterait plus qu'elle n'apporte.
+  var TRADUCTIONS = {
+    fr: null,
+    en: {
+      titre: 'Messagr — invitation',
+      recue: 'You have been invited to join Messagr.',
+      ouvrir: 'Open in Messagr',
+      rien: 'If nothing happens, Messagr is not installed on this device.',
+      copier: 'Copy the link',
+      copie: 'Link copied. Open Messagr after installing: it will offer to paste it.',
+      apk: 'Your phone will ask permission to install an application from an unknown source: that is normal for a file obtained outside a store.',
+      'rien-verifie': 'This page neither checks nor uses your invitation: only the application can claim it.',
+      'qr-label': 'QR code of the invitation link, to scan with the phone',
+      ios: 'Install Messagr for iPhone',
+      android: 'Install Messagr for Android',
+      apkLien: 'Download Messagr for Android',
+      ordinateur: 'Open this link on your phone: Messagr is a mobile application. Scan this code:',
+      attenteIos: 'Messagr is not available for iPhone yet.',
+      attenteAutre: 'The application is not published yet.',
+      maisAndroid: ' It is on Android.',
+      demandez: ' Ask the person who invited you how to get it.'
+    },
+    de: {
+      titre: 'Messagr — Einladung',
+      recue: 'Sie haben eine Einladung zu Messagr erhalten.',
+      ouvrir: 'In Messagr öffnen',
+      rien: 'Wenn nichts passiert, ist Messagr auf diesem Gerät nicht installiert.',
+      copier: 'Link kopieren',
+      copie: 'Link kopiert. Öffnen Sie Messagr nach der Installation: es bietet Ihnen an, ihn einzufügen.',
+      apk: 'Ihr Telefon fragt nach der Erlaubnis, eine Anwendung aus unbekannter Quelle zu installieren: das ist bei einer Datei außerhalb eines Stores normal.',
+      'rien-verifie': 'Diese Seite prüft und verwendet Ihre Einladung nicht: nur die Anwendung kann sie einlösen.',
+      'qr-label': 'QR-Code des Einladungslinks, mit dem Telefon zu scannen',
+      ios: 'Messagr für iPhone installieren',
+      android: 'Messagr für Android installieren',
+      apkLien: 'Messagr für Android herunterladen',
+      ordinateur: 'Öffnen Sie diesen Link auf Ihrem Telefon: Messagr ist eine mobile Anwendung. Scannen Sie diesen Code:',
+      attenteIos: 'Messagr ist für das iPhone noch nicht verfügbar.',
+      attenteAutre: 'Die Anwendung ist noch nicht veröffentlicht.',
+      maisAndroid: ' Für Android schon.',
+      demandez: ' Fragen Sie die Person, die Sie eingeladen hat, wie Sie sie bekommen.'
+    },
+    es: {
+      titre: 'Messagr — invitación',
+      recue: 'Ha recibido una invitación para unirse a Messagr.',
+      ouvrir: 'Abrir en Messagr',
+      rien: 'Si no ocurre nada, Messagr no está instalado en este dispositivo.',
+      copier: 'Copiar el enlace',
+      copie: 'Enlace copiado. Abra Messagr después de instalarlo: le propondrá pegarlo.',
+      apk: 'Su teléfono pedirá permiso para instalar una aplicación de origen desconocido: es normal para un archivo obtenido fuera de una tienda.',
+      'rien-verifie': 'Esta página no comprueba ni utiliza su invitación: solo la aplicación puede reclamarla.',
+      'qr-label': 'Código QR del enlace de invitación, para escanear con el teléfono',
+      ios: 'Instalar Messagr para iPhone',
+      android: 'Instalar Messagr para Android',
+      apkLien: 'Descargar Messagr para Android',
+      ordinateur: 'Abra este enlace desde su teléfono: Messagr es una aplicación móvil. Escanee este código:',
+      attenteIos: 'Messagr aún no está disponible para iPhone.',
+      attenteAutre: 'La aplicación aún no está publicada.',
+      maisAndroid: ' Sí lo está en Android.',
+      demandez: ' Pregunte a la persona que le invitó cómo obtenerla.'
+    },
+    it: {
+      titre: 'Messagr — invito',
+      recue: 'Hai ricevuto un invito a Messagr.',
+      ouvrir: 'Apri in Messagr',
+      rien: 'Se non succede nulla, Messagr non è installato su questo dispositivo.',
+      copier: 'Copia il link',
+      copie: 'Link copiato. Apri Messagr dopo l\'installazione: ti proporrà di incollarlo.',
+      apk: 'Il telefono chiederà il permesso di installare un\'applicazione di origine sconosciuta: è normale per un file ottenuto fuori da uno store.',
+      'rien-verifie': 'Questa pagina non verifica né utilizza il tuo invito: solo l\'applicazione può riscattarlo.',
+      'qr-label': 'Codice QR del link di invito, da scansionare con il telefono',
+      ios: 'Installa Messagr per iPhone',
+      android: 'Installa Messagr per Android',
+      apkLien: 'Scarica Messagr per Android',
+      ordinateur: 'Apri questo link dal telefono: Messagr è un\'applicazione mobile. Scansiona questo codice:',
+      attenteIos: 'Messagr non è ancora disponibile per iPhone.',
+      attenteAutre: 'L\'applicazione non è ancora pubblicata.',
+      maisAndroid: ' Su Android sì.',
+      demandez: ' Chiedi a chi ti ha invitato come ottenerla.'
+    },
+    nl: {
+      titre: 'Messagr — uitnodiging',
+      recue: 'U hebt een uitnodiging voor Messagr ontvangen.',
+      ouvrir: 'Openen in Messagr',
+      rien: 'Als er niets gebeurt, is Messagr niet op dit apparaat geïnstalleerd.',
+      copier: 'Link kopiëren',
+      copie: 'Link gekopieerd. Open Messagr na de installatie: het biedt aan om hem te plakken.',
+      apk: 'Uw telefoon vraagt toestemming om een applicatie uit een onbekende bron te installeren: dat is normaal voor een bestand van buiten een winkel.',
+      'rien-verifie': 'Deze pagina controleert of gebruikt uw uitnodiging niet: alleen de applicatie kan hem opeisen.',
+      'qr-label': 'QR-code van de uitnodigingslink, te scannen met de telefoon',
+      ios: 'Messagr voor iPhone installeren',
+      android: 'Messagr voor Android installeren',
+      apkLien: 'Messagr voor Android downloaden',
+      ordinateur: 'Open deze link op uw telefoon: Messagr is een mobiele applicatie. Scan deze code:',
+      attenteIos: 'Messagr is nog niet beschikbaar voor de iPhone.',
+      attenteAutre: 'De applicatie is nog niet gepubliceerd.',
+      maisAndroid: ' Op Android wel.',
+      demandez: ' Vraag de persoon die u heeft uitgenodigd hoe u hem krijgt.'
+    }
+  };
+
+  // Le français par défaut, et pas seulement quand rien ne correspond : le
+  // HTML le porte déjà, donc `null` veut dire « ne touche à rien ».
+  var LANGUE = (function () {
+    var demandees = (navigator.languages && navigator.languages.length)
+      ? navigator.languages
+      : [navigator.language || 'fr'];
+    for (var i = 0; i < demandees.length; i++) {
+      // `de-AT` compte comme `de` : la sous-étiquette régionale ne change
+      // aucune de ces phrases, et refuser sur elle rendrait la page
+      // française pour la moitié de l'Europe germanophone.
+      var code = String(demandees[i]).toLowerCase().split('-')[0];
+      if (Object.prototype.hasOwnProperty.call(TRADUCTIONS, code)) { return code; }
+    }
+    return 'fr';
+  })();
+
+  var MOTS = TRADUCTIONS[LANGUE];
+
+  /** Un mot du catalogue choisi, ou le repli français passé par l'appelant. */
+  function mot(cle, francais) {
+    return (MOTS && MOTS[cle]) ? MOTS[cle] : francais;
+  }
+
+  // Remplacer plutôt que construire : chaque phrase est déjà dans le HTML en
+  // français, marquée d'un `data-t`. Sans script elles restent ; avec, elles
+  // deviennent celles de la langue lue.
+  if (MOTS) {
+    if (document.documentElement) { document.documentElement.lang = LANGUE; }
+    if (MOTS.titre) { document.title = MOTS.titre; }
+    var marques = document.querySelectorAll
+      ? document.querySelectorAll('[data-t]')
+      : [];
+    for (var m = 0; m < marques.length; m++) {
+      var cle = marques[m].getAttribute('data-t');
+      if (MOTS[cle]) { marques[m].textContent = MOTS[cle]; }
+    }
+    var etiquettes = document.querySelectorAll
+      ? document.querySelectorAll('[data-t-label]')
+      : [];
+    for (var e = 0; e < etiquettes.length; e++) {
+      var cleE = etiquettes[e].getAttribute('data-t-label');
+      if (MOTS[cleE]) { etiquettes[e].setAttribute('aria-label', MOTS[cleE]); }
+    }
+  }
+
+  // Nombre total de mots de code, par version.
+  var TOTAL = [26, 44, 70, 100, 134, 172, 196, 242, 292, 346,
+               404, 466, 532, 581, 655, 733, 815, 901, 991, 1085];
+
+  // Par version, au niveau M : [mots de correction par bloc,
+  // blocs du groupe 1, donnees par bloc du groupe 1,
+  // blocs du groupe 2, donnees par bloc du groupe 2].
+  var BLOCS_M = [
+    [10, 1, 16, 0, 0], [16, 1, 28, 0, 0], [26, 1, 44, 0, 0], [18, 2, 32, 0, 0],
+    [24, 2, 43, 0, 0], [16, 4, 27, 0, 0], [18, 4, 31, 0, 0], [22, 2, 38, 2, 39],
+    [22, 3, 36, 2, 37], [26, 4, 43, 1, 44], [30, 1, 50, 4, 51], [22, 6, 36, 2, 37],
+    [22, 8, 37, 1, 38], [24, 4, 40, 5, 41], [24, 5, 41, 5, 42], [28, 7, 45, 3, 46],
+    [28, 10, 46, 1, 47], [26, 9, 43, 4, 44], [26, 3, 44, 11, 45], [26, 3, 41, 13, 42]
+  ];
+
+  // Centres des motifs d'alignement, par version.
+  var ALIGN = [
+    [], [6, 18], [6, 22], [6, 26], [6, 30], [6, 34], [6, 22, 38], [6, 24, 42],
+    [6, 26, 46], [6, 28, 50], [6, 30, 54], [6, 32, 58], [6, 34, 62],
+    [6, 26, 46, 66], [6, 26, 48, 70], [6, 26, 50, 74], [6, 30, 54, 78],
+    [6, 30, 56, 82], [6, 30, 58, 86], [6, 34, 62, 90]
+  ];
+
+  // ── Arithmetique dans GF(256), polynome primitif 0x11D ───────────────────
+  var EXP = new Uint8Array(512), LOG = new Uint8Array(256);
+  (function () {
+    var x = 1;
+    for (var i = 0; i < 255; i++) {
+      EXP[i] = x; LOG[x] = i;
+      x <<= 1;
+      if (x & 0x100) { x ^= 0x11D; }
+    }
+    for (var j = 255; j < 512; j++) { EXP[j] = EXP[j - 255]; }
+  })();
+
+  function mul(a, b) { return (a === 0 || b === 0) ? 0 : EXP[LOG[a] + LOG[b]]; }
+
+  function polynomeGenerateur(degre) {
+    var g = [1];
+    for (var i = 0; i < degre; i++) {
+      var suivant = new Array(g.length + 1).fill(0);
+      for (var j = 0; j < g.length; j++) {
+        suivant[j] ^= g[j];
+        suivant[j + 1] ^= mul(g[j], EXP[i]);
+      }
+      g = suivant;
+    }
+    return g;
+  }
+
+  function correction(donnees, nbCorrection) {
+    var g = polynomeGenerateur(nbCorrection);
+    var reste = new Array(nbCorrection).fill(0);
+    for (var i = 0; i < donnees.length; i++) {
+      var facteur = donnees[i] ^ reste[0];
+      reste.shift();
+      reste.push(0);
+      if (facteur !== 0) {
+        for (var j = 0; j < nbCorrection; j++) {
+          reste[j] ^= mul(g[j + 1], facteur);
+        }
+      }
+    }
+    return reste;
+  }
+
+  // ── Encodage des donnees ─────────────────────────────────────────────────
+  function octetsUtf8(texte) {
+    var sortie = [];
+    var brut = unescape(encodeURIComponent(texte));
+    for (var i = 0; i < brut.length; i++) { sortie.push(brut.charCodeAt(i)); }
+    return sortie;
+  }
+
+  function choisirVersion(nbOctets) {
+    for (var v = 1; v <= 20; v++) {
+      var p = BLOCS_M[v - 1];
+      var capacite = p[1] * p[2] + p[3] * p[4];
+      // 4 bits de mode + 8 ou 16 bits de compte + les donnees.
+      var entete = 4 + (v <= 9 ? 8 : 16);
+      if (nbOctets * 8 + entete <= capacite * 8) { return v; }
+    }
+    return null;
+  }
+
+  function motsDeCode(octets, version) {
+    var p = BLOCS_M[version - 1];
+    var capacite = p[1] * p[2] + p[3] * p[4];
+    var bits = [];
+    function pousser(valeur, longueur) {
+      for (var i = longueur - 1; i >= 0; i--) { bits.push((valeur >> i) & 1); }
+    }
+    pousser(0x4, 4);                                   // mode octet
+    pousser(octets.length, version <= 9 ? 8 : 16);
+    for (var i = 0; i < octets.length; i++) { pousser(octets[i], 8); }
+    // Terminateur, au plus quatre bits, puis alignement sur l'octet.
+    var reste = capacite * 8 - bits.length;
+    pousser(0, Math.min(4, reste));
+    while (bits.length % 8 !== 0) { bits.push(0); }
+    var mots = [];
+    for (var b = 0; b < bits.length; b += 8) {
+      var v = 0;
+      for (var k = 0; k < 8; k++) { v = (v << 1) | bits[b + k]; }
+      mots.push(v);
+    }
+    // Remplissage alterne, comme la specification l'impose.
+    var remplissage = [0xEC, 0x11];
+    for (var r = 0; mots.length < capacite; r++) { mots.push(remplissage[r % 2]); }
+    return mots;
+  }
+
+  function entrelacer(mots, version) {
+    var p = BLOCS_M[version - 1];
+    var nbCorrection = p[0];
+    var blocs = [], corrections = [], position = 0;
+    var groupes = [[p[1], p[2]], [p[3], p[4]]];
+    for (var g = 0; g < 2; g++) {
+      for (var b = 0; b < groupes[g][0]; b++) {
+        var bloc = mots.slice(position, position + groupes[g][1]);
+        position += groupes[g][1];
+        blocs.push(bloc);
+        corrections.push(correction(bloc, nbCorrection));
+      }
+    }
+    var sortie = [];
+    var maxDonnees = Math.max(p[2], p[4]);
+    for (var i = 0; i < maxDonnees; i++) {
+      for (var j = 0; j < blocs.length; j++) {
+        if (i < blocs[j].length) { sortie.push(blocs[j][i]); }
+      }
+    }
+    for (var i2 = 0; i2 < nbCorrection; i2++) {
+      for (var j2 = 0; j2 < corrections.length; j2++) { sortie.push(corrections[j2][i2]); }
+    }
+    return sortie;
+  }
+
+  // ── Placement des modules ────────────────────────────────────────────────
+  function matriceVide(cote) {
+    var m = [], reserve = [];
+    for (var i = 0; i < cote; i++) {
+      m.push(new Array(cote).fill(0));
+      reserve.push(new Array(cote).fill(false));
+    }
+    return { m: m, reserve: reserve };
+  }
+
+  function poserMotifs(grille, version) {
+    var cote = grille.m.length;
+    function poserRepere(ligne, colonne) {
+      for (var r = -1; r <= 7; r++) {
+        for (var c = -1; c <= 7; c++) {
+          var y = ligne + r, x = colonne + c;
+          if (y < 0 || y >= cote || x < 0 || x >= cote) { continue; }
+          var sombre = (r >= 0 && r <= 6 && (c === 0 || c === 6)) ||
+                       (c >= 0 && c <= 6 && (r === 0 || r === 6)) ||
+                       (r >= 2 && r <= 4 && c >= 2 && c <= 4);
+          grille.m[y][x] = sombre ? 1 : 0;
+          grille.reserve[y][x] = true;
+        }
+      }
+    }
+    poserRepere(0, 0);
+    poserRepere(0, cote - 7);
+    poserRepere(cote - 7, 0);
+
+    // Motifs de synchronisation.
+    for (var i = 8; i < cote - 8; i++) {
+      var bit = (i % 2 === 0) ? 1 : 0;
+      grille.m[6][i] = bit; grille.reserve[6][i] = true;
+      grille.m[i][6] = bit; grille.reserve[i][6] = true;
+    }
+
+    // Motifs d'alignement, sauf la ou ils recouvriraient un repere.
+    var centres = ALIGN[version - 1];
+    for (var a = 0; a < centres.length; a++) {
+      for (var b = 0; b < centres.length; b++) {
+        var ly = centres[a], lx = centres[b];
+        if ((ly <= 8 && lx <= 8) || (ly <= 8 && lx >= cote - 9) ||
+            (ly >= cote - 9 && lx <= 8)) { continue; }
+        for (var r2 = -2; r2 <= 2; r2++) {
+          for (var c2 = -2; c2 <= 2; c2++) {
+            var sombre2 = Math.max(Math.abs(r2), Math.abs(c2)) !== 1;
+            grille.m[ly + r2][lx + c2] = sombre2 ? 1 : 0;
+            grille.reserve[ly + r2][lx + c2] = true;
+          }
+        }
+      }
+    }
+
+    // Module sombre, et reservation des zones d'information de format.
+    grille.m[cote - 8][8] = 1; grille.reserve[cote - 8][8] = true;
+    for (var f = 0; f <= 8; f++) {
+      if (f !== 6) { grille.reserve[8][f] = true; grille.reserve[f][8] = true; }
+    }
+    for (var f2 = 0; f2 < 8; f2++) {
+      grille.reserve[8][cote - 1 - f2] = true;
+      grille.reserve[cote - 1 - f2][8] = true;
+    }
+
+    // Information de version, a partir de la version 7.
+    if (version >= 7) {
+      // BCH(18,6), polynome generateur 0x1F25. Verifie contre les valeurs
+      // publiees pour les versions 7, 8, 9, 10 et 12.
+      var reste = version;
+      for (var k = 0; k < 12; k++) { reste = (reste << 1) ^ ((reste >> 11) * 0x1F25); }
+      var info = (version << 12) | reste;
+      for (var p = 0; p < 18; p++) {
+        var bitp = (info >> p) & 1;
+        var y2 = Math.floor(p / 3), x2 = cote - 11 + (p % 3);
+        grille.m[y2][x2] = bitp; grille.reserve[y2][x2] = true;
+        grille.m[x2][y2] = bitp; grille.reserve[x2][y2] = true;
+      }
+    }
+  }
+
+  function poserDonnees(grille, flot) {
+    var cote = grille.m.length, index = 0, montant = true;
+    for (var colonne = cote - 1; colonne > 0; colonne -= 2) {
+      if (colonne === 6) { colonne = 5; }
+      for (var pas = 0; pas < cote; pas++) {
+        var ligne = montant ? cote - 1 - pas : pas;
+        for (var d = 0; d < 2; d++) {
+          var x = colonne - d;
+          if (grille.reserve[ligne][x]) { continue; }
+          var bit = 0;
+          if (index < flot.length * 8) {
+            bit = (flot[index >> 3] >> (7 - (index & 7))) & 1;
+          }
+          grille.m[ligne][x] = bit;
+          index++;
+        }
+      }
+      montant = !montant;
+    }
+  }
+
+  function masque(numero, ligne, colonne) {
+    switch (numero) {
+      case 0: return (ligne + colonne) % 2 === 0;
+      case 1: return ligne % 2 === 0;
+      case 2: return colonne % 3 === 0;
+      case 3: return (ligne + colonne) % 3 === 0;
+      case 4: return (Math.floor(ligne / 2) + Math.floor(colonne / 3)) % 2 === 0;
+      case 5: return (ligne * colonne) % 2 + (ligne * colonne) % 3 === 0;
+      case 6: return ((ligne * colonne) % 2 + (ligne * colonne) % 3) % 2 === 0;
+      default: return ((ligne + colonne) % 2 + (ligne * colonne) % 3) % 2 === 0;
+    }
+  }
+
+  function poserFormat(grille, numeroMasque) {
+    var cote = grille.m.length;
+    // Niveau M = 00 dans les deux bits de tete.
+    // BCH(15,5), polynome 0x537, puis masquage par 0x5412 pour qu'un symbole
+    // tout clair ne donne pas un format valide. Verifie contre les huit
+    // valeurs publiees du niveau M.
+    var donnees = (0 << 3) | numeroMasque;
+    var reste = donnees;
+    for (var k = 0; k < 10; k++) { reste = (reste << 1) ^ ((reste >> 9) * 0x537); }
+    var info = ((donnees << 10) | reste) ^ 0x5412;
+    for (var p = 0; p < 15; p++) {
+      // LE BIT DE POIDS FORT EN PREMIER. Le placement va du bit 14 en (8,0)
+      // jusqu'au bit 0 en (0,8) ; ecrire (info >> p) donnait le symbole exact
+      // a quinze modules pres, et ces quinze-la sont ceux qui disent au
+      // lecteur quel masque retirer — donc le symbole entier restait illisible.
+      var bit = (info >> (14 - p)) & 1;
+      if (p < 6) { grille.m[8][p] = bit; }
+      else if (p < 8) { grille.m[8][p + 1] = bit; }
+      else if (p === 8) { grille.m[7][8] = bit; }
+      else { grille.m[14 - p][8] = bit; }
+      // SEPT LIGNES, PUIS HUIT COLONNES — et pas huit puis sept. La huitieme
+      // ligne est (cote-8, 8), le MODULE SOMBRE, qui vaut 1 quoi qu'il arrive.
+      // L'ecraser avec un bit de format donnait un symbole que rien ne
+      // signalait, sinon qu'il ne se lisait pas.
+      if (p < 7) { grille.m[cote - 1 - p][8] = bit; }
+      else { grille.m[8][cote - 15 + p] = bit; }
+    }
+  }
+
+  function penalite(m) {
+    var cote = m.length, total = 0, i, j;
+    // Regle 1 : suites de cinq modules ou plus de meme teinte.
+    for (i = 0; i < cote; i++) {
+      for (var sens = 0; sens < 2; sens++) {
+        var compte = 1, precedent = -1;
+        for (j = 0; j < cote; j++) {
+          var v = sens === 0 ? m[i][j] : m[j][i];
+          if (v === precedent) { compte++; }
+          else { if (compte >= 5) { total += compte - 2; } compte = 1; precedent = v; }
+        }
+        if (compte >= 5) { total += compte - 2; }
+      }
+    }
+    // Regle 2 : blocs de deux par deux.
+    for (i = 0; i < cote - 1; i++) {
+      for (j = 0; j < cote - 1; j++) {
+        var a = m[i][j];
+        if (a === m[i][j + 1] && a === m[i + 1][j] && a === m[i + 1][j + 1]) { total += 3; }
+      }
+    }
+    // Regle 3 : le motif 1:1:3:1:1 borde de clair.
+    var motifs = [[1, 0, 1, 1, 1, 0, 1, 0, 0, 0, 0], [0, 0, 0, 0, 1, 0, 1, 1, 1, 0, 1]];
+    for (i = 0; i < cote; i++) {
+      for (j = 0; j <= cote - 11; j++) {
+        for (var p2 = 0; p2 < 2; p2++) {
+          var horizontal = true, vertical = true;
+          for (var k2 = 0; k2 < 11; k2++) {
+            if (m[i][j + k2] !== motifs[p2][k2]) { horizontal = false; }
+            if (m[j + k2][i] !== motifs[p2][k2]) { vertical = false; }
+          }
+          if (horizontal) { total += 40; }
+          if (vertical) { total += 40; }
+        }
+      }
+    }
+    // Regle 4 : desequilibre entre sombre et clair.
+    var sombres = 0;
+    for (i = 0; i < cote; i++) { for (j = 0; j < cote; j++) { sombres += m[i][j]; } }
+    var pourcent = (sombres * 100) / (cote * cote);
+    total += Math.floor(Math.abs(pourcent - 50) / 5) * 10;
+    return total;
+  }
+
+  function encoderQr(texte) {
+    var octets = octetsUtf8(texte);
+    var version = choisirVersion(octets.length);
+    if (version === null) { return null; }
+    var flot = entrelacer(motsDeCode(octets, version), version);
+    var cote = 21 + 4 * (version - 1);
+
+    var meilleur = null, meilleurScore = Infinity;
+    for (var numero = 0; numero < 8; numero++) {
+      var grille = matriceVide(cote);
+      poserMotifs(grille, version);
+      poserDonnees(grille, flot);
+      for (var i = 0; i < cote; i++) {
+        for (var j = 0; j < cote; j++) {
+          if (!grille.reserve[i][j] && masque(numero, i, j)) { grille.m[i][j] ^= 1; }
+        }
+      }
+      poserFormat(grille, numero);
+      var score = penalite(grille.m);
+      if (score < meilleurScore) { meilleurScore = score; meilleur = grille.m; }
+    }
+    return { cote: cote, modules: meilleur };
+  }
+
+  // SUBSTITUÉES AU DÉPLOIEMENT par build-site.sh, jamais portées par le
+  // lien. Aucun lien émis ne devient caduc quand ces valeurs changent :
+  // c'est la propriété qui justifie la configuration plutôt qu'un lien par
+  // environnement.
+  //
+  // `androidApk` EST LE CHEMIN D'AVANT LA PUBLICATION. La première personne
+  // qui essaie l'application doit pouvoir l'obtenir alors qu'aucun magasin
+  // ne la porte encore ; sans ce troisième emplacement la page ne sait dire
+  // que « demandez à la personne qui vous a invité », ce qui est honnête et
+  // inutile. build-site.sh ne le remplit que lorsqu'un fichier est
+  // effectivement publié à cette adresse.
+  var DESTINATIONS = {
+    ios: '',
+    android: '',
+    androidApk: ''
+  };
+
+  // LA PHRASE D'ATTENTE NOMME LA PLATEFORME, ET ELLE A DU L'APPRENDRE.
+  //
+  // Elle disait « L'application n'est pas encore publiée » a tout le monde.
+  // C'etait vrai le jour ou elle a ete ecrite, et faux a partir du 18 aout
+  // 2026 a 10 h, quand l'APK est parti sur messagr.eu : l'application est
+  // publiee, sur Android. Le porteur a scanne une invitation avec un iPhone
+  // ce soir-la et a lu qu'elle ne l'etait nulle part.
+  //
+  // Une phrase qui ne nomme pas la plateforme ne peut pas rester vraie quand
+  // les deux plateformes divergent. Celle-ci nomme la sienne, et ajoute
+  // l'autre voie quand elle existe, parce que le lecteur a peut-etre un
+  // second appareil et que rien d'autre ne le lui dira.
+  function attentePour(plateforme) {
+    var phrase = plateforme === 'ios'
+      ? mot('attenteIos', "Messagr n'est pas encore disponible sur iPhone.")
+      : mot('attenteAutre', "L'application n'est pas encore publiée.");
+    if (plateforme === 'ios' && (DESTINATIONS.android || DESTINATIONS.androidApk)) {
+      phrase += mot('maisAndroid', " Elle l'est sur Android.");
+    }
+    return phrase + mot('demandez', " Demandez à la personne qui vous a " +
+      "invité comment l'obtenir.");
+  }
+
+  // UN SEUL ENDROIT DÉCIDE entre un lien et la phrase d'attente, et les deux
+  // branches s'excluent parce qu'elles sont les deux moitiés d'un `if`. La
+  // page ne peut donc pas offrir une adresse tout en disant qu'il n'y en a
+  // pas — ce n'est pas une relecture, c'est la forme du code.
+  // deploy/messagr-eu/tests/destinations-page-invitation.js le mesure sur la
+  // page CONSTRUITE, pour chaque configuration.
+  function montrer(id, texte, url, avertissement) {
+    var noeud = document.getElementById(id);
+    if (!noeud) { return; }
+    if (url) {
+      // `createElement` et `textContent`, jamais `innerHTML` : rien de ce
+      // qui vient de la configuration ne peut devenir du balisage.
+      var lien = document.createElement('a');
+      lien.href = url;
+      lien.textContent = texte;
+      noeud.appendChild(lien);
+      if (avertissement) {
+        var note = document.getElementById(avertissement);
+        if (note) { note.hidden = false; }
+      }
+    } else {
+      noeud.textContent = attentePour(id === 'dest-ios' ? 'ios' : 'android');
+    }
+    noeud.hidden = false;
+  }
+
+  var ua = navigator.userAgent || '';
+  // iPadOS se déclare Macintosh depuis iOS 13 ; le tactile le trahit.
+  var estIOS = /iPhone|iPod/.test(ua) ||
+    (/Macintosh/.test(ua) && navigator.maxTouchPoints > 1);
+  var estAndroid = /Android/.test(ua);
+
+  if (estIOS) {
+    // PAS DE FICHIER SUR IOS. Il n'y a pas d'installation hors magasin sur
+    // iPhone ; en proposer une serait le même mensonge dans l'autre sens.
+    // Un accès anticipé y passe par TestFlight, qui est une adresse comme
+    // une autre et tient dans `ios`.
+    montrer('dest-ios', mot('ios', 'Installer Messagr pour iPhone'),
+            DESTINATIONS.ios);
+  } else if (estAndroid) {
+    // LE MAGASIN D'ABORD, LE FICHIER ENSUITE. Le jour où l'application est
+    // publiée, le magasin met à jour, vérifie la signature et survit au
+    // changement d'appareil ; le fichier ne fait rien de tout cela. Il
+    // n'existe que pour la période où le magasin ne répond pas encore.
+    if (DESTINATIONS.android) {
+      montrer('dest-android', mot('android', 'Installer Messagr pour Android'),
+              DESTINATIONS.android);
+    } else {
+      montrer('dest-android', mot('apkLien', 'Télécharger Messagr pour Android'),
+              DESTINATIONS.androidApk, 'apk-avertissement');
+    }
+  } else {
+    var autre = document.getElementById('dest-autre');
+    autre.textContent = mot('ordinateur',
+      "Ouvrez ce lien depuis votre téléphone : Messagr est une application " +
+      "mobile. Scannez ce code :");
+    autre.hidden = false;
+    dessinerQr(location.href);
+  }
+
+  // LE DESSIN SUIT LA MEME REGLE QUE LES COQUILLES : zone de silence de
+  // quatre modules, et chaque module peint un pixel plus large pour qu'aucun
+  // filet clair ne separe deux voisins — un lecteur lirait ces filets comme
+  // des modules clairs.
+  function dessinerQr(lien) {
+    var toile = document.getElementById('qr');
+    if (!toile || !toile.getContext) { return; }
+    var symbole = encoderQr(lien);
+    // Au-dela de la version 20 il n'y a pas de symbole : le canevas reste
+    // cache, et la page garde son texte de repli. Un QR absent vaut mieux
+    // qu'un QR faux.
+    if (!symbole) { return; }
+    var silence = 4;
+    var total = symbole.cote + silence * 2;
+    var echelle = Math.max(1, Math.floor(330 / total));
+    toile.width = total * echelle;
+    toile.height = total * echelle;
+    var ctx = toile.getContext('2d');
+    ctx.fillStyle = '#ffffff';
+    ctx.fillRect(0, 0, toile.width, toile.height);
+    ctx.fillStyle = '#0C1F19';
+    for (var l = 0; l < symbole.cote; l++) {
+      for (var c = 0; c < symbole.cote; c++) {
+        if (!symbole.modules[l][c]) { continue; }
+        ctx.fillRect((c + silence) * echelle, (l + silence) * echelle,
+                     echelle + 1, echelle + 1);
+      }
+    }
+    toile.hidden = false;
+  }
+
+  // LA COPIE EST UN GESTE, JAMAIS UN EFFET DE BORD. Elle existe pour que
+  // l'installation ne fasse pas recommencer : l'application proposera de
+  // coller au premier lancement. Rien n'est déposé sans un clic, et sur iOS
+  // le système demande lui-même l'autorisation — le geste est visible et
+  // consenti plutôt que silencieux.
+  var bouton = document.getElementById('copier');
+  if (bouton && navigator.clipboard) {
+    bouton.hidden = false;
+    bouton.addEventListener('click', function () {
+      navigator.clipboard.writeText(location.href).then(function () {
+        document.getElementById('copie-faite').hidden = false;
+      });
+    });
+  }
+})();
+</script>
+</body>
+</html>

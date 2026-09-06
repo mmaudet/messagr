@@ -121,3 +121,10 @@ export const wakeSecrets = keychainStore('eu.messagr.wake')
  * rather than a flag, so a revision can re-ask -- see `termsAccepted.ts`.
  */
 export const termsSecrets = keychainStore('eu.messagr.terms')
+
+/**
+ * Where this installation keeps its stores. Not a secret, and here because a
+ * headless wake is handed no initial properties and has nowhere else to
+ * learn it -- see `storeDirectory.ts`.
+ */
+export const storeDirectorySecrets = keychainStore('eu.messagr.store-dir')

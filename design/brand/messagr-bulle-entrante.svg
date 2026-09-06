@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 240 96" width="240" height="96">
+  <title>Messagr — bulle entrante, coin plié</title>
+  <desc>Coupe à 45° en haut à gauche, égale au rayon d&#39;angle (20).</desc>
+  <path d="M 20 0 H 220 A 20 20 0 0 1 240 20 V 76 A 20 20 0 0 1 220 96 H 20 A 20 20 0 0 1 0 76 V 20 Z" fill="#FFFFFF" stroke="#E5E5E7" stroke-width="2"></path>
+</svg>

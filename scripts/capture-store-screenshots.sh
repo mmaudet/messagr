@@ -23,21 +23,29 @@ shot() {
 }
 
 # Relaunched rather than photographed where the suite left it: the last test
-# leaves the readout scrolled somewhere arbitrary, and a screenshot should
-# show what opening the application shows.
+# leaves the screen wherever its own gesture did, and a listing should show
+# what opening the application shows.
 adb shell am force-stop eu.messagr
 adb shell am start -n eu.messagr/.MainActivity >/dev/null
 sleep 25
 
-# The conversation sits at the top of the readout, which is what a person
-# opening the application sees first.
+# An account with one room opens into that room, which is what a person
+# arriving by invitation sees first.
 shot 01-conversation
 
-# Then the state below it: what the device proved about itself. Honest for a
-# version distributed to testers, and it will be replaced by a second product
-# screen as soon as there is one.
-adb shell input swipe 540 1600 540 400 400
-sleep 2
-shot 02-etat
+# TWO PRODUCT SCREENS NOW, AND THAT IS #105.
+#
+# The second shot used to scroll down and photograph the diagnostic readout --
+# "what the device proved about itself", honest for a build handed to testers
+# and never right for a store listing. This script's own comment said it would
+# be replaced by a second product screen as soon as there was one. There is.
+#
+# The hardware back key rather than a tap at a coordinate: the application
+# handles it, unwinding one level at a time, so this asks for "the screen
+# behind this one" instead of guessing where a control was drawn. A layout
+# change moves a coordinate and would silently photograph the wrong thing.
+adb shell input keyevent KEYCODE_BACK
+sleep 3
+shot 02-conversations
 
 echo "store screenshots captured"

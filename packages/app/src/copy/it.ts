@@ -199,6 +199,8 @@ export const it: Readonly<Record<CopyKey, string>> = {
   invite_working: 'Creazione della conversazione…',
   invite_ready:
     'Invii questo link a questa persona. Vale un’ora e serve una volta sola.',
+  invite_qr: 'Oppure fagli scansionare questo codice.',
+  invite_qr_label: 'Codice QR del link di invito',
   invite_share: 'Condividere il link',
   invite_close: 'Chiudere',
   invite_failed: 'Non è stato possibile creare l’invito.',
@@ -294,6 +296,23 @@ export const it: Readonly<Record<CopyKey, string>> = {
   community_soon_why:
     'Una comunità raggruppa stanze sotto un oggetto pseudonimo. La scheda è riservata per la stessa ragione di quella delle chiamate: la barra non deve spostarsi quando arriveranno.',
   brand_name: 'Messagr',
+  'plate_more %1$d': '+ %1$d',
+  plate_open: 'Vedere la foto',
+  plate_close: 'Chiudere',
+  'plate_of %1$d %2$d': '%1$d di %2$d',
+  'plate_sending %1$d %2$d': 'Invio %1$d di %2$d…',
+  'plate_partly %1$d': '%1$d foto inviate. Le altre non sono potute partire.',
+  plate_too_many: 'Troppe foto in una volta. Cinquanta al massimo.',
+  composer_emoji: 'Emoji',
+  composer_photo: 'Aggiungere una foto',
+  composer_record: 'Messaggio vocale',
+  composer_record_soon:
+    'I messaggi vocali arrivano in V2. Il pulsante tiene il suo posto perché la barra non si sposti quel giorno.',
+  person_open: 'Su questa persona',
+  person_title: 'Questa persona',
+  person_back: 'Indietro',
+  message_delivered_hint: 'Consegnato al server',
+  message_read_hint: 'Letto',
   settings_wake: 'Notifiche',
   settings_wake_hint:
     'Attive. Ciò che attraversa Google non contiene né mittente, né conversazione, né messaggio: soltanto un segnale di risveglio. Il dispositivo decifra poi da sé, qui. Disattivarle non registra alcun destinatario presso il server: non ha più dove inviare.',
@@ -314,7 +333,6 @@ export const it: Readonly<Record<CopyKey, string>> = {
     'Non è stato possibile aprire questa foto su questo dispositivo.',
   conversation_attach: 'Inviare una foto',
   conversation_attaching: 'Cifratura e invio della foto…',
-  header_no_directory: 'nessun elenco',
   'list_unread %1$d': '%1$d messaggi non letti',
   invite_open: 'Invitare qualcuno',
 }

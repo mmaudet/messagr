@@ -1,0 +1,16 @@
+{
+  "applinks": {
+    "details": [
+      {
+        "appIDs": [
+          "KUT463DS29.eu.messagr"
+        ],
+        "components": [
+          {
+            "/": "/i*"
+          }
+        ]
+      }
+    ]
+  }
+}

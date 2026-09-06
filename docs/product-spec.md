@@ -849,6 +849,50 @@ the frame is drawn at the picture's own proportions rather than as a spinner,
 so the timeline does not reflow as photographs arrive.
 
 
+### 13.24 Several photographs, read as one plate (designed here)
+
+**Matrix has no album event, and this does not invent one.** Each photograph
+is its own `m.image`, which is what every other client reads. What makes
+several read as one thing is a **reading of the timeline**: consecutive
+images, from one sender, within five minutes. An album event would be a shape
+only this application could open, in a protocol whose point is that it is not
+only this application — the same argument §13.22 makes about the attachment
+secret.
+
+**All three conditions, and each earns its place.** One sender, because two
+people posting at once is two plates and merging them attributes one person's
+photographs to the other. Nothing said in between, because a sentence between
+two pictures means they were not one gesture. Within five minutes, because
+consecutive in a timeline is not the same as sent together.
+
+**A plate of one is still a plate**, so a screen has one shape to draw rather
+than two.
+
+**Four tiles, square, and a count on the fourth.** The pictures are not square
+and the tiles are: a grid of differently-shaped tiles is a grid nobody can
+scan, so a tile crops, which is what a thumbnail is for. Beyond four the last
+tile carries `+ N` and opens at the **fifth** — the first photograph it stands
+for, not one already on screen.
+
+**Full screen pages through the whole plate**, not the four that were drawn.
+Somebody who taps the count is asking to see what the count stands for.
+
+**Sent one at a time, never at once.** `encryptAttachment` holds the plaintext
+and the ciphertext together, so thirty concurrent is sixty copies in memory
+and a phone killed by the operating system rather than slowed. Fifty at most,
+and that cap is enforced twice — in the picker and in the send path — because
+a limit enforced in one place is a limit until somebody edits that place.
+
+**A failure stops the run and names the boundary.** Carrying on would send the
+fourth after the third failed, leaving a hole a person cannot see; stopping
+says how many went and how many are still there to send.
+
+**No view-once, and no disappearing media.** The reference for this screen has
+it; this product does not support it and will not pretend to. A control
+promising a photograph would vanish, on a protocol with no such guarantee,
+would be the worst kind of lie this product can tell.
+
+
 ### 13.23 The first launch: a language, then an acceptance (designed here)
 
 Two gates, in that order, before anything else happens.
@@ -993,3 +1037,134 @@ This version integrates:
 - the cross-cutting decisions on groups (pseudonymous community, capability links, client-signed roles, anonymous channel), anonymity (identity/discovery split, metadata minimization, explicit recovery choice), encryption (product positioning, MLS target for communities), and inter-instance federation (UX invisibility + explicit Product API handling, multi-instance topology, health, cross-instance tests).
 
 The standalone formalization document is no longer the source of truth for this portion and remains only as a migration note.
+
+### 13.25 An invitation is a picture as well as a link (designed here)
+
+**Beside the link, never instead of it.** The invitation screen draws the
+link as a QR code under the link itself. The two people an invitation
+matters most for are the ones standing next to each other — which, in a
+product entered only by invitation, is the ordinary case rather than an
+edge one — and a camera is the gesture for that. But the link stays
+readable and selectable: reading it aloud is the path that has to work when
+a camera does not, and it is the only path for somebody with one phone.
+
+**The symbol is the same one the website draws.** `messagr.eu/i/<token>`
+has drawn a QR since before the application could, for the desktop case
+— *« Ouvrez ce lien depuis votre téléphone… Scannez ce code »*. Its
+encoder exists because that page's content security policy forbids an
+external script. The application's encoder is a port of it rather than a
+package: one encoder rather than two is what the page's own note asks for,
+since a symbol written at one error-correction level and read at another
+is not the same symbol.
+
+**Level M, byte mode, versions 1 to 20.** The level is a constant shared
+with the page and not a setting. Twenty versions cover an invitation link
+with room to spare and stop short of the versions whose modules are finer
+than a phone screen draws honestly.
+
+**The encoder is verified by decoding, not by looking.** The website's copy
+is checked by eye, which catches a symbol that is obviously wrong and
+passes one that is subtly wrong — and a subtly wrong QR is one that simply
+does not scan, with nothing on screen to say so. In the application, the
+tests paint the symbol into pixels and read it back the way a camera would,
+including the SVG path a screen is actually given, so an off-by-one in the
+drawing fails a test rather than a person.
+
+**The quiet zone is part of the symbol.** Four modules of light on every
+side, inside the drawing rather than around the component, so no layout can
+take it away. A symbol flush against a coloured screen does not scan, and
+nothing on screen says why.
+
+**A symbol that cannot be drawn draws nothing.** Not an empty frame, which
+reads as a broken code. The link is still there, which is the path that has
+to keep working.
+
+**Scanning is the other half and is not settled here.** An application
+entered only by invitation has nowhere obvious to put a camera before
+entry: there is no account yet, and the only screen before one is the
+promise — whose own rule (§13.23) is that it asks for nothing. A camera
+permission is asking for something. That is a decision about the promise
+screen's meaning, not a placement detail, and it is recorded as open rather
+than defaulted.
+
+### 13.26 Naming the sender, and when silence is honest (designed here)
+
+**A message names who it claims to be from, unless the answer is
+obvious.** Decrypting an event proves which key wrote it and nothing
+about who holds that key, so the word is always *claims* — « Se présente
+comme » — and never an established identity.
+
+It is obvious in exactly one case: a conversation with two people, where
+a message that is not this account's own is the other person's, and the
+header already names them. Spelling out a full Matrix identifier above
+every message there teaches nobody anything and breaks the density
+screen 21 is the reference for.
+
+**It stops being obvious at three.** The first version of this rule
+named the sender only when they were *not* the expected other party —
+which, in a room without exactly two people, is never: every message
+unattributed, and no way to tell who wrote what. The rule is the other
+way round. The sender is named unless the conversation has exactly one
+other person and the message is theirs.
+
+That case is what `theOtherMember` answers: exactly one other member, or
+nothing. A conversation with three people is not a conversation with
+somebody, and the product should not pretend it knows which of them is
+speaking.
+
+### 13.27 The frame, and where the instrument went (designed here)
+
+**One scroll container per screen, and a new one each time.** Nothing in
+the product scrolls inside something that scrolls: no screen carries a
+scroll of its own, so the frame carries it for whichever is showing. A
+single shared container keeps its offset across whatever is rendered into
+it — leaving a long conversation for Réglages arrived scrolled into the
+middle of a short screen, and returning to the conversation arrived
+wherever Réglages had been. The container is keyed on what it shows, so
+each screen gets its own.
+
+**A conversation rests at its newest message.** It opened at its oldest
+and never moved, so a message somebody sent landed below the fold and the
+answer to "did it send?" was a scroll. Every messenger opens at the
+newest.
+
+The second half of that rule is the whole of it: following the newest on
+every content change would be a different defect, since a message
+arriving while somebody reads history would pull them back down. The
+frame follows only for somebody already resting within a message's height
+of the end.
+
+**The diagnostic readout is gone, and the log is not.** The application's
+screen carried a readout — New Architecture, Runtime gaps, Matrix
+transport, Entry, Session sync, Crypto bridge, Crypto pump, Encrypted
+send, Received, Brand geometry, Live sync, Given names, Keystore form —
+with the product's screens rendered into it as they were built. It *was*
+the application before there were screens. Nobody installing Messagr
+should ever have seen it.
+
+Every `logEvent` call stays. The readout was the dashboard; the log is
+the instrument, and it is the half that found the defects — an emulator
+with no network once reported thirteen crypto assertions failing for no
+stated reason, and the only account of what was really wrong was the
+application's own. Removing the log to remove the readout would have been
+removing the instrument to remove the dashboard.
+
+**No diagnostic text appears on any screen a person can reach**, and that
+includes fallbacks. A history claim that failed for a reason with no copy
+used to render `kind: reason` under the conversation — a diagnostic
+string, in French text, on a screen a person reads. The two cases
+somebody can act on say so; the rest are silent and are in the launch
+report.
+
+**The end-to-end suite reads that log rather than the screen.** Thirty-one
+assertions matched rendered sentences, so each was really an assertion
+about scroll position, and five continuous-integration failures were paid
+for it — every one of them correct behaviour reported as a product
+failure. A line of structured JSON cannot be scrolled off, cannot be
+truncated by a layout, and says the same thing whatever the screens
+become.
+
+Three assertions stay on the screen, and they are the right three: typing
+a message and seeing it arrive, a conversation being open and writable,
+and « Se présente comme » — the claim the product makes to a person about
+a sender it cannot authenticate. Nothing in a log can stand in for those.

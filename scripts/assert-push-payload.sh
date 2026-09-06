@@ -41,7 +41,7 @@ else
   kept="$(sed -n '/^pub fn strip/,/^}/p' "$GATEWAY" | grep -o '"[a-z_]*":' | tr -d '":' | sort -u | tr '\n' ' ')"
   # `notification` is the envelope the push gateway API defines, not a field
   # about a message. The other four are what goes inside it.
-  expected="app_id devices notification prio pushkey "
+  expected="app_id devices event_id notification prio pushkey "
   if [ "$kept" = "$expected" ]; then
     say_ok "the gateway forwards only: $kept"
   else
@@ -49,11 +49,27 @@ else
     say_bad "if that change is intended, the policy page has to change with it"
   fi
 
-  for leaked in event_id room_id sender content room_name membership; do
+  for leaked in room_id sender content room_name membership type; do
     if sed -n '/^pub fn strip/,/^}/p' "$GATEWAY" | grep -q "\"$leaked\""; then
       say_bad "the gateway forwards $leaked, which the page says it does not"
     fi
   done
+
+  # `event_id` IS forwarded, and the whole question is which one.
+  #
+  # Sygnal discards a notification carrying no room id, no event id and no
+  # counts -- measured against the real deployment, where it answered 200 and
+  # sent nothing. So a value has to be there, and it is a random one. Passing
+  # the real event id instead would be the leak this gateway exists to
+  # prevent, and it is a one-word edit away.
+  if sed -n '/^pub fn strip/,/^}/p' "$GATEWAY" | grep -q 'meaningless_id()'; then
+    say_ok "the event id sent is generated, not the message's"
+  else
+    say_bad "the gateway's event id is no longer a generated one"
+  fi
+  if sed -n '/^pub fn strip/,/^}/p' "$GATEWAY" | grep -q 'notification.event_id'; then
+    say_bad "the gateway reads the real event id, which must never leave"
+  fi
 fi
 
 # ── What the page says, in the repository and live ────────────────────────
@@ -79,7 +95,8 @@ refute_text() {
 }
 
 MUST_SAY_1="ni expéditeur, ni conversation, ni message"
-MUST_SAY_2="l'identifiant technique de votre appareil, et une priorité de remise"
+MUST_SAY_2="l'identifiant technique de votre appareil, une priorité de remise, et un nombre tiré au hasard"
+MUST_SAY_3="tiré au hasard à chaque envoi, sans aucun rapport avec le message"
 MUST_NOT_SAY="il n'existe aucun tiers dans cette application"
 
 source_text="$(cat "$PAGE_SOURCE" 2>/dev/null || true)"
@@ -88,6 +105,7 @@ if [ -z "$source_text" ]; then
 else
   check_text "the page in the repository" "$source_text" "$MUST_SAY_1"
   check_text "the page in the repository" "$source_text" "$MUST_SAY_2"
+  check_text "the page in the repository" "$source_text" "$MUST_SAY_3"
   refute_text "the page in the repository" "$source_text" "$MUST_NOT_SAY"
 fi
 
@@ -108,7 +126,7 @@ if [ -z "$live_text" ]; then
   printf '  SKIP  the live page could not be read at %s\n' "$PAGE"
 else
   behind=0
-  for phrase in "$MUST_SAY_1" "$MUST_SAY_2"; do
+  for phrase in "$MUST_SAY_1" "$MUST_SAY_2" "$MUST_SAY_3"; do
     printf '%s' "$live_text" | tr -s ' \n' ' ' | grep -qF "$phrase" || behind=1
   done
   printf '%s' "$live_text" | tr -s ' \n' ' ' | grep -qF "$MUST_NOT_SAY" && behind=1

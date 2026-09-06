@@ -9,7 +9,13 @@ import {
 } from 'react-native'
 import Svg, { Path } from 'react-native-svg'
 
-import { color, floors, space, type as typeScale } from '../design/tokens'
+import {
+  color,
+  floors,
+  space,
+  stroke,
+  type as typeScale,
+} from '../design/tokens'
 import { notchedRectPath, notchLegFor } from './notchGeometry'
 
 /**
@@ -56,6 +62,24 @@ export interface NotchedButtonProps {
    * rather than only in a unit test.
    */
   readonly onGeometry?: (geometry: { height: number; leg: number }) => void
+  /**
+   * What the button is, in the palette's own vocabulary.
+   *
+   * `brand` is `green500`, whose token reads *« Humain et vérifié. Action
+   * principale, accusé de lecture, marque. »* — so it is the principal action
+   * and nothing else.
+   *
+   * `measure` is `deny.500`: *« Action de mesure. Jamais un avertissement. »*
+   * Removing somebody from a conversation is a measure. It was green until
+   * this existed, which said the wrong thing twice over: it spent the colour
+   * reserved for a verified human on taking one away.
+   *
+   * `quiet` carries no fill and a border instead. It exists so a refusal can
+   * be a button of the same rank as the thing it refuses — see `Vouch` and
+   * `Evict`, and the prototype's own rule for the verification screen:
+   * *« Le refus est un bouton de même rang que l'acceptation. »*
+   */
+  readonly tone?: 'brand' | 'measure' | 'quiet'
 }
 
 export function NotchedButton({
@@ -64,6 +88,7 @@ export function NotchedButton({
   onPress,
   testID,
   onGeometry,
+  tone = 'brand',
 }: NotchedButtonProps) {
   const [size, setSize] = useState<{ width: number; height: number } | null>(
     null,
@@ -97,7 +122,15 @@ export function NotchedButton({
                 size.height,
                 notchLegFor(size.height),
               )}
-              fill={palette.brand.green500}
+              fill={
+                tone === 'measure'
+                  ? palette.deny['500']
+                  : tone === 'quiet'
+                    ? 'transparent'
+                    : palette.brand.green500
+              }
+              stroke={tone === 'quiet' ? palette.neutral['300'] : undefined}
+              strokeWidth={tone === 'quiet' ? stroke.base : undefined}
             />
           </Svg>
         </View>
@@ -109,7 +142,18 @@ export function NotchedButton({
           about 2:1, which fails the AA threshold for text, while ink on the
           same green is comfortably above it. The mockup's choice was the
           accessible one and this was not. */}
-      <Text style={[styles.label, { color: palette.brand.ink900 }]}>
+      {/* The label's colour follows the fill. Ink on green and on the
+          measure red -- both are light enough that paper would fail AA, which
+          `NotchedButton` learned the hard way -- and the neutral ink on the
+          quiet one, which has no fill at all. */}
+      <Text
+        style={[
+          styles.label,
+          {
+            color:
+              tone === 'quiet' ? palette.neutral['900'] : palette.brand.ink900,
+          },
+        ]}>
         {label}
       </Text>
     </Pressable>

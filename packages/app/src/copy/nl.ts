@@ -200,6 +200,8 @@ export const nl: Readonly<Record<CopyKey, string>> = {
   invite_working: 'Het gesprek wordt aangemaakt…',
   invite_ready:
     'Stuur deze link naar die persoon. Hij is een uur geldig en werkt één keer.',
+  invite_qr: 'Of laat deze code scannen.',
+  invite_qr_label: 'QR-code van de uitnodigingslink',
   invite_share: 'De link delen',
   invite_close: 'Sluiten',
   invite_failed: 'De uitnodiging kon niet worden aangemaakt.',
@@ -295,6 +297,23 @@ export const nl: Readonly<Record<CopyKey, string>> = {
   community_soon_why:
     'Een gemeenschap groepeert kamers onder een pseudoniem object. Het tabblad is gereserveerd om dezelfde reden als dat van de oproepen: de balk mag niet verschuiven wanneer ze er zijn.',
   brand_name: 'Messagr',
+  'plate_more %1$d': '+ %1$d',
+  plate_open: 'Foto bekijken',
+  plate_close: 'Sluiten',
+  'plate_of %1$d %2$d': '%1$d van %2$d',
+  'plate_sending %1$d %2$d': '%1$d van %2$d wordt verstuurd…',
+  'plate_partly %1$d': '%1$d foto’s verstuurd. De rest kon niet weg.',
+  plate_too_many: 'Te veel foto’s tegelijk. Hooguit vijftig.',
+  composer_emoji: 'Emoji',
+  composer_photo: 'Een foto toevoegen',
+  composer_record: 'Spraakbericht',
+  composer_record_soon:
+    'Spraakberichten komen in V2. De knop houdt zijn plek zodat de balk die dag niet verschuift.',
+  person_open: 'Over deze persoon',
+  person_title: 'Deze persoon',
+  person_back: 'Terug',
+  message_delivered_hint: 'Aan de server afgegeven',
+  message_read_hint: 'Gelezen',
   settings_wake: 'Meldingen',
   settings_wake_hint:
     'Aan. Wat Google passeert bevat geen afzender, geen gesprek en geen bericht: alleen een wekseintje. Het apparaat ontsleutelt daarna zelf, hier. Ze uitzetten registreert geen ontvanger bij de server: hij heeft nergens meer heen te sturen.',
@@ -314,7 +333,6 @@ export const nl: Readonly<Record<CopyKey, string>> = {
   image_unreadable: 'Deze foto kon op dit apparaat niet worden geopend.',
   conversation_attach: 'Een foto versturen',
   conversation_attaching: 'De foto wordt versleuteld en verstuurd…',
-  header_no_directory: 'geen adresboek',
   'list_unread %1$d': '%1$d ongelezen berichten',
   invite_open: 'Iemand uitnodigen',
 }

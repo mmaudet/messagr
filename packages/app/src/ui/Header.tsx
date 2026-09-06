@@ -2,7 +2,7 @@ import React from 'react'
 import { StatusBar, StyleSheet, Text, View } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 
-import { t, type CopyKey } from '../copy'
+import { t } from '../copy'
 import { color, layout, space, type } from '../design/tokens'
 import { BrandMark } from './BrandMark'
 
@@ -18,17 +18,13 @@ import { BrandMark } from './BrandMark'
  * that difference. Putting a title here would waste it; the screen below
  * already says which screen it is.
  *
- * # What it says, and what the mockup said that this does not
+ * # It carried "aucun annuaire", and no longer does
  *
- * *« aucun annuaire »* — that no directory exists, which is the product's
- * single most consequential fact and the one nobody would guess. The mockup
- * suffixes it with a phase marker; that marker is a reference to the
- * specification for whoever is reading the mockup, and it is not something to
- * put on the screen of somebody reading their own messages.
- *
- * The mono role, because it is a machine fact about this instance and not a
- * sentence addressed to anybody — the same distinction `ConversationList`
- * draws between a name and an identifier.
+ * That no directory exists is the product's most consequential fact, and the
+ * mockup puts it here. It is also said, in full and in a sentence somebody
+ * can read, directly under the conversation list — and saying it twice on one
+ * screen is how a thing stops being read at all. Removed at the account
+ * holder's request, with `list_no_directory` left carrying it.
  *
  * # It owns the top inset, and the status bar with it
  *
@@ -44,14 +40,7 @@ import { BrandMark } from './BrandMark'
  * `TabBar` at the other edge — whatever sits on an edge paints to it.
  */
 
-export function Header({
-  state = 'header_no_directory',
-  testID = 'header',
-}: {
-  /** What this instance is, in the mono role. */
-  readonly state?: CopyKey
-  readonly testID?: string
-}) {
+export function Header({ testID = 'header' }: { readonly testID?: string }) {
   return (
     <SafeAreaView edges={['top']} style={styles.band} testID={testID}>
       {/* No `backgroundColor`: React Native 0.87 dropped it, because
@@ -63,9 +52,6 @@ export function Header({
         <BrandMark size={space.xl} tint={color.surface.paper} />
         <Text style={styles.wordmark}>{t('brand_name')}</Text>
       </View>
-      <Text style={styles.state} testID={`${testID}-state`}>
-        {t(state)}
-      </Text>
     </SafeAreaView>
   )
 }
@@ -74,8 +60,11 @@ const styles = StyleSheet.create({
   band: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
-    backgroundColor: color.brand.ink900,
+    // `green900`, not `ink900`. The band was near-black -- reported from a
+    // device -- and `ink900`'s own token says what it is for: the ground of
+    // security boundaries, which is the promise screen and not a title bar.
+    // A band that is meant to read as the brand should read as the brand.
+    backgroundColor: color.brand.green900,
     paddingHorizontal: layout.screenGutter,
     paddingVertical: space.m,
     gap: space.m,
@@ -88,11 +77,5 @@ const styles = StyleSheet.create({
   wordmark: {
     ...type.titleMd,
     color: color.surface.paper,
-  },
-  state: {
-    ...type.monoLabel,
-    // Not the paper white: this is a fact about the instance, subordinate to
-    // the mark beside it, and equal weight would make them read as one label.
-    color: color.agent['400'],
   },
 })

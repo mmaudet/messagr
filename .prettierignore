@@ -13,3 +13,18 @@ spikes/**/target/
 spikes/**/gen/
 
 services/**/target/
+
+# THE SITE IS NOT FORMATTED, AND THAT IS DELIBERATE.
+#
+# `site/i/index.html` holds a security property in its exact content: its
+# response must be byte-identical for every token, and its content security
+# policy and inline script are read by `tests/doctrine-page-invitation.sh`
+# and `tests/qr-page-invitation.js` with regular expressions. Reformatting a
+# page whose bytes are the thing being asserted is a large diff across the
+# one file where a large diff is hardest to review.
+#
+# The tests beside it are ES5 for a browser and for Node without a build --
+# `var`, `'use strict'`, no modules. They are written that way on purpose and
+# are not this repository's TypeScript.
+deploy/messagr-eu/site/
+deploy/messagr-eu/tests/

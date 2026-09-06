@@ -4,7 +4,7 @@
 // `yarn tokens:check`, so a stale copy of this file fails the build rather
 // than drifting quietly away from the design it claims to carry.
 //
-// Source: Messagr Prototype V3.dc.html, tokens v3.2.0
+// Source: Messagr Prototype V3.dc.html, tokens v3.4.0
 
 /**
  * The spacing scale. Every margin, padding and gap comes from here.
@@ -26,6 +26,8 @@ export const space = {
 export const color = {
   brand: {
     green500: '#12b76a', // Humain et vérifié. Action principale, accusé de lecture, marque.
+    green200: '#d4f0e0', // Bulle sortante. Plus saturé que green100, qui est une teinte d'étiquette : un message n'est pas une étiquette, et au-dessous de cette saturation il ne se lit plus comme vert.
+    green900: '#0a5c3c', // Fond de bandeau applicatif. Vert sombre et non presque noir : ink900 est le fond des frontières de sécurité et le garde. 7,4:1 sous surface.paper.
     green700: '#0e8f63', // Même sémantique sur fond clair : texte, bordure, lien.
     green100: '#eef8f2', // Surface vérifiée : fond d'étiquette, bulle sortante claire.
     ink900: '#0c1f19', // Fond des frontières de sécurité, texte fort.
@@ -63,6 +65,8 @@ export const color = {
   dark: {
     brand: {
       green500: '#2fd48a', // Action principale, marque. Remonté en clarté pour tenir sur fond sombre.
+      green200: '#123a2c', // Bulle sortante en sombre : la même place dans la hiérarchie, à l'envers.
+      green900: '#083524', // Fond de bandeau en sombre : plus foncé que green900 clair, pour rester distinct de surface.paper sombre.
       green700: '#54dfa0', // Rôle « texte et bordure » : sur sombre, il est plus clair que green500, pas plus foncé.
       green100: '#10281f', // Surface vérifiée.
       ink900: '#05100d', // Fond des frontières de sécurité : reste distinct de surface.paper en sombre.
@@ -144,6 +148,11 @@ export const type = {
     fontSize: 17,
     lineHeight: 22,
     fontWeight: '600',
+  },
+  titleMono: {
+    fontSize: 17,
+    lineHeight: 23,
+    fontWeight: '400',
   },
   body: {
     fontSize: 14.5,

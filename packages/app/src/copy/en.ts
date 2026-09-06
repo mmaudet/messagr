@@ -204,6 +204,8 @@ export const en: Readonly<Record<CopyKey, string>> = {
   invite_working: 'Creating the conversation…',
   invite_ready:
     'Send this link to them. It is valid for an hour and works once.',
+  invite_qr: 'Or let them scan this code.',
+  invite_qr_label: 'QR code of the invitation link',
   invite_share: 'Share the link',
   invite_close: 'Close',
   invite_failed: 'The invitation could not be created.',
@@ -298,6 +300,23 @@ export const en: Readonly<Record<CopyKey, string>> = {
   community_soon_why:
     'A community groups rooms under a pseudonymous object. The tab is held for the same reason as the calls one: the bar must not move when they arrive.',
   brand_name: 'Messagr',
+  'plate_more %1$d': '+ %1$d',
+  plate_open: 'View photo',
+  plate_close: 'Close',
+  'plate_of %1$d %2$d': '%1$d of %2$d',
+  'plate_sending %1$d %2$d': 'Sending %1$d of %2$d…',
+  'plate_partly %1$d': '%1$d photos sent. The rest could not go.',
+  plate_too_many: 'Too many photos at once. Fifty at most.',
+  composer_emoji: 'Emoji',
+  composer_photo: 'Add a photo',
+  composer_record: 'Voice message',
+  composer_record_soon:
+    'Voice messages arrive in V2. The button holds its place so the bar does not move that day.',
+  person_open: 'About this person',
+  person_title: 'This person',
+  person_back: 'Back',
+  message_delivered_hint: 'Handed to the server',
+  message_read_hint: 'Read',
   settings_wake: 'Notifications',
   settings_wake_hint:
     'On. What crosses Google contains no sender, no conversation and no message: only a wake-up signal. The device then decrypts here, itself. Turning them off registers no recipient with the server: it has nowhere left to send.',
@@ -317,7 +336,6 @@ export const en: Readonly<Record<CopyKey, string>> = {
   image_unreadable: 'This photo could not be opened on this device.',
   conversation_attach: 'Send a photo',
   conversation_attaching: 'Encrypting and sending the photo…',
-  header_no_directory: 'no directory',
   'list_unread %1$d': '%1$d unread messages',
   invite_open: 'Invite someone',
 }

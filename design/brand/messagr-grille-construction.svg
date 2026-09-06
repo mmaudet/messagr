@@ -1,0 +1,42 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="-14 -14 128 128" width="640" height="640">
+  <title>Messagr — grille de construction du signe</title>
+  <desc>Grille de 100 unités. Carré porteur 76 u, rayon 18 u, entaille 12 u à 45° depuis x = 54 u.</desc>
+  <rect x="-14" y="-14" width="128" height="128" fill="#F2FBF6"></rect>
+  <g>
+    <line x1="0" y1="0" x2="0" y2="100" stroke="#12B76A" stroke-opacity="0.18" stroke-width="0.4"></line>
+    <line x1="0" y1="0" x2="100" y2="0" stroke="#12B76A" stroke-opacity="0.18" stroke-width="0.4"></line>
+    <line x1="10" y1="0" x2="10" y2="100" stroke="#12B76A" stroke-opacity="0.18" stroke-width="0.4"></line>
+    <line x1="0" y1="10" x2="100" y2="10" stroke="#12B76A" stroke-opacity="0.18" stroke-width="0.4"></line>
+    <line x1="20" y1="0" x2="20" y2="100" stroke="#12B76A" stroke-opacity="0.18" stroke-width="0.4"></line>
+    <line x1="0" y1="20" x2="100" y2="20" stroke="#12B76A" stroke-opacity="0.18" stroke-width="0.4"></line>
+    <line x1="30" y1="0" x2="30" y2="100" stroke="#12B76A" stroke-opacity="0.18" stroke-width="0.4"></line>
+    <line x1="0" y1="30" x2="100" y2="30" stroke="#12B76A" stroke-opacity="0.18" stroke-width="0.4"></line>
+    <line x1="40" y1="0" x2="40" y2="100" stroke="#12B76A" stroke-opacity="0.18" stroke-width="0.4"></line>
+    <line x1="0" y1="40" x2="100" y2="40" stroke="#12B76A" stroke-opacity="0.18" stroke-width="0.4"></line>
+    <line x1="50" y1="0" x2="50" y2="100" stroke="#12B76A" stroke-opacity="0.18" stroke-width="0.4"></line>
+    <line x1="0" y1="50" x2="100" y2="50" stroke="#12B76A" stroke-opacity="0.18" stroke-width="0.4"></line>
+    <line x1="60" y1="0" x2="60" y2="100" stroke="#12B76A" stroke-opacity="0.18" stroke-width="0.4"></line>
+    <line x1="0" y1="60" x2="100" y2="60" stroke="#12B76A" stroke-opacity="0.18" stroke-width="0.4"></line>
+    <line x1="70" y1="0" x2="70" y2="100" stroke="#12B76A" stroke-opacity="0.18" stroke-width="0.4"></line>
+    <line x1="0" y1="70" x2="100" y2="70" stroke="#12B76A" stroke-opacity="0.18" stroke-width="0.4"></line>
+    <line x1="80" y1="0" x2="80" y2="100" stroke="#12B76A" stroke-opacity="0.18" stroke-width="0.4"></line>
+    <line x1="0" y1="80" x2="100" y2="80" stroke="#12B76A" stroke-opacity="0.18" stroke-width="0.4"></line>
+    <line x1="90" y1="0" x2="90" y2="100" stroke="#12B76A" stroke-opacity="0.18" stroke-width="0.4"></line>
+    <line x1="0" y1="90" x2="100" y2="90" stroke="#12B76A" stroke-opacity="0.18" stroke-width="0.4"></line>
+    <line x1="100" y1="0" x2="100" y2="100" stroke="#12B76A" stroke-opacity="0.18" stroke-width="0.4"></line>
+    <line x1="0" y1="100" x2="100" y2="100" stroke="#12B76A" stroke-opacity="0.18" stroke-width="0.4"></line>
+  </g>
+  <rect x="12" y="12" width="76" height="76" fill="none" stroke="#06614A" stroke-opacity="0.5" stroke-width="0.5" stroke-dasharray="2 2"></rect>
+  <path d="M 30 12 H 70 A 18 18 0 0 1 88 30 V 70 A 18 18 0 0 1 70 88 H 30 A 18 18 0 0 1 12 70 V 30 A 18 18 0 0 1 30 12 Z M 54 12 L 88 46 L 88 58 L 42 12 Z" fill="#12B76A" fill-rule="evenodd"></path>
+  <g font-family="monospace" font-size="4" fill="#06614A">
+    <text x="12" y="8">carré porteur 76 u</text>
+    <text x="12" y="97">rayon d&#39;angle 18 u</text>
+    <text x="56" y="8">entaille 12 u · 45°</text>
+    <text x="56" y="97">départ x = 54 u</text>
+  </g>
+  <g stroke="#06614A" stroke-width="0.4">
+    <line x1="12" y1="93" x2="88" y2="93"></line>
+    <line x1="12" y1="91.5" x2="12" y2="94.5"></line>
+    <line x1="88" y1="91.5" x2="88" y2="94.5"></line>
+  </g>
+</svg>

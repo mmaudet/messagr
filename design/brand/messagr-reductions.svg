@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 260 80" width="1040" height="320">
+  <title>Messagr — réductions de contrôle</title>
+  <g fill="#0C1F19" fill-rule="evenodd">
+    <g transform="translate(8 8) scale(0.64)"><path d="M 30 12 H 70 A 18 18 0 0 1 88 30 V 70 A 18 18 0 0 1 70 88 H 30 A 18 18 0 0 1 12 70 V 30 A 18 18 0 0 1 30 12 Z M 54 12 L 88 46 L 88 58 L 42 12 Z"></path></g>
+    <g transform="translate(84 20) scale(0.42)"><path d="M 30 12 H 70 A 18 18 0 0 1 88 30 V 70 A 18 18 0 0 1 70 88 H 30 A 18 18 0 0 1 12 70 V 30 A 18 18 0 0 1 30 12 Z M 54 12 L 88 46 L 88 58 L 42 12 Z"></path></g>
+    <g transform="translate(136 28) scale(0.32)"><path d="M 30 12 H 70 A 18 18 0 0 1 88 30 V 70 A 18 18 0 0 1 70 88 H 30 A 18 18 0 0 1 12 70 V 30 A 18 18 0 0 1 30 12 Z M 54 12 L 88 46 L 88 58 L 42 12 Z"></path></g>
+    <g transform="translate(176 34) scale(0.21)"><path d="M 30 12 H 70 A 18 18 0 0 1 88 30 V 70 A 18 18 0 0 1 70 88 H 30 A 18 18 0 0 1 12 70 V 30 A 18 18 0 0 1 30 12 Z M 54 12 L 88 46 L 88 58 L 42 12 Z"></path></g>
+  </g>
+  <g font-family="monospace" font-size="5" fill="#6B665C">
+    <text x="8" y="76">64 px</text>
+    <text x="84" y="76">42 px</text>
+    <text x="136" y="76">32 px</text>
+    <text x="176" y="76">21 px</text>
+  </g>
+</svg>
