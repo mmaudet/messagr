@@ -31,9 +31,16 @@ import { color, floors, layout, space, stroke, type } from '../design/tokens'
 export function Settings({
   onBack,
   onLegal,
+  receipts,
+  onReceipts,
+  receiptsNotKept,
 }: {
   readonly onBack: () => void
   readonly onLegal: () => void
+  readonly receipts: boolean
+  readonly onReceipts: (on: boolean) => void
+  /** `true` when the last change could not be kept. */
+  readonly receiptsNotKept: boolean
 }) {
   return (
     <View style={styles.screen} testID="settings">
@@ -55,6 +62,28 @@ export function Settings({
         style={styles.row}>
         <Text style={styles.rowLabel}>{t('settings_legal')}</Text>
       </Pressable>
+
+      {/* The one setting this lot's own features need. Its hint says what
+          turning it on costs rather than what it does: everybody knows what a
+          read receipt does, and nobody is told who else finds out. */}
+      <View style={styles.setting} testID="setting-receipts">
+        <Pressable
+          testID="toggle-receipts"
+          onPress={() => onReceipts(!receipts)}
+          accessibilityRole="switch"
+          accessibilityState={{ checked: receipts }}
+          accessibilityLabel={t('settings_receipts')}
+          style={styles.row}>
+          <Text style={styles.rowLabel}>{t('settings_receipts')}</Text>
+          <Text style={styles.rowValue}>
+            {receipts ? t('settings_receipts_on') : t('settings_receipts_off')}
+          </Text>
+        </Pressable>
+        <Text style={styles.hint}>{t('settings_receipts_hint')}</Text>
+        {receiptsNotKept && (
+          <Text style={styles.notKept}>{t('settings_receipts_not_kept')}</Text>
+        )}
+      </View>
 
       <Text style={styles.nothingElse}>{t('settings_nothing_else')}</Text>
     </View>
@@ -90,6 +119,19 @@ const styles = StyleSheet.create({
   rowLabel: {
     ...type.titleMd,
     color: color.neutral['900'],
+  },
+  setting: { gap: space.s },
+  rowValue: {
+    ...type.bodySm,
+    color: color.neutral['600'],
+  },
+  hint: {
+    ...type.caption,
+    color: color.neutral['600'],
+  },
+  notKept: {
+    ...type.caption,
+    color: color.deny['700'],
   },
   nothingElse: {
     ...type.caption,

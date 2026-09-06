@@ -1,6 +1,7 @@
 import { getErrorMessage } from '../runtime/errors'
 import type { HttpRequester } from '../runtime/pump'
 import type { TimelineEntry } from './mergeTimeline'
+import { readReaction, type LooseReaction } from './reactions'
 
 /**
  * Reading a room's history, and turning it into a conversation.
@@ -71,13 +72,27 @@ export async function fetchRoomMessages(
  * Everything that is not a message is skipped. Membership changes, topic
  * edits and receipts are what the room recorded, not what was said in it.
  */
+/**
+ * What one pass over a room's events yields: the messages, and the reactions
+ * that point at them.
+ *
+ * Both, because a decrypted event stream carries both and separating them
+ * afterwards would mean decrypting twice. ADR-0011: a reaction is an
+ * encrypted event like any other here, so it comes out of the same door.
+ */
+export interface DecryptedEvents {
+  readonly entries: TimelineEntry[]
+  readonly reactions: LooseReaction[]
+}
+
 export async function toTimelineEntries(
   machine: TimelineMachine,
   decodeUtf8: (bytes: Uint8Array) => string,
   roomId: string,
   events: readonly unknown[],
-): Promise<TimelineEntry[]> {
+): Promise<DecryptedEvents> {
   const entries: TimelineEntry[] = []
+  const reactions: LooseReaction[] = []
 
   for (const raw of events) {
     const event = raw as RawEvent
@@ -111,6 +126,16 @@ export async function toTimelineEntries(
       const content = JSON.parse(decodeUtf8(envelope.ciphertext)) as {
         body?: unknown
       }
+
+      // A reaction before a message, because a reaction has a body of its own
+      // in no sense: read as a message it would be one with no text, which is
+      // the shape reserved for a message that carried none.
+      const reaction = readReaction(eventId, sender, content)
+      if (reaction !== null) {
+        reactions.push(reaction)
+        continue
+      }
+
       entries.push({
         eventId,
         claimedSender: sender,
@@ -131,5 +156,5 @@ export async function toTimelineEntries(
     }
   }
 
-  return entries
+  return { entries, reactions }
 }

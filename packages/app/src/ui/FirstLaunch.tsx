@@ -93,14 +93,20 @@ const styles = StyleSheet.create({
     gap: space.l,
   },
   wordmark: {
-    ...type.display,
+    // The brand screen's own roles, added to `tokens.json` in 3.2.0 rather
+    // than approximated with the nearest general one. The prototype draws
+    // this screen off the eight-role scale, and snapping it to them made the
+    // wordmark 30 where the mockup says 36 and the thesis 22 where it says
+    // 26 -- visible, and wrong. Putting the sizes in the token file is the
+    // only answer that keeps invariant 11 and the mockup both true.
+    ...type.brandWordmark,
     color: color.surface.paper,
   },
   saying: {
     gap: space.xl,
   },
   thesis: {
-    ...type.titleLg,
+    ...type.brandThesis,
     color: color.surface.paper,
   },
   subtitle: {
@@ -123,7 +129,7 @@ const styles = StyleSheet.create({
     color: color.brand.green500,
   },
   pointLabel: {
-    ...type.bodySm,
+    ...type.brandPoint,
     color: color.surface.paper,
     flexShrink: 1,
   },

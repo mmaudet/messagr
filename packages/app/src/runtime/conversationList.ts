@@ -112,7 +112,10 @@ async function summarise(
   }
 
   try {
-    const entries = await toTimelineEntries(
+    // Only the entries: a row shows the last thing said, and a reaction is
+    // not something said. The reactions come back too and are dropped here
+    // deliberately rather than by omission.
+    const { entries } = await toTimelineEntries(
       deps.machine,
       deps.decodeUtf8,
       scope,
