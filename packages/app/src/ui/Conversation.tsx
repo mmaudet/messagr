@@ -143,7 +143,7 @@ export function Conversation({
                 onReact={(key, own) => onReact?.(entry.eventId, key, own)}
                 onLoadImage={onLoadImage}
                 unexpected={
-                  otherParty !== undefined && entry.claimedSender !== otherParty
+                  otherParty === undefined || entry.claimedSender !== otherParty
                 }
               />
             )}
@@ -260,7 +260,16 @@ function Message({
           screen 21 is the reference for. It appears when the sender is *not*
           the person this conversation is with, which is exactly when the
           distinction between "the account says" and "the person is" has
-          something to tell. The trust screen carries the argument in full. */}
+          something to tell. The trust screen carries the argument in full.
+
+          AND WHEN THERE IS NO SUCH PERSON, IT ALWAYS APPEARS. `otherParty` is
+          undefined when the room does not have exactly two people in it --
+          `theOtherMember` answers null for three, which is right, because a
+          conversation with three people is not one with somebody. The first
+          version of this rule read `otherParty !== undefined && ...`, so a
+          three-person room named nobody at all: every message unattributed,
+          and no way to tell who wrote what. Silence is only honest where the
+          answer is obvious, and it stops being obvious at three. */}
       {!mine && unexpected && (
         <Text
           testID={`claimed-${entry.eventId}`}

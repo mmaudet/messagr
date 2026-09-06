@@ -1087,7 +1087,32 @@ permission is asking for something. That is a decision about the promise
 screen's meaning, not a placement detail, and it is recorded as open rather
 than defaulted.
 
-### 13.26 The frame, and where the instrument went (designed here)
+### 13.26 Naming the sender, and when silence is honest (designed here)
+
+**A message names who it claims to be from, unless the answer is
+obvious.** Decrypting an event proves which key wrote it and nothing
+about who holds that key, so the word is always *claims* — « Se présente
+comme » — and never an established identity.
+
+It is obvious in exactly one case: a conversation with two people, where
+a message that is not this account's own is the other person's, and the
+header already names them. Spelling out a full Matrix identifier above
+every message there teaches nobody anything and breaks the density
+screen 21 is the reference for.
+
+**It stops being obvious at three.** The first version of this rule
+named the sender only when they were *not* the expected other party —
+which, in a room without exactly two people, is never: every message
+unattributed, and no way to tell who wrote what. The rule is the other
+way round. The sender is named unless the conversation has exactly one
+other person and the message is theirs.
+
+That case is what `theOtherMember` answers: exactly one other member, or
+nothing. A conversation with three people is not a conversation with
+somebody, and the product should not pretend it knows which of them is
+speaking.
+
+### 13.27 The frame, and where the instrument went (designed here)
 
 **One scroll container per screen, and a new one each time.** Nothing in
 the product scrolls inside something that scrolls: no screen carries a
