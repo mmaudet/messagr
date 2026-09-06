@@ -97,13 +97,13 @@
 <body>
 <main>
   <h1>Messagr</h1>
-  <p>Vous avez reçu une invitation à rejoindre Messagr.</p>
+  <p data-t="recue">Vous avez reçu une invitation à rejoindre Messagr.</p>
   <!-- Lien vide : il renvoie vers cette même URL. Si l'application est
        installée et les liens universels en place, iOS/Android l'ouvre dans
        l'application ; sinon, on reste ici et le texte ci-dessous explique
        pourquoi. Aucun script n'est nécessaire à ce comportement. -->
-  <a class="ouvrir" href="">Ouvrir dans Messagr</a>
-  <p>Si rien ne se passe, Messagr n'est pas installé sur cet appareil.</p>
+  <a class="ouvrir" href="" data-t="ouvrir">Ouvrir dans Messagr</a>
+  <p data-t="rien">Si rien ne se passe, Messagr n'est pas installé sur cet appareil.</p>
 
   <!-- LES TROIS DESTINATIONS SONT DANS LE HTML DÈS LE DÉPART, et le script
        n'en RÉVÈLE qu'une. Rien n'est construit, rien n'est demandé au
@@ -115,23 +115,23 @@
        ni avec la phrase d'attente : `montrer` ne le dévoile que lorsqu'elle
        a posé un lien. Sans lui, la personne clique, le téléphone refuse en
        silence et la page a menti par omission. -->
-  <p class="note" id="apk-avertissement" hidden>Votre téléphone demandera
-     l'autorisation d'installer une application de sources inconnues :
-     c'est normal pour un fichier obtenu hors magasin.</p>
+  <p class="note" id="apk-avertissement" hidden data-t="apk">Votre téléphone
+     demandera l'autorisation d'installer une application de sources
+     inconnues : c'est normal pour un fichier obtenu hors magasin.</p>
   <p class="destination" id="dest-autre" hidden></p>
 
   <!-- LE QR N'EXISTE QUE SUR ORDINATEUR. Sur telephone, l'application
        s'ouvre ou le magasin repond ; ici, le seul chemin vers le telephone
        est de faire scanner l'ecran. -->
-  <canvas id="qr" width="330" height="330" hidden
+  <canvas id="qr" width="330" height="330" hidden data-t-label="qr-label"
           aria-label="Code QR du lien d'invitation, a scanner avec le telephone"></canvas>
 
-  <button class="copier" id="copier" hidden type="button">Copier le lien</button>
-  <p class="note" id="copie-faite" hidden>Lien copié. Ouvrez Messagr après
-     l'installation : il vous proposera de le coller.</p>
+  <button class="copier" id="copier" hidden type="button" data-t="copier">Copier le lien</button>
+  <p class="note" id="copie-faite" hidden data-t="copie">Lien copié. Ouvrez
+     Messagr après l'installation : il vous proposera de le coller.</p>
 
-  <p class="note">Cette page ne vérifie ni n'utilise votre invitation :
-     seule l'application peut la réclamer.</p>
+  <p class="note" data-t="rien-verifie">Cette page ne vérifie ni n'utilise
+     votre invitation : seule l'application peut la réclamer.</p>
 </main>
 <script>
 // CE SCRIPT NE LIT JAMAIS L'INVITATION.
@@ -162,6 +162,174 @@
   // Le niveau M est celui de `QR_ERROR_CORRECTION` dans core/src/qr.rs. Les
   // deux doivent bouger ensemble, sinon les deux symboles cessent d'etre le
   // meme symbole.
+
+  // ── LA LANGUE ─────────────────────────────────────────────────────────
+  //
+  // L'application embarque six catalogues et n'a aucun repli : #103 le dit
+  // sans détour, un repli est la manière dont une langue à moitié traduite
+  // part en production sans que personne ne s'en aperçoive. Cette page était
+  // en français seul — donc quelqu'un qui ne lit que l'allemand rencontrait
+  // deux écrans français avant celui qui lui demande enfin quelle langue il
+  // lit.
+  //
+  // TOUT EST ICI, ET C'EST OBLIGATOIRE. La politique de sécurité de contenu
+  // interdit tout script externe et toute requête : c'est ce qui empêche
+  // cette page de dire si une invitation existe. Une traduction chargée au
+  // moment de l'affichage la briserait.
+  //
+  // LA PROPRIÉTÉ « OCTET POUR OCTET IDENTIQUE » Y SURVIT, et la distinction
+  // vaut d'être écrite : elle porte sur le JETON. Tous les jetons reçoivent
+  // les mêmes octets, donc la page n'est pas un oracle d'existence. Elle ne
+  // dit rien du lecteur. Six traductions embarquées et une choisie dans le
+  // navigateur, ce sont les mêmes octets pour tout le monde.
+  //
+  // LE FRANÇAIS RESTE DANS LE HTML. Sans script, la page est celle d'avant
+  // avec son texte de repli — c'est la propriété dont le commentaire des
+  // trois destinations est déjà fier, et une traduction qui la retirerait
+  // coûterait plus qu'elle n'apporte.
+  var TRADUCTIONS = {
+    fr: null,
+    en: {
+      titre: 'Messagr — invitation',
+      recue: 'You have been invited to join Messagr.',
+      ouvrir: 'Open in Messagr',
+      rien: 'If nothing happens, Messagr is not installed on this device.',
+      copier: 'Copy the link',
+      copie: 'Link copied. Open Messagr after installing: it will offer to paste it.',
+      apk: 'Your phone will ask permission to install an application from an unknown source: that is normal for a file obtained outside a store.',
+      'rien-verifie': 'This page neither checks nor uses your invitation: only the application can claim it.',
+      'qr-label': 'QR code of the invitation link, to scan with the phone',
+      ios: 'Install Messagr for iPhone',
+      android: 'Install Messagr for Android',
+      apkLien: 'Download Messagr for Android',
+      ordinateur: 'Open this link on your phone: Messagr is a mobile application. Scan this code:',
+      attenteIos: 'Messagr is not available for iPhone yet.',
+      attenteAutre: 'The application is not published yet.',
+      maisAndroid: ' It is on Android.',
+      demandez: ' Ask the person who invited you how to get it.'
+    },
+    de: {
+      titre: 'Messagr — Einladung',
+      recue: 'Sie haben eine Einladung zu Messagr erhalten.',
+      ouvrir: 'In Messagr öffnen',
+      rien: 'Wenn nichts passiert, ist Messagr auf diesem Gerät nicht installiert.',
+      copier: 'Link kopieren',
+      copie: 'Link kopiert. Öffnen Sie Messagr nach der Installation: es bietet Ihnen an, ihn einzufügen.',
+      apk: 'Ihr Telefon fragt nach der Erlaubnis, eine Anwendung aus unbekannter Quelle zu installieren: das ist bei einer Datei außerhalb eines Stores normal.',
+      'rien-verifie': 'Diese Seite prüft und verwendet Ihre Einladung nicht: nur die Anwendung kann sie einlösen.',
+      'qr-label': 'QR-Code des Einladungslinks, mit dem Telefon zu scannen',
+      ios: 'Messagr für iPhone installieren',
+      android: 'Messagr für Android installieren',
+      apkLien: 'Messagr für Android herunterladen',
+      ordinateur: 'Öffnen Sie diesen Link auf Ihrem Telefon: Messagr ist eine mobile Anwendung. Scannen Sie diesen Code:',
+      attenteIos: 'Messagr ist für das iPhone noch nicht verfügbar.',
+      attenteAutre: 'Die Anwendung ist noch nicht veröffentlicht.',
+      maisAndroid: ' Für Android schon.',
+      demandez: ' Fragen Sie die Person, die Sie eingeladen hat, wie Sie sie bekommen.'
+    },
+    es: {
+      titre: 'Messagr — invitación',
+      recue: 'Ha recibido una invitación para unirse a Messagr.',
+      ouvrir: 'Abrir en Messagr',
+      rien: 'Si no ocurre nada, Messagr no está instalado en este dispositivo.',
+      copier: 'Copiar el enlace',
+      copie: 'Enlace copiado. Abra Messagr después de instalarlo: le propondrá pegarlo.',
+      apk: 'Su teléfono pedirá permiso para instalar una aplicación de origen desconocido: es normal para un archivo obtenido fuera de una tienda.',
+      'rien-verifie': 'Esta página no comprueba ni utiliza su invitación: solo la aplicación puede reclamarla.',
+      'qr-label': 'Código QR del enlace de invitación, para escanear con el teléfono',
+      ios: 'Instalar Messagr para iPhone',
+      android: 'Instalar Messagr para Android',
+      apkLien: 'Descargar Messagr para Android',
+      ordinateur: 'Abra este enlace desde su teléfono: Messagr es una aplicación móvil. Escanee este código:',
+      attenteIos: 'Messagr aún no está disponible para iPhone.',
+      attenteAutre: 'La aplicación aún no está publicada.',
+      maisAndroid: ' Sí lo está en Android.',
+      demandez: ' Pregunte a la persona que le invitó cómo obtenerla.'
+    },
+    it: {
+      titre: 'Messagr — invito',
+      recue: 'Hai ricevuto un invito a Messagr.',
+      ouvrir: 'Apri in Messagr',
+      rien: 'Se non succede nulla, Messagr non è installato su questo dispositivo.',
+      copier: 'Copia il link',
+      copie: 'Link copiato. Apri Messagr dopo l\'installazione: ti proporrà di incollarlo.',
+      apk: 'Il telefono chiederà il permesso di installare un\'applicazione di origine sconosciuta: è normale per un file ottenuto fuori da uno store.',
+      'rien-verifie': 'Questa pagina non verifica né utilizza il tuo invito: solo l\'applicazione può riscattarlo.',
+      'qr-label': 'Codice QR del link di invito, da scansionare con il telefono',
+      ios: 'Installa Messagr per iPhone',
+      android: 'Installa Messagr per Android',
+      apkLien: 'Scarica Messagr per Android',
+      ordinateur: 'Apri questo link dal telefono: Messagr è un\'applicazione mobile. Scansiona questo codice:',
+      attenteIos: 'Messagr non è ancora disponibile per iPhone.',
+      attenteAutre: 'L\'applicazione non è ancora pubblicata.',
+      maisAndroid: ' Su Android sì.',
+      demandez: ' Chiedi a chi ti ha invitato come ottenerla.'
+    },
+    nl: {
+      titre: 'Messagr — uitnodiging',
+      recue: 'U hebt een uitnodiging voor Messagr ontvangen.',
+      ouvrir: 'Openen in Messagr',
+      rien: 'Als er niets gebeurt, is Messagr niet op dit apparaat geïnstalleerd.',
+      copier: 'Link kopiëren',
+      copie: 'Link gekopieerd. Open Messagr na de installatie: het biedt aan om hem te plakken.',
+      apk: 'Uw telefoon vraagt toestemming om een applicatie uit een onbekende bron te installeren: dat is normaal voor een bestand van buiten een winkel.',
+      'rien-verifie': 'Deze pagina controleert of gebruikt uw uitnodiging niet: alleen de applicatie kan hem opeisen.',
+      'qr-label': 'QR-code van de uitnodigingslink, te scannen met de telefoon',
+      ios: 'Messagr voor iPhone installeren',
+      android: 'Messagr voor Android installeren',
+      apkLien: 'Messagr voor Android downloaden',
+      ordinateur: 'Open deze link op uw telefoon: Messagr is een mobiele applicatie. Scan deze code:',
+      attenteIos: 'Messagr is nog niet beschikbaar voor de iPhone.',
+      attenteAutre: 'De applicatie is nog niet gepubliceerd.',
+      maisAndroid: ' Op Android wel.',
+      demandez: ' Vraag de persoon die u heeft uitgenodigd hoe u hem krijgt.'
+    }
+  };
+
+  // Le français par défaut, et pas seulement quand rien ne correspond : le
+  // HTML le porte déjà, donc `null` veut dire « ne touche à rien ».
+  var LANGUE = (function () {
+    var demandees = (navigator.languages && navigator.languages.length)
+      ? navigator.languages
+      : [navigator.language || 'fr'];
+    for (var i = 0; i < demandees.length; i++) {
+      // `de-AT` compte comme `de` : la sous-étiquette régionale ne change
+      // aucune de ces phrases, et refuser sur elle rendrait la page
+      // française pour la moitié de l'Europe germanophone.
+      var code = String(demandees[i]).toLowerCase().split('-')[0];
+      if (Object.prototype.hasOwnProperty.call(TRADUCTIONS, code)) { return code; }
+    }
+    return 'fr';
+  })();
+
+  var MOTS = TRADUCTIONS[LANGUE];
+
+  /** Un mot du catalogue choisi, ou le repli français passé par l'appelant. */
+  function mot(cle, francais) {
+    return (MOTS && MOTS[cle]) ? MOTS[cle] : francais;
+  }
+
+  // Remplacer plutôt que construire : chaque phrase est déjà dans le HTML en
+  // français, marquée d'un `data-t`. Sans script elles restent ; avec, elles
+  // deviennent celles de la langue lue.
+  if (MOTS) {
+    if (document.documentElement) { document.documentElement.lang = LANGUE; }
+    if (MOTS.titre) { document.title = MOTS.titre; }
+    var marques = document.querySelectorAll
+      ? document.querySelectorAll('[data-t]')
+      : [];
+    for (var m = 0; m < marques.length; m++) {
+      var cle = marques[m].getAttribute('data-t');
+      if (MOTS[cle]) { marques[m].textContent = MOTS[cle]; }
+    }
+    var etiquettes = document.querySelectorAll
+      ? document.querySelectorAll('[data-t-label]')
+      : [];
+    for (var e = 0; e < etiquettes.length; e++) {
+      var cleE = etiquettes[e].getAttribute('data-t-label');
+      if (MOTS[cleE]) { etiquettes[e].setAttribute('aria-label', MOTS[cleE]); }
+    }
+  }
 
   // Nombre total de mots de code, par version.
   var TOTAL = [26, 44, 70, 100, 134, 172, 196, 242, 292, 346,
@@ -541,13 +709,13 @@
   // second appareil et que rien d'autre ne le lui dira.
   function attentePour(plateforme) {
     var phrase = plateforme === 'ios'
-      ? "Messagr n'est pas encore disponible sur iPhone."
-      : "L'application n'est pas encore publiée.";
+      ? mot('attenteIos', "Messagr n'est pas encore disponible sur iPhone.")
+      : mot('attenteAutre', "L'application n'est pas encore publiée.");
     if (plateforme === 'ios' && (DESTINATIONS.android || DESTINATIONS.androidApk)) {
-      phrase += " Elle l'est sur Android.";
+      phrase += mot('maisAndroid', " Elle l'est sur Android.");
     }
-    return phrase + " Demandez à la personne qui vous a invité comment " +
-      "l'obtenir.";
+    return phrase + mot('demandez', " Demandez à la personne qui vous a " +
+      "invité comment l'obtenir.");
   }
 
   // UN SEUL ENDROIT DÉCIDE entre un lien et la phrase d'attente, et les deux
@@ -587,22 +755,25 @@
     // iPhone ; en proposer une serait le même mensonge dans l'autre sens.
     // Un accès anticipé y passe par TestFlight, qui est une adresse comme
     // une autre et tient dans `ios`.
-    montrer('dest-ios', 'Installer Messagr pour iPhone', DESTINATIONS.ios);
+    montrer('dest-ios', mot('ios', 'Installer Messagr pour iPhone'),
+            DESTINATIONS.ios);
   } else if (estAndroid) {
     // LE MAGASIN D'ABORD, LE FICHIER ENSUITE. Le jour où l'application est
     // publiée, le magasin met à jour, vérifie la signature et survit au
     // changement d'appareil ; le fichier ne fait rien de tout cela. Il
     // n'existe que pour la période où le magasin ne répond pas encore.
     if (DESTINATIONS.android) {
-      montrer('dest-android', 'Installer Messagr pour Android', DESTINATIONS.android);
+      montrer('dest-android', mot('android', 'Installer Messagr pour Android'),
+              DESTINATIONS.android);
     } else {
-      montrer('dest-android', 'Télécharger Messagr pour Android',
+      montrer('dest-android', mot('apkLien', 'Télécharger Messagr pour Android'),
               DESTINATIONS.androidApk, 'apk-avertissement');
     }
   } else {
     var autre = document.getElementById('dest-autre');
-    autre.textContent = "Ouvrez ce lien depuis votre téléphone : Messagr est " +
-      "une application mobile. Scannez ce code :";
+    autre.textContent = mot('ordinateur',
+      "Ouvrez ce lien depuis votre téléphone : Messagr est une application " +
+      "mobile. Scannez ce code :");
     autre.hidden = false;
     dessinerQr(location.href);
   }
