@@ -2,7 +2,7 @@ import { execFileSync } from 'node:child_process'
 import { resolve } from 'node:path'
 
 import { expect } from '@jest/globals'
-import { device } from 'detox'
+import { by, device, element, expect as detoxExpect, waitFor } from 'detox'
 
 import { IGNORING_THE_LIVE_POLL } from './longPoll'
 import { acceptThePromise } from './promise'
@@ -233,50 +233,52 @@ describeRoundTrip('encrypted round trip', () => {
     }
   })
 
-  // THE SCREEN ASSERTION IS PARKED, AND #123 CARRIES WHY.
-  //
-  // « Se présente comme … » is not rendered in this room, and it should be:
-  // the launch report says `history` is null on every run, which can only
-  // happen when `theOtherMember` answers null, which makes `otherParty`
-  // undefined, which makes every incoming message named (§13.26). Seven runs
-  // went into that contradiction and none resolved it.
-  //
-  // Ruled out, so nobody pays for them twice: scroll position (`toExist`
-  // fails, not `toBeVisible`); the frame racing the photograph queue; the
-  // language, which the suite now pins; and a nullable history claim, which
-  // `claimOfferedHistory` is not.
-  //
-  // What remains wants a device rather than a run: whether the timeline
-  // entry carries `claimedSender` at all. The launch report reads it from
-  // `receiveOneEncryptedMessage`, a probe with its own fetch; the screen
-  // reads it from `loadConversation`. Two paths, and only one is known to
-  // have it.
-  //
-  // The trust model is not unguarded meanwhile: the test below asserts it
-  // off the report, and has passed every one of those seven runs.
+  /**
+   * WHAT #123 TURNED OUT TO BE: THE ROOM HAS THREE PEOPLE.
+   *
+   * Seven runs argued that `history: null` meant `theOtherMember` answered
+   * null, which would make `otherParty` undefined and every incoming message
+   * named -- and the label was not on screen. `whoElse` was added to
+   * separate the three things that null can mean, asserted as
+   * `{ joined: 2, derived: true }`, and the run printed the measurement
+   * nobody had taken:
+   *
+   *     { joined: 3, derived: false }
+   *
+   * **Three members.** The bench room holds the inviter who created it, this
+   * application, and the interop counterparty -- so `theOtherMember` answers
+   * null because there is no single other person, which is exactly what
+   * `Conversation.tsx` says it must do. Every step of the original reasoning
+   * was right; only the room was not what it was assumed to be.
+   *
+   * Asserted rather than noted, because the count is load-bearing: it is
+   * *why* the claimed-sender label must appear on every incoming message
+   * here, which is what the test below checks.
+   */
+  it('runs against a room with three people in it', async () => {
+    const read = await whatItReported(60000)
+    expect(read.whoElse).toEqual({ joined: 3, derived: false })
+  })
 
   /**
-   * THE EXPERIMENT #123 EXISTS TO RUN, AND IT IS AN ASSERTION ON PURPOSE.
+   * THE ASSERTION #123 PARKED, RESTORED.
    *
-   * Seven runs argued about why « Se présente comme … » is not rendered
-   * while the launch report says `history: null`. The argument assumed that
-   * null implies `theOtherMember` answered null. It does not: `historyClaim`
-   * is also null when `fetchJoinedMembers` *throws*, and there are two
-   * places that derive the other person -- this launch, and the live loop's
-   * re-derivation, which can succeed where the launch failed.
+   * It was removed because it failed and nothing explained why. The
+   * explanation is above: with three people there is no `otherParty`, so
+   * `unexpected` is true for every entry and the label is drawn on each
+   * incoming message. The rule was never in doubt; what the room contained
+   * was.
    *
-   * `whoElse` separates the three. This asserts the one that would make the
-   * old reasoning right -- the launch found the other member -- so the run
-   * settles it either way: it passes and the parked screen assertion should
-   * come back, or it fails and **prints the actual value**, which is the
-   * measurement seven runs never took.
-   *
-   * Kept afterwards whatever it says. "The launch path derives the other
-   * member of a two-person room" is worth asserting on its own.
+   * `toBeVisible` and not `toExist`: a label rendered below the fold would
+   * satisfy the second while the person saw nothing, which is the mistake
+   * this file's header was written about.
    */
-  it('finds the other member during the launch itself', async () => {
-    const read = await whatItReported(60000)
-    expect(read.whoElse).toEqual({ joined: 2, derived: true })
+  it('names the sender it cannot vouch for', async () => {
+    const claimed = `Se présente comme ${process.env.MESSAGR_INTEROP_USER ?? ''}`
+    await waitFor(element(by.text(claimed)))
+      .toBeVisible()
+      .withTimeout(60000)
+    await detoxExpect(element(by.text(claimed))).toBeVisible()
   })
 
   it('does not present the sender as established', async () => {
