@@ -2027,7 +2027,31 @@ export function App({
               does, and this used to. Changed at the account holder's request:
               the bar never moves, so muscle memory holds everywhere. Recorded
               as a decision rather than a drift. */}
-            <TabBar current={tab} onSelect={setTab} unread={unreadCount} />
+            {/* A TAB PRESS COMES BACK TO THAT TAB'S TOP, AND `setTab` ALONE
+                DID NOT. From inside a conversation, pressing Discussions set
+                the tab to the one it was already on and changed nothing
+                visible: the conversation is drawn over the list, and nothing
+                closed it. Reported from a Pixel on 7 September 2026, in the
+                words anybody would use -- "rien ne se passe".
+
+                The same layers the hardware back button already enumerates,
+                closed in one go rather than one press at a time: a tab is
+                not a step backwards, it is a destination. `back` walks them;
+                this clears them. */}
+            <TabBar
+              current={tab}
+              onSelect={next => {
+                setOpenPlate(null)
+                setPersonOpen(false)
+                setOpenScope(null)
+                openScopeRef.current = null
+                setLegalOpen(false)
+                setInvite({ stage: 'shut' })
+                setAdmission(null)
+                setTab(next)
+              }}
+              unread={unreadCount}
+            />
           </View>
         </SafeAreaView>
       </SafeAreaProvider>
