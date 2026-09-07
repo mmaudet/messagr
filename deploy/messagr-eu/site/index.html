@@ -294,7 +294,16 @@
         <ul>
           <li data-t="point1">Chiffrée de bout en bout, sans réglage</li>
           <li data-t="point2">Aucun carnet d'adresses aspiré, aucune publicité</li>
-          <li data-t="point3">Vos messages exportables à tout moment</li>
+          <!-- CET ARGUMENT EN REMPLACE UN QUI ÉTAIT FAUX.
+             La page annonçait « Vos messages exportables à tout moment ». Les
+             clés `settings_row_export_*` existent dans les six catalogues et
+             AUCUN écran ne les affiche : `Settings.tsx` ne rend qu'une ligne,
+             celle de la langue, et il n'existe aucun ticket d'export. La
+             promesse était en production, en six langues, sur une liste de
+             trois.
+             Celui-ci est vrai, livré, et personne d'autre ne peut l'écrire :
+             ADR-0010, et `person_name_local` le dit sur l'écran même. -->
+        <li data-t="point3">Les noms que vous donnez restent sur votre appareil</li>
         </ul>
 
         <!-- LES DEUX PORTES, ET C'EST LA CORRECTION PRINCIPALE DE CETTE PAGE.
