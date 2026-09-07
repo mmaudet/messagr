@@ -492,7 +492,7 @@ CODES.forEach(function (code) {
   var bloc = /<script>([\s\S]*?)<\/script>/.exec(accueil);
   if (!bloc) { echouer("la page d'accueil n'a plus de script"); return; }
 
-  function jouer(langueDeLaPage, ou, langues, memoire) {
+  function jouer(langueDeLaPage, ou, langues, memoire, fragment) {
     var abonnes = [];
     var choix = {
       value: '',
@@ -509,6 +509,7 @@ CODES.forEach(function (code) {
       navigator: { languages: langues },
       location: {
         pathname: ou,
+        hash: fragment || '',
         set href(v) { alle.vers = v; },
         replace: function (v) { alle.remplace = v; }
       },
@@ -567,6 +568,34 @@ CODES.forEach(function (code) {
   if (apresChoix.alle.remplace !== null) {
     echouer('un choix explicite de français doit tenir, il renvoie vers ' +
       apresChoix.alle.remplace);
+  }
+
+  // LE FRAGMENT SURVIT AUX DEUX DÉPLACEMENTS.
+  //
+  // Il ne coûtait rien de le perdre tant qu'aucune adresse de cette page n'en
+  // portait. La loupe en a fait une adresse : `#loupe-salon` ouvre un écran en
+  // grand, et le lien envoyé à quelqu'un dont le navigateur demande l'anglais
+  // le déposait sur `/en/` sans rien d'ouvert -- un lien qui a l'air de marcher
+  // et ne montre pas ce qu'on lui a montré.
+  var avecFragment = jouer('fr', '/', ['de-DE'], null, '#loupe-salon');
+  if (avecFragment.alle.remplace !== '/de/#loupe-salon') {
+    echouer('le renvoi vers la langue du lecteur doit garder le fragment, ' +
+      'il mène à ' + avecFragment.alle.remplace);
+  }
+  // Et le sélecteur : changer de langue devant un écran ouvert doit rouvrir le
+  // même écran, pas revenir en haut de la page.
+  var choisiDevantUnEcran = jouer('de', '/de/', ['de-DE'], null, '#loupe-appel');
+  choisiDevantUnEcran.choix.value = 'it';
+  choisiDevantUnEcran.declencher();
+  if (choisiDevantUnEcran.alle.vers !== '/it/#loupe-appel') {
+    echouer('le sélecteur doit garder le fragment, il mène à ' +
+      choisiDevantUnEcran.alle.vers);
+  }
+  // Sans fragment, aucune adresse ne gagne un `#` vide.
+  var sansFragment = jouer('fr', '/', ['nl-NL'], null);
+  if (sansFragment.alle.remplace !== '/nl/') {
+    echouer('sans fragment, le renvoi doit rester nu, il mène à ' +
+      sansFragment.alle.remplace);
   }
 })();
 
