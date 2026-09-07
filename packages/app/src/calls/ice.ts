@@ -71,6 +71,9 @@ export type IceConfigFailure =
     }
   | { readonly kind: 'unreachable'; readonly reason: string }
 
+/** What this needs to reach a homeserver. `pump.ts`'s, and type-only. */
+import type { HttpRequester } from '../runtime/pump'
+
 /** What the homeserver answers at `/_matrix/client/v3/voip/turnServer`. */
 export interface TurnServerAnswer {
   readonly uris?: unknown
@@ -128,4 +131,28 @@ export function iceConfigFrom(
       transportPolicy: 'relay-only',
     },
   }
+}
+
+/**
+ * The thin shell this module's own note promised: one request, and the body
+ * handed to `iceConfigFrom` unread.
+ *
+ * Unread on purpose. The rules above are the part worth testing and the part
+ * that must not be duplicated -- a second opinion about whether a `ttl` is a
+ * number is a second place for the two to disagree.
+ *
+ * Throws rather than answering a failure, and `session.ts` turns that into
+ * `no-relay`: a relay that could not be asked for and a relay that does not
+ * exist are the same call, which is a call that is not placed.
+ */
+export async function fetchTurnServer(
+  http: HttpRequester,
+): Promise<TurnServerAnswer> {
+  const answerJson = await http.authedRequest(
+    'GET',
+    '/_matrix/client/v3/voip/turnServer',
+    {},
+    undefined,
+  )
+  return JSON.parse(answerJson) as TurnServerAnswer
 }

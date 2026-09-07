@@ -2,6 +2,18 @@
 
     <uses-permission android:name="android.permission.INTERNET" />
 
+    <!-- THE MICROPHONE, FOR A CALL AND FOR NOTHING ELSE.
+         Declared here and asked for at the moment somebody places or answers
+         a call, never at launch: a permission dialog with no call behind it
+         is a product asking to listen for reasons of its own.
+
+         `MODIFY_AUDIO_SETTINGS` is what lets the application route the call
+         to the earpiece and switch it to the speaker. Without it the audio
+         plays wherever the system last left it, which on a telephone is
+         usually the wrong one. -->
+    <uses-permission android:name="android.permission.RECORD_AUDIO" />
+    <uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS" />
+
     <!--
       React Native's own debug-build manifest fragment
       (ReactAndroid/src/debug/AndroidManifest.xml) declares this for its
