@@ -351,6 +351,44 @@ CODES.forEach(function (code) {
     if (code !== 'fr' && plat.indexOf('>' + copie.fr.titre + '<') !== -1) {
       echouer('la page « ' + code + ' » a gardé le titre français');
     }
+    // L'APERÇU DE LIEN, PAR LANGUE. Une carte française sur `/de/` annulerait
+    // ce que les six adresses corrigent, et c'est la seule surface par
+    // laquelle ce produit se diffuse : quelqu'un envoie un lien à quelqu'un.
+    var social = [
+      ['og:title', copie[code].titre],
+      ['og:description', copie[code].chapo],
+      ['og:url', adresse],
+      ['og:image', 'https://messagr.eu/messagr-partage-' + code + '.png']
+    ];
+    social.forEach(function (paire) {
+      var attendu = '<meta property="' + paire[0] + '" content="' +
+        paire[1].replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+          .replace(/"/g, '&quot;') + '">';
+      if (rendue.indexOf(attendu) === -1) {
+        echouer('la page « ' + code + ' » ne porte pas ' + paire[0] + ' dans sa langue');
+      }
+    });
+    // ET L'IMAGE DOIT EXISTER. Une carte nommée et absente donne un aperçu
+    // gris, c'est-à-dire exactement le défaut que tout ceci corrige, avec le
+    // balisage en plus pour faire croire le contraire.
+    var carte = path.join(bon.sortie, 'messagr-partage-' + code + '.png');
+    if (!fs.existsSync(carte)) {
+      echouer('la carte de partage « ' + code + ' » est nommée et absente de la construction');
+    }
+  });
+
+  // Ce qu'un moteur et un navigateur vont chercher sans qu'on le leur dise.
+  ['favicon.ico', 'robots.txt', 'sitemap.xml'].forEach(function (nom) {
+    if (!fs.existsSync(path.join(bon.sortie, nom))) {
+      echouer(nom + " manque à la construction");
+    }
+  });
+  var plan = fs.readFileSync(path.join(bon.sortie, 'sitemap.xml'), 'utf8');
+  CODES.forEach(function (code) {
+    var adresse = code === 'fr' ? 'https://messagr.eu/' : 'https://messagr.eu/' + code + '/';
+    if (plan.indexOf('<loc>' + adresse + '</loc>') === -1) {
+      echouer('le plan du site ne nomme pas « ' + code + ' »');
+    }
   });
   fs.rmSync(bon.sortie, { recursive: true, force: true });
 
