@@ -37,8 +37,11 @@ symptôme est un collègue qui verrouille son téléphone et attend une
 notification qui ne viendra jamais, et une conclusion fausse sur #109.
 
 `scripts/assert-ios-push.sh` refuse que l'entitlement et le `platform` de
-sygnal divergent. Il tourne dans `checks`. Faites-lui confiance et ne
-contournez pas son refus.
+sygnal divergent, dans `checks`, en lisant les sources.
+`scripts/assert-ipa-push.sh` refuse le même désaccord dans le **binaire
+construit**, juste avant le téléversement — et c'est celui-là qui compte,
+parce que la signature peut changer l'entitlement sans que la source bouge.
+Faites-leur confiance et ne contournez pas leur refus.
 
 Le prix de ce réglage est réel : **une build lancée depuis Xcode sur un
 téléphone branché ne peut plus être réveillée**, puisqu'elle réclamerait un
@@ -62,40 +65,60 @@ build.
   pour #109
 - SKU : n'importe quoi de stable, `messagr-ios` fait l'affaire
 
-### 2. Archiver
+### 2 et 3. Archiver, vérifier, téléverser — en une commande
 
-Depuis `packages/app/ios`, ouvrez `Messagr.xcworkspace` — **le workspace, pas
-le projet** : les pods n'existent que dans le premier.
+**Ces deux étapes ne se font plus dans Xcode.** Elles ont été faites à la
+main une fois, le 7 septembre 2026, et ce qu'elles ont appris est dans
+`scripts/publish-ios.sh` plutôt que dans un enchaînement de clics.
 
-- Le schéma sur **Messagr**, la cible sur **Any iOS Device (arm64)**
-- **Product → Archive**
+```
+export ASC_KEY_ID=BV84NRG5SB
+export ASC_ISSUER_ID=<l'Issuer ID, sur la page Clés d'App Store Connect>
+./scripts/publish-ios.sh
+```
 
-Si Xcode réclame un profil, laissez-le le créer : la signature est automatique
-et l'équipe est déjà renseignée.
+La clé `.p8` se télécharge **une seule fois** depuis App Store Connect →
+Utilisateurs et accès → Intégrations → Clés, et se range dans
+`~/.appstoreconnect/private_keys/` en `chmod 600` : c'est là que `xcodebuild`
+et `altool` la trouvent par identifiant seul. Elle ne va jamais dans le
+dépôt — `.gitignore` refuse `*.p8` et `AuthKey_*`, et ce dépôt est public.
 
-### 3. Téléverser
+Le script fait quatre choses, dans cet ordre, et s'arrête à la première qui
+échoue :
 
-**Il n'y a aucun fichier à choisir.** Le mot induit en erreur, et la question
-s'est posée : l'archive de l'étape 2 est rangée par Xcode lui-même, sous
-`~/Library/Developer/Xcode/Archives/<date>/`, et l'Organizer s'ouvre dessus
-quand l'archivage réussit. Vous ne la manipulez jamais dans le Finder, et il
-n'y a de sélecteur de fichier nulle part dans ce chemin.
+1. **archive** avec `-allowProvisioningUpdates`, qui enregistre l'App ID,
+   active la capacité Push que réclament les entitlements, et crée le profil ;
+2. **exporte** un `.ipa` signé pour la distribution, via `ExportOptions.plist` ;
+3. **vérifie** ce `.ipa` avec `scripts/assert-ipa-push.sh` ;
+4. **valide** auprès d'Apple, puis **téléverse**.
 
-Dans l'Organizer, onglet **Archives**, la plus récente est en haut :
-sélectionnez-la, puis **Distribute App** → **App Store Connect** →
-**Upload**. Laissez les options par défaut ; « Manage Version and Build
-Number » évite de buter sur un numéro de build déjà pris.
+#### Pourquoi il exporte un fichier au lieu d'envoyer directement
 
-Si l'Organizer s'est fermé entre-temps, **Window → Organizer** le ramène ;
-l'archive `Messagr` y est avec sa date.
+`xcodebuild -exportArchive` sait signer et envoyer d'un seul geste
+(`destination: upload`), sans jamais écrire d'`.ipa`. C'est ce que faisait la
+première version, et c'est aveugle.
 
-L'autre voie existe et ne vaut pas la peine ici : **Export** au lieu d'**Upload**
-écrit bien un `.ipa` sur le disque, qu'il faut ensuite donner à Transporter ou
-à `xcrun altool`. C'est le même téléversement en deux gestes de plus, et une
-occasion supplémentaire de se tromper de fichier.
+**L'archive sort avec `aps-environment: development`**, quoi que disent les
+entitlements. La signature automatique intersecte les entitlements avec ce que
+le profil accorde, et l'étape d'archivage signe contre un profil de
+développement ; c'est l'export qui resigne contre un profil de distribution et
+rend `production`. Constaté sur la première archive réelle, à un geste du
+téléversement.
 
-Le traitement chez Apple prend de cinq à trente minutes. Un courriel arrive
-quand la build est prête, ou une pastille dans TestFlight.
+C'est précisément le piège décrit plus haut, et « l'export le corrige » est
+une affirmation qu'on vérifie. Le fichier est donc écrit, lu, et seulement
+ensuite envoyé. `assert-ipa-push.sh` lit l'environnement attendu dans
+`sygnal.yaml` plutôt que de l'écrire en dur : celui qui bascule une moitié de
+la paire voit l'autre le contredire.
+
+#### Ce qui a été trouvé en le faisant, et qui ne se voyait nulle part
+
+`AppIcon.appiconset` déclarait neuf emplacements et ne contenait aucun
+fichier. Ça compile, ça s'installe, ça tourne, l'écran d'accueil montre un
+carré blanc, et la CI reste verte : App Store Connect a été la première chose
+à s'en apercevoir, avec trois erreurs d'un coup (90713, 90022, 90023).
+Réparé depuis `design/brand/messagr-icone-ios-1024.svg`, et
+`scripts/assert-ios-icon.sh` le vérifie maintenant dans `checks`.
 
 ### 4. Inviter le testeur
 
@@ -120,15 +143,13 @@ nomme la conversation et ne nomme personne d'autre. S'il ne se passe rien, la
 première chose à regarder est le journal de sygnal — `BadDeviceToken` y
 désignerait la paire d'environnements, et non l'application.
 
-## Et la CI, plus tard
+## Et la CI
 
-Ce document décrit des gestes manuels parce que le premier téléversement en
-vaut la peine : le chemin CI demande une clé d'API App Store Connect (issuer
-ID, key ID, un `.p8`), un runner macOS, et un export signé — soit le même
-travail que #43 a fait pour Play, mais à déboguer à distance. Un archivage
-depuis le Mac coûte trente minutes et ne bloque personne.
-
-Le jour où une seconde build sera nécessaire — l'essai #91, puis les appels —
-`publish.yml` est le modèle à suivre : il matérialise sa clé hors de l'espace
-de travail, vérifie que ce qu'il a produit est bien signé, et ne pousse que
-sur déclenchement manuel.
+Le travail que ce document décrivait comme « à faire un jour » est fait : la
+clé d'API existe, `ExportOptions.plist` est dans le dépôt, et
+`publish-ios.sh` ne demande rien d'interactif. Ce qui manque pour que la CI
+téléverse toute seule est un runner macOS et trois secrets
+(`MESSAGR_ASC_KEY_ID`, `MESSAGR_ASC_ISSUER_ID`,
+`MESSAGR_ASC_KEY_BASE64`) — soit exactement la forme que `publish.yml` a déjà
+pour Play, y compris sa règle de matérialiser la clé hors de l'espace de
+travail et de ne partir que sur déclenchement manuel.

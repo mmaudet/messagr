@@ -1,0 +1,49 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<!-- HOW AN ARCHIVE BECOMES A TESTFLIGHT BUILD, WITHOUT XCODE'S WINDOW.
+
+	     `publishing-ios.md` describes the Organizer because the first upload
+	     was going to be made by hand. It is described here instead because a
+	     second one is always needed -- the trial (#91), then the calls -- and
+	     a set of clicks is not a thing a repository can hold.
+
+	     EXPORT, NOT UPLOAD, AND THE REASON IS THE WHOLE OF #109.
+
+	     The first draft of this file said `destination: upload`, so that
+	     `xcodebuild -exportArchive` would sign and send in one gesture with
+	     no `.ipa` on a disk to confuse with another. Then the archive was
+	     inspected and it carried `aps-environment: development`.
+
+	     That is not a mistake, it is how automatic signing works: the archive
+	     is signed against a *development* profile, and the entitlements are
+	     intersected with what that profile grants -- so `production` in
+	     `Messagr.entitlements` becomes `development` in the archive. The
+	     export re-signs against a distribution profile and `production` comes
+	     back.
+
+	     "Comes back" is exactly the kind of claim this product does not take
+	     on trust. A sandbox token on a TestFlight build answers
+	     `BadDeviceToken` at every push, delivers nothing, and reports nothing
+	     anywhere -- the failure #109 exists to avoid. So the export writes an
+	     `.ipa`, `scripts/assert-ipa-push.sh` reads its entitlements, and only
+	     a verified file is uploaded. One extra step buys the one check that
+	     cannot be made after the fact. -->
+	<key>method</key>
+	<string>app-store-connect</string>
+	<key>destination</key>
+	<string>export</string>
+	<key>teamID</key>
+	<string>KUT463DS29</string>
+	<key>signingStyle</key>
+	<string>automatic</string>
+	<!-- The symbols are what turns a crash report from TestFlight into a line
+	     number. A build nobody can diagnose is a build that teaches nothing,
+	     and #109 exists to be diagnosed. -->
+	<key>uploadSymbols</key>
+	<true/>
+	<key>manageAppVersionAndBuildNumber</key>
+	<true/>
+</dict>
+</plist>

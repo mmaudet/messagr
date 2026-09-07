@@ -80,6 +80,13 @@ jobs:
       - name: Assert an iPhone built from this tree could be woken
         run: ./scripts/assert-ios-push.sh
 
+      # THE SAME SHAPE OF FAILURE, ONE STEP LATER IN THE PIPELINE.
+      # An empty AppIcon.appiconset builds, installs and runs; App Store
+      # Connect is the first thing that refuses it, which is one round trip
+      # into a manual upload. Found exactly that way on #109.
+      - name: Assert the build carries an app icon
+        run: ./scripts/assert-ios-icon.sh
+
       # THE SITE, BUILT AND THEN CHECKED -- not the committed pages.
       #
       # `build-site.sh` exists because the substitution it performs used to
