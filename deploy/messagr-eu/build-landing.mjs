@@ -332,6 +332,14 @@ for (const langue of langues) {
   page = entete(page, langue)
   page = ecrireLesFaits(page, langue, faits)
 
+  // LE DÉTAIL DE CONVERSATION SUIT LA LANGUE DE LA PAGE. Une conversation
+  // française sur `/de/` annulerait ce que les six adresses corrigent, et le
+  // séparateur « Hier » s'y lirait « ici ». Exigé avant d'être remplacé, comme
+  // tout le reste : une image renommée doit arrêter la construction.
+  const motifConversation = /\/messagr-conversation-[a-z]{2}\.png/g
+  exigerUneFois(page, motifConversation, "l'image de conversation", langue)
+  page = page.replace(motifConversation, `/messagr-conversation-${langue}.png`)
+
   // AUCUNE MARQUE NE DOIT SURVIVRE. Une page qui montrerait « %TAILLE% » à un
   // lecteur est pire qu'une page muette : elle a l'air cassée, et elle l'est.
   const restante = /%[A-Z]+%/.exec(page)

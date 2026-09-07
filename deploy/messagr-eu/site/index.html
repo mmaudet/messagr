@@ -89,7 +89,7 @@
   /* ── L'accueil ───────────────────────────────────────────────────── */
   .grille-accueil{display:grid; grid-template-columns:1fr; gap:52px; align-items:center}
   @media (min-width:900px){
-    .grille-accueil{grid-template-columns:1.08fr .92fr; gap:64px}
+    .grille-accueil{grid-template-columns:1fr 1.06fr; gap:56px}
   }
   h1{
     font-size:clamp(38px,6.2vw,66px); line-height:1.02; letter-spacing:-0.035em;
@@ -106,23 +106,19 @@
 
   /* ── La figure : les bulles de la marque, sans un mot dedans ─────── */
   /* LA FIGURE NE PARAÎT QUE LÀ OÙ ELLE ÉQUILIBRE QUELQUE CHOSE. Sur deux
-     colonnes elle fait contrepoids au titre ; sur une seule elle devient trois
-     formes vides entre les portes et la bande sombre, et la page est plus
-     franche sans elle. La marque est déjà en haut. */
+     colonnes elle fait contrepoids au titre ; sur une seule elle passerait
+     sous les portes, loin du titre qu'elle illustre, et la page est plus
+     franche sans elle. */
   .figure{display:none}
   @media (min-width:900px){
-    .figure{position:relative; display:flex; flex-direction:column; gap:16px;
-            align-items:flex-start; padding:8px 0}
+    .figure{display:block}
   }
-  .bulle{display:block; width:min(260px,74%); height:auto}
-  .bulle.envoyee{align-self:flex-end; width:min(300px,86%)}
-  .bulle.courte{width:min(190px,54%)}
-  @media (prefers-reduced-motion:no-preference){
-    .bulle{animation:poser .5s cubic-bezier(.2,.7,.3,1) both}
-    .bulle.envoyee{animation-delay:.12s}
-    .bulle.courte{animation-delay:.24s}
+  .conversation{
+    display:block; width:100%; height:auto; border-radius:4px;
+    /* L'image porte son propre fond, celui de la conversation. Une ombre
+       douce la décolle du papier sans en faire une carte. */
+    box-shadow:0 1px 2px rgba(12,31,25,.05), 0 12px 28px -12px rgba(12,31,25,.16);
   }
-  @keyframes poser{from{opacity:0; transform:translateY(9px)} to{opacity:1; transform:none}}
 
   /* ── Les deux portes ─────────────────────────────────────────────── */
   .portes{display:flex; flex-wrap:wrap; gap:12px; margin:0}
@@ -197,6 +193,14 @@
   .faits.avert{margin-top:12px}
   .apres{font-size:14.5px; color:var(--doux); margin:22px 0 0; max-width:52ch}
 
+  /* ── L'éditeur ───────────────────────────────────────────────────────
+     Qui exploite le service n'est pas une obligation légale à loger sous le
+     pli : pour quelqu'un qui choisit une messagerie souveraine, c'est un
+     argument. Il passe donc au-dessus du pied, à sa taille. */
+  .editeur h2{font-size:22px; margin:0 0 14px; max-width:26ch}
+  .editeur p{font-size:15.5px; color:var(--doux); margin:0 0 10px; max-width:60ch}
+  .editeur p:last-of-type{margin-bottom:26px}
+  .editeur a{color:var(--appui)}
   /* ── Le pied ─────────────────────────────────────────────────────── */
   footer{font-size:14px; color:var(--doux); max-width:70ch}
   footer a{color:var(--appui)}
@@ -308,16 +312,25 @@
         </div>
       </div>
 
-      <!-- LES DEUX BULLES DE LA MARQUE, ET AUCUN TEXTE DEDANS.
-           Le pli du coin est ce qui distingue ce produit au premier regard, et
-           les deux fichiers viennent de `design/brand`. Y écrire des phrases
-           en ferait une capture d'écran prétendue, c'est-à-dire une
-           affirmation sur ce à quoi l'application ressemble ; cette
-           affirmation appartient à une vraie photographie (#145, #157). -->
-      <div class="figure" aria-hidden="true">
-        <img class="bulle recue" src="/messagr-bulle-entrante.svg" alt="" width="240" height="96">
-        <img class="bulle envoyee" src="/messagr-bulle-sortante.svg" alt="" width="240" height="96">
-        <img class="bulle recue courte" src="/messagr-bulle-entrante.svg" alt="" width="240" height="96">
+      <!-- UN VRAI ÉCHANGE, TIRÉ DE LA SOURCE DE CONCEPTION.
+           Les trois bulles vides d'avant portaient la forme de la marque et
+           rien d'autre. Celle-ci vient de l'écran « conversation en
+           tête-à-tête » du prototype, qui fait autorité sur la disposition.
+
+           CE N'EST PAS UNE PHOTOGRAPHIE DE L'APPLICATION, et l'`alt` le dit.
+           Le jour où un banc peut photographier un état de produit (#157),
+           l'image est remplacée par la vraie.
+
+           Ce qu'elle montre est entièrement livré : la conversation en
+           tête-à-tête, l'horodatage, la double coche, les deux plis de coin.
+           L'en-tête et ses boutons d'appel, le message vocal et la vignette
+           photographique ont été cadrés hors de l'image, parce qu'ils
+           annonceraient ce qui ne tourne pas encore. Le détail est en tête de
+           `landing/conversation.html`. -->
+      <div class="figure">
+        <img class="conversation" src="/messagr-conversation-fr.png"
+             alt="Un échange dans Messagr : une question, une réponse, l'heure et la double coche."
+             width="1000" height="290" loading="lazy" decoding="async">
       </div>
     </div>
   </div>
@@ -472,6 +485,37 @@
 
 <section class="bande pied">
   <div class="mesure">
+
+    <!-- QUI EXPLOITE CE SERVICE, ET OÙ.
+         C'était une ligne sous le pli, dimensionnée comme une mention légale.
+         L'éditeur, le pays du serveur et l'absence de transfert hors de
+         l'Union sont des arguments pour qui choisit une messagerie
+         souveraine, et ils sont vérifiables : les trois viennent de la
+         politique de confidentialité publiée.
+
+         DEUX CHOSES NE SONT PAS ÉCRITES ICI, ET C'EST DÉLIBÉRÉ.
+
+         Pas de durée de conservation : elle vit dans `retention.json`, la
+         politique la publie, et `scripts/assert-retention.sh` tient les deux
+         d'accord. Une troisième copie serait une troisième chose à faire
+         diverger. Et la durée des journaux est imposée par décret, pas
+         choisie : l'annoncer ici comme une promesse serait la présenter pour
+         ce qu'elle n'est pas.
+
+         Pas de « aucun tiers dans l'application » : c'était vrai, ça ne l'est
+         plus depuis que l'application réveille le téléphone par Firebase, et
+         la politique a été corrigée pour le dire. Ce qui reste vrai, et se
+         vérifie en ouvrant l'inspecteur, c'est que CE SITE ne contacte
+         personne. -->
+    <section class="editeur">
+      <h2 data-t="editeur-titre">Qui édite ce service</h2>
+      <p data-t="editeur-societe">RV Myriagone Holding est responsable de ce traitement au
+      sens du règlement européen sur la protection des données.</p>
+      <p data-t="editeur-serveur">Le serveur est hébergé à Helsinki, en Finlande, donc au
+      sein de l'Union européenne. Il n'y a aucun transfert hors de l'Union.</p>
+      <p data-t="editeur-mesure">Ce site ne mesure rien : aucun traceur, aucune
+      bibliothèque d'analyse, aucun tiers. Il ne charge que ses propres fichiers.</p>
+    </section>
 
     <footer>
       Messagr est exploité par RV Myriagone Holding, 22 rue de la Garenne, 78130 Chapet,
