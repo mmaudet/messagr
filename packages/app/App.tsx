@@ -521,6 +521,21 @@ export function App({
       let passphrase: 'minted' | 'reused' | null = null
       let signUp: 'unfinished' | 'complete' | null = null
       let form: FormMigration | null = null
+      // WHO ELSE THE LAUNCH FOUND IN THE ROOM.
+      //
+      // Three answers, not two, which is the whole point: `null` means the
+      // member list never arrived, `derived: false` means it arrived and
+      // named nobody but this account, `derived: true` means the other
+      // person was found. `history` collapses all three into one null.
+      //
+      // Shape, not identity. A Matrix identifier written into logcat would
+      // answer the question by putting a correspondent's name in the system
+      // log; #107 refuses that of a notification, and a diagnostic has no
+      // better claim.
+      let whoElse: {
+        readonly joined: number
+        readonly derived: boolean
+      } | null = null
       if (credentials === null) {
         sessionStatus = 'not-configured'
         pumpStatus = 'not-configured'
@@ -1243,6 +1258,19 @@ export function App({
               // a readable conversation -- so the only way to tell "history
               // arrived" from "the key came by some other route" is to say
               // which one happened, and the log is where that is said.
+              // SAID HERE, BECAUSE `history` DOES NOT PROVE IT.
+              //
+              // #123 turns on a contradiction: the report says
+              // `history: null`, from which I concluded seven times that
+              // `other` was null -- hence `otherParty` undefined, hence every
+              // incoming message named (§13.26) -- and it is not.
+              //
+              // The implication is false. `historyClaim` also stays null when
+              // `fetchJoinedMembers` throws, and there are *two* places that
+              // derive the other person: this launch, and the live loop's
+              // re-derivation. The second can succeed where the first failed,
+              // which sets `party` without `history` ever moving.
+              whoElse = { joined: members.length, derived: other !== null }
               if (other !== null) {
                 setParty({ scope: roomId, other })
                 // Never throws: see claimHistory.ts for why a history that
@@ -1315,6 +1343,7 @@ export function App({
         send: sendStatus,
         received: receiveStatus,
         history: historyClaim,
+        whoElse,
         // The three the readout used to be the only witness for. `form` is
         // the keystore migration, which answers even on a launch that then
         // fails to start a machine at all -- so it is reported outside every
