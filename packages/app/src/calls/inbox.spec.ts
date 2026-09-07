@@ -83,6 +83,26 @@ describe('fetchTurnServer', () => {
     }
     expect(await fetchTurnServer(http)).toEqual(answer)
   })
+  it('reads a 404 as a homeserver with no relay, not as a failed request', async () => {
+    // The endpoint's own error table: a homeserver with no TURN SHOULD
+    // answer 404 `M_NOT_FOUND`. Left as a throw it reached the screen as a
+    // raw `MatrixError: [404]`, which is what messagr-fork answers today.
+    const http: HttpRequester = {
+      authedRequest: async () => {
+        throw Object.assign(new Error('[404] Not Found'), { httpStatus: 404 })
+      },
+    }
+    expect(await fetchTurnServer(http)).toEqual({ uris: [] })
+  })
+
+  it('lets any other failure through, because it is not an answer', async () => {
+    const http: HttpRequester = {
+      authedRequest: async () => {
+        throw Object.assign(new Error('gateway timed out'), { httpStatus: 504 })
+      },
+    }
+    await expect(fetchTurnServer(http)).rejects.toThrow('gateway timed out')
+  })
 })
 
 describe('openCallEvents', () => {

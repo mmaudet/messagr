@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react'
 import { Modal, Pressable, StyleSheet, Text, View } from 'react-native'
 
 import type { CallState, EndReason } from '../calls/machine'
+import type { CallSessionFailure } from '../calls/session'
 import { t, type CopyKey } from '../copy'
 import { color, floors, radius, space, type } from '../design/tokens'
 import { Avatar } from './Avatar'
@@ -42,6 +43,23 @@ import { TabIcon } from './TabIcon'
  * speaker button that does not move the sound is exactly the control that
  * ticket refuses.
  */
+
+/**
+ * Why the call never happened, when it never happened.
+ *
+ * These two come before every state below, because a call refused before it
+ * was placed is still `idle` or `ended` and those sentences would say it
+ * finished. Both are things somebody can act on: one is their operator's
+ * business, the other is theirs.
+ */
+function refusalFor(failure: CallSessionFailure): CopyKey {
+  switch (failure.kind) {
+    case 'no-relay':
+      return 'call_failed_no_relay'
+    case 'no-microphone':
+      return 'call_failed_no_microphone'
+  }
+}
 
 /** What a state says, in one line. */
 function sentenceFor(state: CallState): CopyKey {
@@ -101,6 +119,7 @@ function endingFor(reason: EndReason): CopyKey {
 
 export function CallScreen({
   state,
+  failure,
   shown,
   muted,
   onAnswer,
@@ -110,6 +129,8 @@ export function CallScreen({
   onDismiss,
 }: {
   readonly state: CallState
+  /** Why it never started, when that is what happened. */
+  readonly failure?: CallSessionFailure
   /** The name or the identifier, exactly as the conversation header shows it. */
   readonly shown: string
   readonly muted: boolean
@@ -140,7 +161,9 @@ export function CallScreen({
             {shown}
           </Text>
           <Text style={styles.sentence} testID="call-state">
-            {t(sentenceFor(state))}
+            {t(
+              failure === undefined ? sentenceFor(state) : refusalFor(failure),
+            )}
             {state.call === 'reconnecting' && ` ${state.secondsLeft}`}
           </Text>
           {state.call === 'inCall' && <Elapsed />}

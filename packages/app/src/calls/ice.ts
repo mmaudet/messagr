@@ -148,11 +148,32 @@ export function iceConfigFrom(
 export async function fetchTurnServer(
   http: HttpRequester,
 ): Promise<TurnServerAnswer> {
-  const answerJson = await http.authedRequest(
-    'GET',
-    '/_matrix/client/v3/voip/turnServer',
-    {},
-    undefined,
-  )
-  return JSON.parse(answerJson) as TurnServerAnswer
+  try {
+    const answerJson = await http.authedRequest(
+      'GET',
+      '/_matrix/client/v3/voip/turnServer',
+      {},
+      undefined,
+    )
+    return JSON.parse(answerJson) as TurnServerAnswer
+  } catch (cause: unknown) {
+    // A 404 IS AN ANSWER, NOT A FAILURE TO GET ONE.
+    //
+    // The endpoint's own error table says a homeserver with no TURN SHOULD
+    // answer 404 `M_NOT_FOUND`, and one that does not implement the endpoint
+    // reads the same way under the specification's general rule --
+    // `no-relay-configured` above says exactly this. So it comes back as an
+    // answer offering nothing, which is what it is, and `iceConfigFrom`
+    // classifies it like any other. Left as a throw it reached the screen as
+    // a raw `MatrixError: [404]`, which is what
+    // `messagr-fork.maudet.cloud` actually answers today.
+    if (statusOf(cause) === 404) return { uris: [] }
+    throw cause
+  }
+}
+
+/** The HTTP status a thrown request carried, when it carried one. */
+function statusOf(cause: unknown): number | undefined {
+  const status = (cause as { httpStatus?: unknown } | null)?.httpStatus
+  return typeof status === 'number' ? status : undefined
 }

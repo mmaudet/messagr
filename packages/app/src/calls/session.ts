@@ -1,3 +1,4 @@
+import { getErrorMessage } from '../runtime/errors'
 import {
   iceConfigFrom,
   type IceConfigFailure,
@@ -194,7 +195,27 @@ export function startCallSession(
    */
   async function relayed(): Promise<CallMedia> {
     if (media !== undefined) return media
-    const answer = await ports.turnServer()
+    // A HOMESERVER THAT COULD NOT BE ASKED IS A CALL THAT IS NOT PLACED.
+    //
+    // `IceConfigFailure` has carried an `unreachable` arm from the start and
+    // nothing produced it: a throw here went past every arm of this
+    // function and reached the caller as whatever the transport threw --
+    // measured on a device as `MatrixError: [404]` on a screen. The rule
+    // this module is built on does not care why there is no relay, only
+    // that there is none, so a request that failed lands in the same place
+    // as a homeserver that offered nothing.
+    let answer: TurnServerAnswer
+    try {
+      answer = await ports.turnServer()
+    } catch (cause: unknown) {
+      throw new CallSessionError(
+        {
+          kind: 'no-relay',
+          failure: { kind: 'unreachable', reason: getErrorMessage(cause) },
+        },
+        'the relay could not be asked for, and the call will not be placed',
+      )
+    }
     const config_ = iceConfigFrom(answer)
     if (!config_.ok) {
       throw new CallSessionError(

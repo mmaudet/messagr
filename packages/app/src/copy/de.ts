@@ -325,6 +325,9 @@ export const de: Readonly<Record<CopyKey, string>> = {
   call_mute: 'Mikrofon aus',
   call_unmute: 'Mikrofon ein',
   call_dismiss: 'Schließen',
+  call_failed_no_relay:
+    'Dieser Server hat kein Anrufrelais: Der Anruf war nicht möglich.',
+  call_failed_no_microphone: 'Das Mikrofon ist nicht verfügbar.',
   community_soon_title: 'Bald: Communitys und Räume',
   community_soon_why:
     'Eine Community fasst Räume unter einem pseudonymen Objekt zusammen. Der Reiter ist aus demselben Grund reserviert wie der für Anrufe: die Leiste darf sich nicht verschieben, wenn sie kommen.',

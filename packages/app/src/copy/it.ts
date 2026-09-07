@@ -317,6 +317,9 @@ export const it: Readonly<Record<CopyKey, string>> = {
   call_mute: 'Disattiva il microfono',
   call_unmute: 'Attiva il microfono',
   call_dismiss: 'Chiudi',
+  call_failed_no_relay:
+    'Questo server non ha un relay per le chiamate: la chiamata non è partita.',
+  call_failed_no_microphone: 'Il microfono non è disponibile.',
   community_soon_title: 'Presto: comunità e stanze',
   community_soon_why:
     'Una comunità raggruppa stanze sotto un oggetto pseudonimo. La scheda è riservata per la stessa ragione di quella delle chiamate: la barra non deve spostarsi quando arriveranno.',

@@ -114,6 +114,27 @@ describe('a call that cannot be placed is not placed', () => {
     expect((refusal as CallSessionError).failure.kind).toBe('no-relay')
   })
 
+  it('refuses a homeserver that could not be asked at all', async () => {
+    // THE ONE THAT WOULD HAVE CAUGHT IT. `IceConfigFailure` has carried an
+    // `unreachable` arm from the start and nothing produced it: a throwing
+    // `turnServer` went past every arm of `relayed` and reached the caller
+    // as whatever the transport threw. Measured on a device, where a
+    // homeserver with no TURN answers 404 and the screen showed
+    // `MatrixError: [404]`.
+    const { session, sent } = build({
+      turnServer: async () => {
+        throw new Error('the homeserver refused')
+      },
+    })
+    const refusal = await session.place().catch((e: unknown) => e)
+    expect(refusal).toBeInstanceOf(CallSessionError)
+    expect((refusal as CallSessionError).failure).toMatchObject({
+      kind: 'no-relay',
+      failure: { kind: 'unreachable' },
+    })
+    expect(sent).toEqual([])
+  })
+
   it('refuses a relay that only offers STUN', async () => {
     // STUN discovers an address; it does not carry media. An operator who
     // configured one meant to configure a relay.
