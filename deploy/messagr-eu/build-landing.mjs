@@ -183,8 +183,57 @@ const entete = (html, langue) => {
     motifDesc,
     `<meta name="description" content="${echapper(description).replace(/"/g, '&quot;')}">`,
   )
+  // L'APERÇU DE LIEN, PAR LANGUE. Une carte française sur `/de/` annulerait ce
+  // que les six adresses viennent de corriger, et c'est la surface par laquelle
+  // ce produit se diffuse : quelqu'un envoie un lien à quelqu'un.
+  //
+  // Chaque balise est exigée avant d'être réécrite, pour la raison écrite plus
+  // haut : une balise renommée doit arrêter la construction plutôt que de se
+  // faire remplacer par rien, en silence.
+  const social = [
+    ['og:title', copie[langue].titre],
+    ['og:description', copie[langue].chapo],
+    ['og:url', `${ORIGINE}${cheminDe(langue)}`],
+    ['og:image', `${ORIGINE}/messagr-partage-${langue}.png`],
+  ]
+  for (const [propriete, valeur] of social) {
+    const motif = new RegExp(
+      `<meta property="${propriete}" content="[^"]*">`,
+      'g',
+    )
+    exigerUneFois(
+      sortie,
+      motif,
+      `la balise <meta property="${propriete}">`,
+      langue,
+    )
+    sortie = sortie.replace(
+      motif,
+      `<meta property="${propriete}" content="${echapper(valeur).replace(/"/g, '&quot;')}">`,
+    )
+  }
+
   const canonique = `<link rel="canonical" href="${ORIGINE}${cheminDe(langue)}">`
   return sortie.replace('</head>', `${canonique}\n${liens}\n</head>`)
+}
+
+// ── Le plan du site ────────────────────────────────────────────────────────
+//
+// Six adresses et les deux pages légales. La page d'invitation n'y est pas :
+// elle n'a pas de contenu propre à indexer, elle répond les mêmes octets pour
+// tout jeton, et l'inscrire reviendrait à proposer à un moteur de parcourir
+// des jetons.
+const planDuSite = () => {
+  const pages = langues
+    .map(l => `${ORIGINE}${cheminDe(l)}`)
+    .concat([`${ORIGINE}/confidentialite/`, `${ORIGINE}/conditions-generales/`])
+  const entrees = pages.map(u => `  <url><loc>${u}</loc></url>`).join('\n')
+  return (
+    '<?xml version="1.0" encoding="UTF-8"?>\n' +
+    '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n' +
+    entrees +
+    '\n</urlset>\n'
+  )
 }
 
 // ── Écriture ───────────────────────────────────────────────────────────────
@@ -206,6 +255,9 @@ for (const langue of langues) {
   ecrites += 1
 }
 
+writeFileSync(join(destination, 'sitemap.xml'), planDuSite())
+
 console.log(
-  `build-landing: ${ecrites} pages, une par langue, chacune entière sans script`,
+  `build-landing: ${ecrites} pages, une par langue, chacune entière sans script, ` +
+    `et un plan du site de ${langues.length + 2} adresses`,
 )

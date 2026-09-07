@@ -5,6 +5,28 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Messagr</title>
 <meta name="description" content="La messagerie qui ne vous demande rien. Pas de numéro, pas de compte, pas de mot de passe.">
+<!-- L'APERÇU DE LIEN, ET IL COMPTE ICI PLUS QU'AILLEURS.
+     Messagr ne se diffuse que d'une seule façon : quelqu'un envoie un lien à
+     quelqu'un. Collé dans une messagerie, un courriel ou un réseau, ce lien
+     s'affichait en gris, sans titre ni image. L'aperçu EST la principale
+     surface publicitaire de ce produit, et elle était vide.
+     `build-landing.mjs` réécrit le titre, la description, l'adresse et
+     l'image pour chacune des six langues : une carte française sur /de/
+     annulerait ce que les six adresses viennent de corriger. -->
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="Messagr">
+<meta property="og:title" content="La messagerie qui ne vous demande rien.">
+<meta property="og:description" content="Pas de numéro, pas de compte, pas de mot de passe. Quelqu'un vous invite, vous écrivez.">
+<meta property="og:url" content="https://messagr.eu/">
+<meta property="og:image" content="https://messagr.eu/messagr-partage-fr.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<!-- `twitter:card` seul : les autres champs de Twitter retombent sur og: quand
+     ils manquent, et deux jeux de balises à tenir en phase, c'est un jeu qui
+     finit par mentir. -->
+<meta name="twitter:card" content="summary_large_image">
+<link rel="icon" href="/favicon.ico" sizes="any">
+<link rel="icon" href="/messagr-monogramme-r-vert.svg" type="image/svg+xml">
 <style>
   :root{
     --ground:#F7F5EF; --surface:#ffffff; --ink:#0C1F19; --soft:#5A6B63;
