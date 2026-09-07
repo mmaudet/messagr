@@ -167,7 +167,30 @@
     padding:3px 8px; border-radius:3px; white-space:nowrap;
   }
   .etat.fait{background:var(--bulle); color:var(--appui)}
+  /* Le troisième état se lit entre les deux : le trait plein de « fait » et
+     rien du fond de « à venir ». Il n'invente pas de couleur -- une troisième
+     teinte ferait trois signaux là où il n'y a qu'une échelle. */
+  .etat.encours{background:transparent; color:var(--appui);
+                box-shadow:inset 0 0 0 1.5px var(--appui)}
   .etat.avenir{background:var(--creux); color:var(--doux); box-shadow:inset 0 0 0 1px var(--regle)}
+  /* Dans la bande sombre, une pastille creuse doit se voir sur l'encre. */
+  .sombre .etat.encours{color:var(--appui); box-shadow:inset 0 0 0 1.5px var(--appui)}
+
+  /* ── Le tableau des états ────────────────────────────────────────────
+     Ses propres classes, et non celles de la bande sombre : `.colonne h3` y
+     est écrit en `--sur-sombre`, presque blanc, donc illisible sur le papier.
+     Trois groupes plutôt que seize pastilles : l'état se lit une fois par
+     colonne au lieu d'être répété à chaque ligne. */
+  .capacites{background:var(--surface); border-top:1px solid var(--regle);
+             border-bottom:1px solid var(--regle)}
+  .etats{display:grid; grid-template-columns:1fr; gap:26px; margin-top:34px}
+  @media (min-width:720px){ .etats{grid-template-columns:repeat(3,1fr); gap:32px} }
+  .groupe{border-top:2px solid var(--regle); padding:16px 0 0}
+  .groupe h3{margin:0 0 16px}
+  .groupe ul{list-style:none; padding:0; margin:0;
+             display:flex; flex-direction:column; gap:11px}
+  .groupe li{font-size:16.5px; line-height:1.35}
+  .capacites .faits{margin-top:30px; max-width:none}
 
   /* ── La loupe, en CSS seul ───────────────────────────────────────────
      `:target` fait la lucarne : le lien de la vignette pointe vers l'adresse
@@ -450,7 +473,7 @@
       Les trois autres sont dessinés et ne tournent pas encore.</p>
 
       <div class="galerie">
-      <div class="vue">
+      <div class="vue" data-cap="invitation">
         <figure>
           <a class="agrandir" href="#loupe-lancement"><img src="/messagr-ecran-premier-lancement.png" alt="" loading="lazy" decoding="async"></a>
           <figcaption>
@@ -459,7 +482,7 @@
           </figcaption>
         </figure>
       </div>
-      <div class="vue">
+      <div class="vue" data-cap="tete-a-tete">
         <figure>
           <a class="agrandir" href="#loupe-conversation"><img src="/messagr-conversation-fr.png" alt="" loading="lazy" decoding="async"></a>
           <figcaption>
@@ -468,7 +491,7 @@
           </figcaption>
         </figure>
       </div>
-      <div class="vue">
+      <div class="vue" data-cap="invitation">
         <figure>
           <a class="agrandir" href="#loupe-lien"><img src="/messagr-ecran-lien-expire.png" alt="" loading="lazy" decoding="async"></a>
           <figcaption>
@@ -477,7 +500,7 @@
           </figcaption>
         </figure>
       </div>
-      <div class="vue">
+      <div class="vue" data-cap="salons">
         <figure>
           <a class="agrandir" href="#loupe-salon"><img src="/messagr-ecran-salon.png" alt="" loading="lazy" decoding="async"></a>
           <figcaption>
@@ -486,7 +509,7 @@
           </figcaption>
         </figure>
       </div>
-      <div class="vue">
+      <div class="vue" data-cap="agents">
         <figure>
           <a class="agrandir" href="#loupe-agent"><img src="/messagr-ecran-agent.png" alt="" loading="lazy" decoding="async"></a>
           <figcaption>
@@ -495,12 +518,12 @@
           </figcaption>
         </figure>
       </div>
-      <div class="vue">
+      <div class="vue" data-cap="appels">
         <figure>
           <a class="agrandir" href="#loupe-appel"><img src="/messagr-ecran-appel.png" alt="" loading="lazy" decoding="async"></a>
           <figcaption>
             <span class="quoi" data-t="ecran-appel">Un appel chiffré</span>
-            <span class="etat avenir" data-t="etat-avenir">À venir</span>
+            <span class="etat encours" data-t="etat-encours">En cours</span>
           </figcaption>
         </figure>
       </div>
@@ -522,7 +545,16 @@
             <li data-t="serveur-non1">Le texte de vos messages</li>
             <li data-t="serveur-non2">Vos photographies</li>
             <li data-t="serveur-non3">Vos réactions</li>
-            <li data-t="serveur-non4">Qu'un appel est un appel</li>
+            <!-- LA PASTILLE EST LÀ PARCE QUE LA LIGNE ÉTAIT UNE SURANNONCE.
+                 La phrase est vraie du code -- `src/calls/transport.ts` fait
+                 passer les événements m.call.* par la même porte que les
+                 messages -- et fausse du produit : rien n'importe ce module,
+                 et aucune de ses chaînes n'est dans le paquet servi. Un
+                 lecteur lisait une liste de ce que l'application fait. Même
+                 famille que « Vos messages exportables à tout moment », qui a
+                 vécu ici jusqu'au 7 septembre 2026. -->
+            <li data-cap="appels"><span data-t="serveur-non4">Qu'un appel est un
+              appel</span> <span class="etat encours" data-t="etat-encours">En cours</span></li>
             <li data-t="serveur-non5">Les noms que vous donnez à vos contacts</li>
           </ul>
         </div>
@@ -584,6 +616,73 @@
            - les noms donnés : ADR-0010, ils ne quittent jamais l'appareil.
          Ce qui n'était pas certain n'est pas écrit, plutôt qu'écrit en plus
          prudent. -->
+  </div>
+</section>
+
+<!-- TROIS ÉTATS ET UNE DATE, PLUTÔT QUE DE LA PROSE SUR LES FONCTIONNALITÉS.
+     De la prose vieillit en silence. La fiche du magasin en est la preuve : elle
+     annonce encore « pas d'images, pas de réactions » alors que les deux sont
+     dans le fichier que cette page propose, et rien nulle part ne l'aurait dit.
+
+     C'EST UNE CHOSE CONTRE-INTUITIVE À METTRE SUR UNE PAGE DE PROMOTION, et
+     c'est le bon choix ici : l'objection « c'est une bêta » se désamorce mieux
+     avant l'installation qu'après. Le lecteur sait ce qu'il télécharge, et il a
+     une raison de revenir.
+
+     CHAQUE LIGNE « FAIT » EST VRAIE DU FICHIER SERVI, mesurée et non déduite du
+     journal des commits -- `tests/tableau-des-capacites.js` dit sur quoi.
+     L'attribut `data-verifie-sur` porte l'empreinte contre laquelle le tableau a
+     été vérifié : la construction s'arrête si le téléchargement change sans que
+     quelqu'un revérifie, ce qui est exactement la manière dont la fiche du
+     magasin est devenue fausse. -->
+<section class="bande capacites" id="etat"
+         data-verifie-sur="fd03d53e37b395a3ed3c08b99d1f150ff20da3b2d0cb53b29a2c951a3f19c12e">
+  <div class="mesure">
+    <h2 data-t="etat-titre">Ce que l'application fait aujourd'hui.</h2>
+    <p class="amorce" data-t="etat-amorce">Trois états, une date. Nous n'annonçons rien qui
+    ne tourne pas : cette liste est vérifiée sur le fichier que cette page propose.</p>
+
+    <div class="etats">
+      <div class="groupe">
+        <h3><span class="etat fait" data-t="etat-fait">Fait</span></h3>
+        <ul>
+          <li data-cap="tete-a-tete" data-t="cap-tete-a-tete">Conversation en tête-à-tête</li>
+          <li data-cap="invitation" data-t="cap-invitation">Entrée par invitation</li>
+          <li data-cap="chiffrement" data-t="cap-chiffrement">Chiffrement de bout en bout</li>
+          <li data-cap="photos" data-t="cap-photos">Photographies</li>
+          <li data-cap="reactions" data-t="cap-reactions">Réactions</li>
+          <li data-cap="noms" data-t="cap-noms">Noms donnés, gardés sur l'appareil</li>
+          <li data-cap="parrainage" data-t="cap-parrainage">Parrainage et éviction</li>
+          <li data-cap="notifications" data-t="cap-notifications">Notifications</li>
+        </ul>
+      </div>
+      <div class="groupe">
+        <h3><span class="etat encours" data-t="etat-encours">En cours</span></h3>
+        <ul>
+          <li data-cap="iphone" data-t="cap-iphone">iPhone</li>
+          <li data-cap="appels" data-t="cap-appels">Appels audio</li>
+        </ul>
+      </div>
+      <div class="groupe">
+        <h3><span class="etat avenir" data-t="etat-avenir">À venir</span></h3>
+        <ul>
+          <li data-cap="vocaux" data-t="cap-vocaux">Messages vocaux</li>
+          <li data-cap="video" data-t="cap-video">Appels vidéo</li>
+          <li data-cap="salons" data-t="cap-salons">Salons</li>
+          <li data-cap="communautes" data-t="cap-communautes">Communautés</li>
+          <li data-cap="agents" data-t="cap-agents">Agents</li>
+          <li data-cap="bureau" data-t="cap-bureau">Application de bureau</li>
+        </ul>
+      </div>
+    </div>
+
+    <!-- LA DATE EST CELLE DU FICHIER, PAS UNE DATE TAPÉE. `deploy.sh` mesure la
+         date de l'APK et `build-landing.mjs` l'écrit ici comme il l'écrit sous
+         le bouton de téléchargement : le tableau est vérifié CONTRE une
+         construction, donc c'est sa date qui le date. Une date saisie à la main
+         serait périmée au premier envoi et rien ne le dirait. -->
+    <p class="faits" data-t="etat-verifie">Vérifié sur la construction du %DATE%, celle que
+    cette page propose.</p>
   </div>
 </section>
 
@@ -709,7 +808,7 @@
      signe, parce qu'un « × » lu à voix haute ne dit rien. Et le bouton retour
      du navigateur referme aussi, gratuitement, ce qu'une lucarne en script
      doit coder exprès. -->
-  <div class="loupe" id="loupe-lancement">
+  <div class="loupe" id="loupe-lancement" data-cap="invitation">
     <a class="voile" href="#galerie" tabindex="-1" aria-hidden="true"></a>
     <figure>
       <img src="/messagr-ecran-premier-lancement.png" alt="">
@@ -720,7 +819,7 @@
       </figcaption>
     </figure>
   </div>
-  <div class="loupe" id="loupe-conversation">
+  <div class="loupe" id="loupe-conversation" data-cap="tete-a-tete">
     <a class="voile" href="#galerie" tabindex="-1" aria-hidden="true"></a>
     <figure>
       <img src="/messagr-conversation-fr.png" alt="">
@@ -731,7 +830,7 @@
       </figcaption>
     </figure>
   </div>
-  <div class="loupe" id="loupe-lien">
+  <div class="loupe" id="loupe-lien" data-cap="invitation">
     <a class="voile" href="#galerie" tabindex="-1" aria-hidden="true"></a>
     <figure>
       <img src="/messagr-ecran-lien-expire.png" alt="">
@@ -742,7 +841,7 @@
       </figcaption>
     </figure>
   </div>
-  <div class="loupe" id="loupe-salon">
+  <div class="loupe" id="loupe-salon" data-cap="salons">
     <a class="voile" href="#galerie" tabindex="-1" aria-hidden="true"></a>
     <figure>
       <img src="/messagr-ecran-salon.png" alt="">
@@ -753,7 +852,7 @@
       </figcaption>
     </figure>
   </div>
-  <div class="loupe" id="loupe-agent">
+  <div class="loupe" id="loupe-agent" data-cap="agents">
     <a class="voile" href="#galerie" tabindex="-1" aria-hidden="true"></a>
     <figure>
       <img src="/messagr-ecran-agent.png" alt="">
@@ -764,13 +863,13 @@
       </figcaption>
     </figure>
   </div>
-  <div class="loupe" id="loupe-appel">
+  <div class="loupe" id="loupe-appel" data-cap="appels">
     <a class="voile" href="#galerie" tabindex="-1" aria-hidden="true"></a>
     <figure>
       <img src="/messagr-ecran-appel.png" alt="">
       <figcaption>
         <span class="quoi" data-t="ecran-appel">Un appel chiffré</span>
-        <span class="etat avenir" data-t="etat-avenir">À venir</span>
+        <span class="etat encours" data-t="etat-encours">En cours</span>
         <a class="fermer" href="#galerie"><span aria-hidden="true">&#215;</span><span class="lu" data-t="fermer">Fermer</span></a>
       </figcaption>
     </figure>

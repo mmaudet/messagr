@@ -250,7 +250,12 @@ const entete = (html, langue) => {
 // incrémentés depuis la première construction. Les annoncer ressemblerait à
 // une information et n'en serait pas une. L'empreinte, elle, distingue deux
 // constructions et se vérifie en une commande.
-const CLES_DE_FAITS = ['apk-faits', 'apk-empreinte']
+//
+// `etat-verifie` en fait partie parce que le tableau des états est vérifié
+// CONTRE une construction : sans fichier proposé, « vérifié sur la
+// construction du … » n'a rien à nommer, et la ligne sort avec les deux
+// autres plutôt que d'afficher sa marque.
+const CLES_DE_FAITS = ['apk-faits', 'apk-empreinte', 'etat-verifie']
 
 const faitsDuTelechargement = () => {
   const octets = process.env.MESSAGR_APK_OCTETS || ''
@@ -330,6 +335,38 @@ const planDuSite = () => {
 // ── Écriture ───────────────────────────────────────────────────────────────
 
 const faits = faitsDuTelechargement()
+
+// ── Le tableau des états ne peut pas dater d'une autre construction ────────
+//
+// C'EST LA MANIÈRE EXACTE DONT LA FICHE DU MAGASIN EST DEVENUE FAUSSE. Elle
+// annonce encore « pas d'images, pas de réactions » ; les deux ont été livrées
+// depuis, personne n'est repassé sur la fiche, et rien nulle part ne l'a dit.
+// Le tableau porte donc l'empreinte contre laquelle il a été vérifié, et un
+// téléchargement qui change sans revérification arrête la construction.
+//
+// Le contrôle ne se pose que lorsque l'empreinte est connue, c'est-à-dire au
+// déploiement. L'intégration continue n'a pas l'APK, et une règle qui ne peut
+// pas s'appliquer ne doit pas se deviner.
+const verifieContre = (html => {
+  const trouve = /data-verifie-sur="([0-9a-f]{64})"/.exec(html)
+  if (!trouve) {
+    echouer(
+      "le tableau des états ne porte pas d'attribut `data-verifie-sur` : sans " +
+        "l'empreinte contre laquelle il a été vérifié, rien ne dirait qu'il " +
+        "parle d'une construction que cette page ne propose plus",
+    )
+  }
+  return trouve[1]
+})(gabarit)
+
+if (faits && faits.empreinte !== verifieContre) {
+  echouer(
+    'le téléchargement a changé depuis que le tableau des états a été ' +
+      `vérifié.\n  proposé  : ${faits.empreinte}\n  vérifié  : ${verifieContre}\n` +
+      '  Revérifiez ce que porte la nouvelle construction, corrigez les états ' +
+      "qui ont bougé, puis reportez l'empreinte dans `data-verifie-sur`.",
+  )
+}
 let ecrites = 0
 for (const langue of langues) {
   let page = gabarit
