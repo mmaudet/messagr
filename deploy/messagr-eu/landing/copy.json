@@ -7,12 +7,18 @@
     "point1": "Chiffrée de bout en bout, sans réglage",
     "point2": "Aucun carnet d'adresses aspiré, aucune publicité",
     "point3": "Vos messages exportables à tout moment",
+    "porte-oui": "J'ai une invitation",
+    "porte-non": "Je n'en ai pas",
     "obtenir": "Obtenir l'application",
     "direct": "Téléchargement direct",
     "bientot-play": "Bientôt sur Google Play",
     "bientot": "Bientôt",
+    "apres": "Après l'installation, ouvrez le lien qu'on vous a envoyé : c'est lui qui crée le compte.",
     "invitation-titre": "On n'entre dans Messagr que sur invitation.",
-    "invitation-corps": "L'application seule ne suffit pas : il vous faut le lien que quelqu'un vous a envoyé. Sans lui, rien à créer, rien à remplir."
+    "invitation-corps": "L'application seule ne suffit pas : il vous faut le lien que quelqu'un vous a envoyé. Sans lui, rien à créer, rien à remplir.",
+    "pourquoi": "Personne ne peut vous écrire sans que vous l'ayez laissé entrer. Il n'y a pas d'annuaire, pas de recherche par numéro, pas de carnet d'adresses aspiré : un inconnu n'a aucun moyen de vous trouver.",
+    "demander": "Demander une invitation",
+    "demander-note": "Votre message arrive à une personne, pas à un formulaire."
   },
   "en": {
     "menu-cgu": "Terms of use",
@@ -22,12 +28,18 @@
     "point1": "End-to-end encrypted, with nothing to set",
     "point2": "No address book harvested, no advertising",
     "point3": "Your messages exportable at any time",
+    "porte-oui": "I have an invitation",
+    "porte-non": "I don't have one",
     "obtenir": "Get the application",
     "direct": "Direct download",
     "bientot-play": "Coming to Google Play",
     "bientot": "Coming soon",
+    "apres": "After installing, open the link somebody sent you: that is what creates the account.",
     "invitation-titre": "Messagr is entered by invitation only.",
-    "invitation-corps": "The application alone is not enough: you need the link somebody sent you. Without it there is nothing to create and nothing to fill in."
+    "invitation-corps": "The application alone is not enough: you need the link somebody sent you. Without it there is nothing to create and nothing to fill in.",
+    "pourquoi": "Nobody can write to you unless you have let them in. There is no directory, no search by number, no address book harvested: a stranger has no way to find you.",
+    "demander": "Ask for an invitation",
+    "demander-note": "Your message reaches a person, not a form."
   },
   "de": {
     "menu-cgu": "Nutzungsbedingungen",
@@ -37,12 +49,18 @@
     "point1": "Ende-zu-Ende verschlüsselt, ohne Einstellung",
     "point2": "Kein Adressbuch abgesaugt, keine Werbung",
     "point3": "Ihre Nachrichten jederzeit exportierbar",
+    "porte-oui": "Ich habe eine Einladung",
+    "porte-non": "Ich habe keine",
     "obtenir": "Anwendung holen",
     "direct": "Direkter Download",
     "bientot-play": "Bald bei Google Play",
     "bientot": "Demnächst",
+    "apres": "Öffnen Sie nach der Installation den Link, den Ihnen jemand geschickt hat: er ist es, der das Konto anlegt.",
     "invitation-titre": "In Messagr kommt man nur auf Einladung.",
-    "invitation-corps": "Die Anwendung allein genügt nicht: Sie brauchen den Link, den Ihnen jemand geschickt hat. Ohne ihn gibt es nichts zu erstellen und nichts auszufüllen."
+    "invitation-corps": "Die Anwendung allein genügt nicht: Sie brauchen den Link, den Ihnen jemand geschickt hat. Ohne ihn gibt es nichts zu erstellen und nichts auszufüllen.",
+    "pourquoi": "Niemand kann Ihnen schreiben, ohne dass Sie ihn hereingelassen haben. Es gibt kein Verzeichnis, keine Suche nach Nummer, kein abgesaugtes Adressbuch: ein Fremder hat keine Möglichkeit, Sie zu finden.",
+    "demander": "Eine Einladung anfragen",
+    "demander-note": "Ihre Nachricht erreicht einen Menschen, kein Formular."
   },
   "es": {
     "menu-cgu": "Condiciones de uso",
@@ -52,12 +70,18 @@
     "point1": "Cifrada de extremo a extremo, sin ajustes",
     "point2": "Ninguna agenda aspirada, ninguna publicidad",
     "point3": "Sus mensajes exportables en cualquier momento",
+    "porte-oui": "Tengo una invitación",
+    "porte-non": "No tengo ninguna",
     "obtenir": "Obtener la aplicación",
     "direct": "Descarga directa",
     "bientot-play": "Pronto en Google Play",
     "bientot": "Pronto",
+    "apres": "Después de instalar, abra el enlace que alguien le envió: es él quien crea la cuenta.",
     "invitation-titre": "A Messagr solo se entra por invitación.",
-    "invitation-corps": "La aplicación por sí sola no basta: necesita el enlace que alguien le ha enviado. Sin él, nada que crear, nada que rellenar."
+    "invitation-corps": "La aplicación por sí sola no basta: necesita el enlace que alguien le ha enviado. Sin él, nada que crear, nada que rellenar.",
+    "pourquoi": "Nadie puede escribirle sin que usted le haya dejado entrar. No hay directorio, ni búsqueda por número, ni agenda aspirada: un desconocido no tiene forma de encontrarle.",
+    "demander": "Pedir una invitación",
+    "demander-note": "Su mensaje llega a una persona, no a un formulario."
   },
   "it": {
     "menu-cgu": "Condizioni d'uso",
@@ -67,12 +91,18 @@
     "point1": "Cifrata end-to-end, senza impostazioni",
     "point2": "Nessuna rubrica aspirata, nessuna pubblicità",
     "point3": "I tuoi messaggi esportabili in qualsiasi momento",
+    "porte-oui": "Ho un invito",
+    "porte-non": "Non ne ho uno",
     "obtenir": "Ottenere l'applicazione",
     "direct": "Download diretto",
     "bientot-play": "Presto su Google Play",
     "bientot": "Presto",
+    "apres": "Dopo l'installazione, apri il link che qualcuno ti ha inviato: è lui che crea l'account.",
     "invitation-titre": "In Messagr si entra solo su invito.",
-    "invitation-corps": "L'applicazione da sola non basta: ti serve il link che qualcuno ti ha inviato. Senza, niente da creare e niente da compilare."
+    "invitation-corps": "L'applicazione da sola non basta: ti serve il link che qualcuno ti ha inviato. Senza, niente da creare e niente da compilare.",
+    "pourquoi": "Nessuno può scriverti senza che tu l'abbia lasciato entrare. Non c'è elenco, non c'è ricerca per numero, non c'è rubrica aspirata: uno sconosciuto non ha alcun modo di trovarti.",
+    "demander": "Chiedere un invito",
+    "demander-note": "Il tuo messaggio arriva a una persona, non a un modulo."
   },
   "nl": {
     "menu-cgu": "Gebruiksvoorwaarden",
@@ -82,11 +112,17 @@
     "point1": "End-to-end versleuteld, zonder instellingen",
     "point2": "Geen adresboek opgezogen, geen reclame",
     "point3": "Uw berichten op elk moment exporteerbaar",
+    "porte-oui": "Ik heb een uitnodiging",
+    "porte-non": "Ik heb er geen",
     "obtenir": "De applicatie halen",
     "direct": "Directe download",
     "bientot-play": "Binnenkort in Google Play",
     "bientot": "Binnenkort",
+    "apres": "Open na de installatie de link die iemand u heeft gestuurd: die maakt het account aan.",
     "invitation-titre": "Messagr betreedt men alleen op uitnodiging.",
-    "invitation-corps": "De applicatie alleen is niet genoeg: u hebt de link nodig die iemand u heeft gestuurd. Zonder die link valt er niets te maken en niets in te vullen."
+    "invitation-corps": "De applicatie alleen is niet genoeg: u hebt de link nodig die iemand u heeft gestuurd. Zonder die link valt er niets te maken en niets in te vullen.",
+    "pourquoi": "Niemand kan u schrijven zonder dat u hem hebt binnengelaten. Er is geen gids, geen zoeken op nummer, geen opgezogen adresboek: een onbekende heeft geen enkele manier om u te vinden.",
+    "demander": "Een uitnodiging vragen",
+    "demander-note": "Uw bericht komt bij een mens terecht, niet bij een formulier."
   }
 }
