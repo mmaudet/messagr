@@ -1,4 +1,4 @@
-import React, { useState } from 'react'
+import React, { useRef, useState } from 'react'
 import { Pressable, StyleSheet, Text, View } from 'react-native'
 
 import { t, type CopyKey } from '../copy'
@@ -127,6 +127,12 @@ export function Conversation({
    * which one is listening.
    */
   const [offering, setOffering] = useState<string | null>(null)
+  /**
+   * Whether the touch still on the screen is the one that just opened a row.
+   * A ref rather than state: it is read inside the same gesture that writes
+   * it, and a re-render between the two would be a re-render for nothing.
+   */
+  const justOpened = useRef(false)
 
   return (
     <View
@@ -134,15 +140,24 @@ export function Conversation({
       style={styles.screen}
       // ANY TOUCH CLOSES IT, AND THE TOUCH STILL LANDS.
       //
-      // Capture runs from the root towards whatever was touched, so this sees
-      // the tap first and closes the row; returning `false` declines the
-      // gesture, so the emoji underneath still receives it. Choosing a
-      // reaction therefore reacts AND closes, and tapping anywhere else just
-      // closes -- one rule for both, instead of an invisible overlay that has
-      // to be told what to let through.
-      onStartShouldSetResponderCapture={() => {
+      // At the END of the touch, never the start. Closing on touch-down
+      // unmounted the emoji under the finger before the finger came off it,
+      // so the press it was aimed at never happened: measured on a Pixel,
+      // where tapping a reaction closed the row and reacted with nothing.
+      // By touch-end the emoji has had its press, and this only clears what
+      // is left.
+      //
+      // Capture rather than bubble so it runs whatever the touch landed on,
+      // including a child that consumed it. Nothing here claims the gesture.
+      onTouchEndCapture={() => {
+        // Except the long press that opened it, whose own finger has yet to
+        // come off the screen -- closing on that release would make the row
+        // impossible to open.
+        if (justOpened.current) {
+          justOpened.current = false
+          return
+        }
         setOffering(held => (held === null ? held : null))
-        return false
       }}>
       {entries.length === 0 ? (
         <Text
@@ -182,7 +197,10 @@ export function Conversation({
                 // toggle here would read the state it just cleared and
                 // reopen on every long press. A long press means "offer me
                 // reactions"; closing is any other touch's job now.
-                onOffer={() => setOffering(entry.eventId)}
+                onOffer={() => {
+                  justOpened.current = true
+                  setOffering(entry.eventId)
+                }}
                 mine={entry.claimedSender === selfUserId}
                 palette={palette}
                 tallies={reactions.get(entry.eventId) ?? []}

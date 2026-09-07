@@ -1,4 +1,5 @@
 import { getErrorMessage } from '../runtime/errors'
+import { logEvent } from '../runtime/log'
 import type { HttpRequester } from '../runtime/pump'
 import type { TimelineEntry } from './mergeTimeline'
 import { readImageEvent } from './imageEvent'
@@ -153,12 +154,27 @@ export async function toTimelineEntries(
           : { reason: 'this message carried no text' }),
       })
     } catch (cause: unknown) {
+      const reason = getErrorMessage(cause)
+      // The screen says only "its key never arrived", which is the right
+      // sentence for somebody reading a conversation and the wrong one for
+      // anybody working out WHY. A message this device sent itself coming
+      // back unreadable means something quite different from one whose
+      // sender never shared the key, and the two look identical on screen.
+      // Metadata only: the identifier, who claimed to send it, and the
+      // library's own words. No ciphertext, and by definition no plaintext.
+      // The sender is enough to tell the two apart -- this account's own
+      // identifier there is the case worth chasing.
+      logEvent('warn', 'MESSAGR_UNREADABLE', {
+        eventId,
+        claimedSender: sender,
+        reason,
+      })
       entries.push({
         eventId,
         claimedSender: sender,
         sentAt,
         body: null,
-        reason: getErrorMessage(cause),
+        reason,
       })
     }
   }
