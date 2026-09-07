@@ -26,7 +26,7 @@ const CONFIG: IceConfig = {
   uris: ['turn:relay.example.org:3478'],
   username: 'u',
   credential: 'c',
-  policy: 'relay-only',
+  transportPolicy: 'relay-only',
   ttlSeconds: 86400,
 }
 
