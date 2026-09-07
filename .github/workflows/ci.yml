@@ -87,6 +87,15 @@ jobs:
       - name: Assert the build carries an app icon
         run: ./scripts/assert-ios-icon.sh
 
+      # THE THIRD OF THE SAME SHAPE, AND THE MOST EXPENSIVE SO FAR.
+      # ITMS-90683 refused #109's first delivery an hour after `altool
+      # --validate-app` had said VERIFY SUCCEEDED, by an email to an address
+      # nobody was watching; 90592 refused the next one for a half-made export
+      # declaration. Both are things the plist says, and both were invisible
+      # until Apple said them.
+      - name: Assert Info.plist says what App Store Connect requires
+        run: ./scripts/assert-ios-info-plist.sh
+
       # THE SITE, BUILT AND THEN CHECKED -- not the committed pages.
       #
       # `build-site.sh` exists because the substitution it performs used to

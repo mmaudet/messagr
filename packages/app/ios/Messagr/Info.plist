@@ -54,31 +54,47 @@
 		<key>NSAllowsLocalNetworking</key>
 		<true/>
 	</dict>
+	<!-- LES DEUX TEXTES QU'APPLE A RECLAMES, ET POURQUOI L'UN EST UN AVEU.
+
+	     ITMS-90683, sur la premiere livraison de #109 : le binaire reference des
+	     API sensibles, donc l'Info.plist doit porter le texte correspondant,
+	     "meme si votre app n'utilise pas ces API". Un build sans eux se
+	     construit, se signe, se televerse et se fait refuser au traitement,
+	     par courriel, une heure plus tard.
+
+	     `scripts/assert-ios-purpose-strings.sh` refuse desormais ca dans
+	     `checks`, a partir des dependances declarees. -->
+	<key>NSMicrophoneUsageDescription</key>
+	<string>Pour que votre correspondant vous entende pendant un appel. Le son est chiffré de bout en bout : ni le serveur ni Messagr ne peuvent l’écouter, et rien n’est enregistré.</string>
+	<!-- UN TEXTE POUR UNE AUTORISATION QUI NE SERA JAMAIS DEMANDEE.
+	     Messagr ne touche pas la camera : ce lot est audio, et la video n'est
+	     pas offerte (#88). C'est `react-native-webrtc` qui reference l'API, et
+	     Apple exige le texte de qui la reference, pas de qui l'appelle. Le
+	     texte dit donc la verite plutot que d'annoncer une fonction absente :
+	     si jamais il s'affichait, il ne mentirait pas. -->
+	<key>NSCameraUsageDescription</key>
+	<string>Messagr n’utilise pas l’appareil photo. Ce texte est exigé par iOS parce que la bibliothèque d’appels référence cette API ; l’autorisation ne vous sera pas demandée.</string>
 	<key>NSPhotoLibraryUsageDescription</key>
 	<string>Pour choisir une image à envoyer dans une conversation. L’image est chiffrée sur cet appareil avant d’être envoyée : ni le serveur ni Messagr ne peuvent la lire.</string>
 	<key>RCTNewArchEnabled</key>
 	<true/>
-	<!-- THE EXPORT DECLARATION, ANSWERED HERE RATHER THAN AT EVERY UPLOAD.
+	<!-- L'EXPORT N'EST PAS DECLARE ICI, ET APPLE EST CELUI QUI L'A TRANCHE.
 
-	     Without this key App Store Connect marks each build "Missing
-	     Compliance" and holds it back from testers until somebody answers the
-	     question in a web form. It is the same answer every time, so it
-	     belongs in the build.
+	     Ce fichier a porte `ITSAppUsesNonExemptEncryption = true` pendant une
+	     livraison, pour que la question cesse d'etre posee a chaque build.
+	     Apple l'a refusee : erreur 90592, "Invalid Export Compliance Code. The
+	     export compliance key value [] in the app's Info.plist doesn't match
+	     the key value of the app's export compliance documentation".
 
-	     TRUE, AND THE REASON IS THE PRODUCT ITSELF. The exemption that would
-	     allow `false` is for applications that only use the encryption iOS
-	     already provides: HTTPS through URLSession, the keychain,
-	     authentication. Messagr encrypts its own messages end to end with
-	     Olm and Megolm, which is not that, and is the whole point.
+	     La cle `true` n'est utilisable qu'accompagnee de
+	     `ITSEncryptionExportComplianceCode`, le code qu'Apple delivre APRES
+	     avoir recu la documentation d'export. Tant qu'on ne le detient pas, la
+	     declarer est un renvoi vers un document qui n'existe pas.
 
-	     The algorithms are standard and published (AES-256, Curve25519,
-	     Ed25519, HMAC-SHA-256), so this is mass-market cryptography rather
-	     than anything proprietary. What follows from `true` is an annual
-	     self-classification report, not a CCATS review. Declaring `false`
-	     would be claiming an exemption this product does not have, in a
-	     statement Linagora signs. -->
-	<key>ITSAppUsesNonExemptEncryption</key>
-	<true/>
+	     Donc la question se repond dans App Store Connect, une fois par build,
+	     ou l'interface pose les vraies questions et ou la reponse est signee
+	     par une personne. Le jour ou le code existe, il vient ici avec la cle,
+	     et `assert-ios-info-plist.sh` refuse l'une sans l'autre. -->
 
 	<!-- WAKING A CLOSED APPLICATION.
 	     Without this, iOS drops a content-available push instead of deferring
