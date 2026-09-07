@@ -49,7 +49,8 @@
     "editeur-titre": "Qui édite ce service",
     "editeur-societe": "RV Myriagone Holding est responsable de ce traitement au sens du règlement européen sur la protection des données.",
     "editeur-serveur": "Le serveur est hébergé à Helsinki, en Finlande, donc au sein de l'Union européenne. Il n'y a aucun transfert hors de l'Union.",
-    "editeur-mesure": "Ce site ne mesure rien : aucun traceur, aucune bibliothèque d'analyse, aucun tiers. Il ne charge que ses propres fichiers."
+    "editeur-mesure": "Ce site ne mesure rien : aucun traceur, aucune bibliothèque d'analyse, aucun tiers. Il ne charge que ses propres fichiers.",
+    "fermer": "Fermer"
   },
   "en": {
     "menu-cgu": "Terms of use",
@@ -101,7 +102,8 @@
     "editeur-titre": "Who operates this service",
     "editeur-societe": "RV Myriagone Holding is the controller of this processing under the European data protection regulation.",
     "editeur-serveur": "The server is hosted in Helsinki, Finland, and therefore inside the European Union. There is no transfer outside the Union.",
-    "editeur-mesure": "This site measures nothing: no tracker, no analytics library, no third party. It loads only its own files."
+    "editeur-mesure": "This site measures nothing: no tracker, no analytics library, no third party. It loads only its own files.",
+    "fermer": "Close"
   },
   "de": {
     "menu-cgu": "Nutzungsbedingungen",
@@ -153,7 +155,8 @@
     "editeur-titre": "Wer diesen Dienst betreibt",
     "editeur-societe": "RV Myriagone Holding ist der Verantwortliche dieser Verarbeitung im Sinne der europäischen Datenschutz-Grundverordnung.",
     "editeur-serveur": "Der Server steht in Helsinki, Finnland, also innerhalb der Europäischen Union. Es gibt keine Übermittlung außerhalb der Union.",
-    "editeur-mesure": "Diese Website misst nichts: kein Tracker, keine Analysebibliothek, kein Dritter. Sie lädt nur ihre eigenen Dateien."
+    "editeur-mesure": "Diese Website misst nichts: kein Tracker, keine Analysebibliothek, kein Dritter. Sie lädt nur ihre eigenen Dateien.",
+    "fermer": "Schließen"
   },
   "es": {
     "menu-cgu": "Condiciones de uso",
@@ -205,7 +208,8 @@
     "editeur-titre": "Quién explota este servicio",
     "editeur-societe": "RV Myriagone Holding es el responsable de este tratamiento en el sentido del reglamento europeo de protección de datos.",
     "editeur-serveur": "El servidor está alojado en Helsinki, Finlandia, es decir, dentro de la Unión Europea. No hay ninguna transferencia fuera de la Unión.",
-    "editeur-mesure": "Este sitio no mide nada: ningún rastreador, ninguna biblioteca de análisis, ningún tercero. Solo carga sus propios archivos."
+    "editeur-mesure": "Este sitio no mide nada: ningún rastreador, ninguna biblioteca de análisis, ningún tercero. Solo carga sus propios archivos.",
+    "fermer": "Cerrar"
   },
   "it": {
     "menu-cgu": "Condizioni d'uso",
@@ -257,7 +261,8 @@
     "editeur-titre": "Chi gestisce questo servizio",
     "editeur-societe": "RV Myriagone Holding è il titolare di questo trattamento ai sensi del regolamento europeo sulla protezione dei dati.",
     "editeur-serveur": "Il server è ospitato a Helsinki, in Finlandia, quindi all'interno dell'Unione europea. Non c'è alcun trasferimento fuori dall'Unione.",
-    "editeur-mesure": "Questo sito non misura nulla: nessun tracciante, nessuna libreria di analisi, nessuna terza parte. Carica soltanto i propri file."
+    "editeur-mesure": "Questo sito non misura nulla: nessun tracciante, nessuna libreria di analisi, nessuna terza parte. Carica soltanto i propri file.",
+    "fermer": "Chiudi"
   },
   "nl": {
     "menu-cgu": "Gebruiksvoorwaarden",
@@ -309,6 +314,7 @@
     "editeur-titre": "Wie deze dienst exploiteert",
     "editeur-societe": "RV Myriagone Holding is de verwerkingsverantwoordelijke voor deze verwerking in de zin van de Europese privacyverordening.",
     "editeur-serveur": "De server staat in Helsinki, Finland, dus binnen de Europese Unie. Er vindt geen doorgifte buiten de Unie plaats.",
-    "editeur-mesure": "Deze site meet niets: geen tracker, geen analysebibliotheek, geen derde partij. Ze laadt alleen haar eigen bestanden."
+    "editeur-mesure": "Deze site meet niets: geen tracker, geen analysebibliotheek, geen derde partij. Ze laadt alleen haar eigen bestanden.",
+    "fermer": "Sluiten"
   }
 }

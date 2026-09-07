@@ -169,6 +169,57 @@
   .etat.fait{background:var(--bulle); color:var(--appui)}
   .etat.avenir{background:var(--creux); color:var(--doux); box-shadow:inset 0 0 0 1px var(--regle)}
 
+  /* ── La loupe, en CSS seul ───────────────────────────────────────────
+     `:target` fait la lucarne : le lien de la vignette pointe vers l'adresse
+     de la loupe, et la loupe ne s'affiche que lorsqu'elle est visée. Aucun
+     script, donc rien à charger et rien à réparer le jour où le script casse.
+     Le bouton retour du navigateur referme, gratuitement. */
+  .agrandir{display:block; cursor:zoom-in}
+  .agrandir:focus-visible{outline:3px solid var(--marque); outline-offset:3px}
+  .loupe{
+    display:none; position:fixed; inset:0; z-index:20;
+    align-items:center; justify-content:center; padding:24px;
+  }
+  .loupe:target{display:flex}
+  .voile{position:absolute; inset:0; background:rgba(12,31,25,.72); cursor:zoom-out}
+  /* La figure prend la largeur de l'image et pas davantage : sinon la légende
+     et la croix s'étalaient sur toute la largeur permise pendant que l'image,
+     bornée par sa hauteur, restait étroite au milieu. */
+  .loupe figure{
+    position:relative; margin:0; width:fit-content;
+    max-width:min(920px, 100%); max-height:100%;
+    display:flex; flex-direction:column; gap:12px;
+  }
+  .loupe img{
+    display:block; width:100%; height:auto; max-height:calc(100vh - 130px);
+    object-fit:contain; background:var(--surface); border-radius:6px;
+    box-shadow:0 24px 60px -20px rgba(0,0,0,.5);
+  }
+  .loupe figcaption{
+    display:flex; align-items:center; gap:12px; flex-wrap:wrap;
+    color:#EAF3EE;
+  }
+  .loupe .quoi{font-size:16px; font-weight:600}
+  .loupe .etat.fait{background:var(--bulle); color:var(--appui)}
+  .loupe .etat.avenir{background:rgba(255,255,255,.14); color:#EAF3EE; box-shadow:none}
+  /* La croix : quarante-quatre pixels de côté, le plancher tactile que le
+     système de design impose partout ailleurs. Elle est un lien, donc elle
+     est atteignable au clavier sans qu'on l'écrive. */
+  .fermer{
+    margin-left:auto; display:inline-flex; align-items:center; justify-content:center;
+    width:44px; height:44px; flex:0 0 44px;
+    font-size:26px; line-height:1; color:#EAF3EE; text-decoration:none;
+    border-radius:50%; background:rgba(255,255,255,.12);
+  }
+  .fermer:hover{background:rgba(255,255,255,.24)}
+  .fermer:focus-visible{outline:3px solid var(--marque); outline-offset:3px}
+  /* Le nom accessible est derrière le signe : « × » lu à voix haute ne dit
+     rien, et il se traduit comme le reste de la page. */
+  .lu{
+    position:absolute; width:1px; height:1px; overflow:hidden;
+    clip-path:inset(50%); white-space:nowrap;
+  }
+
   /* ── Titres de section ───────────────────────────────────────────── */
   h2{
     font-size:clamp(26px,3.4vw,38px); line-height:1.1; letter-spacing:-0.03em;
@@ -392,7 +443,7 @@
        Les écrans viennent du prototype de conception et ne sont pas des
        photographies : `landing/ecrans/LISEZ-MOI.md` dit d'où ils sortent et ce
        qui en a été retiré. -->
-  <section class="bande">
+  <section class="bande" id="galerie">
     <div class="mesure">
       <h2 data-t="galerie-titre">Ce que vous verrez.</h2>
       <p class="amorce" data-t="galerie-amorce">Trois de ces écrans existent aujourd'hui.
@@ -401,7 +452,7 @@
       <div class="galerie">
       <div class="vue">
         <figure>
-          <img src="/messagr-ecran-premier-lancement.png" alt="" loading="lazy" decoding="async">
+          <a class="agrandir" href="#loupe-lancement"><img src="/messagr-ecran-premier-lancement.png" alt="" loading="lazy" decoding="async"></a>
           <figcaption>
             <span class="quoi" data-t="ecran-lancement">Le premier lancement</span>
             <span class="etat fait" data-t="etat-fait">Fait</span>
@@ -410,7 +461,7 @@
       </div>
       <div class="vue">
         <figure>
-          <img src="/messagr-conversation-fr.png" alt="" loading="lazy" decoding="async">
+          <a class="agrandir" href="#loupe-conversation"><img src="/messagr-conversation-fr.png" alt="" loading="lazy" decoding="async"></a>
           <figcaption>
             <span class="quoi" data-t="ecran-conversation">Une conversation</span>
             <span class="etat fait" data-t="etat-fait">Fait</span>
@@ -419,7 +470,7 @@
       </div>
       <div class="vue">
         <figure>
-          <img src="/messagr-ecran-lien-expire.png" alt="" loading="lazy" decoding="async">
+          <a class="agrandir" href="#loupe-lien"><img src="/messagr-ecran-lien-expire.png" alt="" loading="lazy" decoding="async"></a>
           <figcaption>
             <span class="quoi" data-t="ecran-lien">Une invitation ne sert qu'une fois</span>
             <span class="etat fait" data-t="etat-fait">Fait</span>
@@ -428,7 +479,7 @@
       </div>
       <div class="vue">
         <figure>
-          <img src="/messagr-ecran-salon.png" alt="" loading="lazy" decoding="async">
+          <a class="agrandir" href="#loupe-salon"><img src="/messagr-ecran-salon.png" alt="" loading="lazy" decoding="async"></a>
           <figcaption>
             <span class="quoi" data-t="ecran-salon">Une conversation à plusieurs</span>
             <span class="etat avenir" data-t="etat-avenir">À venir</span>
@@ -437,7 +488,7 @@
       </div>
       <div class="vue">
         <figure>
-          <img src="/messagr-ecran-agent.png" alt="" loading="lazy" decoding="async">
+          <a class="agrandir" href="#loupe-agent"><img src="/messagr-ecran-agent.png" alt="" loading="lazy" decoding="async"></a>
           <figcaption>
             <span class="quoi" data-t="ecran-agent">Un agent, et ce qu'il peut faire</span>
             <span class="etat avenir" data-t="etat-avenir">À venir</span>
@@ -446,7 +497,7 @@
       </div>
       <div class="vue">
         <figure>
-          <img src="/messagr-ecran-appel.png" alt="" loading="lazy" decoding="async">
+          <a class="agrandir" href="#loupe-appel"><img src="/messagr-ecran-appel.png" alt="" loading="lazy" decoding="async"></a>
           <figcaption>
             <span class="quoi" data-t="ecran-appel">Un appel chiffré</span>
             <span class="etat avenir" data-t="etat-avenir">À venir</span>
@@ -646,6 +697,85 @@
 </section>
 
 </main>
+
+<!-- LA LOUPE, ET PAS UNE LIGNE DE SCRIPT.
+     Les vignettes sont petites, et un écran mérite d'être vu en grand. Une
+     lucarne se fait d'ordinaire en JavaScript ; ici elle se fait avec
+     `:target`, qui est du CSS. La page garde donc la propriété qu'elle tient
+     depuis le début : entière sans script, et aucune requête vers l'extérieur.
+
+     Le voile est un lien : cliquer à côté referme, comme partout ailleurs.
+     La croix en est un aussi, avec un nom accessible traduit derrière le
+     signe, parce qu'un « × » lu à voix haute ne dit rien. Et le bouton retour
+     du navigateur referme aussi, gratuitement, ce qu'une lucarne en script
+     doit coder exprès. -->
+  <div class="loupe" id="loupe-lancement">
+    <a class="voile" href="#galerie" tabindex="-1" aria-hidden="true"></a>
+    <figure>
+      <img src="/messagr-ecran-premier-lancement.png" alt="">
+      <figcaption>
+        <span class="quoi" data-t="ecran-lancement">Le premier lancement</span>
+        <span class="etat fait" data-t="etat-fait">Fait</span>
+        <a class="fermer" href="#galerie"><span aria-hidden="true">&#215;</span><span class="lu" data-t="fermer">Fermer</span></a>
+      </figcaption>
+    </figure>
+  </div>
+  <div class="loupe" id="loupe-conversation">
+    <a class="voile" href="#galerie" tabindex="-1" aria-hidden="true"></a>
+    <figure>
+      <img src="/messagr-conversation-fr.png" alt="">
+      <figcaption>
+        <span class="quoi" data-t="ecran-conversation">Une conversation</span>
+        <span class="etat fait" data-t="etat-fait">Fait</span>
+        <a class="fermer" href="#galerie"><span aria-hidden="true">&#215;</span><span class="lu" data-t="fermer">Fermer</span></a>
+      </figcaption>
+    </figure>
+  </div>
+  <div class="loupe" id="loupe-lien">
+    <a class="voile" href="#galerie" tabindex="-1" aria-hidden="true"></a>
+    <figure>
+      <img src="/messagr-ecran-lien-expire.png" alt="">
+      <figcaption>
+        <span class="quoi" data-t="ecran-lien">Une invitation ne sert qu'une fois</span>
+        <span class="etat fait" data-t="etat-fait">Fait</span>
+        <a class="fermer" href="#galerie"><span aria-hidden="true">&#215;</span><span class="lu" data-t="fermer">Fermer</span></a>
+      </figcaption>
+    </figure>
+  </div>
+  <div class="loupe" id="loupe-salon">
+    <a class="voile" href="#galerie" tabindex="-1" aria-hidden="true"></a>
+    <figure>
+      <img src="/messagr-ecran-salon.png" alt="">
+      <figcaption>
+        <span class="quoi" data-t="ecran-salon">Une conversation à plusieurs</span>
+        <span class="etat avenir" data-t="etat-avenir">À venir</span>
+        <a class="fermer" href="#galerie"><span aria-hidden="true">&#215;</span><span class="lu" data-t="fermer">Fermer</span></a>
+      </figcaption>
+    </figure>
+  </div>
+  <div class="loupe" id="loupe-agent">
+    <a class="voile" href="#galerie" tabindex="-1" aria-hidden="true"></a>
+    <figure>
+      <img src="/messagr-ecran-agent.png" alt="">
+      <figcaption>
+        <span class="quoi" data-t="ecran-agent">Un agent, et ce qu'il peut faire</span>
+        <span class="etat avenir" data-t="etat-avenir">À venir</span>
+        <a class="fermer" href="#galerie"><span aria-hidden="true">&#215;</span><span class="lu" data-t="fermer">Fermer</span></a>
+      </figcaption>
+    </figure>
+  </div>
+  <div class="loupe" id="loupe-appel">
+    <a class="voile" href="#galerie" tabindex="-1" aria-hidden="true"></a>
+    <figure>
+      <img src="/messagr-ecran-appel.png" alt="">
+      <figcaption>
+        <span class="quoi" data-t="ecran-appel">Un appel chiffré</span>
+        <span class="etat avenir" data-t="etat-avenir">À venir</span>
+        <a class="fermer" href="#galerie"><span aria-hidden="true">&#215;</span><span class="lu" data-t="fermer">Fermer</span></a>
+      </figcaption>
+    </figure>
+  </div>
+
 <script>
 // LA LANGUE EST UNE ADRESSE, PLUS UN REMPLACEMENT DE PHRASES.
 //
