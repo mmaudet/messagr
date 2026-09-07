@@ -70,8 +70,33 @@
     font-family:ui-monospace,SFMono-Regular,Menlo,monospace; font-size:11px;
     letter-spacing:.09em; text-transform:uppercase; color:var(--soft); padding-left:2px;
   }
+  /* LES DEUX PORTES. L'entaille à 45 degrés est celle des boutons du système
+     de design (notch.button vaut 16), la même que les pastilles de magasin
+     portent déjà : une page de promotion qui invente sa propre forme de bouton
+     cesse d'être la même marque que l'application. */
+  .portes{display:flex; flex-wrap:wrap; gap:12px; margin:0 0 40px}
+  .porte{
+    display:inline-flex; align-items:center; justify-content:center;
+    flex:1 1 210px; min-height:48px; padding:13px 22px;
+    background:var(--ink); color:#fff; text-decoration:none;
+    font-size:15.5px; font-weight:620; text-align:center;
+    clip-path:polygon(0 0, calc(100% - 16px) 0, 100% 16px, 100% 100%, 0 100%);
+  }
+  .porte:hover{background:var(--accent)}
+  .porte:focus-visible{outline:3px solid var(--mark); outline-offset:2px}
+  .porte.creuse{background:var(--bubble); color:var(--accent)}
+  .porte.creuse:hover{background:var(--mark); color:#fff}
+  .invite h2{
+    font-size:21px; line-height:1.25; letter-spacing:-0.015em; font-weight:640;
+    margin:0 0 12px; text-wrap:balance;
+  }
+  .invite p{margin:0 0 14px}
+  .invite p:last-child{margin-bottom:0}
+  .invite .porte{flex:0 1 auto; margin:4px 0 12px}
+  .invite .note{font-size:13.5px; color:var(--soft); margin:0}
+  .apres{font-size:14px; color:var(--soft); margin:20px 0 0}
   .invite{
-    background:var(--bubble); border-radius:4px; padding:18px 20px;
+    background:var(--bubble); border-radius:4px; padding:26px 24px;
     font-size:15.5px; margin-top:26px;
   }
   .invite b{font-weight:640}
@@ -87,6 +112,10 @@
     }
     .logotype.light{display:none}
     .logotype.dark{display:block}
+    .porte{background:var(--mark); color:#06251B}
+    .porte:hover{background:var(--accent); color:#06251B}
+    .porte.creuse{background:var(--bubble); color:var(--accent)}
+    .porte.creuse:hover{background:var(--mark); color:#06251B}
     .badge{background:var(--mark); color:#06251B}
     .badge:hover{background:var(--accent); color:#06251B}
     .badge.off{background:#1E3229; color:#7C9084}
@@ -134,7 +163,21 @@
     <li data-t="point3">Vos messages exportables à tout moment</li>
   </ul>
 
-  <div class="card">
+  <!-- LES DEUX PORTES, ET C'EST LA CORRECTION PRINCIPALE DE CETTE PAGE.
+       Elle n'offrait qu'une action, le téléchargement, et l'encadré placé
+       juste dessous expliquait que l'application seule ne sert à rien sans un
+       lien reçu de quelqu'un : elle invalidait son propre appel à l'action
+       dans le même bloc visuel. Tout visiteur qui le suivait obtenait une
+       application qui lui présentait un mur.
+
+       Celui qui n'a pas d'invitation est aussi la seule population qu'une page
+       web puisse convaincre. Il lui faut une porte. -->
+  <div class="portes">
+    <a class="porte" href="#obtenir" data-t="porte-oui">J'ai une invitation</a>
+    <a class="porte creuse" href="#invitation" data-t="porte-non">Je n'en ai pas</a>
+  </div>
+
+  <div class="card" id="obtenir">
     <div class="getline">
       <img class="appicon" src="/messagr-monogramme-r-vert.svg" alt="" width="52" height="52" aria-hidden="true">
       <p class="label" data-t="obtenir">Obtenir l'application</p>
@@ -167,12 +210,35 @@
 
     </div>
 
-    <div class="invite">
-      <b data-t="invitation-titre">On n'entre dans Messagr que sur invitation.</b>
-      <span data-t="invitation-corps">L'application seule ne suffit pas : il vous faut le lien
-      que quelqu'un vous a envoyé. Sans lui, rien à créer, rien à remplir.</span>
-    </div>
+    <p class="apres" data-t="apres">Après l'installation, ouvrez le lien qu'on vous a
+    envoyé : c'est lui qui crée le compte.</p>
   </div>
+
+  <!-- L'ENTRÉE PAR INVITATION EST L'ARGUMENT, PAS LA CONDITION. La page la
+       présentait comme une restriction, dans un encadré au bas d'une carte de
+       téléchargement. C'est la meilleure chose que ce produit ait à vendre :
+       pas de démarchage, pas d'inconnu qui écrit, aucun carnet d'adresses
+       aspiré.
+
+       Les deux phrases de l'encadré sont reprises telles quelles, avec leurs
+       clés : elles sont déjà traduites dans les six langues et elles disent
+       juste. Ce qui manquait, c'est la suite. -->
+  <section class="invite" id="invitation">
+    <h2 data-t="invitation-titre">On n'entre dans Messagr que sur invitation.</h2>
+    <p data-t="invitation-corps">L'application seule ne suffit pas : il vous faut le lien
+    que quelqu'un vous a envoyé. Sans lui, rien à créer, rien à remplir.</p>
+    <p data-t="pourquoi">Personne ne peut vous écrire sans que vous l'ayez laissé entrer.
+    Il n'y a pas d'annuaire, pas de recherche par numéro, pas de carnet d'adresses
+    aspiré : un inconnu n'a aucun moyen de vous trouver.</p>
+    <!-- UN `mailto:`, ET C'EST DÉLIBÉRÉ POUR L'INSTANT. Il fonctionne sans
+         script, ne contacte aucun tiers et ne mesure rien -- trois propriétés
+         que ce site tient et qu'un formulaire hébergé ailleurs romprait. Le
+         relier au service d'invitations est #152. -->
+    <a class="porte" href="mailto:conformite@messagr.eu?subject=Messagr%20invitation"
+       data-t="demander">Demander une invitation</a>
+    <p class="note" data-t="demander-note">Votre message arrive à une personne, pas à un
+    formulaire.</p>
+  </section>
 
   <footer>
     Messagr est exploité par RV Myriagone Holding, 22 rue de la Garenne, 78130 Chapet,
