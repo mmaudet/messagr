@@ -1,6 +1,10 @@
 package eu.messagr
 
 import android.os.Bundle
+import android.view.View
+import androidx.core.graphics.Insets
+import androidx.core.view.ViewCompat
+import androidx.core.view.WindowInsetsCompat
 import com.facebook.react.ReactActivity
 import com.facebook.react.ReactActivityDelegate
 import com.facebook.react.defaults.DefaultNewArchitectureEntryPoint.fabricEnabled
@@ -29,6 +33,43 @@ class MainActivity : ReactActivity() {
   override fun onCreate(savedInstanceState: Bundle?) {
     setTheme(R.style.AppTheme)
     super.onCreate(savedInstanceState)
+    liftTheContentAboveTheKeyboard()
+  }
+
+  /**
+   * Pads the content up by whatever the software keyboard covers.
+   *
+   * WHY THE MANIFEST'S `adjustResize` IS NOT ENOUGH ANY MORE. It is declared,
+   * and for years it was the whole answer: the system shrank the window and a
+   * composer at the bottom rose with it. Under the edge-to-edge display
+   * Android 15 enforces there is nothing left to shrink -- the window IS the
+   * screen -- so the keyboard is simply drawn over the text field somebody is
+   * typing into. Reported twice from a Pixel running Android 16 with
+   * `targetSdk 36`, the second time after a JavaScript fix that could not
+   * work: React Native's `keyboardDidShow` reports a height on Android by way
+   * of the same window resize, so under edge-to-edge it reports nothing.
+   *
+   * The inset has to come from where it still exists, which is
+   * `WindowInsetsCompat.Type.ime()`. This is the smallest thing that reads
+   * it: the listener runs on the activity's own content view, applies the
+   * keyboard's height as bottom padding, and returns the insets untouched so
+   * nothing else that wants them is deprived.
+   *
+   * `ime()` and not `systemBars()`: the navigation bar's inset is already
+   * handled by the safe-area context on the JavaScript side, and adding it
+   * here would push the tab bar up by a bar's height that is not there.
+   */
+  private fun liftTheContentAboveTheKeyboard() {
+    val content: View = findViewById(android.R.id.content)
+    ViewCompat.setOnApplyWindowInsetsListener(content) { view, insets ->
+      val keyboard: Insets = insets.getInsets(WindowInsetsCompat.Type.ime())
+      val bars: Insets = insets.getInsets(WindowInsetsCompat.Type.systemBars())
+      // The keyboard's inset already contains the navigation bar it covers,
+      // so subtracting it is what keeps the composer flush with the keyboard
+      // rather than a bar's height above it.
+      view.setPadding(0, 0, 0, (keyboard.bottom - bars.bottom).coerceAtLeast(0))
+      insets
+    }
   }
 
   /**
