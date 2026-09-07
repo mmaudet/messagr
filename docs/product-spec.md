@@ -1168,3 +1168,98 @@ Three assertions stay on the screen, and they are the right three: typing
 a message and seeing it arrive, a conversation being open and writable,
 and « Se présente comme » — the claim the product makes to a person about
 a sender it cannot authenticate. Nothing in a log can stand in for those.
+
+### 13.28 The brain of a call, before there is any sound (designed here)
+
+**The protocol half of a call is separable from the sound, and separating
+it is what makes it testable.** A 1:1 call is two problems wearing one
+name: a signalling exchange over the conversation's own room — who is
+calling, who picked up, which of their devices, who hung up and why — and
+a media path that carries audio. The second needs a device, a microphone
+and a network. The first needs none of them, and it is where every defect
+a person notices actually lives: the call that rang under the wrong name,
+the one that said "no answer" when it never left the telephone, the one
+that stayed on "connecting" until the application was killed.
+
+So the signalling is a state machine that takes its clock as a parameter,
+is handed the call and party identifiers rather than drawing them, and
+performs no input or output at all. Its whole output is a list of
+instructions: put this event in the room, hand this SDP to the media
+layer, the state is now this. Ninety scenarios replay against it in two
+hundredths of a second, including the ones nobody can produce on demand —
+two people ringing each other in the same instant, a second device
+answering first, an invite that expires between being displayed and being
+accepted, a connection lost for nineteen seconds and recovered.
+
+**Version 1 of the Matrix VoIP protocol, on everything sent.** It is the
+version that adds a party identifier to every event, and with it
+`m.call.select_answer` and `m.call.reject` — which is to say the version
+that can tell an account's devices apart. An account here has several by
+design, so a call that could not say *which* device answered would end the
+ringing on all of them or on none. Events arriving in the older version
+are still accepted, leniently, and answered in the version they speak; a
+version this build has never heard of is read as version 1, which is what
+the specification instructs.
+
+**Ninety seconds of ringing.** The specification recommends a floor rather
+than a default, and says why in the only terms that matter: "this should
+give the user enough time to actually pick up the call". Nothing shorter
+survives a telephone in another room.
+
+**Two people ringing each other at once resolve it without a round trip.**
+Both sides compare the two call identifiers, keep the lesser, and abandon
+the greater; whoever kept the incoming one becomes the callee. Because
+both run the same comparison on the same two values, they converge with
+nothing further sent. The specification then asks that the surviving call
+be accepted "on behalf of the user" — silently, with no ringing — and that
+obligation is deliberately *not* the machine's: accepting needs an answer,
+an answer needs a media layer, and the machine has none. It raises a flag
+and stops. Whoever holds the media layer discharges it, and if that fails
+the call should go on ringing as an ordinary incoming call rather than
+being ended.
+
+**The caller's offer is carried in the ringing state, and that is a
+correction rather than a detail.** A callee builds its answer from the
+caller's description; without it there is nothing to answer. An earlier
+version of this machine dropped it from what it published, and the result
+was not a degraded call but no answerable call at all.
+
+**Two deadlines, armed by different things, ending with opposite reasons.**
+A call that is agreed and never comes up is ended after thirty seconds
+with `ice_failed` — a backstop for a media layer that reports nothing at
+all, which is the failure mode that leaves a screen lying to somebody. A
+call that *was* up and loses its connection is not ended: it opens a
+twenty-second window with a visible countdown, during which reconnection
+is attempted, and ends with `ice_timeout` only if the window runs out. The
+split between the two reasons is whether media ever flowed, never whether
+the ending was a timeout, because the two render as different sentences —
+"the connection could not be established" and "the connection was
+interrupted" — and the wrong one puts on the screen something that never
+happened. The countdown is counted down in the machine and handed out as a
+number, so no screen owns a clock for it and two of them cannot disagree
+about what second it is.
+
+**A call that could not be sent is not a call nobody answered.** When the
+room refuses an invite, the call ends immediately and says so, rather than
+waiting out ninety seconds indistinguishable from the peer ignoring it.
+"We could not reach them" and "they did not pick up" are two different
+sentences, and a screen that cannot tell them apart shows the second while
+the first is what happened.
+
+**Somebody leaving the conversation ends the call, and the machine cannot
+see it.** A departure is a membership event, not a call event, so it never
+reaches a machine whose entire input is the seven call event types.
+Whoever wires this to a room must watch the peer's membership and feed the
+machine a hangup for the active call. The debt is written where it was
+incurred, and the alternative reading the specification permits — treating
+a departure as a *rejection* — was refused, because a synthesised
+rejection would have to invent a party identifier for a device that never
+answered.
+
+**What is not in this increment, and is not missing.** No media: SDP is
+carried and never inspected, and nothing here knows what a microphone is.
+No transport: nothing touches a room. No screen. The relay-only ICE
+policy §4.5 depends on — media relayed by the instance's own TURN server
+so that a peer never learns the other's address — is a separate decision
+with a separate home, and stating it here would be claiming something is
+wired that is not.
