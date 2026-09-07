@@ -1,0 +1,57 @@
+<!doctype html><meta charset="utf-8"><body style="margin:0;background:#F7F5EF">
+<!--ENLEVES {{ c.label }}-->
+<style>
+  body { margin:0; background:#e8e4dc; color:#1b1a19; font-family:'Schibsted Grotesk', Helvetica, sans-serif; -webkit-font-smoothing:antialiased; }
+  a { color:#0e8f63; text-decoration:none; }
+  a:hover { color:#06614a; text-decoration:underline; }
+  * { box-sizing:border-box; }
+  ::-webkit-scrollbar { width:6px; height:6px; }
+  ::-webkit-scrollbar-thumb { background:#cfc8bb; border-radius:3px; }
+  @keyframes riseIn { from{opacity:0; transform:translateY(8px)} to{opacity:1; transform:none} }
+  @keyframes pulseRing { 0%{opacity:.25} 50%{opacity:.9} 100%{opacity:.25} }
+  @keyframes scanSweep { 0%{transform:translateY(-104px)} 100%{transform:translateY(104px)} }
+</style>
+<div style="flex:1; min-height:0; overflow:auto; padding:18px 18px 24px;">
+                  <div style="display:flex; align-items:center; gap:13px; padding-bottom:16px; border-bottom:1px solid #e4dfd4;">
+                    <span style="width:52px; height:52px; flex:0 0 52px; background:#3a3630; color:#f2fbf6; display:flex; align-items:center; justify-content:center; font-family:'JetBrains Mono', monospace; font-size:11px; clip-path:polygon(0 0, 100% 0, 100% 68%, 68% 100%, 0 100%);">CR</span>
+                    <div>
+                      <div style="font-size:17px; font-weight:600;">Compte-rendu</div>
+                      <div style="font-family:'JetBrains Mono', monospace; font-size:10.5px; color:#6b665c; margin-top:2px;">Agent · SharedWorkspaceAgent</div>
+                      <div style="font-size:12px; color:#8f8a7e; margin-top:3px;">Ajouté par Nadia · propriétaire responsable</div>
+                    </div>
+                  </div>
+
+                  <p style="margin:15px 0 0; font-size:13.5px; line-height:1.55; color:#3f3b34; text-wrap:pretty;">Ce participant n'est pas une personne. Ce qu'il peut lire, écrire et déclencher est listé ci-dessous, et rien d'autre ne lui est accordé.</p>
+
+                  <div style="font-family:'JetBrains Mono', monospace; font-size:9.5px; letter-spacing:.14em; text-transform:uppercase; color:#8f8a7e; margin:20px 0 9px;">Ce qu'il peut faire</div>
+                  
+
+                  <div style="margin-top:12px; display:flex; align-items:center; justify-content:space-between; gap:12px; background:#fbf8f3; border:1px solid #e0dace; padding:11px 13px;">
+                    <div style="min-width:0;">
+                      <div style="font-size:13.5px; font-weight:500;">Écrire seulement si on la mentionne</div>
+                      <div style="font-size:11.5px; color:#8f8a7e; margin-top:2px;">Recommandé · l'agent ne prend jamais la parole seul</div>
+                    </div>
+                    <button onclick="{{ mentionToggle }}" style="{{ mentionTrack }}">
+                      <span style="{{ mentionKnob }}"></span>
+                    </button>
+                  </div>
+
+                  <div style="margin-top:18px; background:#f4f0e8; border-left:0; padding:13px 15px; clip-path:polygon(0 0, calc(100% - 16px) 0, 100% 16px, 100% 100%, 0 100%);">
+                    <div style="font-size:12.5px; line-height:1.55; color:#5b564d; text-wrap:pretty;">Le droit de lecture est le seul qui élargisse le cercle de déchiffrement : accordé, l'agent est un lecteur de plus, comme un membre humain.</div>
+                  </div>
+
+                  <sc-if value="{{ capsReadOnly }}" hint-placeholder-val="{{ false }}">
+                    <div style="display:flex; flex-direction:column; gap:9px; margin-top:18px;">
+                      <div style="background:#f4f0e8; border:1px solid #e0dace; padding:11px 13px; font-size:12px; line-height:1.5; color:#5b564d; text-wrap:pretty;">Vue depuis la conversation : lecture seule. Seul le propriétaire responsable modifie ces capacités, depuis les réglages de l'agent.</div>
+                      <button onclick="{{ goAgentConfig }}" style="background:#0c1f19; color:#f2fbf6; border:none; padding:13px 16px; font-size:14px; font-weight:600; font-family:inherit; cursor:pointer; clip-path:polygon(0 0, calc(100% - 14px) 0, 100% 14px, 100% 100%, 0 100%);">Ouvrir les réglages de l'agent</button>
+                      <button onclick="{{ goAudit }}" style="background:none; border:1px solid #cfc8bb; color:#3f3b34; padding:12px 16px; font-size:13.5px; font-family:inherit; cursor:pointer;">Voir ce qu'il a fait dans ce salon</button>
+                    </div>
+                  </sc-if>
+                  <sc-if value="{{ capsEditable }}" hint-placeholder-val="{{ true }}">
+                    <div style="display:flex; flex-direction:column; gap:9px; margin-top:18px;">
+                      <button onclick="{{ goAgentAdd }}" style="background:#0c1f19; color:#f2fbf6; border:none; padding:13px 16px; font-size:14px; font-weight:600; font-family:inherit; cursor:pointer; clip-path:polygon(0 0, calc(100% - 14px) 0, 100% 14px, 100% 100%, 0 100%);">Enregistrer et insérer dans un salon</button>
+                      <button style="background:none; border:1px solid #d8b4b4; color:#a13b3b; padding:12px 16px; font-size:13.5px; font-weight:500; font-family:inherit; cursor:pointer;">Supprimer cet agent</button>
+                    </div>
+                  </sc-if>
+                </div>
+</body>

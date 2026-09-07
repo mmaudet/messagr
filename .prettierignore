@@ -41,3 +41,4 @@ deploy/messagr-eu/tests/
 # et la seule chose qu'on veuille de lui est qu'il rende à l'identique.
 # `design/` est ignoré pour la même raison, une ligne plus haut.
 deploy/messagr-eu/landing/conversation.html
+deploy/messagr-eu/landing/ecrans/
