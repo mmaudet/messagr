@@ -792,8 +792,19 @@
   var RACINE = 'fr';
   var MEMOIRE = 'messagr-langue';
 
+  // LE FRAGMENT SURVIT AU DÉPLACEMENT, ET C'EST NEUF.
+  //
+  // Il ne coûtait rien de le perdre tant qu'aucune adresse n'en portait :
+  // depuis la loupe, `#loupe-salon` ouvre un écran en grand, et `messagr.eu/#loupe-salon`
+  // envoyé à quelqu'un dont le navigateur demande l'anglais le déposait sur
+  // `/en/` sans rien d'ouvert. Le lien avait l'air de marcher et ne montrait
+  // pas ce qu'on lui avait montré.
+  //
+  // Vaut pour les deux gestes : changer de langue devant un écran ouvert doit
+  // rouvrir le même écran, pas revenir en haut de la page.
   function chemin(code) {
-    return code === RACINE ? '/' : '/' + code + '/';
+    var base = code === RACINE ? '/' : '/' + code + '/';
+    return base + (location.hash || '');
   }
 
   // PREMIER GESTE : le sélecteur navigue.
