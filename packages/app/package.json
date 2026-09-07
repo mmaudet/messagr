@@ -12,6 +12,8 @@
     "e2e:android": "detox test --configuration android.emu.debug"
   },
   "dependencies": {
+    "@bam.tech/react-native-image-resizer": "3.0.11",
+    "@dr.pogodin/react-native-fs": "2.40.2",
     "@notifee/react-native": "^9.1.8",
     "@op-engineering/op-sqlite": "18.2.0",
     "@react-native-firebase/app": "^26.4.0",
@@ -26,6 +28,7 @@
     "react-native-matrix-crypto": "^0.6.0",
     "react-native-safe-area-context": "^5.5.2",
     "react-native-svg": "15.15.5",
+    "react-native-webrtc": "124.0.8",
     "text-encoding-polyfill": "^0.6.7"
   },
   "devDependencies": {

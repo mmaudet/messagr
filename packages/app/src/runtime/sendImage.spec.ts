@@ -2,12 +2,19 @@ import { describe, expect, it, vi } from 'vitest'
 
 import { sendImage, type SendingImageDeps } from './sendImage'
 
-const SECRET = JSON.stringify({
-  v: 'v2',
-  key: { kty: 'oct', alg: 'A256CTR', k: 'AA' },
-  iv: 'BB',
-  hashes: { sha256: 'CC' },
-})
+/**
+ * What `encryptAttachment` hands back, with a key that differs per call.
+ *
+ * A fixture answering one constant secret would make "the thumbnail has a key
+ * of its own" true for free, and the assertion that pins it worthless.
+ */
+const secretSealing = (nth: number) =>
+  JSON.stringify({
+    v: 'v2',
+    key: { kty: 'oct', alg: 'A256CTR', k: `key-${nth}` },
+    iv: `iv-${nth}`,
+    hashes: { sha256: `sha-${nth}` },
+  })
 
 const IMAGE = {
   bytes: new Uint8Array([1, 2, 3]),
@@ -16,12 +23,27 @@ const IMAGE = {
   height: 50,
 }
 
+/** The same photograph, with the downscaled copy a picker can make of it. */
+const IMAGE_WITH_THUMBNAIL = {
+  ...IMAGE,
+  thumbnail: {
+    bytes: new Uint8Array([7]),
+    mimeType: 'image/jpeg',
+    width: 10,
+    height: 5,
+  },
+}
+
 function deps(over: Partial<SendingImageDeps> = {}): SendingImageDeps {
+  let sealings = 0
   return {
-    seal: async bytes => ({
-      ciphertext: new Uint8Array([...bytes].reverse()),
-      secret: SECRET,
-    }),
+    seal: async bytes => {
+      sealings += 1
+      return {
+        ciphertext: new Uint8Array([...bytes].reverse()),
+        secret: secretSealing(sealings),
+      }
+    },
     upload: async () => 'mxc://h/abc',
     machine: {
       encryptEvent: async (_scope, _type, payload) => ({
@@ -85,7 +107,7 @@ describe('sendImage', () => {
     )
     const content = encrypted as { file: Record<string, unknown> }
     expect(content.file.url).toBe('mxc://h/abc')
-    expect(content.file.iv).toBe('BB')
+    expect(content.file.iv).toBe('iv-1')
   })
 
   it('reports the event it sent', async () => {
@@ -117,5 +139,102 @@ describe('sendImage', () => {
         IMAGE,
       ),
     ).toEqual({ sent: false, reason: 'the media repository is full' })
+  })
+})
+
+describe('sending the thumbnail beside the photograph', () => {
+  /** The event that went, read back out of the payload that was encrypted. */
+  async function eventFor(
+    image: Parameters<typeof sendImage>[2],
+    over: Partial<SendingImageDeps> = {},
+  ) {
+    let encrypted: Record<string, unknown> = {}
+    await sendImage(
+      deps({
+        machine: {
+          encryptEvent: async (_scope, _type, payload) => {
+            encrypted = payload
+            return { ciphertext: new Uint8Array() }
+          },
+        },
+        ...over,
+      }),
+      '!room:x',
+      image,
+    )
+    return encrypted as {
+      file: { url: string; key: { k: string } }
+      info: { thumbnail_file?: { url: string; key: { k: string } } }
+    }
+  }
+
+  it("seals the thumbnail with a key that is not the photograph's", async () => {
+    // The specification gives the thumbnail its own `file` object so that it
+    // can be an independent sealing, and it has to be one: a key shared with
+    // the photograph would mean that handing somebody the small picture hands
+    // them the large one.
+    const event = await eventFor(IMAGE_WITH_THUMBNAIL)
+    expect(event.info.thumbnail_file?.key.k).not.toBe(event.file.key.k)
+  })
+
+  it('puts the two ciphertexts at two addresses', async () => {
+    // Two uploads, two `mxc://`, and the event points at each of them. One
+    // address for both would be the thumbnail overwriting the photograph.
+    let uploads = 0
+    const event = await eventFor(IMAGE_WITH_THUMBNAIL, {
+      upload: async () => {
+        uploads += 1
+        return `mxc://h/${uploads}`
+      },
+    })
+    expect(uploads).toBe(2)
+    expect(event.info.thumbnail_file?.url).toBe('mxc://h/1')
+    expect(event.file.url).toBe('mxc://h/2')
+  })
+
+  it('uploads the thumbnail before the photograph', async () => {
+    // The order is the correctness (see the module): a thumbnail the
+    // repository refuses has to fail before anything has been put in it,
+    // rather than after the photograph is already there.
+    const sizes: number[] = []
+    await sendImage(
+      deps({
+        upload: async ciphertext => {
+          sizes.push(ciphertext.length)
+          return 'mxc://h/abc'
+        },
+      }),
+      '!room:x',
+      IMAGE_WITH_THUMBNAIL,
+    )
+    expect(sizes).toEqual([1, 3])
+  })
+
+  it('leaves nothing in the repository when the thumbnail cannot go', async () => {
+    const upload = vi.fn(async () => {
+      throw new Error('the media repository is full')
+    })
+    const send = vi.fn(async () => '$event')
+    const result = await sendImage(
+      deps({ upload, send }),
+      '!room:x',
+      IMAGE_WITH_THUMBNAIL,
+    )
+    expect(result).toEqual({
+      sent: false,
+      reason: 'the media repository is full',
+    })
+    expect(upload).toHaveBeenCalledTimes(1)
+    expect(send).not.toHaveBeenCalled()
+  })
+
+  it('sends the photograph alone when the picker made no thumbnail', async () => {
+    // The commonest case for as long as the picker cannot downscale, and the
+    // only case for every event already in a conversation. It must produce
+    // exactly the event it produced before there were thumbnails at all.
+    const upload = vi.fn(async () => 'mxc://h/abc')
+    const event = await eventFor(IMAGE, { upload })
+    expect(upload).toHaveBeenCalledTimes(1)
+    expect('thumbnail_file' in event.info).toBe(false)
   })
 })

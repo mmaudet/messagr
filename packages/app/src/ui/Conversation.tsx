@@ -12,7 +12,7 @@ import {
   type as typeScale,
 } from '../design/tokens'
 import type { ShownImage } from '../runtime/receiveImage'
-import type { ReadImage } from '../timeline/imageEvent'
+import type { ReadFile } from '../timeline/imageEvent'
 import { separatorsFor, type DayMark } from '../timeline/daySeparators'
 import { platesIn, type Plate as Grouping } from '../timeline/plates'
 import type { TimelineEntry } from '../timeline/mergeTimeline'
@@ -61,7 +61,7 @@ export interface ConversationProps {
    */
   readonly onReact?: (target: string, key: string, own: string | null) => void
   /** Downloads and decrypts a photograph. Absent means none are drawn. */
-  readonly onLoadImage?: (image: ReadImage) => Promise<ShownImage>
+  readonly onLoadImage?: (file: ReadFile) => Promise<ShownImage>
   /**
    * The clock, injectable, for the same reason `ConversationList` takes one:
    * a screen reading `Date.now()` inside itself is one nothing can screenshot
@@ -243,7 +243,7 @@ function Message({
   read: boolean
   /** `mine` is the id of this account's own reaction, when it has one. */
   onReact: (key: string, mine: string | null) => void
-  readonly onLoadImage?: (image: ReadImage) => Promise<ShownImage>
+  readonly onLoadImage?: (file: ReadFile) => Promise<ShownImage>
 }) {
   const [offering, setOffering] = useState(false)
 

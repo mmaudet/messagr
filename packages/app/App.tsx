@@ -98,7 +98,7 @@ import { sendImages } from './src/runtime/sendImages'
 import { pushTokenForThisDevice } from './src/runtime/pushDevice'
 import { whenNotificationPressed } from './src/runtime/showNotification'
 import type { ShownImage } from './src/runtime/receiveImage'
-import type { ReadImage } from './src/timeline/imageEvent'
+import type { ReadFile } from './src/timeline/imageEvent'
 import type { Plate as Grouping } from './src/timeline/plates'
 import type { EvictOutcome } from './src/runtime/evict'
 import type { HistoryClaim } from './src/runtime/claimHistory'
@@ -349,9 +349,9 @@ export function App({
   // Registering or removing this device's pusher. Held in a ref because the
   // settings switch is rendered outside the launch effect that binds it.
   const wakeThisDeviceRef = useRef<((on: boolean) => void) | null>(null)
-  const openImageRef = useRef<
-    ((image: ReadImage) => Promise<ShownImage>) | null
-  >(null)
+  const openImageRef = useRef<((file: ReadFile) => Promise<ShownImage>) | null>(
+    null,
+  )
   const reactRef = useRef<
     ((target: string, key: string, own: string | null) => void) | null
   >(null)
@@ -1405,13 +1405,13 @@ export function App({
   // arrow built in the JSX would be a new value every render, so every render
   // would download and decrypt the picture again.
   const loadImage = useMemo(
-    () => (image: ReadImage) =>
+    () => (file: ReadFile) =>
       openImageRef.current === null
         ? Promise.resolve<ShownImage>({
             shown: false,
             reason: 'the application is not ready to fetch media yet',
           })
-        : openImageRef.current(image),
+        : openImageRef.current(file),
     [],
   )
 

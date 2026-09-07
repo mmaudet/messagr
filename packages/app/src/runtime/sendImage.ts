@@ -1,4 +1,4 @@
-import { describeImage } from '../timeline/imageEvent'
+import { describeImage, type Uploaded } from '../timeline/imageEvent'
 import { sendEncryptedEvent } from './encryptedSend'
 import { getErrorMessage } from './errors'
 import { refuseImage, type PickedImage } from './pickImage'
@@ -34,6 +34,23 @@ import type { HttpRequester } from './pump'
  * a sealed image nobody uploaded is bytes in memory, and an uploaded
  * ciphertext nobody pointed at is a file with no key anywhere, which is
  * indistinguishable from noise.
+ *
+ * # The thumbnail is sealed with a key of its own, and it goes first
+ *
+ * `seal` is `encryptAttachment`, which mints a key per call, so sealing twice
+ * is two keys and there is a test that pins it. That is not an accident worth
+ * relying on quietly: the specification gives the thumbnail its own `file`
+ * object so it can be an independent one, and reusing the photograph's key
+ * would mean that handing somebody the small picture hands them the large one.
+ *
+ * It goes **before** the photograph, which is the only ordering that keeps the
+ * paragraph above true. A thumbnail is around a hundred kilobytes against
+ * several megabytes, so trying it first costs almost nothing — and if the media
+ * repository refuses it, nothing has been uploaded yet and the send fails the
+ * way an upload failure already fails. The other order would have to choose
+ * between failing a photograph that is already in the repository and sending
+ * one whose missing thumbnail nobody would ever notice, which is the shape of
+ * defect this codebase spends its comments avoiding.
  */
 
 export interface SealedFile {
@@ -70,9 +87,12 @@ export async function sendImage(
   if (refusal !== null) return { sent: false, reason: refusal }
 
   try {
-    const sealed = await deps.seal(image.bytes)
-    const url = await deps.upload(sealed.ciphertext)
-    const content = describeImage(image, url, sealed.secret)
+    const thumbnail =
+      image.thumbnail === undefined
+        ? null
+        : await sealAndUpload(deps, image.thumbnail.bytes)
+    const photograph = await sealAndUpload(deps, image.bytes)
+    const content = describeImage(image, photograph, thumbnail)
 
     // `m.room.message` inside the ciphertext, which is what an image is:
     // `m.image` is a message's `msgtype`, not an event type. The outer type
@@ -90,6 +110,23 @@ export async function sendImage(
   } catch (cause: unknown) {
     return { sent: false, reason: getErrorMessage(cause) }
   }
+}
+
+/**
+ * One file, sealed and put in the media repository.
+ *
+ * The pair is per file rather than sealing both files and then uploading
+ * both, so the thumbnail's ciphertext is gone before the photograph's exists.
+ * `encryptAttachment` holds the plaintext and the ciphertext at once, and
+ * holding two of those at a time is the peak `sendImages.ts` already refuses
+ * to pay across a batch.
+ */
+async function sealAndUpload(
+  deps: SendingImageDeps,
+  plaintext: Uint8Array,
+): Promise<Uploaded> {
+  const sealed = await deps.seal(plaintext)
+  return { url: await deps.upload(sealed.ciphertext), secret: sealed.secret }
 }
 
 /** The transport half, bound where `HttpRequester` is available. */
