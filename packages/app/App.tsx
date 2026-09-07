@@ -24,6 +24,7 @@ import {
   loadConversation,
   runOutgoingPump,
   sendOneEncryptedMessage,
+  sendTypedMessage,
   admitEntrant,
   inviteSomebody,
   listConversations,
@@ -123,6 +124,7 @@ import { setCatalogue, t } from './src/copy'
 import type { Language } from './src/copy/languages'
 import { enterWithASession } from './src/runtime/entry'
 import { initialLink, watchLinks } from './src/runtime/incomingLink'
+import { useKeyboardInset } from './src/ui/keyboardInset'
 import { servicePoster } from './src/runtime/servicePoster'
 import {
   fetchSessionSyncStatus,
@@ -388,6 +390,10 @@ export function App({
   // yet known" keeps the list from telling somebody they are locked out for
   // the second the keystore takes to answer.
   const [inYet, setInYet] = useState<boolean | null>(null)
+  // What the keyboard is covering. See `keyboardInset.ts`: the manifest's
+  // `adjustResize` stopped resizing anything under Android's enforced
+  // edge-to-edge display, so the composer sat under the keyboard.
+  const keyboardInset = useKeyboardInset()
   /**
    * A link handed over while this application was already running, and the
    * count of them.
@@ -759,9 +765,16 @@ export function App({
               setSendMessage(() => (body: string) => {
                 setSending('sending')
                 const deliver = async () => {
-                  const sent = await sendOneEncryptedMessage(
+                  // THE ROOM, WHICH THIS DID NOT PASS. It called
+                  // `sendOneEncryptedMessage`, a launch probe that picks
+                  // `fetchJoinedRooms()[0]` -- so every message typed in
+                  // any conversation went to whichever room the homeserver
+                  // listed first. Two people watched their replies never
+                  // arrive on 7 September 2026, and nothing was wrong with
+                  // the encryption.
+                  const sent = await sendTypedMessage(
                     sessionClient,
-                    credentials,
+                    scope,
                     body,
                   )
                   if (!sent.sent) {
@@ -1593,7 +1606,9 @@ export function App({
           view reserved; and a reserved top inset left a pale strip above the
           dark band, into which the system drew the clock and the battery in
           white. Whatever sits on an edge paints to it. */}
-        <SafeAreaView style={styles.screen} edges={['left', 'right']}>
+        <SafeAreaView
+          style={[styles.screen, { paddingBottom: keyboardInset }]}
+          edges={['left', 'right']}>
           {/* Outside the scroll view, like the tab bar and for the same reason:
             what the band says is true of the instance rather than of the
             screen under it, and a fact about the instance that scrolls away
