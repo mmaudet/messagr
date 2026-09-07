@@ -24,3 +24,9 @@ services/**/target/
 # own configuration, and prettier reformats a checkout somebody is working in.
 # Scratch space, and none of the three should look at it.
 .claude/worktrees/
+
+# App Store Connect API keys. Never in a repository, and this one is public.
+# The key lives in ~/.appstoreconnect/private_keys/, which is where altool and
+# xcodebuild look for it by key ID alone.
+*.p8
+AuthKey_*

@@ -58,6 +58,28 @@
 	<string>Pour choisir une image à envoyer dans une conversation. L’image est chiffrée sur cet appareil avant d’être envoyée : ni le serveur ni Messagr ne peuvent la lire.</string>
 	<key>RCTNewArchEnabled</key>
 	<true/>
+	<!-- THE EXPORT DECLARATION, ANSWERED HERE RATHER THAN AT EVERY UPLOAD.
+
+	     Without this key App Store Connect marks each build "Missing
+	     Compliance" and holds it back from testers until somebody answers the
+	     question in a web form. It is the same answer every time, so it
+	     belongs in the build.
+
+	     TRUE, AND THE REASON IS THE PRODUCT ITSELF. The exemption that would
+	     allow `false` is for applications that only use the encryption iOS
+	     already provides: HTTPS through URLSession, the keychain,
+	     authentication. Messagr encrypts its own messages end to end with
+	     Olm and Megolm, which is not that, and is the whole point.
+
+	     The algorithms are standard and published (AES-256, Curve25519,
+	     Ed25519, HMAC-SHA-256), so this is mass-market cryptography rather
+	     than anything proprietary. What follows from `true` is an annual
+	     self-classification report, not a CCATS review. Declaring `false`
+	     would be claiming an exemption this product does not have, in a
+	     statement Linagora signs. -->
+	<key>ITSAppUsesNonExemptEncryption</key>
+	<true/>
+
 	<!-- WAKING A CLOSED APPLICATION.
 	     Without this, iOS drops a content-available push instead of deferring
 	     it: the application is never started and the notification is never
