@@ -36,6 +36,18 @@
 <title>Messagr — invitation</title>
 <style>
   :root { color-scheme: light; }
+  /* `hidden` NE CACHE PLUS RIEN DÈS QU'UNE RÈGLE POSE `display`.
+     L'attribut ne vaut que par `[hidden] { display: none }` dans la feuille du
+     navigateur, et n'importe quelle règle de cette page-ci la bat, quelle que
+     soit sa spécificité : une feuille d'auteur passe avant celle de l'agent.
+     `canvas#qr { display: block }` était donc plus forte que le `hidden` du
+     canevas, et sur un téléphone -- où le code QR n'est jamais dessiné, puisque
+     le lien s'ouvre directement -- la page réservait un bloc blanc de 330
+     pixels entre l'avertissement et le bouton de copie. Il était en ligne, et
+     toute personne invitée depuis un téléphone le voyait.
+     Posé ici une fois pour toutes plutôt que corrigé règle par règle :
+     `button.copier` portait la même faute en dormance. */
+  [hidden] { display: none !important; }
   body {
     margin: 0;
     min-height: 100vh;
@@ -89,7 +101,10 @@
     font: inherit;
     font-weight: 600;
     padding: 13px;
-    margin-bottom: 16px;
+    /* Le haut est neuf : le canevas de 330 pixels séparait ce bouton du
+       paragraphe au-dessus tant qu'il occupait sa place. Une fois le canevas
+       vraiment caché, les deux se touchaient. */
+    margin: 16px 0;
     cursor: pointer;
   }
 </style>
