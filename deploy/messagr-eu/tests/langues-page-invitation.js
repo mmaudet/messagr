@@ -343,13 +343,18 @@ CODES.forEach(function (code) {
     // qu'un lecteur voit et empêchait la comparaison littérale de trouver une
     // phrase qui était bien là.
     var plat = rendue.replace(/\s+/g, ' ');
-    // LES DEUX LIGNES DE FAITS SONT ABSENTES ICI, ET C'EST LE COMPORTEMENT.
+    // LES TROIS LIGNES DE FAITS SONT ABSENTES ICI, ET C'EST LE COMPORTEMENT.
     // Cette construction n'a pas reçu les mesures du téléchargement, donc le
     // générateur les retire au lieu d'afficher « %TAILLE% ». Les exiger
     // reviendrait à exiger une page qui ment. Elles sont éprouvées plus bas,
     // dans leurs deux états.
+    //
+    // `etat-verifie` en fait partie pour la même raison : le tableau des états
+    // est vérifié CONTRE une construction, donc sans fichier proposé la phrase
+    // « vérifié sur la construction du … » n'a rien à nommer.
+    var FAITS = ['apk-faits', 'apk-empreinte', 'etat-verifie'];
     marqueesAccueil.filter(function (c) {
-      return c !== 'apk-faits' && c !== 'apk-empreinte';
+      return FAITS.indexOf(c) === -1;
     }).forEach(function (cle) {
       if (plat.indexOf(copie[code][cle]) === -1) {
         echouer('la page « ' + code + ' » ne porte pas sa phrase « ' + cle + ' »');
@@ -401,7 +406,18 @@ CODES.forEach(function (code) {
     });
   });
 
-  var EMPREINTE = 'a'.repeat(64);
+  // L'EMPREINTE FABRIQUÉE EST CELLE QUE LA PAGE DÉCLARE, ET NON UNE SUITE DE
+  // « a ». Le tableau des états porte `data-verifie-sur` : l'empreinte contre
+  // laquelle il a été vérifié, et `build-landing.mjs` refuse de publier un
+  // tableau vérifié contre un autre fichier que celui que la page propose.
+  // Un jeu de faits inventé au hasard tombe donc sur ce refus, qui est le bon
+  // comportement -- mais ce bloc-ci éprouve l'écriture des faits, pas le
+  // garde-fou, et il ne doit pas échouer pour la raison d'un autre.
+  var declaree = /data-verifie-sur="([0-9a-f]{64})"/.exec(accueil);
+  if (!declaree) {
+    echouer("le tableau des états ne déclare pas `data-verifie-sur`");
+  }
+  var EMPREINTE = declaree ? declaree[1] : 'a'.repeat(64);
   var avecFaits = construire(function () {
     process.env.MESSAGR_APK_OCTETS = '139006945';
     process.env.MESSAGR_APK_SHA256 = EMPREINTE;
