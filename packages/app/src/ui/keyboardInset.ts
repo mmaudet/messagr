@@ -17,6 +17,18 @@ import { Keyboard, Platform } from 'react-native'
  * Reported on a Pixel running Android 16 with `targetSdk 36`, where somebody
  * trying to answer a message could not see what they were typing.
  *
+ * # ANDROID IS HANDLED NATIVELY, AND THIS HOOK ANSWERS ZERO THERE
+ *
+ * The first version of this hook subscribed on both platforms and did
+ * nothing on Android: React Native reports a keyboard height there by way of
+ * the same window resize that edge-to-edge removed, so `keyboardDidShow`
+ * arrives with nothing useful. Measured on a device -- the composer did not
+ * move by a pixel with the keyboard up.
+ *
+ * `MainActivity` reads `WindowInsetsCompat.Type.ime()` instead, which is
+ * where the number still exists, and pads the content view. Subscribing here
+ * as well would add that padding twice.
+ *
  * # Why a listener rather than `KeyboardAvoidingView`
  *
  * `KeyboardAvoidingView`'s Android behaviour is exactly the one that stopped
@@ -37,16 +49,17 @@ export function useKeyboardInset(): number {
   const [inset, setInset] = useState(0)
 
   useEffect(() => {
-    const shown = Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow'
-    const hidden =
-      Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide'
-    const up = Keyboard.addListener(shown, event => {
+    // Android pads its own content view; see the note above.
+    if (Platform.OS !== 'ios') return undefined
+    // `Will` rather than `Did`: iOS emits it before the animation, which is
+    // what lets the composer rise with the keyboard rather than after it.
+    const up = Keyboard.addListener('keyboardWillShow', event => {
       // `endCoordinates.height` is what the keyboard will occupy once it has
       // finished arriving. The screen height minus its top would be the same
       // number the long way round, and wrong on a split keyboard.
       setInset(event.endCoordinates.height)
     })
-    const down = Keyboard.addListener(hidden, () => setInset(0))
+    const down = Keyboard.addListener('keyboardWillHide', () => setInset(0))
     return () => {
       up.remove()
       down.remove()
