@@ -367,6 +367,15 @@ export function App({
    */
   const [call, setCall] = useState<CallOnScreen | null>(null)
   const [callMuted, setCallMuted] = useState(false)
+  /**
+   * Whether the call is on the loudspeaker.
+   *
+   * Kept beside the mute rather than read back from the platform: the
+   * routing has no observer, only a setter, so the screen's own record is
+   * the only account of what was asked for. Reset with the call, because the
+   * audio session ends with it and the next one starts at the earpiece.
+   */
+  const [callSpeaker, setCallSpeaker] = useState(false)
   const callRuntimeRef = useRef<CallRuntime | null>(null)
   // Choosing and sending a photograph, and opening one that arrived. Held in
   // refs like every other gesture the launch effect binds.
@@ -1237,7 +1246,10 @@ export function App({
                 setCall(onScreen)
                 // A call that ended took the microphone with it, and the next
                 // one starts unmuted.
-                if (onScreen === null) setCallMuted(false)
+                if (onScreen === null) {
+                  setCallMuted(false)
+                  setCallSpeaker(false)
+                }
               },
             )
 
@@ -1714,6 +1726,7 @@ export function App({
             failure={call.failure}
             shown={displayNameFor(call.peerUserId, names.get(call.peerUserId))}
             muted={callMuted}
+            speaker={callSpeaker}
             onAnswer={() =>
               callRuntimeRef.current?.answer().catch((cause: unknown) =>
                 logEvent('warn', 'MESSAGR_CALL_NOT_ANSWERED', {
@@ -1729,6 +1742,10 @@ export function App({
               // happen, and a button drawn from the intent would lie about it.
               const held = callRuntimeRef.current?.setMuted(wanted) ?? wanted
               setCallMuted(held)
+            }}
+            onSpeaker={wanted => {
+              callRuntimeRef.current?.setSpeaker(wanted)
+              setCallSpeaker(wanted)
             }}
             onDismiss={() =>
               callRuntimeRef.current?.release().catch((cause: unknown) =>

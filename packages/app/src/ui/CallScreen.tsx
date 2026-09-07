@@ -37,11 +37,11 @@ import { TabIcon } from './TabIcon'
  * # No video, and no control that pretends
  *
  * §4.5 names camera controls; this lot is audio, and #88 says a control that
- * does nothing is worse than an absent one. There is no camera button here
- * and no speaker button either -- routing audio to the loudspeaker needs a
- * platform API neither `react-native-webrtc` nor this application has, and a
- * speaker button that does not move the sound is exactly the control that
- * ticket refuses.
+ * does nothing is worse than an absent one. There is no camera button here.
+ *
+ * There was no speaker button either, for the same reason, until the routing
+ * existed to put behind it: `callAudio.ts` now holds the audio session, so
+ * the control moves the sound and has earned its place.
  */
 
 /**
@@ -122,10 +122,12 @@ export function CallScreen({
   failure,
   shown,
   muted,
+  speaker,
   onAnswer,
   onReject,
   onHangup,
   onMute,
+  onSpeaker,
   onDismiss,
 }: {
   readonly state: CallState
@@ -134,10 +136,13 @@ export function CallScreen({
   /** The name or the identifier, exactly as the conversation header shows it. */
   readonly shown: string
   readonly muted: boolean
+  /** Whether the sound is going to the loudspeaker rather than the earpiece. */
+  readonly speaker: boolean
   readonly onAnswer: () => void
   readonly onReject: () => void
   readonly onHangup: () => void
   readonly onMute: (muted: boolean) => void
+  readonly onSpeaker: (on: boolean) => void
   /** Leaves the call screen. Only offered once the call is over. */
   readonly onDismiss: () => void
 }) {
@@ -197,6 +202,16 @@ export function CallScreen({
                 tint={muted ? color.brand.green500 : color.neutral['600']}
                 onPress={() => onMute(!muted)}
                 glyph="mic"
+              />
+              {/* GREEN WHEN IT IS ON, like the mute beside it: on a screen
+                  with two toggles and no labels-as-state, the fill IS the
+                  state, and one convention for both is one thing to learn. */}
+              <Round
+                testID="call-speaker"
+                label={t('call_speaker')}
+                tint={speaker ? color.brand.green500 : color.neutral['600']}
+                onPress={() => onSpeaker(!speaker)}
+                glyph="community"
               />
               <Round
                 testID="call-hangup"
@@ -260,7 +275,7 @@ function Round({
   readonly label: string
   readonly tint: string
   readonly onPress: () => void
-  readonly glyph: 'calls' | 'mic'
+  readonly glyph: 'calls' | 'mic' | 'community'
 }) {
   return (
     <View style={styles.control}>
