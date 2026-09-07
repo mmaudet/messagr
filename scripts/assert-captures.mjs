@@ -13,6 +13,18 @@
 // sur le COMPORTEMENT que les essais ont vérifié, pas sur ce que l'écran
 // affichait à l'instant du `screencap`.
 //
+// CE QUE CE BLANC ÉTAIT, ET LA LEÇON. Il a d'abord été lu comme « l'application
+// ne dessine rien », et c'était faux. La même commande, Messagr fermé et le
+// lanceur Android au premier plan, rend la MÊME trame blanche de 10 195 octets,
+// écran éveillé et couches composées normalement. C'est la capture de ce banc
+// qui rend du vide, pour tout.
+//
+// La garde n'en est pas affaiblie, elle en est mieux justifiée : un banc dont
+// les captures sont blanches quelle que soit l'application est exactement le cas
+// qui produisait quatre rectangles, imprimait « captured » et téléversait un
+// artefact d'apparence pleine. Et le message d'échec ne nomme donc pas de
+// coupable : il dit que rien n'a été rendu et comment départager en une commande.
+//
 // Deux propriétés suffisent à attraper ce cas, et aucune des deux ne demande
 // de décoder l'image.
 //
@@ -102,7 +114,10 @@ for (const nom of fichiers) {
     echouer(
       `${nom} pèse ${parMegapixel} octets par mégapixel, sous le plancher de ` +
         `${PLANCHER_PAR_MEGAPIXEL}. Une surface unie compresse jusque-là ; un écran ` +
-        `avec du texte, jamais. L'application n'a probablement rien dessiné.`,
+        `avec du texte, jamais. Rien n'a été rendu -- et la cause n'est pas ici : ` +
+        `ce peut être l'application, ou la capture de ce banc, qui rend parfois ` +
+        `une trame vide pour TOUT, lanceur compris. Photographier l'écran d'accueil ` +
+        `du système départage les deux en une commande.`,
     )
   }
 
