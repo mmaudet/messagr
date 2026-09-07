@@ -181,147 +181,63 @@
 
 </main>
 <script>
-// LA LANGUE, ET RIEN D'AUTRE.
+// LA LANGUE EST UNE ADRESSE, PLUS UN REMPLACEMENT DE PHRASES.
 //
-// Cette page n'avait aucun script, et c'était une propriété : elle
-// fonctionne avec JavaScript coupé. Elle la garde -- le français est dans le
-// balisage, ce bloc ne fait que le REMPLACER pour un navigateur qui lit
-// autre chose. Coupé, la page reste française et entière.
+// Ce bloc traduisait la page à l'affichage, ce qui la rendait juste pour le
+// lecteur et invisible pour tout le reste : un moteur n'indexait que le
+// français, et personne ne pouvait envoyer « la page en allemand » puisque
+// l'adresse était la même pour les six.
 //
-// Pourquoi elle est traduite du tout : l'application embarque six langues
-// et n'a aucun repli (#103), et la moitié de cet argument se perdait sur les
-// écrans qui précèdent l'application. Voir #115 et
-// `tests/langues-page-invitation.js`, qui tient les deux pages.
+// Les six pages existent maintenant, écrites par `build-landing.mjs`, et
+// chacune est entière dans sa langue sans qu'aucun script tourne. Il ne reste
+// donc à celui-ci que deux gestes, et aucun des deux ne touche au texte.
 (function () {
-  var T = {
-    fr: null,
-    en: {
-      'menu-cgu': 'Terms of use',
-      'menu-confidentialite': 'Privacy',
-      titre: 'The messenger that asks you for nothing.',
-      chapo: 'No number, no account, no password. Somebody invites you, you write.',
-      point1: 'End-to-end encrypted, with nothing to set',
-      point2: 'No address book harvested, no advertising',
-      point3: 'Your messages exportable at any time',
-      obtenir: 'Get the application',
-      direct: 'Direct download',
-      'bientot-play': 'Coming to Google Play',
-      bientot: 'Coming soon',
-      'invitation-titre': 'Messagr is entered by invitation only.',
-      'invitation-corps': 'The application alone is not enough: you need the link somebody sent you. Without it there is nothing to create and nothing to fill in.'
-    },
-    de: {
-      'menu-cgu': 'Nutzungsbedingungen',
-      'menu-confidentialite': 'Datenschutz',
-      titre: 'Der Messenger, der nichts von Ihnen verlangt.',
-      chapo: 'Keine Nummer, kein Konto, kein Passwort. Jemand lädt Sie ein, Sie schreiben.',
-      point1: 'Ende-zu-Ende verschlüsselt, ohne Einstellung',
-      point2: 'Kein Adressbuch abgesaugt, keine Werbung',
-      point3: 'Ihre Nachrichten jederzeit exportierbar',
-      obtenir: 'Anwendung holen',
-      direct: 'Direkter Download',
-      'bientot-play': 'Bald bei Google Play',
-      bientot: 'Demnächst',
-      'invitation-titre': 'In Messagr kommt man nur auf Einladung.',
-      'invitation-corps': 'Die Anwendung allein genügt nicht: Sie brauchen den Link, den Ihnen jemand geschickt hat. Ohne ihn gibt es nichts zu erstellen und nichts auszufüllen.'
-    },
-    es: {
-      'menu-cgu': 'Condiciones de uso',
-      'menu-confidentialite': 'Privacidad',
-      titre: 'La mensajería que no le pide nada.',
-      chapo: 'Sin número, sin cuenta, sin contraseña. Alguien le invita, usted escribe.',
-      point1: 'Cifrada de extremo a extremo, sin ajustes',
-      point2: 'Ninguna agenda aspirada, ninguna publicidad',
-      point3: 'Sus mensajes exportables en cualquier momento',
-      obtenir: 'Obtener la aplicación',
-      direct: 'Descarga directa',
-      'bientot-play': 'Pronto en Google Play',
-      bientot: 'Pronto',
-      'invitation-titre': 'A Messagr solo se entra por invitación.',
-      'invitation-corps': 'La aplicación por sí sola no basta: necesita el enlace que alguien le ha enviado. Sin él, nada que crear, nada que rellenar.'
-    },
-    it: {
-      'menu-cgu': 'Condizioni d\'uso',
-      'menu-confidentialite': 'Riservatezza',
-      titre: 'La messaggistica che non ti chiede nulla.',
-      chapo: 'Nessun numero, nessun account, nessuna password. Qualcuno ti invita, tu scrivi.',
-      point1: 'Cifrata end-to-end, senza impostazioni',
-      point2: 'Nessuna rubrica aspirata, nessuna pubblicità',
-      point3: 'I tuoi messaggi esportabili in qualsiasi momento',
-      obtenir: "Ottenere l'applicazione",
-      direct: 'Download diretto',
-      'bientot-play': 'Presto su Google Play',
-      bientot: 'Presto',
-      'invitation-titre': 'In Messagr si entra solo su invito.',
-      'invitation-corps': "L'applicazione da sola non basta: ti serve il link che qualcuno ti ha inviato. Senza, niente da creare e niente da compilare."
-    },
-    nl: {
-      'menu-cgu': 'Gebruiksvoorwaarden',
-      'menu-confidentialite': 'Privacy',
-      titre: 'De berichtendienst die niets van u vraagt.',
-      chapo: 'Geen nummer, geen account, geen wachtwoord. Iemand nodigt u uit, u schrijft.',
-      point1: 'End-to-end versleuteld, zonder instellingen',
-      point2: 'Geen adresboek opgezogen, geen reclame',
-      point3: 'Uw berichten op elk moment exporteerbaar',
-      obtenir: 'De applicatie halen',
-      direct: 'Directe download',
-      'bientot-play': 'Binnenkort in Google Play',
-      bientot: 'Binnenkort',
-      'invitation-titre': 'Messagr betreedt men alleen op uitnodiging.',
-      'invitation-corps': 'De applicatie alleen is niet genoeg: u hebt de link nodig die iemand u heeft gestuurd. Zonder die link valt er niets te maken en niets in te vullen.'
-    }
-  };
-  // LE FRANÇAIS EST DANS LE BALISAGE, DONC IL FAUT POUVOIR Y REVENIR.
-  //
-  // `T.fr` vaut `null` parce que la page est déjà écrite en français : rien
-  // à remplacer au chargement. Mais quelqu'un qui lit en espagnol et choisit
-  // « Français » attend que la page redevienne française, et un dictionnaire
-  // nul ne remplace rien -- la page serait restée espagnole. Les phrases du
-  // balisage sont donc relevées AVANT toute traduction, et c'est ce relevé
-  // qui sert de dictionnaire français.
-  var origine = {};
-  var marques = document.querySelectorAll('[data-t]');
-  for (var m = 0; m < marques.length; m++) {
-    origine[marques[m].getAttribute('data-t')] = marques[m].textContent;
-  }
-  T.fr = origine;
+  var LANGUES = ['fr', 'en', 'de', 'es', 'it', 'nl'];
+  var RACINE = 'fr';
+  var MEMOIRE = 'messagr-langue';
 
-  function appliquer(code) {
-    var mots = T[code];
-    if (!mots) { return; }
-    document.documentElement.lang = code;
-    for (var k = 0; k < marques.length; k++) {
-      var cle = marques[k].getAttribute('data-t');
-      if (mots[cle]) { marques[k].textContent = mots[cle]; }
-    }
+  function chemin(code) {
+    return code === RACINE ? '/' : '/' + code + '/';
   }
 
-  var demandees = (navigator.languages && navigator.languages.length)
-    ? navigator.languages : [navigator.language || 'fr'];
-  var code = 'fr';
-  for (var i = 0; i < demandees.length; i++) {
-    // `de-AT` compte comme `de` : la sous-étiquette régionale ne change
-    // aucune de ces phrases.
-    var court = String(demandees[i]).toLowerCase().split('-')[0];
-    if (Object.prototype.hasOwnProperty.call(T, court)) { code = court; break; }
-  }
-  appliquer(code);
-
-  // LE SÉLECTEUR ÉTAIT DESSINÉ ET BRANCHÉ SUR RIEN.
+  // PREMIER GESTE : le sélecteur navigue.
   //
-  // Il existait, il s'ouvrait, on choisissait Español et la page restait
-  // française : aucun code ne lisait jamais sa valeur. Signalé depuis le
-  // site en production le 7 septembre 2026.
-  //
-  // Deux gestes le réparent, et le second est celui qu'on oublie : refléter
-  // la langue détectée dans le contrôle. Sans lui, un lecteur allemand voit
-  // une page allemande sous un menu qui annonce « Français », et le premier
-  // choix qu'il fait ne change rien parce qu'il rechoisit ce qui est déjà
-  // affiché.
+  // Sans script il ne fait rien, et c'est déjà le cas aujourd'hui : un
+  // `select` sans formulaire est inerte. Les six pages restent atteignables,
+  // et un lecteur qui coupe le script lit la sienne entière plutôt qu'une
+  // page à moitié traduite.
   var choix = document.getElementById('langue');
   if (choix) {
-    choix.value = code;
-    choix.addEventListener('change', function () { appliquer(choix.value); });
+    choix.value = document.documentElement.lang || RACINE;
+    choix.addEventListener('change', function () {
+      // LE CHOIX EST MÉMORISÉ, ET C'EST CE QUI EMPÊCHE UN PIÈGE. Sans cela,
+      // un lecteur allemand qui choisit « Français » atterrit sur `/`, que le
+      // second geste renvoie aussitôt vers `/de/` : il ne pourrait jamais
+      // lire le français.
+      try { sessionStorage.setItem(MEMOIRE, choix.value); } catch (e) {}
+      location.href = chemin(choix.value);
+    });
+  }
+
+  // SECOND GESTE : la racine renvoie vers la langue du lecteur.
+  //
+  // À la racine seulement. Une page de langue est une adresse que quelqu'un a
+  // demandée, et la renvoyer ailleurs serait lui reprendre son choix.
+  if (location.pathname !== '/') { return; }
+  try { if (sessionStorage.getItem(MEMOIRE)) { return; } } catch (e) {}
+
+  var demandees = (navigator.languages && navigator.languages.length)
+    ? navigator.languages : [navigator.language || RACINE];
+  for (var i = 0; i < demandees.length; i++) {
+    // `de-AT` compte comme `de` : la sous-étiquette régionale ne change aucune
+    // de ces phrases.
+    var court = String(demandees[i]).toLowerCase().split('-')[0];
+    if (LANGUES.indexOf(court) !== -1) {
+      // `replace` et non `href` : le bouton de retour ne doit pas ramener sur
+      // une page qui renvoie de nouveau.
+      if (court !== RACINE) { location.replace(chemin(court)); }
+      return;
+    }
   }
 })();
 </script>
