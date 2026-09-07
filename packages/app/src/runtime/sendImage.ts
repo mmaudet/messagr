@@ -86,29 +86,62 @@ export async function sendImage(
   const refusal = refuseImage(image)
   if (refusal !== null) return { sent: false, reason: refusal }
 
+  // NAMED STEPS, BECAUSE "crypto error: unknown" NAMES NOTHING.
+  //
+  // A photograph failed to send on a device on 7 September 2026 and the only
+  // thing anybody had was `crypto error: unknown` -- the bridge's own message
+  // for an error variant it has no mapping for, so the variant name is
+  // already lost before it gets here. This function then wrapped five
+  // different operations in one `try`, so the report could not even say
+  // WHICH of them threw: sealing a thumbnail, sealing a photograph,
+  // uploading either, encrypting the event, or the send itself.
+  //
+  // Four of those five are ordinary failures with ordinary remedies, and the
+  // fifth is a key problem. Telling them apart is the difference between
+  // "retry" and "this peer's devices are not known yet", and a reader had
+  // neither.
+  //
+  // So each step says its own name. The cost is one wrapper; what it buys is
+  // that the next failure on a device is diagnosable from its one line.
   try {
     const thumbnail =
       image.thumbnail === undefined
         ? null
-        : await sealAndUpload(deps, image.thumbnail.bytes)
-    const photograph = await sealAndUpload(deps, image.bytes)
+        : await sealAndUpload(deps, image.thumbnail.bytes, 'thumbnail')
+    const photograph = await sealAndUpload(deps, image.bytes, 'photograph')
     const content = describeImage(image, photograph, thumbnail)
 
     // `m.room.message` inside the ciphertext, which is what an image is:
     // `m.image` is a message's `msgtype`, not an event type. The outer type
     // on the wire is `m.room.encrypted`, as for everything else.
-    const envelope = await deps.machine.encryptEvent(
-      scope,
-      'm.room.message',
-      content as unknown as Record<string, unknown>,
+    const envelope = await whileDoing('encrypting the event', () =>
+      deps.machine.encryptEvent(
+        scope,
+        'm.room.message',
+        content as unknown as Record<string, unknown>,
+      ),
     )
-    const eventId = await deps.send(
-      scope,
-      new TextDecoder().decode(envelope.ciphertext),
+    const eventId = await whileDoing('sending the event', () =>
+      deps.send(scope, new TextDecoder().decode(envelope.ciphertext)),
     )
     return { sent: true, eventId }
   } catch (cause: unknown) {
     return { sent: false, reason: getErrorMessage(cause) }
+  }
+}
+
+/**
+ * Runs one step and, if it throws, says which step that was.
+ *
+ * The original error's own message is kept whole and put after the step's
+ * name: what the bridge said is the half a reader needs second, and losing it
+ * to a prettier sentence would be the mistake this exists to correct.
+ */
+async function whileDoing<T>(step: string, run: () => Promise<T>): Promise<T> {
+  try {
+    return await run()
+  } catch (cause: unknown) {
+    throw new Error(`${step}: ${getErrorMessage(cause)}`)
   }
 }
 
@@ -124,9 +157,15 @@ export async function sendImage(
 async function sealAndUpload(
   deps: SendingImageDeps,
   plaintext: Uint8Array,
+  what: 'thumbnail' | 'photograph',
 ): Promise<Uploaded> {
-  const sealed = await deps.seal(plaintext)
-  return { url: await deps.upload(sealed.ciphertext), secret: sealed.secret }
+  const sealed = await whileDoing(`sealing the ${what}`, () =>
+    deps.seal(plaintext),
+  )
+  const url = await whileDoing(`uploading the ${what}`, () =>
+    deps.upload(sealed.ciphertext),
+  )
+  return { url, secret: sealed.secret }
 }
 
 /** The transport half, bound where `HttpRequester` is available. */

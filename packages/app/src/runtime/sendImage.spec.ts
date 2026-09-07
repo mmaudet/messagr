@@ -88,7 +88,10 @@ describe('sendImage', () => {
       IMAGE,
     )
     expect(upload).not.toHaveBeenCalled()
-    expect(result).toEqual({ sent: false, reason: 'the machine refused' })
+    expect(result).toEqual({
+      sent: false,
+      reason: 'sealing the photograph: the machine refused',
+    })
   })
 
   it('puts the secret inside the conversation encryption, not beside it', async () => {
@@ -127,6 +130,35 @@ describe('sendImage', () => {
     expect(upload).not.toHaveBeenCalled()
   })
 
+  it('names the step, so a device failure is diagnosable from one line', async () => {
+    // THE ONE THAT WOULD HAVE SAVED AN AFTERNOON. A photograph failed on a
+    // Pixel with `crypto error: unknown` -- the bridge's own words for a
+    // variant it cannot name -- and the report could not even say which of
+    // five operations had thrown. Four of them are ordinary failures with
+    // ordinary remedies; the fifth is a key problem, and telling them apart
+    // is the difference between "retry" and "this peer's devices are not
+    // known yet".
+    //
+    // Both halves are asserted: the step this file adds, and the original
+    // message it must not swallow.
+    expect(
+      await sendImage(
+        deps({
+          machine: {
+            encryptEvent: async () => {
+              throw new Error('crypto error: unknown')
+            },
+          },
+        }),
+        '!room:x',
+        IMAGE,
+      ),
+    ).toEqual({
+      sent: false,
+      reason: 'encrypting the event: crypto error: unknown',
+    })
+  })
+
   it('says what went wrong when the upload does', async () => {
     expect(
       await sendImage(
@@ -138,7 +170,10 @@ describe('sendImage', () => {
         '!room:x',
         IMAGE,
       ),
-    ).toEqual({ sent: false, reason: 'the media repository is full' })
+    ).toEqual({
+      sent: false,
+      reason: 'uploading the photograph: the media repository is full',
+    })
   })
 })
 
@@ -222,7 +257,7 @@ describe('sending the thumbnail beside the photograph', () => {
     )
     expect(result).toEqual({
       sent: false,
-      reason: 'the media repository is full',
+      reason: 'uploading the thumbnail: the media repository is full',
     })
     expect(upload).toHaveBeenCalledTimes(1)
     expect(send).not.toHaveBeenCalled()
