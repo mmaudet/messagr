@@ -263,9 +263,116 @@ if (!scriptAccueil) {
   });
 }
 
+// ── 4. LE SÉLECTEUR DE LA PAGE D'ACCUEIL, QUI ÉTAIT BRANCHÉ SUR RIEN ────
+//
+// La section 3 vérifiait que les catalogues de l'accueil sont complets, et
+// s'arrêtait là : elle ne faisait jamais tourner son script. Le `select`
+// existait donc, s'ouvrait, et choisir « Español » ne changeait rien --
+// aucun code ne lisait sa valeur. Signalé depuis le site en production le
+// 7 septembre 2026, sur une page dont tous les tests étaient verts.
+//
+// Ce bloc le fait tourner pour de vrai : détection, reflet dans le contrôle,
+// changement, et retour au français.
+(function () {
+  function rendreAccueil(langues) {
+    var bloc = accueil.match(/<script>([\s\S]*?)<\/script>/);
+    if (!bloc) { echouer("la page d'accueil n'a plus de script"); return null; }
+
+    var marquees = [];
+    var balise = /<([a-z0-9]+)[^>]*\bdata-t="([^"]+)"[^>]*>([\s\S]*?)<\/\1>/g;
+    var m;
+    while ((m = balise.exec(accueil)) !== null) {
+      (function (cle, texte) {
+        marquees.push({
+          cle: cle,
+          textContent: texte.replace(/\s+/g, ' ').trim(),
+          getAttribute: function () { return cle; }
+        });
+      })(m[2], m[3]);
+    }
+
+    // Le `select`, avec ce que le balisage lui donne comme options, et un
+    // écouteur qu'on pourra déclencher : c'est exactement la pièce dont
+    // l'absence rendait ce défaut invisible.
+    var abonnes = [];
+    var choix = {
+      value: '',
+      addEventListener: function (nom, fn) {
+        if (nom === 'change') { abonnes.push(fn); }
+      }
+    };
+    var racineHtml = { lang: 'fr' };
+    var document_ = {
+      documentElement: racineHtml,
+      getElementById: function (id) { return id === 'langue' ? choix : null; },
+      querySelectorAll: function (sel) { return sel === '[data-t]' ? marquees : []; }
+    };
+    // eslint-disable-next-line no-new-func
+    new Function('document', 'navigator', bloc[1])(document_, {
+      languages: langues,
+      language: langues[0]
+    });
+    return {
+      // UNE FONCTION, PAS UNE COPIE. La première version relevait
+      // `racineHtml.lang` à la construction, donc elle lisait toujours la
+      // valeur d'avant la bascule et accusait la page d'un défaut qui était
+      // dans ce fichier.
+      lang: function () { return racineHtml.lang; },
+      choix: choix,
+      marquees: marquees,
+      basculer: function (code) {
+        choix.value = code;
+        abonnes.forEach(function (fn) { fn(); });
+      },
+      dit: function (cle) {
+        for (var i = 0; i < marquees.length; i++) {
+          if (marquees[i].cle === cle) { return marquees[i].textContent; }
+        }
+        return null;
+      }
+    };
+  }
+
+  var vue = rendreAccueil(['fr-FR', 'fr']);
+  if (!vue) { return; }
+  var enFrancais = vue.dit('titre');
+
+  if (vue.choix.value !== 'fr') {
+    echouer("le sélecteur n'affiche pas la langue détectée (" +
+      JSON.stringify(vue.choix.value) + ' au lieu de "fr")');
+  }
+
+  // LE DÉFAUT SIGNALÉ, DANS LES DEUX SENS.
+  vue.basculer('es');
+  if (vue.lang() !== 'es') {
+    echouer('choisir « es » ne change pas la langue du document');
+  }
+  if (vue.dit('titre') === enFrancais) {
+    echouer('choisir « es » ne traduit pas la page');
+  }
+
+  // ET LE RETOUR, QUI EST L'AUTRE MOITIÉ. Le français est dans le balisage,
+  // donc son catalogue est vide : sans un relevé fait avant la première
+  // traduction, revenir au français ne remplacerait rien et la page
+  // resterait espagnole.
+  vue.basculer('fr');
+  if (vue.dit('titre') !== enFrancais) {
+    echouer('revenir au français ne rend pas la page au français');
+  }
+  if (vue.lang() !== 'fr') {
+    echouer('revenir au français ne remet pas la langue du document');
+  }
+
+  // Et la détection continue de fonctionner pour qui ne touche à rien.
+  var espagnol = rendreAccueil(['es-ES', 'es']);
+  if (espagnol && espagnol.choix.value !== 'es') {
+    echouer("un navigateur espagnol n'obtient pas « es » dans le sélecteur");
+  }
+})();
+
 if (status === 0) {
   console.log('langues: ' + (CODES.length - 1) + ' catalogues complets sur ' +
-    'les deux pages, et la page d\'invitation se traduit pour le navigateur ' +
-    'qui la lit');
+    'les deux pages, la page d\'invitation se traduit pour le navigateur ' +
+    'qui la lit, et le sélecteur de l\'accueil change vraiment de langue');
 }
 process.exit(status);
