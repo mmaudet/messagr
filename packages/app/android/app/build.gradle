@@ -5,6 +5,11 @@ apply plugin: "com.facebook.react"
 // it and where it has to be: it reads the application id to pick the right
 // client out of `google-services.json`, and there is no application id before
 // that line.
+// `google-services.json` PORTE UNE CLÉ, ET ELLE EST VERSIONNÉE EXPRÈS.
+// GitHub la signale sur ce dépôt public ; `docs/google-services-key.md` dit
+// pourquoi ce n'est pas un secret, pourquoi la faire tourner serait le geste
+// coûteux et sans effet, et où se trouve le risque réel — qui n'est pas la
+// publication du fichier mais l'absence de restriction sur la clé.
 apply plugin: "com.google.gms.google-services"
 
 /**
