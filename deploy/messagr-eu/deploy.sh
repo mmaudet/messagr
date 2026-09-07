@@ -68,6 +68,30 @@ elif [ -n "$MESSAGR_APK" ]; then
     exit 1
   fi
   MESSAGR_DEST_ANDROID_APK="$APK_URL"
+
+  # ── CE QUE LE FICHIER PÈSE, MESURÉ SUR LE FICHIER ────────────────────────
+  #
+  # La page annonçait un téléchargement sans dire ce qu'il pesait : 132 Mio sur
+  # un forfait mobile, c'est un abandon quasi certain, et le chiffre n'était
+  # écrit nulle part. Un chiffre TAPÉ serait périmé au premier changement du
+  # fichier sans que rien ne le dise, ce qui est la faute que build-site.sh a
+  # été écrit pour rendre impossible ailleurs. Il est donc lu ici, sur le
+  # fichier même que la ligne au-dessus s'apprête à envoyer.
+  #
+  # `export` et non un préfixe de commande : la vérification de conformité, à
+  # la fin de ce script, reconstruit le site et doit voir les mêmes valeurs,
+  # sinon elle comparerait une page sans faits à une page qui en porte.
+  #
+  # La date est celle du fichier, pas celle du jour : un redéploiement qui ne
+  # change pas l'APK ne doit pas rajeunir ce qu'il annonce.
+  export MESSAGR_APK_OCTETS
+  MESSAGR_APK_OCTETS=$(wc -c < "$MESSAGR_APK" | tr -d ' ')
+  export MESSAGR_APK_SHA256
+  MESSAGR_APK_SHA256=$(shasum -a 256 "$MESSAGR_APK" | cut -d' ' -f1)
+  export MESSAGR_APK_DATE
+  MESSAGR_APK_DATE=$(date -u -r "$MESSAGR_APK" +%Y-%m-%d 2>/dev/null \
+    || date -u -d "@$(stat -c %Y "$MESSAGR_APK")" +%Y-%m-%d)
+  echo "the download is $MESSAGR_APK_OCTETS bytes, dated $MESSAGR_APK_DATE"
 elif [ "$apk_on_server" = "yes" ]; then
   # THE ONE THAT KEEPS THEM IN STEP. A deployment that says nothing about
   # the download would leave the file served and the page saying the
