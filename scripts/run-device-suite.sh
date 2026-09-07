@@ -32,7 +32,13 @@ status=$?
 # Only on a green suite: a screenshot of a state the tests refused would be a
 # listing showing something nobody should get.
 if [ "$status" -eq 0 ] && [ "${MESSAGR_CAPTURE_STORE:-0}" = "1" ]; then
-  ../../scripts/capture-store-screenshots.sh "../../store-screenshots" || true
+  # NO `|| true`. It was there so a screenshot glitch could not turn a green
+  # suite red, which was reasonable when the capture could only fail by not
+  # running. It can now fail by producing four identical blank rectangles, and
+  # swallowing that would leave the artefact looking full and useless. Captures
+  # are opt-in: somebody who asked for them and got white ones did not get what
+  # they asked for.
+  ../../scripts/capture-store-screenshots.sh "../../store-screenshots"
 fi
 
 if [ "$status" -ne 0 ]; then
