@@ -1,7 +1,12 @@
 import { describe, expect, it } from 'vitest'
 
 import type { HttpRequester } from './pump'
-import { fetchSync, readChangedScopes, readNextBatch } from './syncResponse'
+import {
+  fetchSync,
+  readChangedScopes,
+  readNextBatch,
+  readTimelineEvents,
+} from './syncResponse'
 
 function fakeHttp(responseJson: string): HttpRequester & {
   calls: Array<{
@@ -71,6 +76,29 @@ describe('readNextBatch', () => {
   it('is null for a token that is empty or not a string', () => {
     expect(readNextBatch({ next_batch: '' })).toBeNull()
     expect(readNextBatch({ next_batch: 12 })).toBeNull()
+  })
+})
+
+describe('readTimelineEvents', () => {
+  it('hands back the events a conversation carried, not only its name', async () => {
+    // A call is signalled by events that must reach the session in order and
+    // without a second request; `readChangedScopes` answers a different
+    // question and a screen is happy with it.
+    const found = readTimelineEvents({
+      rooms: {
+        join: {
+          '!a:x': { timeline: { events: [{ type: 'm.room.encrypted' }] } },
+          '!quiet:x': { timeline: { events: [] } },
+        },
+      },
+    })
+    expect([...found.keys()]).toEqual(['!a:x'])
+    expect(found.get('!a:x')).toHaveLength(1)
+  })
+
+  it('answers an empty map for a response with no rooms in it', () => {
+    expect(readTimelineEvents({}).size).toBe(0)
+    expect(readTimelineEvents({ rooms: 'not an object' }).size).toBe(0)
   })
 })
 

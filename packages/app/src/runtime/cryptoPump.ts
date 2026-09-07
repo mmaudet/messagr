@@ -338,7 +338,7 @@ export async function sendOneEncryptedMessage(
 }
 
 /** What both send paths need from the machine and the wire. */
-function encryptingDeps(sessionClient: ReturnType<typeof createClient>) {
+export function encryptingDeps(sessionClient: ReturnType<typeof createClient>) {
   return {
     http: makePumpHttp(sessionClient),
     machine: {

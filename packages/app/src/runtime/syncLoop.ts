@@ -16,6 +16,7 @@ import type { EncryptionSliceFn } from './syncDelta'
 import {
   fetchSync,
   readChangedScopes,
+  readTimelineEvents,
   readNextBatch,
   LONG_POLL_TIMEOUT_MS,
 } from './syncResponse'
@@ -63,6 +64,14 @@ export interface SyncTick {
    * is the caller's question, not this loop's, so all of them come back.
    */
   readonly receipts: ReadonlyMap<string, readonly Receipt[]>
+  /**
+   * The raw timeline events this poll carried, by conversation.
+   *
+   * Still encrypted, and handed over rather than summarised: a call's
+   * signalling has to reach its session in order and without a second
+   * request. `readTimelineEvents` says why at length.
+   */
+  readonly timelineEvents: ReadonlyMap<string, readonly unknown[]>
   /**
    * Whether the cursor this poll ended at reached the keystore. `false` is
    * survivable — the loop carries on from the token it holds in memory, and
@@ -191,6 +200,7 @@ export function startSyncLoop(deps: SyncLoopDeps): RunningSyncLoop {
           onTick({
             changedScopes: readChangedScopes(sync),
             receipts: readAllReceipts(sync),
+            timelineEvents: readTimelineEvents(sync),
             cursorPersisted,
           })
         } catch (cause: unknown) {
