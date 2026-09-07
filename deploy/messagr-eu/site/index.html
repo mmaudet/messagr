@@ -135,6 +135,39 @@
   .porte.creuse:hover{background:var(--marque); color:#fff}
   .verte .porte.creuse{background:var(--surface)}
 
+  /* ── Le parcours : trois étapes, dans l'ordre ────────────────────────
+     Une liste ORDONNÉE, et pas une grille de cartes : l'ordre est le contenu.
+     Le numéro vient du compteur de la liste plutôt que d'être tapé, donc il ne
+     peut pas se désaccorder du rang réel.
+     Les images sont plus petites que celles de la galerie : ici on suit une
+     histoire, on ne détaille pas un écran. Elles sont cliquables nulle part,
+     puisque deux d'entre elles s'agrandissent déjà plus bas. */
+  .parcours{background:var(--surface); border-top:1px solid var(--regle)}
+  .etapes{
+    list-style:none; counter-reset:etape; padding:0; margin:34px 0 0;
+    display:grid; grid-template-columns:1fr; gap:34px;
+  }
+  @media (min-width:760px){ .etapes{grid-template-columns:repeat(3,1fr); gap:30px} }
+  .etape{counter-increment:etape; display:flex; flex-direction:column; gap:14px}
+  .etape img{
+    display:block; width:100%; aspect-ratio:1 / 1; object-fit:contain;
+    object-position:center; border-radius:4px; border:1px solid var(--regle);
+    background:var(--creux); padding:10px;
+    box-shadow:0 1px 2px rgba(12,31,25,.04), 0 10px 24px -14px rgba(12,31,25,.16);
+  }
+  /* SUR UNE COLONNE, LE CADRE CARRÉ NE SERT PLUS À RIEN. Il n'existe que pour
+     que les trois images fassent la même hauteur sur une rangée ; empilées, il
+     n'y a pas de rangée, et la conversation -- large et basse -- flottait au
+     milieu d'un carré presque vide. */
+  @media (max-width:759px){ .etape img{aspect-ratio:auto; max-height:420px} }
+  .etape p{margin:0; font-size:16px; line-height:1.45; color:var(--doux)}
+  .etape p::before{
+    content:counter(etape); display:inline-flex; align-items:center;
+    justify-content:center; width:22px; height:22px; margin-right:9px;
+    border-radius:50%; background:var(--bulle); color:var(--appui);
+    font-size:12px; font-weight:700; vertical-align:2px;
+  }
+
   /* ── La galerie ──────────────────────────────────────────────────────
      Deux rangées, et l'état de chaque écran sur l'écran lui-même. Une note en
      bas de section ne serait pas lue par qui regarde les images, et montrer du
@@ -453,6 +486,56 @@
   </div>
 </section>
 
+<!-- COMMENT ON ENTRE, EN TROIS IMAGES.
+     L'encadré vert racontait une restriction : « il vous faut le lien que
+     quelqu'un vous a envoyé ». C'est vrai et ça n'apprend rien à faire. Trois
+     écrans dans l'ordre où on les rencontre en apprennent davantage, et
+     quelqu'un qui les a vus sait déjà se servir de l'application.
+
+     LES NUMÉROS SONT DE L'INFORMATION ICI, et c'est la seule raison de les
+     mettre : ceci est une suite, pas une grille. On ne peut pas ouvrir le lien
+     avant de l'avoir reçu, ni écrire avant que le compte existe.
+
+     LA PREMIÈRE IMAGE N'EST PAS UN ÉCRAN D'APPLICATION mais la vraie page
+     d'invitation, celle que ce site sert : c'est la première chose qu'on voit,
+     avant d'avoir rien installé. Rendue avec l'agent d'un téléphone par
+     `landing/rendre-ecrans.mjs`, puisque c'est le seul appareil pour lequel ce
+     parcours existe.
+
+     CHAQUE PHRASE A ÉTÉ VÉRIFIÉE DANS LE SERVICE, pas déduite de l'intention :
+       - « il ne sert qu'une fois » : `issueInvitation.ts` demande `max_uses: 1`
+         à chaque émission ;
+       - « il ne porte ni votre nom ni votre numéro » : la table `invitations`
+         porte l'émetteur, des dates, un quota et un état, rien de l'invité,
+         qui n'existe pas encore ;
+       - « le compte est créé à cet instant, pas avant » : `create` n'atteint
+         jamais `/v3/register`, le commentaire de `claim.rs` le dit et
+         `register_dormant` n'est appelé que là. C'est ce qui donne un sens à
+         la révocation. -->
+<section class="bande parcours" id="entrer">
+  <div class="mesure">
+    <h2 data-t="parcours-titre">Comment on entre.</h2>
+
+    <ol class="etapes">
+      <li class="etape">
+        <img src="/messagr-ecran-invitation.png" alt="" loading="lazy" decoding="async">
+        <p data-t="parcours-1">Quelqu'un vous envoie un lien. Il ne porte ni votre nom
+        ni votre numéro, et il ne sert qu'une fois.</p>
+      </li>
+      <li class="etape">
+        <img src="/messagr-ecran-premier-lancement.png" alt="" loading="lazy" decoding="async">
+        <p data-t="parcours-2">Vous installez l'application. Elle vous montre ce qu'elle
+        promet avant de vous demander quoi que ce soit.</p>
+      </li>
+      <li class="etape">
+        <img src="/messagr-conversation-fr.png" alt="" loading="lazy" decoding="async">
+        <p data-t="parcours-3">Vous rouvrez le lien. Le compte est créé à cet instant,
+        pas avant : tiré au hasard, rattaché à rien. Vous écrivez.</p>
+      </li>
+    </ol>
+  </div>
+</section>
+
   <!-- LA GALERIE MONTRE AUSSI CE QUI N'EST PAS ENCORE LÀ, ET LE DIT SUR
        CHAQUE ÉCRAN. Le porteur produit l'a demandé : les salons, les agents et
        les appels sont un vrai plus, et les cacher jusqu'au jour de leur
@@ -585,8 +668,11 @@
   <div class="mesure">
     <section class="invite" id="invitation">
       <h2 data-t="invitation-titre">On n'entre dans Messagr que sur invitation.</h2>
-      <p data-t="invitation-corps">L'application seule ne suffit pas : il vous faut le lien
-      que quelqu'un vous a envoyé. Sans lui, rien à créer, rien à remplir.</p>
+      <!-- « L'application seule ne suffit pas : il vous faut le lien que
+           quelqu'un vous a envoyé » vivait ici. La première étape du parcours
+           le dit en le montrant, et deux fois la même chose sur une page se lit
+           comme une page qui se répète. Ce qui suit ne se répète pas : il n'y a
+           pas d'annuaire, et c'est un argument que le parcours ne porte pas. -->
       <p data-t="pourquoi">Personne ne peut vous écrire sans que vous l'ayez laissé entrer.
       Il n'y a pas d'annuaire, pas de recherche par numéro, pas de carnet d'adresses
       aspiré : un inconnu n'a aucun moyen de vous trouver.</p>
