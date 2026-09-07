@@ -425,7 +425,11 @@ apps:
   # rien n'arrive, sans autre signe.
   eu.messagr.apns:
     type: apns
-    platform: sandbox
+    # PRODUCTION, ET LA PAIRE EST GARDEE. Bascule le 7 septembre 2026 avec
+    # `aps-environment` des entitlements, qui doit dire la meme chose :
+    # `scripts/assert-ios-push.sh` refuse toute divergence, parce qu'une
+    # paire cassee ne se voit que sur le telephone de quelqu'un d'autre.
+    platform: production
     keyfile: /secrets/apns-messagr-voip.p8
     key_id: YKZW452SYM
     team_id: KUT463DS29
