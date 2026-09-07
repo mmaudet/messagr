@@ -186,6 +186,8 @@ export const es: Readonly<Record<CopyKey, string>> = {
   list_title: 'Conversaciones',
   list_invitation_ignored:
     'Ha abierto una invitación y este teléfono ya tiene una cuenta. No se ha usado: sigue siendo válida para la persona a la que estaba destinada.',
+  list_not_in_yet:
+    'Todavía no ha entrado. Abra el enlace de invitación que le enviaron: es la única puerta, y la aplicación no puede hacer nada antes.',
   list_empty:
     'Ninguna conversación por ahora. Invite a alguien para empezar una.',
   list_nothing_said: 'Todavía no se ha dicho nada',
