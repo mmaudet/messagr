@@ -67,6 +67,7 @@ function fakeHomeserver(
           ?.plain
         if (typeof plain !== 'string') throw new Error('no key for this event')
         return {
+          eventType: 'm.room.message',
           // The bridge hands back the decrypted *content*, whose `body` is at
           // the top level. Matching `toTimelineEntries`'s own reading.
           ciphertext: new TextEncoder().encode(JSON.stringify({ body: plain })),

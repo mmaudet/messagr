@@ -297,6 +297,27 @@ export const nl: Readonly<Record<CopyKey, string>> = {
     'Het tabblad is vanaf V1 gereserveerd zodat de balk later niet verschuift. V1 draagt alleen tekst, links en stilstaande beelden; spraakberichten in V2, individuele en daarna groepsoproepen in V3.',
   calls_soon_v2: 'V2 · spraakberichten',
   calls_soon_v3: 'V3 · audio + video',
+  // A call in progress. One screen draws every one of these -- see
+  // `CallScreen.tsx` -- so what changes between two states is exactly this
+  // sentence and which buttons sit under it.
+  call_start: 'Bellen',
+  call_ringing: 'Bellen…',
+  call_incoming: 'Inkomende oproep',
+  call_connecting: 'Verbinden…',
+  call_active: 'In gesprek',
+  call_reconnecting: 'Opnieuw verbinden…',
+  call_ended_hung_up: 'Gesprek beëindigd',
+  call_ended_unanswered: 'Niemand heeft opgenomen',
+  call_ended_declined: 'Oproep geweigerd',
+  call_ended_failed: 'De verbinding kon niet tot stand komen',
+  call_ended_elsewhere: 'Op een ander apparaat opgenomen',
+  call_ended_unreachable: 'Deze persoon was niet bereikbaar',
+  call_answer: 'Opnemen',
+  call_reject: 'Weigeren',
+  call_hangup: 'Ophangen',
+  call_mute: 'Microfoon uit',
+  call_unmute: 'Microfoon aan',
+  call_dismiss: 'Sluiten',
   community_soon_title: 'Binnenkort: gemeenschappen en kamers',
   community_soon_why:
     'Een gemeenschap groepeert kamers onder een pseudoniem object. Het tabblad is gereserveerd om dezelfde reden als dat van de oproepen: de balk mag niet verschuiven wanneer ze er zijn.',

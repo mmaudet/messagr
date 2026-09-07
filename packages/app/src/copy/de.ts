@@ -304,6 +304,27 @@ export const de: Readonly<Record<CopyKey, string>> = {
     'Der Reiter ist ab V1 reserviert, damit sich die Leiste später nicht verschiebt. V1 überträgt nur Text, Links und unbewegte Bilder; Sprachnachrichten in V2, Einzel- und dann Gruppenanrufe in V3.',
   calls_soon_v2: 'V2 · Sprachnachrichten',
   calls_soon_v3: 'V3 · Audio + Video',
+  // A call in progress. One screen draws every one of these -- see
+  // `CallScreen.tsx` -- so what changes between two states is exactly this
+  // sentence and which buttons sit under it.
+  call_start: 'Anrufen',
+  call_ringing: 'Anruf läuft …',
+  call_incoming: 'Eingehender Anruf',
+  call_connecting: 'Verbindung wird hergestellt …',
+  call_active: 'Im Gespräch',
+  call_reconnecting: 'Erneute Verbindung …',
+  call_ended_hung_up: 'Anruf beendet',
+  call_ended_unanswered: 'Niemand hat abgenommen',
+  call_ended_declined: 'Anruf abgelehnt',
+  call_ended_failed: 'Die Verbindung kam nicht zustande',
+  call_ended_elsewhere: 'Auf einem anderen Gerät angenommen',
+  call_ended_unreachable: 'Diese Person war nicht erreichbar',
+  call_answer: 'Annehmen',
+  call_reject: 'Ablehnen',
+  call_hangup: 'Auflegen',
+  call_mute: 'Mikrofon aus',
+  call_unmute: 'Mikrofon ein',
+  call_dismiss: 'Schließen',
   community_soon_title: 'Bald: Communitys und Räume',
   community_soon_why:
     'Eine Community fasst Räume unter einem pseudonymen Objekt zusammen. Der Reiter ist aus demselben Grund reserviert wie der für Anrufe: die Leiste darf sich nicht verschieben, wenn sie kommen.',

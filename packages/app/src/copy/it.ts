@@ -296,6 +296,27 @@ export const it: Readonly<Record<CopyKey, string>> = {
     'La scheda è riservata fin dalla V1 per non spostare la barra più tardi. La V1 trasporta solo testo, link e immagini fisse; note vocali in V2, chiamate individuali e poi di gruppo in V3.',
   calls_soon_v2: 'V2 · note vocali',
   calls_soon_v3: 'V3 · audio + video',
+  // A call in progress. One screen draws every one of these -- see
+  // `CallScreen.tsx` -- so what changes between two states is exactly this
+  // sentence and which buttons sit under it.
+  call_start: 'Chiama',
+  call_ringing: 'Chiamata in corso…',
+  call_incoming: 'Chiamata in arrivo',
+  call_connecting: 'Connessione…',
+  call_active: 'In chiamata',
+  call_reconnecting: 'Riconnessione…',
+  call_ended_hung_up: 'Chiamata terminata',
+  call_ended_unanswered: 'Nessuno ha risposto',
+  call_ended_declined: 'Chiamata rifiutata',
+  call_ended_failed: 'Non è stato possibile stabilire la connessione',
+  call_ended_elsewhere: 'Risposta da un altro dispositivo',
+  call_ended_unreachable: 'Non è stato possibile raggiungere questa persona',
+  call_answer: 'Rispondi',
+  call_reject: 'Rifiuta',
+  call_hangup: 'Riaggancia',
+  call_mute: 'Disattiva il microfono',
+  call_unmute: 'Attiva il microfono',
+  call_dismiss: 'Chiudi',
   community_soon_title: 'Presto: comunità e stanze',
   community_soon_why:
     'Una comunità raggruppa stanze sotto un oggetto pseudonimo. La scheda è riservata per la stessa ragione di quella delle chiamate: la barra non deve spostarsi quando arriveranno.',
