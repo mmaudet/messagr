@@ -76,7 +76,8 @@ find "$source_dir" -maxdepth 1 -type f -exec cp {} "$destination/" \;
 # visual is the point of the rule.
 brand="$(cd "$(dirname "$0")/../.." && pwd)/design/brand"
 for asset in messagr-logotype-vert.svg messagr-logotype-vert-inverse.svg \
-             messagr-monogramme-r-vert.svg; do
+             messagr-monogramme-r-vert.svg \
+             messagr-bulle-entrante.svg messagr-bulle-sortante.svg; do
   [ -f "$brand/$asset" ] || { echo "build-site: FAIL: missing brand asset $asset" >&2; exit 1; }
   cp "$brand/$asset" "$destination/$asset"
 done
