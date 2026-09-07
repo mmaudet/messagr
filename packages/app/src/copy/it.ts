@@ -271,7 +271,7 @@ export const it: Readonly<Record<CopyKey, string>> = {
   message_read: 'Letto',
   settings_receipts: 'Conferme di lettura',
   settings_receipts_hint:
-    'Disattivate. Una conferma di lettura è pubblica: il server viene a sapere chi ha letto cosa, e a che ora. Attivarle avverte il suo interlocutore che ha letto — e nello stesso momento anche il server.',
+    'Pubblica: il server viene a sapere chi ha letto cosa, e quando.',
   settings_receipts_on: 'Attivate',
   settings_receipts_off: 'Disattivate',
   settings_receipts_not_kept:
@@ -315,7 +315,7 @@ export const it: Readonly<Record<CopyKey, string>> = {
   message_read_hint: 'Letto',
   settings_wake: 'Notifiche',
   settings_wake_hint:
-    'Attive. Ciò che attraversa Google non contiene né mittente, né conversazione, né messaggio: soltanto un segnale di risveglio. Il dispositivo decifra poi da sé, qui. Disattivarle non registra alcun destinatario presso il server: non ha più dove inviare.',
+    'Il segnale di risveglio non porta né mittente né messaggio. Il dispositivo decifra qui.',
   settings_wake_on: 'Attive',
   settings_wake_off: 'Disattivate',
   settings_wake_not_kept:
