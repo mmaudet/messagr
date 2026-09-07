@@ -28,345 +28,457 @@
 <link rel="icon" href="/favicon.ico" sizes="any">
 <link rel="icon" href="/messagr-monogramme-r-vert.svg" type="image/svg+xml">
 <style>
+  /* ─────────────────────────────────────────────────────────────────────
+     Toutes les valeurs viennent de design/tokens.json et de
+     design/brand/LISEZ-MOI.md. Rien n'est inventé ici, et aucune police
+     n'est chargée depuis l'extérieur : la page affirme qu'elle ne contacte
+     personne, et une police distante ferait de cette phrase un mensonge.
+     La personnalité vient donc de l'échelle et de la composition.
+     ───────────────────────────────────────────────────────────────────── */
   :root{
-    --ground:#F7F5EF; --surface:#ffffff; --ink:#0C1F19; --soft:#5A6B63;
-    --accent:#06614A; --mark:#12B76A; --bubble:#C9F2DC; --rule:#E2DED2;
+    --papier:#F7F5EF; --surface:#ffffff; --creux:#F2EFE8;
+    --encre:#0C1F19; --doux:#5A6B63; --pale:#8A9A92;
+    --appui:#06614A; --marque:#12B76A; --bulle:#C9F2DC; --regle:#E2DED2;
+    --sur-sombre:#EAF3EE; --doux-sombre:#9FC0B0; --regle-sombre:#1E3A2E;
   }
   *{box-sizing:border-box}
   html,body{margin:0}
   body{
-    background:var(--ground); color:var(--ink);
-    font-family:-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-    line-height:1.6; -webkit-font-smoothing:antialiased;
+    background:var(--papier); color:var(--encre);
+    font-family:-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    font-size:17px; line-height:1.6; -webkit-font-smoothing:antialiased;
   }
-  main{max-width:640px; margin:0 auto; padding:56px 24px 80px}
+
+  /* ── Les bandes ──────────────────────────────────────────────────────
+     Une bande par idée, chacune avec son fond. C'est ce qui donne à la page
+     une silhouette : avant d'avoir lu un mot, on voit qu'il y a quatre
+     choses à lire et non un seul bloc. */
+  .bande{padding:0 20px}
+  .mesure{max-width:1060px; margin:0 auto; padding:64px 0}
+  .bande.accueil .mesure{padding-top:38px}
+  /* CHAQUE BANDE A LA MESURE DE CE QU'ELLE PORTE. L'accueil et la bande
+     sombre tiennent deux colonnes et méritent la largeur ; l'invitation et le
+     téléchargement n'en tiennent qu'une, et les laisser dans la même mesure
+     donnait une moitié droite vide qui se lit comme un oubli. */
+  .bande.verte .mesure,
+  .bande.obtenir .mesure{max-width:800px}
+  .bande.sombre{background:var(--encre); color:var(--sur-sombre)}
+  .bande.verte{background:var(--bulle)}
+  .bande.pied{border-top:1px solid var(--regle)}
+  .bande.pied .mesure{padding:34px 0 60px}
+
+  /* ── L'en-tête ───────────────────────────────────────────────────── */
   .bar{display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between;
-       gap:18px; margin-bottom:40px}
+       gap:18px; margin-bottom:64px}
   .mark{display:block; width:max-content}
-  .menu{display:flex; flex-wrap:wrap; align-items:center; gap:18px; font-size:14.5px}
-  .menu a{color:inherit; opacity:.72; text-decoration:none; border-bottom:1px solid transparent;
+  .mark:focus-visible{outline:3px solid var(--marque); outline-offset:4px}
+  .logotype{display:block; width:min(212px,52vw); height:auto}
+  .logotype.dark{display:none}
+  .menu{display:flex; flex-wrap:wrap; align-items:center; gap:20px; font-size:15px}
+  .menu a{color:inherit; opacity:.7; text-decoration:none; border-bottom:1px solid transparent;
           padding:6px 0}
   .menu a:hover{opacity:1; border-bottom-color:currentColor}
-  /* Assez haut pour un pouce : 44 est le plancher que l'application tient
-     aussi, et une page qu'on lit sur un téléphone n'en mérite pas moins. */
-  .langue{font:inherit; font-size:14.5px; color:inherit; background:transparent;
-          border:1px solid currentColor; border-radius:8px; padding:9px 10px;
-          min-height:44px; opacity:.72}
+  /* Un `select` natif : chaque système en dessine un que tout le monde sait
+     déjà ouvrir, accessible au clavier et au lecteur d'écran sans une ligne
+     de script. Une rangée de drapeaux serait plus jolie et moins utilisable. */
+  .langue{font:inherit; font-size:15px; color:inherit; background:transparent;
+          border:1px solid currentColor; border-radius:8px; padding:9px 11px;
+          min-height:44px; opacity:.7}
   .langue:hover{opacity:1}
-  .mark:focus-visible{outline:3px solid var(--mark); outline-offset:4px}
-  .logotype{display:block; width:min(260px,62vw); height:auto}
-  .logotype.dark{display:none}
-  .getline{display:flex; align-items:center; gap:14px; margin-bottom:16px}
-  .getline .label{margin:0}
-  .appicon{flex:0 0 52px; width:52px; height:52px; display:block}
+
+  /* ── L'accueil ───────────────────────────────────────────────────── */
+  .grille-accueil{display:grid; grid-template-columns:1fr; gap:52px; align-items:center}
+  @media (min-width:900px){
+    .grille-accueil{grid-template-columns:1.08fr .92fr; gap:64px}
+  }
   h1{
-    font-size:clamp(30px,7vw,42px); line-height:1.12; letter-spacing:-0.025em;
-    font-weight:650; margin:0 0 18px; text-wrap:balance;
+    font-size:clamp(38px,6.2vw,66px); line-height:1.02; letter-spacing:-0.035em;
+    font-weight:700; margin:0 0 22px; max-width:15ch; text-wrap:balance;
   }
-  .lead{font-size:18px; color:var(--soft); margin:0 0 34px; text-wrap:pretty}
-  ul{list-style:none; padding:0; margin:0 0 40px; display:flex; flex-direction:column; gap:11px}
-  li{display:flex; gap:11px; align-items:baseline; font-size:16px}
-  li::before{content:"◆"; color:var(--mark); font-size:12px; flex:0 0 auto}
-  .card{
-    background:var(--surface); border:1px solid var(--rule); border-radius:4px;
-    padding:26px 24px; margin-bottom:22px;
+  .lead{
+    font-size:clamp(18px,2.1vw,21px); line-height:1.45; color:var(--doux);
+    margin:0 0 34px; max-width:44ch; text-wrap:pretty;
   }
-  .label{
-    font-family:ui-monospace,SFMono-Regular,Menlo,monospace; font-size:11px;
-    letter-spacing:.13em; text-transform:uppercase; color:var(--soft); margin:0 0 16px;
+  .mots ul{list-style:none; padding:0; margin:0 0 38px;
+           display:flex; flex-direction:column; gap:12px}
+  .mots li{display:flex; gap:12px; align-items:baseline; font-size:16.5px}
+  .mots li::before{content:"◆"; color:var(--marque); font-size:11px; flex:0 0 auto}
+
+  /* ── La figure : les bulles de la marque, sans un mot dedans ─────── */
+  /* LA FIGURE NE PARAÎT QUE LÀ OÙ ELLE ÉQUILIBRE QUELQUE CHOSE. Sur deux
+     colonnes elle fait contrepoids au titre ; sur une seule elle devient trois
+     formes vides entre les portes et la bande sombre, et la page est plus
+     franche sans elle. La marque est déjà en haut. */
+  .figure{display:none}
+  @media (min-width:900px){
+    .figure{position:relative; display:flex; flex-direction:column; gap:16px;
+            align-items:flex-start; padding:8px 0}
   }
+  .bulle{display:block; width:min(260px,74%); height:auto}
+  .bulle.envoyee{align-self:flex-end; width:min(300px,86%)}
+  .bulle.courte{width:min(190px,54%)}
+  @media (prefers-reduced-motion:no-preference){
+    .bulle{animation:poser .5s cubic-bezier(.2,.7,.3,1) both}
+    .bulle.envoyee{animation-delay:.12s}
+    .bulle.courte{animation-delay:.24s}
+  }
+  @keyframes poser{from{opacity:0; transform:translateY(9px)} to{opacity:1; transform:none}}
+
+  /* ── Les deux portes ─────────────────────────────────────────────── */
+  .portes{display:flex; flex-wrap:wrap; gap:12px; margin:0}
+  .porte{
+    display:inline-flex; align-items:center; justify-content:center;
+    flex:1 1 200px; min-height:52px; padding:14px 24px;
+    background:var(--encre); color:#fff; text-decoration:none;
+    font-size:16px; font-weight:620; text-align:center;
+    clip-path:polygon(0 0, calc(100% - 16px) 0, 100% 16px, 100% 100%, 0 100%);
+  }
+  .porte:hover{background:var(--appui)}
+  .porte:focus-visible{outline:3px solid var(--marque); outline-offset:3px}
+  .porte.creuse{background:var(--surface); color:var(--appui)}
+  .porte.creuse:hover{background:var(--marque); color:#fff}
+  .verte .porte.creuse{background:var(--surface)}
+
+  /* ── Titres de section ───────────────────────────────────────────── */
+  h2{
+    font-size:clamp(26px,3.4vw,38px); line-height:1.1; letter-spacing:-0.03em;
+    font-weight:660; margin:0 0 14px; max-width:20ch; text-wrap:balance;
+  }
+  .amorce{font-size:18px; line-height:1.5; color:var(--doux); margin:0 0 34px; max-width:52ch}
+  .sombre .amorce{color:var(--doux-sombre)}
+
+  /* ── La bande sombre : ce que le serveur voit ────────────────────── */
+  .colonnes{display:grid; grid-template-columns:1fr; gap:12px}
+  @media (min-width:700px){ .colonnes{grid-template-columns:1fr 1fr; gap:20px} }
+  .colonne{border-top:2px solid var(--marque); padding:18px 0 0}
+  .colonne.reste{border-top-color:var(--regle-sombre)}
+  .colonne h3{font-size:15px; font-weight:640; letter-spacing:0; margin:0 0 16px;
+              color:var(--sur-sombre)}
+  .colonne.reste h3{color:var(--doux-sombre)}
+  .colonne ul{list-style:none; padding:0; margin:0; display:flex; flex-direction:column; gap:12px}
+  .colonne li{font-size:17px; line-height:1.4}
+  .colonne.reste li{color:var(--doux-sombre)}
+  .fin{font-size:19px; line-height:1.5; margin:36px 0 0; max-width:48ch; font-weight:500}
+  .lien{font-size:14.5px; margin:12px 0 0}
+  .lien a{color:var(--doux-sombre); text-underline-offset:3px}
+  .lien a:hover{color:var(--marque)}
+
+  /* ── La bande verte : l'invitation ───────────────────────────────── */
+  .invite p{margin:0 0 16px; max-width:56ch; font-size:17px}
+  .invite .porte{flex:0 1 auto; margin:10px 0 12px}
+  .invite .note{font-size:14.5px; color:var(--appui); margin:0}
+
+  /* ── Obtenir l'application ───────────────────────────────────────── */
+  .card{background:var(--surface); border:1px solid var(--regle); border-radius:4px;
+        padding:30px 28px}
+  .getline{display:flex; align-items:center; gap:14px; margin-bottom:20px}
+  .appicon{flex:0 0 46px; width:46px; height:46px; display:block}
+  /* La seule étiquette en capitales de la page, et c'est le rôle `monoLabel`
+     du système de design. Il y en avait trois : deux sont devenues des titres
+     de phrase, parce qu'une capitale au-dessus de chaque bloc est un tic, pas
+     une information. */
+  .label{font-family:ui-monospace,SFMono-Regular,Menlo,monospace; font-size:11px;
+         letter-spacing:.13em; text-transform:uppercase; color:var(--doux); margin:0}
   .stores{display:flex; flex-wrap:wrap; gap:16px}
   .store{flex:1 1 210px; display:flex; flex-direction:column; gap:7px}
-  .badge{
-    display:flex; align-items:center; gap:13px; padding:13px 18px;
-    background:var(--ink); color:#fff; text-decoration:none;
-    clip-path:polygon(0 0, calc(100% - 14px) 0, 100% 14px, 100% 100%, 0 100%);
-  }
-  .badge:hover{background:var(--accent)}
-  .badge:focus-visible{outline:3px solid var(--mark); outline-offset:2px}
+  .badge{display:flex; align-items:center; gap:13px; padding:13px 18px;
+         background:var(--encre); color:#fff; text-decoration:none;
+         clip-path:polygon(0 0, calc(100% - 14px) 0, 100% 14px, 100% 100%, 0 100%)}
+  .badge:hover{background:var(--appui)}
+  .badge:focus-visible{outline:3px solid var(--marque); outline-offset:2px}
   .badge.off{background:#DAD6CA; color:#6E7A73; pointer-events:none}
   .badge svg{flex:0 0 24px}
   .badge b{display:block; font-size:15px; font-weight:620; line-height:1.25}
   .badge em{display:block; font-style:normal; font-size:11.5px; opacity:.75}
-  .under{
-    font-family:ui-monospace,SFMono-Regular,Menlo,monospace; font-size:11px;
-    letter-spacing:.09em; text-transform:uppercase; color:var(--soft); padding-left:2px;
-  }
-  /* LES DEUX PORTES. L'entaille à 45 degrés est celle des boutons du système
-     de design (notch.button vaut 16), la même que les pastilles de magasin
-     portent déjà : une page de promotion qui invente sa propre forme de bouton
-     cesse d'être la même marque que l'application. */
-  .portes{display:flex; flex-wrap:wrap; gap:12px; margin:0 0 40px}
-  .porte{
-    display:inline-flex; align-items:center; justify-content:center;
-    flex:1 1 210px; min-height:48px; padding:13px 22px;
-    background:var(--ink); color:#fff; text-decoration:none;
-    font-size:15.5px; font-weight:620; text-align:center;
-    clip-path:polygon(0 0, calc(100% - 16px) 0, 100% 16px, 100% 100%, 0 100%);
-  }
-  .porte:hover{background:var(--accent)}
-  .porte:focus-visible{outline:3px solid var(--mark); outline-offset:2px}
-  .porte.creuse{background:var(--bubble); color:var(--accent)}
-  .porte.creuse:hover{background:var(--mark); color:#fff}
-  .invite h2{
-    font-size:21px; line-height:1.25; letter-spacing:-0.015em; font-weight:640;
-    margin:0 0 12px; text-wrap:balance;
-  }
-  .invite p{margin:0 0 14px}
-  .invite p:last-child{margin-bottom:0}
-  .invite .porte{flex:0 1 auto; margin:4px 0 12px}
-  .invite .note{font-size:13.5px; color:var(--soft); margin:0}
-  /* LES DEUX COLONNES. Aucun concurrent grand public n'ose cette section, et
-     c'est exactement pourquoi elle convainc. Elles ont le même poids visuel :
-     mettre la colonne de droite en petit serait la nier, et c'est elle qui
-     rend la gauche croyable. */
-  .serveur{margin:26px 0 0}
-  .serveur > h2{
-    font-size:21px; line-height:1.25; letter-spacing:-0.015em; font-weight:640;
-    margin:0 0 6px; text-wrap:balance;
-  }
-  .serveur > .amorce{font-size:15.5px; color:var(--soft); margin:0 0 20px}
-  .colonnes{display:grid; grid-template-columns:1fr; gap:16px}
-  @media (min-width:640px){ .colonnes{grid-template-columns:1fr 1fr} }
-  .colonne{
-    background:var(--surface); border:1px solid var(--rule); border-radius:4px;
-    padding:20px 22px;
-  }
-  .colonne h3{
-    font-family:ui-monospace,SFMono-Regular,Menlo,monospace; font-size:11px;
-    letter-spacing:.13em; text-transform:uppercase; color:var(--soft);
-    font-weight:500; margin:0 0 14px;
-  }
-  .colonne ul{margin:0; gap:10px}
-  .colonne li{font-size:15px; align-items:baseline}
-  .colonne.reste li::before{content:"\25C7"; color:var(--soft)}
-  .serveur .fin{font-size:15.5px; margin:20px 0 0}
-  .serveur .fin b{font-weight:640}
-  .serveur .lien{font-size:13.5px; margin:10px 0 0}
-  .serveur .lien a{color:var(--soft); text-underline-offset:3px}
-  .serveur .lien a:hover{color:var(--accent)}
-  .faits{font-size:12.5px; line-height:1.5; color:var(--soft); margin:8px 0 0; word-break:break-word}
-  .faits.avert{margin-top:10px}
-  .apres{font-size:14px; color:var(--soft); margin:20px 0 0}
-  .invite{
-    background:var(--bubble); border-radius:4px; padding:26px 24px;
-    font-size:15.5px; margin-top:26px;
-  }
-  .invite b{font-weight:640}
-  footer{
-    margin-top:46px; padding-top:20px; border-top:1px solid var(--rule);
-    font-size:13.5px; color:var(--soft);
-  }
-  footer a{color:var(--accent)}
+  .under{font-family:ui-monospace,SFMono-Regular,Menlo,monospace; font-size:11px;
+         letter-spacing:.09em; text-transform:uppercase; color:var(--doux)}
+  .faits{font-size:12.5px; line-height:1.5; color:var(--doux); margin:8px 0 0;
+         word-break:break-word}
+  .faits.avert{margin-top:12px}
+  .apres{font-size:14.5px; color:var(--doux); margin:22px 0 0; max-width:52ch}
+
+  /* ── Le pied ─────────────────────────────────────────────────────── */
+  footer{font-size:14px; color:var(--doux); max-width:70ch}
+  footer a{color:var(--appui)}
+
   @media (prefers-color-scheme:dark){
     :root{
-      --ground:#0B1A15; --surface:#11241D; --ink:#E9F1EC; --soft:#93A89E;
-      --accent:#4FD39B; --rule:#23392F; --bubble:#1C3D30;
+      --papier:#0B1A15; --surface:#11241D; --creux:#0A1712;
+      --encre:#E9F1EC; --doux:#93A89E; --pale:#6E837A;
+      --appui:#4FD39B; --bulle:#173428; --regle:#23392F;
+      --sur-sombre:#E9F1EC; --doux-sombre:#93A89E; --regle-sombre:#2A473A;
     }
     .logotype.light{display:none}
     .logotype.dark{display:block}
-    .porte{background:var(--mark); color:#06251B}
-    .porte:hover{background:var(--accent); color:#06251B}
-    .porte.creuse{background:var(--bubble); color:var(--accent)}
-    .porte.creuse:hover{background:var(--mark); color:#06251B}
-    .badge{background:var(--mark); color:#06251B}
-    .badge:hover{background:var(--accent); color:#06251B}
+    /* LA FIGURE EST UN ÉLÉMENT DE THÈME CLAIR, ET C'EST LA MARQUE QUI LE DIT.
+       `messagr-bulle-entrante.svg` porte `fill="#FFFFFF"` : elle est dessinée
+       pour un fond clair, et sur un fond sombre elle devient un bloc lumineux.
+       La marque ne fournit pas de variante inverse pour les bulles, et lui en
+       fabriquer une ici serait une seconde vérité — exactement ce que
+       `design/brand/LISEZ-MOI.md` interdit. Elle sort donc, et la grille se
+       referme sur une colonne plutôt que de laisser un vide à droite. */
+    .figure{display:none}
+    @media (min-width:900px){
+      .figure{display:none}
+      .grille-accueil{grid-template-columns:1fr}
+    }
+    /* La bande « sombre » garde son rôle sur un fond déjà sombre : elle
+       s'enfonce au lieu de s'éclaircir, et sa règle verte la tient. */
+    .bande.sombre{background:#061410; color:var(--sur-sombre)}
+    .porte{background:var(--marque); color:#06251B}
+    .porte:hover{background:var(--appui); color:#06251B}
+    .porte.creuse{background:transparent; color:var(--appui);
+                  box-shadow:inset 0 0 0 1.5px var(--appui)}
+    .porte.creuse:hover{background:var(--marque); color:#06251B; box-shadow:none}
+    .verte .porte.creuse{background:transparent}
+    .badge{background:var(--marque); color:#06251B}
+    .badge:hover{background:var(--appui); color:#06251B}
     .badge.off{background:#1E3229; color:#7C9084}
+    .card{background:var(--surface)}
   }
 </style>
 </head>
 <body>
 <main>
 
-  <div class="bar">
-    <a class="mark" href="/" aria-label="Messagr">
-      <img class="logotype light" src="/messagr-logotype-vert.svg" alt="Messagr" width="260" height="60">
-      <img class="logotype dark" src="/messagr-logotype-vert-inverse.svg" alt="Messagr" width="260" height="60">
-    </a>
-    <!-- LES LIBELLÉS SE TRADUISENT, LES PAGES NON. Un texte juridique traduit
-         est un second texte, pas le même : celui qui engage est celui qui est
-         écrit. Nommer la porte dans la langue du lecteur reste utile — il sait
-         ce qu'il y a derrière avant de l'ouvrir. -->
-    <nav class="menu">
-      <a href="/conditions-generales/" data-t="menu-cgu">Conditions générales</a>
-      <a href="/confidentialite/" data-t="menu-confidentialite">Confidentialité</a>
-      <!-- LE SÉLECTEUR EST UN `select`, ET C'EST DÉLIBÉRÉ. Le navigateur en
-           dessine un que chaque système connaît déjà, accessible au clavier
-           et au lecteur d'écran sans qu'on l'écrive, et qui ne coûte aucun
-           script pour s'ouvrir. Une rangée de drapeaux serait plus jolie et
-           moins utilisable, sur une page dont le seul travail est d'être
-           comprise. -->
-      <select class="langue" id="langue" aria-label="Langue">
-        <option value="fr">Français</option>
-        <option value="en">English</option>
-        <option value="de">Deutsch</option>
-        <option value="es">Español</option>
-        <option value="it">Italiano</option>
-        <option value="nl">Nederlands</option>
-      </select>
-    </nav>
-  </div>
+<!-- LA PAGE EST FAITE DE BANDES, PLUS D'UNE COLONNE.
+     Les sections étaient justes et la page ne l'était pas : une colonne de 640
+     pixels, un seul fond, tout empilé au même poids. Elle se lisait comme un
+     avis avec plus de paragraphes. Une bande pleine largeur par idée, chacune
+     avec son fond, donne à la page une silhouette qu'on lit avant d'avoir lu
+     un mot.
 
-  <h1 data-t="titre">La messagerie qui ne vous demande rien.</h1>
-  <p class="lead" data-t="chapo">Pas de numéro, pas de compte, pas de mot de passe. Quelqu'un vous invite, vous écrivez.</p>
+     L'ORDRE A CHANGÉ, ET C'EST LE SEUL DÉPLACEMENT : promesse, puis PREUVE,
+     puis argument, puis téléchargement. « Ce que le serveur voit » vient juste
+     après la promesse parce que c'est lui qui rend le reste croyable. -->
 
-  <ul>
-    <li data-t="point1">Chiffrée de bout en bout, sans réglage</li>
-    <li data-t="point2">Aucun carnet d'adresses aspiré, aucune publicité</li>
-    <li data-t="point3">Vos messages exportables à tout moment</li>
-  </ul>
-
-  <!-- LES DEUX PORTES, ET C'EST LA CORRECTION PRINCIPALE DE CETTE PAGE.
-       Elle n'offrait qu'une action, le téléchargement, et l'encadré placé
-       juste dessous expliquait que l'application seule ne sert à rien sans un
-       lien reçu de quelqu'un : elle invalidait son propre appel à l'action
-       dans le même bloc visuel. Tout visiteur qui le suivait obtenait une
-       application qui lui présentait un mur.
-
-       Celui qui n'a pas d'invitation est aussi la seule population qu'une page
-       web puisse convaincre. Il lui faut une porte. -->
-  <div class="portes">
-    <a class="porte" href="#obtenir" data-t="porte-oui">J'ai une invitation</a>
-    <a class="porte creuse" href="#invitation" data-t="porte-non">Je n'en ai pas</a>
-  </div>
-
-  <div class="card" id="obtenir">
-    <div class="getline">
-      <img class="appicon" src="/messagr-monogramme-r-vert.svg" alt="" width="52" height="52" aria-hidden="true">
-      <p class="label" data-t="obtenir">Obtenir l'application</p>
-    </div>
-    <div class="stores">
-
-      <div class="store">
-        <a class="badge" href="/messagr.apk">
-          <svg viewBox="0 0 24 27" aria-hidden="true" width="24" height="27">
-            <path d="M1.6 1.1 14 13.5 1.6 25.9A2.4 2.4 0 0 1 1 24.3V2.7c0-.6.2-1.2.6-1.6z" fill="currentColor"/>
-            <path d="M17.4 10 3.5.3l12.2 12.2z" fill="currentColor" opacity=".85"/>
-            <path d="M17.4 17 3.5 26.7l12.2-12.2z" fill="currentColor" opacity=".85"/>
-            <path d="M21.9 12.1c1.4.8 1.4 2.5 0 3.3l-3 1.7-3.2-3.3 3.2-3.3z" fill="currentColor" opacity=".7"/>
-          </svg>
-          <span><b>Android</b><em data-t="direct">Téléchargement direct</em></span>
-        </a>
-        <div class="under" data-t="bientot-play">Bientôt sur Google Play</div>
-        <!-- LE POIDS EST MESURÉ, JAMAIS TAPÉ. Un chiffre écrit à la main est
-             périmé au premier changement du fichier, et rien ne le dirait.
-             `build-landing.mjs` remplit les trois marques depuis
-             l'environnement que `deploy.sh` lui passe, et refuse un jeu
-             incomplet : annoncer un poids sans dire de quel fichier il est
-             vaut moins que se taire.
-
-             PAS DE NUMÉRO DE VERSION, ET C'EST UNE DÉCISION. `aapt2` lit
-             versionName='1.0' et versionCode='1' sur le fichier en ligne :
-             ils n'ont jamais été incrémentés. Les annoncer ressemblerait à une
-             information et n'en serait pas une. L'empreinte, elle, distingue
-             deux constructions et se vérifie en une commande. -->
-        <p class="faits" data-t="apk-faits">Poids : %TAILLE%, mis en ligne le %DATE%.</p>
-        <p class="faits" data-t="apk-empreinte">Empreinte SHA-256 : %EMPREINTE%</p>
-        <p class="faits avert" data-t="apk-avertissement">Votre téléphone demandera
-        l'autorisation d'installer une application de sources inconnues : c'est normal
-        pour un fichier obtenu hors magasin.</p>
-      </div>
-
-      <div class="store">
-        <span class="badge off" aria-disabled="true">
-          <svg viewBox="0 0 24 27" aria-hidden="true" width="24" height="27">
-            <path d="M17.6 14.2c0-2.6 2.1-3.8 2.2-3.9-1.2-1.8-3.1-2-3.8-2-1.6-.2-3.1.9-3.9.9-.8 0-2.1-.9-3.4-.9-1.8 0-3.4 1-4.3 2.6-1.8 3.2-.5 7.9 1.3 10.5.9 1.3 1.9 2.7 3.2 2.6 1.3-.1 1.8-.8 3.3-.8 1.5 0 2 .8 3.4.8 1.4 0 2.3-1.3 3.1-2.6.6-.9.9-1.4 1.3-2.4-3.3-1.2-3.4-4.7-3.4-4.8z" fill="currentColor"/>
-            <path d="M15.1 4.6c.7-.9 1.2-2.1 1.1-3.3-1 0-2.3.7-3 1.6-.7.8-1.3 2-1.1 3.2 1.1.1 2.3-.6 3-1.5z" fill="currentColor"/>
-          </svg>
-          <span><b>iPhone</b><em>App Store</em></span>
-        </span>
-        <div class="under" data-t="bientot">Bientôt</div>
-      </div>
-
+<section class="bande accueil">
+  <div class="mesure">
+    <div class="bar">
+      <a class="mark" href="/" aria-label="Messagr">
+        <img class="logotype light" src="/messagr-logotype-vert.svg" alt="Messagr" width="260" height="60">
+        <img class="logotype dark" src="/messagr-logotype-vert-inverse.svg" alt="Messagr" width="260" height="60">
+      </a>
+      <!-- LES LIBELLÉS SE TRADUISENT, LES PAGES NON. Un texte juridique traduit
+           est un second texte, pas le même : celui qui engage est celui qui est
+           écrit. Nommer la porte dans la langue du lecteur reste utile — il sait
+           ce qu'il y a derrière avant de l'ouvrir. -->
+      <nav class="menu">
+        <a href="/conditions-generales/" data-t="menu-cgu">Conditions générales</a>
+        <a href="/confidentialite/" data-t="menu-confidentialite">Confidentialité</a>
+        <!-- LE SÉLECTEUR EST UN `select`, ET C'EST DÉLIBÉRÉ. Le navigateur en
+             dessine un que chaque système connaît déjà, accessible au clavier
+             et au lecteur d'écran sans qu'on l'écrive, et qui ne coûte aucun
+             script pour s'ouvrir. Une rangée de drapeaux serait plus jolie et
+             moins utilisable, sur une page dont le seul travail est d'être
+             comprise. -->
+        <select class="langue" id="langue" aria-label="Langue">
+          <option value="fr">Français</option>
+          <option value="en">English</option>
+          <option value="de">Deutsch</option>
+          <option value="es">Español</option>
+          <option value="it">Italiano</option>
+          <option value="nl">Nederlands</option>
+        </select>
+      </nav>
     </div>
 
-    <p class="apres" data-t="apres">Après l'installation, ouvrez le lien qu'on vous a
-    envoyé : c'est lui qui crée le compte.</p>
-  </div>
-
-  <!-- L'ENTRÉE PAR INVITATION EST L'ARGUMENT, PAS LA CONDITION. La page la
-       présentait comme une restriction, dans un encadré au bas d'une carte de
-       téléchargement. C'est la meilleure chose que ce produit ait à vendre :
-       pas de démarchage, pas d'inconnu qui écrit, aucun carnet d'adresses
-       aspiré.
-
-       Les deux phrases de l'encadré sont reprises telles quelles, avec leurs
-       clés : elles sont déjà traduites dans les six langues et elles disent
-       juste. Ce qui manquait, c'est la suite. -->
-  <section class="invite" id="invitation">
-    <h2 data-t="invitation-titre">On n'entre dans Messagr que sur invitation.</h2>
-    <p data-t="invitation-corps">L'application seule ne suffit pas : il vous faut le lien
-    que quelqu'un vous a envoyé. Sans lui, rien à créer, rien à remplir.</p>
-    <p data-t="pourquoi">Personne ne peut vous écrire sans que vous l'ayez laissé entrer.
-    Il n'y a pas d'annuaire, pas de recherche par numéro, pas de carnet d'adresses
-    aspiré : un inconnu n'a aucun moyen de vous trouver.</p>
-    <!-- UN `mailto:`, ET C'EST DÉLIBÉRÉ POUR L'INSTANT. Il fonctionne sans
-         script, ne contacte aucun tiers et ne mesure rien -- trois propriétés
-         que ce site tient et qu'un formulaire hébergé ailleurs romprait. Le
-         relier au service d'invitations est #152. -->
-    <a class="porte" href="mailto:conformite@messagr.eu?subject=Messagr%20invitation"
-       data-t="demander">Demander une invitation</a>
-    <p class="note" data-t="demander-note">Votre message arrive à une personne, pas à un
-    formulaire.</p>
-  </section>
-
-  <!-- CE QUE LE SERVEUR VOIT, ET CE QU'IL NE VOIT PAS.
-       « Chiffrée de bout en bout » était écrit sur cette page et rien ne le
-       soutenait : c'est la phrase que chaque messagerie écrit, y compris
-       celles qui mentent. Le lecteur qui sait lire ne la croit pas sur parole,
-       et celui qui ne sait pas lire ne la comprend pas.
-
-       CHAQUE LIGNE DE GAUCHE EST VRAIE DU CODE, et vérifiée avant d'être
-       écrite ici :
-         - le texte, les photographies : le chemin d'envoi chiffré ;
-         - les réactions : ADR-0011, chiffrées comme le reste ;
-         - qu'un appel soit un appel : packages/app/src/calls/transport.ts
-           passe les événements m.call.* par « the same door messages take »,
-           donc le serveur voit m.room.encrypted et rien d'autre ;
-         - les noms donnés : ADR-0010, ils ne quittent jamais l'appareil.
-       Ce qui n'était pas certain n'est pas écrit, plutôt qu'écrit en plus
-       prudent. -->
-  <section class="serveur">
-    <h2 data-t="serveur-titre">Ce que le serveur voit, et ce qu'il ne voit pas.</h2>
-    <p class="amorce" data-t="serveur-amorce">Le chiffrement protège le contenu, pas son
-    existence. Voici les deux côtés, sans en cacher un.</p>
-
-    <div class="colonnes">
-      <div class="colonne">
-        <h3 data-t="serveur-non-titre">Ce qu'il ne peut pas savoir</h3>
+    <div class="grille-accueil">
+      <div class="mots">
+        <h1 data-t="titre">La messagerie qui ne vous demande rien.</h1>
+        <p class="lead" data-t="chapo">Pas de numéro, pas de compte, pas de mot de passe. Quelqu'un vous invite, vous écrivez.</p>
         <ul>
-          <li data-t="serveur-non1">Le texte de vos messages</li>
-          <li data-t="serveur-non2">Vos photographies</li>
-          <li data-t="serveur-non3">Vos réactions</li>
-          <li data-t="serveur-non4">Qu'un appel est un appel</li>
-          <li data-t="serveur-non5">Les noms que vous donnez à vos contacts</li>
+          <li data-t="point1">Chiffrée de bout en bout, sans réglage</li>
+          <li data-t="point2">Aucun carnet d'adresses aspiré, aucune publicité</li>
+          <li data-t="point3">Vos messages exportables à tout moment</li>
         </ul>
+
+        <!-- LES DEUX PORTES, ET C'EST LA CORRECTION PRINCIPALE DE CETTE PAGE.
+             Elle n'offrait qu'une action, le téléchargement, et l'encadré placé
+             juste dessous expliquait que l'application seule ne sert à rien sans un
+             lien reçu de quelqu'un : elle invalidait son propre appel à l'action
+             dans le même bloc visuel. Tout visiteur qui le suivait obtenait une
+             application qui lui présentait un mur.
+
+             Celui qui n'a pas d'invitation est aussi la seule population qu'une page
+             web puisse convaincre. Il lui faut une porte. -->
+        <div class="portes">
+          <a class="porte" href="#obtenir" data-t="porte-oui">J'ai une invitation</a>
+          <a class="porte creuse" href="#invitation" data-t="porte-non">Je n'en ai pas</a>
+        </div>
       </div>
-      <div class="colonne reste">
-        <h3 data-t="serveur-oui-titre">Ce qu'il sait quand même</h3>
-        <ul>
-          <li data-t="serveur-oui1">Quels comptes échangent, et à quel moment</li>
-          <li data-t="serveur-oui2">La taille de ce qui passe</li>
-          <li data-t="serveur-oui3">Qu'un appareil doit être réveillé, sans savoir pourquoi</li>
-        </ul>
+
+      <!-- LES DEUX BULLES DE LA MARQUE, ET AUCUN TEXTE DEDANS.
+           Le pli du coin est ce qui distingue ce produit au premier regard, et
+           les deux fichiers viennent de `design/brand`. Y écrire des phrases
+           en ferait une capture d'écran prétendue, c'est-à-dire une
+           affirmation sur ce à quoi l'application ressemble ; cette
+           affirmation appartient à une vraie photographie (#145, #157). -->
+      <div class="figure" aria-hidden="true">
+        <img class="bulle recue" src="/messagr-bulle-entrante.svg" alt="" width="240" height="96">
+        <img class="bulle envoyee" src="/messagr-bulle-sortante.svg" alt="" width="240" height="96">
+        <img class="bulle recue courte" src="/messagr-bulle-entrante.svg" alt="" width="240" height="96">
       </div>
     </div>
+  </div>
+</section>
 
-    <p class="fin" data-t="serveur-fin">Ce n'est pas une politique que nous pourrions
-    changer en silence : c'est une propriété du chiffrement.</p>
-    <!-- LE LIEN PORTE LA CLÉ, ET NON UNE ANCRE À L'INTÉRIEUR D'ELLE. Le
-         générateur remplace le contenu d'un élément marqué et exige qu'il ne
-         porte aucune balise : une ancre imbriquée ferait tomber le compte à
-         zéro et arrêterait la construction. C'est la contrainte qui se voit,
-         et elle vaut mieux qu'une page à moitié traduite. -->
-    <p class="lien"><a href="/confidentialite/" data-t="serveur-lien">Le détail est dans
-    notre politique de confidentialité.</a></p>
-  </section>
+<section class="bande sombre">
+  <div class="mesure">
+    <section class="serveur">
+      <h2 data-t="serveur-titre">Ce que le serveur voit, et ce qu'il ne voit pas.</h2>
+      <p class="amorce" data-t="serveur-amorce">Le chiffrement protège le contenu, pas son
+      existence. Voici les deux côtés, sans en cacher un.</p>
 
-  <footer>
-    Messagr est exploité par RV Myriagone Holding, 22 rue de la Garenne, 78130 Chapet,
-    RCS Versailles 894&nbsp;754&nbsp;548. Écrire à <a href="mailto:conformite@messagr.eu">conformite@messagr.eu</a>.
-  </footer>
+      <div class="colonnes">
+        <div class="colonne">
+          <h3 data-t="serveur-non-titre">Ce qu'il ne peut pas savoir</h3>
+          <ul>
+            <li data-t="serveur-non1">Le texte de vos messages</li>
+            <li data-t="serveur-non2">Vos photographies</li>
+            <li data-t="serveur-non3">Vos réactions</li>
+            <li data-t="serveur-non4">Qu'un appel est un appel</li>
+            <li data-t="serveur-non5">Les noms que vous donnez à vos contacts</li>
+          </ul>
+        </div>
+        <div class="colonne reste">
+          <h3 data-t="serveur-oui-titre">Ce qu'il sait quand même</h3>
+          <ul>
+            <li data-t="serveur-oui1">Quels comptes échangent, et à quel moment</li>
+            <li data-t="serveur-oui2">La taille de ce qui passe</li>
+            <li data-t="serveur-oui3">Qu'un appareil doit être réveillé, sans savoir pourquoi</li>
+          </ul>
+        </div>
+      </div>
+
+      <p class="fin" data-t="serveur-fin">Ce n'est pas une politique que nous pourrions
+      changer en silence : c'est une propriété du chiffrement.</p>
+      <!-- LE LIEN PORTE LA CLÉ, ET NON UNE ANCRE À L'INTÉRIEUR D'ELLE. Le
+           générateur remplace le contenu d'un élément marqué et exige qu'il ne
+           porte aucune balise : une ancre imbriquée ferait tomber le compte à
+           zéro et arrêterait la construction. C'est la contrainte qui se voit,
+           et elle vaut mieux qu'une page à moitié traduite. -->
+      <p class="lien"><a href="/confidentialite/" data-t="serveur-lien">Le détail est dans
+      notre politique de confidentialité.</a></p>
+    </section>
+  </div>
+</section>
+
+<section class="bande verte">
+  <div class="mesure">
+    <section class="invite" id="invitation">
+      <h2 data-t="invitation-titre">On n'entre dans Messagr que sur invitation.</h2>
+      <p data-t="invitation-corps">L'application seule ne suffit pas : il vous faut le lien
+      que quelqu'un vous a envoyé. Sans lui, rien à créer, rien à remplir.</p>
+      <p data-t="pourquoi">Personne ne peut vous écrire sans que vous l'ayez laissé entrer.
+      Il n'y a pas d'annuaire, pas de recherche par numéro, pas de carnet d'adresses
+      aspiré : un inconnu n'a aucun moyen de vous trouver.</p>
+      <!-- UN `mailto:`, ET C'EST DÉLIBÉRÉ POUR L'INSTANT. Il fonctionne sans
+           script, ne contacte aucun tiers et ne mesure rien -- trois propriétés
+           que ce site tient et qu'un formulaire hébergé ailleurs romprait. Le
+           relier au service d'invitations est #152. -->
+      <a class="porte" href="mailto:conformite@messagr.eu?subject=Messagr%20invitation"
+         data-t="demander">Demander une invitation</a>
+      <p class="note" data-t="demander-note">Votre message arrive à une personne, pas à un
+      formulaire.</p>
+    </section>
+
+    <!-- CE QUE LE SERVEUR VOIT, ET CE QU'IL NE VOIT PAS.
+         « Chiffrée de bout en bout » était écrit sur cette page et rien ne le
+         soutenait : c'est la phrase que chaque messagerie écrit, y compris
+         celles qui mentent. Le lecteur qui sait lire ne la croit pas sur parole,
+         et celui qui ne sait pas lire ne la comprend pas.
+
+         CHAQUE LIGNE DE GAUCHE EST VRAIE DU CODE, et vérifiée avant d'être
+         écrite ici :
+           - le texte, les photographies : le chemin d'envoi chiffré ;
+           - les réactions : ADR-0011, chiffrées comme le reste ;
+           - qu'un appel soit un appel : packages/app/src/calls/transport.ts
+             passe les événements m.call.* par « the same door messages take »,
+             donc le serveur voit m.room.encrypted et rien d'autre ;
+           - les noms donnés : ADR-0010, ils ne quittent jamais l'appareil.
+         Ce qui n'était pas certain n'est pas écrit, plutôt qu'écrit en plus
+         prudent. -->
+  </div>
+</section>
+
+<section class="bande obtenir">
+  <div class="mesure">
+    <div class="card" id="obtenir">
+      <div class="getline">
+        <img class="appicon" src="/messagr-monogramme-r-vert.svg" alt="" width="52" height="52" aria-hidden="true">
+        <p class="label" data-t="obtenir">Obtenir l'application</p>
+      </div>
+      <div class="stores">
+
+        <div class="store">
+          <a class="badge" href="/messagr.apk">
+            <svg viewBox="0 0 24 27" aria-hidden="true" width="24" height="27">
+              <path d="M1.6 1.1 14 13.5 1.6 25.9A2.4 2.4 0 0 1 1 24.3V2.7c0-.6.2-1.2.6-1.6z" fill="currentColor"/>
+              <path d="M17.4 10 3.5.3l12.2 12.2z" fill="currentColor" opacity=".85"/>
+              <path d="M17.4 17 3.5 26.7l12.2-12.2z" fill="currentColor" opacity=".85"/>
+              <path d="M21.9 12.1c1.4.8 1.4 2.5 0 3.3l-3 1.7-3.2-3.3 3.2-3.3z" fill="currentColor" opacity=".7"/>
+            </svg>
+            <span><b>Android</b><em data-t="direct">Téléchargement direct</em></span>
+          </a>
+          <div class="under" data-t="bientot-play">Bientôt sur Google Play</div>
+          <!-- LE POIDS EST MESURÉ, JAMAIS TAPÉ. Un chiffre écrit à la main est
+               périmé au premier changement du fichier, et rien ne le dirait.
+               `build-landing.mjs` remplit les trois marques depuis
+               l'environnement que `deploy.sh` lui passe, et refuse un jeu
+               incomplet : annoncer un poids sans dire de quel fichier il est
+               vaut moins que se taire.
+
+               PAS DE NUMÉRO DE VERSION, ET C'EST UNE DÉCISION. `aapt2` lit
+               versionName='1.0' et versionCode='1' sur le fichier en ligne :
+               ils n'ont jamais été incrémentés. Les annoncer ressemblerait à une
+               information et n'en serait pas une. L'empreinte, elle, distingue
+               deux constructions et se vérifie en une commande. -->
+          <p class="faits" data-t="apk-faits">Poids : %TAILLE%, mis en ligne le %DATE%.</p>
+          <p class="faits" data-t="apk-empreinte">Empreinte SHA-256 : %EMPREINTE%</p>
+          <p class="faits avert" data-t="apk-avertissement">Votre téléphone demandera
+          l'autorisation d'installer une application de sources inconnues : c'est normal
+          pour un fichier obtenu hors magasin.</p>
+        </div>
+
+        <div class="store">
+          <span class="badge off" aria-disabled="true">
+            <svg viewBox="0 0 24 27" aria-hidden="true" width="24" height="27">
+              <path d="M17.6 14.2c0-2.6 2.1-3.8 2.2-3.9-1.2-1.8-3.1-2-3.8-2-1.6-.2-3.1.9-3.9.9-.8 0-2.1-.9-3.4-.9-1.8 0-3.4 1-4.3 2.6-1.8 3.2-.5 7.9 1.3 10.5.9 1.3 1.9 2.7 3.2 2.6 1.3-.1 1.8-.8 3.3-.8 1.5 0 2 .8 3.4.8 1.4 0 2.3-1.3 3.1-2.6.6-.9.9-1.4 1.3-2.4-3.3-1.2-3.4-4.7-3.4-4.8z" fill="currentColor"/>
+              <path d="M15.1 4.6c.7-.9 1.2-2.1 1.1-3.3-1 0-2.3.7-3 1.6-.7.8-1.3 2-1.1 3.2 1.1.1 2.3-.6 3-1.5z" fill="currentColor"/>
+            </svg>
+            <span><b>iPhone</b><em>App Store</em></span>
+          </span>
+          <div class="under" data-t="bientot">Bientôt</div>
+        </div>
+
+      </div>
+
+      <p class="apres" data-t="apres">Après l'installation, ouvrez le lien qu'on vous a
+      envoyé : c'est lui qui crée le compte.</p>
+    </div>
+
+    <!-- L'ENTRÉE PAR INVITATION EST L'ARGUMENT, PAS LA CONDITION. La page la
+         présentait comme une restriction, dans un encadré au bas d'une carte de
+         téléchargement. C'est la meilleure chose que ce produit ait à vendre :
+         pas de démarchage, pas d'inconnu qui écrit, aucun carnet d'adresses
+         aspiré.
+
+         Les deux phrases de l'encadré sont reprises telles quelles, avec leurs
+         clés : elles sont déjà traduites dans les six langues et elles disent
+         juste. Ce qui manquait, c'est la suite. -->
+  </div>
+</section>
+
+<section class="bande pied">
+  <div class="mesure">
+
+    <footer>
+      Messagr est exploité par RV Myriagone Holding, 22 rue de la Garenne, 78130 Chapet,
+      RCS Versailles 894&nbsp;754&nbsp;548. Écrire à <a href="mailto:conformite@messagr.eu">conformite@messagr.eu</a>.
+    </footer>
+  </div>
+</section>
 
 </main>
 <script>
