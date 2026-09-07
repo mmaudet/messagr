@@ -145,6 +145,8 @@
   .serveur .lien{font-size:13.5px; margin:10px 0 0}
   .serveur .lien a{color:var(--soft); text-underline-offset:3px}
   .serveur .lien a:hover{color:var(--accent)}
+  .faits{font-size:12.5px; line-height:1.5; color:var(--soft); margin:8px 0 0; word-break:break-word}
+  .faits.avert{margin-top:10px}
   .apres{font-size:14px; color:var(--soft); margin:20px 0 0}
   .invite{
     background:var(--bubble); border-radius:4px; padding:26px 24px;
@@ -246,6 +248,23 @@
           <span><b>Android</b><em data-t="direct">Téléchargement direct</em></span>
         </a>
         <div class="under" data-t="bientot-play">Bientôt sur Google Play</div>
+        <!-- LE POIDS EST MESURÉ, JAMAIS TAPÉ. Un chiffre écrit à la main est
+             périmé au premier changement du fichier, et rien ne le dirait.
+             `build-landing.mjs` remplit les trois marques depuis
+             l'environnement que `deploy.sh` lui passe, et refuse un jeu
+             incomplet : annoncer un poids sans dire de quel fichier il est
+             vaut moins que se taire.
+
+             PAS DE NUMÉRO DE VERSION, ET C'EST UNE DÉCISION. `aapt2` lit
+             versionName='1.0' et versionCode='1' sur le fichier en ligne :
+             ils n'ont jamais été incrémentés. Les annoncer ressemblerait à une
+             information et n'en serait pas une. L'empreinte, elle, distingue
+             deux constructions et se vérifie en une commande. -->
+        <p class="faits" data-t="apk-faits">Poids : %TAILLE%, mis en ligne le %DATE%.</p>
+        <p class="faits" data-t="apk-empreinte">Empreinte SHA-256 : %EMPREINTE%</p>
+        <p class="faits avert" data-t="apk-avertissement">Votre téléphone demandera
+        l'autorisation d'installer une application de sources inconnues : c'est normal
+        pour un fichier obtenu hors magasin.</p>
       </div>
 
       <div class="store">

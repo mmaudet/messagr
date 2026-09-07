@@ -343,7 +343,14 @@ CODES.forEach(function (code) {
     // qu'un lecteur voit et empêchait la comparaison littérale de trouver une
     // phrase qui était bien là.
     var plat = rendue.replace(/\s+/g, ' ');
-    marqueesAccueil.forEach(function (cle) {
+    // LES DEUX LIGNES DE FAITS SONT ABSENTES ICI, ET C'EST LE COMPORTEMENT.
+    // Cette construction n'a pas reçu les mesures du téléchargement, donc le
+    // générateur les retire au lieu d'afficher « %TAILLE% ». Les exiger
+    // reviendrait à exiger une page qui ment. Elles sont éprouvées plus bas,
+    // dans leurs deux états.
+    marqueesAccueil.filter(function (c) {
+      return c !== 'apk-faits' && c !== 'apk-empreinte';
+    }).forEach(function (cle) {
       if (plat.indexOf(copie[code][cle]) === -1) {
         echouer('la page « ' + code + ' » ne porte pas sa phrase « ' + cle + ' »');
       }
@@ -376,6 +383,64 @@ CODES.forEach(function (code) {
       echouer('la carte de partage « ' + code + ' » est nommée et absente de la construction');
     }
   });
+
+  // ── LES FAITS DU TÉLÉCHARGEMENT, DANS LEURS DEUX ÉTATS ─────────────────
+  //
+  // Sans eux, les deux paragraphes doivent SORTIR de la page : une marque
+  // « %TAILLE% » montrée à un lecteur est pire qu'un silence. Avec eux, ils
+  // doivent porter le chiffre de la langue — « 132,6 Mo » et « 132.6 MB » sont
+  // le même nombre écrit pour deux lecteurs.
+  ['%TAILLE%', '%DATE%', '%EMPREINTE%'].forEach(function (marque) {
+    CODES.forEach(function (code) {
+      var ou = code === 'fr'
+        ? path.join(bon.sortie, 'index.html')
+        : path.join(bon.sortie, code, 'index.html');
+      if (fs.readFileSync(ou, 'utf8').indexOf(marque) !== -1) {
+        echouer('la page « ' + code + ' » montre la marque ' + marque);
+      }
+    });
+  });
+
+  var EMPREINTE = 'a'.repeat(64);
+  var avecFaits = construire(function () {
+    process.env.MESSAGR_APK_OCTETS = '139006945';
+    process.env.MESSAGR_APK_SHA256 = EMPREINTE;
+    process.env.MESSAGR_APK_DATE = '2026-09-07';
+  });
+  delete process.env.MESSAGR_APK_OCTETS;
+  delete process.env.MESSAGR_APK_SHA256;
+  delete process.env.MESSAGR_APK_DATE;
+  if (avecFaits.code !== 0) {
+    echouer('la construction refuse des faits de téléchargement valides : ' +
+      avecFaits.dit.trim());
+  } else {
+    var pageFr = fs.readFileSync(path.join(avecFaits.sortie, 'index.html'), 'utf8');
+    if (pageFr.indexOf('132,6 Mo') === -1) {
+      echouer("le français devrait écrire « 132,6 Mo », il ne l'écrit pas");
+    }
+    if (pageFr.indexOf(EMPREINTE) === -1) {
+      echouer("l'empreinte n'apparaît pas sur la page française");
+    }
+    var pageDe = fs.readFileSync(path.join(avecFaits.sortie, 'de', 'index.html'), 'utf8');
+    if (pageDe.indexOf('132,6 MB') === -1) {
+      echouer("l'allemand devrait écrire « 132,6 MB », il ne l'écrit pas");
+    }
+    if (/%[A-Z]+%/.test(pageDe)) {
+      echouer('une marque a survécu sur la page allemande');
+    }
+  }
+  fs.rmSync(avecFaits.sortie, { recursive: true, force: true });
+
+  // ET UN JEU INCOMPLET DOIT ARRÊTER LA CONSTRUCTION. Annoncer un poids sans
+  // dire de quel fichier il est vaut moins que se taire.
+  var incomplet = construire(function () {
+    process.env.MESSAGR_APK_OCTETS = '139006945';
+  });
+  delete process.env.MESSAGR_APK_OCTETS;
+  if (incomplet.code === 0) {
+    echouer('la construction accepte un poids sans empreinte ni date');
+  }
+  fs.rmSync(incomplet.sortie, { recursive: true, force: true });
 
   // Ce qu'un moteur et un navigateur vont chercher sans qu'on le leur dise.
   ['favicon.ico', 'robots.txt', 'sitemap.xml'].forEach(function (nom) {
