@@ -431,6 +431,30 @@ export function App({
     () => process.env.MESSAGR_PANIC_PROBE === '1',
     [],
   )
+  /**
+   * Whether this build proves its cryptography by sending a message at
+   * launch.
+   *
+   * OFF IN AN ORDINARY BUILD, AND A TESTER IS WHY. The probe below encrypts
+   * "encrypted by the bridge, sent by the application", puts it in a room and
+   * reads it back -- which is the end-to-end proof #34 was built around, and
+   * which for months landed in a bench account's own room where nobody was
+   * looking.
+   *
+   * On 7 September 2026 somebody joined by invitation and that room became a
+   * conversation with a person in it. He watched a sentence in English appear
+   * in his chat on every launch, and reported it as a message that had not
+   * been decrypted. It was decrypted; it was simply not for him.
+   *
+   * A diagnostic that writes into a conversation somebody reads is not a
+   * diagnostic, it is a message. So it runs where it belongs -- the device
+   * suite sets the flag -- and the report says `not-run` everywhere else,
+   * which is the truth rather than a gap.
+   */
+  const sendProbeRequested = useMemo(
+    () => process.env.MESSAGR_SEND_PROBE === '1',
+    [],
+  )
 
   // BACKGROUNDING, AND WHY IT IS NOT LEFT TO CHANCE.
   //
@@ -672,18 +696,21 @@ export function App({
             // Only once the keys are published: a message encrypted before
             // this device's own keys are on the server is one nobody can
             // ask about, let alone decrypt.
-            sendStatus = await sendOneEncryptedMessage(
-              sessionClient,
-              credentials,
-            )
+            if (sendProbeRequested) {
+              sendStatus = await sendOneEncryptedMessage(
+                sessionClient,
+                credentials,
+              )
+            }
             // Attempted whether or not this run's own send worked: what is
             // being read was written by somebody else, and one direction
             // failing should not hide the other. The room is the one the
             // send resolved, or the first joined room when there was no
             // send to resolve it.
-            const roomId = sendStatus.sent
-              ? sendStatus.roomId
-              : await firstJoinedRoom(sessionClient)
+            const roomId =
+              sendStatus !== 'not-run' && sendStatus.sent
+                ? sendStatus.roomId
+                : await firstJoinedRoom(sessionClient)
 
             // THE NOTEBOOK. ADR-0010: the application's own encrypted store,
             // with a passphrase of its own. It degrades rather than failing --
