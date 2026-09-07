@@ -1378,3 +1378,95 @@ two tests, turning the refusal into a fallback fails two, and dropping
 the scheme's case normalisation fails one — the last being a refusal
 nobody could have diagnosed from its message, since the homeserver would
 have been correctly configured.
+
+### 13.31 The room boundary of a call, and the two debts it settles (designed here)
+
+**The brain of a call decides nothing about a room, and that separation is
+what §13.28 bought.** The signalling machine takes its clock as a parameter,
+draws no identifiers and touches nothing. Something still has to put its
+decisions in the conversation, bring the peer's back, and tell it the time.
+That is the transport, and it is a layer of its own for the reason the
+machine's purity is worth having in the first place: the moment a room is
+reachable from inside the machine, the hundred scenarios that replay in
+milliseconds stop replaying at all.
+
+**A call's events go through the same door messages do.** They are put in the
+conversation's own room, encrypted like everything else in it — not beside the
+encrypted path, and not in the clear. That is not tidiness either: the party
+identifier every event carries is this device's identifier, which the
+specification permits and then hedges, because in an *unencrypted* room it
+would tell anybody watching which of somebody's devices were used and when. In
+an encrypted room it tells only the two people on the call. The hedge is the
+argument for the door, so the door is not optional.
+
+**Events from this account's own other devices are carried in, not filtered
+out.** It reads like a bug and it is the opposite: a call answered on a tablet
+is learned by the telephone from the tablet's own answer, and a client that
+ignored everything its own account sent would leave every other device ringing
+after somebody picked up. Which event is this device's own echo is a question
+about the party identifier, and the machine already answers it.
+
+**An age can arrive negative, and a negative age is read as zero.** How long
+an invite has left is its lifetime minus how old the server says it is,
+counted forward on the receiving device's own clock — which is the whole
+reason the protocol carries an age rather than a timestamp. When the two
+clocks disagree the age can come back below zero, and letting that through
+would silently lend an invite more life than the person who sent it granted
+it.
+
+**Somebody leaving the conversation ends the call, and a ban counts as
+leaving.** This is the first of the two debts §13.28 recorded: a departure is
+a membership change, not a call event, so the machine cannot see it and the
+transport watches for it and hands the machine a hangup. The predecessor
+watched only for a leave; a banned person is out of the room by every measure
+a call cares about — they can receive nothing further — so both are read the
+same way. A departure while nothing is ringing is an ordinary membership
+change and does nothing at all.
+
+**When this account is the one that left, the specification says nothing, so
+the reading is stated rather than assumed.** A call without a room cannot
+continue, so leaving ends it here as a deliberate act: a hangup where a hangup
+is the gesture that state has, a refusal while the telephone is still ringing.
+The event that goes with it will very likely be refused by a room this account
+is no longer in, and that is fine — what a person needs is the call ending on
+their screen, honestly.
+
+**Two people ringing each other at once are answered without ringing, and a
+media layer that cannot do it leaves the telephone ringing.** The second debt.
+The machine picks the surviving call and raises a flag; the transport draws an
+answer and accepts, with nothing shown to anybody, because the tie-break has
+already decided on their behalf. If no answer can be produced, the call is
+*not* ended: it degrades to an ordinary incoming call somebody can still pick
+up. And because producing an answer takes real time, what is ringing when the
+answer arrives is checked again — in that interval the caller can have hung up
+and a different call can have started ringing, and answering *that* one with
+an answer built for the first is a call that can never connect.
+
+**Order is a product property, not an implementation detail.** Events leave in
+one queue, in the order the machine decided them. The case that forces it is
+the one above: abandoning one call and accepting another happens in a single
+instant, and if the abandonment overtook the invite it abandons, the person at
+the other end sees a call ended before it was placed.
+
+**A call that could not be sent ends immediately — for the two events that
+matter, and only those.** Losing the invite means the peer never learns there
+is a call; losing the answer means the caller waits out the full ninety
+seconds while this side believes it is connecting. Both end the call at once
+and say so, rather than looking like somebody not picking up. The other five
+survive being lost: more candidates are gathered, a renegotiation has its own
+short life and a call that loses one goes on working, and a hangup or a
+refusal is sent by a side that has already ended.
+
+**Nothing here can break the sync loop.** Call events arrive on the same poll
+as everything else, and the loop's only answer to an exception is to declare
+the connection lost and back off — so an event that threw would be an event
+that arrives in every poll and stops the application receiving anything, for
+ever. Every event is read on its own, anything unreadable is skipped, and the
+one after it is still read.
+
+**What is not wired, and is not missing.** Nothing in this increment is
+connected to a screen or to the running application: this is the layer, with
+its own tests and no device. Neither is the replay of a call that was already
+ringing before the application looked — that belongs with waking a device for
+an incoming call, and inventing it here would be building the answer to a
+question nothing yet asks.
