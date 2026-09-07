@@ -37,6 +37,7 @@ const IMAGE_WITH_THUMBNAIL = {
 function deps(over: Partial<SendingImageDeps> = {}): SendingImageDeps {
   let sealings = 0
   return {
+    shareTheKey: async () => undefined,
     seal: async bytes => {
       sealings += 1
       return {
@@ -79,6 +80,7 @@ describe('sendImage', () => {
     const upload = vi.fn(async () => 'mxc://h/abc')
     const result = await sendImage(
       deps({
+        shareTheKey: async () => undefined,
         seal: async () => {
           throw new Error('the machine refused')
         },
@@ -128,6 +130,61 @@ describe('sendImage', () => {
     const result = await sendImage(deps({ upload }), '!room:x', huge)
     expect(result).toEqual({ sent: false, reason: 'too-large' })
     expect(upload).not.toHaveBeenCalled()
+  })
+
+  it('shares the room key before it encrypts, and says so when it cannot', async () => {
+    // THE DEFECT THAT COST A PHOTOGRAPH. `encryptEvent` was called on its
+    // own. `encryptAndSend.ts` has always said that is not enough -- sharing
+    // queues to-device requests rather than sending them -- and in a
+    // conversation that had just been created there was no group session at
+    // all, so it failed outright with `crypto error: unknown`.
+    const order: string[] = []
+    expect(
+      await sendImage(
+        deps({
+          shareTheKey: async () => {
+            order.push('share')
+          },
+          machine: {
+            encryptEvent: async () => {
+              order.push('encrypt')
+              throw new Error('stop here')
+            },
+          },
+        }),
+        '!room:x',
+        IMAGE,
+      ),
+    ).toEqual({ sent: false, reason: 'encrypting the event: stop here' })
+    expect(order).toEqual(['share', 'encrypt'])
+  })
+
+  it('does not encrypt at all when the key could not be shared', async () => {
+    // A message encrypted for a room whose key nobody received is a message
+    // nobody can read, and it looks exactly like success from here.
+    const order: string[] = []
+    expect(
+      await sendImage(
+        deps({
+          shareTheKey: async () => {
+            throw new Error('two of the room key requests could not be sent')
+          },
+          machine: {
+            encryptEvent: async () => {
+              order.push('encrypt')
+              throw new Error('never reached')
+            },
+          },
+        }),
+        '!room:x',
+        IMAGE,
+      ),
+    ).toEqual({
+      sent: false,
+      reason:
+        'sharing the room key: two of the room key requests could not be sent',
+    })
+    expect(order).toEqual([])
   })
 
   it('names the step, so a device failure is diagnosable from one line', async () => {

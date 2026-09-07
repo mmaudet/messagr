@@ -63,6 +63,23 @@ export interface SendingImageDeps {
   readonly seal: (plaintext: Uint8Array) => Promise<SealedFile>
   /** Puts the ciphertext in the media repository and answers its `mxc://`. */
   readonly upload: (ciphertext: Uint8Array) => Promise<string>
+  /**
+   * Gives every device in the room the group key, and drains what that
+   * queues.
+   *
+   * SKIPPED UNTIL 7 SEPTEMBER 2026, AND A PHOTOGRAPH COULD NOT BE SENT.
+   * `encryptEvent` was called on its own, which `encryptAndSend.ts` has
+   * always said is not enough: sharing queues to-device requests rather than
+   * sending them, so without the drain a message goes out "perfectly
+   * encrypted to a room where nobody has the key" -- and in a room with no
+   * group session at all it does not even get that far. In a conversation
+   * that had just been created it failed outright, with `crypto error:
+   * unknown`.
+   *
+   * One port rather than three, because the caller already owns the sequence
+   * and this module has no business knowing what a to-device request is.
+   */
+  readonly shareTheKey: (scope: string) => Promise<void>
   readonly machine: {
     readonly encryptEvent: (
       scope: string,
@@ -110,6 +127,12 @@ export async function sendImage(
         : await sealAndUpload(deps, image.thumbnail.bytes, 'thumbnail')
     const photograph = await sealAndUpload(deps, image.bytes, 'photograph')
     const content = describeImage(image, photograph, thumbnail)
+
+    // BEFORE ENCRYPTING, AND THE ORDER IS THE WHOLE POINT. See the port's
+    // own note: encrypting into a scope with no group session does not fail
+    // politely, and encrypting into one whose key nobody received produces a
+    // message nobody can read.
+    await whileDoing('sharing the room key', () => deps.shareTheKey(scope))
 
     // `m.room.message` inside the ciphertext, which is what an image is:
     // `m.image` is a message's `msgtype`, not an event type. The outer type
