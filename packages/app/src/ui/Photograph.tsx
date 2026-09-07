@@ -4,7 +4,11 @@ import { Image, StyleSheet, Text, View } from 'react-native'
 import { t } from '../copy'
 import { color, radius, space, type } from '../design/tokens'
 import type { ShownImage } from '../runtime/receiveImage'
-import type { ReadImage } from '../timeline/imageEvent'
+import {
+  smallestCopyOf,
+  type ReadFile,
+  type ReadImage,
+} from '../timeline/imageEvent'
 
 /**
  * A photograph inside a conversation.
@@ -16,6 +20,16 @@ import type { ReadImage } from '../timeline/imageEvent'
  * derivation cost megabytes. So each one fetches itself, once, when its
  * message is drawn — which is also what makes it possible for a picture to
  * fail on its own without taking the message with it.
+ *
+ * # It draws the smallest copy that will do, and `full` is opted into
+ *
+ * A tile is about 130 points and a photograph up to twelve megabytes, so a
+ * surface that is not the full-screen viewer asks for the sender's thumbnail
+ * (#117). `full` is the exception rather than the default on purpose: a
+ * surface that forgets to ask gets a soft picture, which somebody can see,
+ * where the opposite default would give it a full download, which nobody can
+ * — and an invisible megabyte per tile is precisely the defect this argument
+ * exists to remove.
  *
  * # Three states, and the middle one is not a spinner
  *
@@ -38,9 +52,10 @@ export function Photograph({
   fetch,
   testID,
   fill = false,
+  full = false,
 }: {
   readonly image: ReadImage
-  readonly fetch: (image: ReadImage) => Promise<ShownImage>
+  readonly fetch: (file: ReadFile) => Promise<ShownImage>
   readonly testID: string
   /**
    * Fill the space given rather than take the picture's own proportions.
@@ -51,12 +66,24 @@ export function Photograph({
    * picture.
    */
   readonly fill?: boolean
+  /**
+   * Fetch the photograph itself rather than the sender's thumbnail.
+   *
+   * For the full-screen viewer, which is the one surface a thumbnail is not
+   * good enough for — and the one where the photograph's cost is affordable,
+   * because it is one picture at a time with nothing else competing for the
+   * thread that draws.
+   */
+  readonly full?: boolean
 }) {
   const [shown, setShown] = useState<ShownImage | null>(null)
+  // An event with no thumbnail — every one sent before #117 — answers the
+  // photograph, so this is the whole of the backward compatibility.
+  const drawn = full ? image : smallestCopyOf(image)
 
   useEffect(() => {
     let wanted = true
-    fetch(image)
+    fetch(drawn)
       .then(answer => {
         if (wanted) setShown(answer)
       })
@@ -70,11 +97,14 @@ export function Photograph({
     return () => {
       wanted = false
     }
-  }, [image, fetch])
+  }, [drawn, fetch])
 
+  // The proportions of the copy actually drawn, not of the photograph: a
+  // picker is free to re-encode, and a frame reserved at one shape for a
+  // picture that lands at another is the reflow the frame exists to prevent.
   const ratio =
-    image.width !== null && image.height !== null && image.height > 0
-      ? image.width / image.height
+    drawn.width !== null && drawn.height !== null && drawn.height > 0
+      ? drawn.width / drawn.height
       : ASSUMED_RATIO
 
   if (shown === null) {

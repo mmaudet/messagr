@@ -1,4 +1,4 @@
-import type { ReadImage } from '../timeline/imageEvent'
+import type { ReadFile } from '../timeline/imageEvent'
 import { getErrorMessage } from './errors'
 import { logEvent } from './log'
 
@@ -28,6 +28,14 @@ import { logEvent } from './log'
  * a bug upstream of the download, the second is a download worth making
  * again. A screen that said "could not show this image" for both would throw
  * away the only actionable half.
+ *
+ * # A thumbnail is a file like any other
+ *
+ * It has its own address and its own key (`imageEvent.ts` says why the key is
+ * its own), so nothing here needs to know which of the two it was handed.
+ * That is what `ReadFile` is for, and it is why the cache below keys on the
+ * address: a thumbnail and its photograph are two entries, as they are two
+ * files.
  */
 
 export interface ImageSource {
@@ -62,6 +70,11 @@ const ASSUMED_TYPE = 'image/jpeg'
  * oldest is dropped when the limit is reached: a conversation is read in
  * order, and what is furthest up the screen is what is least likely to be
  * looked at again.
+ *
+ * Most of what is held is now a thumbnail, which is two orders of magnitude
+ * smaller, so the count is more conservative than it was. It is left where it
+ * is deliberately: the number bounds the worst case, and the worst case is
+ * still twelve photographs opened full screen.
  *
  * # It holds plaintext, in memory, and that is ADR-0006's whole line
  *
@@ -139,7 +152,7 @@ export function forgetWhatIsWaiting(): void {
 
 export async function fetchImage(
   source: ImageSource,
-  image: ReadImage,
+  image: ReadFile,
 ): Promise<ShownImage> {
   // Keyed by the address, which is what identifies the bytes. Not by the
   // secret: the same upload referenced twice is the same picture, and the
@@ -161,15 +174,17 @@ export async function fetchImage(
   return answer
 }
 
-async function open(
-  source: ImageSource,
-  image: ReadImage,
-): Promise<ShownImage> {
+async function open(source: ImageSource, image: ReadFile): Promise<ShownImage> {
   // The turn is taken around the whole thing rather than around the download
   // alone: the decryption and the encoding contend too -- the same run showed
   // decryption growing from 38ms to 993ms behind others -- and letting ten
   // decryptions start because ten downloads finished would move the queue
   // rather than remove it.
+  //
+  // A thumbnail takes a turn like anything else. It is a hundredth of the
+  // bytes, so it leaves the queue almost at once -- which is the point: three
+  // turns spent on thumbnails serve a whole screen where three spent on
+  // photographs served three tiles.
   await takeATurn()
   try {
     // TIMED, IN THREE PARTS, BECAUSE THEY ARE THREE DIFFERENT PROBLEMS.

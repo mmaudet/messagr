@@ -65,7 +65,7 @@ import {
 import type { PickedImage } from './pickImage'
 import { fetchImage, type ShownImage } from './receiveImage'
 import { sendImage, sendingThrough, type ImageSent } from './sendImage'
-import type { ReadImage } from '../timeline/imageEvent'
+import type { ReadFile } from '../timeline/imageEvent'
 import { makePumpHttp } from './pump'
 import {
   admitDrawnEntrant,
@@ -804,10 +804,16 @@ export async function stopWakingThisDevice(
   )
 }
 
-/** The other half: what a screen calls to draw a photograph it received. */
+/**
+ * The other half: what a screen calls to draw a photograph it received.
+ *
+ * A `ReadFile` and not a `ReadImage`, because a thumbnail is a file with an
+ * address and a key of its own -- the caller decides which of the two it
+ * wants, and nothing down here needs to know which it was given.
+ */
 export async function openPhotograph(
   credentials: { readonly baseUrl: string; readonly accessToken: string },
-  image: ReadImage,
+  image: ReadFile,
 ): Promise<ShownImage> {
   const media = mediaRepository(
     credentials.baseUrl,

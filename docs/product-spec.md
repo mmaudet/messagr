@@ -846,7 +846,8 @@ when it cannot draw the picture, and `image.jpg` does that job.
 is derived, and it fails on its own: a picture that will not download is a
 sentence in that message and not a conversation that failed. While it loads,
 the frame is drawn at the picture's own proportions rather than as a spinner,
-so the timeline does not reflow as photographs arrive.
+so the timeline does not reflow as photographs arrive. What it fetches is the
+smallest copy the surface can use, which is §13.29.
 
 
 ### 13.24 Several photographs, read as one plate (designed here)
@@ -1263,3 +1264,72 @@ policy §4.5 depends on — media relayed by the instance's own TURN server
 so that a peer never learns the other's address — is a separate decision
 with a separate home, and stating it here would be claiming something is
 wired that is not.
+
+### 13.29 A tile is not a photograph, so it does not cost one (designed here)
+
+**A grid tile is about 130 points and a photograph is up to twelve
+megabytes.** Timed on a Pixel, one 2.8 MB photograph cost about 840 ms to
+download, 40 ms to decrypt and a further 250 ms to base64 — and that last
+quarter second runs on the thread that draws. The data URI it leaves behind is
+a ~3.7 MB JavaScript string, per picture, benefiting from neither the
+platform's image cache nor its downscaling. None of that buys anything a
+130-point square can show.
+
+**So the sender makes the small copy, because nobody else can.** A media
+repository holding ciphertext cannot thumbnail it — that is the point of
+sealing it — so the thumbnail is produced on the sending device, sealed and
+uploaded like the photograph, and pointed at from `info.thumbnail_file`, with
+`info.thumbnail_info` stating its own width, height, type and size. Matrix
+has had that slot for exactly this reason; this fills it rather than inventing
+anything.
+
+**The thumbnail carries a key of its own, and the specification asks for
+that.** `encryptAttachment` mints a key per call, so two sealings are two
+keys; a test pins that the event's two `file` objects do not share one.
+Reusing the photograph's key would mean that handing somebody the small
+picture hands them the large one, which is a disclosure nobody chose by
+sending a photograph.
+
+**It is uploaded before the photograph is.** The send path's argument has
+always been that a failure at any step leaves nothing behind that a person
+must clean up. A thumbnail is twenty kilobytes against several megabytes, so
+trying it first costs almost nothing and keeps that argument true: a
+repository that refuses it refuses it before the photograph is in there. The
+alternative would have to choose between failing a photograph already
+uploaded and quietly sending one whose missing thumbnail nobody would ever
+see.
+
+**Everything but the full-screen viewer draws the smallest copy offered.** A
+plate tile and a conversation bubble ask for the thumbnail; the photograph is
+fetched when somebody opens it full screen — one at a time, which is also when
+its quarter second of base64 stops mattering, because nothing else is
+competing for the thread. The exception is opted into rather than defaulted:
+a surface that forgets to ask for the photograph shows a soft picture, which
+somebody can see, where the opposite default would give it a full download,
+which nobody can.
+
+**An `m.image` with no thumbnail draws from the full file, exactly as
+before.** Every photograph sent before this, and every one from a client that
+makes none, has no `thumbnail_file`; the reader answers the photograph and the
+screen is the screen it always was. That is the common case today, not a
+degraded path.
+
+**Not a plaintext cache on disk, and the measurement is why.** Caching
+decrypted photographs would remove the same costs and more, and it would put a
+decrypted photograph on a disk, which ADR-0006 forbids. What costs here is the
+*size*, and a thumbnail addresses the size without touching the property. That
+decision stays open on its own merits; this did not need it.
+
+**The downscaling itself is not done yet, and the reason is recorded rather
+than deferred silently.** React Native cannot resize an image in JavaScript,
+and nothing already in this tree can do it on Android: the picker's
+`maxWidth`/`maxHeight` resize the asset a call returns, and a call returns one
+asset, so two sizes would mean presenting the library twice and asking
+somebody to choose the same photographs again; React Native's own
+`ImageEditingManager` survives on iOS and is gone from Android; `fetch` reads
+`file:` URLs on iOS and not on Android, so the picker's original path cannot
+be read back there; and `react-native-svg` rasterises only to PNG, which is
+three or four times smaller than the file it replaces where this wants an
+order of magnitude. Until a resizer is added, this application sends
+photographs with no thumbnail and draws them from the full file — which is the
+fallback above, working as designed.
