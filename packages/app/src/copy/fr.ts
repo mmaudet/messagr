@@ -484,6 +484,7 @@ export const fr = {
   call_hangup: 'Raccrocher',
   call_mute: 'Couper le micro',
   call_unmute: 'Rétablir le micro',
+  call_speaker: 'Haut-parleur',
   call_dismiss: 'Fermer',
   call_failed_no_relay:
     'Ce serveur n’a pas de relais d’appel : l’appel n’a pas pu être passé.',

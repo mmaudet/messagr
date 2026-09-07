@@ -13,6 +13,7 @@ import {
   type CallSessionFailure,
 } from '../calls/session'
 import type { CallEvent } from '../calls/wire'
+import { deviceCallAudio } from './callAudio'
 import { deviceMedia } from './callMedia'
 import { encryptingDeps } from './cryptoPump'
 import { sendIntoScope } from './encryptAndSend'
@@ -155,6 +156,8 @@ export interface CallRuntime {
   readonly reject: () => void
   readonly hangup: () => void
   readonly setMuted: (muted: boolean) => boolean
+  /** Moves the sound between the earpiece and the loudspeaker. */
+  readonly setSpeaker: (on: boolean) => void
   /** Ends the call and forgets it, so the next one starts clean. */
   readonly release: () => Promise<void>
 }
@@ -282,10 +285,17 @@ export function startCallRuntime(
     reject: () => held?.session.reject(),
     hangup: () => held?.session.hangup(),
     setMuted: muted => held?.session.setMuted(muted) ?? muted,
+    setSpeaker: on => deviceCallAudio.speaker(on),
     release: async () => {
       const running = held
       held = null
       onChanged(null)
+      // Before the session stops, and unconditionally: giving the audio
+      // session back is what returns the device to its ringer volume and
+      // lets the screen lock again. A call that failed to tear down cleanly
+      // must not leave a telephone that behaves as though it is still on
+      // one.
+      deviceCallAudio.end()
       await running?.session.stop()
     },
   }
