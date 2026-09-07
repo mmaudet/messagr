@@ -418,7 +418,7 @@ export const fr = {
   // quoi, et quand, lisible par le serveur.
   settings_receipts: 'Accusés de lecture',
   settings_receipts_hint:
-    'Désactivés. Un accusé de lecture est public : le serveur apprend qui a lu quoi, et à quelle heure. Les activer prévient votre correspondant que vous avez lu — et le serveur en même temps.',
+    'Public : le serveur apprend qui a lu quoi, et quand.',
   settings_receipts_on: 'Activés',
   settings_receipts_off: 'Désactivés',
   settings_receipts_not_kept:
@@ -490,7 +490,7 @@ export const fr = {
   message_read_hint: 'Lu',
   settings_wake: 'Notifications',
   settings_wake_hint:
-    'Activées. Ce qui traverse Google ne contient ni expéditeur, ni conversation, ni message : seulement un signal de réveil. L’appareil déchiffre ensuite lui-même, ici. Les désactiver n’enregistre aucun destinataire auprès du serveur : il n’a plus où envoyer.',
+    'Le signal de réveil ne porte ni expéditeur ni message. L’appareil déchiffre ici.',
   settings_wake_on: 'Activées',
   settings_wake_off: 'Désactivées',
   settings_wake_not_kept:

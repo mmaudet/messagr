@@ -78,6 +78,7 @@ export function LanguageStrip({
   onChoose,
   onSettle,
   onDark = false,
+  rows = 4,
   testID = 'language-strip',
 }: {
   readonly chosen: Language
@@ -87,12 +88,39 @@ export function LanguageStrip({
   readonly onSettle?: (language: Language) => void
   /** Whether the ground behind it is `ink900`. See the note above. */
   readonly onDark?: boolean
+  /**
+   * How many rows are visible at once.
+   *
+   * FOUR ON THE FIRST SCREEN, ONE IN SETTINGS, AND THE ACCOUNT HOLDER ASKED
+   * FOR THE SECOND. On first launch the strip is the screen's business and
+   * four rows say "this is a list, it moves". In Réglages it sits between
+   * two sections that are each one line, and six flags there read as a
+   * feature rather than as a setting. One row is a setting: it shows what is
+   * chosen, and it moves.
+   *
+   * One number rather than two components: a selector that behaved
+   * differently in the two places it appears would be two selectors, which
+   * is the same argument that made it a column in both.
+   */
+  readonly rows?: number
   readonly testID?: string
 }) {
   // The last one reported, so a drag inside one item reports nothing. A ref
   // rather than state: this is compared during a scroll, and a re-render for
   // the comparison's own sake would be a re-render per frame.
   const reported = useRef<Language>(chosen)
+  const rail = useRef<React.ComponentRef<typeof ScrollView>>(null)
+
+  // WHERE IT OPENS, AND WHY ONLY THE NARROW ONE NEEDS IT.
+  //
+  // Four rows deep, the chosen language is usually already in frame. One row
+  // deep it is in frame only if it happens to be the first, so a settings
+  // screen would show « Français » to somebody reading Español -- the exact
+  // failure the web page had this morning, in another form.
+  const opensAt = Math.max(
+    0,
+    LANGUAGES.findIndex(language => language.code === chosen),
+  )
 
   // NO RAIL, AND THE HORIZONTAL VERSION NEEDED ONE.
   //
@@ -118,15 +146,23 @@ export function LanguageStrip({
     }
   }
 
-  return (
+  const strip = (
     <ScrollView
+      ref={rail}
       testID={testID}
       // Bounded, because a column inside a screen that scrolls must not
       // scroll the screen instead. Four rows of room and six languages, so
       // the list is visibly a list -- something that can be moved -- rather
       // than a stack that happens to be cut off.
-      style={styles.rail}
+      style={[styles.rail, { maxHeight: ITEM * rows }]}
       showsVerticalScrollIndicator={false}
+      // `contentOffset` is honoured on iOS; Android wants the scroll after
+      // layout. Both, because each platform quietly ignores the other's --
+      // the same pair `FullScreenPlate` needs for the same reason.
+      contentOffset={{ x: 0, y: opensAt * ITEM }}
+      onLayout={() =>
+        rail.current?.scrollTo({ y: opensAt * ITEM, animated: false })
+      }
       nestedScrollEnabled
       snapToInterval={ITEM}
       decelerationRate="fast"
@@ -171,12 +207,42 @@ export function LanguageStrip({
       })}
     </ScrollView>
   )
+
+  if (rows > 1) return strip
+
+  // A ROW THAT DOES NOT LOOK SCROLLABLE IS A ROW NOBODY SCROLLS.
+  //
+  // Four rows say what they are by being cut off at the bottom. One row says
+  // nothing, so the affordance has to be drawn: two chevrons, outside the
+  // scrolling area so they stay put, and `pointerEvents: 'none'` so they
+  // never take the drag they exist to advertise.
+  return (
+    <View style={styles.window}>
+      {strip}
+      <Text style={styles.more} pointerEvents="none">
+        {'⌃\n⌄'}
+      </Text>
+    </View>
+  )
 }
 
 const styles = StyleSheet.create({
-  // Four rows deep. Six languages do not fit, and that is the point: a list
-  // that ends inside the frame gives no reason to move it.
-  rail: { maxHeight: ITEM * 4 },
+  // Height comes from `rows`. Four rows deep, six languages do not fit, and
+  // that is the point: a list that ends inside the frame gives no reason to
+  // move it. One row deep, the chevrons below say the same thing instead.
+  rail: {},
+  window: { justifyContent: 'center' },
+  more: {
+    position: 'absolute',
+    right: space.m,
+    // `caption`'s own line height, not a tighter one written in place:
+    // invariant 11 allows only values from the token module, and a
+    // hand-picked 12 here would be exactly the kind of drift it exists to
+    // stop. Two lines of caption fit a 56pt row with room to spare.
+    ...type.caption,
+    color: color.neutral['400'],
+    textAlign: 'center',
+  },
   slot: {
     height: ITEM,
     justifyContent: 'center',
