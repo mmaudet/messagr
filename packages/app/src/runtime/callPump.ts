@@ -247,6 +247,15 @@ export function startCallRuntime(
       // ringing at nobody.
       for (const [scope, carried] of tick.timelineEvents) {
         const opened = await openCallEvents(deps, scope, carried)
+        // Only when the poll carried something sealed: a line per tick
+        // saying "no call in this one" would bury every line that matters.
+        if (opened.length > 0) {
+          logEvent('info', 'MESSAGR_CALL_POLL', {
+            scope,
+            carried: carried.length,
+            opened: opened.map(event => (event as { type: string }).type),
+          })
+        }
         const invite = opened.find(
           event => (event as { type?: unknown }).type === 'm.call.invite',
         )
