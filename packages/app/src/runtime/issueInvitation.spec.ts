@@ -94,8 +94,33 @@ describe('issueInvitation', () => {
       issued: true,
       scope: '!made:x',
       invitationId: 'inv-1',
-      link: 'messagr://messagr.eu/i/a-token',
+      link: 'https://messagr.eu/i/a-token',
     })
+  })
+
+  it('mints an https link, because a camera cannot read the other scheme', async () => {
+    // THE ONE THAT WOULD HAVE CAUGHT IT. This minted `messagr://` for
+    // months, and the QR code on the invitation screen encoded it: iOS's
+    // camera and most Android scanners ignore an unknown scheme, so nothing
+    // could read that picture -- not a camera, and not Messagr, which has no
+    // scanner. Every test passed, because none of them looked at the scheme.
+    //
+    // `invitationLink.ts` accepts both and always said which was which. The
+    // assertion belongs on the side that *writes* the link.
+    const { deps } = harness()
+    const issued = await issueInvitation(deps, 'messagr.eu')
+    if (!issued.issued) throw new Error('expected an invitation')
+    expect(issued.link.startsWith('https://')).toBe(true)
+  })
+
+  it('names the instance in the link, so nobody is asked which server', async () => {
+    // The host is the account's own homeserver, and the https change did not
+    // touch it: a link that named a fixed instance would be a link nobody on
+    // any other one could claim.
+    const { deps } = harness()
+    const issued = await issueInvitation(deps, 'messagr-fork.example.org')
+    if (!issued.issued) throw new Error('expected an invitation')
+    expect(issued.link).toBe('https://messagr-fork.example.org/i/a-token')
   })
 
   it('costs 50 to invite into and admits members at 0', async () => {

@@ -281,7 +281,7 @@ export const de: Readonly<Record<CopyKey, string>> = {
   message_read: 'Gelesen',
   settings_receipts: 'Lesebestätigungen',
   settings_receipts_hint:
-    'Aus. Eine Lesebestätigung ist öffentlich: der Server erfährt, wer was gelesen hat und wann. Sie einzuschalten sagt Ihrem Gegenüber, dass Sie gelesen haben — und im selben Moment auch dem Server.',
+    'Öffentlich: der Server erfährt, wer was gelesen hat und wann.',
   settings_receipts_on: 'An',
   settings_receipts_off: 'Aus',
   settings_receipts_not_kept:
@@ -325,7 +325,7 @@ export const de: Readonly<Record<CopyKey, string>> = {
   message_read_hint: 'Gelesen',
   settings_wake: 'Benachrichtigungen',
   settings_wake_hint:
-    'An. Was Google durchquert, enthält weder Absender noch Unterhaltung noch Nachricht: nur ein Wecksignal. Das Gerät entschlüsselt danach selbst, hier. Sie auszuschalten meldet dem Server keinen Empfänger: er hat nichts mehr, wohin er senden könnte.',
+    'Das Wecksignal trägt weder Absender noch Nachricht. Das Gerät entschlüsselt hier.',
   settings_wake_on: 'An',
   settings_wake_off: 'Aus',
   settings_wake_not_kept:

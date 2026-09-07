@@ -271,6 +271,31 @@
       'invitation-corps': 'De applicatie alleen is niet genoeg: u hebt de link nodig die iemand u heeft gestuurd. Zonder die link valt er niets te maken en niets in te vullen.'
     }
   };
+  // LE FRANÇAIS EST DANS LE BALISAGE, DONC IL FAUT POUVOIR Y REVENIR.
+  //
+  // `T.fr` vaut `null` parce que la page est déjà écrite en français : rien
+  // à remplacer au chargement. Mais quelqu'un qui lit en espagnol et choisit
+  // « Français » attend que la page redevienne française, et un dictionnaire
+  // nul ne remplace rien -- la page serait restée espagnole. Les phrases du
+  // balisage sont donc relevées AVANT toute traduction, et c'est ce relevé
+  // qui sert de dictionnaire français.
+  var origine = {};
+  var marques = document.querySelectorAll('[data-t]');
+  for (var m = 0; m < marques.length; m++) {
+    origine[marques[m].getAttribute('data-t')] = marques[m].textContent;
+  }
+  T.fr = origine;
+
+  function appliquer(code) {
+    var mots = T[code];
+    if (!mots) { return; }
+    document.documentElement.lang = code;
+    for (var k = 0; k < marques.length; k++) {
+      var cle = marques[k].getAttribute('data-t');
+      if (mots[cle]) { marques[k].textContent = mots[cle]; }
+    }
+  }
+
   var demandees = (navigator.languages && navigator.languages.length)
     ? navigator.languages : [navigator.language || 'fr'];
   var code = 'fr';
@@ -280,13 +305,23 @@
     var court = String(demandees[i]).toLowerCase().split('-')[0];
     if (Object.prototype.hasOwnProperty.call(T, court)) { code = court; break; }
   }
-  var mots = T[code];
-  if (!mots) { return; }
-  document.documentElement.lang = code;
-  var marques = document.querySelectorAll('[data-t]');
-  for (var m = 0; m < marques.length; m++) {
-    var cle = marques[m].getAttribute('data-t');
-    if (mots[cle]) { marques[m].textContent = mots[cle]; }
+  appliquer(code);
+
+  // LE SÉLECTEUR ÉTAIT DESSINÉ ET BRANCHÉ SUR RIEN.
+  //
+  // Il existait, il s'ouvrait, on choisissait Español et la page restait
+  // française : aucun code ne lisait jamais sa valeur. Signalé depuis le
+  // site en production le 7 septembre 2026.
+  //
+  // Deux gestes le réparent, et le second est celui qu'on oublie : refléter
+  // la langue détectée dans le contrôle. Sans lui, un lecteur allemand voit
+  // une page allemande sous un menu qui annonce « Français », et le premier
+  // choix qu'il fait ne change rien parce qu'il rechoisit ce qui est déjà
+  // affiché.
+  var choix = document.getElementById('langue');
+  if (choix) {
+    choix.value = code;
+    choix.addEventListener('change', function () { appliquer(choix.value); });
   }
 })();
 </script>
