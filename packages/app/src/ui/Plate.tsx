@@ -4,7 +4,7 @@ import { Pressable, StyleSheet, Text, View } from 'react-native'
 import { t } from '../copy'
 import { color, radius, space, type } from '../design/tokens'
 import type { ShownImage } from '../runtime/receiveImage'
-import type { ReadImage } from '../timeline/imageEvent'
+import type { ReadFile } from '../timeline/imageEvent'
 import type { Plate as Grouping } from '../timeline/plates'
 import { Photograph } from './Photograph'
 
@@ -39,6 +39,14 @@ import { Photograph } from './Photograph'
  * A grid of differently-shaped tiles is a grid nobody can scan. The tiles are
  * square and the pictures fill them, which crops — and cropping a thumbnail
  * is what a thumbnail is for. Full screen shows the whole picture.
+ *
+ * # A tile draws the thumbnail, and that is the whole of #117 here
+ *
+ * The tile said "thumbnail" and downloaded a photograph: a 130-point square
+ * cost the full file, its decryption and its base64, and held the result in
+ * memory as a string a third larger than the file. `Photograph` asks for the
+ * smallest copy unless it is told otherwise, so this file changes nothing to
+ * get it -- which is the point of putting the choice there rather than here.
  */
 
 /** How many tiles are drawn before the count takes over. */
@@ -51,7 +59,7 @@ export function Plate({
   onLongPress,
 }: {
   readonly plate: Grouping
-  readonly fetch: (image: ReadImage) => Promise<ShownImage>
+  readonly fetch: (file: ReadFile) => Promise<ShownImage>
   /** Opens the plate full screen, at the index tapped. */
   readonly onOpen: (at: number) => void
   /** What a long press does. The message's own, so there is one answer. */

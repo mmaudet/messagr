@@ -13,6 +13,7 @@ const picture = (url: string): ReadImage => ({
   mimeType: 'image/jpeg',
   width: 100,
   height: 100,
+  thumbnail: null,
 })
 
 const said = (
