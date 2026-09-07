@@ -135,23 +135,21 @@ export function Invite({ stage, onInvite, onClose, admission }: InviteProps) {
 
   return (
     <View style={styles.resting}>
-      <Text style={styles.hint}>{t('invite_ready')}</Text>
-      {/* The link itself, in the mono role and selectable: sharing is the
-          ordinary path, and reading it out loud is the one that has to work
-          when sharing does not. */}
-      <Text testID="invite-link" selectable style={styles.link}>
-        {stage.link}
-      </Text>
-      {/* BESIDE THE LINK, NEVER INSTEAD OF IT.
+      {/* THE PICTURE FIRST, AND THE ORDER IS THE ARGUMENT.
           The two people an invitation matters most for are the ones standing
           next to each other -- which, in a product entered only by
-          invitation, is the ordinary case. A camera is the gesture for that.
+          invitation, is the ordinary case. A camera is the gesture for that,
+          so the thing a camera reads is what the screen opens with.
 
-          But the link stays. Reading it out loud is the path that has to work
-          when a camera does not, and `invite_ready` above already promises it
-          is valid for an hour and works once. A screen that replaced the link
-          with a picture would take that promise away from anybody without a
-          second phone in front of them. */}
+          It reads it now: the link was minted `messagr://` until 7 September
+          2026, a scheme no camera opens, so this picture had never been
+          scannable by anything. `issueInvitation.ts` says what changed.
+
+          The link is still here, below, because reading it out loud is the
+          path that has to work when a camera does not -- and it now sits
+          against the button that shares it, which is the other way it
+          travels. Two ways of moving one link, together, instead of one at
+          each end of the screen. */}
       <View style={styles.symbol}>
         <QrCode
           text={stage.link}
@@ -161,15 +159,32 @@ export function Invite({ stage, onInvite, onClose, admission }: InviteProps) {
         />
         <Text style={styles.hint}>{t('invite_qr')}</Text>
       </View>
-      <NotchedButton
-        label={t('invite_share')}
-        testID="invite-share"
-        onPress={() => {
-          // Failure is ordinary here: somebody dismissed the sheet. There is
-          // nothing to report and nothing to retry -- the link is on screen.
-          Share.share({ message: stage.link }).catch(() => {})
-        }}
-      />
+
+      <Text style={styles.hint}>{t('invite_ready')}</Text>
+
+      {/* The link in the mono role and selectable, then the button that
+          sends it. `invite_ready` above promises it is valid for an hour and
+          works once, and that promise belongs to the link rather than to the
+          picture. */}
+      <Text testID="invite-link" selectable style={styles.link}>
+        {stage.link}
+      </Text>
+      {/* CENTRED, LIKE THE PICTURE ABOVE IT. A full-width button under a
+          centred symbol reads as two screens stacked; the same axis makes it
+          one. Asked for on a Pixel Fold, where the width makes the mismatch
+          plain. */}
+      <View style={styles.centred}>
+        <NotchedButton
+          label={t('invite_share')}
+          testID="invite-share"
+          onPress={() => {
+            // Failure is ordinary here: somebody dismissed the sheet. There
+            // is nothing to report and nothing to retry -- the link is on
+            // screen.
+            Share.share({ message: stage.link }).catch(() => {})
+          }}
+        />
+      </View>
       {admission !== null && (
         <Text testID="invite-admission" style={styles.hint}>
           {admission === 'admitted'
@@ -189,6 +204,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: space.s,
   },
+  centred: { alignItems: 'center' },
   resting: {
     gap: space.m,
     paddingVertical: space.m,

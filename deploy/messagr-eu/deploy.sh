@@ -213,3 +213,30 @@ if [ "$offered" = "yes" ]; then
 else
   echo "no download offered, and the page says so"
 fi
+
+# ── AND THE WHOLE SITE, FILE BY FILE, AS THE SERVER ANSWERS IT ───────────
+#
+# The block above reads one page and one download. This reads all of them,
+# and it is the last thing that happens because it is the only one that can
+# say the deployment as a whole landed.
+#
+# It exists because of what was true on 7 September 2026: messagr.eu served
+# a landing page `master` did not contain, and a privacy policy that had
+# lost a section `master` had gained. Both had been that way for a day or
+# more, both were invisible to every check in this repository, and the
+# reason is that no check had ever asked the server anything.
+#
+# Run here it answers the narrower of the two questions -- did THIS run land
+# what it built -- and that is worth having on its own. The wider one, does
+# the server match `master`, is the same script run from `master`.
+#
+# THE DESTINATIONS ARE PASSED, and that is what makes this run strict. Given
+# them, the check builds the page with them and compares byte for byte; given
+# nothing it falls back to tolerating any plain https address in those three
+# slots. Tolerating any address here would accept somebody else's store at the
+# exact moment we know which one we just put there.
+echo "== the served site against the built one"
+MESSAGR_DEST_IOS="$MESSAGR_DEST_IOS" \
+MESSAGR_DEST_ANDROID="$MESSAGR_DEST_ANDROID" \
+MESSAGR_DEST_ANDROID_APK="$MESSAGR_DEST_ANDROID_APK" \
+  node tests/conformite-site-deploye.js --live "https://messagr.eu"

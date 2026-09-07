@@ -178,7 +178,30 @@ export async function issueInvitation(
       issued: true,
       scope,
       invitationId: minted.invitation_id,
-      link: `messagr://${linkHost}/i/${minted.token}`,
+      // HTTPS, NOT THE APPLICATION'S OWN SCHEME, AND A CAMERA IS WHY.
+      //
+      // `invitationLink.ts` accepts both and has always said which is which:
+      // "`https` is what travels through a message or a QR code; the
+      // application's own scheme is what the operating system hands over."
+      // This minted the second one, so the QR code on the invitation screen
+      // encoded `messagr://` -- a scheme iOS's camera and most Android
+      // scanners ignore. Nothing could read it: not a camera, and not
+      // Messagr, which has no scanner. Reported from a Pixel Fold on
+      // 7 September 2026, and the screen had been offering that picture
+      // since it was built.
+      //
+      // The host is untouched: it is the account's own homeserver, so a link
+      // still names its instance and nobody is asked which server they are
+      // joining. On messagr.eu that yields `https://messagr.eu/i/<token>`,
+      // which every camera opens, which Android App Links route into the
+      // application -- the Play fingerprints served since this morning are
+      // what makes that verification pass -- and which iOS routes through
+      // the AASA's `/i*`. Somebody without the application lands on the
+      // invitation page instead, which exists for exactly that.
+      //
+      // No scanner is needed, and that is the point: the camera everybody
+      // already has is the scanner.
+      link: `https://${linkHost}/i/${minted.token}`,
     }
   } catch (cause: unknown) {
     return {

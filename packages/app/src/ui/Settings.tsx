@@ -1,5 +1,5 @@
 import React from 'react'
-import { Pressable, StyleSheet, Text, View } from 'react-native'
+import { Pressable, StyleSheet, Switch, Text, View } from 'react-native'
 
 import { t } from '../copy'
 import type { Language } from '../copy/languages'
@@ -87,10 +87,15 @@ export function Settings({
           person who cannot read a list of language names. */}
       <View style={styles.setting} testID="setting-language">
         <Text style={styles.rowLabel}>{t('settings_row_lang_label')}</Text>
+        {/* ONE ROW HERE, FOUR ON THE FIRST SCREEN, AT THE ACCOUNT HOLDER'S
+            WORD. Six flags between two one-line settings read as a feature
+            rather than as a setting; one row that moves reads as a setting.
+            Same component, one number. */}
         <LanguageStrip
           chosen={language}
           onChoose={onLanguage}
           onSettle={onLanguageSettled}
+          rows={1}
           testID="settings-language-strip"
         />
       </View>
@@ -99,18 +104,17 @@ export function Settings({
           turning it on costs rather than what it does: everybody knows what a
           read receipt does, and nobody is told who else finds out. */}
       <View style={styles.setting} testID="setting-receipts">
-        <Pressable
-          testID="toggle-receipts"
-          onPress={() => onReceipts(!receipts)}
-          accessibilityRole="switch"
-          accessibilityState={{ checked: receipts }}
-          accessibilityLabel={t('settings_receipts')}
-          style={styles.row}>
+        <View style={styles.row}>
           <Text style={styles.rowLabel}>{t('settings_receipts')}</Text>
-          <Text style={styles.rowValue}>
-            {receipts ? t('settings_receipts_on') : t('settings_receipts_off')}
-          </Text>
-        </Pressable>
+          <Switch
+            testID="toggle-receipts"
+            value={receipts}
+            onValueChange={onReceipts}
+            accessibilityLabel={t('settings_receipts')}
+            trackColor={SWITCH_TRACK}
+            thumbColor={color.surface.paper}
+          />
+        </View>
         <Text style={styles.hint}>{t('settings_receipts_hint')}</Text>
         {receiptsNotKept && (
           <Text style={styles.notKept}>{t('settings_receipts_not_kept')}</Text>
@@ -124,18 +128,17 @@ export function Settings({
           "notifications" is the setting people most reasonably assume leaks
           their messages. */}
       <View style={styles.setting} testID="setting-wake">
-        <Pressable
-          testID="toggle-wake"
-          onPress={() => onWake(!wake)}
-          accessibilityRole="switch"
-          accessibilityState={{ checked: wake }}
-          accessibilityLabel={t('settings_wake')}
-          style={styles.row}>
+        <View style={styles.row}>
           <Text style={styles.rowLabel}>{t('settings_wake')}</Text>
-          <Text style={styles.rowValue}>
-            {wake ? t('settings_wake_on') : t('settings_wake_off')}
-          </Text>
-        </Pressable>
+          <Switch
+            testID="toggle-wake"
+            value={wake}
+            onValueChange={onWake}
+            accessibilityLabel={t('settings_wake')}
+            trackColor={SWITCH_TRACK}
+            thumbColor={color.surface.paper}
+          />
+        </View>
         <Text style={styles.hint}>{t('settings_wake_hint')}</Text>
         {wakeNotKept && (
           <Text style={styles.notKept}>{t('settings_wake_not_kept')}</Text>
@@ -145,6 +148,24 @@ export function Settings({
       <Text style={styles.nothingElse}>{t('settings_nothing_else')}</Text>
     </View>
   )
+}
+
+/**
+ * THE STATE IS THE SWITCH NOW, NOT A WORD BESIDE IT.
+ *
+ * Both settings were a pressable row with « Activés » / « Désactivés »
+ * written on the right -- readable, and nothing anybody recognises as a
+ * control. The platform's own switch is what a person reaches for, it
+ * announces itself to a screen reader without being told, and it makes the
+ * first word of each hint redundant, which is half of why the hints could be
+ * cut in two.
+ *
+ * `green500` is the brand's action colour, and the track is the only place
+ * this screen carries one.
+ */
+const SWITCH_TRACK = {
+  false: color.neutral['300'],
+  true: color.brand.green500,
 }
 
 const styles = StyleSheet.create({
