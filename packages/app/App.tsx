@@ -518,6 +518,8 @@ export function App({
       // `minted` means the passphrase did not survive and this device opened
       // a new, empty store, losing every room key the old one held -- and
       // there is nothing else anywhere that would say so.
+      let whoElse: { readonly joined: number; readonly other: string } | null =
+        null
       let passphrase: 'minted' | 'reused' | null = null
       let signUp: 'unfinished' | 'complete' | null = null
       let form: FormMigration | null = null
@@ -1238,11 +1240,27 @@ export function App({
                 roomId,
               )
               const other = theOtherMember(members, credentials.userId)
+              // DIT, PARCE QUE `history` NE LE PROUVE PAS.
+              //
+              // #123 tourne autour d'une contradiction : le rapport dit
+              // `history: null`, dont j'ai conclu sept fois que `other`
+              // etait nul -- donc `otherParty` indefini, donc chaque message
+              // entrant nomme (§13.26) -- et il ne l'est pas.
+              //
+              // L'implication est fausse. `historyClaim` reste nul aussi
+              // quand `fetchJoinedMembers` echoue, et il y a DEUX endroits
+              // qui derivent l'autre personne : ce lancement, et la boucle
+              // vive. Le second peut reussir la ou le premier a echoue, ce
+              // qui pose `party` sans que `history` bouge.
+              //
+              // Ceci dit la chose elle-meme.
               // Reported in the launch log below. A gap that closed and a
               // gap that never opened look identical on screen -- both show
               // a readable conversation -- so the only way to tell "history
               // arrived" from "the key came by some other route" is to say
               // which one happened, and the log is where that is said.
+              whoElse =
+                other === null ? null : { joined: members.length, other }
               if (other !== null) {
                 setParty({ scope: roomId, other })
                 // Never throws: see claimHistory.ts for why a history that
@@ -1315,6 +1333,7 @@ export function App({
         send: sendStatus,
         received: receiveStatus,
         history: historyClaim,
+        whoElse,
         // The three the readout used to be the only witness for. `form` is
         // the keystore migration, which answers even on a launch that then
         // fails to start a machine at all -- so it is reported outside every
