@@ -44,6 +44,13 @@ export type TabGlyph =
   | 'mic'
   | 'plus'
   | 'camera'
+  // The loudspeaker, for the in-call control. NOT from `design/icons/`: the
+  // identity has no speaker glyph, because until there were calls there was
+  // nothing to draw one for. Built on the same rules as the set it joins --
+  // 24 grid, 1.5 stroke, `currentColor` -- so it sits beside them without
+  // announcing that it came later. It is a cone and two waves, which is what
+  // every speaker glyph has been since the first one.
+  | 'speaker'
 
 const STROKE = {
   fill: 'none' as const,
@@ -84,6 +91,17 @@ export function TabIcon({
         </>
       )}
 
+      {glyph === 'speaker' && (
+        <>
+          <Path
+            d="M11.5 4.8 6.8 8.6H3.9a.9.9 0 0 0-.9.9v5a.9.9 0 0 0 .9.9h2.9l4.7 3.8z"
+            stroke={tint}
+            {...STROKE}
+          />
+          <Path d="M15.4 9.2a4 4 0 0 1 0 5.6" stroke={tint} {...STROKE} />
+          <Path d="M18.1 6.6a7.7 7.7 0 0 1 0 10.8" stroke={tint} {...STROKE} />
+        </>
+      )}
       {glyph === 'calls' && (
         <Path
           d="M5 3.5h3l1.7 4.2-2.1 1.6a11.5 11.5 0 0 0 5.6 5.6l1.6-2.1 4.2 1.7v3a1.7 1.7 0 0 1-1.9 1.7C9.6 18.6 5.4 14.4 3.8 5.4A1.7 1.7 0 0 1 5 3.5z"
