@@ -94,6 +94,35 @@
   .invite p:last-child{margin-bottom:0}
   .invite .porte{flex:0 1 auto; margin:4px 0 12px}
   .invite .note{font-size:13.5px; color:var(--soft); margin:0}
+  /* LES DEUX COLONNES. Aucun concurrent grand public n'ose cette section, et
+     c'est exactement pourquoi elle convainc. Elles ont le même poids visuel :
+     mettre la colonne de droite en petit serait la nier, et c'est elle qui
+     rend la gauche croyable. */
+  .serveur{margin:26px 0 0}
+  .serveur > h2{
+    font-size:21px; line-height:1.25; letter-spacing:-0.015em; font-weight:640;
+    margin:0 0 6px; text-wrap:balance;
+  }
+  .serveur > .amorce{font-size:15.5px; color:var(--soft); margin:0 0 20px}
+  .colonnes{display:grid; grid-template-columns:1fr; gap:16px}
+  @media (min-width:640px){ .colonnes{grid-template-columns:1fr 1fr} }
+  .colonne{
+    background:var(--surface); border:1px solid var(--rule); border-radius:4px;
+    padding:20px 22px;
+  }
+  .colonne h3{
+    font-family:ui-monospace,SFMono-Regular,Menlo,monospace; font-size:11px;
+    letter-spacing:.13em; text-transform:uppercase; color:var(--soft);
+    font-weight:500; margin:0 0 14px;
+  }
+  .colonne ul{margin:0; gap:10px}
+  .colonne li{font-size:15px; align-items:baseline}
+  .colonne.reste li::before{content:"\25C7"; color:var(--soft)}
+  .serveur .fin{font-size:15.5px; margin:20px 0 0}
+  .serveur .fin b{font-weight:640}
+  .serveur .lien{font-size:13.5px; margin:10px 0 0}
+  .serveur .lien a{color:var(--soft); text-underline-offset:3px}
+  .serveur .lien a:hover{color:var(--accent)}
   .apres{font-size:14px; color:var(--soft); margin:20px 0 0}
   .invite{
     background:var(--bubble); border-radius:4px; padding:26px 24px;
@@ -238,6 +267,59 @@
        data-t="demander">Demander une invitation</a>
     <p class="note" data-t="demander-note">Votre message arrive à une personne, pas à un
     formulaire.</p>
+  </section>
+
+  <!-- CE QUE LE SERVEUR VOIT, ET CE QU'IL NE VOIT PAS.
+       « Chiffrée de bout en bout » était écrit sur cette page et rien ne le
+       soutenait : c'est la phrase que chaque messagerie écrit, y compris
+       celles qui mentent. Le lecteur qui sait lire ne la croit pas sur parole,
+       et celui qui ne sait pas lire ne la comprend pas.
+
+       CHAQUE LIGNE DE GAUCHE EST VRAIE DU CODE, et vérifiée avant d'être
+       écrite ici :
+         - le texte, les photographies : le chemin d'envoi chiffré ;
+         - les réactions : ADR-0011, chiffrées comme le reste ;
+         - qu'un appel soit un appel : packages/app/src/calls/transport.ts
+           passe les événements m.call.* par « the same door messages take »,
+           donc le serveur voit m.room.encrypted et rien d'autre ;
+         - les noms donnés : ADR-0010, ils ne quittent jamais l'appareil.
+       Ce qui n'était pas certain n'est pas écrit, plutôt qu'écrit en plus
+       prudent. -->
+  <section class="serveur">
+    <h2 data-t="serveur-titre">Ce que le serveur voit, et ce qu'il ne voit pas.</h2>
+    <p class="amorce" data-t="serveur-amorce">Le chiffrement protège le contenu, pas son
+    existence. Voici les deux côtés, sans en cacher un.</p>
+
+    <div class="colonnes">
+      <div class="colonne">
+        <h3 data-t="serveur-non-titre">Ce qu'il ne peut pas savoir</h3>
+        <ul>
+          <li data-t="serveur-non1">Le texte de vos messages</li>
+          <li data-t="serveur-non2">Vos photographies</li>
+          <li data-t="serveur-non3">Vos réactions</li>
+          <li data-t="serveur-non4">Qu'un appel est un appel</li>
+          <li data-t="serveur-non5">Les noms que vous donnez à vos contacts</li>
+        </ul>
+      </div>
+      <div class="colonne reste">
+        <h3 data-t="serveur-oui-titre">Ce qu'il sait quand même</h3>
+        <ul>
+          <li data-t="serveur-oui1">Quels comptes échangent, et à quel moment</li>
+          <li data-t="serveur-oui2">La taille de ce qui passe</li>
+          <li data-t="serveur-oui3">Qu'un appareil doit être réveillé, sans savoir pourquoi</li>
+        </ul>
+      </div>
+    </div>
+
+    <p class="fin" data-t="serveur-fin">Ce n'est pas une politique que nous pourrions
+    changer en silence : c'est une propriété du chiffrement.</p>
+    <!-- LE LIEN PORTE LA CLÉ, ET NON UNE ANCRE À L'INTÉRIEUR D'ELLE. Le
+         générateur remplace le contenu d'un élément marqué et exige qu'il ne
+         porte aucune balise : une ancre imbriquée ferait tomber le compte à
+         zéro et arrêterait la construction. C'est la contrainte qui se voit,
+         et elle vaut mieux qu'une page à moitié traduite. -->
+    <p class="lien"><a href="/confidentialite/" data-t="serveur-lien">Le détail est dans
+    notre politique de confidentialité.</a></p>
   </section>
 
   <footer>
