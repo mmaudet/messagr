@@ -1711,6 +1711,7 @@ export function App({
         {call !== null && (
           <CallScreen
             state={call.state}
+            failure={call.failure}
             shown={displayNameFor(call.peerUserId, names.get(call.peerUserId))}
             muted={callMuted}
             onAnswer={() =>

@@ -320,6 +320,9 @@ export const en: Readonly<Record<CopyKey, string>> = {
   call_mute: 'Mute',
   call_unmute: 'Unmute',
   call_dismiss: 'Close',
+  call_failed_no_relay:
+    'This server has no call relay: the call could not be placed.',
+  call_failed_no_microphone: 'The microphone is not available.',
   community_soon_title: 'Coming: communities and rooms',
   community_soon_why:
     'A community groups rooms under a pseudonymous object. The tab is held for the same reason as the calls one: the bar must not move when they arrive.',

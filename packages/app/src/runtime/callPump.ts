@@ -6,9 +6,11 @@ import { openCallEvents } from '../calls/inbox'
 import type { CallState } from '../calls/machine'
 import { fetchTurnServer } from '../calls/ice'
 import {
+  CallSessionError,
   startCallSession,
   type CallSession,
   type CallSessionConfig,
+  type CallSessionFailure,
 } from '../calls/session'
 import type { CallEvent } from '../calls/wire'
 import { deviceMedia } from './callMedia'
@@ -162,6 +164,18 @@ export interface CallOnScreen {
   readonly scope: string
   readonly peerUserId: string
   readonly state: CallState
+  /**
+   * Why the call never started, when that is what happened.
+   *
+   * WITHOUT THIS THE SCREEN SAID "APPEL TERMINÉ". A call refused for want of
+   * a relay never rang anybody, and telling the person it ended is telling
+   * them the wrong thing about their own homeserver -- `ice.ts` argues that
+   * the operator should learn a missing relay from an error rather than the
+   * user learning it from a leak they cannot see, and an error nobody is
+   * shown is not an error anybody learns from. Measured against
+   * `messagr-fork.maudet.cloud`, which answers 404 there.
+   */
+  readonly failure?: CallSessionFailure
 }
 
 export function startCallRuntime(
@@ -171,6 +185,26 @@ export function startCallRuntime(
 ): CallRuntime {
   const deps = encryptingDeps(sessionClient)
   let held: (DeviceCall & CallOnScreen) | null = null
+
+  /**
+   * Runs a gesture that can be refused, and keeps the refusal on the screen.
+   *
+   * `CallSessionError` is the one failure a person can act on -- no relay is
+   * their operator's business, a microphone that will not open is theirs --
+   * so it is recorded before it is re-thrown. Anything else is a fault, and
+   * faults go to the log, not to somebody holding a telephone.
+   */
+  async function refusable(gesture: Promise<void>): Promise<void> {
+    try {
+      await gesture
+    } catch (cause: unknown) {
+      if (cause instanceof CallSessionError && held !== null) {
+        held = { ...held, failure: cause.failure }
+        onChanged({ ...held })
+      }
+      throw cause
+    }
+  }
 
   function begin(scope: string, peerUserId: string): DeviceCall & CallOnScreen {
     const started = startDeviceCall(
@@ -229,10 +263,12 @@ export function startCallRuntime(
 
     place: async (scope, peerUserId) => {
       if (held !== null) throw new Error('a call is already running')
-      await begin(scope, peerUserId).session.place()
+      await refusable(begin(scope, peerUserId).session.place())
     },
     answer: async () => {
-      await held?.session.answer()
+      const running = held
+      if (running === null) return
+      await refusable(running.session.answer())
     },
     reject: () => held?.session.reject(),
     hangup: () => held?.session.hangup(),

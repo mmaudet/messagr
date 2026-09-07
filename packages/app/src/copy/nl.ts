@@ -318,6 +318,9 @@ export const nl: Readonly<Record<CopyKey, string>> = {
   call_mute: 'Microfoon uit',
   call_unmute: 'Microfoon aan',
   call_dismiss: 'Sluiten',
+  call_failed_no_relay:
+    'Deze server heeft geen oproeprelais: bellen was niet mogelijk.',
+  call_failed_no_microphone: 'De microfoon is niet beschikbaar.',
   community_soon_title: 'Binnenkort: gemeenschappen en kamers',
   community_soon_why:
     'Een gemeenschap groepeert kamers onder een pseudoniem object. Het tabblad is gereserveerd om dezelfde reden als dat van de oproepen: de balk mag niet verschuiven wanneer ze er zijn.',

@@ -485,6 +485,9 @@ export const fr = {
   call_mute: 'Couper le micro',
   call_unmute: 'Rétablir le micro',
   call_dismiss: 'Fermer',
+  call_failed_no_relay:
+    'Ce serveur n’a pas de relais d’appel : l’appel n’a pas pu être passé.',
+  call_failed_no_microphone: 'Le micro n’est pas accessible.',
 
   community_soon_title: 'Bientôt : communautés et salons',
   community_soon_why:
