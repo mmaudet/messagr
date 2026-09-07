@@ -34,7 +34,6 @@
     "serveur-fin": "Ce n'est pas une politique que nous pourrions changer en silence : c'est une propriété du chiffrement.",
     "serveur-lien": "Le détail est dans notre politique de confidentialité.",
     "invitation-titre": "On n'entre dans Messagr que sur invitation.",
-    "invitation-corps": "L'application seule ne suffit pas : il vous faut le lien que quelqu'un vous a envoyé. Sans lui, rien à créer, rien à remplir.",
     "pourquoi": "Personne ne peut vous écrire sans que vous l'ayez laissé entrer. Il n'y a pas d'annuaire, pas de recherche par numéro, pas de carnet d'adresses aspiré : un inconnu n'a aucun moyen de vous trouver.",
     "demander": "Demander une invitation",
     "demander-note": "Votre message arrive à une personne, pas à un formulaire.",
@@ -70,7 +69,11 @@
     "cap-salons": "Salons",
     "cap-communautes": "Communautés",
     "cap-agents": "Agents",
-    "cap-bureau": "Application de bureau"
+    "cap-bureau": "Application de bureau",
+    "parcours-titre": "Comment on entre.",
+    "parcours-1": "Quelqu'un vous envoie un lien. Il ne porte ni votre nom ni votre numéro, et il ne sert qu'une fois.",
+    "parcours-2": "Vous installez l'application. Elle vous montre ce qu'elle promet avant de vous demander quoi que ce soit.",
+    "parcours-3": "Vous rouvrez le lien. Le compte est créé à cet instant, pas avant : tiré au hasard, rattaché à rien. Vous écrivez."
   },
   "en": {
     "menu-cgu": "Terms of use",
@@ -107,7 +110,6 @@
     "serveur-fin": "This is not a policy we could change in silence: it is a property of the encryption.",
     "serveur-lien": "The detail is in our privacy policy.",
     "invitation-titre": "Messagr is entered by invitation only.",
-    "invitation-corps": "The application alone is not enough: you need the link somebody sent you. Without it there is nothing to create and nothing to fill in.",
     "pourquoi": "Nobody can write to you unless you have let them in. There is no directory, no search by number, no address book harvested: a stranger has no way to find you.",
     "demander": "Ask for an invitation",
     "demander-note": "Your message reaches a person, not a form.",
@@ -143,7 +145,11 @@
     "cap-salons": "Channels",
     "cap-communautes": "Communities",
     "cap-agents": "Agents",
-    "cap-bureau": "Desktop application"
+    "cap-bureau": "Desktop application",
+    "parcours-titre": "How you get in.",
+    "parcours-1": "Somebody sends you a link. It carries neither your name nor your number, and it works once.",
+    "parcours-2": "You install the application. It shows you what it promises before asking you for anything.",
+    "parcours-3": "You open the link again. The account is created at that moment, not before: drawn at random, attached to nothing. You write."
   },
   "de": {
     "menu-cgu": "Nutzungsbedingungen",
@@ -180,7 +186,6 @@
     "serveur-fin": "Das ist keine Richtlinie, die wir stillschweigend ändern könnten: es ist eine Eigenschaft der Verschlüsselung.",
     "serveur-lien": "Die Einzelheiten stehen in unserer Datenschutzerklärung.",
     "invitation-titre": "In Messagr kommt man nur auf Einladung.",
-    "invitation-corps": "Die Anwendung allein genügt nicht: Sie brauchen den Link, den Ihnen jemand geschickt hat. Ohne ihn gibt es nichts zu erstellen und nichts auszufüllen.",
     "pourquoi": "Niemand kann Ihnen schreiben, ohne dass Sie ihn hereingelassen haben. Es gibt kein Verzeichnis, keine Suche nach Nummer, kein abgesaugtes Adressbuch: ein Fremder hat keine Möglichkeit, Sie zu finden.",
     "demander": "Eine Einladung anfragen",
     "demander-note": "Ihre Nachricht erreicht einen Menschen, kein Formular.",
@@ -216,7 +221,11 @@
     "cap-salons": "Kanäle",
     "cap-communautes": "Gemeinschaften",
     "cap-agents": "Agenten",
-    "cap-bureau": "Desktop-Anwendung"
+    "cap-bureau": "Desktop-Anwendung",
+    "parcours-titre": "So kommt man hinein.",
+    "parcours-1": "Jemand schickt Ihnen einen Link. Er trägt weder Ihren Namen noch Ihre Nummer, und er funktioniert genau einmal.",
+    "parcours-2": "Sie installieren die Anwendung. Sie zeigt Ihnen, was sie verspricht, bevor sie irgendetwas von Ihnen verlangt.",
+    "parcours-3": "Sie öffnen den Link erneut. Das Konto entsteht in diesem Moment, nicht früher: zufällig gezogen, an nichts gebunden. Sie schreiben."
   },
   "es": {
     "menu-cgu": "Condiciones de uso",
@@ -253,7 +262,6 @@
     "serveur-fin": "No es una política que pudiéramos cambiar en silencio: es una propiedad del cifrado.",
     "serveur-lien": "El detalle está en nuestra política de privacidad.",
     "invitation-titre": "A Messagr solo se entra por invitación.",
-    "invitation-corps": "La aplicación por sí sola no basta: necesita el enlace que alguien le ha enviado. Sin él, nada que crear, nada que rellenar.",
     "pourquoi": "Nadie puede escribirle sin que usted le haya dejado entrar. No hay directorio, ni búsqueda por número, ni agenda aspirada: un desconocido no tiene forma de encontrarle.",
     "demander": "Pedir una invitación",
     "demander-note": "Su mensaje llega a una persona, no a un formulario.",
@@ -289,7 +297,11 @@
     "cap-salons": "Canales",
     "cap-communautes": "Comunidades",
     "cap-agents": "Agentes",
-    "cap-bureau": "Aplicación de escritorio"
+    "cap-bureau": "Aplicación de escritorio",
+    "parcours-titre": "Cómo se entra.",
+    "parcours-1": "Alguien le envía un enlace. No lleva ni su nombre ni su número, y sirve una sola vez.",
+    "parcours-2": "Instala la aplicación. Le muestra lo que promete antes de pedirle nada.",
+    "parcours-3": "Vuelve a abrir el enlace. La cuenta se crea en ese instante, no antes: sorteada al azar, sin vínculo con nada. Usted escribe."
   },
   "it": {
     "menu-cgu": "Condizioni d'uso",
@@ -326,7 +338,6 @@
     "serveur-fin": "Non è una politica che potremmo cambiare in silenzio: è una proprietà della cifratura.",
     "serveur-lien": "Il dettaglio è nella nostra informativa sulla privacy.",
     "invitation-titre": "In Messagr si entra solo su invito.",
-    "invitation-corps": "L'applicazione da sola non basta: ti serve il link che qualcuno ti ha inviato. Senza, niente da creare e niente da compilare.",
     "pourquoi": "Nessuno può scriverti senza che tu l'abbia lasciato entrare. Non c'è elenco, non c'è ricerca per numero, non c'è rubrica aspirata: uno sconosciuto non ha alcun modo di trovarti.",
     "demander": "Chiedere un invito",
     "demander-note": "Il tuo messaggio arriva a una persona, non a un modulo.",
@@ -362,7 +373,11 @@
     "cap-salons": "Canali",
     "cap-communautes": "Comunità",
     "cap-agents": "Agenti",
-    "cap-bureau": "Applicazione desktop"
+    "cap-bureau": "Applicazione desktop",
+    "parcours-titre": "Come si entra.",
+    "parcours-1": "Qualcuno ti manda un link. Non porta né il tuo nome né il tuo numero, e serve una volta sola.",
+    "parcours-2": "Installi l'applicazione. Ti mostra che cosa promette prima di chiederti qualsiasi cosa.",
+    "parcours-3": "Riapri il link. L'account nasce in quell'istante, non prima: estratto a caso, legato a niente. E scrivi."
   },
   "nl": {
     "menu-cgu": "Gebruiksvoorwaarden",
@@ -399,7 +414,6 @@
     "serveur-fin": "Dit is geen beleid dat wij stilzwijgend zouden kunnen wijzigen: het is een eigenschap van de versleuteling.",
     "serveur-lien": "De details staan in ons privacybeleid.",
     "invitation-titre": "Messagr betreedt men alleen op uitnodiging.",
-    "invitation-corps": "De applicatie alleen is niet genoeg: u hebt de link nodig die iemand u heeft gestuurd. Zonder die link valt er niets te maken en niets in te vullen.",
     "pourquoi": "Niemand kan u schrijven zonder dat u hem hebt binnengelaten. Er is geen gids, geen zoeken op nummer, geen opgezogen adresboek: een onbekende heeft geen enkele manier om u te vinden.",
     "demander": "Een uitnodiging vragen",
     "demander-note": "Uw bericht komt bij een mens terecht, niet bij een formulier.",
@@ -435,6 +449,10 @@
     "cap-salons": "Kanalen",
     "cap-communautes": "Gemeenschappen",
     "cap-agents": "Agenten",
-    "cap-bureau": "Bureaubladtoepassing"
+    "cap-bureau": "Bureaubladtoepassing",
+    "parcours-titre": "Hoe je binnenkomt.",
+    "parcours-1": "Iemand stuurt u een link. Hij draagt noch uw naam noch uw nummer, en werkt één keer.",
+    "parcours-2": "U installeert de toepassing. Ze laat zien wat ze belooft voordat ze iets van u vraagt.",
+    "parcours-3": "U opent de link opnieuw. Het account ontstaat op dat moment, niet eerder: willekeurig getrokken, aan niets gekoppeld. U schrijft."
   }
 }

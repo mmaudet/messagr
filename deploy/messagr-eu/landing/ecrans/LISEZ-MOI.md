@@ -29,10 +29,27 @@ photographique, et la légende qui la désignait. Le détail est en tête de
 | (`../conversation.html`) | La conversation en tête-à-tête | Fait |
 | `salon.html` | Une conversation à plusieurs | À venir |
 | `agent.html` | La fiche de capacités d'un agent | À venir |
-| `appel.html` | Un appel chiffré de bout en bout | À venir |
+| `appel.html` | Un appel chiffré de bout en bout | En cours |
 
-L'état vient de la même source que le tableau daté de #149, pour que les deux ne
-puissent pas se contredire.
+L'état n'est pas lu depuis le tableau daté de #149 : il est écrit deux fois, ici
+et dans la page. Ce qui empêche les deux de se contredire est
+`tests/tableau-des-capacites.js`, qui refuse une pastille dont l'état diffère de
+celui que le tableau donne à la même capacité. Cette table-ci n'est donc pas la
+source : elle est une copie de courtoisie, et la construction s'arrête si la
+page la démentait.
+
+L'appel est passé de « À venir » à « En cours » le 7 septembre 2026 : le module
+`src/calls/` existe sur master, couvert par ses `.spec`, et n'est importé par
+rien -- écrit, éprouvé, pas embarqué.
+
+## La page d'invitation, qui n'est pas de cette famille
+
+`messagr-ecran-invitation.png` ne sort pas du prototype : c'est la **vraie page
+d'invitation**, celle que ce site sert, rendue avec l'agent d'un téléphone.
+C'est la première image du parcours en trois étapes de la page d'accueil, et la
+première chose qu'une personne invitée voit, avant d'avoir rien installé.
+`rendre-ecrans.mjs` la produit comme les autres, en lisant l'adresse du
+téléchargement dans `deploy.sh` plutôt qu'en la recopiant.
 
 ## Refaire les images
 
