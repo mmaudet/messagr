@@ -37,6 +37,34 @@ rather than claimed in a comment:
 `build-site.sh` runs both on what it produced, so they are held by what is
 deployed and not only by what is committed.
 
+## Asking the server what it serves
+
+Every other check in this directory reads what the repository holds. None of
+them had ever read what the server answers, and on 7 September 2026 that cost
+two live defects at once, both invisible to a green CI:
+
+- the landing page carried a language-selector fix that `master` did not have,
+  so the next deploy from `master` would have put the broken selector back;
+- the privacy policy served was the one from before #102, still claiming
+  _"il n'existe aucun tiers dans cette application"_ while the application had
+  since gained Firebase Cloud Messaging and `master` had gained a whole section
+  explaining exactly what crosses Google.
+
+`tests/conformite-site-deploye.js` closes that. It builds the site and compares
+it with what an address answers, file by file, and names the byte where each
+one first disagrees.
+
+**One difference is tolerated and it is written as narrowly as the build
+allows**: the three store destinations, only inside `i/index.html`, only inside
+the `DESTINATIONS` object, and only when the served value is the plain https
+address `build-site.sh` would itself accept. A renamed object is a failure, not
+a pass, for the same reason `build-site.sh` refuses a renamed slot.
+
+Run with no argument it takes no network: it builds the site and holds its own
+comparator against eight fabricated servers, which is how the tolerance is kept
+from quietly widening. That is the half CI runs. `--live` is the half that
+reads a real server, and `deploy.sh` runs it after every deployment.
+
 ## The QR code, and the second encoder
 
 The page draws a QR of the invitation link for the desktop case. It carries
@@ -122,3 +150,6 @@ Verify after:
     curl -sS -o /dev/null -w '%{http_code}\n' https://messagr.eu/conditions-generales
     deploy/messagr-eu/tests/identical-page-invitation.sh /tmp/messagr-site \
       deploy/messagr-eu/nginx-messagr-eu.conf --live
+    node deploy/messagr-eu/tests/conformite-site-deploye.js --live
+
+`deploy.sh` runs the last of those itself, at the end.
