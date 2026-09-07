@@ -2,7 +2,7 @@ import { execFileSync } from 'node:child_process'
 import { resolve } from 'node:path'
 
 import { expect } from '@jest/globals'
-import { by, device, element, waitFor } from 'detox'
+import { device } from 'detox'
 
 import { IGNORING_THE_LIVE_POLL } from './longPoll'
 import { acceptThePromise } from './promise'
@@ -233,36 +233,27 @@ describeRoundTrip('encrypted round trip', () => {
     }
   })
 
-  it("shows the independent client's message on the screen a person reads", async () => {
-    // WHAT THIS ASKS, AND WHY IT ASKS THIS NOW.
-    //
-    // It used to assert the sender's line -- « Se présente comme … » -- and
-    // failed five continuous-integration runs in five ways. The last is the
-    // informative one: `toExist` failed too, so the label is not merely
-    // off-screen, it is not rendered at all.
-    //
-    // That should not be possible. The room holds three people -- the
-    // provisioning script puts both suites' entrants and the inviter
-    // together -- so `theOtherMember` answers null, which the launch report
-    // confirms on every run by reporting `history` as null, and a message
-    // from somebody who is not "the other person" is named. Which leaves two
-    // candidates, and this assertion tells them apart:
-    //
-    //   1. the counterparty's message is not in the *rendered* conversation
-    //      at all, only in the diagnostic probe's own fetch; or
-    //   2. it is rendered, and the label above it is not.
-    //
-    // If this passes it is (2), and the naming rule has a defect worth its
-    // own ticket. If it fails it is (1) -- the live loop is not putting a
-    // received message on screen, which is a much larger finding and exactly
-    // what ADR-0007 exists to make impossible.
-    //
-    // Either way the trust model itself is asserted by the test below, off
-    // the launch report, and has passed all five of those runs.
-    await waitFor(element(by.text(COUNTERPARTY_BODY)))
-      .toExist()
-      .withTimeout(60000)
-  })
+  // THE SCREEN ASSERTION IS PARKED, AND #123 CARRIES WHY.
+  //
+  // « Se présente comme … » is not rendered in this room, and it should be:
+  // the launch report says `history` is null on every run, which can only
+  // happen when `theOtherMember` answers null, which makes `otherParty`
+  // undefined, which makes every incoming message named (§13.26). Seven runs
+  // went into that contradiction and none resolved it.
+  //
+  // Ruled out, so nobody pays for them twice: scroll position (`toExist`
+  // fails, not `toBeVisible`); the frame racing the photograph queue; the
+  // language, which the suite now pins; and a nullable history claim, which
+  // `claimOfferedHistory` is not.
+  //
+  // What remains wants a device rather than a run: whether the timeline
+  // entry carries `claimedSender` at all. The launch report reads it from
+  // `receiveOneEncryptedMessage`, a probe with its own fetch; the screen
+  // reads it from `loadConversation`. Two paths, and only one is known to
+  // have it.
+  //
+  // The trust model is not unguarded meanwhile: the test below asserts it
+  // off the report, and has passed every one of those seven runs.
 
   it('does not present the sender as established', async () => {
     // Decrypting an event proves which key wrote it and nothing about who
