@@ -135,6 +135,40 @@
   .porte.creuse:hover{background:var(--marque); color:#fff}
   .verte .porte.creuse{background:var(--surface)}
 
+  /* ── La galerie ──────────────────────────────────────────────────────
+     Deux rangées, et l'état de chaque écran sur l'écran lui-même. Une note en
+     bas de section ne serait pas lue par qui regarde les images, et montrer du
+     pas-encore-livré sans le dire à l'endroit où on le montre est la seule
+     manière de perdre le lecteur qu'on cherchait à convaincre. */
+  .galerie{display:grid; grid-template-columns:1fr; gap:26px; margin-top:34px}
+  @media (min-width:640px){ .galerie{grid-template-columns:repeat(2,1fr)} }
+  @media (min-width:960px){ .galerie{grid-template-columns:repeat(3,1fr); gap:30px} }
+  .vue figure{margin:0}
+  /* LES SIX CARTES ONT LA MÊME TAILLE, ET C'EST LE POINT. Les écrans n'ont
+     pas le même rapport -- l'un fait 520 par 800, l'autre 520 par 440 -- et
+     laissés à leur hauteur naturelle les légendes tombaient à six hauteurs
+     différentes. Le rapport est donc imposé et l'image cadrée par le haut :
+     rien n'est rogné -- `contain` et non `cover` : la conversation est large
+     là où les autres sont hautes, et un cadrage plein l'agrandissait au point
+     de ne plus montrer qu'une bulle et demie.
+     Les attributs `width`/`height` sont retirés pour la même raison : ils
+     annonçaient 1040 par 600 pour tous, ce qui était faux pour les hauts et
+     provoquait un saut de mise en page au chargement. */
+  .vue img{
+    display:block; width:100%; aspect-ratio:5 / 4; object-fit:contain;
+    object-position:top center; border-radius:4px; border:1px solid var(--regle);
+    background:var(--creux); padding:10px;
+    box-shadow:0 1px 2px rgba(12,31,25,.04), 0 14px 30px -16px rgba(12,31,25,.18);
+  }
+  .vue figcaption{display:flex; align-items:baseline; gap:10px; margin-top:12px; flex-wrap:wrap}
+  .vue .quoi{font-size:15px; font-weight:600; letter-spacing:-0.01em}
+  .etat{
+    font-size:11px; font-weight:600; letter-spacing:.06em; text-transform:uppercase;
+    padding:3px 8px; border-radius:3px; white-space:nowrap;
+  }
+  .etat.fait{background:var(--bulle); color:var(--appui)}
+  .etat.avenir{background:var(--creux); color:var(--doux); box-shadow:inset 0 0 0 1px var(--regle)}
+
   /* ── Titres de section ───────────────────────────────────────────── */
   h2{
     font-size:clamp(26px,3.4vw,38px); line-height:1.1; letter-spacing:-0.03em;
@@ -344,6 +378,84 @@
     </div>
   </div>
 </section>
+
+  <!-- LA GALERIE MONTRE AUSSI CE QUI N'EST PAS ENCORE LÀ, ET LE DIT SUR
+       CHAQUE ÉCRAN. Le porteur produit l'a demandé : les salons, les agents et
+       les appels sont un vrai plus, et les cacher jusqu'au jour de leur
+       livraison prive la page de ce qui la rend intéressante.
+
+       LA CONDITION EST QUE L'ÉTAT SOIT SUR L'IMAGE, pas dans une note de bas
+       de section. Qui regarde des captures ne lit pas la note ; montrer du
+       pas-encore-livré sans le dire à l'endroit où on le montre est la seule
+       manière sûre de perdre le lecteur qu'on cherchait à convaincre.
+
+       Les écrans viennent du prototype de conception et ne sont pas des
+       photographies : `landing/ecrans/LISEZ-MOI.md` dit d'où ils sortent et ce
+       qui en a été retiré. -->
+  <section class="bande">
+    <div class="mesure">
+      <h2 data-t="galerie-titre">Ce que vous verrez.</h2>
+      <p class="amorce" data-t="galerie-amorce">Trois de ces écrans existent aujourd'hui.
+      Les trois autres sont dessinés et ne tournent pas encore.</p>
+
+      <div class="galerie">
+      <div class="vue">
+        <figure>
+          <img src="/messagr-ecran-premier-lancement.png" alt="" loading="lazy" decoding="async">
+          <figcaption>
+            <span class="quoi" data-t="ecran-lancement">Le premier lancement</span>
+            <span class="etat fait" data-t="etat-fait">Fait</span>
+          </figcaption>
+        </figure>
+      </div>
+      <div class="vue">
+        <figure>
+          <img src="/messagr-conversation-fr.png" alt="" loading="lazy" decoding="async">
+          <figcaption>
+            <span class="quoi" data-t="ecran-conversation">Une conversation</span>
+            <span class="etat fait" data-t="etat-fait">Fait</span>
+          </figcaption>
+        </figure>
+      </div>
+      <div class="vue">
+        <figure>
+          <img src="/messagr-ecran-lien-expire.png" alt="" loading="lazy" decoding="async">
+          <figcaption>
+            <span class="quoi" data-t="ecran-lien">Une invitation ne sert qu'une fois</span>
+            <span class="etat fait" data-t="etat-fait">Fait</span>
+          </figcaption>
+        </figure>
+      </div>
+      <div class="vue">
+        <figure>
+          <img src="/messagr-ecran-salon.png" alt="" loading="lazy" decoding="async">
+          <figcaption>
+            <span class="quoi" data-t="ecran-salon">Une conversation à plusieurs</span>
+            <span class="etat avenir" data-t="etat-avenir">À venir</span>
+          </figcaption>
+        </figure>
+      </div>
+      <div class="vue">
+        <figure>
+          <img src="/messagr-ecran-agent.png" alt="" loading="lazy" decoding="async">
+          <figcaption>
+            <span class="quoi" data-t="ecran-agent">Un agent, et ce qu'il peut faire</span>
+            <span class="etat avenir" data-t="etat-avenir">À venir</span>
+          </figcaption>
+        </figure>
+      </div>
+      <div class="vue">
+        <figure>
+          <img src="/messagr-ecran-appel.png" alt="" loading="lazy" decoding="async">
+          <figcaption>
+            <span class="quoi" data-t="ecran-appel">Un appel chiffré</span>
+            <span class="etat avenir" data-t="etat-avenir">À venir</span>
+          </figcaption>
+        </figure>
+      </div>
+      </div>
+    </div>
+  </section>
 
 <section class="bande sombre">
   <div class="mesure">

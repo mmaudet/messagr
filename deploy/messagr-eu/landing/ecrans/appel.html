@@ -1,0 +1,31 @@
+<!doctype html><meta charset="utf-8"><body style="margin:0;background:#F7F5EF">
+<!--ENLEVES {{ c.label }}-->
+<style>
+  body { margin:0; background:#e8e4dc; color:#1b1a19; font-family:'Schibsted Grotesk', Helvetica, sans-serif; -webkit-font-smoothing:antialiased; }
+  a { color:#0e8f63; text-decoration:none; }
+  a:hover { color:#06614a; text-decoration:underline; }
+  * { box-sizing:border-box; }
+  ::-webkit-scrollbar { width:6px; height:6px; }
+  ::-webkit-scrollbar-thumb { background:#cfc8bb; border-radius:3px; }
+  @keyframes riseIn { from{opacity:0; transform:translateY(8px)} to{opacity:1; transform:none} }
+  @keyframes pulseRing { 0%{opacity:.25} 50%{opacity:.9} 100%{opacity:.25} }
+  @keyframes scanSweep { 0%{transform:translateY(-104px)} 100%{transform:translateY(104px)} }
+</style>
+<sc-if value="{{ isCall }}" hint-placeholder-val="{{ false }}">
+              <div style="flex:1; background:#0c1f19; color:#f2fbf6; display:flex; flex-direction:column; align-items:center; justify-content:space-between; padding:30px 22px 26px; position:relative; overflow:hidden;">
+                <div style="position:absolute; inset:-30% -25% auto; height:60%; background:radial-gradient(closest-side, rgba(18,183,106,.18), transparent);"></div>
+                <div style="position:relative; text-align:center;">
+                  <div style="display:inline-flex; align-items:center; gap:7px; background:rgba(18,183,106,.14); border:1px solid rgba(18,183,106,.34); padding:6px 12px; border-radius:20px;">
+                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#12b76a" stroke-width="2" stroke-linecap="round"><rect x="4" y="10" width="16" height="11" rx="2.5"></rect><path d="M8 10V7a4 4 0 018 0v3"></path></svg>
+                    <span style="font-size:12px; color:#8ee7bb;">Appel chiffré de bout en bout</span>
+                  </div>
+                  <div style="font-size:26px; font-weight:600; letter-spacing:-0.02em; margin-top:16px;">Nadia Belkacem</div>
+                  <div style="font-size:13.5px; color:rgba(242,251,246,.6); margin-top:5px;">04:12 · vérifiée</div>
+                </div>
+                <div style="position:relative; width:132px; height:132px;">
+                  <image-slot id="call-avatar" shape="circle" style="width:132px; height:132px;" src="https://api.dicebear.com/9.x/notionists/svg?seed=Nadia&amp;backgroundColor=c8ddd2&amp;scale=105" placeholder="Nadia"></image-slot>
+                </div>
+                
+              </div>
+            </sc-if>
+</body>

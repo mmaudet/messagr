@@ -84,9 +84,13 @@ try {
 // que personne n'affiche. Les deux sont des erreurs, et aucune ne se voit.
 const marquees = [...gabarit.matchAll(/data-t="([^"]+)"/g)].map(m => m[1])
 const uniques = [...new Set(marquees)].sort()
-if (marquees.length !== uniques.length) {
-  echouer('une clé data-t apparaît deux fois dans la page')
-}
+// UNE CLÉ PEUT SERVIR PLUSIEURS FOIS, ET LA GALERIE EN A BESOIN. La règle
+// était « une clé, une occurrence » : un garde-fou contre une substitution qui
+// frapperait un endroit que personne ne visait. La galerie porte six écrans et
+// deux étiquettes d'état, donc « Fait » paraît trois fois, et c'est légitime.
+// Ce qui doit être tenu n'est pas le compte mais la COUVERTURE : toute clé
+// marquée est remplacée, partout, et aucune ne reste en français sur une page
+// qui ne l'est pas. C'est `remplacer` qui le vérifie.
 
 for (const langue of langues) {
   const cles = Object.keys(copie[langue]).sort()
@@ -136,9 +140,14 @@ const remplacer = (html, cle, valeur, langue) => {
     vus += 1
     return ouvrante + echapper(valeur) + fermante
   })
-  if (vus !== 1) {
+  // ZÉRO EST LA SEULE FAUTE. Plusieurs occurrences sont légitimes -- une
+  // étiquette d'état se répète sur chaque écran de la galerie -- et elles sont
+  // toutes remplacées. Zéro veut dire qu'un remplacement n'a rien fait, et
+  // c'est ainsi qu'une phrase française reste au milieu d'une page qui ne
+  // l'est pas.
+  if (vus === 0) {
     echouer(
-      `« ${cle} » a été remplacée ${vus} fois dans la page ${langue}, une attendue. ` +
+      `« ${cle} » n'a été remplacée nulle part dans la page ${langue}. ` +
         `Un remplacement sans effet laisse la phrase française au milieu d'une ` +
         `page qui ne l'est pas.`,
     )
@@ -336,8 +345,16 @@ for (const langue of langues) {
   // française sur `/de/` annulerait ce que les six adresses corrigent, et le
   // séparateur « Hier » s'y lirait « ici ». Exigé avant d'être remplacé, comme
   // tout le reste : une image renommée doit arrêter la construction.
+  //
+  // TOUTES LES OCCURRENCES, ET PLUS UNE SEULE. Le hero et la galerie montrent
+  // le même écran ; exiger une occurrence unique interdisait de le citer deux
+  // fois. Ce qui compte n'est pas le compte, c'est qu'aucune page ne montre
+  // l'image d'une autre langue -- donc au moins une, et toutes remplacées.
   const motifConversation = /\/messagr-conversation-[a-z]{2}\.png/g
-  exigerUneFois(page, motifConversation, "l'image de conversation", langue)
+  const citations = page.match(motifConversation)
+  if (!citations || citations.length === 0) {
+    echouer(`la page ${langue} ne cite aucune image de conversation`)
+  }
   page = page.replace(motifConversation, `/messagr-conversation-${langue}.png`)
 
   // AUCUNE MARQUE NE DOIT SURVIVRE. Une page qui montrerait « %TAILLE% » à un
