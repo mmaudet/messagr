@@ -127,16 +127,38 @@ fi
 # catch the outage, by refusing to conclude. But it catches AFTER the files are
 # live, and the page stayed broken in between. A permission check before the
 # send would be earlier; it is not written here.
+# THE WHOLE TREE, BY SHAPE. AND THE SAME DEFECT, ONE LAYER DOWN.
+#
+# This was three commands: `i/` by name, `.well-known/` by name, and then the
+# root's files with `--exclude='*/'` to leave those two alone. Its comment said
+# the exclusion "leaves the two directories above to the two lines that already
+# own them", and that was true when there were two.
+#
+# `confidentialite/` and `conditions-generales/` were added to the site since.
+# They are excluded by `*/` and named by no line, so THEY HAVE NEVER BEEN
+# UPLOADED BY THIS SCRIPT. Measured on the server on 7 September 2026:
+#
+#     index.html, i/, .well-known/, the marks   2026-09-07 12:30
+#     conditions-generales/index.html           2026-09-05 04:57
+#     confidentialite/index.html                2026-09-05 05:07
+#
+# Everything else was deployed that morning; the legal pages had not moved in
+# two days, through every deployment in between. The privacy policy served was
+# the one from before #102 -- it still claimed "il n'existe aucun tiers dans
+# cette application" while the application carried Firebase Cloud Messaging --
+# and no deployment could have fixed it.
+#
+# This is `build-site.sh`'s own defect, one layer down and unfixed. That script
+# copied `i/` and `.well-known/` BY NAME, so the two legal directories were
+# built into nothing; it was fixed on 18 August by copying by shape. The pages
+# have been built correctly ever since, and uploaded nowhere.
+#
+# One command, no exclusion. Without `--delete`, so `messagr.apk` -- which
+# lives on the server and not in the build -- stays where the block above put
+# it.
 echo "== site → $HOST:$SITE_DIR"
 # rsync --checksum: only files actually modified are pushed.
 rsync -av --checksum --rsync-path="sudo rsync" \
-  "$poussee/i/" "$HOST:$SITE_DIR/i/"
-rsync -av --checksum --rsync-path="sudo rsync" \
-  "$poussee/.well-known/" "$HOST:$SITE_DIR/.well-known/"
-# The root's own files, by shape and not by name: `--exclude='*/'` leaves the
-# two directories above to the two lines that already own them. Added the day
-# the apex stopped answering 403.
-rsync -av --checksum --exclude='*/' --rsync-path="sudo rsync" \
   "$poussee/" "$HOST:$SITE_DIR/"
 
 if [ "$MESSAGR_APK" = "none" ]; then
