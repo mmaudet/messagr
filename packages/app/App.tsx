@@ -1682,7 +1682,6 @@ export function App({
                   : displayNameFor(party.other, names.get(party.other))
               }
               named={party !== null && names.get(party.other) !== undefined}
-              identifier={party?.other}
               onBack={() => {
                 setOpenScope(null)
                 openScopeRef.current = null
