@@ -149,6 +149,20 @@ async function thumbnailOf(
 ): Promise<ImageBytes | undefined> {
   if (uri === undefined) return undefined
   try {
+    // NO `mode`, AND THE BLACK BARS ARE WHY.
+    //
+    // This asked for a SQUARE box with `mode: 'contain'`, and `contain`
+    // fills the rest of the box it was given: a landscape photograph came
+    // back square with black bands baked into the pixels. They were not
+    // drawn by any screen -- they were in the file, so they survived the
+    // upload, the encryption and the fetch, and appeared identically on both
+    // platforms. Reported from an iPhone and a Pixel on 7 September 2026.
+    //
+    // Without `mode` the two numbers are a bounding box the library scales
+    // *within*, preserving the photograph's own proportions, which is what a
+    // thumbnail of a picture should be. `onlyScaleDown` stays: a small
+    // photograph must not be enlarged into a bigger file than the one it
+    // replaces.
     const small = await ImageResizer.createResizedImage(
       uri,
       THUMBNAIL_EDGE,
@@ -158,7 +172,7 @@ async function thumbnailOf(
       0,
       undefined,
       false,
-      { mode: 'contain', onlyScaleDown: true },
+      { onlyScaleDown: true },
     )
     // A resize that came back no smaller is a resize worth dropping: a second
     // file to seal, upload and fetch, for no fewer bytes.
