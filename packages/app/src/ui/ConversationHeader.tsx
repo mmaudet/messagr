@@ -43,19 +43,29 @@ import { Avatar } from './Avatar'
  * aujourd'hui existant est tout à fait inutile, le bandeau doit être sur
  * toute la largeur à minima".
  *
- * # Two lines when there are two things to say
+ * # One line, and the identifier is one tap away
  *
- * A given name on the first line and the identifier under it, small. Somebody
- * who named a person still needs the identifier occasionally -- it is what
- * they would read out to check -- and burying it a screen deeper to save
- * eleven points of height is a trade nobody asked for. With no given name the
- * identifier is the first line and there is no second.
+ * This showed a given name on the first line and the identifier under it, on
+ * the argument that somebody who named a person still needs it occasionally
+ * and that burying it a screen deeper to save eleven points of height was a
+ * trade nobody asked for.
+ *
+ * Somebody asked for it, on 7 September 2026, looking at a conversation with
+ * a person he had just named. The argument was not wrong about the need; it
+ * was wrong about the cost. `@5oxlguqkuvkz:messagr-fork.maudet.cloud` under
+ * "Quentin" is a line of machine text at the top of every screen of a
+ * conversation with somebody whose name is right above it -- and the header
+ * is itself the control that opens the screen where the identifier lives in
+ * full. It is not buried, it is one tap under the thing you would tap to
+ * check it.
+ *
+ * With no given name the identifier is the only line, exactly as before:
+ * there is no second thing to say, and the first one has to be something.
  */
 
 export function ConversationHeader({
   shown,
   named,
-  identifier,
   onBack,
   onOpenPerson,
 }: {
@@ -63,8 +73,6 @@ export function ConversationHeader({
   readonly shown: string
   /** Whether `shown` is a given name. Decides the typographic role. */
   readonly named: boolean
-  /** The identifier, shown small under a given name. */
-  readonly identifier?: string
   readonly onBack: () => void
   readonly onOpenPerson: () => void
 }) {
@@ -96,11 +104,6 @@ export function ConversationHeader({
             style={named ? styles.name : styles.identifier}>
             {shown}
           </Text>
-          {named && identifier !== undefined && (
-            <Text numberOfLines={1} style={styles.under}>
-              {identifier}
-            </Text>
-          )}
         </View>
       </Pressable>
 
@@ -147,10 +150,6 @@ const styles = StyleSheet.create({
     minHeight: floors.touchTargetMin,
   },
   said: { flex: 1 },
-  under: {
-    ...type.caption,
-    color: color.neutral['600'],
-  },
   name: {
     ...type.titleMd,
     color: color.neutral['900'],
