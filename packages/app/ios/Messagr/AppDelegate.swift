@@ -2,6 +2,7 @@ import UIKit
 import React
 import React_RCTAppDelegate
 import ReactAppDependencyProvider
+import FirebaseCore
 
 @main
 class AppDelegate: UIResponder, UIApplicationDelegate {
@@ -9,6 +10,33 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
 
   var reactNativeDelegate: ReactNativeDelegate?
   var reactNativeFactory: RCTReactNativeFactory?
+
+  /// Initialises Firebase, and only when this build actually carries its configuration.
+  ///
+  /// **WHY IT EXISTS AT ALL.** `index.js` registers the background message handler at module
+  /// scope -- the only place a headless process ever runs it -- and that call needs a default
+  /// Firebase app. On Android `google-services.json` and the Gradle plugin create one before any
+  /// JavaScript runs. On iOS nothing does it implicitly, and nothing here did it explicitly, so
+  /// `getMessaging()` threw `No Firebase App '[DEFAULT]' has been created` while the bundle was
+  /// still being evaluated. In Debug that is a red box; in Release it is a BLACK SCREEN and
+  /// nothing else, which is what the first TestFlight tester saw.
+  ///
+  /// **WHY IT IS CONDITIONAL.** `FirebaseApp.configure()` raises when there is no
+  /// `GoogleService-Info.plist` in the bundle, so calling it unconditionally would replace one
+  /// launch failure with another. Asking whether the file is there first means a build without
+  /// it starts, works, and cannot be woken -- a degradation rather than a failure, which is the
+  /// same rule `index.js`'s guard follows.
+  ///
+  /// **WHAT FIREBASE IS FOR HERE, WHICH IS LESS THAN IT LOOKS.** iOS takes Apple's own channel:
+  /// `pushDevice.ts` reads an APNs token, sygnal talks to Apple, and no push goes near Google.
+  /// Firebase is present only because `getAPNSToken` is the two lines that read that token.
+  private static func configureFirebaseIfPresent() {
+    guard Bundle.main.url(forResource: "GoogleService-Info", withExtension: "plist") != nil else {
+      NSLog("MESSAGR_FIREBASE_ABSENT no GoogleService-Info.plist; this build cannot be woken")
+      return
+    }
+    FirebaseApp.configure()
+  }
 
   /// A directory this process may write the crypto store into.
   ///
@@ -57,6 +85,11 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
     _ application: UIApplication,
     didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]? = nil
   ) -> Bool {
+    // BEFORE THE REACT NATIVE FACTORY, AND THE ORDER IS THE WHOLE POINT.
+    // The factory evaluates the JavaScript bundle, and `index.js` asks for a default Firebase
+    // app while it does. Configuring afterwards would be configuring after the throw.
+    Self.configureFirebaseIfPresent()
+
     let delegate = ReactNativeDelegate()
     let factory = RCTReactNativeFactory(delegate: delegate)
     delegate.dependencyProvider = RCTAppDependencyProvider()
