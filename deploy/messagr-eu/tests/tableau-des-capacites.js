@@ -19,11 +19,15 @@
 //      -- nomme sa capacité par `data-cap`, et l'état qu'il affiche est celui
 //      que le tableau lui donne. C'est mécanique : aucun vocabulaire, aucun
 //      jugement.
-//   3. LA PAGE NE RÉCLAME RIEN HORS DU TABLEAU. Une poignée de mots ne peuvent
+//   3. LE PARCOURS NE MONTRE QUE DU LIVRÉ. Les trois images de « Comment on
+//      entre » ne portent pas de pastille, et c'est juste puisque les trois sont
+//      faites ; la règle empêche qu'on y glisse plus tard un écran qui ne
+//      tourne pas.
+//   4. LA PAGE NE RÉCLAME RIEN HORS DU TABLEAU. Une poignée de mots ne peuvent
 //      apparaître dans la prose que si le tableau porte leur capacité comme
 //      faite. Ailleurs, ils doivent être dans le tableau ou sous une pastille.
 //
-// La règle 3 est la seule qui demande du vocabulaire, donc la seule qui peut
+// La règle 4 est la seule qui demande du vocabulaire, donc la seule qui peut
 // se tromper. Elle est tenue courte exprès, et chaque mot est ancré à une
 // capacité : mieux vaut une liste qui attrape peu et sûrement qu'une liste
 // large qui crie au loup et qu'on finit par désarmer.
@@ -397,7 +401,7 @@ function prose(html) {
     .replace(/<!--[\s\S]*?-->/g, '')
     .replace(/<style>[\s\S]*?<\/style>/g, '')
     .replace(/<script>[\s\S]*?<\/script>/g, '')
-    .replace(/<div class="vue" data-cap="[\s\S]*?<\/div>\s*<\/div>/g, '')
+    .replace(/<div class="vue" data-cap="[\s\S]*?<\/figure>\s*<\/div>/g, '')
     .replace(/<div class="loupe"[^>]*data-cap="[\s\S]*?<\/figure>\s*<\/div>/g, '')
     .replace(/<li data-cap="[\s\S]*?<\/li>/g, '')
 }
@@ -438,6 +442,67 @@ if (tableau) {
             "jusqu'au 7 septembre 2026."
         )
       }
+    })
+  })
+}
+
+// ── 5. Le parcours ne montre que des écrans livrés ───────────────────────
+//
+// Les trois images de « Comment on entre » ne portent pas de pastille, et c'est
+// juste : les trois sont faites, et une pastille « Fait » répétée trois fois
+// serait du bruit. Mais sans règle, rien n'empêcherait d'y glisser plus tard un
+// écran qui ne tourne pas -- et un parcours est le pire endroit pour ça,
+// puisqu'il se lit comme ce qui se passe VRAIMENT quand on entre.
+//
+// La règle est donc : chaque image du parcours est déjà montrée par une carte
+// de la galerie donnée pour faite, ou bien elle est dans la courte liste
+// ci-dessous, qui n'est pas une capacité de l'application.
+var HORS_APPLICATION = {
+  '/messagr-ecran-invitation.png':
+    "la page d'invitation de ce site, pas un écran de l'application",
+}
+
+if (tableau) {
+  LANGUES.forEach(function (langue) {
+    var html = pages[langue]
+    var parcours = /<ol class="etapes">[\s\S]*?<\/ol>/.exec(html)
+    if (!parcours) {
+      echouer('la page ' + langue + ' ne porte plus le parcours en trois étapes')
+      return
+    }
+    // Les images que la galerie montre comme faites.
+    var livrees = {}
+    ;(html.match(/<div class="vue" data-cap="[\s\S]*?<\/figure>\s*<\/div>/g) || []).forEach(
+      function (carte) {
+        var cap = /data-cap="([a-z-]+)"/.exec(carte)
+        var img = /<img src="([^"]+)"/.exec(carte)
+        if (cap && img && tableau[cap[1]] === 'fait') {
+          livrees[img[1]] = true
+        }
+      }
+    )
+    var images = parcours[0].match(/<img src="([^"]+)"/g) || []
+    if (images.length !== 3) {
+      echouer(
+        'le parcours de la page ' +
+          langue +
+          ' porte ' +
+          images.length +
+          ' image(s), trois attendues'
+      )
+    }
+    images.forEach(function (brute) {
+      var src = /<img src="([^"]+)"/.exec(brute)[1]
+      if (livrees[src] || HORS_APPLICATION[src]) return
+      echouer(
+        'le parcours de la page ' +
+          langue +
+          ' montre ' +
+          src +
+          ", qu'aucune carte de la galerie ne donne pour faite. Un parcours se " +
+          "lit comme ce qui se passe vraiment quand on entre : il ne peut pas " +
+          "y figurer d'écran qui ne tourne pas."
+      )
     })
   })
 }
