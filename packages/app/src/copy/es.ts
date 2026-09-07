@@ -273,7 +273,7 @@ export const es: Readonly<Record<CopyKey, string>> = {
   message_read: 'Leído',
   settings_receipts: 'Confirmaciones de lectura',
   settings_receipts_hint:
-    'Desactivadas. Una confirmación de lectura es pública: el servidor sabe quién ha leído qué, y a qué hora. Activarlas avisa a su interlocutor de que ha leído — y al servidor al mismo tiempo.',
+    'Público: el servidor sabe quién ha leído qué, y cuándo.',
   settings_receipts_on: 'Activadas',
   settings_receipts_off: 'Desactivadas',
   settings_receipts_not_kept:
@@ -317,7 +317,7 @@ export const es: Readonly<Record<CopyKey, string>> = {
   message_read_hint: 'Leído',
   settings_wake: 'Notificaciones',
   settings_wake_hint:
-    'Activadas. Lo que atraviesa Google no contiene remitente, ni conversación, ni mensaje: solo una señal de despertar. Después el dispositivo descifra aquí, por sí mismo. Desactivarlas no registra ningún destinatario en el servidor: ya no tiene adónde enviar.',
+    'La señal de despertar no lleva remitente ni mensaje. El dispositivo descifra aquí.',
   settings_wake_on: 'Activadas',
   settings_wake_off: 'Desactivadas',
   settings_wake_not_kept:

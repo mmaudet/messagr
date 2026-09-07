@@ -274,8 +274,7 @@ export const en: Readonly<Record<CopyKey, string>> = {
   message_sent: 'Sent',
   message_read: 'Read',
   settings_receipts: 'Read receipts',
-  settings_receipts_hint:
-    'Off. A read receipt is public: the server learns who read what, and at what time. Turning them on tells the person you are writing to that you have read — and tells the server at the same moment.',
+  settings_receipts_hint: 'Public: the server learns who read what, and when.',
   settings_receipts_on: 'On',
   settings_receipts_off: 'Off',
   settings_receipts_not_kept:
@@ -319,7 +318,7 @@ export const en: Readonly<Record<CopyKey, string>> = {
   message_read_hint: 'Read',
   settings_wake: 'Notifications',
   settings_wake_hint:
-    'On. What crosses Google contains no sender, no conversation and no message: only a wake-up signal. The device then decrypts here, itself. Turning them off registers no recipient with the server: it has nowhere left to send.',
+    'The wake-up signal carries no sender and no message. The device decrypts here.',
   settings_wake_on: 'On',
   settings_wake_off: 'Off',
   settings_wake_not_kept:

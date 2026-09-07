@@ -272,7 +272,7 @@ export const nl: Readonly<Record<CopyKey, string>> = {
   message_read: 'Gelezen',
   settings_receipts: 'Leesbevestigingen',
   settings_receipts_hint:
-    'Uit. Een leesbevestiging is openbaar: de server komt te weten wie wat heeft gelezen, en hoe laat. Ze aanzetten laat uw gesprekspartner weten dat u hebt gelezen — en op hetzelfde moment ook de server.',
+    'Openbaar: de server komt te weten wie wat heeft gelezen, en wanneer.',
   settings_receipts_on: 'Aan',
   settings_receipts_off: 'Uit',
   settings_receipts_not_kept:
@@ -316,7 +316,7 @@ export const nl: Readonly<Record<CopyKey, string>> = {
   message_read_hint: 'Gelezen',
   settings_wake: 'Meldingen',
   settings_wake_hint:
-    'Aan. Wat Google passeert bevat geen afzender, geen gesprek en geen bericht: alleen een wekseintje. Het apparaat ontsleutelt daarna zelf, hier. Ze uitzetten registreert geen ontvanger bij de server: hij heeft nergens meer heen te sturen.',
+    'Het wekseintje draagt geen afzender en geen bericht. Het apparaat ontsleutelt hier.',
   settings_wake_on: 'Aan',
   settings_wake_off: 'Uit',
   settings_wake_not_kept:
