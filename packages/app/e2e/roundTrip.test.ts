@@ -273,6 +273,28 @@ describeRoundTrip('encrypted round trip', () => {
    * satisfy the second while the person saw nothing, which is the mistake
    * this file's header was written about.
    */
+  /**
+   * THE DISCRIMINATOR THE PARKED NOTE ASKED FOR AND NEVER RAN.
+   *
+   * It said: the report reads the message through
+   * `receiveOneEncryptedMessage`, a probe with its own fetch, while the
+   * screen reads it through `loadConversation` -- two paths, and only one is
+   * known to carry it. Asserting the *body* separates them. If this fails,
+   * the message is not on screen at all and the missing label is a
+   * consequence rather than the fault; if it passes and the one below fails,
+   * the fault is in the label itself.
+   *
+   * Worth keeping either way: "the message a counterparty encrypted is drawn
+   * in the conversation" is the whole point of the round trip, and until now
+   * only the report said so.
+   */
+  it("draws the counterparty's message in the conversation", async () => {
+    await waitFor(element(by.text(COUNTERPARTY_BODY)))
+      .toBeVisible()
+      .withTimeout(60000)
+    await detoxExpect(element(by.text(COUNTERPARTY_BODY))).toBeVisible()
+  })
+
   it('names the sender it cannot vouch for', async () => {
     const claimed = `Se présente comme ${process.env.MESSAGR_INTEROP_USER ?? ''}`
     await waitFor(element(by.text(claimed)))
