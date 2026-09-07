@@ -875,19 +875,46 @@ export function App({
                     reason: done.reason ?? 'no reason given',
                   })
                 }
-                // Re-derived rather than guessed at: the tally is built from
-                // what the homeserver holds, and a chip drawn from a local
-                // guess would disagree with it the moment anything else
-                // changed.
-                const fresh = await loadConversation(
-                  sessionClient,
-                  scope,
-                  credentials.userId,
-                )
-                setConversation(held =>
-                  mergeTimeline(held ?? [], fresh.entries),
-                )
-                setReactions(fresh.reactions)
+                // RE-DERIVED, AND RE-DERIVED AGAIN UNTIL IT IS THERE.
+                //
+                // The tally is built from what the homeserver holds rather
+                // than from a local guess, and that stays: a chip drawn from
+                // a guess disagrees with the room the moment anything else
+                // changes. But one read straight after the send is a read
+                // the event has not always reached yet, and nothing ran
+                // afterwards -- `derive` runs only when a conversation is
+                // opened. So the person who pressed the emoji watched
+                // nothing happen while the person they pressed it at saw the
+                // chip appear. Reported from an iPhone on 7 September 2026.
+                //
+                // A few short attempts rather than one, and a wait between
+                // them. Bounded because a reaction the server never accepted
+                // must stop being asked about, and short because this is a
+                // chip under somebody's thumb.
+                const stillMine = () => openScopeRef.current === scope
+                for (let look = 0; look < 4 && stillMine(); look += 1) {
+                  const fresh = await loadConversation(
+                    sessionClient,
+                    scope,
+                    credentials.userId,
+                  )
+                  setConversation(held =>
+                    mergeTimeline(held ?? [], fresh.entries),
+                  )
+                  setReactions(fresh.reactions)
+                  // The tallies for the message that was pressed. Adding a
+                  // reaction has landed when one of them is this key and is
+                  // mine; removing one has landed when none of them is.
+                  const here = fresh.reactions.get(target) ?? []
+                  const landed =
+                    own === null
+                      ? here.some(
+                          tally => tally.key === key && tally.mine !== null,
+                        )
+                      : here.every(tally => tally.mine !== own)
+                  if (landed) break
+                  await new Promise(resolve => setTimeout(resolve, 700))
+                }
               }
               gesture().catch((cause: unknown) =>
                 logEvent('warn', 'MESSAGR_REACT_FAILED', {
