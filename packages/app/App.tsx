@@ -122,7 +122,7 @@ import { Vouch } from './src/ui/Vouch'
 import { setCatalogue, t } from './src/copy'
 import type { Language } from './src/copy/languages'
 import { enterWithASession } from './src/runtime/entry'
-import { initialLink } from './src/runtime/incomingLink'
+import { initialLink, watchLinks } from './src/runtime/incomingLink'
 import { servicePoster } from './src/runtime/servicePoster'
 import {
   fetchSessionSyncStatus,
@@ -384,6 +384,29 @@ export function App({
   // an unspent invitation or it was not, and a note that disappeared while
   // somebody read it would be worse than none.
   const [invitationIgnored, setInvitationIgnored] = useState(false)
+  // `null` until the launch has answered. Distinguishing "not in" from "not
+  // yet known" keeps the list from telling somebody they are locked out for
+  // the second the keystore takes to answer.
+  const [inYet, setInYet] = useState<boolean | null>(null)
+  /**
+   * A link handed over while this application was already running, and the
+   * count of them.
+   *
+   * THE CASE THAT LOOKED HANDLED AND WAS NOT. `getInitialURL` answers only
+   * when the operating system started the application to open a link.
+   * Somebody who installs first and is sent the link afterwards is in the
+   * other case entirely: the application comes to the front and nothing has
+   * read anything. Reported by the first TestFlight tester on 7 September
+   * 2026, who watched an empty conversation list and could do nothing.
+   *
+   * The count is what makes the launch below run again. Two invitations in a
+   * row are two different links, and a value alone would not re-trigger for
+   * the second if it happened to be the same string.
+   */
+  const [warmLink, setWarmLink] = useState<{
+    readonly url: string
+    readonly count: number
+  } | null>(null)
   const [evicted, setEvicted] = useState<'idle' | 'working' | EvictOutcome>(
     'idle',
   )
@@ -428,6 +451,17 @@ export function App({
       pause()
     }
   }, [])
+
+  // EVERY LINK HANDED OVER WHILE RUNNING, and the promise still gates it:
+  // the launch below refuses to do anything until `promiseSeen` is true, so
+  // an invitation arriving early is remembered rather than acted on.
+  useEffect(
+    () =>
+      watchLinks(url => {
+        setWarmLink(held => ({ url, count: (held?.count ?? 0) + 1 }))
+      }),
+    [],
+  )
 
   // Asked once, before anything else. A keystore read and nothing more: no
   // network, which is what lets it run under the promise rather than after it.
@@ -500,7 +534,11 @@ export function App({
       const entered = await enterWithASession({
         secrets: sessionSecrets,
         poster: servicePoster,
-        link: initialLink,
+        // The warm link wins when there is one: it is the more recent
+        // answer to the same question, and `getInitialURL` keeps handing
+        // back the address this process was started with for as long as it
+        // lives.
+        link: warmLink === null ? initialLink : async () => warmLink.url,
         signUp: signUpSecrets,
         // A claim is two calls with the issuer's application in between. See
         // claimInvitation.ts: without a wait this tries once, is told 409,
@@ -596,6 +634,7 @@ export function App({
             //
             // Everything uncertain resolves to `restored-session`, which
             // creates nothing. See signUpMarker.ts.
+            setInYet(entered.entered)
             if (entered.entered && entered.invitationIgnored === true) {
               setInvitationIgnored(true)
             }
@@ -1375,6 +1414,15 @@ export function App({
         })
       }
     })
+    // THE DEPENDENCY LIST IS DELIBERATE, AND `warmLink` IS NOT IN IT.
+    //
+    // The object is rebuilt on every arrival, so watching it would re-run the
+    // whole launch -- keystore, pump, sync -- for a link this effect has
+    // already spent. `warmLink?.count` is the thing that actually changed,
+    // and it is a new number exactly once per link handed over, including
+    // when two invitations carry the same address. The url is read inside
+    // rather than watched: it is whatever the newest count refers to.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
     architecture,
     hermes,
@@ -1383,6 +1431,7 @@ export function App({
     storeDir,
     panicProbeRequested,
     promiseSeen,
+    warmLink?.count,
   ])
 
   // THE HARDWARE BACK BUTTON, WHICH WAS CLOSING THE APPLICATION.
@@ -1723,6 +1772,7 @@ export function App({
                     summaries={summaries}
                     names={names}
                     invitationIgnored={invitationIgnored}
+                    notInYet={inYet === false}
                     onOpen={scope => openConversationRef.current?.(scope)}
                   />
                 </View>

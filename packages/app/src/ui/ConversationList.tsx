@@ -55,6 +55,17 @@ export interface ConversationListProps {
    */
   readonly invitationIgnored?: boolean
   /**
+   * Whether this device has no session at all.
+   *
+   * AN APPLICATION THAT CANNOT DO ANYTHING MUST NOT LOOK AS IF IT CAN. Entry
+   * failing left the tab bar, the floating action and this list on screen,
+   * all of them inert -- and the empty state said "invite somebody", which is
+   * the one thing a person without an account cannot do. The first TestFlight
+   * tester read that and reported he could do nothing, which was exactly
+   * right.
+   */
+  readonly notInYet?: boolean
+  /**
    * The clock, injectable. A list reading `Date.now()` inside itself is one
    * nothing can screenshot twice and get the same answer from.
    */
@@ -66,6 +77,7 @@ export function ConversationList({
   names,
   onOpen,
   invitationIgnored = false,
+  notInYet = false,
   now = Date.now(),
 }: ConversationListProps) {
   return (
@@ -97,7 +109,13 @@ export function ConversationList({
           its own round trips, and the day either is wrong they are wrong
           together. */}
       {summaries.length === 0 ? (
-        <Empty />
+        notInYet ? (
+          <Text style={styles.empty} testID="list-not-in-yet">
+            {t('list_not_in_yet')}
+          </Text>
+        ) : (
+          <Empty />
+        )
       ) : (
         summaries.map((summary, index) => (
           <View key={summary.scope}>

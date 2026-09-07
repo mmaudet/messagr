@@ -272,6 +272,8 @@ export const fr = {
   list_title: 'Conversations',
   list_invitation_ignored:
     'Vous avez ouvert une invitation, et ce téléphone a déjà un compte. Elle n’a pas été utilisée : elle reste valable pour la personne à qui elle était destinée.',
+  list_not_in_yet:
+    'Vous n’êtes pas encore entré. Ouvrez le lien d’invitation qu’on vous a envoyé : c’est la seule porte, et l’application ne peut rien faire avant.',
   list_empty:
     'Aucune conversation pour l’instant. Invitez quelqu’un pour en commencer une.',
   list_nothing_said: 'Rien n’a encore été dit',

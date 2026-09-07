@@ -191,6 +191,8 @@ export const de: Readonly<Record<CopyKey, string>> = {
   list_title: 'Unterhaltungen',
   list_invitation_ignored:
     'Sie haben eine Einladung geöffnet, und dieses Telefon hat bereits ein Konto. Sie wurde nicht verbraucht und gilt weiterhin für die Person, für die sie bestimmt war.',
+  list_not_in_yet:
+    'Sie sind noch nicht drin. Öffnen Sie den Einladungslink, den Ihnen jemand geschickt hat: er ist die einzige Tür, und davor kann die Anwendung nichts tun.',
   list_empty:
     'Noch keine Unterhaltung. Laden Sie jemanden ein, um eine zu beginnen.',
   list_nothing_said: 'Es wurde noch nichts gesagt',

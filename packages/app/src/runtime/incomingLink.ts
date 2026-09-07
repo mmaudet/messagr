@@ -11,11 +11,20 @@ import { Linking } from 'react-native'
  * installed it and tapped what a friend sent. The event listener answers when
  * it was already running.
  *
- * Only the first is used for now: an application with no session has nothing
- * to do but claim, and one that already has a session ignores a second
- * invitation rather than spending it. Handling the warm case means deciding
- * what a second invitation means for an account that already exists, which is
- * a product question this slice does not have to answer.
+ * BOTH ARE USED NOW, AND A TESTER IS WHY.
+ *
+ * Only the cold one was, on the reasoning that a warm invitation raised a
+ * product question -- what a second invitation means for an account that
+ * already exists. That reasoning skipped the case that actually happened on
+ * 7 September 2026: somebody installed the application, opened it, and only
+ * THEN was sent a link. The application was already running, so the link
+ * brought it to the front and nothing read it. He watched an empty
+ * conversation list and could do nothing at all.
+ *
+ * The warm case is not one question but two, and only one of them is open.
+ * **With no session it is the same as the cold one**: there is nothing to do
+ * but claim, and the ambiguity was never there. With a session, the answer is
+ * already written -- `entry.ts` refuses to spend it and says so on screen.
  */
 export type LinkSource = () => Promise<string | null>
 
@@ -24,3 +33,17 @@ export const initialLink: LinkSource = async () =>
   // deciding between "no link" and "a link" should have one shape to check,
   // not two.
   (await Linking.getInitialURL()) ?? null
+
+/**
+ * Every link handed over while the application is running.
+ *
+ * Answers the function that stops listening, which is what a React effect
+ * returns. The url arrives whole: `entry.ts` parses it, and a listener that
+ * decided anything here would be a second place the link's shape is known.
+ */
+export function watchLinks(arrived: (url: string) => void): () => void {
+  const subscription = Linking.addEventListener('url', ({ url }) => {
+    arrived(url)
+  })
+  return () => subscription.remove()
+}

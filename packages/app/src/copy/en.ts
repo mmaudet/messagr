@@ -189,6 +189,8 @@ export const en: Readonly<Record<CopyKey, string>> = {
   list_title: 'Conversations',
   list_invitation_ignored:
     'You opened an invitation, and this phone already has an account. It was not used: it is still valid for the person it was meant for.',
+  list_not_in_yet:
+    'You are not in yet. Open the invitation link somebody sent you: it is the only door, and the application can do nothing before it.',
   list_empty: 'No conversations yet. Invite someone to start one.',
   list_nothing_said: 'Nothing has been said yet',
   list_unreadable: 'This device cannot read the last message',
