@@ -255,6 +255,30 @@ describeRoundTrip('encrypted round trip', () => {
   // The trust model is not unguarded meanwhile: the test below asserts it
   // off the report, and has passed every one of those seven runs.
 
+  /**
+   * THE EXPERIMENT #123 EXISTS TO RUN, AND IT IS AN ASSERTION ON PURPOSE.
+   *
+   * Seven runs argued about why « Se présente comme … » is not rendered
+   * while the launch report says `history: null`. The argument assumed that
+   * null implies `theOtherMember` answered null. It does not: `historyClaim`
+   * is also null when `fetchJoinedMembers` *throws*, and there are two
+   * places that derive the other person -- this launch, and the live loop's
+   * re-derivation, which can succeed where the launch failed.
+   *
+   * `whoElse` separates the three. This asserts the one that would make the
+   * old reasoning right -- the launch found the other member -- so the run
+   * settles it either way: it passes and the parked screen assertion should
+   * come back, or it fails and **prints the actual value**, which is the
+   * measurement seven runs never took.
+   *
+   * Kept afterwards whatever it says. "The launch path derives the other
+   * member of a two-person room" is worth asserting on its own.
+   */
+  it('finds the other member during the launch itself', async () => {
+    const read = await whatItReported(60000)
+    expect(read.whoElse).toEqual({ joined: 2, derived: true })
+  })
+
   it('does not present the sender as established', async () => {
     // Decrypting an event proves which key wrote it and nothing about who
     // holds that key. The readout used to say so in the word
