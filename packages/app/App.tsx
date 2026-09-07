@@ -65,6 +65,7 @@ import {
 } from './src/runtime/deviceSecrets'
 import {
   publishReceipts,
+  RECEIPTS_DEFAULT,
   receiptsArePublished,
 } from './src/runtime/receiptSetting'
 import { readUpTo } from './src/runtime/receipts'
@@ -330,7 +331,10 @@ export function App({
   // Whether this device publishes read receipts, and which of this account's
   // own messages somebody else has read. Off unless somebody turned it on:
   // see receiptSetting.ts.
-  const [receipts, setReceipts] = useState(false)
+  // The switch starts where a device that has never been asked stands, so it
+  // does not show `off` for the moment the keystore takes to answer and then
+  // flip. `receiptSetting.ts` carries the argument for the default itself.
+  const [receipts, setReceipts] = useState(RECEIPTS_DEFAULT)
   const [receiptsNotKept, setReceiptsNotKept] = useState(false)
   // Whether this device asks to be woken. On unless somebody says otherwise,
   // which is the opposite of the switch above -- `wakeSetting.ts` says why.
@@ -338,7 +342,9 @@ export function App({
   const [wakeNotKept, setWakeNotKept] = useState(false)
   const wakeRef = useRef(true)
   const [readHere, setReadHere] = useState<ReadonlySet<string>>(new Set())
-  const receiptsRef = useRef(false)
+  // The same starting value as the state above, so a receipt sent before the
+  // keystore has answered follows the default rather than the opposite of it.
+  const receiptsRef = useRef(RECEIPTS_DEFAULT)
   // The conversation as the loop's callbacks can see it: they are made once,
   // and a receipt arriving names an event that has to be found among the
   // entries held right now.

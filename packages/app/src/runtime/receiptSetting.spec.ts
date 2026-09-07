@@ -1,6 +1,10 @@
 import { describe, expect, it } from 'vitest'
 
-import { publishReceipts, receiptsArePublished } from './receiptSetting'
+import {
+  RECEIPTS_DEFAULT,
+  publishReceipts,
+  receiptsArePublished,
+} from './receiptSetting'
 import type { SecretStore } from './sessionStore'
 
 function store(held: string | null): SecretStore & { held: string | null } {
@@ -24,8 +28,12 @@ const refusing: SecretStore = {
 }
 
 describe('receiptsArePublished', () => {
-  it('is off on a device where nobody has chosen', async () => {
-    expect(await receiptsArePublished(store(null))).toBe(false)
+  it('takes the default on a device where nobody has chosen', async () => {
+    // The default was `false` until 7 September 2026 and is now the
+    // constant, so this test moves with the decision instead of pinning one
+    // side of it. `receiptSetting.ts` carries the argument for both.
+    expect(await receiptsArePublished(store(null))).toBe(RECEIPTS_DEFAULT)
+    expect(await receiptsArePublished(store(''))).toBe(RECEIPTS_DEFAULT)
   })
 
   it('is on once somebody turns it on', async () => {
