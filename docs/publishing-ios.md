@@ -120,27 +120,30 @@ carré blanc, et la CI reste verte : App Store Connect a été la première chos
 Réparé depuis `design/brand/messagr-icone-ios-1024.svg`, et
 `scripts/assert-ios-icon.sh` le vérifie maintenant dans `checks`.
 
-#### La conformité à l'export, répondue une fois pour toutes
+#### La conformité à l'export
 
-Sans `ITSAppUsesNonExemptEncryption` dans l'`Info.plist`, App Store Connect
-marque chaque build « Conformité manquante » et la retient loin des testeurs
-jusqu'à ce que quelqu'un réponde dans un formulaire web. La réponse est la
-même à chaque fois, donc elle est dans la build.
+Déclarée **exemptée**, dans le build comme dans le compte :
+`ITSAppUsesNonExemptEncryption` vaut `false`, et le titulaire du compte a
+répondu la même chose dans App Store Connect le 7 septembre 2026, sur la
+build 1.0 (2). Les deux enregistrent une seule déclaration, et
+`assert-ios-info-plist.sh` vérifie que le fichier reste cohérent.
 
-Elle vaut `true`, et c'est le produit qui le dicte : l'exemption qui
-permettrait `false` vise les applications n'utilisant que le chiffrement
-fourni par iOS — HTTPS, le trousseau, l'authentification. Messagr chiffre ses
-propres messages de bout en bout avec Olm et Megolm, ce qui n'est pas ça, et
-qui est toute la raison d'être.
+**Ce n'est pas au dépôt de trancher.** Une première version de ce document
+plaidait pour « non exempté », en partant du chiffrement de bout en bout
+d'Olm et Megolm. Ces faits techniques n'ont pas changé et ils ne décident
+rien : l'exemption se lit dans la réglementation, la déclaration est signée
+par Linagora, et le dépôt enregistre la réponse plutôt que de la déduire.
 
-Les algorithmes sont standards et publiés — AES-256, Curve25519, Ed25519,
-HMAC-SHA-256 — donc c'est de la cryptographie de marché de masse et non du
-propriétaire : ce qui découle de `true` est un rapport d'auto-classification
-annuel, pas une revue CCATS.
+**Un piège si la réponse change un jour.** `true` ne se déclare pas seul : il
+exige `ITSEncryptionExportComplianceCode`, le code qu'Apple délivre après
+avoir reçu la documentation d'export. Une livraison a été refusée pour
+l'avoir posé sans lui — erreur 90592 — et le garde refuse désormais la paire
+à moitié faite, dans les deux sens.
 
-**La toute première build, celle du 7 septembre 2026, est partie sans cette
-clé.** Il a fallu répondre une fois dans l'interface pour celle-là ; toutes
-les suivantes la portent.
+**Et sans la clé du tout**, App Store Connect marque chaque build
+« Conformité manquante » et la retient loin des testeurs jusqu'à ce que
+quelqu'un réponde dans l'interface. C'est ce qui est arrivé à la build 2
+avant que la clé n'y soit posée.
 
 ### 4. Inviter le testeur
 

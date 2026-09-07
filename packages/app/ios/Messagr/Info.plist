@@ -78,23 +78,31 @@
 	<string>Pour choisir une image à envoyer dans une conversation. L’image est chiffrée sur cet appareil avant d’être envoyée : ni le serveur ni Messagr ne peuvent la lire.</string>
 	<key>RCTNewArchEnabled</key>
 	<true/>
-	<!-- L'EXPORT N'EST PAS DECLARE ICI, ET APPLE EST CELUI QUI L'A TRANCHE.
+	<!-- L'EXPORT, DECLARE EXEMPTE, ET C'EST LE COMPTE QUI LE DIT.
 
-	     Ce fichier a porte `ITSAppUsesNonExemptEncryption = true` pendant une
-	     livraison, pour que la question cesse d'etre posee a chaque build.
-	     Apple l'a refusee : erreur 90592, "Invalid Export Compliance Code. The
-	     export compliance key value [] in the app's Info.plist doesn't match
-	     the key value of the app's export compliance documentation".
+	     Le titulaire du compte a repondu "exempte" dans App Store Connect le
+	     7 septembre 2026, sur la build 1.0 (2) : l'API porte desormais
+	     `usesNonExemptEncryption: false`. Cette ligne dit la meme chose dans le
+	     build, pour que la question cesse d'etre posee a chaque livraison et
+	     surtout pour que le depot et le compte ne se contredisent pas.
 
-	     La cle `true` n'est utilisable qu'accompagnee de
-	     `ITSEncryptionExportComplianceCode`, le code qu'Apple delivre APRES
-	     avoir recu la documentation d'export. Tant qu'on ne le detient pas, la
-	     declarer est un renvoi vers un document qui n'existe pas.
+	     `false` se suffit a lui-meme. C'est `true` qui exige
+	     `ITSEncryptionExportComplianceCode`, le code qu'Apple delivre apres
+	     avoir recu la documentation d'export, et une livraison a ete refusee
+	     pour l'avoir declare sans lui : erreur 90592, "Invalid Export
+	     Compliance Code. The export compliance key value [] ne correspond pas".
+	     `assert-ios-info-plist.sh` refuse desormais la paire a moitie faite,
+	     dans les deux sens.
 
-	     Donc la question se repond dans App Store Connect, une fois par build,
-	     ou l'interface pose les vraies questions et ou la reponse est signee
-	     par une personne. Le jour ou le code existe, il vient ici avec la cle,
-	     et `assert-ios-info-plist.sh` refuse l'une sans l'autre. -->
+	     CE QUE CE FICHIER NE FAIT PAS : plaider. Une premiere version de ce
+	     commentaire argumentait pour `true`, en partant du chiffrement de bout
+	     en bout d'Olm et Megolm. Ces faits techniques n'ont pas change, et ils
+	     ne tranchent pas la question : l'exemption se lit dans la
+	     reglementation, pas dans le code, et la declaration est signee par
+	     Linagora. Le depot enregistre la reponse du compte ; il ne la deduit
+	     pas. Si elle change, elle change ici et la-bas ensemble. -->
+	<key>ITSAppUsesNonExemptEncryption</key>
+	<false/>
 
 	<!-- WAKING A CLOSED APPLICATION.
 	     Without this, iOS drops a content-available push instead of deferring

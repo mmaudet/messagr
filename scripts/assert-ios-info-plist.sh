@@ -50,7 +50,20 @@ OBLIGES = {
 
 manifest = json.load(open(f'{root}/packages/app/package.json'))
 declared = set(manifest.get('dependencies', {})) | set(manifest.get('devDependencies', {}))
-plist = plistlib.load(open(f'{root}/packages/app/ios/Messagr/Info.plist', 'rb'))
+
+# READ WITH A STRICT PARSER, AND SAY SO WHEN IT REFUSES.
+#
+# `plutil -lint` accepts things XML does not -- `--` inside a comment, most
+# of all, which this file has grown twice. Xcode builds such a plist happily
+# and the failure surfaces somewhere else entirely, so this is the thing that
+# notices, and it must name what it found rather than raise a traceback.
+try:
+    plist = plistlib.load(open(f'{root}/packages/app/ios/Messagr/Info.plist', 'rb'))
+except Exception as refused:
+    print(f'  FAIL  Info.plist is not well-formed XML: {refused}', file=sys.stderr)
+    print('        (plutil -lint is lenient; "--" inside a comment is the usual cause)',
+          file=sys.stderr)
+    sys.exit(1)
 
 missing, checked = [], 0
 for package, keys in OBLIGES.items():
@@ -88,7 +101,13 @@ fi
 if ! python3 - "$ROOT" <<'PY'
 import plistlib, sys
 
-plist = plistlib.load(open(f'{sys.argv[1]}/packages/app/ios/Messagr/Info.plist', 'rb'))
+try:
+    plist = plistlib.load(open(f'{sys.argv[1]}/packages/app/ios/Messagr/Info.plist', 'rb'))
+except Exception:
+    # The check above already named this, and has already failed the run.
+    # Reporting it twice, as a traceback, would bury the one line that says
+    # what to fix.
+    sys.exit(0)
 uses = plist.get('ITSAppUsesNonExemptEncryption')
 code = plist.get('ITSEncryptionExportComplianceCode')
 
@@ -103,9 +122,15 @@ if code and uses is not True:
     sys.exit(1)
 if uses is True:
     print('  OK    the export declaration carries its compliance code')
+elif uses is False:
+    # The build says what the account said. They are two records of one
+    # declaration, and the only failure worth guarding is their disagreeing,
+    # which nothing here can see -- so this says which one it is reading.
+    print('  OK    the build declares exempt encryption, as the account holder '
+          'answered in App Store Connect')
 else:
-    print('  OK    the export question is left to App Store Connect, as it must be '
-          'without a compliance code')
+    print('  OK    the export question is left to App Store Connect, which is '
+          'where it must go without a compliance code')
 PY
 then
   failed=1
