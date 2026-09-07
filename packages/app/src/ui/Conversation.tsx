@@ -114,8 +114,36 @@ export function Conversation({
   const plateAt = new Map(plates.map(plate => [plate.at, plate]))
   const swallowed = new Set(plates.flatMap(plate => [...plate.swallowed]))
 
+  /**
+   * Which message has its reaction row open, if any.
+   *
+   * HELD HERE BECAUSE A BUBBLE CANNOT CLOSE ITSELF FROM OUTSIDE. It was a
+   * boolean inside each bubble, so tapping anywhere else left the row
+   * standing -- a popover that only its own long press could take back.
+   * Reported from a Pixel on 7 September 2026.
+   *
+   * One open at a time falls out of holding it here, which is also what a
+   * person expects: two rows of emoji on one screen is a question about
+   * which one is listening.
+   */
+  const [offering, setOffering] = useState<string | null>(null)
+
   return (
-    <View testID="conversation" style={styles.screen}>
+    <View
+      testID="conversation"
+      style={styles.screen}
+      // ANY TOUCH CLOSES IT, AND THE TOUCH STILL LANDS.
+      //
+      // Capture runs from the root towards whatever was touched, so this sees
+      // the tap first and closes the row; returning `false` declines the
+      // gesture, so the emoji underneath still receives it. Choosing a
+      // reaction therefore reacts AND closes, and tapping anywhere else just
+      // closes -- one rule for both, instead of an invisible overlay that has
+      // to be told what to let through.
+      onStartShouldSetResponderCapture={() => {
+        setOffering(held => (held === null ? held : null))
+        return false
+      }}>
       {entries.length === 0 ? (
         <Text
           testID="conversation-empty"
@@ -148,6 +176,13 @@ export function Conversation({
                 entry={entry}
                 plate={plateAt.get(entry.eventId)}
                 onOpenPlate={onOpenPlate}
+                offering={offering === entry.eventId}
+                // Opens, and never toggles: the capture above has already
+                // closed whatever was open by the time this runs, so a
+                // toggle here would read the state it just cleared and
+                // reopen on every long press. A long press means "offer me
+                // reactions"; closing is any other touch's job now.
+                onOffer={() => setOffering(entry.eventId)}
                 mine={entry.claimedSender === selfUserId}
                 palette={palette}
                 tallies={reactions.get(entry.eventId) ?? []}
@@ -237,6 +272,8 @@ function Message({
   tallies,
   onReact,
   read,
+  offering,
+  onOffer,
   onLoadImage,
   unexpected,
   plate,
@@ -255,10 +292,12 @@ function Message({
   read: boolean
   /** `mine` is the id of this account's own reaction, when it has one. */
   onReact: (key: string, mine: string | null) => void
+  /** Whether this bubble's reaction row is the open one. Held by the screen. */
+  offering: boolean
+  /** Asks for it to open. Closing is the screen's business: any touch does it. */
+  onOffer: () => void
   readonly onLoadImage?: (file: ReadFile) => Promise<ShownImage>
 }) {
-  const [offering, setOffering] = useState(false)
-
   return (
     <View style={mine ? styles.mine : styles.theirs}>
       {/* WHO IT CLAIMS TO BE FROM, AND ONLY WHEN THAT IS NEWS.
@@ -294,7 +333,7 @@ function Message({
           it, and stealing that gesture for a menu is how a conversation stops
           being scrollable. */}
       <Pressable
-        onLongPress={() => setOffering(held => !held)}
+        onLongPress={onOffer}
         delayLongPress={350}
         accessibilityRole="button"
         accessibilityLabel={t('reaction_offer')}
@@ -321,7 +360,7 @@ function Message({
             // The same gesture the bubble above it answers. A plate's
             // reactions annotate its first event, which is the event this
             // `Message` is: one plate, one place they attach.
-            onLongPress={() => setOffering(held => !held)}
+            onLongPress={onOffer}
           />
         ) : entry.image !== undefined && onLoadImage !== undefined ? (
           // The photograph instead of the text, not beside it. An `m.image`
@@ -404,7 +443,6 @@ function Message({
               key={key}
               testID={`offer-${entry.eventId}-${key}`}
               onPress={() => {
-                setOffering(false)
                 onReact(
                   key,
                   tallies.find(tally => tally.key === key)?.mine ?? null,
