@@ -101,6 +101,24 @@ export interface RuntimeReport {
       }
   readonly history: { readonly claimed: string }
   /**
+   * Who else the launch path found in the room, in three answers where
+   * `history` gives one.
+   *
+   * `null` means the member list never arrived; `derived: false` means it
+   * arrived and named nobody but this account; `derived: true` means the
+   * other person was found. #123 turns on telling those apart, and
+   * `history: null` cannot: it is also null when `fetchJoinedMembers`
+   * throws.
+   *
+   * Shape and not identity, deliberately: a Matrix identifier written into
+   * logcat would answer the question by putting a correspondent's name in
+   * the system log, which #107 refuses of a notification.
+   */
+  readonly whoElse: {
+    readonly joined: number
+    readonly derived: boolean
+  } | null
+  /**
    * The store's own continuity.
    *
    * `minted` on a relaunch means the passphrase did not survive, so this
