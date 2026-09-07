@@ -64,10 +64,41 @@ describe('enterWithASession', () => {
       link: async () => 'https://messagr.eu/i/abc123',
       signUp: markerStore().secrets,
     })
-    expect(result).toEqual({ entered: true, session: SESSION, claimed: false })
+    // `invitationIgnored` is the half that was missing: the rule was right
+    // and the application drew its conversation list as if nothing had
+    // happened, so somebody who scanned an invitation on a phone that
+    // already had Messagr could not tell whether the code had been read.
+    expect(result).toEqual({
+      entered: true,
+      session: SESSION,
+      claimed: false,
+      invitationIgnored: true,
+    })
     // An invitation is single-use. Spending one for an account that already
     // exists would destroy a link somebody was given.
     expect(posted).toBe(false)
+  })
+
+  it('says nothing about an invitation when the launch carried none', async () => {
+    // The opposite direction, so the flag cannot become "there is a session",
+    // which is every ordinary launch and would put a notice on all of them.
+    const result = await enterWithASession({
+      secrets: store(JSON.stringify(SESSION)),
+      poster: { post: async () => ({ status: 200, body: GRANTED }) },
+      link: async () => null,
+      signUp: markerStore().secrets,
+    })
+    expect(result).toEqual({ entered: true, session: SESSION, claimed: false })
+  })
+
+  it('says nothing when the link is not an invitation', async () => {
+    const result = await enterWithASession({
+      secrets: store(JSON.stringify(SESSION)),
+      poster: { post: async () => ({ status: 200, body: GRANTED }) },
+      link: async () => 'https://messagr.eu/about',
+      signUp: markerStore().secrets,
+    })
+    expect(result).toEqual({ entered: true, session: SESSION, claimed: false })
   })
 
   it('claims the link when there is no session yet, and keeps what it gets', async () => {

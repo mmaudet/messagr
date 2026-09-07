@@ -182,6 +182,8 @@ export const nl: Readonly<Record<CopyKey, string>> = {
     'U komt binnen op uitnodiging, niet via een formulier',
   promise_action: 'Beginnen',
   list_title: 'Gesprekken',
+  list_invitation_ignored:
+    'U hebt een uitnodiging geopend, en deze telefoon heeft al een account. Ze is niet gebruikt en blijft geldig voor de persoon voor wie ze bedoeld was.',
   list_empty:
     'Voorlopig geen gesprekken. Nodig iemand uit om er een te beginnen.',
   list_nothing_said: 'Er is nog niets gezegd',

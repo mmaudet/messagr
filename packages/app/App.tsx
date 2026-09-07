@@ -380,6 +380,10 @@ export function App({
     readonly accessToken: string
   } | null>(null)
   const [claimed, setClaimed] = useState<HistoryClaim | null>(null)
+  // Set once, at entry, and never cleared: the launch either was opened with
+  // an unspent invitation or it was not, and a note that disappeared while
+  // somebody read it would be worse than none.
+  const [invitationIgnored, setInvitationIgnored] = useState(false)
   const [evicted, setEvicted] = useState<'idle' | 'working' | EvictOutcome>(
     'idle',
   )
@@ -592,6 +596,10 @@ export function App({
             //
             // Everything uncertain resolves to `restored-session`, which
             // creates nothing. See signUpMarker.ts.
+            if (entered.entered && entered.invitationIgnored === true) {
+              setInvitationIgnored(true)
+            }
+
             const entitlement =
               entered.entered && entered.claimed
                 ? ('account-just-created' as const)
@@ -1714,6 +1722,7 @@ export function App({
                   <ConversationList
                     summaries={summaries}
                     names={names}
+                    invitationIgnored={invitationIgnored}
                     onOpen={scope => openConversationRef.current?.(scope)}
                   />
                 </View>

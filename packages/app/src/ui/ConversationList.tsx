@@ -50,6 +50,11 @@ export interface ConversationListProps {
   readonly names: ReadonlyMap<string, string>
   readonly onOpen: (scope: string) => void
   /**
+   * Whether this launch was opened with an invitation it did not spend,
+   * because the device already had an account. See `entry.ts`.
+   */
+  readonly invitationIgnored?: boolean
+  /**
    * The clock, injectable. A list reading `Date.now()` inside itself is one
    * nothing can screenshot twice and get the same answer from.
    */
@@ -60,10 +65,30 @@ export function ConversationList({
   summaries,
   names,
   onOpen,
+  invitationIgnored = false,
   now = Date.now(),
 }: ConversationListProps) {
   return (
     <View style={styles.screen} testID="conversation-list">
+      {/* AN INVITATION THAT ARRIVED ON A PHONE THAT ALREADY HAS AN ACCOUNT.
+          `entry.ts` refuses to spend it, and that refusal is right: an
+          invitation must not be able to replace an account somebody already
+          has, and leaving the token unspent keeps it working for whoever it
+          was meant for.
+
+          What was missing is this line. The application drew this list
+          exactly as if the icon had been tapped, so somebody who scanned an
+          invitation could not tell whether the code had even been read.
+          Reported from a Pixel on 7 September 2026.
+
+          It says the second half too -- that the invitation still works --
+          because the first thing anybody fears here is having burnt somebody
+          else's link. */}
+      {invitationIgnored && (
+        <Text style={styles.ignored} testID="list-invitation-ignored">
+          {t('list_invitation_ignored')}
+        </Text>
+      )}
       {/* Plain rows rather than a `FlatList`, because this sits inside the
           screen's own scroll view. A list that scrolls inside something that
           scrolls is the defect that reports as "the list will not move", and
@@ -221,6 +246,14 @@ function Empty() {
 }
 
 const styles = StyleSheet.create({
+  // A note, not an alarm: nothing went wrong, and the invitation is intact.
+  // `neutral.600` is the role for a line that explains rather than warns.
+  ignored: {
+    ...type.caption,
+    color: color.neutral['600'],
+    paddingHorizontal: layout.screenGutter,
+    paddingBottom: space.s,
+  },
   screen: {
     flex: 1,
     backgroundColor: color.surface.paper,
