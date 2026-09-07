@@ -16,23 +16,63 @@
 # explains. To skip it once, commit with `--no-verify`.
 set -e
 
-if ! yarn --silent prettier --check . >/dev/null 2>&1; then
-  echo "Formatting: some files are not formatted." >&2
-  echo "  Fix with: yarn prettier --write ." >&2
+# ── Where the binaries are, and why this is not `yarn` ────────────────────
+#
+# It was `yarn --silent prettier --check .`, and inside a git worktree that
+# fails with "Command \"prettier\" not found": `node_modules` lives in the main
+# checkout, and yarn looks only at the project root it was started from.
+#
+# THE FAILURE WAS REPORTED AS THE WRONG CAUSE, which is the part worth fixing.
+# The output went to /dev/null and the hook announced "some files are not
+# formatted" -- on a tree prettier had never been able to read. Somebody would
+# have spent the evening reformatting files that were already correct, and the
+# advice printed underneath, `yarn prettier --write .`, would have failed the
+# same way without saying so.
+#
+# Node resolves modules by walking up, so the binaries are found the same way.
+bin=""
+dir=$(pwd)
+while [ "$dir" != "/" ]; do
+  if [ -x "$dir/node_modules/.bin/prettier" ]; then
+    bin="$dir/node_modules/.bin"
+    break
+  fi
+  dir=$(dirname "$dir")
+done
+
+if [ -z "$bin" ]; then
+  echo "Hook: no node_modules/.bin found above $(pwd)." >&2
+  echo "  The gates cannot run, so nothing was checked." >&2
+  echo "  Fix with: yarn install    (or commit with --no-verify)" >&2
   exit 1
 fi
+
+# ONE PLACE THAT PRINTS WHAT THE TOOL SAID. The three gates each swallowed
+# their own output, which is how a missing binary looked like a formatting
+# fault for as long as it did. A gate that fails now shows the reason it gave.
+porte() {
+  nom=$1
+  aide=$2
+  shift 2
+  if ! dit=$("$@" 2>&1); then
+    echo "$nom" >&2
+    echo "$dit" | sed 's/^/  /' >&2
+    echo "  Fix with: $aide" >&2
+    exit 1
+  fi
+}
+
+porte "Formatting: some files are not formatted." \
+      "yarn prettier --write ." \
+      "$bin/prettier" --check .
 
 # Before the lint, because the lint points at the generated token module and
 # a stale one would make it enforce yesterday's design very strictly. Costs
 # under a second, which is the bar for living here.
-if ! yarn --silent node scripts/generate-design-tokens.mjs --check >/dev/null 2>&1; then
-  echo "Design tokens: the generated module no longer matches design/tokens.json." >&2
-  echo "  Fix with: yarn tokens" >&2
-  exit 1
-fi
+porte "Design tokens: the generated module no longer matches design/tokens.json." \
+      "yarn tokens" \
+      node scripts/generate-design-tokens.mjs --check
 
-if ! yarn --silent eslint . --max-warnings 0 >/dev/null 2>&1; then
-  echo "Lint: eslint reported problems." >&2
-  echo "  See them with: yarn lint" >&2
-  exit 1
-fi
+porte "Lint: eslint reported problems." \
+      "yarn lint" \
+      "$bin/eslint" . --max-warnings 0
