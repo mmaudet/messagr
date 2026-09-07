@@ -96,7 +96,7 @@ for (const [langue, [question, reponse, veille]] of Object.entries(PHRASES)) {
       '--disable-gpu',
       '--hide-scrollbars',
       `--screenshot=${plein}`,
-      '--window-size=520,720',
+      '--window-size=520,305',
       '--force-device-scale-factor=2',
       '--virtual-time-budget=4000',
       `file://${source}`,
@@ -104,16 +104,15 @@ for (const [langue, [question, reponse, veille]] of Object.entries(PHRASES)) {
     { stdio: 'pipe' },
   )
 
-  // Le cadrage garde l'échange et rien d'autre : au-dessus il y a l'en-tête et
-  // ses boutons d'appel, en dessous la vignette vide et le message vocal.
+  // LE CADRAGE EST CELUI DE LA FENÊTRE, ET PLUS CELUI DE `sips`. La source
+  // extraite a perdu la contrainte de hauteur du cadre de téléphone, donc le
+  // rendu traîne du vide sous le composeur. Une première version le coupait
+  // avec `sips -c` : l'outil recadre en CENTRANT, `--cropOffset 0 0` ou non,
+  // et le nom du correspondant se retrouvait tranché en haut de l'image.
+  // Dimensionner la fenêtre au contenu n'a pas ce défaut, et supprime un
+  // outil au passage.
   const sortie = join(site, `messagr-conversation-${langue}.png`)
-  execFileSync(
-    'sips',
-    ['-c', '290', '1000', '--cropOffset', '124', '20', plein, '--out', sortie],
-    {
-      stdio: 'pipe',
-    },
-  )
+  execFileSync('cp', [plein, sortie], { stdio: 'pipe' })
   console.log(`  ${langue}`)
 }
 
