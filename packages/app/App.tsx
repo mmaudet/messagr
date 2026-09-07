@@ -518,11 +518,24 @@ export function App({
       // `minted` means the passphrase did not survive and this device opened
       // a new, empty store, losing every room key the old one held -- and
       // there is nothing else anywhere that would say so.
-      let whoElse: { readonly joined: number; readonly other: string } | null =
-        null
       let passphrase: 'minted' | 'reused' | null = null
       let signUp: 'unfinished' | 'complete' | null = null
       let form: FormMigration | null = null
+      // WHO ELSE THE LAUNCH FOUND IN THE ROOM.
+      //
+      // Three answers, not two, which is the whole point: `null` means the
+      // member list never arrived, `derived: false` means it arrived and
+      // named nobody but this account, `derived: true` means the other
+      // person was found. `history` collapses all three into one null.
+      //
+      // Shape, not identity. A Matrix identifier written into logcat would
+      // answer the question by putting a correspondent's name in the system
+      // log; #107 refuses that of a notification, and a diagnostic has no
+      // better claim.
+      let whoElse: {
+        readonly joined: number
+        readonly derived: boolean
+      } | null = null
       if (credentials === null) {
         sessionStatus = 'not-configured'
         pumpStatus = 'not-configured'
@@ -1240,27 +1253,24 @@ export function App({
                 roomId,
               )
               const other = theOtherMember(members, credentials.userId)
-              // DIT, PARCE QUE `history` NE LE PROUVE PAS.
-              //
-              // #123 tourne autour d'une contradiction : le rapport dit
-              // `history: null`, dont j'ai conclu sept fois que `other`
-              // etait nul -- donc `otherParty` indefini, donc chaque message
-              // entrant nomme (§13.26) -- et il ne l'est pas.
-              //
-              // L'implication est fausse. `historyClaim` reste nul aussi
-              // quand `fetchJoinedMembers` echoue, et il y a DEUX endroits
-              // qui derivent l'autre personne : ce lancement, et la boucle
-              // vive. Le second peut reussir la ou le premier a echoue, ce
-              // qui pose `party` sans que `history` bouge.
-              //
-              // Ceci dit la chose elle-meme.
               // Reported in the launch log below. A gap that closed and a
               // gap that never opened look identical on screen -- both show
               // a readable conversation -- so the only way to tell "history
               // arrived" from "the key came by some other route" is to say
               // which one happened, and the log is where that is said.
-              whoElse =
-                other === null ? null : { joined: members.length, other }
+              // SAID HERE, BECAUSE `history` DOES NOT PROVE IT.
+              //
+              // #123 turns on a contradiction: the report says
+              // `history: null`, from which I concluded seven times that
+              // `other` was null -- hence `otherParty` undefined, hence every
+              // incoming message named (§13.26) -- and it is not.
+              //
+              // The implication is false. `historyClaim` also stays null when
+              // `fetchJoinedMembers` throws, and there are *two* places that
+              // derive the other person: this launch, and the live loop's
+              // re-derivation. The second can succeed where the first failed,
+              // which sets `party` without `history` ever moving.
+              whoElse = { joined: members.length, derived: other !== null }
               if (other !== null) {
                 setParty({ scope: roomId, other })
                 // Never throws: see claimHistory.ts for why a history that
