@@ -14,6 +14,20 @@
 	     entry needs `platform: production` with it. The two go together,
 	     and a mismatch answers BadDeviceToken and delivers nothing. -->
 	<key>aps-environment</key>
-	<string>development</string>
+	<!-- PRODUCTION, PARCE QUE TESTFLIGHT EST DE LA PRODUCTION.
+	     Un build distribue par TestFlight ou l'App Store recoit un jeton
+	     APNs de production, quel que soit le nom qu'on donne au canal. Une
+	     entitlement `development` sur un tel build produit un jeton sandbox :
+	     Apple repond BadDeviceToken a chaque poussee, rien n'arrive, et rien
+	     ne le signale nulle part.
+	     Le prix est reel et assume : une build lancee depuis Xcode sur un
+	     telephone branche ne peut plus etre reveillee, puisqu'elle reclamerait
+	     un jeton production sans y avoir droit. Le seul chemin de test iOS
+	     prevu passe par TestFlight (#109), et c'est ce reglage qui le rend
+	     possible.
+	     `scripts/assert-ios-push.sh` refuse que ceci et le `platform` de
+	     sygnal divergent, ce qui est la seule facon de ne pas decouvrir la
+	     paire cassee sur le telephone de quelqu'un d'autre. -->
+	<string>production</string>
 </dict>
 </plist>
