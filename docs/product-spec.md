@@ -1334,6 +1334,51 @@ order of magnitude. Until a resizer is added, this application sends
 photographs with no thumbnail and draws them from the full file — which is the
 fallback above, working as designed.
 
+### 13.30 A call relays, and the type is what says so (designed here)
+
+**The media of a call is relayed by the server's own TURN, always.** Not
+by default, and not preferably: `IceTransportPolicy` is a union with one
+member, so any other policy is inexpressible. The day a second is wanted
+it is added there, in the type, where every place that reads it stops
+compiling until somebody has thought about it — never as a boolean at a
+call site.
+
+The reason is RFC 8827 §6.4, and it is about exactly this product's
+case: *"A side effect of the default ICE behavior is that the peer learns
+one's IP address"*, and the API *"MUST provide a mechanism for the
+calling application JS to indicate that only TURN candidates are to be
+used."* A call here is between two people who know each other; the peer
+is somebody the user chose, and the user's address is still none of their
+business.
+
+**The credentials come from the homeserver**, at
+`GET /_matrix/client/v3/voip/turnServer`, and are short-lived on purpose.
+Their lifetime is passed through untouched: refreshing is the caller's
+business, and a module that started a timer would be deciding something
+it does not know.
+
+**Every failure fails closed.** There is no fallback to STUN and none to
+host candidates. A call that cannot be relayed is a call that is not
+placed, because the alternative is putting the device's address on the
+wire under an interface that promised the opposite — and the operator
+learns it from an error rather than the user learning it from a leak they
+cannot see.
+
+Two refusals rather than one, and they are different conversations. A
+homeserver that offers nothing has no relay configured — the endpoint's
+own error table says it SHOULD answer 404. A homeserver that offers URIs
+none of which relay has an operator who meant to configure one and
+configured STUN instead; STUN discovers an address, it does not carry
+media, so it buys nothing here.
+
+**The rules are pure, so they are tested without a homeserver.** Every one
+of them is a way an address could reach a peer, and none should need a
+network to catch. Checked by breaking each: letting `stun:` through fails
+two tests, turning the refusal into a fallback fails two, and dropping
+the scheme's case normalisation fails one — the last being a refusal
+nobody could have diagnosed from its message, since the homeserver would
+have been correctly configured.
+
 ### 13.31 The room boundary of a call, and the two debts it settles (designed here)
 
 **The brain of a call decides nothing about a room, and that separation is
