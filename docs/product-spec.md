@@ -1320,19 +1320,38 @@ decrypted photograph on a disk, which ADR-0006 forbids. What costs here is the
 *size*, and a thumbnail addresses the size without touching the property. That
 decision stays open on its own merits; this did not need it.
 
-**The downscaling itself is not done yet, and the reason is recorded rather
-than deferred silently.** React Native cannot resize an image in JavaScript,
-and nothing already in this tree can do it on Android: the picker's
-`maxWidth`/`maxHeight` resize the asset a call returns, and a call returns one
-asset, so two sizes would mean presenting the library twice and asking
-somebody to choose the same photographs again; React Native's own
-`ImageEditingManager` survives on iOS and is gone from Android; `fetch` reads
-`file:` URLs on iOS and not on Android, so the picker's original path cannot
-be read back there; and `react-native-svg` rasterises only to PNG, which is
-three or four times smaller than the file it replaces where this wants an
-order of magnitude. Until a resizer is added, this application sends
-photographs with no thumbnail and draws them from the full file — which is the
-fallback above, working as designed.
+**The downscaling took two dependencies, and each candidate that could have
+avoided them was checked rather than assumed.** React Native cannot resize an
+image in JavaScript, and nothing already in this tree could do it on Android:
+the picker's `maxWidth`/`maxHeight` resize the asset a call returns, and a
+call returns one asset, so two sizes would mean presenting the library twice
+and asking somebody to choose the same photographs again; React Native's own
+`ImageEditingManager` survives on iOS and is gone from Android;
+`react-native-svg` rasterises only to PNG, which is three or four times
+smaller than the file it replaces where this wants an order of magnitude.
+So `@bam.tech/react-native-image-resizer` does the resize.
+
+**The second dependency is there because the first answers a path.** `fetch`
+resolves `file:` URLs on iOS through `RCTFileRequestHandler` and on Android
+through nothing at all — `NetworkingModule` reads a file URI only to *send* it
+as a request body, never to hand its contents back. So
+`@dr.pogodin/react-native-fs` reads the one resized file, and `readFile(path,
+'base64')` is the whole of what this application asks of it.
+
+**A filesystem module here does not bend ADR-0006, and the distinction is
+worth stating.** The file read is one the *picker already wrote*, from a
+photograph its owner chose out of their own gallery, which the system had on
+that disk before this application existed. Nothing this application decrypted
+is written anywhere, and the resized copy is read once and dropped. What
+ADR-0006 forbids is caching a *received* photograph after decrypting it, and
+that remains forbidden.
+
+**A thumbnail that fails is not a photograph that fails.** A codec that
+refuses a format, a cache the system cleared between the pick and the read:
+none of them may cost somebody their picture. The thumbnail is dropped, the
+photograph is sent whole, and a reader draws it from the full file — which is
+the same fallback old events already take, so it is a path with two users
+rather than a branch nobody exercises.
 
 ### 13.30 A call relays, and the type is what says so (designed here)
 
