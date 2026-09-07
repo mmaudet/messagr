@@ -2008,7 +2008,22 @@ const styles = StyleSheet.create({
   // Its native handlers attach to this view; without `flex: 1` it lays out at
   // zero height and every gesture below it is delivered to nothing -- which
   // looks exactly like the library not working.
-  root: { flex: 1 },
+  // LE FOND, POSÉ, ET LE MODE SOMBRE D'iOS EST POURQUOI.
+  //
+  // Cette racine n'avait pas de couleur. Sur un appareil en thème clair rien
+  // ne se voyait : la vue parente était déjà pâle. En thème sombre, iOS peint
+  // une racine sans fond en NOIR, et seule la liste des conversations, qui
+  // pose son propre `surface.paper`, restait claire -- une carte pâle
+  // flottant sur du noir, avec du noir partout ailleurs. Rapporté depuis
+  // l'iPhone d'un testeur le 7 septembre 2026, sur la première build qui ait
+  // jamais démarré là-bas.
+  //
+  // `surface.paper` plutôt qu'une réaction au thème du système : cette
+  // application a une palette claire, et une palette sombre réservée aux
+  // surfaces qui la demandent (l'écran de promesse, le plein écran d'une
+  // photographie). Suivre le thème du système serait un second jeu de
+  // couleurs pour tout l'écran, ce que le lot n'a pas.
+  root: { flex: 1, backgroundColor: color.surface.paper },
   back: {
     ...typeScale.bodySm,
     color: color.brand.green700,

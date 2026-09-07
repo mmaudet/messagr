@@ -132,8 +132,16 @@ export function FirstLaunch({
 
         <View style={styles.gate}>
           <Text style={styles.gateHeading}>{t('promise_language')}</Text>
+          {/* UNE LANGUE À LA FOIS, COMME DANS RÉGLAGES.
+              Quatre lignes ici demandaient à quelqu'un qui n'a encore rien
+              lu de choisir dans une liste, sous un écran déjà long : sur un
+              iPhone, la case des conditions passait sous le pli. Une seule
+              ligne rend l'écran plus court que ce qu'il présente, et c'est
+              le même contrôle qu'aux Réglages -- deux formes différentes
+              pour un même geste seraient deux contrôles. */}
           <LanguageStrip
             onDark
+            rows={1}
             chosen={language}
             onChoose={onLanguage}
             onSettle={onLanguageSettled}
