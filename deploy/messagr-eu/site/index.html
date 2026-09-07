@@ -197,6 +197,14 @@
   .faits.avert{margin-top:12px}
   .apres{font-size:14.5px; color:var(--doux); margin:22px 0 0; max-width:52ch}
 
+  /* ── L'éditeur ───────────────────────────────────────────────────────
+     Qui exploite le service n'est pas une obligation légale à loger sous le
+     pli : pour quelqu'un qui choisit une messagerie souveraine, c'est un
+     argument. Il passe donc au-dessus du pied, à sa taille. */
+  .editeur h2{font-size:22px; margin:0 0 14px; max-width:26ch}
+  .editeur p{font-size:15.5px; color:var(--doux); margin:0 0 10px; max-width:60ch}
+  .editeur p:last-of-type{margin-bottom:26px}
+  .editeur a{color:var(--appui)}
   /* ── Le pied ─────────────────────────────────────────────────────── */
   footer{font-size:14px; color:var(--doux); max-width:70ch}
   footer a{color:var(--appui)}
@@ -472,6 +480,37 @@
 
 <section class="bande pied">
   <div class="mesure">
+
+    <!-- QUI EXPLOITE CE SERVICE, ET OÙ.
+         C'était une ligne sous le pli, dimensionnée comme une mention légale.
+         L'éditeur, le pays du serveur et l'absence de transfert hors de
+         l'Union sont des arguments pour qui choisit une messagerie
+         souveraine, et ils sont vérifiables : les trois viennent de la
+         politique de confidentialité publiée.
+
+         DEUX CHOSES NE SONT PAS ÉCRITES ICI, ET C'EST DÉLIBÉRÉ.
+
+         Pas de durée de conservation : elle vit dans `retention.json`, la
+         politique la publie, et `scripts/assert-retention.sh` tient les deux
+         d'accord. Une troisième copie serait une troisième chose à faire
+         diverger. Et la durée des journaux est imposée par décret, pas
+         choisie : l'annoncer ici comme une promesse serait la présenter pour
+         ce qu'elle n'est pas.
+
+         Pas de « aucun tiers dans l'application » : c'était vrai, ça ne l'est
+         plus depuis que l'application réveille le téléphone par Firebase, et
+         la politique a été corrigée pour le dire. Ce qui reste vrai, et se
+         vérifie en ouvrant l'inspecteur, c'est que CE SITE ne contacte
+         personne. -->
+    <section class="editeur">
+      <h2 data-t="editeur-titre">Qui édite ce service</h2>
+      <p data-t="editeur-societe">RV Myriagone Holding est responsable de ce traitement au
+      sens du règlement européen sur la protection des données.</p>
+      <p data-t="editeur-serveur">Le serveur est hébergé à Helsinki, en Finlande, donc au
+      sein de l'Union européenne. Il n'y a aucun transfert hors de l'Union.</p>
+      <p data-t="editeur-mesure">Ce site ne mesure rien : aucun traceur, aucune
+      bibliothèque d'analyse, aucun tiers. Il ne charge que ses propres fichiers.</p>
+    </section>
 
     <footer>
       Messagr est exploité par RV Myriagone Holding, 22 rue de la Garenne, 78130 Chapet,
