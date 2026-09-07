@@ -19,6 +19,9 @@
  * without a homeserver, a microphone or a device.
  */
 
+import { getErrorMessage } from '../runtime/errors'
+import { logEvent } from '../runtime/log'
+
 /** What this needs from a crypto machine, and nothing more. */
 export interface OpeningMachine {
   readonly decryptEvent: (
@@ -89,10 +92,19 @@ export async function openCallEvents(
         // and dropping it here would make every replayed invite look new.
         ...(event.unsigned === undefined ? {} : { unsigned: event.unsigned }),
       })
-    } catch {
+    } catch (cause: unknown) {
       // A key that never came, or an event somebody took back -- a redaction
       // leaves an `m.room.encrypted` with nothing in it. Neither is a call,
       // and neither is worth the poll.
+      //
+      // SAID OUT LOUD, THOUGH. A telephone that does not ring and a poll
+      // full of events that would not open look identical from outside, and
+      // the first hour of debugging the first real call was spent not
+      // knowing which one was happening.
+      logEvent('warn', 'MESSAGR_CALL_EVENT_DROPPED', {
+        eventId: (raw as { event_id?: unknown }).event_id,
+        reason: getErrorMessage(cause),
+      })
     }
   }
   return opened
