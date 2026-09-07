@@ -101,6 +101,44 @@ describe('toTimelineEntries', () => {
     expect(entries[1]?.reason).toBeTruthy()
   })
 
+  it('draws nothing at all for an event that was taken back', async () => {
+    // THE ONE THAT WOULD HAVE CAUGHT IT. A redaction strips the content and
+    // leaves the shell: an `m.room.encrypted` with no ciphertext, which
+    // cannot decrypt and was therefore drawn as "its key never arrived" --
+    // a phantom message in the account's own name. Every redaction this
+    // application makes is somebody taking a reaction back, and a reaction
+    // taken back must leave nothing behind.
+    const entries = await entriesOf(
+      machine({ $a: 'lisible' }),
+      decodeUtf8,
+      '!room:messagr.eu',
+      [
+        encrypted('$a', 1000),
+        {
+          ...encrypted('$gone', 2000),
+          content: {},
+          unsigned: { redacted_because: { type: 'm.room.redaction' } },
+        },
+      ],
+    )
+    expect(entries).toHaveLength(1)
+    expect(entries[0]?.eventId).toBe('$a')
+  })
+
+  it('does not ask the crypto machine to open an event that is not there', async () => {
+    // Not only cosmetic: a redacted event has no ciphertext, so every
+    // attempt is a failure the log would report as a decryption fault.
+    const opener = machine({})
+    await entriesOf(opener, decodeUtf8, '!room:messagr.eu', [
+      {
+        ...encrypted('$gone', 2000),
+        content: {},
+        unsigned: { redacted_because: { type: 'm.room.redaction' } },
+      },
+    ])
+    expect(opener.scopes).toEqual([])
+  })
+
   it('keeps the sender the event claims, and calls it claimed', async () => {
     const [entry] = await entriesOf(
       machine({ $a: 'x' }),

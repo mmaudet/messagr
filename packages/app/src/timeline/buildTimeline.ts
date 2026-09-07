@@ -87,6 +87,23 @@ export interface DecryptedEvents {
   readonly reactions: LooseReaction[]
 }
 
+/**
+ * Whether the homeserver has already told us this event was taken back.
+ *
+ * `unsigned.redacted_because` is the specification's marker and carries the
+ * redaction event itself, so its presence is the fact rather than a guess
+ * from an empty content -- which an event could have for other reasons.
+ */
+function isRedacted(event: RawEvent): boolean {
+  const unsigned = (event as { unsigned?: unknown }).unsigned
+  return (
+    typeof unsigned === 'object' &&
+    unsigned !== null &&
+    'redacted_because' in unsigned &&
+    (unsigned as { redacted_because?: unknown }).redacted_because !== undefined
+  )
+}
+
 export async function toTimelineEntries(
   machine: TimelineMachine,
   decodeUtf8: (bytes: Uint8Array) => string,
@@ -120,6 +137,27 @@ export async function toTimelineEntries(
     }
 
     if (event.type !== 'm.room.encrypted') {
+      continue
+    }
+
+    // REDACTED, WHICH IS NOT THE SAME AS UNREADABLE, AND LOOKED IDENTICAL.
+    //
+    // A redaction strips an event's content and leaves the shell behind, type
+    // and all. An `m.room.encrypted` with nothing in it cannot be decrypted
+    // -- there is no ciphertext -- so it fell into the catch below and was
+    // drawn as "its key never arrived": a phantom message, in this account's
+    // own name, on a conversation it never said anything on.
+    //
+    // Every redaction this application can make today is somebody taking a
+    // reaction back, and a reaction taken back must leave nothing. Reported
+    // from a Pixel as messages nobody had sent; the log showed four such
+    // events with no `session_id`, one of them a reaction removed minutes
+    // earlier.
+    //
+    // The day a message can be deleted, this is where that would branch: a
+    // deleted message may well deserve a line saying so, where a withdrawn
+    // reaction deserves silence.
+    if (isRedacted(event)) {
       continue
     }
 
@@ -164,9 +202,18 @@ export async function toTimelineEntries(
       // library's own words. No ciphertext, and by definition no plaintext.
       // The sender is enough to tell the two apart -- this account's own
       // identifier there is the case worth chasing.
+      // The Megolm session, which is the field that tells the two apart: a
+      // key somebody never sent, or a session this device made and then
+      // could not read back. Both say "undecryptable" and only one of them
+      // is this application's fault.
+      const wrapper = (event as { content?: Record<string, unknown> }).content
       logEvent('warn', 'MESSAGR_UNREADABLE', {
         eventId,
         claimedSender: sender,
+        session:
+          typeof wrapper?.session_id === 'string' ? wrapper.session_id : null,
+        fromDevice:
+          typeof wrapper?.device_id === 'string' ? wrapper.device_id : null,
         reason,
       })
       entries.push({
