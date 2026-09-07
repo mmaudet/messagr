@@ -464,6 +464,27 @@ export const fr = {
     'L’onglet est réservé dès la V1 pour ne pas déplacer la barre plus tard. La V1 ne transporte que texte, liens et images statiques ; vocaux en V2, appels individuels puis de groupe en V3.',
   calls_soon_v2: 'V2 · messages vocaux',
   calls_soon_v3: 'V3 · audio + vidéo',
+  // A call in progress. One screen draws every one of these -- see
+  // `CallScreen.tsx` -- so what changes between two states is exactly this
+  // sentence and which buttons sit under it.
+  call_start: 'Appeler',
+  call_ringing: 'Appel en cours…',
+  call_incoming: 'Appel entrant',
+  call_connecting: 'Connexion…',
+  call_active: 'En communication',
+  call_reconnecting: 'Reconnexion…',
+  call_ended_hung_up: 'Appel terminé',
+  call_ended_unanswered: 'Personne n’a répondu',
+  call_ended_declined: 'Appel refusé',
+  call_ended_failed: 'La connexion n’a pas pu s’établir',
+  call_ended_elsewhere: 'Pris sur un autre appareil',
+  call_ended_unreachable: 'Impossible de joindre cette personne',
+  call_answer: 'Répondre',
+  call_reject: 'Refuser',
+  call_hangup: 'Raccrocher',
+  call_mute: 'Couper le micro',
+  call_unmute: 'Rétablir le micro',
+  call_dismiss: 'Fermer',
 
   community_soon_title: 'Bientôt : communautés et salons',
   community_soon_why:

@@ -47,6 +47,11 @@ import {
   type TrustReading,
   type SendReport,
 } from './src/runtime/cryptoPump'
+import {
+  startCallRuntime,
+  type CallOnScreen,
+  type CallRuntime,
+} from './src/runtime/callPump'
 import { getErrorMessage } from './src/runtime/errors'
 import { computeHermesReport } from './src/runtime/hermes'
 import { logEvent } from './src/runtime/log'
@@ -111,6 +116,7 @@ import { FloatingAction } from './src/ui/FloatingAction'
 import { Header } from './src/ui/Header'
 import { Composer } from './src/ui/Composer'
 import { FullScreenPlate } from './src/ui/FullScreenPlate'
+import { CallScreen } from './src/ui/CallScreen'
 import { ConversationHeader } from './src/ui/ConversationHeader'
 import { Legal } from './src/ui/Legal'
 import { Reserved } from './src/ui/Reserved'
@@ -351,6 +357,17 @@ export function App({
   const conversationRef = useRef<readonly TimelineEntry[]>([])
   const [openScope, setOpenScope] = useState<string | null>(null)
   const openScopeRef = useRef<string | null>(null)
+  /**
+   * The call, when there is one. `null` is the ordinary state of a telephone.
+   *
+   * The runtime holds it; this is the projection a screen is drawn from, and
+   * it arrives by callback because a call changes state for reasons that have
+   * nothing to do with anybody touching the screen -- a peer answering, a
+   * relay failing, ninety seconds passing.
+   */
+  const [call, setCall] = useState<CallOnScreen | null>(null)
+  const [callMuted, setCallMuted] = useState(false)
+  const callRuntimeRef = useRef<CallRuntime | null>(null)
   // Choosing and sending a photograph, and opening one that arrived. Held in
   // refs like every other gesture the launch effect binds.
   const attachRef = useRef<(() => void) | null>(null)
@@ -1206,6 +1223,24 @@ export function App({
             // and anything it says once superseded is dropped. A loop merely
             // paused has not been superseded, and its `stopped` still reaches
             // the screen, which is correct: it did stop.
+            // ONE RUNTIME FOR THE WHOLE SESSION, NOT ONE PER CALL.
+            //
+            // A callee's application has no call until it has been rung, and
+            // the ring arrives inside an encrypted event in a poll -- so
+            // something has to be listening before there is anything to
+            // listen for. This is that something; it holds at most one call
+            // and starts it when a poll turns out to be an invitation.
+            callRuntimeRef.current = startCallRuntime(
+              sessionClient,
+              credentials,
+              onScreen => {
+                setCall(onScreen)
+                // A call that ended took the microphone with it, and the next
+                // one starts unmuted.
+                if (onScreen === null) setCallMuted(false)
+              },
+            )
+
             const beginLiveSync = () => {
               if (runningSyncRef.current !== null) return
               const generation = liveGenerationRef.current + 1
@@ -1279,6 +1314,23 @@ export function App({
                     })
                     .catch((cause: unknown) =>
                       logEvent('warn', 'MESSAGR_ADMIT_ROUND_FAILED', {
+                        reason: getErrorMessage(cause),
+                      }),
+                    )
+
+                  // BEFORE THE EARLY RETURN, like the admission round above
+                  // and for a related reason: a call's events do move a
+                  // scope, but nothing here should depend on that being the
+                  // reason this tick exists. A telephone that rings only when
+                  // the list also had work to do is a telephone with a
+                  // condition on it.
+                  //
+                  // Not awaited: the loop's tick must not wait on a
+                  // decryption pass, and nothing below depends on it.
+                  callRuntimeRef.current
+                    ?.deliver(tick)
+                    .catch((cause: unknown) =>
+                      logEvent('warn', 'MESSAGR_CALL_DELIVER_FAILED', {
                         reason: getErrorMessage(cause),
                       }),
                     )
@@ -1650,6 +1702,43 @@ export function App({
   return (
     <GestureHandlerRootView style={styles.root}>
       <SafeAreaProvider>
+        {/* ABOVE EVERYTHING, AND NOT INSIDE THE CONVERSATION.
+          A call outlives the screen it started on: somebody who places one
+          and then goes back to the list is still on that call, and a
+          telephone that rings only while the right conversation is open is
+          not a telephone. So it hangs off the root, drawn from the runtime's
+          own state rather than from wherever the person happens to be. */}
+        {call !== null && (
+          <CallScreen
+            state={call.state}
+            shown={displayNameFor(call.peerUserId, names.get(call.peerUserId))}
+            muted={callMuted}
+            onAnswer={() =>
+              callRuntimeRef.current?.answer().catch((cause: unknown) =>
+                logEvent('warn', 'MESSAGR_CALL_NOT_ANSWERED', {
+                  reason: getErrorMessage(cause),
+                }),
+              )
+            }
+            onReject={() => callRuntimeRef.current?.reject()}
+            onHangup={() => callRuntimeRef.current?.hangup()}
+            onMute={wanted => {
+              // What the microphone actually holds afterwards, not what was
+              // asked for: a track that refused is a mute that did not
+              // happen, and a button drawn from the intent would lie about it.
+              const held = callRuntimeRef.current?.setMuted(wanted) ?? wanted
+              setCallMuted(held)
+            }}
+            onDismiss={() =>
+              callRuntimeRef.current?.release().catch((cause: unknown) =>
+                logEvent('warn', 'MESSAGR_CALL_NOT_RELEASED', {
+                  reason: getErrorMessage(cause),
+                }),
+              )
+            }
+          />
+        )}
+
         {openPlate !== null && (
           <FullScreenPlate
             plate={openPlate.plate}
@@ -1697,6 +1786,25 @@ export function App({
                 setPersonOpen(false)
               }}
               onOpenPerson={() => setPersonOpen(true)}
+              // Only with somebody to call. `theOtherMember` answers null in
+              // a conversation that is not two people, and a call button in
+              // a room of three is a button with no peer to name -- #88 is
+              // 1:1, and the control says so by being absent.
+              onCall={
+                party === null || call !== null
+                  ? undefined
+                  : () => {
+                      const runtime = callRuntimeRef.current
+                      if (runtime === null || openScope === null) return
+                      runtime
+                        .place(openScope, party.other)
+                        .catch((cause: unknown) =>
+                          logEvent('warn', 'MESSAGR_CALL_NOT_PLACED', {
+                            reason: getErrorMessage(cause),
+                          }),
+                        )
+                    }
+              }
             />
           )}
 

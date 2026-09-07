@@ -4,6 +4,7 @@ import { Pressable, StyleSheet, Text, View } from 'react-native'
 import { t } from '../copy'
 import { color, floors, space, stroke, type } from '../design/tokens'
 import { Avatar } from './Avatar'
+import { TabIcon } from './TabIcon'
 
 /**
  * The bar at the top of a conversation, and the door to everything rare.
@@ -68,6 +69,7 @@ export function ConversationHeader({
   named,
   onBack,
   onOpenPerson,
+  onCall,
 }: {
   /** The name or the identifier, exactly as the list row shows it. */
   readonly shown: string
@@ -75,6 +77,12 @@ export function ConversationHeader({
   readonly named: boolean
   readonly onBack: () => void
   readonly onOpenPerson: () => void
+  /**
+   * Places an audio call. Absent while there is no way to make one, which
+   * is not the same as a button that does nothing: §4.5 puts the call in the
+   * header, and #88 says a control that cannot act is worse than none.
+   */
+  readonly onCall?: () => void
 }) {
   return (
     <View style={styles.bar} testID="conversation-header">
@@ -106,6 +114,17 @@ export function ConversationHeader({
           </Text>
         </View>
       </Pressable>
+
+      {onCall !== undefined && (
+        <Pressable
+          testID="conversation-call"
+          onPress={onCall}
+          accessibilityRole="button"
+          accessibilityLabel={t('call_start')}
+          style={styles.more}>
+          <TabIcon glyph="calls" tint={color.neutral['600']} />
+        </Pressable>
+      )}
 
       <Pressable
         testID="open-person-menu"

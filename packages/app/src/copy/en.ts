@@ -299,6 +299,27 @@ export const en: Readonly<Record<CopyKey, string>> = {
     'The tab is held from V1 so the bar does not move later. V1 carries text, links and still images only; voice messages in V2, one-to-one then group calls in V3.',
   calls_soon_v2: 'V2 · voice messages',
   calls_soon_v3: 'V3 · audio + video',
+  // A call in progress. One screen draws every one of these -- see
+  // `CallScreen.tsx` -- so what changes between two states is exactly this
+  // sentence and which buttons sit under it.
+  call_start: 'Call',
+  call_ringing: 'Calling…',
+  call_incoming: 'Incoming call',
+  call_connecting: 'Connecting…',
+  call_active: 'In call',
+  call_reconnecting: 'Reconnecting…',
+  call_ended_hung_up: 'Call ended',
+  call_ended_unanswered: 'Nobody answered',
+  call_ended_declined: 'Call declined',
+  call_ended_failed: 'The connection could not be made',
+  call_ended_elsewhere: 'Answered on another device',
+  call_ended_unreachable: 'Could not reach them',
+  call_answer: 'Answer',
+  call_reject: 'Decline',
+  call_hangup: 'Hang up',
+  call_mute: 'Mute',
+  call_unmute: 'Unmute',
+  call_dismiss: 'Close',
   community_soon_title: 'Coming: communities and rooms',
   community_soon_why:
     'A community groups rooms under a pseudonymous object. The tab is held for the same reason as the calls one: the bar must not move when they arrive.',

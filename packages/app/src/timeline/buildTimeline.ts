@@ -30,7 +30,7 @@ export interface TimelineMachine {
   readonly decryptEvent: (
     scope: string,
     rawEvent: unknown,
-  ) => Promise<{ ciphertext: Uint8Array }>
+  ) => Promise<{ readonly eventType: string; readonly ciphertext: Uint8Array }>
 }
 
 interface RawEvent {
@@ -163,6 +163,22 @@ export async function toTimelineEntries(
 
     try {
       const envelope = await machine.decryptEvent(roomId, raw)
+
+      // SIGNALLING IS NOT SPEECH, AND IT WAS BEING DRAWN AS SOME.
+      //
+      // A call's `m.call.*` events go into the conversation encrypted, for
+      // the reason `session.ts` gives: an unencrypted `party_id` tells the
+      // timeline which of somebody's devices is on a call. They therefore
+      // arrive here exactly like a message, decrypt perfectly, and carry no
+      // `body` -- so every invite, answer and candidate list drew a bubble
+      // saying "message illisible sur cet appareil". A single call would
+      // have filled the conversation with them.
+      //
+      // The inner type is the only thing that tells them apart, and it is on
+      // the envelope. `inbox.ts` reads the same field to decide the
+      // opposite question.
+      if (envelope.eventType.startsWith('m.call.')) continue
+
       const content = JSON.parse(decodeUtf8(envelope.ciphertext)) as {
         body?: unknown
       }
