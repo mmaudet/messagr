@@ -75,9 +75,24 @@ et l'équipe est déjà renseignée.
 
 ### 3. Téléverser
 
-Dans l'Organizer qui s'ouvre : **Distribute App** → **App Store Connect** →
+**Il n'y a aucun fichier à choisir.** Le mot induit en erreur, et la question
+s'est posée : l'archive de l'étape 2 est rangée par Xcode lui-même, sous
+`~/Library/Developer/Xcode/Archives/<date>/`, et l'Organizer s'ouvre dessus
+quand l'archivage réussit. Vous ne la manipulez jamais dans le Finder, et il
+n'y a de sélecteur de fichier nulle part dans ce chemin.
+
+Dans l'Organizer, onglet **Archives**, la plus récente est en haut :
+sélectionnez-la, puis **Distribute App** → **App Store Connect** →
 **Upload**. Laissez les options par défaut ; « Manage Version and Build
 Number » évite de buter sur un numéro de build déjà pris.
+
+Si l'Organizer s'est fermé entre-temps, **Window → Organizer** le ramène ;
+l'archive `Messagr` y est avec sa date.
+
+L'autre voie existe et ne vaut pas la peine ici : **Export** au lieu d'**Upload**
+écrit bien un `.ipa` sur le disque, qu'il faut ensuite donner à Transporter ou
+à `xcrun altool`. C'est le même téléversement en deux gestes de plus, et une
+occasion supplémentaire de se tromper de fichier.
 
 Le traitement chez Apple prend de cinq à trente minutes. Un courriel arrive
 quand la build est prête, ou une pastille dans TestFlight.
