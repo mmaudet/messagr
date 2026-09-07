@@ -233,6 +233,21 @@ export function startCallRuntime(
       state: started.session.state(),
     }
     held = call
+    // THE AUDIO SESSION IS TAKEN WHEN THE CALL BEGINS, NOT WHEN IT CONNECTS.
+    //
+    // A ringing telephone is already a call as far as the device is
+    // concerned: the proximity sensor has to be watching before somebody
+    // lifts it to their ear, and the platform has to be in its communication
+    // mode before the first packet rather than after it. Taking it at
+    // `inCall` would put the first seconds of every call through the media
+    // path -- loudspeaker, media volume, no echo canceller.
+    //
+    // MEASURED MISSING ONCE. This line was written and did not land, and
+    // nothing failed: the call connected, carried audio, and `dumpsys audio`
+    // said `MODE_NORMAL` with no mode owner while two people were talking.
+    // That is the whole hazard of this dependency -- everything works
+    // without it, slightly wrong, and only a platform dump says so.
+    deviceCallAudio.begin()
     onChanged({ ...call })
     return call
   }

@@ -211,7 +211,7 @@ export function CallScreen({
                 label={t('call_speaker')}
                 tint={speaker ? color.brand.green500 : color.neutral['600']}
                 onPress={() => onSpeaker(!speaker)}
-                glyph="community"
+                glyph="speaker"
               />
               <Round
                 testID="call-hangup"
@@ -275,7 +275,7 @@ function Round({
   readonly label: string
   readonly tint: string
   readonly onPress: () => void
-  readonly glyph: 'calls' | 'mic' | 'community'
+  readonly glyph: 'calls' | 'mic' | 'speaker'
 }) {
   return (
     <View style={styles.control}>
