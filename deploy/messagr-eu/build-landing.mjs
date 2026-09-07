@@ -223,6 +223,88 @@ const entete = (html, langue) => {
 // elle n'a pas de contenu propre à indexer, elle répond les mêmes octets pour
 // tout jeton, et l'inscrire reviendrait à proposer à un moteur de parcourir
 // des jetons.
+// ── Ce que pèse le téléchargement ─────────────────────────────────────────
+//
+// MESURÉ, JAMAIS TAPÉ. Un chiffre écrit à la main est périmé au premier
+// changement du fichier, et rien ne le dirait : c'est la faute que
+// `build-site.sh` a été écrit pour rendre impossible sur les destinations.
+//
+// Les trois valeurs viennent de l'environnement, que `deploy.sh` exporte après
+// avoir lu le fichier qu'il s'apprête à envoyer. Un jeu INCOMPLET arrête la
+// construction : annoncer un poids sans dire de quel fichier il est vaut moins
+// que se taire. Un jeu VIDE est légitime — c'est le cas de l'intégration
+// continue, qui n'a pas l'APK : les deux lignes de faits sortent alors de la
+// page plutôt que d'y afficher leurs marques.
+//
+// PAS DE NUMÉRO DE VERSION, ET C'EST UNE DÉCISION. `aapt2` lit
+// versionName='1.0' et versionCode='1' sur le fichier en ligne, jamais
+// incrémentés depuis la première construction. Les annoncer ressemblerait à
+// une information et n'en serait pas une. L'empreinte, elle, distingue deux
+// constructions et se vérifie en une commande.
+const CLES_DE_FAITS = ['apk-faits', 'apk-empreinte']
+
+const faitsDuTelechargement = () => {
+  const octets = process.env.MESSAGR_APK_OCTETS || ''
+  const empreinte = process.env.MESSAGR_APK_SHA256 || ''
+  const date = process.env.MESSAGR_APK_DATE || ''
+  const donnes = [octets, empreinte, date].filter(Boolean).length
+  if (donnes === 0) return null
+  if (donnes !== 3) {
+    echouer(
+      'les faits du téléchargement sont incomplets : MESSAGR_APK_OCTETS, ' +
+        'MESSAGR_APK_SHA256 et MESSAGR_APK_DATE se donnent ensemble ou pas du tout',
+    )
+  }
+  if (!/^[0-9]+$/.test(octets)) {
+    echouer(
+      `MESSAGR_APK_OCTETS vaut « ${octets} », qui n'est pas un nombre d'octets`,
+    )
+  }
+  if (!/^[0-9a-f]{64}$/.test(empreinte)) {
+    echouer(
+      `MESSAGR_APK_SHA256 vaut « ${empreinte} », qui n'est pas une empreinte SHA-256`,
+    )
+  }
+  if (!/^[0-9]{4}-[0-9]{2}-[0-9]{2}$/.test(date)) {
+    echouer(`MESSAGR_APK_DATE vaut « ${date} », qui n'est pas une date ISO`)
+  }
+  return { octets: Number(octets), empreinte, date }
+}
+
+// Le séparateur décimal et le nom du mois viennent d'`Intl`, donc de la langue
+// de la page : « 132,6 Mo » et « 132.6 MB » sont le même chiffre écrit pour
+// deux lecteurs, et chacun se lit mal dans la langue de l'autre.
+const ecrireLesFaits = (html, langue, faits) => {
+  if (!faits) {
+    for (const cle of CLES_DE_FAITS) {
+      const motif = new RegExp(
+        `\\n\\s*<p[^>]*\\bdata-t="${cle}"[^>]*>[^<]*</p>`,
+        'g',
+      )
+      exigerUneFois(html, motif, `le paragraphe « ${cle} »`, langue)
+      html = html.replace(motif, '')
+    }
+    return html
+  }
+  const taille =
+    new Intl.NumberFormat(langue, { maximumFractionDigits: 1 }).format(
+      faits.octets / (1024 * 1024),
+    ) + (langue === 'fr' ? ' Mo' : ' MB')
+  const date = new Intl.DateTimeFormat(langue, {
+    day: 'numeric',
+    month: 'long',
+    year: 'numeric',
+    timeZone: 'UTC',
+  }).format(new Date(`${faits.date}T00:00:00Z`))
+  return html
+    .split('%TAILLE%')
+    .join(taille)
+    .split('%DATE%')
+    .join(date)
+    .split('%EMPREINTE%')
+    .join(faits.empreinte)
+}
+
 const planDuSite = () => {
   const pages = langues
     .map(l => `${ORIGINE}${cheminDe(l)}`)
@@ -238,6 +320,7 @@ const planDuSite = () => {
 
 // ── Écriture ───────────────────────────────────────────────────────────────
 
+const faits = faitsDuTelechargement()
 let ecrites = 0
 for (const langue of langues) {
   let page = gabarit
@@ -247,6 +330,14 @@ for (const langue of langues) {
     }
   }
   page = entete(page, langue)
+  page = ecrireLesFaits(page, langue, faits)
+
+  // AUCUNE MARQUE NE DOIT SURVIVRE. Une page qui montrerait « %TAILLE% » à un
+  // lecteur est pire qu'une page muette : elle a l'air cassée, et elle l'est.
+  const restante = /%[A-Z]+%/.exec(page)
+  if (restante) {
+    echouer(`la page ${langue} porte encore la marque ${restante[0]}`)
+  }
 
   const chemin =
     langue === RACINE ? source : join(destination, langue, 'index.html')
