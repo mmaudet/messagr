@@ -229,5 +229,14 @@ fi
 # Run here it answers the narrower of the two questions -- did THIS run land
 # what it built -- and that is worth having on its own. The wider one, does
 # the server match `master`, is the same script run from `master`.
+#
+# THE DESTINATIONS ARE PASSED, and that is what makes this run strict. Given
+# them, the check builds the page with them and compares byte for byte; given
+# nothing it falls back to tolerating any plain https address in those three
+# slots. Tolerating any address here would accept somebody else's store at the
+# exact moment we know which one we just put there.
 echo "== the served site against the built one"
-node tests/conformite-site-deploye.js --live "https://messagr.eu"
+MESSAGR_DEST_IOS="$MESSAGR_DEST_IOS" \
+MESSAGR_DEST_ANDROID="$MESSAGR_DEST_ANDROID" \
+MESSAGR_DEST_ANDROID_APK="$MESSAGR_DEST_ANDROID_APK" \
+  node tests/conformite-site-deploye.js --live "https://messagr.eu"

@@ -56,12 +56,19 @@ one first disagrees.
 
 **One difference is tolerated and it is written as narrowly as the build
 allows**: the three store destinations, only inside `i/index.html`, only inside
-the `DESTINATIONS` object, and only when the served value is the plain https
-address `build-site.sh` would itself accept. A renamed object is a failure, not
-a pass, for the same reason `build-site.sh` refuses a renamed slot.
+the `DESTINATIONS` object, and only when the served value satisfies the address
+grammar — which is **read out of `build-site.sh`** rather than copied here, so
+the two cannot drift. A renamed object is a failure, not a pass, for the same
+reason `build-site.sh` refuses a renamed slot.
+
+**And the tolerance switches off when the destinations are known.** With
+`MESSAGR_DEST_IOS` and its two sisters in the environment, as they are during a
+deployment, the page is built with them and the comparison is byte for byte.
+Accepting any https address at the moment you know which one you just put there
+would accept somebody else's store. `deploy.sh` passes them.
 
 Run with no argument it takes no network: it builds the site and holds its own
-comparator against eight fabricated servers, which is how the tolerance is kept
+comparator against ten fabricated servers, which is how the tolerance is kept
 from quietly widening. That is the half CI runs. `--live` is the half that
 reads a real server, and `deploy.sh` runs it after every deployment.
 
