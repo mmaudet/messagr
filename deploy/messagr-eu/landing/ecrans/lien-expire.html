@@ -1,0 +1,35 @@
+<!doctype html><meta charset="utf-8"><body style="margin:0;background:#F7F5EF">
+<style>
+  body { margin:0; background:#e8e4dc; color:#1b1a19; font-family:'Schibsted Grotesk', Helvetica, sans-serif; -webkit-font-smoothing:antialiased; }
+  a { color:#0e8f63; text-decoration:none; }
+  a:hover { color:#06614a; text-decoration:underline; }
+  * { box-sizing:border-box; }
+  ::-webkit-scrollbar { width:6px; height:6px; }
+  ::-webkit-scrollbar-thumb { background:#cfc8bb; border-radius:3px; }
+  @keyframes riseIn { from{opacity:0; transform:translateY(8px)} to{opacity:1; transform:none} }
+  @keyframes pulseRing { 0%{opacity:.25} 50%{opacity:.9} 100%{opacity:.25} }
+  @keyframes scanSweep { 0%{transform:translateY(-104px)} 100%{transform:translateY(104px)} }
+</style>
+
+
+<sc-if value="{{ isInviteDead }}" hint-placeholder-val="{{ false }}">
+              <div style="flex:1; display:flex; flex-direction:column; min-height:0;">
+                <div style="flex:0 0 auto; padding:14px 18px; border-bottom:1px solid #e4dfd4; display:flex; align-items:center; gap:12px;">
+                  <span style="font-size:19px; color:#6b665c;">‹</span>
+                  <div style="font-size:15.5px; font-weight:600;">Invitation</div>
+                </div>
+                <div style="flex:1; min-height:0; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:16px; padding:28px 26px 34px; text-align:center;">
+                  <span style="width:58px; height:58px; background:#f4f0e8; border:1px solid #e0dace; display:flex; align-items:center; justify-content:center; color:#8a6d1f; clip-path:polygon(0 0, 100% 0, 100% 72%, 72% 100%, 0 100%);">
+                    <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><circle cx="12" cy="12" r="9"></circle><path d="M12 7.5v5"></path><path d="M12 16.2h.01"></path></svg>
+                  </span>
+                  <h2 style="margin:0; font-size:21px; line-height:1.25; font-weight:600; letter-spacing:-0.02em; text-wrap:pretty;">Ce lien ne fonctionne plus</h2>
+                  <p style="margin:0; font-size:13.5px; line-height:1.6; color:#5b564d; max-width:272px; text-wrap:pretty;">Il était prévu pour un seul usage, et il a déjà servi. C'est le comportement attendu : une invitation ne reste pas ouverte derrière vous.</p>
+                  <div style="width:100%; max-width:292px; display:flex; flex-direction:column; gap:9px; margin-top:6px;">
+                    <button onclick="{{ goQrScan }}" style="background:#0c1f19; color:#f2fbf6; border:none; padding:13px 16px; font-size:14px; font-weight:600; font-family:inherit; cursor:pointer; clip-path:polygon(0 0, calc(100% - 14px) 0, 100% 14px, 100% 100%, 0 100%);">Demander un nouveau lien à Nadia</button>
+                    <button onclick="{{ goPlain }}" style="background:none; border:1px solid #cfc8bb; color:#3f3b34; padding:12px 16px; font-size:13.5px; font-family:inherit; cursor:pointer;">Revenir aux conversations</button>
+                  </div>
+                </div>
+              </div>
+            </sc-if>
+
+</body>
