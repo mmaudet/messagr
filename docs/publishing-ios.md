@@ -120,6 +120,28 @@ carré blanc, et la CI reste verte : App Store Connect a été la première chos
 Réparé depuis `design/brand/messagr-icone-ios-1024.svg`, et
 `scripts/assert-ios-icon.sh` le vérifie maintenant dans `checks`.
 
+#### La conformité à l'export, répondue une fois pour toutes
+
+Sans `ITSAppUsesNonExemptEncryption` dans l'`Info.plist`, App Store Connect
+marque chaque build « Conformité manquante » et la retient loin des testeurs
+jusqu'à ce que quelqu'un réponde dans un formulaire web. La réponse est la
+même à chaque fois, donc elle est dans la build.
+
+Elle vaut `true`, et c'est le produit qui le dicte : l'exemption qui
+permettrait `false` vise les applications n'utilisant que le chiffrement
+fourni par iOS — HTTPS, le trousseau, l'authentification. Messagr chiffre ses
+propres messages de bout en bout avec Olm et Megolm, ce qui n'est pas ça, et
+qui est toute la raison d'être.
+
+Les algorithmes sont standards et publiés — AES-256, Curve25519, Ed25519,
+HMAC-SHA-256 — donc c'est de la cryptographie de marché de masse et non du
+propriétaire : ce qui découle de `true` est un rapport d'auto-classification
+annuel, pas une revue CCATS.
+
+**La toute première build, celle du 7 septembre 2026, est partie sans cette
+clé.** Il a fallu répondre une fois dans l'interface pour celle-là ; toutes
+les suivantes la portent.
+
 ### 4. Inviter le testeur
 
 App Store Connect → **Utilisateurs et accès** → **+** : son adresse, son rôle.
