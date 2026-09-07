@@ -1,5 +1,11 @@
 import React, { useEffect, useState } from 'react'
-import { Image, StyleSheet, Text, View } from 'react-native'
+import {
+  Image,
+  StyleSheet,
+  Text,
+  useWindowDimensions,
+  View,
+} from 'react-native'
 
 import { t } from '../copy'
 import { color, radius, space, type } from '../design/tokens'
@@ -47,6 +53,25 @@ import {
 /** What a picture with no stated proportions is drawn as. */
 const ASSUMED_RATIO = 1
 
+/**
+ * The most of the screen one photograph may take, in a conversation.
+ *
+ * A portrait photograph at the bubble's full width is taller than the screen:
+ * measured on a Pixel, one filled 1397 of 2364 pixels and pushed its own
+ * reactions past the bottom edge, so the picture and the hearts on it could
+ * not be seen at once. Reported as "on ne voit plus la photo avec les
+ * réactions", which is exactly what it looked like.
+ *
+ * Bounding it costs bubble-coloured margins at the sides of a very tall
+ * picture, because `contain` keeps the whole photograph rather than cropping
+ * to a shape this application chose. That is the trade this makes: the whole
+ * picture, smaller, over part of a picture at the size it asked for.
+ *
+ * Not applied to the full-screen viewer, which is the surface whose entire
+ * job is to be as large as the screen.
+ */
+const TALLEST_SHARE = 0.45
+
 export function Photograph({
   image,
   fetch,
@@ -77,6 +102,14 @@ export function Photograph({
   readonly full?: boolean
 }) {
   const [shown, setShown] = useState<ShownImage | null>(null)
+  // The cap is a share of the screen rather than a number of points: a
+  // photograph that leaves room for its own reactions on a telephone leaves
+  // room on a tablet too, and the same constant says so on both.
+  const { height: screenHeight } = useWindowDimensions()
+  const bounded =
+    fill || full
+      ? null
+      : { maxHeight: Math.round(screenHeight * TALLEST_SHARE) }
   // An event with no thumbnail — every one sent before #117 — answers the
   // photograph, so this is the whole of the backward compatibility.
   const drawn = full ? image : smallestCopyOf(image)
@@ -115,6 +148,7 @@ export function Photograph({
           styles.frame,
           styles.waiting,
           fill ? styles.filling : { aspectRatio: ratio },
+          bounded,
         ]}
       />
     )
@@ -132,7 +166,11 @@ export function Photograph({
     <Image
       testID={testID}
       source={{ uri: shown.uri }}
-      style={[styles.frame, fill ? styles.filling : { aspectRatio: ratio }]}
+      style={[
+        styles.frame,
+        fill ? styles.filling : { aspectRatio: ratio },
+        bounded,
+      ]}
       // On its own, `contain`: cropping somebody's photograph to fit a box
       // this application chose is not this application's decision. In a
       // plate's tile, `cover`, because the tile is a thumbnail and a
