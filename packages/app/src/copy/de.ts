@@ -189,6 +189,8 @@ export const de: Readonly<Record<CopyKey, string>> = {
     'Sie kommen per Einladung herein, nicht per Formular',
   promise_action: 'Beginnen',
   list_title: 'Unterhaltungen',
+  list_invitation_ignored:
+    'Sie haben eine Einladung geöffnet, und dieses Telefon hat bereits ein Konto. Sie wurde nicht verbraucht und gilt weiterhin für die Person, für die sie bestimmt war.',
   list_empty:
     'Noch keine Unterhaltung. Laden Sie jemanden ein, um eine zu beginnen.',
   list_nothing_said: 'Es wurde noch nichts gesagt',

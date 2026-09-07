@@ -53,6 +53,23 @@ export type EntryResult =
        * is a warning about the next launch rather than about this one.
        */
       readonly kept?: boolean
+      /**
+       * `true` when this launch was opened with a usable invitation and did
+       * not spend it, because the device already had a session.
+       *
+       * SILENCE WAS THE DEFECT. The rule above is right and stays: an
+       * invitation must not be able to replace an account somebody already
+       * has, and the token is left unspent so it still works for whoever it
+       * was meant for. But the application simply drew its conversation list,
+       * exactly as if the icon had been tapped -- so somebody who scanned an
+       * invitation on a phone that already had Messagr saw nothing at all and
+       * could not tell whether the code had even been read. Reported from a
+       * Pixel on 7 September 2026.
+       *
+       * Reported rather than acted on: what to draw is a screen's business,
+       * and this module decides entry.
+       */
+      readonly invitationIgnored?: boolean
     }
   | { readonly entered: false; readonly reason: string }
 
@@ -61,7 +78,18 @@ export async function enterWithASession(deps: EntryDeps): Promise<EntryResult> {
 
   const held = await loadSession(secrets)
   if (held !== null) {
-    return { entered: true, session: held, claimed: false }
+    // The link is read even though it will not be spent: the only way to
+    // tell "opened with an invitation" from "opened from the home screen"
+    // is to look, and a screen cannot say what happened without knowing.
+    // `getInitialURL` is a read and consumes nothing.
+    const offered = await link()
+    const usable = offered !== null && parseInvitationLink(offered) !== null
+    return {
+      entered: true,
+      session: held,
+      claimed: false,
+      ...(usable ? { invitationIgnored: true } : {}),
+    }
   }
 
   const raw = await link()

@@ -181,6 +181,8 @@ export const it: Readonly<Record<CopyKey, string>> = {
   promise_point_invitation: 'Si entra su invito, non compilando un modulo',
   promise_action: 'Cominciare',
   list_title: 'Conversazioni',
+  list_invitation_ignored:
+    'Ha aperto un invito e questo telefono ha già un account. Non è stato usato: resta valido per la persona a cui era destinato.',
   list_empty:
     'Nessuna conversazione per ora. Inviti qualcuno per cominciarne una.',
   list_nothing_said: 'Non è ancora stato detto nulla',

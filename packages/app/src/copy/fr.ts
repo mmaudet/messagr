@@ -270,6 +270,8 @@ export const fr = {
   // word "federation" -- §13.19 invariant 6. What went wrong technically goes
   // to the log; a row says what it means for the person reading it.
   list_title: 'Conversations',
+  list_invitation_ignored:
+    'Vous avez ouvert une invitation, et ce téléphone a déjà un compte. Elle n’a pas été utilisée : elle reste valable pour la personne à qui elle était destinée.',
   list_empty:
     'Aucune conversation pour l’instant. Invitez quelqu’un pour en commencer une.',
   list_nothing_said: 'Rien n’a encore été dit',

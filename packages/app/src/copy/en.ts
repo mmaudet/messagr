@@ -187,6 +187,8 @@ export const en: Readonly<Record<CopyKey, string>> = {
   promise_point_invitation: 'You enter by invitation, not by form',
   promise_action: 'Begin',
   list_title: 'Conversations',
+  list_invitation_ignored:
+    'You opened an invitation, and this phone already has an account. It was not used: it is still valid for the person it was meant for.',
   list_empty: 'No conversations yet. Invite someone to start one.',
   list_nothing_said: 'Nothing has been said yet',
   list_unreadable: 'This device cannot read the last message',
