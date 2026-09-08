@@ -31,8 +31,23 @@ APP="$ROOT/packages/app"
 APK="$APP/android/app/build/outputs/apk/debug/app-debug.apk"
 SERIAL="${MESSAGR_PIXEL_SERIAL:-}"
 
-DEVICE=()
-if [ -n "$SERIAL" ]; then DEVICE=(-s "$SERIAL"); fi
+# WHICH TELEPHONE, WHEN THERE IS MORE THAN ONE ATTACHED.
+#
+# A bare `adb install` with an emulator running answers "more than one
+# device" and stops -- at the install, at the end of the build. The
+# demonstration Pixel is the one that is not an emulator, which is a rule
+# rather than a guess: `adb devices` names every emulator `emulator-NNNN`.
+# `MESSAGR_PIXEL_SERIAL` still wins, for the day there are two real ones.
+if [ -z "$SERIAL" ]; then
+  SERIAL="$(adb devices | awk '$2 == "device" && $1 !~ /^emulator-/ { print $1 }' | head -1)"
+fi
+if [ -z "$SERIAL" ]; then
+  echo "no telephone attached (an emulator is not one)." >&2
+  echo "Plug the Pixel in, or set MESSAGR_PIXEL_SERIAL." >&2
+  exit 2
+fi
+DEVICE=(-s "$SERIAL")
+echo "==> telephone: $SERIAL"
 
 echo "==> bundling the JavaScript (the step assembleDebug does not do)"
 cd "$APP"
