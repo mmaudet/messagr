@@ -37,6 +37,7 @@ import {
   readTrust,
   removeReaction,
   startCryptoMachine,
+  enterAnyInvitations,
   startLiveSync,
   vouchForEntrant,
   type CryptoPumpReport,
@@ -746,6 +747,19 @@ export function App({
                 credentials,
               )
             }
+            // THE DOOR SOMEBODY HELD OPEN, WALKED THROUGH BEFORE ANYTHING
+            // IS READ.
+            //
+            // An invitation is not membership: until this joins, the room is
+            // not in `/joined_rooms`, no message reaches this device, and the
+            // conversation list is empty on an account whose sync reports a
+            // room. `enterInvitations.ts` says how that came to be missing.
+            //
+            // Before the list rather than after: a conversation joined a
+            // moment later would be derived a moment too late and only appear
+            // at the next tick.
+            await enterAnyInvitations(sessionClient)
+
             // Attempted whether or not this run's own send worked: what is
             // being read was written by somebody else, and one direction
             // failing should not hide the other. The room is the one the
@@ -1389,6 +1403,29 @@ export function App({
                     })
                     .catch((cause: unknown) =>
                       logEvent('warn', 'MESSAGR_ADMIT_ROUND_FAILED', {
+                        reason: getErrorMessage(cause),
+                      }),
+                    )
+
+                  // AND ON EVERY TICK, BECAUSE ADMISSION IS NOT LAUNCH.
+                  //
+                  // The entrant claims a link, and the issuer admits them a
+                  // poll later -- so the invitation arrives at a device that
+                  // is already running and has finished launching. Entering
+                  // only at launch would leave them on the threshold until
+                  // they next restarted the application.
+                  //
+                  // Not awaited: nothing below depends on it, and the loop's
+                  // tick must not wait on a join.
+                  enterAnyInvitations(sessionClient)
+                    .then(walked => {
+                      // A room joined is a row the list does not have yet.
+                      if (walked.joined.length > 0) {
+                        refreshList().catch(() => {})
+                      }
+                    })
+                    .catch((cause: unknown) =>
+                      logEvent('warn', 'MESSAGR_ENTER_FAILED', {
                         reason: getErrorMessage(cause),
                       }),
                     )
