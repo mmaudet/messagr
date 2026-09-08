@@ -81,7 +81,7 @@ import {
   RECEIPTS_DEFAULT,
   receiptsArePublished,
 } from './src/runtime/receiptSetting'
-import { readUpTo } from './src/runtime/receipts'
+import { readUpTo, type Receipt } from './src/runtime/receipts'
 import { hasSeenPromise, rememberPromiseSeen } from './src/runtime/promiseSeen'
 import { clearSignUp, isSignUpUnfinished } from './src/runtime/signUpMarker'
 import { color, floors, space, type as typeScale } from './src/design/tokens'
@@ -366,6 +366,26 @@ export function App({
   // and a receipt arriving names an event that has to be found among the
   // entries held right now.
   const conversationRef = useRef<readonly TimelineEntry[]>([])
+  /**
+   * Every read receipt any poll has reported, by conversation.
+   *
+   * KEPT, BECAUSE A RECEIPT ARRIVES ONCE AND IS NEVER SENT AGAIN.
+   *
+   * They were read straight off the tick and applied only to the
+   * conversation that happened to be open at that instant. Somebody who read
+   * your message while you were on the list, or in another conversation, or
+   * anywhere but that screen, produced a receipt that was looked at once and
+   * dropped -- and opening the conversation afterwards showed a single tick
+   * for ever, because nothing re-sends it and `/messages` does not carry it.
+   *
+   * Reported from both ends at once: "il a bien l'accusé de lecture activé
+   * mais je ne vois rien et lui-même ne voit rien".
+   *
+   * A map rather than state: it is written from the sync loop's own callback
+   * and read when a conversation opens, and a re-render per receipt for a
+   * conversation nobody is looking at is a re-render for nothing.
+   */
+  const seenReceiptsRef = useRef<Map<string, readonly Receipt[]>>(new Map())
   const [openScope, setOpenScope] = useState<string | null>(null)
   const openScopeRef = useRef<string | null>(null)
   /**
@@ -917,6 +937,19 @@ export function App({
                   mergeTimeline(held ?? [], fresh.entries),
                 )
                 setReactions(fresh.reactions)
+                // WHAT WAS READ BEFORE THIS SCREEN EXISTED.
+                //
+                // `/messages` carries no receipts -- they are ephemeral, and
+                // a receipt is sent once. Whatever the polls have seen since
+                // this launch is the only record of it, so the second tick
+                // is drawn from there rather than waiting for somebody to
+                // read the message a second time.
+                const already = seenReceiptsRef.current.get(scope)
+                if (already !== undefined) {
+                  setReadHere(
+                    readUpTo(fresh.entries, already, credentials.userId),
+                  )
+                }
                 const members = await fetchJoinedMembers(
                   makePumpHttp(sessionClient),
                   scope,
@@ -1386,17 +1419,32 @@ export function App({
                   // Before the early return below: a poll can carry a
                   // receipt for a conversation whose timeline did not move --
                   // somebody reading is not somebody writing.
+                  // KEPT FOR EVERY CONVERSATION, drawn for the one on screen.
+                  // A receipt is sent once; whoever reads it later has to
+                  // find it somewhere.
+                  for (const [scope, seen] of tick.receipts) {
+                    if (seen.length > 0)
+                      seenReceiptsRef.current.set(scope, seen)
+                  }
                   const openNow = openScopeRef.current
                   if (openNow !== null) {
                     const seen = tick.receipts.get(openNow)
                     if (seen !== undefined && seen.length > 0) {
-                      setReadHere(
-                        readUpTo(
-                          conversationRef.current,
-                          seen,
-                          credentials.userId,
-                        ),
+                      const read = readUpTo(
+                        conversationRef.current,
+                        seen,
+                        credentials.userId,
                       )
+                      // The one line anybody debugging a missing second tick
+                      // has. A receipt that arrived and resolved to nothing
+                      // is a different fault from one that never arrived,
+                      // and they are indistinguishable on a screen.
+                      logEvent('info', 'MESSAGR_READ_BY', {
+                        scope: openNow,
+                        receipts: seen.length,
+                        marked: read.size,
+                      })
+                      setReadHere(read)
                     }
                   }
 
@@ -1912,7 +1960,10 @@ export function App({
           dark band, into which the system drew the clock and the battery in
           white. Whatever sits on an edge paints to it. */}
         <SafeAreaView
-          style={[styles.screen, { paddingBottom: keyboardInset }]}
+          // NOT `paddingBottom: keyboardInset`. It was here, and it moved
+          // everything the keyboard was not covering while leaving the one
+          // thing that mattered where it was -- see the dock below.
+          style={styles.screen}
           edges={['left', 'right']}>
           {/* Outside the scroll view, like the tab bar and for the same reason:
             what the band says is true of the instance rather than of the
@@ -2366,8 +2417,17 @@ export function App({
             The action shows only on the list, and only when the invitation
             panel is not already open: a control that opens what is on screen
             is a control that does nothing. */}
+          {/* THE KEYBOARD LIFTS THE DOCK ITSELF, NOT THE VIEW AROUND IT.
+            The note above the `SafeAreaView` says why, and then the padding
+            was put there anyway: "an absolutely-positioned child is laid
+            against the border box and not the padding box". So
+            `paddingBottom` on the parent moved everything EXCEPT this, and
+            this is the composer. Reported from iOS as the keyboard covering
+            the field, twice -- the Android side never showed it because
+            `MainActivity` pads the content view natively, below React
+            Native, where an absolute child is inside what moves. */}
           <View
-            style={styles.dock}
+            style={[styles.dock, { bottom: keyboardInset }]}
             pointerEvents="box-none"
             onLayout={event => setDockHeight(event.nativeEvent.layout.height)}>
             {openScope === null &&
