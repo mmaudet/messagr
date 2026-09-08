@@ -1,0 +1,133 @@
+<!doctype html>
+<!--
+  LE DÉTAIL DE CONVERSATION DU HERO, ET D'OÙ IL VIENT.
+
+  Ce n'est PAS une photographie de l'application : c'est l'écran « conversation
+  en tête-à-tête » du prototype de conception, extrait de
+  `design/prototype/messagr-prototype-v3.html`, qui fait autorité sur la
+  disposition (voir `design/prototype/lisez-moi.md`). Le jour où un banc peut
+  photographier l'application dans un état de produit (#157), cette image est
+  remplacée par la vraie.
+
+  POURQUOI UN DÉTAIL ET PAS L'ÉCRAN ENTIER. L'écran complet du prototype montre
+  trois choses que l'application ne fait pas encore, et les mettre sur une page
+  de promotion serait annoncer ce qui ne tourne pas :
+
+    - deux boutons d'appel en en-tête, alors que #88 et #89 sont ouverts ;
+    - un message vocal, alors que `composer_record` existe mais que le micro
+      du composeur est teinté en `neutral.300`, l'état désactivé ;
+    - une vignette photographique, qui reste vide ici parce que
+      `image-slot.js` n'est pas versionné.
+
+  Ce qui reste est entièrement livré : la conversation en tête-à-tête, les
+  horodatages, la double coche, et les deux plis de coin de la marque.
+
+  LE TEXTE EST REMPLACÉ PAR LANGUE. Une conversation française sur /de/
+  annulerait ce que les six adresses corrigent. Les deux phrases sont des
+  marques, et `landing/rendre-conversation.mjs` les remplit.
+
+  Pour refaire les images :
+      node deploy/messagr-eu/landing/rendre-conversation.mjs
+-->
+<meta charset="utf-8">
+<body style="margin:0;background:#F7F5EF">
+
+<!--TAILLE 370x674-->
+<style>
+  body { margin:0; background:#e8e4dc; color:#1b1a19; font-family:'Schibsted Grotesk', Helvetica, sans-serif; -webkit-font-smoothing:antialiased; }
+  a { color:#0e8f63; text-decoration:none; }
+  a:hover { color:#06614a; text-decoration:underline; }
+  * { box-sizing:border-box; }
+  ::-webkit-scrollbar { width:6px; height:6px; }
+  ::-webkit-scrollbar-thumb { background:#cfc8bb; border-radius:3px; }
+  @keyframes riseIn { from{opacity:0; transform:translateY(8px)} to{opacity:1; transform:none} }
+  @keyframes pulseRing { 0%{opacity:.25} 50%{opacity:.9} 100%{opacity:.25} }
+  @keyframes scanSweep { 0%{transform:translateY(-104px)} 100%{transform:translateY(104px)} }
+</style>
+<sc-if value="{{ isPlain }}" hint-placeholder-val="{{ true }}">
+              <div style="flex:1; display:flex; flex-direction:column; min-height:0; background:#f2efe8;">
+                <div style="flex:0 0 auto; padding:8px 14px 9px; background:#fbf8f3; border-bottom:1px solid #e8e3d9; display:flex; align-items:center; gap:10px;">
+                  <span style="font-size:22px; line-height:1; color:#8f8a7e;">‹</span>
+                  <image-slot id="av-nadia" shape="circle" style="width:36px; height:36px; flex:0 0 36px;" src="https://api.dicebear.com/9.x/notionists/svg?seed=Nadia&amp;backgroundColor=c8ddd2&amp;scale=105" placeholder="Nadia"></image-slot>
+                  <div style="flex:1; min-width:0;">
+                    <div style="font-size:15.5px; font-weight:600; letter-spacing:-0.01em;">Nadia Belkacem</div>
+                    <div style="font-size:12px; color:#0e8f63; margin-top:1px;">en ligne</div>
+                  </div>
+                  <div style="display:flex; gap:16px; align-items:center; color:#5b564d; flex:0 0 auto;">
+                    <svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M23 7l-7 5 7 5V7z"></path><rect x="1" y="5" width="15" height="14" rx="2"></rect></svg>
+                    <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M22 16.9v3a2 2 0 01-2.2 2 19.8 19.8 0 01-8.6-3.1 19.5 19.5 0 01-6-6A19.8 19.8 0 012.1 4.2 2 2 0 014.1 2h3a2 2 0 012 1.7c.1 1 .4 1.9.7 2.8a2 2 0 01-.5 2.1L8.1 9.9a16 16 0 006 6l1.3-1.2a2 2 0 012.1-.5c.9.3 1.8.6 2.8.7a2 2 0 011.7 2z"></path></svg>
+                  </div>
+                </div>
+
+                <div style="flex:1; min-height:0; overflow:auto; padding:12px 12px 8px; display:flex; flex-direction:column; gap:7px;">
+                  <div style="align-self:center; background:rgba(12,31,25,.06); color:#6b665c; font-size:11px; padding:4px 11px; border-radius:11px; margin-bottom:2px;">%VEILLE%</div>
+
+                  <div style="align-self:flex-start; max-width:80%; background:#fff; border-radius:16px 16px 16px 4px; padding:7px 11px 6px; box-shadow:0 1px 1px rgba(12,31,25,.08);">
+                    <div style="font-size:14.5px; line-height:1.4; color:#1b1a19;">%QUESTION%</div>
+                    <div style="text-align:right; font-size:10.5px; color:#a8a196; margin-top:2px;">18:02</div>
+                  </div>
+
+                  <div style="align-self:flex-end; max-width:80%; background:#d7f5e4; border-radius:16px 16px 4px 16px; padding:7px 11px 6px; box-shadow:0 1px 1px rgba(12,31,25,.08);">
+                    <div style="font-size:14.5px; line-height:1.4; color:#062f21;">%REPONSE%</div>
+                    <div style="display:flex; align-items:center; justify-content:flex-end; gap:4px; margin-top:2px;">
+                      <span style="font-size:10.5px; color:#5f8f78;">18:04</span>
+                      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#12b76a" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12.5l4.5 4.5L14 8.5"></path><path d="M9 12.5l4.5 4.5L22 8.5"></path></svg>
+                    </div>
+                  </div>
+
+                  <div style="align-self:center; background:rgba(12,31,25,.06); color:#6b665c; font-size:11px; padding:4px 11px; border-radius:11px; margin:5px 0 2px;">Aujourd'hui</div>
+
+                  <div style="align-self:flex-start; max-width:80%; background:#fff; border-radius:16px; padding:5px 5px 6px; box-shadow:0 1px 1px rgba(12,31,25,.08);">
+                    <div style="position:relative; width:204px; height:150px;">
+                      <image-slot id="conv-photo-1" shape="rounded" radius="12" src="https://picsum.photos/seed/messagr-loire/612/450" placeholder="Photo partagée"></image-slot>
+                      <span style="position:absolute; left:8px; top:8px; background:rgba(12,31,25,.55); color:#f2fbf6; font-size:10.5px; padding:3px 7px; border-radius:9px; pointer-events:none;">1 / 2</span>
+                    </div>
+                    <div style="display:flex; justify-content:flex-end; align-items:center; padding:5px 6px 0;">
+                      <span style="font-size:11px; color:#8f8a7e;">08:12</span>
+                    </div>
+                  </div>
+
+                  <div style="align-self:flex-start; max-width:80%; position:relative; background:#fff; border-radius:16px 16px 16px 4px; padding:7px 11px 6px; box-shadow:0 1px 1px rgba(12,31,25,.08); margin-bottom:10px;">
+                    <div style="font-size:14.5px; line-height:1.4; color:#1b1a19;">Regarde la deuxième, c'est celle que je préfère 😊</div>
+                    <div style="text-align:right; font-size:10.5px; color:#a8a196; margin-top:2px;">08:12</div>
+                    <span style="position:absolute; left:9px; bottom:-11px; background:#fff; border-radius:12px; padding:2px 6px; font-size:11px; box-shadow:0 1px 2px rgba(12,31,25,.14);">❤️ 1</span>
+                  </div>
+
+                  <div style="align-self:flex-end; max-width:80%; background:#d7f5e4; border-radius:16px; padding:8px 11px 7px; box-shadow:0 1px 1px rgba(12,31,25,.08);">
+                    <div style="display:flex; align-items:center; gap:9px;">
+                      <span style="width:26px; height:26px; border-radius:50%; background:#12b76a; display:flex; align-items:center; justify-content:center; flex:0 0 26px;">
+                        <svg width="12" height="12" viewBox="0 0 24 24" fill="#062f21" stroke="none"><path d="M8 5v14l11-7z"></path></svg>
+                      </span>
+                      <span style="display:flex; align-items:flex-end; gap:2px; height:20px;">
+                        <sc-for list="{{ waveform }}" as="w" hint-placeholder-count="18">
+                          <span style="width:2px; border-radius:1px; background:{{ w.color }}; height:{{ w.h }};"></span>
+                        </sc-for>
+                      </span>
+                      <span style="font-size:11px; color:#5f8f78; flex:0 0 auto;">0:08</span>
+                    </div>
+                    <div style="display:flex; align-items:center; justify-content:flex-end; gap:4px; margin-top:3px;">
+                      <span style="font-size:10.5px; color:#5f8f78;">08:15</span>
+                      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#8fae9f" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12.5l4.5 4.5L14 8.5"></path><path d="M9 12.5l4.5 4.5L22 8.5"></path></svg>
+                    </div>
+                  </div>
+
+                  <div style="align-self:flex-start; display:flex; align-items:center; gap:5px; background:#fff; border-radius:16px; padding:10px 13px; box-shadow:0 1px 1px rgba(12,31,25,.08);">
+                    <span style="width:6px; height:6px; border-radius:50%; background:#a8a196; animation:pulseRing 1.2s ease-in-out infinite;"></span>
+                    <span style="width:6px; height:6px; border-radius:50%; background:#a8a196; animation:pulseRing 1.2s ease-in-out .2s infinite;"></span>
+                    <span style="width:6px; height:6px; border-radius:50%; background:#a8a196; animation:pulseRing 1.2s ease-in-out .4s infinite;"></span>
+                  </div>
+                </div>
+
+                <div style="flex:0 0 auto; background:#fbf8f3; border-top:1px solid #e8e3d9; padding:9px 12px 11px; display:flex; gap:9px; align-items:center;">
+                  <span style="color:#5b564d; display:flex;"><svg width="23" height="23" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><path d="M12 5v14M5 12h14"></path></svg></span>
+                  <div style="flex:1; min-width:0; background:#fff; border-radius:20px; padding:9px 12px; display:flex; align-items:center; gap:9px; box-shadow:0 1px 1px rgba(12,31,25,.07);">
+                    <span style="flex:1; font-size:14.5px; color:#a8a196;">Message</span>
+                    <span style="color:#8f8a7e; display:flex;"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><circle cx="12" cy="12" r="9"></circle><path d="M9 14.5c1 1 2 1.5 3 1.5s2-.5 3-1.5"></path><circle cx="9.2" cy="9.8" r=".9" fill="currentColor" stroke="none"></circle><circle cx="14.8" cy="9.8" r=".9" fill="currentColor" stroke="none"></circle></svg></span>
+                    <span style="color:#8f8a7e; display:flex;"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><rect x="2.5" y="6.5" width="14" height="11" rx="2"></rect><path d="M16.5 11l5-3v8l-5-3z"></path></svg></span>
+                  </div>
+                  <span style="width:40px; height:40px; flex:0 0 40px; background:#12b76a; border-radius:50%; color:#062f21; display:flex; align-items:center; justify-content:center;"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M12 3v11"></path><path d="M9 6a3 3 0 016 0v4a3 3 0 01-6 0z" fill="currentColor" stroke="none"></path><path d="M6 11a6 6 0 0012 0"></path><path d="M12 17v3"></path></svg></span>
+                </div>
+              </div>
+            </sc-if>
+
+</body>

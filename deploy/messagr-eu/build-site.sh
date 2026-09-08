@@ -76,10 +76,24 @@ find "$source_dir" -maxdepth 1 -type f -exec cp {} "$destination/" \;
 # visual is the point of the rule.
 brand="$(cd "$(dirname "$0")/../.." && pwd)/design/brand"
 for asset in messagr-logotype-vert.svg messagr-logotype-vert-inverse.svg \
-             messagr-monogramme-r-vert.svg; do
+             messagr-monogramme-r-vert.svg \
+             messagr-bulle-entrante.svg messagr-bulle-sortante.svg; do
   [ -f "$brand/$asset" ] || { echo "build-site: FAIL: missing brand asset $asset" >&2; exit 1; }
   cp "$brand/$asset" "$destination/$asset"
 done
+
+# ── UNE PAGE PAR LANGUE, ÉCRITE ICI ET NON DEVINÉE PAR LE NAVIGATEUR ──────
+#
+# La page d'accueil parlait six langues à une seule adresse : un moteur
+# n'indexait que le français, il n'y avait aucun `hreflang`, et « la page en
+# allemand » n'était pas une chose qu'on pouvait envoyer à quelqu'un.
+#
+# Le générateur écrit les cinq autres à côté de la française et pose les liens
+# entre les six. Il refuse une clé marquée dans la page et absente du
+# catalogue, l'inverse, et un remplacement sans effet -- les trois manières
+# dont une page allemande se retrouverait avec une phrase française au milieu,
+# sans que la construction s'en aperçoive.
+node "$here/build-landing.mjs" "$destination"
 
 page="$destination/i/index.html"
 

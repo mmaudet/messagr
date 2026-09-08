@@ -1,0 +1,12 @@
+# Rien n'est interdit ici, et c'est délibéré : les six pages d'accueil sont
+# faites pour être trouvées, et les deux pages légales pour être lues.
+#
+# `/i/` n'est pas exclu non plus, et ce n'est pas un oubli. La page
+# d'invitation répond les mêmes octets pour tout jeton, valide ou non, donc
+# l'indexer n'apprend rien à personne sur l'existence d'une invitation. Une
+# ligne `Disallow` la désignerait à qui lit ce fichier, ce qui est exactement
+# le contraire de l'effet recherché.
+User-agent: *
+Allow: /
+
+Sitemap: https://messagr.eu/sitemap.xml

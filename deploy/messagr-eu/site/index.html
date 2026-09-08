@@ -5,323 +5,1031 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Messagr</title>
 <meta name="description" content="La messagerie qui ne vous demande rien. Pas de numéro, pas de compte, pas de mot de passe.">
+<!-- L'APERÇU DE LIEN, ET IL COMPTE ICI PLUS QU'AILLEURS.
+     Messagr ne se diffuse que d'une seule façon : quelqu'un envoie un lien à
+     quelqu'un. Collé dans une messagerie, un courriel ou un réseau, ce lien
+     s'affichait en gris, sans titre ni image. L'aperçu EST la principale
+     surface publicitaire de ce produit, et elle était vide.
+     `build-landing.mjs` réécrit le titre, la description, l'adresse et
+     l'image pour chacune des six langues : une carte française sur /de/
+     annulerait ce que les six adresses viennent de corriger. -->
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="Messagr">
+<meta property="og:title" content="La messagerie qui ne vous demande rien.">
+<meta property="og:description" content="Pas de numéro, pas de compte, pas de mot de passe. Quelqu'un vous invite, vous écrivez.">
+<meta property="og:url" content="https://messagr.eu/">
+<meta property="og:image" content="https://messagr.eu/messagr-partage-fr.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<!-- `twitter:card` seul : les autres champs de Twitter retombent sur og: quand
+     ils manquent, et deux jeux de balises à tenir en phase, c'est un jeu qui
+     finit par mentir. -->
+<meta name="twitter:card" content="summary_large_image">
+<link rel="icon" href="/favicon.ico" sizes="any">
+<link rel="icon" href="/messagr-monogramme-r-vert.svg" type="image/svg+xml">
 <style>
+  /* ─────────────────────────────────────────────────────────────────────
+     Toutes les valeurs viennent de design/tokens.json et de
+     design/brand/LISEZ-MOI.md. Rien n'est inventé ici, et aucune police
+     n'est chargée depuis l'extérieur : la page affirme qu'elle ne contacte
+     personne, et une police distante ferait de cette phrase un mensonge.
+     La personnalité vient donc de l'échelle et de la composition.
+     ───────────────────────────────────────────────────────────────────── */
   :root{
-    --ground:#F7F5EF; --surface:#ffffff; --ink:#0C1F19; --soft:#5A6B63;
-    --accent:#06614A; --mark:#12B76A; --bubble:#C9F2DC; --rule:#E2DED2;
+    --papier:#F7F5EF; --surface:#ffffff; --creux:#F2EFE8;
+    --encre:#0C1F19; --doux:#5A6B63; --pale:#8A9A92;
+    --appui:#06614A; --marque:#12B76A; --bulle:#C9F2DC; --regle:#E2DED2;
+    --sur-sombre:#EAF3EE; --doux-sombre:#9FC0B0; --regle-sombre:#1E3A2E;
   }
   *{box-sizing:border-box}
   html,body{margin:0}
   body{
-    background:var(--ground); color:var(--ink);
-    font-family:-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-    line-height:1.6; -webkit-font-smoothing:antialiased;
+    background:var(--papier); color:var(--encre);
+    font-family:-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    font-size:17px; line-height:1.6; -webkit-font-smoothing:antialiased;
   }
-  main{max-width:640px; margin:0 auto; padding:56px 24px 80px}
+
+  /* ── Les bandes ──────────────────────────────────────────────────────
+     Une bande par idée, chacune avec son fond. C'est ce qui donne à la page
+     une silhouette : avant d'avoir lu un mot, on voit qu'il y a quatre
+     choses à lire et non un seul bloc. */
+  .bande{padding:0 20px}
+  .mesure{max-width:1060px; margin:0 auto; padding:64px 0}
+  .bande.accueil .mesure{padding-top:38px}
+  /* CHAQUE BANDE A LA MESURE DE CE QU'ELLE PORTE. L'accueil et la bande
+     sombre tiennent deux colonnes et méritent la largeur ; l'invitation et le
+     téléchargement n'en tiennent qu'une, et les laisser dans la même mesure
+     donnait une moitié droite vide qui se lit comme un oubli. */
+  .bande.verte .mesure,
+  .bande.obtenir .mesure{max-width:800px}
+  .bande.sombre{background:var(--encre); color:var(--sur-sombre)}
+  .bande.verte{background:var(--bulle)}
+  .bande.pied{border-top:1px solid var(--regle)}
+  .bande.pied .mesure{padding:34px 0 60px}
+
+  /* ── L'en-tête ───────────────────────────────────────────────────── */
   .bar{display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between;
-       gap:18px; margin-bottom:40px}
+       gap:18px; margin-bottom:64px}
   .mark{display:block; width:max-content}
-  .menu{display:flex; flex-wrap:wrap; align-items:center; gap:18px; font-size:14.5px}
-  .menu a{color:inherit; opacity:.72; text-decoration:none; border-bottom:1px solid transparent;
+  .mark:focus-visible{outline:3px solid var(--marque); outline-offset:4px}
+  .logotype{display:block; width:min(212px,52vw); height:auto}
+  .logotype.dark{display:none}
+  .menu{display:flex; flex-wrap:wrap; align-items:center; gap:20px; font-size:15px}
+  .menu a{color:inherit; opacity:.7; text-decoration:none; border-bottom:1px solid transparent;
           padding:6px 0}
   .menu a:hover{opacity:1; border-bottom-color:currentColor}
-  /* Assez haut pour un pouce : 44 est le plancher que l'application tient
-     aussi, et une page qu'on lit sur un téléphone n'en mérite pas moins. */
-  .langue{font:inherit; font-size:14.5px; color:inherit; background:transparent;
-          border:1px solid currentColor; border-radius:8px; padding:9px 10px;
-          min-height:44px; opacity:.72}
+  /* Un `select` natif : chaque système en dessine un que tout le monde sait
+     déjà ouvrir, accessible au clavier et au lecteur d'écran sans une ligne
+     de script. Une rangée de drapeaux serait plus jolie et moins utilisable. */
+  .langue{font:inherit; font-size:15px; color:inherit; background:transparent;
+          border:1px solid currentColor; border-radius:8px; padding:9px 11px;
+          min-height:44px; opacity:.7}
   .langue:hover{opacity:1}
-  .mark:focus-visible{outline:3px solid var(--mark); outline-offset:4px}
-  .logotype{display:block; width:min(260px,62vw); height:auto}
-  .logotype.dark{display:none}
-  .getline{display:flex; align-items:center; gap:14px; margin-bottom:16px}
-  .getline .label{margin:0}
-  .appicon{flex:0 0 52px; width:52px; height:52px; display:block}
+
+  /* ── L'accueil ───────────────────────────────────────────────────── */
+  .grille-accueil{display:grid; grid-template-columns:1fr; gap:52px; align-items:center}
+  @media (min-width:900px){
+    .grille-accueil{grid-template-columns:1fr 1.06fr; gap:56px}
+  }
   h1{
-    font-size:clamp(30px,7vw,42px); line-height:1.12; letter-spacing:-0.025em;
-    font-weight:650; margin:0 0 18px; text-wrap:balance;
+    font-size:clamp(38px,6.2vw,66px); line-height:1.02; letter-spacing:-0.035em;
+    font-weight:700; margin:0 0 22px; max-width:15ch; text-wrap:balance;
   }
-  .lead{font-size:18px; color:var(--soft); margin:0 0 34px; text-wrap:pretty}
-  ul{list-style:none; padding:0; margin:0 0 40px; display:flex; flex-direction:column; gap:11px}
-  li{display:flex; gap:11px; align-items:baseline; font-size:16px}
-  li::before{content:"◆"; color:var(--mark); font-size:12px; flex:0 0 auto}
-  .card{
-    background:var(--surface); border:1px solid var(--rule); border-radius:4px;
-    padding:26px 24px; margin-bottom:22px;
+  .lead{
+    font-size:clamp(18px,2.1vw,21px); line-height:1.45; color:var(--doux);
+    margin:0 0 34px; max-width:44ch; text-wrap:pretty;
   }
-  .label{
-    font-family:ui-monospace,SFMono-Regular,Menlo,monospace; font-size:11px;
-    letter-spacing:.13em; text-transform:uppercase; color:var(--soft); margin:0 0 16px;
+  .mots ul{list-style:none; padding:0; margin:0 0 38px;
+           display:flex; flex-direction:column; gap:12px}
+  .mots li{display:flex; gap:12px; align-items:baseline; font-size:16.5px}
+  .mots li::before{content:"◆"; color:var(--marque); font-size:11px; flex:0 0 auto}
+
+  /* ── La figure : les bulles de la marque, sans un mot dedans ─────── */
+  /* LA FIGURE NE PARAÎT QUE LÀ OÙ ELLE ÉQUILIBRE QUELQUE CHOSE. Sur deux
+     colonnes elle fait contrepoids au titre ; sur une seule elle passerait
+     sous les portes, loin du titre qu'elle illustre, et la page est plus
+     franche sans elle. */
+  .figure{display:none}
+  @media (min-width:900px){
+    .figure{display:block}
   }
+  .conversation{
+    display:block; width:100%; height:auto; border-radius:4px;
+    /* L'image porte son propre fond, celui de la conversation. Une ombre
+       douce la décolle du papier sans en faire une carte. */
+    box-shadow:0 1px 2px rgba(12,31,25,.05), 0 12px 28px -12px rgba(12,31,25,.16);
+  }
+
+  /* ── Les deux portes ─────────────────────────────────────────────── */
+  .portes{display:flex; flex-wrap:wrap; gap:12px; margin:0}
+  .porte{
+    display:inline-flex; align-items:center; justify-content:center;
+    flex:1 1 200px; min-height:52px; padding:14px 24px;
+    background:var(--encre); color:#fff; text-decoration:none;
+    font-size:16px; font-weight:620; text-align:center;
+    clip-path:polygon(0 0, calc(100% - 16px) 0, 100% 16px, 100% 100%, 0 100%);
+  }
+  .porte:hover{background:var(--appui)}
+  .porte:focus-visible{outline:3px solid var(--marque); outline-offset:3px}
+  .porte.creuse{background:var(--surface); color:var(--appui)}
+  .porte.creuse:hover{background:var(--marque); color:#fff}
+  .verte .porte.creuse{background:var(--surface)}
+
+  /* ── Le parcours : trois étapes, dans l'ordre ────────────────────────
+     Une liste ORDONNÉE, et pas une grille de cartes : l'ordre est le contenu.
+     Le numéro vient du compteur de la liste plutôt que d'être tapé, donc il ne
+     peut pas se désaccorder du rang réel.
+     Les images sont plus petites que celles de la galerie : ici on suit une
+     histoire, on ne détaille pas un écran. Elles sont cliquables nulle part,
+     puisque deux d'entre elles s'agrandissent déjà plus bas. */
+  .parcours{background:var(--surface); border-top:1px solid var(--regle)}
+  .etapes{
+    list-style:none; counter-reset:etape; padding:0; margin:34px 0 0;
+    display:grid; grid-template-columns:1fr; gap:34px;
+  }
+  @media (min-width:760px){ .etapes{grid-template-columns:repeat(3,1fr); gap:30px} }
+  .etape{counter-increment:etape; display:flex; flex-direction:column; gap:14px}
+  .etape img{
+    display:block; width:100%; aspect-ratio:1 / 1; object-fit:contain;
+    object-position:center; border-radius:4px; border:1px solid var(--regle);
+    background:var(--creux); padding:10px;
+    box-shadow:0 1px 2px rgba(12,31,25,.04), 0 10px 24px -14px rgba(12,31,25,.16);
+  }
+  /* SUR UNE COLONNE, LE CADRE CARRÉ NE SERT PLUS À RIEN. Il n'existe que pour
+     que les trois images fassent la même hauteur sur une rangée ; empilées, il
+     n'y a pas de rangée, et la conversation -- large et basse -- flottait au
+     milieu d'un carré presque vide. */
+  @media (max-width:759px){ .etape img{aspect-ratio:auto; max-height:420px} }
+  .etape p{margin:0; font-size:16px; line-height:1.45; color:var(--doux)}
+  .etape p::before{
+    content:counter(etape); display:inline-flex; align-items:center;
+    justify-content:center; width:22px; height:22px; margin-right:9px;
+    border-radius:50%; background:var(--bulle); color:var(--appui);
+    font-size:12px; font-weight:700; vertical-align:2px;
+  }
+
+  /* ── La galerie ──────────────────────────────────────────────────────
+     Deux rangées, et l'état de chaque écran sur l'écran lui-même. Une note en
+     bas de section ne serait pas lue par qui regarde les images, et montrer du
+     pas-encore-livré sans le dire à l'endroit où on le montre est la seule
+     manière de perdre le lecteur qu'on cherchait à convaincre. */
+  .galerie{display:grid; grid-template-columns:1fr; gap:26px; margin-top:34px}
+  @media (min-width:640px){ .galerie{grid-template-columns:repeat(2,1fr)} }
+  @media (min-width:960px){ .galerie{grid-template-columns:repeat(3,1fr); gap:30px} }
+  .vue figure{margin:0}
+  /* LES SIX CARTES ONT LA MÊME TAILLE, ET C'EST LE POINT. Les écrans n'ont
+     pas le même rapport -- l'un fait 520 par 800, l'autre 520 par 440 -- et
+     laissés à leur hauteur naturelle les légendes tombaient à six hauteurs
+     différentes. Le rapport est donc imposé et l'image cadrée par le haut :
+     rien n'est rogné -- `contain` et non `cover` : la conversation est large
+     là où les autres sont hautes, et un cadrage plein l'agrandissait au point
+     de ne plus montrer qu'une bulle et demie.
+     Les attributs `width`/`height` sont retirés pour la même raison : ils
+     annonçaient 1040 par 600 pour tous, ce qui était faux pour les hauts et
+     provoquait un saut de mise en page au chargement. */
+  .vue img{
+    display:block; width:100%; aspect-ratio:5 / 4; object-fit:contain;
+    object-position:top center; border-radius:4px; border:1px solid var(--regle);
+    background:var(--creux); padding:10px;
+    box-shadow:0 1px 2px rgba(12,31,25,.04), 0 14px 30px -16px rgba(12,31,25,.18);
+  }
+  .vue figcaption{display:flex; align-items:baseline; gap:10px; margin-top:12px; flex-wrap:wrap}
+  .vue .quoi{font-size:15px; font-weight:600; letter-spacing:-0.01em}
+  .etat{
+    font-size:11px; font-weight:600; letter-spacing:.06em; text-transform:uppercase;
+    padding:3px 8px; border-radius:3px; white-space:nowrap;
+  }
+  .etat.fait{background:var(--bulle); color:var(--appui)}
+  /* Le troisième état se lit entre les deux : le trait plein de « fait » et
+     rien du fond de « à venir ». Il n'invente pas de couleur -- une troisième
+     teinte ferait trois signaux là où il n'y a qu'une échelle. */
+  .etat.encours{background:transparent; color:var(--appui);
+                box-shadow:inset 0 0 0 1.5px var(--appui)}
+  .etat.avenir{background:var(--creux); color:var(--doux); box-shadow:inset 0 0 0 1px var(--regle)}
+  /* Dans la bande sombre, une pastille creuse doit se voir sur l'encre. */
+  .sombre .etat.encours{color:var(--appui); box-shadow:inset 0 0 0 1.5px var(--appui)}
+
+  /* ── Le tableau des états ────────────────────────────────────────────
+     Ses propres classes, et non celles de la bande sombre : `.colonne h3` y
+     est écrit en `--sur-sombre`, presque blanc, donc illisible sur le papier.
+     Trois groupes plutôt que seize pastilles : l'état se lit une fois par
+     colonne au lieu d'être répété à chaque ligne. */
+  .capacites{background:var(--surface); border-top:1px solid var(--regle);
+             border-bottom:1px solid var(--regle)}
+  .etats{display:grid; grid-template-columns:1fr; gap:26px; margin-top:34px}
+  @media (min-width:720px){ .etats{grid-template-columns:repeat(3,1fr); gap:32px} }
+  .groupe{border-top:2px solid var(--regle); padding:16px 0 0}
+  .groupe h3{margin:0 0 16px}
+  .groupe ul{list-style:none; padding:0; margin:0;
+             display:flex; flex-direction:column; gap:11px}
+  .groupe li{font-size:16.5px; line-height:1.35}
+  .capacites .faits{margin-top:30px; max-width:none}
+
+  /* ── La loupe, en CSS seul ───────────────────────────────────────────
+     `:target` fait la lucarne : le lien de la vignette pointe vers l'adresse
+     de la loupe, et la loupe ne s'affiche que lorsqu'elle est visée. Aucun
+     script, donc rien à charger et rien à réparer le jour où le script casse.
+     Le bouton retour du navigateur referme, gratuitement. */
+  .agrandir{display:block; cursor:zoom-in}
+  .agrandir:focus-visible{outline:3px solid var(--marque); outline-offset:3px}
+  .loupe{
+    display:none; position:fixed; inset:0; z-index:20;
+    align-items:center; justify-content:center; padding:24px;
+  }
+  .loupe:target{display:flex}
+  .voile{position:absolute; inset:0; background:rgba(12,31,25,.72); cursor:zoom-out}
+  /* La figure prend la largeur de l'image et pas davantage : sinon la légende
+     et la croix s'étalaient sur toute la largeur permise pendant que l'image,
+     bornée par sa hauteur, restait étroite au milieu. */
+  .loupe figure{
+    position:relative; margin:0; width:fit-content;
+    max-width:min(920px, 100%); max-height:100%;
+    display:flex; flex-direction:column; gap:12px;
+  }
+  .loupe img{
+    display:block; width:100%; height:auto; max-height:calc(100vh - 130px);
+    object-fit:contain; background:var(--surface); border-radius:6px;
+    box-shadow:0 24px 60px -20px rgba(0,0,0,.5);
+  }
+  .loupe figcaption{
+    display:flex; align-items:center; gap:12px; flex-wrap:wrap;
+    color:#EAF3EE;
+  }
+  .loupe .quoi{font-size:16px; font-weight:600}
+  .loupe .etat.fait{background:var(--bulle); color:var(--appui)}
+  .loupe .etat.avenir{background:rgba(255,255,255,.14); color:#EAF3EE; box-shadow:none}
+  /* La croix : quarante-quatre pixels de côté, le plancher tactile que le
+     système de design impose partout ailleurs. Elle est un lien, donc elle
+     est atteignable au clavier sans qu'on l'écrive. */
+  .fermer{
+    margin-left:auto; display:inline-flex; align-items:center; justify-content:center;
+    width:44px; height:44px; flex:0 0 44px;
+    font-size:26px; line-height:1; color:#EAF3EE; text-decoration:none;
+    border-radius:50%; background:rgba(255,255,255,.12);
+  }
+  .fermer:hover{background:rgba(255,255,255,.24)}
+  .fermer:focus-visible{outline:3px solid var(--marque); outline-offset:3px}
+  /* Le nom accessible est derrière le signe : « × » lu à voix haute ne dit
+     rien, et il se traduit comme le reste de la page. */
+  .lu{
+    position:absolute; width:1px; height:1px; overflow:hidden;
+    clip-path:inset(50%); white-space:nowrap;
+  }
+
+  /* ── Titres de section ───────────────────────────────────────────── */
+  h2{
+    font-size:clamp(26px,3.4vw,38px); line-height:1.1; letter-spacing:-0.03em;
+    font-weight:660; margin:0 0 14px; max-width:20ch; text-wrap:balance;
+  }
+  .amorce{font-size:18px; line-height:1.5; color:var(--doux); margin:0 0 34px; max-width:52ch}
+  .sombre .amorce{color:var(--doux-sombre)}
+
+  /* ── La bande sombre : ce que le serveur voit ────────────────────── */
+  .colonnes{display:grid; grid-template-columns:1fr; gap:12px}
+  @media (min-width:700px){ .colonnes{grid-template-columns:1fr 1fr; gap:20px} }
+  .colonne{border-top:2px solid var(--marque); padding:18px 0 0}
+  .colonne.reste{border-top-color:var(--regle-sombre)}
+  .colonne h3{font-size:15px; font-weight:640; letter-spacing:0; margin:0 0 16px;
+              color:var(--sur-sombre)}
+  .colonne.reste h3{color:var(--doux-sombre)}
+  .colonne ul{list-style:none; padding:0; margin:0; display:flex; flex-direction:column; gap:12px}
+  .colonne li{font-size:17px; line-height:1.4}
+  .colonne.reste li{color:var(--doux-sombre)}
+  .fin{font-size:19px; line-height:1.5; margin:36px 0 0; max-width:48ch; font-weight:500}
+  .lien{font-size:14.5px; margin:12px 0 0}
+  .lien a{color:var(--doux-sombre); text-underline-offset:3px}
+  .lien a:hover{color:var(--marque)}
+
+  /* ── La bande verte : l'invitation ───────────────────────────────── */
+  .invite p{margin:0 0 16px; max-width:56ch; font-size:17px}
+  .invite .porte{flex:0 1 auto; margin:10px 0 12px}
+  .invite .note{font-size:14.5px; color:var(--appui); margin:0}
+
+  /* ── Obtenir l'application ───────────────────────────────────────── */
+  .card{background:var(--surface); border:1px solid var(--regle); border-radius:4px;
+        padding:30px 28px}
+  .getline{display:flex; align-items:center; gap:14px; margin-bottom:20px}
+  .appicon{flex:0 0 46px; width:46px; height:46px; display:block}
+  /* La seule étiquette en capitales de la page, et c'est le rôle `monoLabel`
+     du système de design. Il y en avait trois : deux sont devenues des titres
+     de phrase, parce qu'une capitale au-dessus de chaque bloc est un tic, pas
+     une information. */
+  .label{font-family:ui-monospace,SFMono-Regular,Menlo,monospace; font-size:11px;
+         letter-spacing:.13em; text-transform:uppercase; color:var(--doux); margin:0}
   .stores{display:flex; flex-wrap:wrap; gap:16px}
   .store{flex:1 1 210px; display:flex; flex-direction:column; gap:7px}
-  .badge{
-    display:flex; align-items:center; gap:13px; padding:13px 18px;
-    background:var(--ink); color:#fff; text-decoration:none;
-    clip-path:polygon(0 0, calc(100% - 14px) 0, 100% 14px, 100% 100%, 0 100%);
-  }
-  .badge:hover{background:var(--accent)}
-  .badge:focus-visible{outline:3px solid var(--mark); outline-offset:2px}
+  .badge{display:flex; align-items:center; gap:13px; padding:13px 18px;
+         background:var(--encre); color:#fff; text-decoration:none;
+         clip-path:polygon(0 0, calc(100% - 14px) 0, 100% 14px, 100% 100%, 0 100%)}
+  .badge:hover{background:var(--appui)}
+  .badge:focus-visible{outline:3px solid var(--marque); outline-offset:2px}
   .badge.off{background:#DAD6CA; color:#6E7A73; pointer-events:none}
   .badge svg{flex:0 0 24px}
   .badge b{display:block; font-size:15px; font-weight:620; line-height:1.25}
   .badge em{display:block; font-style:normal; font-size:11.5px; opacity:.75}
-  .under{
-    font-family:ui-monospace,SFMono-Regular,Menlo,monospace; font-size:11px;
-    letter-spacing:.09em; text-transform:uppercase; color:var(--soft); padding-left:2px;
-  }
-  .invite{
-    background:var(--bubble); border-radius:4px; padding:18px 20px;
-    font-size:15.5px; margin-top:26px;
-  }
-  .invite b{font-weight:640}
-  footer{
-    margin-top:46px; padding-top:20px; border-top:1px solid var(--rule);
-    font-size:13.5px; color:var(--soft);
-  }
-  footer a{color:var(--accent)}
+  .under{font-family:ui-monospace,SFMono-Regular,Menlo,monospace; font-size:11px;
+         letter-spacing:.09em; text-transform:uppercase; color:var(--doux)}
+  .faits{font-size:12.5px; line-height:1.5; color:var(--doux); margin:8px 0 0;
+         word-break:break-word}
+  .faits.avert{margin-top:12px}
+  .apres{font-size:14.5px; color:var(--doux); margin:22px 0 0; max-width:52ch}
+
+  /* ── L'éditeur ───────────────────────────────────────────────────────
+     Qui exploite le service n'est pas une obligation légale à loger sous le
+     pli : pour quelqu'un qui choisit une messagerie souveraine, c'est un
+     argument. Il passe donc au-dessus du pied, à sa taille. */
+  .editeur h2{font-size:22px; margin:0 0 14px; max-width:26ch}
+  .editeur p{font-size:15.5px; color:var(--doux); margin:0 0 10px; max-width:60ch}
+  .editeur p:last-of-type{margin-bottom:26px}
+  .editeur a{color:var(--appui)}
+  /* ── Le pied ─────────────────────────────────────────────────────── */
+  footer{font-size:14px; color:var(--doux); max-width:70ch}
+  footer a{color:var(--appui)}
+
   @media (prefers-color-scheme:dark){
     :root{
-      --ground:#0B1A15; --surface:#11241D; --ink:#E9F1EC; --soft:#93A89E;
-      --accent:#4FD39B; --rule:#23392F; --bubble:#1C3D30;
+      --papier:#0B1A15; --surface:#11241D; --creux:#0A1712;
+      --encre:#E9F1EC; --doux:#93A89E; --pale:#6E837A;
+      --appui:#4FD39B; --bulle:#173428; --regle:#23392F;
+      --sur-sombre:#E9F1EC; --doux-sombre:#93A89E; --regle-sombre:#2A473A;
     }
     .logotype.light{display:none}
     .logotype.dark{display:block}
-    .badge{background:var(--mark); color:#06251B}
-    .badge:hover{background:var(--accent); color:#06251B}
+    /* LA FIGURE EST UN ÉLÉMENT DE THÈME CLAIR, ET C'EST LA MARQUE QUI LE DIT.
+       `messagr-bulle-entrante.svg` porte `fill="#FFFFFF"` : elle est dessinée
+       pour un fond clair, et sur un fond sombre elle devient un bloc lumineux.
+       La marque ne fournit pas de variante inverse pour les bulles, et lui en
+       fabriquer une ici serait une seconde vérité — exactement ce que
+       `design/brand/LISEZ-MOI.md` interdit. Elle sort donc, et la grille se
+       referme sur une colonne plutôt que de laisser un vide à droite. */
+    .figure{display:none}
+    @media (min-width:900px){
+      .figure{display:none}
+      .grille-accueil{grid-template-columns:1fr}
+    }
+    /* La bande « sombre » garde son rôle sur un fond déjà sombre : elle
+       s'enfonce au lieu de s'éclaircir, et sa règle verte la tient. */
+    .bande.sombre{background:#061410; color:var(--sur-sombre)}
+    .porte{background:var(--marque); color:#06251B}
+    .porte:hover{background:var(--appui); color:#06251B}
+    .porte.creuse{background:transparent; color:var(--appui);
+                  box-shadow:inset 0 0 0 1.5px var(--appui)}
+    .porte.creuse:hover{background:var(--marque); color:#06251B; box-shadow:none}
+    .verte .porte.creuse{background:transparent}
+    .badge{background:var(--marque); color:#06251B}
+    .badge:hover{background:var(--appui); color:#06251B}
     .badge.off{background:#1E3229; color:#7C9084}
+    .card{background:var(--surface)}
   }
 </style>
 </head>
 <body>
 <main>
 
-  <div class="bar">
-    <a class="mark" href="/" aria-label="Messagr">
-      <img class="logotype light" src="/messagr-logotype-vert.svg" alt="Messagr" width="260" height="60">
-      <img class="logotype dark" src="/messagr-logotype-vert-inverse.svg" alt="Messagr" width="260" height="60">
-    </a>
-    <!-- LES LIBELLÉS SE TRADUISENT, LES PAGES NON. Un texte juridique traduit
-         est un second texte, pas le même : celui qui engage est celui qui est
-         écrit. Nommer la porte dans la langue du lecteur reste utile — il sait
-         ce qu'il y a derrière avant de l'ouvrir. -->
-    <nav class="menu">
-      <a href="/conditions-generales/" data-t="menu-cgu">Conditions générales</a>
-      <a href="/confidentialite/" data-t="menu-confidentialite">Confidentialité</a>
-      <!-- LE SÉLECTEUR EST UN `select`, ET C'EST DÉLIBÉRÉ. Le navigateur en
-           dessine un que chaque système connaît déjà, accessible au clavier
-           et au lecteur d'écran sans qu'on l'écrive, et qui ne coûte aucun
-           script pour s'ouvrir. Une rangée de drapeaux serait plus jolie et
-           moins utilisable, sur une page dont le seul travail est d'être
-           comprise. -->
-      <select class="langue" id="langue" aria-label="Langue">
-        <option value="fr">Français</option>
-        <option value="en">English</option>
-        <option value="de">Deutsch</option>
-        <option value="es">Español</option>
-        <option value="it">Italiano</option>
-        <option value="nl">Nederlands</option>
-      </select>
-    </nav>
-  </div>
+<!-- LA PAGE EST FAITE DE BANDES, PLUS D'UNE COLONNE.
+     Les sections étaient justes et la page ne l'était pas : une colonne de 640
+     pixels, un seul fond, tout empilé au même poids. Elle se lisait comme un
+     avis avec plus de paragraphes. Une bande pleine largeur par idée, chacune
+     avec son fond, donne à la page une silhouette qu'on lit avant d'avoir lu
+     un mot.
 
-  <h1 data-t="titre">La messagerie qui ne vous demande rien.</h1>
-  <p class="lead" data-t="chapo">Pas de numéro, pas de compte, pas de mot de passe. Quelqu'un vous invite, vous écrivez.</p>
+     L'ORDRE A CHANGÉ, ET C'EST LE SEUL DÉPLACEMENT : promesse, puis PREUVE,
+     puis argument, puis téléchargement. « Ce que le serveur voit » vient juste
+     après la promesse parce que c'est lui qui rend le reste croyable. -->
 
-  <ul>
-    <li data-t="point1">Chiffrée de bout en bout, sans réglage</li>
-    <li data-t="point2">Aucun carnet d'adresses aspiré, aucune publicité</li>
-    <li data-t="point3">Vos messages exportables à tout moment</li>
-  </ul>
-
-  <div class="card">
-    <div class="getline">
-      <img class="appicon" src="/messagr-monogramme-r-vert.svg" alt="" width="52" height="52" aria-hidden="true">
-      <p class="label" data-t="obtenir">Obtenir l'application</p>
+<section class="bande accueil">
+  <div class="mesure">
+    <div class="bar">
+      <a class="mark" href="/" aria-label="Messagr">
+        <img class="logotype light" src="/messagr-logotype-vert.svg" alt="Messagr" width="260" height="60">
+        <img class="logotype dark" src="/messagr-logotype-vert-inverse.svg" alt="Messagr" width="260" height="60">
+      </a>
+      <!-- LES LIBELLÉS SE TRADUISENT, LES PAGES NON. Un texte juridique traduit
+           est un second texte, pas le même : celui qui engage est celui qui est
+           écrit. Nommer la porte dans la langue du lecteur reste utile — il sait
+           ce qu'il y a derrière avant de l'ouvrir. -->
+      <nav class="menu">
+        <a href="/conditions-generales/" data-t="menu-cgu">Conditions générales</a>
+        <a href="/confidentialite/" data-t="menu-confidentialite">Confidentialité</a>
+        <!-- LE SÉLECTEUR EST UN `select`, ET C'EST DÉLIBÉRÉ. Le navigateur en
+             dessine un que chaque système connaît déjà, accessible au clavier
+             et au lecteur d'écran sans qu'on l'écrive, et qui ne coûte aucun
+             script pour s'ouvrir. Une rangée de drapeaux serait plus jolie et
+             moins utilisable, sur une page dont le seul travail est d'être
+             comprise. -->
+        <select class="langue" id="langue" aria-label="Langue">
+          <option value="fr">Français</option>
+          <option value="en">English</option>
+          <option value="de">Deutsch</option>
+          <option value="es">Español</option>
+          <option value="it">Italiano</option>
+          <option value="nl">Nederlands</option>
+        </select>
+      </nav>
     </div>
-    <div class="stores">
 
-      <div class="store">
-        <a class="badge" href="/messagr.apk">
-          <svg viewBox="0 0 24 27" aria-hidden="true" width="24" height="27">
-            <path d="M1.6 1.1 14 13.5 1.6 25.9A2.4 2.4 0 0 1 1 24.3V2.7c0-.6.2-1.2.6-1.6z" fill="currentColor"/>
-            <path d="M17.4 10 3.5.3l12.2 12.2z" fill="currentColor" opacity=".85"/>
-            <path d="M17.4 17 3.5 26.7l12.2-12.2z" fill="currentColor" opacity=".85"/>
-            <path d="M21.9 12.1c1.4.8 1.4 2.5 0 3.3l-3 1.7-3.2-3.3 3.2-3.3z" fill="currentColor" opacity=".7"/>
-          </svg>
-          <span><b>Android</b><em data-t="direct">Téléchargement direct</em></span>
-        </a>
-        <div class="under" data-t="bientot-play">Bientôt sur Google Play</div>
+    <div class="grille-accueil">
+      <div class="mots">
+        <h1 data-t="titre">La messagerie qui ne vous demande rien.</h1>
+        <p class="lead" data-t="chapo">Pas de numéro, pas de compte, pas de mot de passe. Quelqu'un vous invite, vous écrivez.</p>
+        <ul>
+          <li data-t="point1">Chiffrée de bout en bout, sans réglage</li>
+          <li data-t="point2">Aucun carnet d'adresses aspiré, aucune publicité</li>
+          <!-- CET ARGUMENT EN REMPLACE UN QUI ÉTAIT FAUX.
+             La page annonçait « Vos messages exportables à tout moment ». Les
+             clés `settings_row_export_*` existent dans les six catalogues et
+             AUCUN écran ne les affiche : `Settings.tsx` ne rend qu'une ligne,
+             celle de la langue, et il n'existe aucun ticket d'export. La
+             promesse était en production, en six langues, sur une liste de
+             trois.
+             Celui-ci est vrai, livré, et personne d'autre ne peut l'écrire :
+             ADR-0010, et `person_name_local` le dit sur l'écran même. -->
+        <li data-t="point3">Les noms que vous donnez restent sur votre appareil</li>
+        </ul>
+
+        <!-- LES DEUX PORTES, ET C'EST LA CORRECTION PRINCIPALE DE CETTE PAGE.
+             Elle n'offrait qu'une action, le téléchargement, et l'encadré placé
+             juste dessous expliquait que l'application seule ne sert à rien sans un
+             lien reçu de quelqu'un : elle invalidait son propre appel à l'action
+             dans le même bloc visuel. Tout visiteur qui le suivait obtenait une
+             application qui lui présentait un mur.
+
+             Celui qui n'a pas d'invitation est aussi la seule population qu'une page
+             web puisse convaincre. Il lui faut une porte. -->
+        <div class="portes">
+          <a class="porte" href="#obtenir" data-t="porte-oui">J'ai une invitation</a>
+          <a class="porte creuse" href="#invitation" data-t="porte-non">Je n'en ai pas</a>
+        </div>
       </div>
 
-      <div class="store">
-        <span class="badge off" aria-disabled="true">
-          <svg viewBox="0 0 24 27" aria-hidden="true" width="24" height="27">
-            <path d="M17.6 14.2c0-2.6 2.1-3.8 2.2-3.9-1.2-1.8-3.1-2-3.8-2-1.6-.2-3.1.9-3.9.9-.8 0-2.1-.9-3.4-.9-1.8 0-3.4 1-4.3 2.6-1.8 3.2-.5 7.9 1.3 10.5.9 1.3 1.9 2.7 3.2 2.6 1.3-.1 1.8-.8 3.3-.8 1.5 0 2 .8 3.4.8 1.4 0 2.3-1.3 3.1-2.6.6-.9.9-1.4 1.3-2.4-3.3-1.2-3.4-4.7-3.4-4.8z" fill="currentColor"/>
-            <path d="M15.1 4.6c.7-.9 1.2-2.1 1.1-3.3-1 0-2.3.7-3 1.6-.7.8-1.3 2-1.1 3.2 1.1.1 2.3-.6 3-1.5z" fill="currentColor"/>
-          </svg>
-          <span><b>iPhone</b><em>App Store</em></span>
-        </span>
-        <div class="under" data-t="bientot">Bientôt</div>
+      <!-- UN VRAI ÉCHANGE, TIRÉ DE LA SOURCE DE CONCEPTION.
+           Les trois bulles vides d'avant portaient la forme de la marque et
+           rien d'autre. Celle-ci vient de l'écran « conversation en
+           tête-à-tête » du prototype, qui fait autorité sur la disposition.
+
+           CE N'EST PAS UNE PHOTOGRAPHIE DE L'APPLICATION, et l'`alt` le dit.
+           Le jour où un banc peut photographier un état de produit (#157),
+           l'image est remplacée par la vraie.
+
+           Ce qu'elle montre est entièrement livré : la conversation en
+           tête-à-tête, l'horodatage, la double coche, les deux plis de coin.
+           L'en-tête et ses boutons d'appel, le message vocal et la vignette
+           photographique ont été cadrés hors de l'image, parce qu'ils
+           annonceraient ce qui ne tourne pas encore. Le détail est en tête de
+           `landing/conversation.html`. -->
+      <div class="figure">
+        <img class="conversation" src="/messagr-conversation-fr.png"
+             alt="Un échange dans Messagr : une question, une réponse, l'heure et la double coche."
+             width="1000" height="290" loading="lazy" decoding="async">
       </div>
-
-    </div>
-
-    <div class="invite">
-      <b data-t="invitation-titre">On n'entre dans Messagr que sur invitation.</b>
-      <span data-t="invitation-corps">L'application seule ne suffit pas : il vous faut le lien
-      que quelqu'un vous a envoyé. Sans lui, rien à créer, rien à remplir.</span>
     </div>
   </div>
+</section>
 
-  <footer>
-    Messagr est exploité par RV Myriagone Holding, 22 rue de la Garenne, 78130 Chapet,
-    RCS Versailles 894&nbsp;754&nbsp;548. Écrire à <a href="mailto:conformite@messagr.eu">conformite@messagr.eu</a>.
-  </footer>
+<!-- COMMENT ON ENTRE, EN TROIS IMAGES.
+     L'encadré vert racontait une restriction : « il vous faut le lien que
+     quelqu'un vous a envoyé ». C'est vrai et ça n'apprend rien à faire. Trois
+     écrans dans l'ordre où on les rencontre en apprennent davantage, et
+     quelqu'un qui les a vus sait déjà se servir de l'application.
+
+     LES NUMÉROS SONT DE L'INFORMATION ICI, et c'est la seule raison de les
+     mettre : ceci est une suite, pas une grille. On ne peut pas ouvrir le lien
+     avant de l'avoir reçu, ni écrire avant que le compte existe.
+
+     LA PREMIÈRE IMAGE N'EST PAS UN ÉCRAN D'APPLICATION mais la vraie page
+     d'invitation, celle que ce site sert : c'est la première chose qu'on voit,
+     avant d'avoir rien installé. Rendue avec l'agent d'un téléphone par
+     `landing/rendre-ecrans.mjs`, puisque c'est le seul appareil pour lequel ce
+     parcours existe.
+
+     CHAQUE PHRASE A ÉTÉ VÉRIFIÉE DANS LE SERVICE, pas déduite de l'intention :
+       - « il ne sert qu'une fois » : `issueInvitation.ts` demande `max_uses: 1`
+         à chaque émission ;
+       - « il ne porte ni votre nom ni votre numéro » : la table `invitations`
+         porte l'émetteur, des dates, un quota et un état, rien de l'invité,
+         qui n'existe pas encore ;
+       - « le compte est créé à cet instant, pas avant » : `create` n'atteint
+         jamais `/v3/register`, le commentaire de `claim.rs` le dit et
+         `register_dormant` n'est appelé que là. C'est ce qui donne un sens à
+         la révocation. -->
+<section class="bande parcours" id="entrer">
+  <div class="mesure">
+    <h2 data-t="parcours-titre">Comment on entre.</h2>
+
+    <ol class="etapes">
+      <li class="etape">
+        <img src="/messagr-ecran-invitation.png" alt="" loading="lazy" decoding="async">
+        <p data-t="parcours-1">Quelqu'un vous envoie un lien. Il ne porte ni votre nom
+        ni votre numéro, et il ne sert qu'une fois.</p>
+      </li>
+      <li class="etape">
+        <img src="/messagr-ecran-premier-lancement.png" alt="" loading="lazy" decoding="async">
+        <p data-t="parcours-2">Vous installez l'application. Elle vous montre ce qu'elle
+        promet avant de vous demander quoi que ce soit.</p>
+      </li>
+      <li class="etape">
+        <img src="/messagr-conversation-fr.png" alt="" loading="lazy" decoding="async">
+        <p data-t="parcours-3">Vous rouvrez le lien. Le compte est créé à cet instant,
+        pas avant : tiré au hasard, rattaché à rien. Vous écrivez.</p>
+      </li>
+    </ol>
+  </div>
+</section>
+
+  <!-- LA GALERIE MONTRE AUSSI CE QUI N'EST PAS ENCORE LÀ, ET LE DIT SUR
+       CHAQUE ÉCRAN. Le porteur produit l'a demandé : les salons, les agents et
+       les appels sont un vrai plus, et les cacher jusqu'au jour de leur
+       livraison prive la page de ce qui la rend intéressante.
+
+       LA CONDITION EST QUE L'ÉTAT SOIT SUR L'IMAGE, pas dans une note de bas
+       de section. Qui regarde des captures ne lit pas la note ; montrer du
+       pas-encore-livré sans le dire à l'endroit où on le montre est la seule
+       manière sûre de perdre le lecteur qu'on cherchait à convaincre.
+
+       Les écrans viennent du prototype de conception et ne sont pas des
+       photographies : `landing/ecrans/LISEZ-MOI.md` dit d'où ils sortent et ce
+       qui en a été retiré. -->
+  <section class="bande" id="galerie">
+    <div class="mesure">
+      <h2 data-t="galerie-titre">Ce que vous verrez.</h2>
+      <p class="amorce" data-t="galerie-amorce">Trois de ces écrans existent aujourd'hui.
+      Les trois autres sont dessinés et ne tournent pas encore.</p>
+
+      <div class="galerie">
+      <div class="vue" data-cap="invitation">
+        <figure>
+          <a class="agrandir" href="#loupe-lancement"><img src="/messagr-ecran-premier-lancement.png" alt="" loading="lazy" decoding="async"></a>
+          <figcaption>
+            <span class="quoi" data-t="ecran-lancement">Le premier lancement</span>
+            <span class="etat fait" data-t="etat-fait">Fait</span>
+          </figcaption>
+        </figure>
+      </div>
+      <div class="vue" data-cap="tete-a-tete">
+        <figure>
+          <a class="agrandir" href="#loupe-conversation"><img src="/messagr-conversation-fr.png" alt="" loading="lazy" decoding="async"></a>
+          <figcaption>
+            <span class="quoi" data-t="ecran-conversation">Une conversation</span>
+            <span class="etat fait" data-t="etat-fait">Fait</span>
+          </figcaption>
+        </figure>
+      </div>
+      <div class="vue" data-cap="invitation">
+        <figure>
+          <a class="agrandir" href="#loupe-lien"><img src="/messagr-ecran-lien-expire.png" alt="" loading="lazy" decoding="async"></a>
+          <figcaption>
+            <span class="quoi" data-t="ecran-lien">Une invitation ne sert qu'une fois</span>
+            <span class="etat fait" data-t="etat-fait">Fait</span>
+          </figcaption>
+        </figure>
+      </div>
+      <div class="vue" data-cap="salons">
+        <figure>
+          <a class="agrandir" href="#loupe-salon"><img src="/messagr-ecran-salon.png" alt="" loading="lazy" decoding="async"></a>
+          <figcaption>
+            <span class="quoi" data-t="ecran-salon">Une conversation à plusieurs</span>
+            <span class="etat avenir" data-t="etat-avenir">À venir</span>
+          </figcaption>
+        </figure>
+      </div>
+      <div class="vue" data-cap="agents">
+        <figure>
+          <a class="agrandir" href="#loupe-agent"><img src="/messagr-ecran-agent.png" alt="" loading="lazy" decoding="async"></a>
+          <figcaption>
+            <span class="quoi" data-t="ecran-agent">Un agent, et ce qu'il peut faire</span>
+            <span class="etat avenir" data-t="etat-avenir">À venir</span>
+          </figcaption>
+        </figure>
+      </div>
+      <div class="vue" data-cap="appels">
+        <figure>
+          <a class="agrandir" href="#loupe-appel"><img src="/messagr-ecran-appel.png" alt="" loading="lazy" decoding="async"></a>
+          <figcaption>
+            <span class="quoi" data-t="ecran-appel">Un appel chiffré</span>
+            <span class="etat encours" data-t="etat-encours">En cours</span>
+          </figcaption>
+        </figure>
+      </div>
+      </div>
+    </div>
+  </section>
+
+<section class="bande sombre">
+  <div class="mesure">
+    <section class="serveur">
+      <h2 data-t="serveur-titre">Ce que le serveur voit, et ce qu'il ne voit pas.</h2>
+      <p class="amorce" data-t="serveur-amorce">Le chiffrement protège le contenu, pas son
+      existence. Voici les deux côtés, sans en cacher un.</p>
+
+      <div class="colonnes">
+        <div class="colonne">
+          <h3 data-t="serveur-non-titre">Ce qu'il ne peut pas savoir</h3>
+          <ul>
+            <li data-t="serveur-non1">Le texte de vos messages</li>
+            <li data-t="serveur-non2">Vos photographies</li>
+            <li data-t="serveur-non3">Vos réactions</li>
+            <!-- LA PASTILLE EST LÀ PARCE QUE LA LIGNE ÉTAIT UNE SURANNONCE.
+                 La phrase est vraie du code -- `src/calls/transport.ts` fait
+                 passer les événements m.call.* par la même porte que les
+                 messages -- et fausse du produit : rien n'importe ce module,
+                 et aucune de ses chaînes n'est dans le paquet servi. Un
+                 lecteur lisait une liste de ce que l'application fait. Même
+                 famille que « Vos messages exportables à tout moment », qui a
+                 vécu ici jusqu'au 7 septembre 2026. -->
+            <li data-cap="appels"><span data-t="serveur-non4">Qu'un appel est un
+              appel</span> <span class="etat encours" data-t="etat-encours">En cours</span></li>
+            <li data-t="serveur-non5">Les noms que vous donnez à vos contacts</li>
+          </ul>
+        </div>
+        <div class="colonne reste">
+          <h3 data-t="serveur-oui-titre">Ce qu'il sait quand même</h3>
+          <ul>
+            <li data-t="serveur-oui1">Quels comptes échangent, et à quel moment</li>
+            <li data-t="serveur-oui2">La taille de ce qui passe</li>
+            <li data-t="serveur-oui3">Qu'un appareil doit être réveillé, sans savoir pourquoi</li>
+          </ul>
+        </div>
+      </div>
+
+      <p class="fin" data-t="serveur-fin">Ce n'est pas une politique que nous pourrions
+      changer en silence : c'est une propriété du chiffrement.</p>
+      <!-- LE LIEN PORTE LA CLÉ, ET NON UNE ANCRE À L'INTÉRIEUR D'ELLE. Le
+           générateur remplace le contenu d'un élément marqué et exige qu'il ne
+           porte aucune balise : une ancre imbriquée ferait tomber le compte à
+           zéro et arrêterait la construction. C'est la contrainte qui se voit,
+           et elle vaut mieux qu'une page à moitié traduite. -->
+      <p class="lien"><a href="/confidentialite/" data-t="serveur-lien">Le détail est dans
+      notre politique de confidentialité.</a></p>
+    </section>
+  </div>
+</section>
+
+<section class="bande verte">
+  <div class="mesure">
+    <section class="invite" id="invitation">
+      <h2 data-t="invitation-titre">On n'entre dans Messagr que sur invitation.</h2>
+      <!-- « L'application seule ne suffit pas : il vous faut le lien que
+           quelqu'un vous a envoyé » vivait ici. La première étape du parcours
+           le dit en le montrant, et deux fois la même chose sur une page se lit
+           comme une page qui se répète. Ce qui suit ne se répète pas : il n'y a
+           pas d'annuaire, et c'est un argument que le parcours ne porte pas. -->
+      <p data-t="pourquoi">Personne ne peut vous écrire sans que vous l'ayez laissé entrer.
+      Il n'y a pas d'annuaire, pas de recherche par numéro, pas de carnet d'adresses
+      aspiré : un inconnu n'a aucun moyen de vous trouver.</p>
+      <!-- UN `mailto:`, ET C'EST DÉLIBÉRÉ POUR L'INSTANT. Il fonctionne sans
+           script, ne contacte aucun tiers et ne mesure rien -- trois propriétés
+           que ce site tient et qu'un formulaire hébergé ailleurs romprait. Le
+           relier au service d'invitations est #152. -->
+      <a class="porte" href="mailto:conformite@messagr.eu?subject=Messagr%20invitation"
+         data-t="demander">Demander une invitation</a>
+      <p class="note" data-t="demander-note">Votre message arrive à une personne, pas à un
+      formulaire.</p>
+    </section>
+
+    <!-- CE QUE LE SERVEUR VOIT, ET CE QU'IL NE VOIT PAS.
+         « Chiffrée de bout en bout » était écrit sur cette page et rien ne le
+         soutenait : c'est la phrase que chaque messagerie écrit, y compris
+         celles qui mentent. Le lecteur qui sait lire ne la croit pas sur parole,
+         et celui qui ne sait pas lire ne la comprend pas.
+
+         CHAQUE LIGNE DE GAUCHE EST VRAIE DU CODE, et vérifiée avant d'être
+         écrite ici :
+           - le texte, les photographies : le chemin d'envoi chiffré ;
+           - les réactions : ADR-0011, chiffrées comme le reste ;
+           - qu'un appel soit un appel : packages/app/src/calls/transport.ts
+             passe les événements m.call.* par « the same door messages take »,
+             donc le serveur voit m.room.encrypted et rien d'autre ;
+           - les noms donnés : ADR-0010, ils ne quittent jamais l'appareil.
+         Ce qui n'était pas certain n'est pas écrit, plutôt qu'écrit en plus
+         prudent. -->
+  </div>
+</section>
+
+<!-- TROIS ÉTATS ET UNE DATE, PLUTÔT QUE DE LA PROSE SUR LES FONCTIONNALITÉS.
+     De la prose vieillit en silence. La fiche du magasin en est la preuve : elle
+     annonce encore « pas d'images, pas de réactions » alors que les deux sont
+     dans le fichier que cette page propose, et rien nulle part ne l'aurait dit.
+
+     C'EST UNE CHOSE CONTRE-INTUITIVE À METTRE SUR UNE PAGE DE PROMOTION, et
+     c'est le bon choix ici : l'objection « c'est une bêta » se désamorce mieux
+     avant l'installation qu'après. Le lecteur sait ce qu'il télécharge, et il a
+     une raison de revenir.
+
+     CHAQUE LIGNE « FAIT » EST VRAIE DU FICHIER SERVI, mesurée et non déduite du
+     journal des commits -- `tests/tableau-des-capacites.js` dit sur quoi.
+     L'attribut `data-verifie-sur` porte l'empreinte contre laquelle le tableau a
+     été vérifié : la construction s'arrête si le téléchargement change sans que
+     quelqu'un revérifie, ce qui est exactement la manière dont la fiche du
+     magasin est devenue fausse. -->
+<section class="bande capacites" id="etat"
+         data-verifie-sur="fd03d53e37b395a3ed3c08b99d1f150ff20da3b2d0cb53b29a2c951a3f19c12e">
+  <div class="mesure">
+    <h2 data-t="etat-titre">Ce que l'application fait aujourd'hui.</h2>
+    <p class="amorce" data-t="etat-amorce">Trois états, une date. Nous n'annonçons rien qui
+    ne tourne pas : cette liste est vérifiée sur le fichier que cette page propose.</p>
+
+    <div class="etats">
+      <div class="groupe">
+        <h3><span class="etat fait" data-t="etat-fait">Fait</span></h3>
+        <ul>
+          <li data-cap="tete-a-tete" data-t="cap-tete-a-tete">Conversation en tête-à-tête</li>
+          <li data-cap="invitation" data-t="cap-invitation">Entrée par invitation</li>
+          <li data-cap="chiffrement" data-t="cap-chiffrement">Chiffrement de bout en bout</li>
+          <li data-cap="photos" data-t="cap-photos">Photographies</li>
+          <li data-cap="reactions" data-t="cap-reactions">Réactions</li>
+          <li data-cap="noms" data-t="cap-noms">Noms donnés, gardés sur l'appareil</li>
+          <li data-cap="parrainage" data-t="cap-parrainage">Parrainage et éviction</li>
+          <li data-cap="notifications" data-t="cap-notifications">Notifications</li>
+        </ul>
+      </div>
+      <div class="groupe">
+        <h3><span class="etat encours" data-t="etat-encours">En cours</span></h3>
+        <ul>
+          <li data-cap="iphone" data-t="cap-iphone">iPhone</li>
+          <li data-cap="appels" data-t="cap-appels">Appels audio</li>
+        </ul>
+      </div>
+      <div class="groupe">
+        <h3><span class="etat avenir" data-t="etat-avenir">À venir</span></h3>
+        <ul>
+          <li data-cap="vocaux" data-t="cap-vocaux">Messages vocaux</li>
+          <li data-cap="video" data-t="cap-video">Appels vidéo</li>
+          <li data-cap="salons" data-t="cap-salons">Salons</li>
+          <li data-cap="communautes" data-t="cap-communautes">Communautés</li>
+          <li data-cap="agents" data-t="cap-agents">Agents</li>
+          <li data-cap="bureau" data-t="cap-bureau">Application de bureau</li>
+        </ul>
+      </div>
+    </div>
+
+    <!-- LA DATE EST CELLE DU FICHIER, PAS UNE DATE TAPÉE. `deploy.sh` mesure la
+         date de l'APK et `build-landing.mjs` l'écrit ici comme il l'écrit sous
+         le bouton de téléchargement : le tableau est vérifié CONTRE une
+         construction, donc c'est sa date qui le date. Une date saisie à la main
+         serait périmée au premier envoi et rien ne le dirait. -->
+    <p class="faits" data-t="etat-verifie">Vérifié sur la construction du %DATE%, celle que
+    cette page propose.</p>
+  </div>
+</section>
+
+<section class="bande obtenir">
+  <div class="mesure">
+    <div class="card" id="obtenir">
+      <div class="getline">
+        <img class="appicon" src="/messagr-monogramme-r-vert.svg" alt="" width="52" height="52" aria-hidden="true">
+        <p class="label" data-t="obtenir">Obtenir l'application</p>
+      </div>
+      <div class="stores">
+
+        <div class="store">
+          <a class="badge" href="/messagr.apk">
+            <svg viewBox="0 0 24 27" aria-hidden="true" width="24" height="27">
+              <path d="M1.6 1.1 14 13.5 1.6 25.9A2.4 2.4 0 0 1 1 24.3V2.7c0-.6.2-1.2.6-1.6z" fill="currentColor"/>
+              <path d="M17.4 10 3.5.3l12.2 12.2z" fill="currentColor" opacity=".85"/>
+              <path d="M17.4 17 3.5 26.7l12.2-12.2z" fill="currentColor" opacity=".85"/>
+              <path d="M21.9 12.1c1.4.8 1.4 2.5 0 3.3l-3 1.7-3.2-3.3 3.2-3.3z" fill="currentColor" opacity=".7"/>
+            </svg>
+            <span><b>Android</b><em data-t="direct">Téléchargement direct</em></span>
+          </a>
+          <div class="under" data-t="bientot-play">Bientôt sur Google Play</div>
+          <!-- LE POIDS EST MESURÉ, JAMAIS TAPÉ. Un chiffre écrit à la main est
+               périmé au premier changement du fichier, et rien ne le dirait.
+               `build-landing.mjs` remplit les trois marques depuis
+               l'environnement que `deploy.sh` lui passe, et refuse un jeu
+               incomplet : annoncer un poids sans dire de quel fichier il est
+               vaut moins que se taire.
+
+               PAS DE NUMÉRO DE VERSION, ET C'EST UNE DÉCISION. `aapt2` lit
+               versionName='1.0' et versionCode='1' sur le fichier en ligne :
+               ils n'ont jamais été incrémentés. Les annoncer ressemblerait à une
+               information et n'en serait pas une. L'empreinte, elle, distingue
+               deux constructions et se vérifie en une commande. -->
+          <p class="faits" data-t="apk-faits">Poids : %TAILLE%, mis en ligne le %DATE%.</p>
+          <p class="faits" data-t="apk-empreinte">Empreinte SHA-256 : %EMPREINTE%</p>
+          <p class="faits avert" data-t="apk-avertissement">Votre téléphone demandera
+          l'autorisation d'installer une application de sources inconnues : c'est normal
+          pour un fichier obtenu hors magasin.</p>
+        </div>
+
+        <div class="store">
+          <span class="badge off" aria-disabled="true">
+            <svg viewBox="0 0 24 27" aria-hidden="true" width="24" height="27">
+              <path d="M17.6 14.2c0-2.6 2.1-3.8 2.2-3.9-1.2-1.8-3.1-2-3.8-2-1.6-.2-3.1.9-3.9.9-.8 0-2.1-.9-3.4-.9-1.8 0-3.4 1-4.3 2.6-1.8 3.2-.5 7.9 1.3 10.5.9 1.3 1.9 2.7 3.2 2.6 1.3-.1 1.8-.8 3.3-.8 1.5 0 2 .8 3.4.8 1.4 0 2.3-1.3 3.1-2.6.6-.9.9-1.4 1.3-2.4-3.3-1.2-3.4-4.7-3.4-4.8z" fill="currentColor"/>
+              <path d="M15.1 4.6c.7-.9 1.2-2.1 1.1-3.3-1 0-2.3.7-3 1.6-.7.8-1.3 2-1.1 3.2 1.1.1 2.3-.6 3-1.5z" fill="currentColor"/>
+            </svg>
+            <span><b>iPhone</b><em>App Store</em></span>
+          </span>
+          <div class="under" data-t="bientot">Bientôt</div>
+        </div>
+
+      </div>
+
+      <p class="apres" data-t="apres">Après l'installation, ouvrez le lien qu'on vous a
+      envoyé : c'est lui qui crée le compte.</p>
+    </div>
+
+    <!-- L'ENTRÉE PAR INVITATION EST L'ARGUMENT, PAS LA CONDITION. La page la
+         présentait comme une restriction, dans un encadré au bas d'une carte de
+         téléchargement. C'est la meilleure chose que ce produit ait à vendre :
+         pas de démarchage, pas d'inconnu qui écrit, aucun carnet d'adresses
+         aspiré.
+
+         Les deux phrases de l'encadré sont reprises telles quelles, avec leurs
+         clés : elles sont déjà traduites dans les six langues et elles disent
+         juste. Ce qui manquait, c'est la suite. -->
+  </div>
+</section>
+
+<section class="bande pied">
+  <div class="mesure">
+
+    <!-- QUI EXPLOITE CE SERVICE, ET OÙ.
+         C'était une ligne sous le pli, dimensionnée comme une mention légale.
+         L'éditeur, le pays du serveur et l'absence de transfert hors de
+         l'Union sont des arguments pour qui choisit une messagerie
+         souveraine, et ils sont vérifiables : les trois viennent de la
+         politique de confidentialité publiée.
+
+         DEUX CHOSES NE SONT PAS ÉCRITES ICI, ET C'EST DÉLIBÉRÉ.
+
+         Pas de durée de conservation : elle vit dans `retention.json`, la
+         politique la publie, et `scripts/assert-retention.sh` tient les deux
+         d'accord. Une troisième copie serait une troisième chose à faire
+         diverger. Et la durée des journaux est imposée par décret, pas
+         choisie : l'annoncer ici comme une promesse serait la présenter pour
+         ce qu'elle n'est pas.
+
+         Pas de « aucun tiers dans l'application » : c'était vrai, ça ne l'est
+         plus depuis que l'application réveille le téléphone par Firebase, et
+         la politique a été corrigée pour le dire. Ce qui reste vrai, et se
+         vérifie en ouvrant l'inspecteur, c'est que CE SITE ne contacte
+         personne. -->
+    <section class="editeur">
+      <h2 data-t="editeur-titre">Qui édite ce service</h2>
+      <p data-t="editeur-societe">RV Myriagone Holding est responsable de ce traitement au
+      sens du règlement européen sur la protection des données.</p>
+      <p data-t="editeur-serveur">Le serveur est hébergé à Helsinki, en Finlande, donc au
+      sein de l'Union européenne. Il n'y a aucun transfert hors de l'Union.</p>
+      <p data-t="editeur-mesure">Ce site ne mesure rien : aucun traceur, aucune
+      bibliothèque d'analyse, aucun tiers. Il ne charge que ses propres fichiers.</p>
+    </section>
+
+    <footer>
+      Messagr est exploité par RV Myriagone Holding, 22 rue de la Garenne, 78130 Chapet,
+      RCS Versailles 894&nbsp;754&nbsp;548. Écrire à <a href="mailto:conformite@messagr.eu">conformite@messagr.eu</a>.
+    </footer>
+  </div>
+</section>
 
 </main>
+
+<!-- LA LOUPE, ET PAS UNE LIGNE DE SCRIPT.
+     Les vignettes sont petites, et un écran mérite d'être vu en grand. Une
+     lucarne se fait d'ordinaire en JavaScript ; ici elle se fait avec
+     `:target`, qui est du CSS. La page garde donc la propriété qu'elle tient
+     depuis le début : entière sans script, et aucune requête vers l'extérieur.
+
+     Le voile est un lien : cliquer à côté referme, comme partout ailleurs.
+     La croix en est un aussi, avec un nom accessible traduit derrière le
+     signe, parce qu'un « × » lu à voix haute ne dit rien. Et le bouton retour
+     du navigateur referme aussi, gratuitement, ce qu'une lucarne en script
+     doit coder exprès. -->
+  <div class="loupe" id="loupe-lancement" data-cap="invitation">
+    <a class="voile" href="#galerie" tabindex="-1" aria-hidden="true"></a>
+    <figure>
+      <img src="/messagr-ecran-premier-lancement.png" alt="">
+      <figcaption>
+        <span class="quoi" data-t="ecran-lancement">Le premier lancement</span>
+        <span class="etat fait" data-t="etat-fait">Fait</span>
+        <a class="fermer" href="#galerie"><span aria-hidden="true">&#215;</span><span class="lu" data-t="fermer">Fermer</span></a>
+      </figcaption>
+    </figure>
+  </div>
+  <div class="loupe" id="loupe-conversation" data-cap="tete-a-tete">
+    <a class="voile" href="#galerie" tabindex="-1" aria-hidden="true"></a>
+    <figure>
+      <img src="/messagr-conversation-fr.png" alt="">
+      <figcaption>
+        <span class="quoi" data-t="ecran-conversation">Une conversation</span>
+        <span class="etat fait" data-t="etat-fait">Fait</span>
+        <a class="fermer" href="#galerie"><span aria-hidden="true">&#215;</span><span class="lu" data-t="fermer">Fermer</span></a>
+      </figcaption>
+    </figure>
+  </div>
+  <div class="loupe" id="loupe-lien" data-cap="invitation">
+    <a class="voile" href="#galerie" tabindex="-1" aria-hidden="true"></a>
+    <figure>
+      <img src="/messagr-ecran-lien-expire.png" alt="">
+      <figcaption>
+        <span class="quoi" data-t="ecran-lien">Une invitation ne sert qu'une fois</span>
+        <span class="etat fait" data-t="etat-fait">Fait</span>
+        <a class="fermer" href="#galerie"><span aria-hidden="true">&#215;</span><span class="lu" data-t="fermer">Fermer</span></a>
+      </figcaption>
+    </figure>
+  </div>
+  <div class="loupe" id="loupe-salon" data-cap="salons">
+    <a class="voile" href="#galerie" tabindex="-1" aria-hidden="true"></a>
+    <figure>
+      <img src="/messagr-ecran-salon.png" alt="">
+      <figcaption>
+        <span class="quoi" data-t="ecran-salon">Une conversation à plusieurs</span>
+        <span class="etat avenir" data-t="etat-avenir">À venir</span>
+        <a class="fermer" href="#galerie"><span aria-hidden="true">&#215;</span><span class="lu" data-t="fermer">Fermer</span></a>
+      </figcaption>
+    </figure>
+  </div>
+  <div class="loupe" id="loupe-agent" data-cap="agents">
+    <a class="voile" href="#galerie" tabindex="-1" aria-hidden="true"></a>
+    <figure>
+      <img src="/messagr-ecran-agent.png" alt="">
+      <figcaption>
+        <span class="quoi" data-t="ecran-agent">Un agent, et ce qu'il peut faire</span>
+        <span class="etat avenir" data-t="etat-avenir">À venir</span>
+        <a class="fermer" href="#galerie"><span aria-hidden="true">&#215;</span><span class="lu" data-t="fermer">Fermer</span></a>
+      </figcaption>
+    </figure>
+  </div>
+  <div class="loupe" id="loupe-appel" data-cap="appels">
+    <a class="voile" href="#galerie" tabindex="-1" aria-hidden="true"></a>
+    <figure>
+      <img src="/messagr-ecran-appel.png" alt="">
+      <figcaption>
+        <span class="quoi" data-t="ecran-appel">Un appel chiffré</span>
+        <span class="etat encours" data-t="etat-encours">En cours</span>
+        <a class="fermer" href="#galerie"><span aria-hidden="true">&#215;</span><span class="lu" data-t="fermer">Fermer</span></a>
+      </figcaption>
+    </figure>
+  </div>
+
 <script>
-// LA LANGUE, ET RIEN D'AUTRE.
+// LA LANGUE EST UNE ADRESSE, PLUS UN REMPLACEMENT DE PHRASES.
 //
-// Cette page n'avait aucun script, et c'était une propriété : elle
-// fonctionne avec JavaScript coupé. Elle la garde -- le français est dans le
-// balisage, ce bloc ne fait que le REMPLACER pour un navigateur qui lit
-// autre chose. Coupé, la page reste française et entière.
+// Ce bloc traduisait la page à l'affichage, ce qui la rendait juste pour le
+// lecteur et invisible pour tout le reste : un moteur n'indexait que le
+// français, et personne ne pouvait envoyer « la page en allemand » puisque
+// l'adresse était la même pour les six.
 //
-// Pourquoi elle est traduite du tout : l'application embarque six langues
-// et n'a aucun repli (#103), et la moitié de cet argument se perdait sur les
-// écrans qui précèdent l'application. Voir #115 et
-// `tests/langues-page-invitation.js`, qui tient les deux pages.
+// Les six pages existent maintenant, écrites par `build-landing.mjs`, et
+// chacune est entière dans sa langue sans qu'aucun script tourne. Il ne reste
+// donc à celui-ci que deux gestes, et aucun des deux ne touche au texte.
 (function () {
-  var T = {
-    fr: null,
-    en: {
-      'menu-cgu': 'Terms of use',
-      'menu-confidentialite': 'Privacy',
-      titre: 'The messenger that asks you for nothing.',
-      chapo: 'No number, no account, no password. Somebody invites you, you write.',
-      point1: 'End-to-end encrypted, with nothing to set',
-      point2: 'No address book harvested, no advertising',
-      point3: 'Your messages exportable at any time',
-      obtenir: 'Get the application',
-      direct: 'Direct download',
-      'bientot-play': 'Coming to Google Play',
-      bientot: 'Coming soon',
-      'invitation-titre': 'Messagr is entered by invitation only.',
-      'invitation-corps': 'The application alone is not enough: you need the link somebody sent you. Without it there is nothing to create and nothing to fill in.'
-    },
-    de: {
-      'menu-cgu': 'Nutzungsbedingungen',
-      'menu-confidentialite': 'Datenschutz',
-      titre: 'Der Messenger, der nichts von Ihnen verlangt.',
-      chapo: 'Keine Nummer, kein Konto, kein Passwort. Jemand lädt Sie ein, Sie schreiben.',
-      point1: 'Ende-zu-Ende verschlüsselt, ohne Einstellung',
-      point2: 'Kein Adressbuch abgesaugt, keine Werbung',
-      point3: 'Ihre Nachrichten jederzeit exportierbar',
-      obtenir: 'Anwendung holen',
-      direct: 'Direkter Download',
-      'bientot-play': 'Bald bei Google Play',
-      bientot: 'Demnächst',
-      'invitation-titre': 'In Messagr kommt man nur auf Einladung.',
-      'invitation-corps': 'Die Anwendung allein genügt nicht: Sie brauchen den Link, den Ihnen jemand geschickt hat. Ohne ihn gibt es nichts zu erstellen und nichts auszufüllen.'
-    },
-    es: {
-      'menu-cgu': 'Condiciones de uso',
-      'menu-confidentialite': 'Privacidad',
-      titre: 'La mensajería que no le pide nada.',
-      chapo: 'Sin número, sin cuenta, sin contraseña. Alguien le invita, usted escribe.',
-      point1: 'Cifrada de extremo a extremo, sin ajustes',
-      point2: 'Ninguna agenda aspirada, ninguna publicidad',
-      point3: 'Sus mensajes exportables en cualquier momento',
-      obtenir: 'Obtener la aplicación',
-      direct: 'Descarga directa',
-      'bientot-play': 'Pronto en Google Play',
-      bientot: 'Pronto',
-      'invitation-titre': 'A Messagr solo se entra por invitación.',
-      'invitation-corps': 'La aplicación por sí sola no basta: necesita el enlace que alguien le ha enviado. Sin él, nada que crear, nada que rellenar.'
-    },
-    it: {
-      'menu-cgu': 'Condizioni d\'uso',
-      'menu-confidentialite': 'Riservatezza',
-      titre: 'La messaggistica che non ti chiede nulla.',
-      chapo: 'Nessun numero, nessun account, nessuna password. Qualcuno ti invita, tu scrivi.',
-      point1: 'Cifrata end-to-end, senza impostazioni',
-      point2: 'Nessuna rubrica aspirata, nessuna pubblicità',
-      point3: 'I tuoi messaggi esportabili in qualsiasi momento',
-      obtenir: "Ottenere l'applicazione",
-      direct: 'Download diretto',
-      'bientot-play': 'Presto su Google Play',
-      bientot: 'Presto',
-      'invitation-titre': 'In Messagr si entra solo su invito.',
-      'invitation-corps': "L'applicazione da sola non basta: ti serve il link che qualcuno ti ha inviato. Senza, niente da creare e niente da compilare."
-    },
-    nl: {
-      'menu-cgu': 'Gebruiksvoorwaarden',
-      'menu-confidentialite': 'Privacy',
-      titre: 'De berichtendienst die niets van u vraagt.',
-      chapo: 'Geen nummer, geen account, geen wachtwoord. Iemand nodigt u uit, u schrijft.',
-      point1: 'End-to-end versleuteld, zonder instellingen',
-      point2: 'Geen adresboek opgezogen, geen reclame',
-      point3: 'Uw berichten op elk moment exporteerbaar',
-      obtenir: 'De applicatie halen',
-      direct: 'Directe download',
-      'bientot-play': 'Binnenkort in Google Play',
-      bientot: 'Binnenkort',
-      'invitation-titre': 'Messagr betreedt men alleen op uitnodiging.',
-      'invitation-corps': 'De applicatie alleen is niet genoeg: u hebt de link nodig die iemand u heeft gestuurd. Zonder die link valt er niets te maken en niets in te vullen.'
-    }
-  };
-  // LE FRANÇAIS EST DANS LE BALISAGE, DONC IL FAUT POUVOIR Y REVENIR.
-  //
-  // `T.fr` vaut `null` parce que la page est déjà écrite en français : rien
-  // à remplacer au chargement. Mais quelqu'un qui lit en espagnol et choisit
-  // « Français » attend que la page redevienne française, et un dictionnaire
-  // nul ne remplace rien -- la page serait restée espagnole. Les phrases du
-  // balisage sont donc relevées AVANT toute traduction, et c'est ce relevé
-  // qui sert de dictionnaire français.
-  var origine = {};
-  var marques = document.querySelectorAll('[data-t]');
-  for (var m = 0; m < marques.length; m++) {
-    origine[marques[m].getAttribute('data-t')] = marques[m].textContent;
-  }
-  T.fr = origine;
+  var LANGUES = ['fr', 'en', 'de', 'es', 'it', 'nl'];
+  var RACINE = 'fr';
+  var MEMOIRE = 'messagr-langue';
 
-  function appliquer(code) {
-    var mots = T[code];
-    if (!mots) { return; }
-    document.documentElement.lang = code;
-    for (var k = 0; k < marques.length; k++) {
-      var cle = marques[k].getAttribute('data-t');
-      if (mots[cle]) { marques[k].textContent = mots[cle]; }
-    }
+  // LE FRAGMENT SURVIT AU DÉPLACEMENT, ET C'EST NEUF.
+  //
+  // Il ne coûtait rien de le perdre tant qu'aucune adresse n'en portait :
+  // depuis la loupe, `#loupe-salon` ouvre un écran en grand, et `messagr.eu/#loupe-salon`
+  // envoyé à quelqu'un dont le navigateur demande l'anglais le déposait sur
+  // `/en/` sans rien d'ouvert. Le lien avait l'air de marcher et ne montrait
+  // pas ce qu'on lui avait montré.
+  //
+  // Vaut pour les deux gestes : changer de langue devant un écran ouvert doit
+  // rouvrir le même écran, pas revenir en haut de la page.
+  function chemin(code) {
+    var base = code === RACINE ? '/' : '/' + code + '/';
+    return base + (location.hash || '');
   }
 
-  var demandees = (navigator.languages && navigator.languages.length)
-    ? navigator.languages : [navigator.language || 'fr'];
-  var code = 'fr';
-  for (var i = 0; i < demandees.length; i++) {
-    // `de-AT` compte comme `de` : la sous-étiquette régionale ne change
-    // aucune de ces phrases.
-    var court = String(demandees[i]).toLowerCase().split('-')[0];
-    if (Object.prototype.hasOwnProperty.call(T, court)) { code = court; break; }
-  }
-  appliquer(code);
-
-  // LE SÉLECTEUR ÉTAIT DESSINÉ ET BRANCHÉ SUR RIEN.
+  // PREMIER GESTE : le sélecteur navigue.
   //
-  // Il existait, il s'ouvrait, on choisissait Español et la page restait
-  // française : aucun code ne lisait jamais sa valeur. Signalé depuis le
-  // site en production le 7 septembre 2026.
-  //
-  // Deux gestes le réparent, et le second est celui qu'on oublie : refléter
-  // la langue détectée dans le contrôle. Sans lui, un lecteur allemand voit
-  // une page allemande sous un menu qui annonce « Français », et le premier
-  // choix qu'il fait ne change rien parce qu'il rechoisit ce qui est déjà
-  // affiché.
+  // Sans script il ne fait rien, et c'est déjà le cas aujourd'hui : un
+  // `select` sans formulaire est inerte. Les six pages restent atteignables,
+  // et un lecteur qui coupe le script lit la sienne entière plutôt qu'une
+  // page à moitié traduite.
   var choix = document.getElementById('langue');
   if (choix) {
-    choix.value = code;
-    choix.addEventListener('change', function () { appliquer(choix.value); });
+    choix.value = document.documentElement.lang || RACINE;
+    choix.addEventListener('change', function () {
+      // LE CHOIX EST MÉMORISÉ, ET C'EST CE QUI EMPÊCHE UN PIÈGE. Sans cela,
+      // un lecteur allemand qui choisit « Français » atterrit sur `/`, que le
+      // second geste renvoie aussitôt vers `/de/` : il ne pourrait jamais
+      // lire le français.
+      try { sessionStorage.setItem(MEMOIRE, choix.value); } catch (e) {}
+      location.href = chemin(choix.value);
+    });
+  }
+
+  // SECOND GESTE : la racine renvoie vers la langue du lecteur.
+  //
+  // À la racine seulement. Une page de langue est une adresse que quelqu'un a
+  // demandée, et la renvoyer ailleurs serait lui reprendre son choix.
+  if (location.pathname !== '/') { return; }
+  try { if (sessionStorage.getItem(MEMOIRE)) { return; } } catch (e) {}
+
+  var demandees = (navigator.languages && navigator.languages.length)
+    ? navigator.languages : [navigator.language || RACINE];
+  for (var i = 0; i < demandees.length; i++) {
+    // `de-AT` compte comme `de` : la sous-étiquette régionale ne change aucune
+    // de ces phrases.
+    var court = String(demandees[i]).toLowerCase().split('-')[0];
+    if (LANGUES.indexOf(court) !== -1) {
+      // `replace` et non `href` : le bouton de retour ne doit pas ramener sur
+      // une page qui renvoie de nouveau.
+      if (court !== RACINE) { location.replace(chemin(court)); }
+      return;
+    }
   }
 })();
 </script>

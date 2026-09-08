@@ -35,3 +35,10 @@ deploy/messagr-eu/tests/
 # own configuration, and prettier reformats a checkout somebody is working in.
 # Scratch space, and none of the three should look at it.
 .claude/worktrees/
+
+# L'écran extrait du prototype de conception. C'est un export, pas une source
+# écrite ici : le reformater le ferait diverger de ce que le canvas a produit,
+# et la seule chose qu'on veuille de lui est qu'il rende à l'identique.
+# `design/` est ignoré pour la même raison, une ligne plus haut.
+deploy/messagr-eu/landing/conversation.html
+deploy/messagr-eu/landing/ecrans/

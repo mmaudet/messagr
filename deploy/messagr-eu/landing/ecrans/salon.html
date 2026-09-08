@@ -1,0 +1,103 @@
+<!doctype html><meta charset="utf-8"><body style="margin:0;background:#F7F5EF">
+<!--ENLEVES -->
+<style>
+  body { margin:0; background:#e8e4dc; color:#1b1a19; font-family:'Schibsted Grotesk', Helvetica, sans-serif; -webkit-font-smoothing:antialiased; }
+  a { color:#0e8f63; text-decoration:none; }
+  a:hover { color:#06614a; text-decoration:underline; }
+  * { box-sizing:border-box; }
+  ::-webkit-scrollbar { width:6px; height:6px; }
+  ::-webkit-scrollbar-thumb { background:#cfc8bb; border-radius:3px; }
+  @keyframes riseIn { from{opacity:0; transform:translateY(8px)} to{opacity:1; transform:none} }
+  @keyframes pulseRing { 0%{opacity:.25} 50%{opacity:.9} 100%{opacity:.25} }
+  @keyframes scanSweep { 0%{transform:translateY(-104px)} 100%{transform:translateY(104px)} }
+</style>
+<sc-if value="{{ isAgentB }}" hint-placeholder-val="{{ false }}">
+              <div style="flex:1; display:flex; flex-direction:column; min-height:0; background:#f2efe8;">
+                <div style="flex:0 0 auto; padding:8px 14px 9px; background:#fbf8f3; border-bottom:1px solid #e8e3d9; display:flex; align-items:center; gap:10px;">
+                  <span style="font-size:22px; line-height:1; color:#8f8a7e;">‹</span>
+                  <span style="width:36px; height:36px; flex:0 0 36px; border-radius:50%; background:#dcd6cb; color:#5b564d; display:flex; align-items:center; justify-content:center; font-size:13px; font-weight:600;">CC</span>
+                  <div style="flex:1; min-width:0;">
+                    <div style="font-size:15.5px; font-weight:600; letter-spacing:-0.01em;">Conseil de classe</div>
+                    <div style="font-size:12px; color:#8f8a7e; margin-top:1px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">Nadia, Karim, Léa, +6</div>
+                  </div>
+                  <div style="display:flex; gap:16px; align-items:center; color:#5b564d; flex:0 0 auto;">
+                    <svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M23 7l-7 5 7 5V7z"></path><rect x="1" y="5" width="15" height="14" rx="2"></rect></svg>
+                    <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M22 16.9v3a2 2 0 01-2.2 2 19.8 19.8 0 01-8.6-3.1 19.5 19.5 0 01-6-6A19.8 19.8 0 012.1 4.2 2 2 0 014.1 2h3a2 2 0 012 1.7c.1 1 .4 1.9.7 2.8a2 2 0 01-.5 2.1L8.1 9.9a16 16 0 006 6l1.3-1.2a2 2 0 012.1-.5c.9.3 1.8.6 2.8.7a2 2 0 011.7 2z"></path></svg>
+                  </div>
+                </div>
+
+                <div style="flex:1; min-height:0; overflow:auto; padding:12px 12px 8px; display:flex; flex-direction:column; gap:7px;">
+                  <div style="align-self:center; background:rgba(12,31,25,.06); color:#6b665c; font-size:11px; padding:4px 11px; border-radius:11px; margin-bottom:3px;">Aujourd'hui</div>
+
+                  <div style="align-self:flex-start; display:flex; gap:7px; align-items:flex-end; max-width:82%;">
+                    <span style="width:26px; height:26px; flex:0 0 26px; border-radius:50%; background:#c8ddd2; color:#0c4a35; display:flex; align-items:center; justify-content:center; font-size:10.5px; font-weight:600;">NB</span>
+                    <div style="background:#fff; border-radius:16px 16px 16px 4px; padding:7px 11px 6px; box-shadow:0 1px 1px rgba(12,31,25,.08);">
+                      <div style="font-size:12px; font-weight:600; color:#0e8f63; margin-bottom:2px;">Nadia</div>
+                      <div style="font-size:14.5px; line-height:1.4; color:#1b1a19;">On a parlé de trois choses hier soir, je ne sais plus qui fait quoi.</div>
+                      <div style="text-align:right; font-size:10.5px; color:#a8a196; margin-top:2px;">21:04</div>
+                    </div>
+                  </div>
+
+                  <div style="align-self:flex-end; max-width:80%; background:#d7f5e4; border-radius:16px 16px 4px 16px; padding:7px 11px 6px; box-shadow:0 1px 1px rgba(12,31,25,.08);">
+                    <div style="font-size:14.5px; line-height:1.4; color:#062f21;">Pareil. Je regarde le relevé.</div>
+                    <div style="display:flex; align-items:center; justify-content:flex-end; gap:4px; margin-top:2px;">
+                      <span style="font-size:10.5px; color:#5f8f78;">21:06</span>
+                      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#12b76a" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12.5l4.5 4.5L14 8.5"></path><path d="M9 12.5l4.5 4.5L22 8.5"></path></svg>
+                    </div>
+                  </div>
+
+                  <div style="align-self:flex-start; display:flex; gap:7px; align-items:flex-end; max-width:82%;">
+                    <span style="width:26px; height:26px; flex:0 0 26px; border-radius:50%; background:#e0d5c2; color:#6b4a1e; display:flex; align-items:center; justify-content:center; font-size:10.5px; font-weight:600;">KA</span>
+                    <div style="background:#fff; border-radius:16px 16px 16px 4px; padding:7px 11px 6px; box-shadow:0 1px 1px rgba(12,31,25,.08);">
+                      <div style="font-size:12px; font-weight:600; color:#0e8f63; margin-bottom:2px;">Karim</div>
+                      <div style="display:flex; align-items:center; gap:9px;">
+                        <span style="width:26px; height:26px; border-radius:50%; background:#12b76a; display:flex; align-items:center; justify-content:center; flex:0 0 26px;">
+                          <svg width="12" height="12" viewBox="0 0 24 24" fill="#062f21" stroke="none"><path d="M8 5v14l11-7z"></path></svg>
+                        </span>
+                        <span style="display:flex; align-items:flex-end; gap:2px; height:20px;">
+                          <sc-for list="{{ waveform }}" as="w" hint-placeholder-count="18">
+                            <span style="width:2px; border-radius:1px; background:{{ w.color }}; height:{{ w.h }};"></span>
+                          </sc-for>
+                        </span>
+                        <span style="font-size:11px; color:#8f8a7e; flex:0 0 auto;">0:14</span>
+                      </div>
+                      <div style="text-align:right; font-size:10.5px; color:#a8a196; margin-top:3px;">21:08</div>
+                    </div>
+                  </div>
+
+                  <div style="align-self:center; font-size:11px; color:#a8a196; padding:5px 0;">le fil ne contient que des messages humains</div>
+                </div>
+
+                <div style="flex:0 0 auto; background:#fbf8f3; border-top:1px solid #e8e3d9;">
+                  <div style="padding:10px 14px 0; display:flex; align-items:center; gap:8px;">
+                    <span style="width:10px; height:10px; background:#3a3630; clip-path:polygon(0 0, 100% 0, 100% 60%, 60% 100%, 0 100%);"></span>
+                    <span style="font-size:12.5px; font-weight:600; color:#3a3630;">Compte-rendu</span>
+                    <span style="font-family:'JetBrains Mono', monospace; font-size:8.5px; letter-spacing:.09em; text-transform:uppercase; color:#6b665c; border:1px solid #d5cfc2; padding:1.5px 5px; border-radius:3px;">Agent</span>
+                    <span style="margin-left:auto; font-size:11.5px; color:#8f8a7e;">visible de vous seul</span>
+                  </div>
+                  <div style="padding:8px 14px 12px;">
+                    <div style="background:#f4f0e8; border-radius:14px; padding:10px 12px;">
+                      <div style="font-size:13.5px; line-height:1.45; color:#1b1a19; text-wrap:pretty;">Trois décisions : musée (Nadia), goûter (Karim), courrier mairie — sans responsable.</div>
+                      <div style="display:flex; align-items:center; justify-content:space-between; gap:8px; margin-top:6px;">
+                        <span style="font-size:11px; color:#8f8a7e;">41 messages lus · rien conservé</span>
+                        <span style="font-size:11px; color:#0e8f63;">Détails</span>
+                      </div>
+                    </div>
+                    <div style="display:flex; gap:7px; margin-top:9px;">
+                      <button style="background:#12b76a; color:#062f21; border:none; padding:8px 15px; font-size:13px; font-weight:600; font-family:inherit; border-radius:16px; cursor:pointer;">Insérer dans le fil</button>
+                      <button style="background:none; border:none; color:#8f8a7e; padding:8px 8px; font-size:13px; font-family:inherit; cursor:pointer;">Garder pour moi</button>
+                    </div>
+                  </div>
+                </div>
+
+                <div style="flex:0 0 auto; background:#fbf8f3; border-top:1px solid #e8e3d9; padding:9px 12px 11px; display:flex; gap:9px; align-items:center;">
+                  <span style="color:#5b564d; display:flex;"><svg width="23" height="23" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><path d="M12 5v14M5 12h14"></path></svg></span>
+                  <div style="flex:1; min-width:0; background:#fff; border-radius:20px; padding:9px 12px; display:flex; align-items:center; gap:9px; box-shadow:0 1px 1px rgba(12,31,25,.07);">
+                    <span style="flex:1; font-size:14.5px; color:#a8a196;">Message</span>
+                    <span style="color:#8f8a7e; display:flex;"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><circle cx="12" cy="12" r="9"></circle><path d="M9 14.5c1 1 2 1.5 3 1.5s2-.5 3-1.5"></path><circle cx="9.2" cy="9.8" r=".9" fill="currentColor" stroke="none"></circle><circle cx="14.8" cy="9.8" r=".9" fill="currentColor" stroke="none"></circle></svg></span>
+                  </div>
+                  <span style="width:40px; height:40px; flex:0 0 40px; background:#12b76a; border-radius:50%; color:#062f21; display:flex; align-items:center; justify-content:center;"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M12 3v11"></path><path d="M9 6a3 3 0 016 0v4a3 3 0 01-6 0z" fill="currentColor" stroke="none"></path><path d="M6 11a6 6 0 0012 0"></path><path d="M12 17v3"></path></svg></span>
+                </div>
+              </div>
+            </sc-if>
+</body>

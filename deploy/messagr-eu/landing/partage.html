@@ -1,0 +1,79 @@
+<!doctype html>
+<!--
+  LA CARTE D'APERÇU DE LIEN, ET SA SOURCE.
+
+  1200 par 630, la taille qu'Open Graph attend et que chaque messagerie
+  redimensionne à sa façon. Le rendu est committé à côté, dans
+  `site/messagr-partage.png` : l'intégration continue n'a pas de navigateur, et
+  fabriquer l'image à la construction ajouterait une dépendance lourde pour un
+  fichier qui change une fois par an.
+
+  Ce gabarit existe pour que l'image ne soit pas un objet trouvé. Pour la
+  refaire :
+
+    chrome --headless=new --screenshot=deploy/messagr-eu/site/messagr-partage.png \
+           --window-size=1200,630 deploy/messagr-eu/landing/partage.html
+
+  Les couleurs sont celles de la page, qui sont celles de design/tokens.json.
+  Le logotype est le SVG de design/brand, pas un tracé recopié : une seconde
+  copie de la marque est une marque qui finit par différer d'elle-même.
+-->
+<html lang="fr">
+  <meta charset="utf-8" />
+  <style>
+    html,
+    body {
+      margin: 0;
+      width: 1200px;
+      height: 630px;
+      overflow: hidden;
+    }
+    body {
+      background: #f7f5ef;
+      color: #0c1f19;
+      font-family:
+        -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      padding: 0 96px;
+      box-sizing: border-box;
+    }
+    img {
+      width: 420px;
+      height: auto;
+      display: block;
+      margin-bottom: 52px;
+    }
+    h1 {
+      font-size: 64px;
+      line-height: 1.06;
+      letter-spacing: -0.03em;
+      font-weight: 650;
+      margin: 0 0 26px;
+      max-width: 15ch;
+    }
+    p {
+      font-size: 31px;
+      line-height: 1.35;
+      color: #5a6b63;
+      margin: 0;
+      max-width: 26ch;
+    }
+    /* L'entaille de la marque, en grand et en bas à droite : le signe que
+     l'application porte sur ses boutons et ses bulles. */
+    .coin {
+      position: absolute;
+      right: 0;
+      bottom: 0;
+      width: 210px;
+      height: 210px;
+      background: #c9f2dc;
+      clip-path: polygon(100% 0, 100% 100%, 0 100%);
+    }
+  </style>
+  <img src="../../../design/brand/messagr-logotype-vert.svg" alt="Messagr" />
+  <h1>La messagerie qui ne vous demande rien.</h1>
+  <p>Pas de numéro, pas de compte, pas de mot de passe.</p>
+  <div class="coin"></div>
+</html>
