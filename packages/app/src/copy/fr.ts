@@ -152,6 +152,18 @@ export const fr = {
   language_choose: 'Choisir la langue',
   language_close: 'Fermer',
 
+  emoji_title: 'Réagir',
+  emoji_close: 'Fermer',
+  emoji_more: 'Plus d’emojis',
+  emoji_group_faces: 'Visages',
+  emoji_group_gestures: 'Gestes',
+  emoji_group_hearts: 'Cœurs',
+  emoji_group_people: 'Personnes',
+  emoji_group_nature: 'Nature',
+  emoji_group_food: 'Nourriture',
+  emoji_group_activity: 'Activités',
+  emoji_group_things: 'Objets',
+
   // WRITTEN HERE, NOT CARRIED OVER.
   //
   // The previous product's conversation copy came with its trust wording

@@ -17,6 +17,7 @@ import { separatorsFor, type DayMark } from '../timeline/daySeparators'
 import { platesIn, type Plate as Grouping } from '../timeline/plates'
 import type { TimelineEntry } from '../timeline/mergeTimeline'
 import type { ReactionTally } from '../timeline/reactions'
+import { EmojiPicker } from './EmojiPicker'
 import { Photograph } from './Photograph'
 import { Plate } from './Plate'
 
@@ -128,6 +129,13 @@ export function Conversation({
    */
   const [offering, setOffering] = useState<string | null>(null)
   /**
+   * Which message has the whole catalogue open, if any.
+   *
+   * Separate from `offering`: the row closes on the touch that opened this,
+   * and the picker is a modal that outlives it.
+   */
+  const [picking, setPicking] = useState<string | null>(null)
+  /**
    * Whether the touch still on the screen is the one that just opened a row.
    * A ref rather than state: it is read inside the same gesture that writes
    * it, and a re-render between the two would be a re-render for nothing.
@@ -201,6 +209,10 @@ export function Conversation({
                   justOpened.current = true
                   setOffering(entry.eventId)
                 }}
+                // The `+`. Held on the screen rather than in the bubble
+                // because the picker is a modal over everything, and a
+                // bubble that owns one would own it per bubble.
+                onMore={() => setPicking(entry.eventId)}
                 mine={entry.claimedSender === selfUserId}
                 palette={palette}
                 tallies={reactions.get(entry.eventId) ?? []}
@@ -224,6 +236,22 @@ export function Conversation({
             ? t('conversation_sending')
             : t('conversation_send_failed')}
         </Text>
+      )}
+
+      {picking !== null && (
+        <EmojiPicker
+          onClose={() => setPicking(null)}
+          onChoose={key => {
+            // Whether this account already reacted with THAT key, which is
+            // what makes a second press of the same one take it back --
+            // exactly as the six on the row behave.
+            const already = reactions
+              .get(picking)
+              ?.find(tally => tally.key === key)?.mine
+            onReact?.(picking, key, already ?? null)
+            setPicking(null)
+          }}
+        />
       )}
     </View>
   )
@@ -276,10 +304,15 @@ function dayLabel(mark: DayMark): string {
 /**
  * The keys offered on a long press.
  *
- * Six, and no picker. A full emoji keyboard is a different screen and a
- * different ticket; six covers what a reaction is for -- agreeing, laughing,
- * saying "seen" without saying anything -- and a person who wants a seventh
- * can say it in words, which this application is rather good at.
+ * Six, and then a `+`. This used to say "six, and no picker" -- that a full
+ * emoji keyboard was a different screen and a different ticket, and that
+ * somebody who wanted a seventh could say it in words. Right about the row,
+ * wrong about the ceiling: the account holder asked for what WhatsApp does,
+ * which is the quick six and a way to reach the rest.
+ *
+ * The six do not move. `EmojiPicker.tsx` is what the `+` opens, and
+ * `emojiCatalogue.ts` says why that list is written down rather than taken
+ * from Unicode.
  */
 const OFFERED = ['👍', '❤️', '😂', '😮', '😢', '🙏'] as const
 
@@ -292,6 +325,7 @@ function Message({
   read,
   offering,
   onOffer,
+  onMore,
   onLoadImage,
   unexpected,
   plate,
@@ -314,6 +348,8 @@ function Message({
   offering: boolean
   /** Asks for it to open. Closing is the screen's business: any touch does it. */
   onOffer: () => void
+  /** Opens the whole catalogue. See `EmojiPicker.tsx`. */
+  onMore: () => void
   readonly onLoadImage?: (file: ReadFile) => Promise<ShownImage>
 }) {
   return (
@@ -472,6 +508,17 @@ function Message({
               <Text style={styles.chipKey}>{key}</Text>
             </Pressable>
           ))}
+          {/* THE SEVENTH CHIP IS NOT AN EMOJI. It opens the rest, and it is
+              last because the six before it are the ones a thumb reaches
+              without looking. */}
+          <Pressable
+            testID={`offer-${entry.eventId}-more`}
+            onPress={onMore}
+            accessibilityRole="button"
+            accessibilityLabel={t('emoji_more')}
+            style={styles.chip}>
+            <Text style={styles.chipKey}>{'＋'}</Text>
+          </Pressable>
         </View>
       )}
 
