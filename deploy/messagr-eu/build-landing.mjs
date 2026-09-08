@@ -69,12 +69,49 @@ if (!langues.includes(RACINE)) {
   )
 }
 
-const source = join(destination, 'index.html')
-let gabarit
-try {
-  gabarit = readFileSync(source, 'utf8')
-} catch {
-  echouer(`${source} est introuvable : build-site.sh ne l'a pas copié`)
+// ── LES PAGES ENGENDRÉES, ET IL Y EN A PLUS D'UNE ─────────────────────────
+//
+// Ce générateur n'a longtemps connu qu'une page. La deuxième -- celle du
+// téléchargement -- n'est pas un cas particulier de la première : elle a son
+// propre titre, son propre chapô, ses propres adresses canoniques et son propre
+// jeu de `hreflang`. Une liste plutôt qu'un `if`, pour que la troisième ne
+// demande qu'une entrée.
+//
+// `conversation` dit si la page cite l'écran de conversation, qui suit la
+// langue. Le mettre en donnée plutôt qu'en test : une page qui ne le cite pas
+// n'est pas une page en faute.
+const PAGES = [
+  {
+    nom: 'accueil',
+    source: 'index.html',
+    dossier: langue => (langue === RACINE ? '' : `${langue}/`),
+    titre: 'titre',
+    chapo: 'chapo',
+    conversation: true,
+  },
+  {
+    nom: 'telechargement',
+    source: 'telechargement/index.html',
+    dossier: langue =>
+      langue === RACINE ? 'telechargement/' : `${langue}/telechargement/`,
+    titre: 'dl-titre',
+    chapo: 'dl-chapo',
+    conversation: false,
+  },
+]
+
+const lireLeGabarit = page => {
+  const chemin = join(destination, page.source)
+  try {
+    return readFileSync(chemin, 'utf8')
+  } catch {
+    echouer(`${chemin} est introuvable : build-site.sh ne l'a pas copié`)
+    return ''
+  }
+}
+
+for (const page of PAGES) {
+  page.gabarit = lireLeGabarit(page)
 }
 
 // ── Les clés des deux côtés doivent coïncider ──────────────────────────────
@@ -82,8 +119,15 @@ try {
 // Une clé de plus dans le balisage est une phrase que cinq lecteurs sur six
 // verraient en français ; une clé de plus dans le catalogue est une traduction
 // que personne n'affiche. Les deux sont des erreurs, et aucune ne se voit.
-const marquees = [...gabarit.matchAll(/data-t="([^"]+)"/g)].map(m => m[1])
-const uniques = [...new Set(marquees)].sort()
+// L'UNION DES PAGES, ET NON UNE SEULE. Une clé qui ne sert qu'à la page du
+// téléchargement doit être dans le catalogue sans que la page d'accueil la
+// porte, et l'inverse.
+for (const page of PAGES) {
+  page.uniques = [
+    ...new Set([...page.gabarit.matchAll(/data-t="([^"]+)"/g)].map(m => m[1])),
+  ].sort()
+}
+const uniques = [...new Set(PAGES.flatMap(p => p.uniques))].sort()
 // UNE CLÉ PEUT SERVIR PLUSIEURS FOIS, ET LA GALERIE EN A BESOIN. La règle
 // était « une clé, une occurrence » : un garde-fou contre une substitution qui
 // frapperait un endroit que personne ne visait. La galerie porte six écrans et
@@ -108,20 +152,21 @@ for (const langue of langues) {
 
 // ── Les liens entre les six ────────────────────────────────────────────────
 
-const cheminDe = langue => (langue === RACINE ? '/' : `/${langue}/`)
+const cheminDe = (page, langue) => `/${page.dossier(langue)}`
 
 // x-default désigne la page servie à qui ne demande rien de particulier, et
 // c'est la racine. Sans lui, un moteur choisit lui-même, ce qui revient à ne
 // pas décider.
-const liens = langues
-  .map(
-    l =>
-      `<link rel="alternate" hreflang="${l}" href="${ORIGINE}${cheminDe(l)}">`,
-  )
-  .concat(
-    `<link rel="alternate" hreflang="x-default" href="${ORIGINE}${cheminDe(RACINE)}">`,
-  )
-  .join('\n')
+const liensDe = page =>
+  langues
+    .map(
+      l =>
+        `<link rel="alternate" hreflang="${l}" href="${ORIGINE}${cheminDe(page, l)}">`,
+    )
+    .concat(
+      `<link rel="alternate" hreflang="x-default" href="${ORIGINE}${cheminDe(page, RACINE)}">`,
+    )
+    .join('\n')
 
 // ── Le remplacement, qui refuse de ne rien faire ───────────────────────────
 //
@@ -173,14 +218,14 @@ const exigerUneFois = (html, motif, quoi, langue) => {
   }
 }
 
-const entete = (html, langue) => {
+const entete = (html, langue, page) => {
   const motifLang = /<html lang="[^"]*">/g
   exigerUneFois(html, motifLang, 'la balise <html lang="…">', langue)
   let sortie = html.replace(motifLang, `<html lang="${langue}">`)
 
   // La description reprend le titre et le chapô plutôt qu'une phrase de plus à
   // traduire : une septième chaîne par langue serait une septième à oublier.
-  const description = `${copie[langue].titre} ${copie[langue].chapo}`
+  const description = `${copie[langue][page.titre]} ${copie[langue][page.chapo]}`
   const motifDesc = /<meta name="description" content="[^"]*">/g
   exigerUneFois(
     sortie,
@@ -200,9 +245,9 @@ const entete = (html, langue) => {
   // haut : une balise renommée doit arrêter la construction plutôt que de se
   // faire remplacer par rien, en silence.
   const social = [
-    ['og:title', copie[langue].titre],
-    ['og:description', copie[langue].chapo],
-    ['og:url', `${ORIGINE}${cheminDe(langue)}`],
+    ['og:title', copie[langue][page.titre]],
+    ['og:description', copie[langue][page.chapo]],
+    ['og:url', `${ORIGINE}${cheminDe(page, langue)}`],
     ['og:image', `${ORIGINE}/messagr-partage-${langue}.png`],
   ]
   for (const [propriete, valeur] of social) {
@@ -222,8 +267,8 @@ const entete = (html, langue) => {
     )
   }
 
-  const canonique = `<link rel="canonical" href="${ORIGINE}${cheminDe(langue)}">`
-  return sortie.replace('</head>', `${canonique}\n${liens}\n</head>`)
+  const canonique = `<link rel="canonical" href="${ORIGINE}${cheminDe(page, langue)}">`
+  return sortie.replace('</head>', `${canonique}\n${liensDe(page)}\n</head>`)
 }
 
 // ── Le plan du site ────────────────────────────────────────────────────────
@@ -288,9 +333,38 @@ const faitsDuTelechargement = () => {
 // Le séparateur décimal et le nom du mois viennent d'`Intl`, donc de la langue
 // de la page : « 132,6 Mo » et « 132.6 MB » sont le même chiffre écrit pour
 // deux lecteurs, et chacun se lit mal dans la langue de l'autre.
+// L'OFFRE ET SON ABSENCE SONT DEUX BLOCS, ET UN SEUL SURVIT.
+//
+// `deploy.sh` accepte `MESSAGR_APK=none` : le fichier quitte le serveur, et la
+// page doit cesser de le proposer dans le même geste. Un bouton qui reste avec
+// le poids d'hier est pire qu'une page qui se tait.
+//
+// Les deux blocs sont écrits dans le balisage, donc tous deux relisibles ; la
+// construction en retire un. Exigés avant d'être retirés, comme le reste : un
+// bloc renommé doit arrêter la construction plutôt que de laisser les deux.
+const trancherLOffre = (html, langue, offert) => {
+  const garder = offert ? 'telechargement' : 'pas-de-telechargement'
+  const retirer = offert ? 'pas-de-telechargement' : 'telechargement'
+  const present = new RegExp(`<div data-si="${garder}">`)
+  if (!present.test(html)) {
+    return html
+  }
+  const motif = new RegExp(
+    `\\n\\s*<div data-si="${retirer}">[\\s\\S]*?\\n  </div>`,
+    'g',
+  )
+  exigerUneFois(html, motif, `le bloc « ${retirer} »`, langue)
+  return html.replace(motif, '').replace(`<div data-si="${garder}">`, '<div>')
+}
+
 const ecrireLesFaits = (html, langue, faits) => {
+  // SEULEMENT LES CLÉS QUE CETTE PAGE PORTE. `etat-verifie` ne vit que sur
+  // l'accueil ; l'exiger sur la page du téléchargement arrêterait la
+  // construction sur une page parfaitement correcte.
+  html = trancherLOffre(html, langue, Boolean(faits))
+  const siennes = CLES_DE_FAITS.filter(cle => html.includes(`data-t="${cle}"`))
   if (!faits) {
-    for (const cle of CLES_DE_FAITS) {
+    for (const cle of siennes) {
       const motif = new RegExp(
         `\\n\\s*<p[^>]*\\bdata-t="${cle}"[^>]*>[^<]*</p>`,
         'g',
@@ -320,9 +394,9 @@ const ecrireLesFaits = (html, langue, faits) => {
 }
 
 const planDuSite = () => {
-  const pages = langues
-    .map(l => `${ORIGINE}${cheminDe(l)}`)
-    .concat([`${ORIGINE}/confidentialite/`, `${ORIGINE}/conditions-generales/`])
+  const pages = PAGES.flatMap(page =>
+    langues.map(l => `${ORIGINE}${cheminDe(page, l)}`),
+  ).concat([`${ORIGINE}/confidentialite/`, `${ORIGINE}/conditions-generales/`])
   const entrees = pages.map(u => `  <url><loc>${u}</loc></url>`).join('\n')
   return (
     '<?xml version="1.0" encoding="UTF-8"?>\n' +
@@ -357,7 +431,7 @@ const verifieContre = (html => {
     )
   }
   return trouve[1]
-})(gabarit)
+})(PAGES.find(p => p.nom === 'accueil').gabarit)
 
 if (faits && faits.empreinte !== verifieContre) {
   echouer(
@@ -368,49 +442,63 @@ if (faits && faits.empreinte !== verifieContre) {
   )
 }
 let ecrites = 0
-for (const langue of langues) {
-  let page = gabarit
-  if (langue !== RACINE) {
-    for (const cle of uniques) {
-      page = remplacer(page, cle, copie[langue][cle], langue)
+for (const modele of PAGES) {
+  for (const langue of langues) {
+    let page = modele.gabarit
+    if (langue !== RACINE) {
+      for (const cle of modele.uniques) {
+        page = remplacer(page, cle, copie[langue][cle], langue)
+      }
     }
-  }
-  page = entete(page, langue)
-  page = ecrireLesFaits(page, langue, faits)
+    page = entete(page, langue, modele)
+    page = ecrireLesFaits(page, langue, faits)
 
-  // LE DÉTAIL DE CONVERSATION SUIT LA LANGUE DE LA PAGE. Une conversation
-  // française sur `/de/` annulerait ce que les six adresses corrigent, et le
-  // séparateur « Hier » s'y lirait « ici ». Exigé avant d'être remplacé, comme
-  // tout le reste : une image renommée doit arrêter la construction.
-  //
-  // TOUTES LES OCCURRENCES, ET PLUS UNE SEULE. Le hero et la galerie montrent
-  // le même écran ; exiger une occurrence unique interdisait de le citer deux
-  // fois. Ce qui compte n'est pas le compte, c'est qu'aucune page ne montre
-  // l'image d'une autre langue -- donc au moins une, et toutes remplacées.
-  const motifConversation = /\/messagr-conversation-[a-z]{2}\.png/g
-  const citations = page.match(motifConversation)
-  if (!citations || citations.length === 0) {
-    echouer(`la page ${langue} ne cite aucune image de conversation`)
-  }
-  page = page.replace(motifConversation, `/messagr-conversation-${langue}.png`)
+    // LE DÉTAIL DE CONVERSATION SUIT LA LANGUE DE LA PAGE. Une conversation
+    // française sur `/de/` annulerait ce que les six adresses corrigent, et le
+    // séparateur « Hier » s'y lirait « ici ». Exigé avant d'être remplacé,
+    // comme tout le reste : une image renommée doit arrêter la construction.
+    //
+    // TOUTES LES OCCURRENCES, ET PLUS UNE SEULE. Le hero et la galerie
+    // montrent le même écran ; exiger une occurrence unique interdisait de le
+    // citer deux fois. Ce qui compte n'est pas le compte, c'est qu'aucune page
+    // ne montre l'image d'une autre langue -- donc au moins une, et toutes
+    // remplacées.
+    if (modele.conversation) {
+      const motifConversation = /\/messagr-conversation-[a-z]{2}\.png/g
+      const citations = page.match(motifConversation)
+      if (!citations || citations.length === 0) {
+        echouer(
+          `la page ${modele.nom} ${langue} ne cite aucune image de conversation`,
+        )
+      }
+      page = page.replace(
+        motifConversation,
+        `/messagr-conversation-${langue}.png`,
+      )
+    }
 
-  // AUCUNE MARQUE NE DOIT SURVIVRE. Une page qui montrerait « %TAILLE% » à un
-  // lecteur est pire qu'une page muette : elle a l'air cassée, et elle l'est.
-  const restante = /%[A-Z]+%/.exec(page)
-  if (restante) {
-    echouer(`la page ${langue} porte encore la marque ${restante[0]}`)
-  }
+    // AUCUNE MARQUE NE DOIT SURVIVRE. Une page qui montrerait « %TAILLE% » à
+    // un lecteur est pire qu'une page muette : elle a l'air cassée, et elle
+    // l'est.
+    const restante = /%[A-Z]+%/.exec(page)
+    if (restante) {
+      echouer(
+        `la page ${modele.nom} ${langue} porte encore la marque ${restante[0]}`,
+      )
+    }
 
-  const chemin =
-    langue === RACINE ? source : join(destination, langue, 'index.html')
-  mkdirSync(dirname(chemin), { recursive: true })
-  writeFileSync(chemin, page)
-  ecrites += 1
+    const chemin = join(destination, modele.dossier(langue), 'index.html')
+    mkdirSync(dirname(chemin), { recursive: true })
+    writeFileSync(chemin, page)
+    ecrites += 1
+  }
 }
 
-writeFileSync(join(destination, 'sitemap.xml'), planDuSite())
+const plan = planDuSite()
+writeFileSync(join(destination, 'sitemap.xml'), plan)
 
 console.log(
-  `build-landing: ${ecrites} pages, une par langue, chacune entière sans script, ` +
-    `et un plan du site de ${langues.length + 2} adresses`,
+  `build-landing: ${ecrites} pages (${PAGES.length} par langue, ${langues.length} langues), ` +
+    `chacune entière sans script, et un plan du site de ` +
+    `${(plan.match(/<loc>/g) || []).length} adresses`,
 )
