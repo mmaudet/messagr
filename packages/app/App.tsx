@@ -103,7 +103,10 @@ import { deviceLocale } from './src/runtime/deviceLocale'
 import { pickFromLibrary } from './src/runtime/imageLibrary'
 import { sendImages } from './src/runtime/sendImages'
 import { pushTokenForThisDevice } from './src/runtime/pushDevice'
-import { whenNotificationPressed } from './src/runtime/showNotification'
+import {
+  stopRinging,
+  whenNotificationPressed,
+} from './src/runtime/showNotification'
 import type { ShownImage } from './src/runtime/receiveImage'
 import type { ReadFile } from './src/timeline/imageEvent'
 import type { Plate as Grouping } from './src/timeline/plates'
@@ -377,6 +380,15 @@ export function App({
    */
   const [callSpeaker, setCallSpeaker] = useState(false)
   const callRuntimeRef = useRef<CallRuntime | null>(null)
+  /**
+   * A conversation somebody already answered a call in, from a notification.
+   *
+   * Held until the invitation arrives, because it has not yet: the press
+   * happened on a locked screen and the sync that carries the call is the
+   * next one. Cleared the moment it is spent, so a later call in the same
+   * conversation is not answered by a press from ten minutes ago.
+   */
+  const answerWhenItRingsRef = useRef<string | null>(null)
   // Choosing and sending a photograph, and opening one that arrived. Held in
   // refs like every other gesture the launch effect binds.
   const attachRef = useRef<(() => void) | null>(null)
@@ -1091,10 +1103,37 @@ export function App({
             // The blind notification routes nowhere, because nothing that
             // woke this device said which conversation. It lands on the list,
             // which then shows what is waiting.
-            whenNotificationPressed(scope => {
-              setTab('chat')
-              if (scope !== null) showConversation(scope)
-            })
+            whenNotificationPressed(
+              scope => {
+                setTab('chat')
+                if (scope !== null) showConversation(scope)
+              },
+              // SOMEBODY ALREADY SAID YES, ON A LOCKED SCREEN.
+              //
+              // The application starts with no call: the invitation is still
+              // in a sync nobody has polled yet, and the runtime cannot
+              // answer something it has not been told about. So the answer
+              // is remembered and spent when the telephone starts ringing --
+              // which is the poll after this, seconds away.
+              //
+              // Refusing is immediate and needs no call, because there is
+              // nothing to refuse yet: the notification comes down and the
+              // caller's own invitation runs out. Sending a refusal from a
+              // process with no session open is the half this does not do,
+              // and it costs the caller the ninety seconds.
+              pressed => {
+                if (pressed.answered) {
+                  answerWhenItRingsRef.current = pressed.scope
+                  setTab('chat')
+                  return
+                }
+                answerWhenItRingsRef.current = null
+                stopRinging(pressed.scope).catch(() => {
+                  // A notification that will not come down is not worth
+                  // losing the launch over.
+                })
+              },
+            )
 
             // Asked for rather than computed on every launch: it costs a
             // device-status call and a state fetch per conversation.
@@ -1244,6 +1283,30 @@ export function App({
               credentials,
               onScreen => {
                 setCall(onScreen)
+                // The press that already said yes, spent on the invitation
+                // it was waiting for.
+                if (
+                  onScreen !== null &&
+                  onScreen.state.call === 'incomingInvite' &&
+                  answerWhenItRingsRef.current === onScreen.scope
+                ) {
+                  answerWhenItRingsRef.current = null
+                  callRuntimeRef.current?.answer().catch((cause: unknown) =>
+                    logEvent('warn', 'MESSAGR_CALL_NOT_ANSWERED', {
+                      reason: getErrorMessage(cause),
+                    }),
+                  )
+                }
+                // A telephone that stopped ringing must stop saying so.
+                if (
+                  onScreen === null ||
+                  onScreen.state.call !== 'incomingInvite'
+                ) {
+                  const where = onScreen?.scope
+                  if (where !== undefined) {
+                    stopRinging(where).catch(() => {})
+                  }
+                }
                 // A call that ended took the microphone with it, and the next
                 // one starts unmuted.
                 if (onScreen === null) {
