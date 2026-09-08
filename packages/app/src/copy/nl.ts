@@ -351,6 +351,10 @@ export const nl: Readonly<Record<CopyKey, string>> = {
   person_back: 'Terug',
   message_delivered_hint: 'Aan de server afgegeven',
   message_read_hint: 'Gelezen',
+  settings_full_screen: 'Een oproep het scherm laten inschakelen',
+  settings_open: 'Openen',
+  settings_full_screen_hint:
+    'Android geeft alleen telefoontoepassingen het recht om voor een oproep het scherm in te schakelen. Zonder dat is een inkomende oproep één melding meer op het vergrendelscherm.',
   settings_wake: 'Meldingen',
   settings_wake_hint:
     'Het wekseintje draagt geen afzender en geen bericht. Het apparaat ontsleutelt hier.',

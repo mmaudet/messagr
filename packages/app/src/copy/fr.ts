@@ -527,6 +527,10 @@ export const fr = {
   person_back: 'Retour',
   message_delivered_hint: 'Remis au serveur',
   message_read_hint: 'Lu',
+  settings_full_screen: 'Faire sonner l’écran',
+  settings_open: 'Ouvrir',
+  settings_full_screen_hint:
+    'Android n’accorde qu’aux applications de téléphonie le droit d’allumer l’écran pour un appel. Sans cela, un appel entrant est une notification de plus sur l’écran verrouillé.',
   settings_wake: 'Notifications',
   settings_wake_hint:
     'Le signal de réveil ne porte ni expéditeur ni message. L’appareil déchiffre ici.',

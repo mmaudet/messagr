@@ -350,6 +350,10 @@ export const it: Readonly<Record<CopyKey, string>> = {
   person_back: 'Indietro',
   message_delivered_hint: 'Consegnato al server',
   message_read_hint: 'Letto',
+  settings_full_screen: 'Lascia che una chiamata accenda lo schermo',
+  settings_open: 'Apri',
+  settings_full_screen_hint:
+    'Android concede solo alle applicazioni telefoniche il diritto di accendere lo schermo per una chiamata. Senza, una chiamata in arrivo è una notifica in più sulla schermata di blocco.',
   settings_wake: 'Notifiche',
   settings_wake_hint:
     'Il segnale di risveglio non porta né mittente né messaggio. Il dispositivo decifra qui.',

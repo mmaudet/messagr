@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   AppState,
   BackHandler,
+  Linking,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -2063,6 +2064,33 @@ export function App({
                 <Settings
                   onBack={() => setTab('chat')}
                   onLegal={() => setLegalOpen(true)}
+                  // ANDROID'S OWN SCREEN, NOT A DIALOG OF OURS. The
+                  // permission that lets a call light the display is granted
+                  // at installation only to applications registered as the
+                  // telephone; everybody else has to be taken to Settings
+                  // and shown the switch. `Settings.tsx` says what was
+                  // measured on the demonstration Pixel.
+                  //
+                  // `sendIntent` rather than a native module: this is one
+                  // intent with no answer to read back, and a module written
+                  // to open a screen would be a module to maintain for a
+                  // string.
+                  onRingFullScreen={() => {
+                    Linking.sendIntent(
+                      'android.settings.MANAGE_APP_USE_FULL_SCREEN_INTENT',
+                      [
+                        {
+                          key: 'android.provider.extra.APP_PACKAGE',
+                          value: 'eu.messagr',
+                        },
+                      ],
+                    ).catch(() => {
+                      // An older Android has no such screen. The
+                      // application's own notification settings are where
+                      // somebody would go looking anyway.
+                      Linking.openSettings().catch(() => {})
+                    })
+                  }}
                   receipts={receipts}
                   receiptsNotKept={receiptsNotKept}
                   language={language}

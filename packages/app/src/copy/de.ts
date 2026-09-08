@@ -358,6 +358,10 @@ export const de: Readonly<Record<CopyKey, string>> = {
   person_back: 'Zurück',
   message_delivered_hint: 'An den Server übergeben',
   message_read_hint: 'Gelesen',
+  settings_full_screen: 'Anrufe den Bildschirm einschalten lassen',
+  settings_open: 'Öffnen',
+  settings_full_screen_hint:
+    'Android gewährt nur Telefonanwendungen das Recht, für einen Anruf den Bildschirm einzuschalten. Ohne dies ist ein eingehender Anruf nur eine weitere Benachrichtigung auf dem Sperrbildschirm.',
   settings_wake: 'Benachrichtigungen',
   settings_wake_hint:
     'Das Wecksignal trägt weder Absender noch Nachricht. Das Gerät entschlüsselt hier.',

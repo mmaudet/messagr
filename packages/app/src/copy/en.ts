@@ -353,6 +353,10 @@ export const en: Readonly<Record<CopyKey, string>> = {
   person_back: 'Back',
   message_delivered_hint: 'Handed to the server',
   message_read_hint: 'Read',
+  settings_full_screen: 'Let a call light the screen',
+  settings_open: 'Open',
+  settings_full_screen_hint:
+    'Android grants only telephone applications the right to light the screen for a call. Without it, an incoming call is one more notification on the lock screen.',
   settings_wake: 'Notifications',
   settings_wake_hint:
     'The wake-up signal carries no sender and no message. The device decrypts here.',

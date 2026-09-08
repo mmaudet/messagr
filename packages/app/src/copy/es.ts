@@ -352,6 +352,10 @@ export const es: Readonly<Record<CopyKey, string>> = {
   person_back: 'Volver',
   message_delivered_hint: 'Entregado al servidor',
   message_read_hint: 'Leído',
+  settings_full_screen: 'Permitir que una llamada encienda la pantalla',
+  settings_open: 'Abrir',
+  settings_full_screen_hint:
+    'Android solo concede a las aplicaciones de teléfono el derecho a encender la pantalla para una llamada. Sin él, una llamada entrante es una notificación más en la pantalla de bloqueo.',
   settings_wake: 'Notificaciones',
   settings_wake_hint:
     'La señal de despertar no lleva remitente ni mensaje. El dispositivo descifra aquí.',
