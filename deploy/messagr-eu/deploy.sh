@@ -68,6 +68,30 @@ elif [ -n "$MESSAGR_APK" ]; then
     exit 1
   fi
   MESSAGR_DEST_ANDROID_APK="$APK_URL"
+
+  # ── CE QUE LE FICHIER PÈSE, MESURÉ SUR LE FICHIER ────────────────────────
+  #
+  # La page annonçait un téléchargement sans dire ce qu'il pesait : 132 Mio sur
+  # un forfait mobile, c'est un abandon quasi certain, et le chiffre n'était
+  # écrit nulle part. Un chiffre TAPÉ serait périmé au premier changement du
+  # fichier sans que rien ne le dise, ce qui est la faute que build-site.sh a
+  # été écrit pour rendre impossible ailleurs. Il est donc lu ici, sur le
+  # fichier même que la ligne au-dessus s'apprête à envoyer.
+  #
+  # `export` et non un préfixe de commande : la vérification de conformité, à
+  # la fin de ce script, reconstruit le site et doit voir les mêmes valeurs,
+  # sinon elle comparerait une page sans faits à une page qui en porte.
+  #
+  # La date est celle du fichier, pas celle du jour : un redéploiement qui ne
+  # change pas l'APK ne doit pas rajeunir ce qu'il annonce.
+  export MESSAGR_APK_OCTETS
+  MESSAGR_APK_OCTETS=$(wc -c < "$MESSAGR_APK" | tr -d ' ')
+  export MESSAGR_APK_SHA256
+  MESSAGR_APK_SHA256=$(shasum -a 256 "$MESSAGR_APK" | cut -d' ' -f1)
+  export MESSAGR_APK_DATE
+  MESSAGR_APK_DATE=$(date -u -r "$MESSAGR_APK" +%Y-%m-%d 2>/dev/null \
+    || date -u -d "@$(stat -c %Y "$MESSAGR_APK")" +%Y-%m-%d)
+  echo "the download is $MESSAGR_APK_OCTETS bytes, dated $MESSAGR_APK_DATE"
 elif [ "$apk_on_server" = "yes" ]; then
   # THE ONE THAT KEEPS THEM IN STEP. A deployment that says nothing about
   # the download would leave the file served and the page saying the
@@ -127,16 +151,38 @@ fi
 # catch the outage, by refusing to conclude. But it catches AFTER the files are
 # live, and the page stayed broken in between. A permission check before the
 # send would be earlier; it is not written here.
+# THE WHOLE TREE, BY SHAPE. AND THE SAME DEFECT, ONE LAYER DOWN.
+#
+# This was three commands: `i/` by name, `.well-known/` by name, and then the
+# root's files with `--exclude='*/'` to leave those two alone. Its comment said
+# the exclusion "leaves the two directories above to the two lines that already
+# own them", and that was true when there were two.
+#
+# `confidentialite/` and `conditions-generales/` were added to the site since.
+# They are excluded by `*/` and named by no line, so THEY HAVE NEVER BEEN
+# UPLOADED BY THIS SCRIPT. Measured on the server on 7 September 2026:
+#
+#     index.html, i/, .well-known/, the marks   2026-09-07 12:30
+#     conditions-generales/index.html           2026-09-05 04:57
+#     confidentialite/index.html                2026-09-05 05:07
+#
+# Everything else was deployed that morning; the legal pages had not moved in
+# two days, through every deployment in between. The privacy policy served was
+# the one from before #102 -- it still claimed "il n'existe aucun tiers dans
+# cette application" while the application carried Firebase Cloud Messaging --
+# and no deployment could have fixed it.
+#
+# This is `build-site.sh`'s own defect, one layer down and unfixed. That script
+# copied `i/` and `.well-known/` BY NAME, so the two legal directories were
+# built into nothing; it was fixed on 18 August by copying by shape. The pages
+# have been built correctly ever since, and uploaded nowhere.
+#
+# One command, no exclusion. Without `--delete`, so `messagr.apk` -- which
+# lives on the server and not in the build -- stays where the block above put
+# it.
 echo "== site → $HOST:$SITE_DIR"
 # rsync --checksum: only files actually modified are pushed.
 rsync -av --checksum --rsync-path="sudo rsync" \
-  "$poussee/i/" "$HOST:$SITE_DIR/i/"
-rsync -av --checksum --rsync-path="sudo rsync" \
-  "$poussee/.well-known/" "$HOST:$SITE_DIR/.well-known/"
-# The root's own files, by shape and not by name: `--exclude='*/'` leaves the
-# two directories above to the two lines that already own them. Added the day
-# the apex stopped answering 403.
-rsync -av --checksum --exclude='*/' --rsync-path="sudo rsync" \
   "$poussee/" "$HOST:$SITE_DIR/"
 
 if [ "$MESSAGR_APK" = "none" ]; then
