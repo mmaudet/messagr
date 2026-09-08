@@ -44,6 +44,7 @@ const {
   refuseTheCallHere,
 } = require('./src/runtime/wakeAndLook')
 const {
+  missedNotification,
   readNotification,
   ringingNotification,
 } = require('./src/runtime/notifying')
@@ -114,6 +115,9 @@ function registerTheWake() {
       // instead of the messages when a poll carried both.
       ring: calling =>
         ringNotification(ringingNotification(calling.scope, calling.shown)),
+      // A call that is over, drawn over the ring it replaces.
+      missed: (calling, at) =>
+        missedNotification(calling.scope, calling.shown, at),
     })
     // The one line anybody debugging a push has. There is no screen here.
     logEvent('info', 'MESSAGR_WOKE', outcome)

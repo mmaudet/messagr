@@ -359,6 +359,7 @@ export const nl: Readonly<Record<CopyKey, string>> = {
   notify_blind_body: 'Er is iets aangekomen.',
   notify_channel: 'Berichten',
   notify_ringing_body: 'Inkomende oproep',
+  'notify_missed %1$d %2$d': 'Gemiste oproep om %1$d:%2$d',
   notify_ringing_channel: 'Oproepen',
   notify_answer: 'Opnemen',
   notify_decline: 'Weigeren',

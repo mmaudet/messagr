@@ -35,6 +35,7 @@ function looking(over: Partial<Looking> = {}): Looking {
     // the ringing block is about messages.
     openCalls: async () => [],
     takeTheKeys: async () => {},
+    now: () => 1_700_000_000_000,
     names: { all: async () => new Map(), set: async () => true },
     selfUserId: ME,
     lastRead: new Map(),

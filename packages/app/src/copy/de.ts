@@ -366,6 +366,7 @@ export const de: Readonly<Record<CopyKey, string>> = {
   notify_blind_body: 'Es ist etwas angekommen.',
   notify_channel: 'Nachrichten',
   notify_ringing_body: 'Eingehender Anruf',
+  'notify_missed %1$d %2$d': 'Verpasster Anruf um %1$d:%2$d',
   notify_ringing_channel: 'Anrufe',
   notify_answer: 'Annehmen',
   notify_decline: 'Ablehnen',

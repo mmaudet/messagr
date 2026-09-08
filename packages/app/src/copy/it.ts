@@ -358,6 +358,7 @@ export const it: Readonly<Record<CopyKey, string>> = {
   notify_blind_body: 'È arrivato qualcosa.',
   notify_channel: 'Messaggi',
   notify_ringing_body: 'Chiamata in arrivo',
+  'notify_missed %1$d %2$d': 'Chiamata persa alle %1$d:%2$d',
   notify_ringing_channel: 'Chiamate',
   notify_answer: 'Rispondi',
   notify_decline: 'Rifiuta',

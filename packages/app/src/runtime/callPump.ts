@@ -13,7 +13,7 @@ import {
   type CallSessionFailure,
 } from '../calls/session'
 import type { CallEvent } from '../calls/wire'
-import { deviceCallAudio } from './callAudio'
+import { deviceCallAudio, type CallRole } from './callAudio'
 import { deviceMedia } from './callMedia'
 import { encryptingDeps } from './cryptoPump'
 import { sendIntoScope } from './encryptAndSend'
@@ -209,7 +209,11 @@ export function startCallRuntime(
     }
   }
 
-  function begin(scope: string, peerUserId: string): DeviceCall & CallOnScreen {
+  function begin(
+    scope: string,
+    peerUserId: string,
+    role: CallRole,
+  ): DeviceCall & CallOnScreen {
     const started = startDeviceCall(
       sessionClient,
       scope,
@@ -222,6 +226,11 @@ export function startCallRuntime(
         ownPartyId: credentials.deviceId,
       },
       state => {
+        // THE RINGBACK STOPS WHEN THE FAR END PICKS UP, NOT WHEN THE CALL
+        // ENDS. A tone still playing under somebody's voice is the loudest
+        // possible way of saying the application has lost track of its own
+        // call.
+        if (state.call !== 'outgoingInvite') deviceCallAudio.stopRinging()
         if (held !== null) held = { ...held, state }
         onChanged(held === null ? null : { ...held })
       },
@@ -247,7 +256,7 @@ export function startCallRuntime(
     // said `MODE_NORMAL` with no mode owner while two people were talking.
     // That is the whole hazard of this dependency -- everything works
     // without it, slightly wrong, and only a platform dump says so.
-    deviceCallAudio.begin()
+    deviceCallAudio.begin(role)
     onChanged({ ...call })
     return call
   }
@@ -283,14 +292,14 @@ export function startCallRuntime(
         // caller already has a session; starting a second one to be rung by
         // itself is the loop this guard exists to refuse.
         if (from === credentials.userId) continue
-        begin(scope, from).session.receive(opened)
+        begin(scope, from, 'callee').session.receive(opened)
         return
       }
     },
 
     place: async (scope, peerUserId) => {
       if (held !== null) throw new Error('a call is already running')
-      await refusable(begin(scope, peerUserId).session.place())
+      await refusable(begin(scope, peerUserId, 'caller').session.place())
     },
     answer: async () => {
       const running = held

@@ -103,6 +103,7 @@ export async function lookForWhatArrivedHere(): Promise<WhatWoke | null> {
       // and reported `missing_key` for events whose key was sitting beside
       // them.
       takeTheKeys: sync => receiveSyncChanges(encryptionSlice(sync)),
+      now: () => Date.now(),
       names: notebook.names,
       selfUserId: session.userId,
       lastRead: await notebook.lastRead.all(),

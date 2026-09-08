@@ -360,6 +360,7 @@ export const es: Readonly<Record<CopyKey, string>> = {
   notify_blind_body: 'Ha llegado algo.',
   notify_channel: 'Mensajes',
   notify_ringing_body: 'Llamada entrante',
+  'notify_missed %1$d %2$d': 'Llamada perdida a las %1$d:%2$d',
   notify_ringing_channel: 'Llamadas',
   notify_answer: 'Contestar',
   notify_decline: 'Rechazar',

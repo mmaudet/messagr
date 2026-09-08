@@ -361,6 +361,7 @@ export const en: Readonly<Record<CopyKey, string>> = {
   notify_blind_body: 'Something arrived.',
   notify_channel: 'Messages',
   notify_ringing_body: 'Incoming call',
+  'notify_missed %1$d %2$d': 'Missed call at %1$d:%2$d',
   notify_ringing_channel: 'Calls',
   notify_answer: 'Answer',
   notify_decline: 'Decline',

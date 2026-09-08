@@ -539,6 +539,7 @@ export const fr = {
   notify_blind_body: 'Quelque chose est arrivé.',
   notify_channel: 'Messages',
   notify_ringing_body: 'Appel entrant',
+  'notify_missed %1$d %2$d': 'Appel manqué à %1$dh%2$d',
   notify_ringing_channel: 'Appels',
   notify_answer: 'Répondre',
   notify_decline: 'Refuser',
