@@ -14,6 +14,18 @@
     <uses-permission android:name="android.permission.RECORD_AUDIO" />
     <uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS" />
 
+    <!-- LE PLEIN ÉCRAN SUR UN TÉLÉPHONE VERROUILLÉ.
+         Sans cette permission, un appel entrant est une ligne de plus sur
+         l'écran de verrouillage, à remarquer en quatre-vingt-dix secondes.
+         Avec elle, Android allume l'écran et met l'application devant la
+         personne — ce que fait un téléphone qui sonne.
+
+         Android 14 ne l'accorde à l'installation qu'aux applications d'appel
+         et de réveil. Celle-ci en est une depuis qu'elle passe des appels ;
+         si la plateforme la refuse malgré tout, `ringNotification` reste
+         dessinée, dans la catégorie « appel » et avec ses deux réponses. -->
+    <uses-permission android:name="android.permission.USE_FULL_SCREEN_INTENT" />
+
     <!--
       React Native's own debug-build manifest fragment
       (ReactAndroid/src/debug/AndroidManifest.xml) declares this for its

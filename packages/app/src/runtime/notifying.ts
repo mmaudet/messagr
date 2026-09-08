@@ -71,6 +71,44 @@ export function readNotification(
  * application, which then syncs and shows the list with something waiting.
  * That is the honest destination, not a fallback.
  */
+/**
+ * A ringing call, as a notification.
+ *
+ * # THE IDENTIFIER SAYS IT IS A CALL, BECAUSE THE PRESS HAS TO KNOW
+ *
+ * A press on a message notification opens the conversation; a press on this
+ * one has to land in the call, and by the time it is read there is nothing
+ * left but the identifier. Prefixing it is what `answeredCallOfPress` reads
+ * back, and it keeps the two kinds from colliding on a conversation that has
+ * both.
+ */
+const RINGING = 'ringing:'
+
+export function ringingNotification(
+  scope: string,
+  shown: string,
+): Notification {
+  return {
+    id: `${RINGING}${scope}`,
+    title: shown,
+    body: t('notify_ringing_body'),
+  }
+}
+
+/**
+ * The conversation a ringing notification was about, or `null` when the
+ * press was not one.
+ */
+export function ringingOfPress(id: string | undefined): string | null {
+  return id !== undefined && id.startsWith(RINGING)
+    ? id.slice(RINGING.length)
+    : null
+}
+
 export function scopeOfPress(id: string | undefined): string | null {
-  return id === undefined || id === BLIND_ID ? null : id
+  if (id === undefined || id === BLIND_ID) return null
+  // A ringing press is not a conversation press. It carries the same scope
+  // and means something else entirely, and the caller that wants the
+  // conversation must not be handed one for a call it never answered.
+  return ringingOfPress(id) === null ? id : null
 }

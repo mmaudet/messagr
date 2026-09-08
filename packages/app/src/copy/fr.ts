@@ -538,6 +538,10 @@ export const fr = {
   notify_blind_title: 'Messagr',
   notify_blind_body: 'Quelque chose est arrivé.',
   notify_channel: 'Messages',
+  notify_ringing_body: 'Appel entrant',
+  notify_ringing_channel: 'Appels',
+  notify_answer: 'Répondre',
+  notify_decline: 'Refuser',
 
   // Photographs. `image_alt` is what a screen reader says: not a description
   // of the picture, which nothing here can produce, but what the thing is.
