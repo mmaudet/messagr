@@ -39,46 +39,96 @@ const {
   getMessaging,
 } = require('@react-native-firebase/messaging')
 const { wake } = require('./src/runtime/wake')
-const { lookForWhatArrivedHere } = require('./src/runtime/wakeAndLook')
-const { readNotification } = require('./src/runtime/notifying')
+const {
+  lookForWhatArrivedHere,
+  refuseTheCallHere,
+} = require('./src/runtime/wakeAndLook')
+const {
+  readNotification,
+  ringingNotification,
+} = require('./src/runtime/notifying')
 const {
   drawNotification,
   rememberBackgroundPresses,
+  ringNotification,
 } = require('./src/runtime/showNotification')
 const { logEvent } = require('./src/runtime/log')
 const { wakeIsAllowed } = require('./src/runtime/wakeSetting')
 const { wakeSecrets } = require('./src/runtime/deviceSecrets')
 
-setBackgroundMessageHandler(getMessaging(), async () => {
-  // THE SETTING IS CHECKED HERE TOO, AND NOT ONLY AT REGISTRATION.
-  //
-  // Turning notifications off removes the pusher, so in the ordinary case
-  // nothing arrives to be handled. This is the case where something does
-  // anyway: a push already in flight, or a homeserver that has not yet
-  // stopped. Drawing it would be the switch reading as off while a
-  // notification appears, which is the thing the switch exists to prevent.
-  if (!(await wakeIsAllowed(wakeSecrets))) {
-    logEvent('info', 'MESSAGR_WOKE', {
-      drew: 'nothing',
-      reason: 'switched off',
-    })
-    return
-  }
-
-  const outcome = await wake({
-    lookForWhatArrived: lookForWhatArrivedHere,
-    draw: drawNotification,
-    describe: arrival =>
-      readNotification(arrival.scope, arrival.shown, arrival.preview),
-  })
-  // The one line anybody debugging a push has. There is no screen here.
-  logEvent('info', 'MESSAGR_WOKE', outcome)
-})
-
-// AT MODULE SCOPE, WHICH IS THE ONLY PLACE IT WORKS.
+// GARDÉ, PARCE QU'UN SERVICE DE NOTIFICATION NON CONFIGURÉ A TUÉ
+// L'APPLICATION ENTIÈRE SUR iOS.
 //
-// notifee refuses to hold a press without a background handler, and said so
-// on a device: "no background event handler has been set". Registered inside
-// a component it does not exist when the process is headless -- which is
-// every case a background press happens in.
-rememberBackgroundPresses()
+// `getMessaging()` lève `No Firebase App '[DEFAULT]' has been created` quand
+// rien n'a initialisé Firebase. Sur Android, `google-services.json` et le
+// greffon Gradle le font ; sur iOS il faut `GoogleService-Info.plist` et
+// `FirebaseApp.configure()`, et l'application n'en avait aucun des deux.
+//
+// Au niveau du module, cette exception interrompt l'évaluation du bundle.
+// En débogage elle donne un écran rouge ; en production elle donne un écran
+// NOIR et rien d'autre : `AppRegistry.registerComponent` a bien eu lieu au-
+// dessus, mais le moteur ne se déclare jamais prêt, donc rien n'est monté.
+// Rapporté par le premier testeur TestFlight le 7 septembre 2026, et
+// invisible jusque-là parce que la CI CONSTRUIT le simulateur sans jamais
+// le LANCER.
+//
+// La règle, plus large que ce bogue : **une messagerie dont l'interface ne
+// s'affiche pas parce qu'un service de réveil n'est pas configuré se trompe
+// de priorité.** Ne pas pouvoir être réveillé est une dégradation ; ne rien
+// dessiner est une panne. Ce `try` transforme la seconde en la première.
+//
+// La ligne de journal est le seul témoin qu'aura quelqu'un qui cherche
+// pourquoi les notifications ne partent pas sur une plateforme donnée.
+try {
+  registerTheWake()
+} catch (cause) {
+  logEvent('error', 'MESSAGR_WAKE_UNAVAILABLE', {
+    reason: cause instanceof Error ? cause.message : String(cause),
+  })
+}
+
+function registerTheWake() {
+  setBackgroundMessageHandler(getMessaging(), async () => {
+    // THE SETTING IS CHECKED HERE TOO, AND NOT ONLY AT REGISTRATION.
+    //
+    // Turning notifications off removes the pusher, so in the ordinary case
+    // nothing arrives to be handled. This is the case where something does
+    // anyway: a push already in flight, or a homeserver that has not yet
+    // stopped. Drawing it would be the switch reading as off while a
+    // notification appears, which is the thing the switch exists to prevent.
+    if (!(await wakeIsAllowed(wakeSecrets))) {
+      logEvent('info', 'MESSAGR_WOKE', {
+        drew: 'nothing',
+        reason: 'switched off',
+      })
+      return
+    }
+
+    const outcome = await wake({
+      lookForWhatArrived: lookForWhatArrivedHere,
+      draw: drawNotification,
+      describe: arrival =>
+        readNotification(arrival.scope, arrival.shown, arrival.preview),
+      // A ringing telephone, which is a different notification on a
+      // different channel with two answers on it. `wake.ts` draws this
+      // instead of the messages when a poll carried both.
+      ring: calling =>
+        ringNotification(ringingNotification(calling.scope, calling.shown)),
+    })
+    // The one line anybody debugging a push has. There is no screen here.
+    logEvent('info', 'MESSAGR_WOKE', outcome)
+  })
+
+  // AT MODULE SCOPE, WHICH IS THE ONLY PLACE IT WORKS.
+  //
+  // notifee refuses to hold a press without a background handler, and said so
+  // on a device: "no background event handler has been set". Registered inside
+  // a component it does not exist when the process is headless -- which is
+  // every case a background press happens in.
+  //
+  // Inside the guard with the handler above: both belong to being woken, and
+  // a device that cannot be woken has nothing to hold a press for.
+  // The refusal needs a session and a crypto machine, which is everything
+  // the notification adapter exists not to know about -- so it is handed in.
+  rememberBackgroundPresses(refuseTheCallHere)
+}

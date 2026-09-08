@@ -20,6 +20,8 @@ const encode = (text: string) => new TextEncoder().encode(text)
 
 function machine(
   bodies: Record<string, string | Error>,
+  /** The inner event type per id. A message unless said otherwise. */
+  types: Record<string, string> = {},
 ): TimelineMachine & { scopes: string[] } {
   const scopes: string[] = []
   return {
@@ -33,7 +35,10 @@ function machine(
       }
       // Named `ciphertext` and carrying the plaintext: the library's own
       // naming on this direction, which receiveDecrypt.ts also matches.
-      return { ciphertext: encode(JSON.stringify({ body: answer })) }
+      return {
+        eventType: types[id] ?? 'm.room.message',
+        ciphertext: encode(JSON.stringify({ body: answer })),
+      }
     },
   }
 }
@@ -99,6 +104,70 @@ describe('toTimelineEntries', () => {
     expect(entries[0]).toMatchObject({ eventId: '$a', body: 'lisible' })
     expect(entries[1]?.body).toBeNull()
     expect(entries[1]?.reason).toBeTruthy()
+  })
+
+  it('draws nothing at all for an event that was taken back', async () => {
+    // THE ONE THAT WOULD HAVE CAUGHT IT. A redaction strips the content and
+    // leaves the shell: an `m.room.encrypted` with no ciphertext, which
+    // cannot decrypt and was therefore drawn as "its key never arrived" --
+    // a phantom message in the account's own name. Every redaction this
+    // application makes is somebody taking a reaction back, and a reaction
+    // taken back must leave nothing behind.
+    const entries = await entriesOf(
+      machine({ $a: 'lisible' }),
+      decodeUtf8,
+      '!room:messagr.eu',
+      [
+        encrypted('$a', 1000),
+        {
+          ...encrypted('$gone', 2000),
+          content: {},
+          unsigned: { redacted_because: { type: 'm.room.redaction' } },
+        },
+      ],
+    )
+    expect(entries).toHaveLength(1)
+    expect(entries[0]?.eventId).toBe('$a')
+  })
+
+  it('does not ask the crypto machine to open an event that is not there', async () => {
+    // Not only cosmetic: a redacted event has no ciphertext, so every
+    // attempt is a failure the log would report as a decryption fault.
+    const opener = machine({})
+    await entriesOf(opener, decodeUtf8, '!room:messagr.eu', [
+      {
+        ...encrypted('$gone', 2000),
+        content: {},
+        unsigned: { redacted_because: { type: 'm.room.redaction' } },
+      },
+    ])
+    expect(opener.scopes).toEqual([])
+  })
+
+  it('draws no bubble for a call, which is signalling and not speech', async () => {
+    // THE ONE THAT WOULD HAVE CAUGHT IT. `m.call.*` goes into the
+    // conversation encrypted -- an unencrypted `party_id` would tell the
+    // timeline which of somebody's devices is on a call -- so it arrives
+    // here exactly like a message, decrypts perfectly and carries no `body`.
+    // Every invite, answer and candidate list drew "message illisible sur
+    // cet appareil", and one call would have filled the conversation.
+    const entries = await entriesOf(
+      machine(
+        { $a: 'lisible', $invite: '', $candidates: '' },
+        {
+          $invite: 'm.call.invite',
+          $candidates: 'm.call.candidates',
+        },
+      ),
+      decodeUtf8,
+      '!room:messagr.eu',
+      [
+        encrypted('$a', 1000),
+        encrypted('$invite', 2000),
+        encrypted('$candidates', 3000),
+      ],
+    )
+    expect(entries.map(entry => entry.eventId)).toEqual(['$a'])
   })
 
   it('keeps the sender the event claims, and calls it claimed', async () => {

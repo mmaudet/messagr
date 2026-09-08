@@ -189,6 +189,10 @@ export const de: Readonly<Record<CopyKey, string>> = {
     'Sie kommen per Einladung herein, nicht per Formular',
   promise_action: 'Beginnen',
   list_title: 'Unterhaltungen',
+  list_invitation_ignored:
+    'Sie haben eine Einladung geöffnet, und dieses Telefon hat bereits ein Konto. Sie wurde nicht verbraucht und gilt weiterhin für die Person, für die sie bestimmt war.',
+  list_not_in_yet:
+    'Sie sind noch nicht drin. Öffnen Sie den Einladungslink, den Ihnen jemand geschickt hat: er ist die einzige Tür, und davor kann die Anwendung nichts tun.',
   list_empty:
     'Noch keine Unterhaltung. Laden Sie jemanden ein, um eine zu beginnen.',
   list_nothing_said: 'Es wurde noch nichts gesagt',
@@ -300,6 +304,31 @@ export const de: Readonly<Record<CopyKey, string>> = {
     'Der Reiter ist ab V1 reserviert, damit sich die Leiste später nicht verschiebt. V1 überträgt nur Text, Links und unbewegte Bilder; Sprachnachrichten in V2, Einzel- und dann Gruppenanrufe in V3.',
   calls_soon_v2: 'V2 · Sprachnachrichten',
   calls_soon_v3: 'V3 · Audio + Video',
+  // A call in progress. One screen draws every one of these -- see
+  // `CallScreen.tsx` -- so what changes between two states is exactly this
+  // sentence and which buttons sit under it.
+  call_start: 'Anrufen',
+  call_ringing: 'Anruf läuft …',
+  call_incoming: 'Eingehender Anruf',
+  call_connecting: 'Verbindung wird hergestellt …',
+  call_active: 'Im Gespräch',
+  call_reconnecting: 'Erneute Verbindung …',
+  call_ended_hung_up: 'Anruf beendet',
+  call_ended_unanswered: 'Niemand hat abgenommen',
+  call_ended_declined: 'Anruf abgelehnt',
+  call_ended_failed: 'Die Verbindung kam nicht zustande',
+  call_ended_elsewhere: 'Auf einem anderen Gerät angenommen',
+  call_ended_unreachable: 'Diese Person war nicht erreichbar',
+  call_answer: 'Annehmen',
+  call_reject: 'Ablehnen',
+  call_hangup: 'Auflegen',
+  call_mute: 'Mikrofon aus',
+  call_unmute: 'Mikrofon ein',
+  call_speaker: 'Lautsprecher',
+  call_dismiss: 'Schließen',
+  call_failed_no_relay:
+    'Dieser Server hat kein Anrufrelais: Der Anruf war nicht möglich.',
+  call_failed_no_microphone: 'Das Mikrofon ist nicht verfügbar.',
   community_soon_title: 'Bald: Communitys und Räume',
   community_soon_why:
     'Eine Community fasst Räume unter einem pseudonymen Objekt zusammen. Der Reiter ist aus demselben Grund reserviert wie der für Anrufe: die Leiste darf sich nicht verschieben, wenn sie kommen.',
@@ -336,6 +365,10 @@ export const de: Readonly<Record<CopyKey, string>> = {
   notify_blind_title: 'Messagr',
   notify_blind_body: 'Es ist etwas angekommen.',
   notify_channel: 'Nachrichten',
+  notify_ringing_body: 'Eingehender Anruf',
+  notify_ringing_channel: 'Anrufe',
+  notify_answer: 'Annehmen',
+  notify_decline: 'Ablehnen',
   image_alt: 'Foto',
   image_unreadable:
     'Dieses Foto konnte auf diesem Gerät nicht geöffnet werden.',

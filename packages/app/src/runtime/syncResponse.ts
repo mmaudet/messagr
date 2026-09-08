@@ -92,6 +92,37 @@ export function readChangedScopes(
 }
 
 /**
+ * The raw timeline events each conversation carried, by conversation.
+ *
+ * # WHY THE LOOP HANDS BACK EVENTS AND NOT ONLY THE NEWS THAT THERE ARE SOME
+ *
+ * `readChangedScopes` answers *which* conversations moved, which is all a
+ * screen needs: it re-reads the conversation and derives it again. A call
+ * cannot work that way. Signalling is a conversation of its own -- an invite,
+ * an answer, candidates that keep arriving for as long as ICE gathers -- and
+ * every one of those has to reach the call session in the order it arrived
+ * and without a round trip. Asking `/messages` again for events this poll
+ * already carried would add a request and a reordering to the one part of
+ * the product where latency is audible.
+ *
+ * They are the raw events, still encrypted: this module reads a sync
+ * response and does not hold a crypto machine. Whoever wants what is inside
+ * decrypts them.
+ */
+export function readTimelineEvents(
+  sync: Record<string, unknown>,
+): ReadonlyMap<string, readonly unknown[]> {
+  const found = new Map<string, readonly unknown[]>()
+  const joined = asRecord(asRecord(sync.rooms)?.join)
+  if (joined === null) return found
+  for (const [scope, room] of Object.entries(joined)) {
+    const events = asRecord(asRecord(room)?.timeline)?.events
+    if (Array.isArray(events) && events.length > 0) found.set(scope, events)
+  }
+  return found
+}
+
+/**
  * `null` for anything that is not a plain object, arrays included. Every read
  * above walks a path the homeserver could have sent differently, and a walk
  * that assumed its shape would turn a strange response into a crash inside

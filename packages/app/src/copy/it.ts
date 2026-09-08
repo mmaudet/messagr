@@ -181,6 +181,10 @@ export const it: Readonly<Record<CopyKey, string>> = {
   promise_point_invitation: 'Si entra su invito, non compilando un modulo',
   promise_action: 'Cominciare',
   list_title: 'Conversazioni',
+  list_invitation_ignored:
+    'Ha aperto un invito e questo telefono ha già un account. Non è stato usato: resta valido per la persona a cui era destinato.',
+  list_not_in_yet:
+    'Non è ancora entrato. Apra il link di invito che le hanno mandato: è l’unica porta, e prima l’applicazione non può fare nulla.',
   list_empty:
     'Nessuna conversazione per ora. Inviti qualcuno per cominciarne una.',
   list_nothing_said: 'Non è ancora stato detto nulla',
@@ -292,6 +296,31 @@ export const it: Readonly<Record<CopyKey, string>> = {
     'La scheda è riservata fin dalla V1 per non spostare la barra più tardi. La V1 trasporta solo testo, link e immagini fisse; note vocali in V2, chiamate individuali e poi di gruppo in V3.',
   calls_soon_v2: 'V2 · note vocali',
   calls_soon_v3: 'V3 · audio + video',
+  // A call in progress. One screen draws every one of these -- see
+  // `CallScreen.tsx` -- so what changes between two states is exactly this
+  // sentence and which buttons sit under it.
+  call_start: 'Chiama',
+  call_ringing: 'Chiamata in corso…',
+  call_incoming: 'Chiamata in arrivo',
+  call_connecting: 'Connessione…',
+  call_active: 'In chiamata',
+  call_reconnecting: 'Riconnessione…',
+  call_ended_hung_up: 'Chiamata terminata',
+  call_ended_unanswered: 'Nessuno ha risposto',
+  call_ended_declined: 'Chiamata rifiutata',
+  call_ended_failed: 'Non è stato possibile stabilire la connessione',
+  call_ended_elsewhere: 'Risposta da un altro dispositivo',
+  call_ended_unreachable: 'Non è stato possibile raggiungere questa persona',
+  call_answer: 'Rispondi',
+  call_reject: 'Rifiuta',
+  call_hangup: 'Riaggancia',
+  call_mute: 'Disattiva il microfono',
+  call_unmute: 'Attiva il microfono',
+  call_speaker: 'Vivavoce',
+  call_dismiss: 'Chiudi',
+  call_failed_no_relay:
+    'Questo server non ha un relay per le chiamate: la chiamata non è partita.',
+  call_failed_no_microphone: 'Il microfono non è disponibile.',
   community_soon_title: 'Presto: comunità e stanze',
   community_soon_why:
     'Una comunità raggruppa stanze sotto un oggetto pseudonimo. La scheda è riservata per la stessa ragione di quella delle chiamate: la barra non deve spostarsi quando arriveranno.',
@@ -328,6 +357,10 @@ export const it: Readonly<Record<CopyKey, string>> = {
   notify_blind_title: 'Messagr',
   notify_blind_body: 'È arrivato qualcosa.',
   notify_channel: 'Messaggi',
+  notify_ringing_body: 'Chiamata in arrivo',
+  notify_ringing_channel: 'Chiamate',
+  notify_answer: 'Rispondi',
+  notify_decline: 'Rifiuta',
   image_alt: 'Foto',
   image_unreadable:
     'Non è stato possibile aprire questa foto su questo dispositivo.',

@@ -1,11 +1,15 @@
 // The one module that names `@notifee/react-native`. See `pushDevice.ts` for
 // the rule; what this adapts is `notifying.ts`, which decides what a
 // notification says and is tested without a device.
-import notifee, { AndroidImportance, EventType } from '@notifee/react-native'
+import notifee, {
+  AndroidCategory,
+  AndroidImportance,
+  EventType,
+} from '@notifee/react-native'
 
 import { t } from '../copy'
 import { color } from '../design/tokens'
-import { scopeOfPress, type Notification } from './notifying'
+import { ringingOfPress, scopeOfPress, type Notification } from './notifying'
 
 /**
  * Drawing a notification.
@@ -27,6 +31,20 @@ import { scopeOfPress, type Notification } from './notifying'
 const CHANNEL = 'messages'
 
 /**
+ * A SECOND CHANNEL, BECAUSE A CALL IS NOT A MESSAGE.
+ *
+ * Not a louder setting on the first one: a channel is what a person turns
+ * off, and somebody who silences message notifications has not said they
+ * want to miss calls. Two channels are two switches, which is the only way
+ * that distinction can be made on Android at all.
+ */
+const RINGING_CHANNEL = 'calls'
+
+/** What a press on a ringing notification asked for. */
+export const ANSWER = 'answer'
+export const DECLINE = 'decline'
+
+/**
  * What a tap does, wired once at launch.
  *
  * Three ways in, and a notification tapped from a cold start arrives by the
@@ -36,18 +54,44 @@ const CHANNEL = 'messages'
  */
 export function whenNotificationPressed(
   open: (scope: string | null) => void,
+  /**
+   * What a press on a ringing telephone asked for.
+   *
+   * Separate from `open`, because it is a different destination: a
+   * conversation is a screen somebody navigates to, and a call is something
+   * they just said yes or no to. Absent while nothing can answer one.
+   */
+  answered?: (call: {
+    readonly scope: string
+    readonly answered: boolean
+  }) => void,
 ): () => void {
+  // A PRESS THAT ANSWERED A CALL IS NOT A PRESS THAT OPENED A CONVERSATION,
+  // and both arrive here through the same three doors.
+  const route = (id: string | undefined, action: string | undefined): void => {
+    const call = answeredCallOfPress(id, action)
+    if (call !== null) {
+      answered?.(call)
+      return
+    }
+    open(scopeOfPress(id))
+  }
+
   notifee
     .getInitialNotification()
     .then(initial => {
-      if (initial !== null) open(scopeOfPress(initial.notification.id))
+      if (initial !== null) {
+        route(initial.notification.id, initial.pressAction?.id)
+      }
     })
     .catch(() => {
       // A launch is not worth losing over a notification that may not exist.
     })
 
   return notifee.onForegroundEvent(({ type, detail }) => {
-    if (type === EventType.PRESS) open(scopeOfPress(detail.notification?.id))
+    if (type === EventType.PRESS || type === EventType.ACTION_PRESS) {
+      route(detail.notification?.id, detail.pressAction?.id)
+    }
   })
 }
 
@@ -64,8 +108,36 @@ export function whenNotificationPressed(
  * notification through `getInitialNotification`. Answering here and there
  * both would open the conversation twice.
  */
-export function rememberBackgroundPresses(): void {
-  notifee.onBackgroundEvent(async () => {
+export function rememberBackgroundPresses(
+  /**
+   * Refuses the call in a conversation, from a process with no screen.
+   *
+   * Injected rather than imported, because this module is the notifee
+   * adapter and refusing a call is a session, a crypto machine and an
+   * encrypted send -- everything this file exists not to know about.
+   */
+  refuse?: (scope: string) => Promise<unknown>,
+): void {
+  notifee.onBackgroundEvent(async ({ type, detail }) => {
+    // REFUSING IS THE ONE PRESS THAT MUST NOT OPEN THE APPLICATION.
+    //
+    // Everything else is remembered and read again by the application that
+    // starts afterwards, through `getInitialNotification`. Saying no on a
+    // locked screen is a person deciding not to be interrupted, and opening
+    // the interface at them is the opposite of what they pressed.
+    if (type === EventType.ACTION_PRESS && detail.pressAction?.id === DECLINE) {
+      const scope = ringingOfPress(detail.notification?.id)
+      if (scope !== null) {
+        await notifee.cancelNotification(detail.notification?.id ?? '')
+        try {
+          await refuse?.(scope)
+        } catch {
+          // Nothing to report to. The notification is already down, which is
+          // the half the person pressing can see.
+        }
+      }
+      return
+    }
     // Nothing to do, and registering is the point: without a handler notifee
     // warns and the press is dropped before the application can read it.
   })
@@ -101,4 +173,97 @@ export async function drawNotification(
       color: color.brand.green500,
     },
   })
+}
+
+/**
+ * A telephone ringing, on a screen nobody has unlocked.
+ *
+ * # WHAT MAKES IT INTERRUPT IS NOT A HIGHER NUMBER
+ *
+ * `drawNotification` above reserved `MAX` for "something that interrupts --
+ * a call, when there are calls". There are calls, and there is no `MAX`:
+ * notifee's `AndroidImportance` stops at `HIGH`, because Android's own
+ * `IMPORTANCE_MAX` is documented as unused. Read out of the library's
+ * enumeration rather than assumed, and the comment above is now wrong about
+ * the mechanism while being right about the intent.
+ *
+ * What actually separates a ringing telephone from a message here is three
+ * things that have nothing to do with importance: its own channel,
+ * `category: CALL`, and the full-screen intent below.
+ *
+ * # THE FULL-SCREEN INTENT IS THE WHOLE FEATURE
+ *
+ * A heads-up notification on a locked screen is a line somebody has to
+ * notice within ninety seconds. `fullScreenAction` is what makes Android
+ * light the screen and put the application in front of them instead, which
+ * is what a ringing telephone does and what #89 asks for. It needs
+ * `USE_FULL_SCREEN_INTENT` in the manifest; Android 14 grants that
+ * permission by installation only to applications that are calling or
+ * alarm applications, which this now is.
+ *
+ * If the platform refuses it -- an older Android, a manufacturer that
+ * ignores it -- the notification is still drawn, still in the call
+ * category, still with its two actions. That is the degraded case and it is
+ * a usable one.
+ *
+ * # ONGOING, SO IT CANNOT BE SWIPED INTO SILENCE
+ *
+ * A call that is ringing is not a line to dismiss. It goes when the call
+ * goes -- answered, declined, or expired -- and until then swiping it away
+ * would leave somebody waiting on a telephone that stopped saying so.
+ */
+export async function ringNotification(
+  notification: Notification,
+): Promise<void> {
+  const channelId = await notifee.createChannel({
+    id: RINGING_CHANNEL,
+    name: t('notify_ringing_channel'),
+    importance: AndroidImportance.HIGH,
+  })
+
+  await notifee.displayNotification({
+    id: notification.id,
+    title: notification.title,
+    body: notification.body,
+    android: {
+      channelId,
+      // What tells Android this is a telephone call rather than a message:
+      // it is what puts the notification above the others, keeps it out of
+      // the summarised group, and lets Do Not Disturb's "allow calls"
+      // exception apply to it.
+      category: AndroidCategory.CALL,
+      importance: AndroidImportance.HIGH,
+      ongoing: true,
+      autoCancel: false,
+      fullScreenAction: { id: 'default' },
+      pressAction: { id: 'default' },
+      actions: [
+        { title: t('notify_answer'), pressAction: { id: ANSWER } },
+        { title: t('notify_decline'), pressAction: { id: DECLINE } },
+      ],
+      smallIcon: 'ic_notification',
+      color: color.brand.green500,
+    },
+  })
+}
+
+/** Takes a ringing notification down, whatever became of the call. */
+export async function stopRinging(scope: string): Promise<void> {
+  await notifee.cancelNotification(`ringing:${scope}`)
+}
+
+/**
+ * What a press on a ringing notification asked for, and about which
+ * conversation. `null` when the press was not one.
+ */
+export function answeredCallOfPress(
+  id: string | undefined,
+  action: string | undefined,
+): { readonly scope: string; readonly answered: boolean } | null {
+  const scope = ringingOfPress(id)
+  if (scope === null) return null
+  // A press on the body is a press on "answer": somebody who taps a ringing
+  // telephone is picking it up. Only the explicit second action declines,
+  // which is the arrangement every telephone has.
+  return { scope, answered: action !== DECLINE }
 }

@@ -37,6 +37,7 @@ const IMAGE_WITH_THUMBNAIL = {
 function deps(over: Partial<SendingImageDeps> = {}): SendingImageDeps {
   let sealings = 0
   return {
+    shareTheKey: async () => undefined,
     seal: async bytes => {
       sealings += 1
       return {
@@ -79,6 +80,7 @@ describe('sendImage', () => {
     const upload = vi.fn(async () => 'mxc://h/abc')
     const result = await sendImage(
       deps({
+        shareTheKey: async () => undefined,
         seal: async () => {
           throw new Error('the machine refused')
         },
@@ -88,7 +90,10 @@ describe('sendImage', () => {
       IMAGE,
     )
     expect(upload).not.toHaveBeenCalled()
-    expect(result).toEqual({ sent: false, reason: 'the machine refused' })
+    expect(result).toEqual({
+      sent: false,
+      reason: 'sealing the photograph: the machine refused',
+    })
   })
 
   it('puts the secret inside the conversation encryption, not beside it', async () => {
@@ -127,6 +132,90 @@ describe('sendImage', () => {
     expect(upload).not.toHaveBeenCalled()
   })
 
+  it('shares the room key before it encrypts, and says so when it cannot', async () => {
+    // THE DEFECT THAT COST A PHOTOGRAPH. `encryptEvent` was called on its
+    // own. `encryptAndSend.ts` has always said that is not enough -- sharing
+    // queues to-device requests rather than sending them -- and in a
+    // conversation that had just been created there was no group session at
+    // all, so it failed outright with `crypto error: unknown`.
+    const order: string[] = []
+    expect(
+      await sendImage(
+        deps({
+          shareTheKey: async () => {
+            order.push('share')
+          },
+          machine: {
+            encryptEvent: async () => {
+              order.push('encrypt')
+              throw new Error('stop here')
+            },
+          },
+        }),
+        '!room:x',
+        IMAGE,
+      ),
+    ).toEqual({ sent: false, reason: 'encrypting the event: stop here' })
+    expect(order).toEqual(['share', 'encrypt'])
+  })
+
+  it('does not encrypt at all when the key could not be shared', async () => {
+    // A message encrypted for a room whose key nobody received is a message
+    // nobody can read, and it looks exactly like success from here.
+    const order: string[] = []
+    expect(
+      await sendImage(
+        deps({
+          shareTheKey: async () => {
+            throw new Error('two of the room key requests could not be sent')
+          },
+          machine: {
+            encryptEvent: async () => {
+              order.push('encrypt')
+              throw new Error('never reached')
+            },
+          },
+        }),
+        '!room:x',
+        IMAGE,
+      ),
+    ).toEqual({
+      sent: false,
+      reason:
+        'sharing the room key: two of the room key requests could not be sent',
+    })
+    expect(order).toEqual([])
+  })
+
+  it('names the step, so a device failure is diagnosable from one line', async () => {
+    // THE ONE THAT WOULD HAVE SAVED AN AFTERNOON. A photograph failed on a
+    // Pixel with `crypto error: unknown` -- the bridge's own words for a
+    // variant it cannot name -- and the report could not even say which of
+    // five operations had thrown. Four of them are ordinary failures with
+    // ordinary remedies; the fifth is a key problem, and telling them apart
+    // is the difference between "retry" and "this peer's devices are not
+    // known yet".
+    //
+    // Both halves are asserted: the step this file adds, and the original
+    // message it must not swallow.
+    expect(
+      await sendImage(
+        deps({
+          machine: {
+            encryptEvent: async () => {
+              throw new Error('crypto error: unknown')
+            },
+          },
+        }),
+        '!room:x',
+        IMAGE,
+      ),
+    ).toEqual({
+      sent: false,
+      reason: 'encrypting the event: crypto error: unknown',
+    })
+  })
+
   it('says what went wrong when the upload does', async () => {
     expect(
       await sendImage(
@@ -138,7 +227,10 @@ describe('sendImage', () => {
         '!room:x',
         IMAGE,
       ),
-    ).toEqual({ sent: false, reason: 'the media repository is full' })
+    ).toEqual({
+      sent: false,
+      reason: 'uploading the photograph: the media repository is full',
+    })
   })
 })
 
@@ -222,7 +314,7 @@ describe('sending the thumbnail beside the photograph', () => {
     )
     expect(result).toEqual({
       sent: false,
-      reason: 'the media repository is full',
+      reason: 'uploading the thumbnail: the media repository is full',
     })
     expect(upload).toHaveBeenCalledTimes(1)
     expect(send).not.toHaveBeenCalled()

@@ -11,7 +11,14 @@
 // it makes one here, where the boundary allows it.
 import { createClient } from 'matrix-js-sdk'
 
-import { loadConversation, startCryptoMachine } from './cryptoPump'
+import { openCallEvents } from '../calls/inbox'
+import { rejectEvent } from '../calls/wire'
+
+import {
+  encryptingDeps,
+  loadConversation,
+  startCryptoMachine,
+} from './cryptoPump'
 import {
   sessionSecrets,
   storeDirectorySecrets,
@@ -21,11 +28,13 @@ import { getErrorMessage } from './errors'
 import { logEvent } from './log'
 import { lookForWhatArrived } from './lookForWhatArrived'
 import { openNotebook } from './notebook'
+import { sendIntoScope } from './encryptAndSend'
 import { makePumpHttp } from './pump'
 import { loadSession } from './sessionStore'
 import { readStoreDirectory } from './storeDirectory'
 import { readSyncCursor } from './syncCursor'
-import type { Arrival } from './wake'
+import { fetchRoomMessages } from '../timeline/buildTimeline'
+import type { WhatWoke } from './wake'
 
 /**
  * What a woken device finds, or `null` when it cannot look.
@@ -48,9 +57,7 @@ import type { Arrival } from './wake'
  * There is no screen here. `MESSAGR_WAKE_BLIND` with the reason is the only
  * account anybody debugging a silent phone will ever get.
  */
-export async function lookForWhatArrivedHere(): Promise<
-  readonly Arrival[] | null
-> {
+export async function lookForWhatArrivedHere(): Promise<WhatWoke | null> {
   const blind = (reason: string) => {
     logEvent('info', 'MESSAGR_WAKE_BLIND', { reason })
     return null
@@ -83,11 +90,104 @@ export async function lookForWhatArrivedHere(): Promise<
       since: await readSyncCursor(syncCursorSecrets),
       readConversation: async scope =>
         (await loadConversation(sessionClient, scope, session.userId)).entries,
+      // The same reader the running application uses, bound to the machine
+      // this wake just started. `buildTimeline` draws no bubble for
+      // `m.call.*`, so the conversation above cannot answer this question --
+      // the raw events have to be opened again, for the one event type the
+      // timeline deliberately drops.
+      openCalls: (scope, events) =>
+        openCallEvents(encryptingDeps(sessionClient), scope, events),
       names: notebook.names,
       selfUserId: session.userId,
       lastRead: await notebook.lastRead.all(),
     })
   } catch (cause: unknown) {
     return blind(getErrorMessage(cause))
+  }
+}
+
+/**
+ * Refusing a call from a notification, in a process with no screen.
+ *
+ * # WHY THIS OPENS EVERYTHING AGAIN
+ *
+ * A press on "refuse" happens on a locked screen, and the handler that
+ * receives it runs headless: no application, no session, no crypto machine.
+ * The refusal has to be an encrypted event in the conversation like every
+ * other, so all three are opened for the one send -- the same preamble
+ * `lookForWhatArrivedHere` runs, for the same reason.
+ *
+ * # AND WHY IT IS WORTH IT
+ *
+ * Without it, refusing takes the notification down here and leaves the
+ * caller listening to a telephone that rings for the full ninety seconds of
+ * the invitation's lifetime. `m.call.reject` is the difference between
+ * "they said no" and "they never answered", and the specification is
+ * explicit that a rejection carries no reason: "the rejection of a call is
+ * always implicitly because the user chose not to answer it".
+ *
+ * Answers what happened rather than throwing. There is nobody to tell.
+ */
+export async function refuseTheCallHere(
+  scope: string,
+): Promise<{ readonly refused: boolean; readonly reason?: string }> {
+  const no = (reason: string) => {
+    logEvent('info', 'MESSAGR_CALL_NOT_REFUSED', { scope, reason })
+    return { refused: false, reason }
+  }
+
+  const where = await readStoreDirectory(storeDirectorySecrets)
+  if (where.dir === null) return no(where.reason)
+
+  const session = await loadSession(sessionSecrets)
+  if (session === null) return no('this device holds no session')
+
+  try {
+    const sessionClient = createClient(session)
+    const started = await startCryptoMachine(
+      sessionClient,
+      session,
+      where.dir,
+      () => {
+        // As above: nothing here to report a to-device failure to.
+      },
+    )
+    if (!started.started) return no(started.reason)
+
+    const deps = encryptingDeps(sessionClient)
+    // THE ROOM'S OWN RECENT EVENTS, NOT A SYNC.
+    //
+    // A sync would answer what changed since a cursor this must not
+    // advance, and the invitation may well be behind it -- it is what woke
+    // the device, which happened before this press. `/messages` asks the
+    // question actually being asked: what is the call in this conversation
+    // right now.
+    const events = await fetchRoomMessages(deps.http, scope, 20)
+    const calls = await openCallEvents(deps, scope, events)
+    const invite = [...calls]
+      .reverse()
+      .find(
+        event =>
+          (event as { type?: unknown }).type === 'm.call.invite' &&
+          (event as { sender?: unknown }).sender !== session.userId,
+      )
+    if (invite === undefined) return no('no invitation to refuse')
+
+    const content = (invite as { content?: { call_id?: unknown } }).content
+    const callId = content?.call_id
+    if (typeof callId !== 'string') return no('the invitation named no call')
+
+    // The device id as the party id, which is what the specification
+    // suggests and what the running application uses -- so a refusal from
+    // here and a refusal from the screen name the same device.
+    const refusal = rejectEvent(callId, session.deviceId)
+    const sent = await sendIntoScope(deps, scope, refusal.type, {
+      ...refusal.content,
+    })
+    if (!sent.sent) return no(sent.reason)
+    logEvent('info', 'MESSAGR_CALL_REFUSED', { scope })
+    return { refused: true }
+  } catch (cause: unknown) {
+    return no(getErrorMessage(cause))
   }
 }

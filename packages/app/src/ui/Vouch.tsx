@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { StyleSheet, Text, useColorScheme, View } from 'react-native'
+import { StyleSheet, Text, View } from 'react-native'
 
 import { t } from '../copy'
 import {
@@ -66,8 +66,20 @@ export interface VouchProps {
 
 export function Vouch({ entrantId, hasHistory, onVouch, state }: VouchProps) {
   const [asked, setAsked] = useState(false)
-  const dark = useColorScheme() === 'dark'
-  const palette = dark ? color.dark : color
+  // THE LIGHT PALETTE, NOT THE SYSTEM'S THEME.
+  //
+  // This read `useColorScheme()` and switched to `color.dark`. Four
+  // components did, and nothing else in the application does -- so on a
+  // phone set to dark mode these four turned dark inside screens that stayed
+  // pale: a black composer under a paper conversation, reported from an
+  // iPhone on 7 September 2026 with the words "meme pb de fond".
+  //
+  // The application has a light palette and a dark one reserved for surfaces
+  // that ASK for it -- the promise screen, a photograph full screen. Which
+  // ground a component sits on is its parent's business, which is why
+  // `LanguageStrip` takes `onDark` and does not guess. A component that reads
+  // the system theme is guessing, and it guessed wrong here.
+  const palette = color
 
   // `!asked` GUARDS THIS, AND WITHOUT IT THE BUTTON BELOW IS A LIE.
   //

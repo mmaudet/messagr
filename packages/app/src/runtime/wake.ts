@@ -34,10 +34,29 @@ export interface WakeDeps {
    * Opens the store and derives what arrived, or answers `null` when the
    * store will not open. `null` is the whole reason the blind case exists.
    */
-  readonly lookForWhatArrived: () => Promise<readonly Arrival[] | null>
+  readonly lookForWhatArrived: () => Promise<WhatWoke | null>
   readonly draw: (notification: Notification) => Promise<void>
   /** Builds what a decrypted arrival says. Injected so wording stays in copy. */
   readonly describe: (arrival: Arrival) => Notification
+  /**
+   * Draws a ringing call, which is a different thing from a notification: it
+   * takes the screen, it has two answers, and it stops when the call does.
+   * Injected like the rest, because a headless context is the one place
+   * nothing can be observed.
+   */
+  readonly ring: (calling: Calling) => Promise<void>
+}
+
+/** Somebody calling, as a wake found them. */
+export interface Calling {
+  readonly scope: string
+  readonly shown: string
+  readonly from: string
+}
+
+export interface WhatWoke {
+  readonly messages: readonly Arrival[]
+  readonly ringing: readonly Calling[]
 }
 
 export interface Arrival {
@@ -52,11 +71,18 @@ export type WakeOutcome =
   | { readonly drew: 'blind'; readonly reason: string }
   | { readonly drew: 'nothing' }
   | { readonly drew: 'read'; readonly count: number }
+  /**
+   * A telephone is ringing. Reported apart from `read` because it is the one
+   * outcome somebody is waiting on the other end of: a wake that drew a
+   * notification and a wake that rang are the same code path and very
+   * different events, and the log is all anybody has here.
+   */
+  | { readonly drew: 'ringing'; readonly count: number }
 
 export async function wake(deps: WakeDeps): Promise<WakeOutcome> {
-  let arrivals: readonly Arrival[] | null
+  let woke: WhatWoke | null
   try {
-    arrivals = await deps.lookForWhatArrived()
+    woke = await deps.lookForWhatArrived()
   } catch (cause: unknown) {
     // A LOOK THAT FAILED STILL MEANS SOMETHING ARRIVED.
     //
@@ -67,10 +93,32 @@ export async function wake(deps: WakeDeps): Promise<WakeOutcome> {
     return { drew: 'blind', reason: reasonOf(cause) }
   }
 
-  if (arrivals === null) {
+  if (woke === null) {
     await deps.draw(blindNotification())
     return { drew: 'blind', reason: 'this device could not open its store' }
   }
+
+  // A RINGING TELEPHONE COMES FIRST, AND ALONE.
+  //
+  // Somebody is holding a telephone waiting for this one to answer, and they
+  // have ninety seconds. Drawing message notifications first would spend
+  // that budget on lines nobody is waiting on, and a message notification
+  // over a ringing call is a call somebody misses. So the call is rung and
+  // the messages wait for the next wake, or for the application opening --
+  // neither of which anybody is standing on the other end of.
+  if (woke.ringing.length > 0) {
+    for (const calling of woke.ringing) {
+      try {
+        await deps.ring(calling)
+      } catch {
+        // Nothing to report to. The next one is still attempted, for the
+        // same reason the message loop below catches its own.
+      }
+    }
+    return { drew: 'ringing', count: woke.ringing.length }
+  }
+
+  const arrivals = woke.messages
 
   // Nothing to say. A wake that finds nothing is ordinary: the message may
   // have been read on another device between the push and this, and drawing

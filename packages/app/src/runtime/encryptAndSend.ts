@@ -94,6 +94,66 @@ const MAX_SHARE_ROUNDS = 6
  * panic aborts the process. Recorded in docs/spikes/tauri-crypto-link.md,
  * where it was found.
  */
+/**
+ * Puts one message in a NAMED room, sharing the key first.
+ *
+ * THE PRODUCT'S SEND PATH, AND IT DID NOT EXIST UNTIL 7 SEPTEMBER 2026.
+ *
+ * `encryptAndSendOneMessage` below is a probe: it picks
+ * `fetchJoinedRooms()[0]` because a launch report only has to prove that
+ * this device can encrypt *something* to *somewhere*. The conversation
+ * screen called it anyway, passing the body and not the room -- so every
+ * message a person typed, in any conversation, went to whichever room the
+ * homeserver happened to list first. Two people watched their replies never
+ * arrive and there was nothing wrong with the encryption at all.
+ *
+ * `sendImage` had the opposite half of the same defect: it carried the right
+ * room and called `encryptEvent` directly, skipping the share. The comment
+ * on the probe says what that costs -- "skip it and the message goes out
+ * perfectly encrypted to a room where nobody has the key" -- and in a room
+ * with no group session yet it does not even get that far.
+ *
+ * So this is the piece both were missing: members, share, drain, encrypt,
+ * send, in a room the caller names. The probe keeps its own room-finding,
+ * because finding a room is the only part of it that was ever about
+ * diagnosis.
+ */
+export async function sendIntoScope(
+  deps: EncryptAndSendDeps,
+  scope: string,
+  eventType: string,
+  content: Record<string, unknown>,
+): Promise<{ readonly sent: true; readonly eventId: string } | SendReport> {
+  const { http, machine, decodeUtf8, newTransactionId } = deps
+
+  const members = await fetchJoinedMembers(http, scope)
+  if (members.length === 0) {
+    return { sent: false, reason: `nobody is joined to ${scope}` }
+  }
+
+  const settled = await shareUntilSettled(http, machine, scope, members)
+  if (settled !== null) return settled
+
+  let envelope: EventEnvelope
+  try {
+    envelope = await machine.encryptEvent(scope, eventType, content)
+  } catch (cause: unknown) {
+    return { sent: false, reason: getErrorMessage(cause) }
+  }
+
+  try {
+    const eventId = await sendEncryptedEvent(
+      http,
+      scope,
+      decodeUtf8(envelope.ciphertext),
+      newTransactionId(),
+    )
+    return { sent: true, eventId }
+  } catch (cause: unknown) {
+    return { sent: false, reason: getErrorMessage(cause) }
+  }
+}
+
 export async function encryptAndSendOneMessage(
   deps: EncryptAndSendDeps,
   identity: DeviceIdentity,

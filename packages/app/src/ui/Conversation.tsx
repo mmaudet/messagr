@@ -1,5 +1,5 @@
-import React, { useState } from 'react'
-import { Pressable, StyleSheet, Text, useColorScheme, View } from 'react-native'
+import React, { useRef, useState } from 'react'
+import { Pressable, StyleSheet, Text, View } from 'react-native'
 
 import { t, type CopyKey } from '../copy'
 import {
@@ -90,8 +90,20 @@ export function Conversation({
   otherParty,
   onOpenPlate,
 }: ConversationProps) {
-  const dark = useColorScheme() === 'dark'
-  const palette = dark ? color.dark : color
+  // THE LIGHT PALETTE, NOT THE SYSTEM'S THEME.
+  //
+  // This read `useColorScheme()` and switched to `color.dark`. Four
+  // components did, and nothing else in the application does -- so on a
+  // phone set to dark mode these four turned dark inside screens that stayed
+  // pale: a black composer under a paper conversation, reported from an
+  // iPhone on 7 September 2026 with the words "meme pb de fond".
+  //
+  // The application has a light palette and a dark one reserved for surfaces
+  // that ASK for it -- the promise screen, a photograph full screen. Which
+  // ground a component sits on is its parent's business, which is why
+  // `LanguageStrip` takes `onDark` and does not guess. A component that reads
+  // the system theme is guessing, and it guessed wrong here.
+  const palette = color
   // Which entries open a new day. Computed once per render rather than per
   // message: a separator is a property of the sequence, not of an entry.
   const days = separatorsFor(entries, now)
@@ -102,8 +114,51 @@ export function Conversation({
   const plateAt = new Map(plates.map(plate => [plate.at, plate]))
   const swallowed = new Set(plates.flatMap(plate => [...plate.swallowed]))
 
+  /**
+   * Which message has its reaction row open, if any.
+   *
+   * HELD HERE BECAUSE A BUBBLE CANNOT CLOSE ITSELF FROM OUTSIDE. It was a
+   * boolean inside each bubble, so tapping anywhere else left the row
+   * standing -- a popover that only its own long press could take back.
+   * Reported from a Pixel on 7 September 2026.
+   *
+   * One open at a time falls out of holding it here, which is also what a
+   * person expects: two rows of emoji on one screen is a question about
+   * which one is listening.
+   */
+  const [offering, setOffering] = useState<string | null>(null)
+  /**
+   * Whether the touch still on the screen is the one that just opened a row.
+   * A ref rather than state: it is read inside the same gesture that writes
+   * it, and a re-render between the two would be a re-render for nothing.
+   */
+  const justOpened = useRef(false)
+
   return (
-    <View testID="conversation" style={styles.screen}>
+    <View
+      testID="conversation"
+      style={styles.screen}
+      // ANY TOUCH CLOSES IT, AND THE TOUCH STILL LANDS.
+      //
+      // At the END of the touch, never the start. Closing on touch-down
+      // unmounted the emoji under the finger before the finger came off it,
+      // so the press it was aimed at never happened: measured on a Pixel,
+      // where tapping a reaction closed the row and reacted with nothing.
+      // By touch-end the emoji has had its press, and this only clears what
+      // is left.
+      //
+      // Capture rather than bubble so it runs whatever the touch landed on,
+      // including a child that consumed it. Nothing here claims the gesture.
+      onTouchEndCapture={() => {
+        // Except the long press that opened it, whose own finger has yet to
+        // come off the screen -- closing on that release would make the row
+        // impossible to open.
+        if (justOpened.current) {
+          justOpened.current = false
+          return
+        }
+        setOffering(held => (held === null ? held : null))
+      }}>
       {entries.length === 0 ? (
         <Text
           testID="conversation-empty"
@@ -136,6 +191,16 @@ export function Conversation({
                 entry={entry}
                 plate={plateAt.get(entry.eventId)}
                 onOpenPlate={onOpenPlate}
+                offering={offering === entry.eventId}
+                // Opens, and never toggles: the capture above has already
+                // closed whatever was open by the time this runs, so a
+                // toggle here would read the state it just cleared and
+                // reopen on every long press. A long press means "offer me
+                // reactions"; closing is any other touch's job now.
+                onOffer={() => {
+                  justOpened.current = true
+                  setOffering(entry.eventId)
+                }}
                 mine={entry.claimedSender === selfUserId}
                 palette={palette}
                 tallies={reactions.get(entry.eventId) ?? []}
@@ -225,6 +290,8 @@ function Message({
   tallies,
   onReact,
   read,
+  offering,
+  onOffer,
   onLoadImage,
   unexpected,
   plate,
@@ -243,10 +310,12 @@ function Message({
   read: boolean
   /** `mine` is the id of this account's own reaction, when it has one. */
   onReact: (key: string, mine: string | null) => void
+  /** Whether this bubble's reaction row is the open one. Held by the screen. */
+  offering: boolean
+  /** Asks for it to open. Closing is the screen's business: any touch does it. */
+  onOffer: () => void
   readonly onLoadImage?: (file: ReadFile) => Promise<ShownImage>
 }) {
-  const [offering, setOffering] = useState(false)
-
   return (
     <View style={mine ? styles.mine : styles.theirs}>
       {/* WHO IT CLAIMS TO BE FROM, AND ONLY WHEN THAT IS NEWS.
@@ -282,7 +351,7 @@ function Message({
           it, and stealing that gesture for a menu is how a conversation stops
           being scrollable. */}
       <Pressable
-        onLongPress={() => setOffering(held => !held)}
+        onLongPress={onOffer}
         delayLongPress={350}
         accessibilityRole="button"
         accessibilityLabel={t('reaction_offer')}
@@ -309,7 +378,7 @@ function Message({
             // The same gesture the bubble above it answers. A plate's
             // reactions annotate its first event, which is the event this
             // `Message` is: one plate, one place they attach.
-            onLongPress={() => setOffering(held => !held)}
+            onLongPress={onOffer}
           />
         ) : entry.image !== undefined && onLoadImage !== undefined ? (
           // The photograph instead of the text, not beside it. An `m.image`
@@ -392,7 +461,6 @@ function Message({
               key={key}
               testID={`offer-${entry.eventId}-${key}`}
               onPress={() => {
-                setOffering(false)
                 onReact(
                   key,
                   tallies.find(tally => tally.key === key)?.mine ?? null,

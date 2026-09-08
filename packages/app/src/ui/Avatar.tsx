@@ -26,13 +26,33 @@ import { initialsOf } from './initials'
 export function Avatar({
   shown,
   testID,
+  size,
 }: {
   readonly shown: string
   readonly testID?: string
+  /**
+   * A round of this many points instead of the list's own.
+   *
+   * The default is the touch-target size, which is what a row wants and what
+   * the note below argues for. A call screen is the exception the option
+   * exists for: there is one person on it and nothing else, and an avatar
+   * sized for a list line reads as a decoration on a screen with nothing to
+   * decorate.
+   */
+  readonly size?: number
 }) {
   return (
-    <View style={styles.circle} testID={testID}>
-      <Text style={styles.initials}>{initialsOf(shown)}</Text>
+    <View
+      style={[
+        styles.circle,
+        size === undefined
+          ? undefined
+          : { width: size, height: size, borderRadius: radius.avatar },
+      ]}
+      testID={testID}>
+      <Text style={size === undefined ? styles.initials : styles.large}>
+        {initialsOf(shown)}
+      </Text>
     </View>
   )
 }
@@ -53,6 +73,10 @@ const styles = StyleSheet.create({
   },
   initials: {
     ...type.titleMd,
+    color: color.brand.green700,
+  },
+  large: {
+    ...type.display,
     color: color.brand.green700,
   },
 })

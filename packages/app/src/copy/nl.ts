@@ -182,6 +182,10 @@ export const nl: Readonly<Record<CopyKey, string>> = {
     'U komt binnen op uitnodiging, niet via een formulier',
   promise_action: 'Beginnen',
   list_title: 'Gesprekken',
+  list_invitation_ignored:
+    'U hebt een uitnodiging geopend, en deze telefoon heeft al een account. Ze is niet gebruikt en blijft geldig voor de persoon voor wie ze bedoeld was.',
+  list_not_in_yet:
+    'U bent er nog niet in. Open de uitnodigingslink die iemand u heeft gestuurd: dat is de enige deur, en daarvoor kan de applicatie niets doen.',
   list_empty:
     'Voorlopig geen gesprekken. Nodig iemand uit om er een te beginnen.',
   list_nothing_said: 'Er is nog niets gezegd',
@@ -293,6 +297,31 @@ export const nl: Readonly<Record<CopyKey, string>> = {
     'Het tabblad is vanaf V1 gereserveerd zodat de balk later niet verschuift. V1 draagt alleen tekst, links en stilstaande beelden; spraakberichten in V2, individuele en daarna groepsoproepen in V3.',
   calls_soon_v2: 'V2 · spraakberichten',
   calls_soon_v3: 'V3 · audio + video',
+  // A call in progress. One screen draws every one of these -- see
+  // `CallScreen.tsx` -- so what changes between two states is exactly this
+  // sentence and which buttons sit under it.
+  call_start: 'Bellen',
+  call_ringing: 'Bellen…',
+  call_incoming: 'Inkomende oproep',
+  call_connecting: 'Verbinden…',
+  call_active: 'In gesprek',
+  call_reconnecting: 'Opnieuw verbinden…',
+  call_ended_hung_up: 'Gesprek beëindigd',
+  call_ended_unanswered: 'Niemand heeft opgenomen',
+  call_ended_declined: 'Oproep geweigerd',
+  call_ended_failed: 'De verbinding kon niet tot stand komen',
+  call_ended_elsewhere: 'Op een ander apparaat opgenomen',
+  call_ended_unreachable: 'Deze persoon was niet bereikbaar',
+  call_answer: 'Opnemen',
+  call_reject: 'Weigeren',
+  call_hangup: 'Ophangen',
+  call_mute: 'Microfoon uit',
+  call_unmute: 'Microfoon aan',
+  call_speaker: 'Luidspreker',
+  call_dismiss: 'Sluiten',
+  call_failed_no_relay:
+    'Deze server heeft geen oproeprelais: bellen was niet mogelijk.',
+  call_failed_no_microphone: 'De microfoon is niet beschikbaar.',
   community_soon_title: 'Binnenkort: gemeenschappen en kamers',
   community_soon_why:
     'Een gemeenschap groepeert kamers onder een pseudoniem object. Het tabblad is gereserveerd om dezelfde reden als dat van de oproepen: de balk mag niet verschuiven wanneer ze er zijn.',
@@ -329,6 +358,10 @@ export const nl: Readonly<Record<CopyKey, string>> = {
   notify_blind_title: 'Messagr',
   notify_blind_body: 'Er is iets aangekomen.',
   notify_channel: 'Berichten',
+  notify_ringing_body: 'Inkomende oproep',
+  notify_ringing_channel: 'Oproepen',
+  notify_answer: 'Opnemen',
+  notify_decline: 'Weigeren',
   image_alt: 'Foto',
   image_unreadable: 'Deze foto kon op dit apparaat niet worden geopend.',
   conversation_attach: 'Een foto versturen',

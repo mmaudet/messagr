@@ -24,6 +24,7 @@ import {
   loadConversation,
   runOutgoingPump,
   sendOneEncryptedMessage,
+  sendTypedMessage,
   admitEntrant,
   inviteSomebody,
   listConversations,
@@ -46,6 +47,11 @@ import {
   type TrustReading,
   type SendReport,
 } from './src/runtime/cryptoPump'
+import {
+  startCallRuntime,
+  type CallOnScreen,
+  type CallRuntime,
+} from './src/runtime/callPump'
 import { getErrorMessage } from './src/runtime/errors'
 import { computeHermesReport } from './src/runtime/hermes'
 import { logEvent } from './src/runtime/log'
@@ -64,6 +70,7 @@ import {
 } from './src/runtime/deviceSecrets'
 import {
   publishReceipts,
+  RECEIPTS_DEFAULT,
   receiptsArePublished,
 } from './src/runtime/receiptSetting'
 import { readUpTo } from './src/runtime/receipts'
@@ -96,7 +103,10 @@ import { deviceLocale } from './src/runtime/deviceLocale'
 import { pickFromLibrary } from './src/runtime/imageLibrary'
 import { sendImages } from './src/runtime/sendImages'
 import { pushTokenForThisDevice } from './src/runtime/pushDevice'
-import { whenNotificationPressed } from './src/runtime/showNotification'
+import {
+  stopRinging,
+  whenNotificationPressed,
+} from './src/runtime/showNotification'
 import type { ShownImage } from './src/runtime/receiveImage'
 import type { ReadFile } from './src/timeline/imageEvent'
 import type { Plate as Grouping } from './src/timeline/plates'
@@ -109,6 +119,7 @@ import { FloatingAction } from './src/ui/FloatingAction'
 import { Header } from './src/ui/Header'
 import { Composer } from './src/ui/Composer'
 import { FullScreenPlate } from './src/ui/FullScreenPlate'
+import { CallScreen } from './src/ui/CallScreen'
 import { ConversationHeader } from './src/ui/ConversationHeader'
 import { Legal } from './src/ui/Legal'
 import { Reserved } from './src/ui/Reserved'
@@ -122,7 +133,8 @@ import { Vouch } from './src/ui/Vouch'
 import { setCatalogue, t } from './src/copy'
 import type { Language } from './src/copy/languages'
 import { enterWithASession } from './src/runtime/entry'
-import { initialLink } from './src/runtime/incomingLink'
+import { initialLink, watchLinks } from './src/runtime/incomingLink'
+import { useKeyboardInset } from './src/ui/keyboardInset'
 import { servicePoster } from './src/runtime/servicePoster'
 import {
   fetchSessionSyncStatus,
@@ -328,7 +340,10 @@ export function App({
   // Whether this device publishes read receipts, and which of this account's
   // own messages somebody else has read. Off unless somebody turned it on:
   // see receiptSetting.ts.
-  const [receipts, setReceipts] = useState(false)
+  // The switch starts where a device that has never been asked stands, so it
+  // does not show `off` for the moment the keystore takes to answer and then
+  // flip. `receiptSetting.ts` carries the argument for the default itself.
+  const [receipts, setReceipts] = useState(RECEIPTS_DEFAULT)
   const [receiptsNotKept, setReceiptsNotKept] = useState(false)
   // Whether this device asks to be woken. On unless somebody says otherwise,
   // which is the opposite of the switch above -- `wakeSetting.ts` says why.
@@ -336,13 +351,44 @@ export function App({
   const [wakeNotKept, setWakeNotKept] = useState(false)
   const wakeRef = useRef(true)
   const [readHere, setReadHere] = useState<ReadonlySet<string>>(new Set())
-  const receiptsRef = useRef(false)
+  // The same starting value as the state above, so a receipt sent before the
+  // keystore has answered follows the default rather than the opposite of it.
+  const receiptsRef = useRef(RECEIPTS_DEFAULT)
   // The conversation as the loop's callbacks can see it: they are made once,
   // and a receipt arriving names an event that has to be found among the
   // entries held right now.
   const conversationRef = useRef<readonly TimelineEntry[]>([])
   const [openScope, setOpenScope] = useState<string | null>(null)
   const openScopeRef = useRef<string | null>(null)
+  /**
+   * The call, when there is one. `null` is the ordinary state of a telephone.
+   *
+   * The runtime holds it; this is the projection a screen is drawn from, and
+   * it arrives by callback because a call changes state for reasons that have
+   * nothing to do with anybody touching the screen -- a peer answering, a
+   * relay failing, ninety seconds passing.
+   */
+  const [call, setCall] = useState<CallOnScreen | null>(null)
+  const [callMuted, setCallMuted] = useState(false)
+  /**
+   * Whether the call is on the loudspeaker.
+   *
+   * Kept beside the mute rather than read back from the platform: the
+   * routing has no observer, only a setter, so the screen's own record is
+   * the only account of what was asked for. Reset with the call, because the
+   * audio session ends with it and the next one starts at the earpiece.
+   */
+  const [callSpeaker, setCallSpeaker] = useState(false)
+  const callRuntimeRef = useRef<CallRuntime | null>(null)
+  /**
+   * A conversation somebody already answered a call in, from a notification.
+   *
+   * Held until the invitation arrives, because it has not yet: the press
+   * happened on a locked screen and the sync that carries the call is the
+   * next one. Cleared the moment it is spent, so a later call in the same
+   * conversation is not answered by a press from ten minutes ago.
+   */
+  const answerWhenItRingsRef = useRef<string | null>(null)
   // Choosing and sending a photograph, and opening one that arrived. Held in
   // refs like every other gesture the launch effect binds.
   const attachRef = useRef<(() => void) | null>(null)
@@ -380,6 +426,37 @@ export function App({
     readonly accessToken: string
   } | null>(null)
   const [claimed, setClaimed] = useState<HistoryClaim | null>(null)
+  // Set once, at entry, and never cleared: the launch either was opened with
+  // an unspent invitation or it was not, and a note that disappeared while
+  // somebody read it would be worse than none.
+  const [invitationIgnored, setInvitationIgnored] = useState(false)
+  // `null` until the launch has answered. Distinguishing "not in" from "not
+  // yet known" keeps the list from telling somebody they are locked out for
+  // the second the keystore takes to answer.
+  const [inYet, setInYet] = useState<boolean | null>(null)
+  // What the keyboard is covering. See `keyboardInset.ts`: the manifest's
+  // `adjustResize` stopped resizing anything under Android's enforced
+  // edge-to-edge display, so the composer sat under the keyboard.
+  const keyboardInset = useKeyboardInset()
+  /**
+   * A link handed over while this application was already running, and the
+   * count of them.
+   *
+   * THE CASE THAT LOOKED HANDLED AND WAS NOT. `getInitialURL` answers only
+   * when the operating system started the application to open a link.
+   * Somebody who installs first and is sent the link afterwards is in the
+   * other case entirely: the application comes to the front and nothing has
+   * read anything. Reported by the first TestFlight tester on 7 September
+   * 2026, who watched an empty conversation list and could do nothing.
+   *
+   * The count is what makes the launch below run again. Two invitations in a
+   * row are two different links, and a value alone would not re-trigger for
+   * the second if it happened to be the same string.
+   */
+  const [warmLink, setWarmLink] = useState<{
+    readonly url: string
+    readonly count: number
+  } | null>(null)
   const [evicted, setEvicted] = useState<'idle' | 'working' | EvictOutcome>(
     'idle',
   )
@@ -396,6 +473,30 @@ export function App({
   // says the same about its four).
   const panicProbeRequested = useMemo(
     () => process.env.MESSAGR_PANIC_PROBE === '1',
+    [],
+  )
+  /**
+   * Whether this build proves its cryptography by sending a message at
+   * launch.
+   *
+   * OFF IN AN ORDINARY BUILD, AND A TESTER IS WHY. The probe below encrypts
+   * "encrypted by the bridge, sent by the application", puts it in a room and
+   * reads it back -- which is the end-to-end proof #34 was built around, and
+   * which for months landed in a bench account's own room where nobody was
+   * looking.
+   *
+   * On 7 September 2026 somebody joined by invitation and that room became a
+   * conversation with a person in it. He watched a sentence in English appear
+   * in his chat on every launch, and reported it as a message that had not
+   * been decrypted. It was decrypted; it was simply not for him.
+   *
+   * A diagnostic that writes into a conversation somebody reads is not a
+   * diagnostic, it is a message. So it runs where it belongs -- the device
+   * suite sets the flag -- and the report says `not-run` everywhere else,
+   * which is the truth rather than a gap.
+   */
+  const sendProbeRequested = useMemo(
+    () => process.env.MESSAGR_SEND_PROBE === '1',
     [],
   )
 
@@ -424,6 +525,17 @@ export function App({
       pause()
     }
   }, [])
+
+  // EVERY LINK HANDED OVER WHILE RUNNING, and the promise still gates it:
+  // the launch below refuses to do anything until `promiseSeen` is true, so
+  // an invitation arriving early is remembered rather than acted on.
+  useEffect(
+    () =>
+      watchLinks(url => {
+        setWarmLink(held => ({ url, count: (held?.count ?? 0) + 1 }))
+      }),
+    [],
+  )
 
   // Asked once, before anything else. A keystore read and nothing more: no
   // network, which is what lets it run under the promise rather than after it.
@@ -496,7 +608,11 @@ export function App({
       const entered = await enterWithASession({
         secrets: sessionSecrets,
         poster: servicePoster,
-        link: initialLink,
+        // The warm link wins when there is one: it is the more recent
+        // answer to the same question, and `getInitialURL` keeps handing
+        // back the address this process was started with for as long as it
+        // lives.
+        link: warmLink === null ? initialLink : async () => warmLink.url,
         signUp: signUpSecrets,
         // A claim is two calls with the issuer's application in between. See
         // claimInvitation.ts: without a wait this tries once, is told 409,
@@ -592,6 +708,11 @@ export function App({
             //
             // Everything uncertain resolves to `restored-session`, which
             // creates nothing. See signUpMarker.ts.
+            setInYet(entered.entered)
+            if (entered.entered && entered.invitationIgnored === true) {
+              setInvitationIgnored(true)
+            }
+
             const entitlement =
               entered.entered && entered.claimed
                 ? ('account-just-created' as const)
@@ -619,18 +740,21 @@ export function App({
             // Only once the keys are published: a message encrypted before
             // this device's own keys are on the server is one nobody can
             // ask about, let alone decrypt.
-            sendStatus = await sendOneEncryptedMessage(
-              sessionClient,
-              credentials,
-            )
+            if (sendProbeRequested) {
+              sendStatus = await sendOneEncryptedMessage(
+                sessionClient,
+                credentials,
+              )
+            }
             // Attempted whether or not this run's own send worked: what is
             // being read was written by somebody else, and one direction
             // failing should not hide the other. The room is the one the
             // send resolved, or the first joined room when there was no
             // send to resolve it.
-            const roomId = sendStatus.sent
-              ? sendStatus.roomId
-              : await firstJoinedRoom(sessionClient)
+            const roomId =
+              sendStatus !== 'not-run' && sendStatus.sent
+                ? sendStatus.roomId
+                : await firstJoinedRoom(sessionClient)
 
             // THE NOTEBOOK. ADR-0010: the application's own encrypted store,
             // with a passphrase of its own. It degrades rather than failing --
@@ -712,9 +836,16 @@ export function App({
               setSendMessage(() => (body: string) => {
                 setSending('sending')
                 const deliver = async () => {
-                  const sent = await sendOneEncryptedMessage(
+                  // THE ROOM, WHICH THIS DID NOT PASS. It called
+                  // `sendOneEncryptedMessage`, a launch probe that picks
+                  // `fetchJoinedRooms()[0]` -- so every message typed in
+                  // any conversation went to whichever room the homeserver
+                  // listed first. Two people watched their replies never
+                  // arrive on 7 September 2026, and nothing was wrong with
+                  // the encryption.
+                  const sent = await sendTypedMessage(
                     sessionClient,
-                    credentials,
+                    scope,
                     body,
                   )
                   if (!sent.sent) {
@@ -788,19 +919,46 @@ export function App({
                     reason: done.reason ?? 'no reason given',
                   })
                 }
-                // Re-derived rather than guessed at: the tally is built from
-                // what the homeserver holds, and a chip drawn from a local
-                // guess would disagree with it the moment anything else
-                // changed.
-                const fresh = await loadConversation(
-                  sessionClient,
-                  scope,
-                  credentials.userId,
-                )
-                setConversation(held =>
-                  mergeTimeline(held ?? [], fresh.entries),
-                )
-                setReactions(fresh.reactions)
+                // RE-DERIVED, AND RE-DERIVED AGAIN UNTIL IT IS THERE.
+                //
+                // The tally is built from what the homeserver holds rather
+                // than from a local guess, and that stays: a chip drawn from
+                // a guess disagrees with the room the moment anything else
+                // changes. But one read straight after the send is a read
+                // the event has not always reached yet, and nothing ran
+                // afterwards -- `derive` runs only when a conversation is
+                // opened. So the person who pressed the emoji watched
+                // nothing happen while the person they pressed it at saw the
+                // chip appear. Reported from an iPhone on 7 September 2026.
+                //
+                // A few short attempts rather than one, and a wait between
+                // them. Bounded because a reaction the server never accepted
+                // must stop being asked about, and short because this is a
+                // chip under somebody's thumb.
+                const stillMine = () => openScopeRef.current === scope
+                for (let look = 0; look < 4 && stillMine(); look += 1) {
+                  const fresh = await loadConversation(
+                    sessionClient,
+                    scope,
+                    credentials.userId,
+                  )
+                  setConversation(held =>
+                    mergeTimeline(held ?? [], fresh.entries),
+                  )
+                  setReactions(fresh.reactions)
+                  // The tallies for the message that was pressed. Adding a
+                  // reaction has landed when one of them is this key and is
+                  // mine; removing one has landed when none of them is.
+                  const here = fresh.reactions.get(target) ?? []
+                  const landed =
+                    own === null
+                      ? here.some(
+                          tally => tally.key === key && tally.mine !== null,
+                        )
+                      : here.every(tally => tally.mine !== own)
+                  if (landed) break
+                  await new Promise(resolve => setTimeout(resolve, 700))
+                }
               }
               gesture().catch((cause: unknown) =>
                 logEvent('warn', 'MESSAGR_REACT_FAILED', {
@@ -945,10 +1103,37 @@ export function App({
             // The blind notification routes nowhere, because nothing that
             // woke this device said which conversation. It lands on the list,
             // which then shows what is waiting.
-            whenNotificationPressed(scope => {
-              setTab('chat')
-              if (scope !== null) showConversation(scope)
-            })
+            whenNotificationPressed(
+              scope => {
+                setTab('chat')
+                if (scope !== null) showConversation(scope)
+              },
+              // SOMEBODY ALREADY SAID YES, ON A LOCKED SCREEN.
+              //
+              // The application starts with no call: the invitation is still
+              // in a sync nobody has polled yet, and the runtime cannot
+              // answer something it has not been told about. So the answer
+              // is remembered and spent when the telephone starts ringing --
+              // which is the poll after this, seconds away.
+              //
+              // Refusing is immediate and needs no call, because there is
+              // nothing to refuse yet: the notification comes down and the
+              // caller's own invitation runs out. Sending a refusal from a
+              // process with no session open is the half this does not do,
+              // and it costs the caller the ninety seconds.
+              pressed => {
+                if (pressed.answered) {
+                  answerWhenItRingsRef.current = pressed.scope
+                  setTab('chat')
+                  return
+                }
+                answerWhenItRingsRef.current = null
+                stopRinging(pressed.scope).catch(() => {
+                  // A notification that will not come down is not worth
+                  // losing the launch over.
+                })
+              },
+            )
 
             // Asked for rather than computed on every launch: it costs a
             // device-status call and a state fetch per conversation.
@@ -1086,6 +1271,51 @@ export function App({
             // and anything it says once superseded is dropped. A loop merely
             // paused has not been superseded, and its `stopped` still reaches
             // the screen, which is correct: it did stop.
+            // ONE RUNTIME FOR THE WHOLE SESSION, NOT ONE PER CALL.
+            //
+            // A callee's application has no call until it has been rung, and
+            // the ring arrives inside an encrypted event in a poll -- so
+            // something has to be listening before there is anything to
+            // listen for. This is that something; it holds at most one call
+            // and starts it when a poll turns out to be an invitation.
+            callRuntimeRef.current = startCallRuntime(
+              sessionClient,
+              credentials,
+              onScreen => {
+                setCall(onScreen)
+                // The press that already said yes, spent on the invitation
+                // it was waiting for.
+                if (
+                  onScreen !== null &&
+                  onScreen.state.call === 'incomingInvite' &&
+                  answerWhenItRingsRef.current === onScreen.scope
+                ) {
+                  answerWhenItRingsRef.current = null
+                  callRuntimeRef.current?.answer().catch((cause: unknown) =>
+                    logEvent('warn', 'MESSAGR_CALL_NOT_ANSWERED', {
+                      reason: getErrorMessage(cause),
+                    }),
+                  )
+                }
+                // A telephone that stopped ringing must stop saying so.
+                if (
+                  onScreen === null ||
+                  onScreen.state.call !== 'incomingInvite'
+                ) {
+                  const where = onScreen?.scope
+                  if (where !== undefined) {
+                    stopRinging(where).catch(() => {})
+                  }
+                }
+                // A call that ended took the microphone with it, and the next
+                // one starts unmuted.
+                if (onScreen === null) {
+                  setCallMuted(false)
+                  setCallSpeaker(false)
+                }
+              },
+            )
+
             const beginLiveSync = () => {
               if (runningSyncRef.current !== null) return
               const generation = liveGenerationRef.current + 1
@@ -1159,6 +1389,23 @@ export function App({
                     })
                     .catch((cause: unknown) =>
                       logEvent('warn', 'MESSAGR_ADMIT_ROUND_FAILED', {
+                        reason: getErrorMessage(cause),
+                      }),
+                    )
+
+                  // BEFORE THE EARLY RETURN, like the admission round above
+                  // and for a related reason: a call's events do move a
+                  // scope, but nothing here should depend on that being the
+                  // reason this tick exists. A telephone that rings only when
+                  // the list also had work to do is a telephone with a
+                  // condition on it.
+                  //
+                  // Not awaited: the loop's tick must not wait on a
+                  // decryption pass, and nothing below depends on it.
+                  callRuntimeRef.current
+                    ?.deliver(tick)
+                    .catch((cause: unknown) =>
+                      logEvent('warn', 'MESSAGR_CALL_DELIVER_FAILED', {
                         reason: getErrorMessage(cause),
                       }),
                     )
@@ -1367,6 +1614,15 @@ export function App({
         })
       }
     })
+    // THE DEPENDENCY LIST IS DELIBERATE, AND `warmLink` IS NOT IN IT.
+    //
+    // The object is rebuilt on every arrival, so watching it would re-run the
+    // whole launch -- keystore, pump, sync -- for a link this effect has
+    // already spent. `warmLink?.count` is the thing that actually changed,
+    // and it is a new number exactly once per link handed over, including
+    // when two invitations carry the same address. The url is read inside
+    // rather than watched: it is whatever the newest count refers to.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
     architecture,
     hermes,
@@ -1375,6 +1631,7 @@ export function App({
     storeDir,
     panicProbeRequested,
     promiseSeen,
+    warmLink?.count,
   ])
 
   // THE HARDWARE BACK BUTTON, WHICH WAS CLOSING THE APPLICATION.
@@ -1520,6 +1777,49 @@ export function App({
   return (
     <GestureHandlerRootView style={styles.root}>
       <SafeAreaProvider>
+        {/* ABOVE EVERYTHING, AND NOT INSIDE THE CONVERSATION.
+          A call outlives the screen it started on: somebody who places one
+          and then goes back to the list is still on that call, and a
+          telephone that rings only while the right conversation is open is
+          not a telephone. So it hangs off the root, drawn from the runtime's
+          own state rather than from wherever the person happens to be. */}
+        {call !== null && (
+          <CallScreen
+            state={call.state}
+            failure={call.failure}
+            shown={displayNameFor(call.peerUserId, names.get(call.peerUserId))}
+            muted={callMuted}
+            speaker={callSpeaker}
+            onAnswer={() =>
+              callRuntimeRef.current?.answer().catch((cause: unknown) =>
+                logEvent('warn', 'MESSAGR_CALL_NOT_ANSWERED', {
+                  reason: getErrorMessage(cause),
+                }),
+              )
+            }
+            onReject={() => callRuntimeRef.current?.reject()}
+            onHangup={() => callRuntimeRef.current?.hangup()}
+            onMute={wanted => {
+              // What the microphone actually holds afterwards, not what was
+              // asked for: a track that refused is a mute that did not
+              // happen, and a button drawn from the intent would lie about it.
+              const held = callRuntimeRef.current?.setMuted(wanted) ?? wanted
+              setCallMuted(held)
+            }}
+            onSpeaker={wanted => {
+              callRuntimeRef.current?.setSpeaker(wanted)
+              setCallSpeaker(wanted)
+            }}
+            onDismiss={() =>
+              callRuntimeRef.current?.release().catch((cause: unknown) =>
+                logEvent('warn', 'MESSAGR_CALL_NOT_RELEASED', {
+                  reason: getErrorMessage(cause),
+                }),
+              )
+            }
+          />
+        )}
+
         {openPlate !== null && (
           <FullScreenPlate
             plate={openPlate.plate}
@@ -1536,7 +1836,9 @@ export function App({
           view reserved; and a reserved top inset left a pale strip above the
           dark band, into which the system drew the clock and the battery in
           white. Whatever sits on an edge paints to it. */}
-        <SafeAreaView style={styles.screen} edges={['left', 'right']}>
+        <SafeAreaView
+          style={[styles.screen, { paddingBottom: keyboardInset }]}
+          edges={['left', 'right']}>
           {/* Outside the scroll view, like the tab bar and for the same reason:
             what the band says is true of the instance rather than of the
             screen under it, and a fact about the instance that scrolls away
@@ -1556,7 +1858,6 @@ export function App({
                   : displayNameFor(party.other, names.get(party.other))
               }
               named={party !== null && names.get(party.other) !== undefined}
-              identifier={party?.other}
               onBack={() => {
                 setOpenScope(null)
                 openScopeRef.current = null
@@ -1566,6 +1867,25 @@ export function App({
                 setPersonOpen(false)
               }}
               onOpenPerson={() => setPersonOpen(true)}
+              // Only with somebody to call. `theOtherMember` answers null in
+              // a conversation that is not two people, and a call button in
+              // a room of three is a button with no peer to name -- #88 is
+              // 1:1, and the control says so by being absent.
+              onCall={
+                party === null || call !== null
+                  ? undefined
+                  : () => {
+                      const runtime = callRuntimeRef.current
+                      if (runtime === null || openScope === null) return
+                      runtime
+                        .place(openScope, party.other)
+                        .catch((cause: unknown) =>
+                          logEvent('warn', 'MESSAGR_CALL_NOT_PLACED', {
+                            reason: getErrorMessage(cause),
+                          }),
+                        )
+                    }
+              }
             />
           )}
 
@@ -1714,6 +2034,8 @@ export function App({
                   <ConversationList
                     summaries={summaries}
                     names={names}
+                    invitationIgnored={invitationIgnored}
+                    notInYet={inYet === false}
                     onOpen={scope => openConversationRef.current?.(scope)}
                   />
                 </View>
@@ -1968,7 +2290,31 @@ export function App({
               does, and this used to. Changed at the account holder's request:
               the bar never moves, so muscle memory holds everywhere. Recorded
               as a decision rather than a drift. */}
-            <TabBar current={tab} onSelect={setTab} unread={unreadCount} />
+            {/* A TAB PRESS COMES BACK TO THAT TAB'S TOP, AND `setTab` ALONE
+                DID NOT. From inside a conversation, pressing Discussions set
+                the tab to the one it was already on and changed nothing
+                visible: the conversation is drawn over the list, and nothing
+                closed it. Reported from a Pixel on 7 September 2026, in the
+                words anybody would use -- "rien ne se passe".
+
+                The same layers the hardware back button already enumerates,
+                closed in one go rather than one press at a time: a tab is
+                not a step backwards, it is a destination. `back` walks them;
+                this clears them. */}
+            <TabBar
+              current={tab}
+              onSelect={next => {
+                setOpenPlate(null)
+                setPersonOpen(false)
+                setOpenScope(null)
+                openScopeRef.current = null
+                setLegalOpen(false)
+                setInvite({ stage: 'shut' })
+                setAdmission(null)
+                setTab(next)
+              }}
+              unread={unreadCount}
+            />
           </View>
         </SafeAreaView>
       </SafeAreaProvider>
@@ -1999,7 +2345,22 @@ const styles = StyleSheet.create({
   // Its native handlers attach to this view; without `flex: 1` it lays out at
   // zero height and every gesture below it is delivered to nothing -- which
   // looks exactly like the library not working.
-  root: { flex: 1 },
+  // LE FOND, POSÉ, ET LE MODE SOMBRE D'iOS EST POURQUOI.
+  //
+  // Cette racine n'avait pas de couleur. Sur un appareil en thème clair rien
+  // ne se voyait : la vue parente était déjà pâle. En thème sombre, iOS peint
+  // une racine sans fond en NOIR, et seule la liste des conversations, qui
+  // pose son propre `surface.paper`, restait claire -- une carte pâle
+  // flottant sur du noir, avec du noir partout ailleurs. Rapporté depuis
+  // l'iPhone d'un testeur le 7 septembre 2026, sur la première build qui ait
+  // jamais démarré là-bas.
+  //
+  // `surface.paper` plutôt qu'une réaction au thème du système : cette
+  // application a une palette claire, et une palette sombre réservée aux
+  // surfaces qui la demandent (l'écran de promesse, le plein écran d'une
+  // photographie). Suivre le thème du système serait un second jeu de
+  // couleurs pour tout l'écran, ce que le lot n'a pas.
+  root: { flex: 1, backgroundColor: color.surface.paper },
   back: {
     ...typeScale.bodySm,
     color: color.brand.green700,

@@ -270,6 +270,10 @@ export const fr = {
   // word "federation" -- §13.19 invariant 6. What went wrong technically goes
   // to the log; a row says what it means for the person reading it.
   list_title: 'Conversations',
+  list_invitation_ignored:
+    'Vous avez ouvert une invitation, et ce téléphone a déjà un compte. Elle n’a pas été utilisée : elle reste valable pour la personne à qui elle était destinée.',
+  list_not_in_yet:
+    'Vous n’êtes pas encore entré. Ouvrez le lien d’invitation qu’on vous a envoyé : c’est la seule porte, et l’application ne peut rien faire avant.',
   list_empty:
     'Aucune conversation pour l’instant. Invitez quelqu’un pour en commencer une.',
   list_nothing_said: 'Rien n’a encore été dit',
@@ -460,6 +464,31 @@ export const fr = {
     'L’onglet est réservé dès la V1 pour ne pas déplacer la barre plus tard. La V1 ne transporte que texte, liens et images statiques ; vocaux en V2, appels individuels puis de groupe en V3.',
   calls_soon_v2: 'V2 · messages vocaux',
   calls_soon_v3: 'V3 · audio + vidéo',
+  // A call in progress. One screen draws every one of these -- see
+  // `CallScreen.tsx` -- so what changes between two states is exactly this
+  // sentence and which buttons sit under it.
+  call_start: 'Appeler',
+  call_ringing: 'Appel en cours…',
+  call_incoming: 'Appel entrant',
+  call_connecting: 'Connexion…',
+  call_active: 'En communication',
+  call_reconnecting: 'Reconnexion…',
+  call_ended_hung_up: 'Appel terminé',
+  call_ended_unanswered: 'Personne n’a répondu',
+  call_ended_declined: 'Appel refusé',
+  call_ended_failed: 'La connexion n’a pas pu s’établir',
+  call_ended_elsewhere: 'Pris sur un autre appareil',
+  call_ended_unreachable: 'Impossible de joindre cette personne',
+  call_answer: 'Répondre',
+  call_reject: 'Refuser',
+  call_hangup: 'Raccrocher',
+  call_mute: 'Couper le micro',
+  call_unmute: 'Rétablir le micro',
+  call_speaker: 'Haut-parleur',
+  call_dismiss: 'Fermer',
+  call_failed_no_relay:
+    'Ce serveur n’a pas de relais d’appel : l’appel n’a pas pu être passé.',
+  call_failed_no_microphone: 'Le micro n’est pas accessible.',
 
   community_soon_title: 'Bientôt : communautés et salons',
   community_soon_why:
@@ -509,6 +538,10 @@ export const fr = {
   notify_blind_title: 'Messagr',
   notify_blind_body: 'Quelque chose est arrivé.',
   notify_channel: 'Messages',
+  notify_ringing_body: 'Appel entrant',
+  notify_ringing_channel: 'Appels',
+  notify_answer: 'Répondre',
+  notify_decline: 'Refuser',
 
   // Photographs. `image_alt` is what a screen reader says: not a description
   // of the picture, which nothing here can produce, but what the thing is.

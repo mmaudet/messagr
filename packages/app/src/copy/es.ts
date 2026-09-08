@@ -184,6 +184,10 @@ export const es: Readonly<Record<CopyKey, string>> = {
   promise_point_invitation: 'Se entra por invitación, no por formulario',
   promise_action: 'Empezar',
   list_title: 'Conversaciones',
+  list_invitation_ignored:
+    'Ha abierto una invitación y este teléfono ya tiene una cuenta. No se ha usado: sigue siendo válida para la persona a la que estaba destinada.',
+  list_not_in_yet:
+    'Todavía no ha entrado. Abra el enlace de invitación que le enviaron: es la única puerta, y la aplicación no puede hacer nada antes.',
   list_empty:
     'Ninguna conversación por ahora. Invite a alguien para empezar una.',
   list_nothing_said: 'Todavía no se ha dicho nada',
@@ -294,6 +298,31 @@ export const es: Readonly<Record<CopyKey, string>> = {
     'La pestaña está reservada desde la V1 para no mover la barra más tarde. La V1 solo transporta texto, enlaces e imágenes fijas; notas de voz en V2, llamadas individuales y luego de grupo en V3.',
   calls_soon_v2: 'V2 · notas de voz',
   calls_soon_v3: 'V3 · audio + vídeo',
+  // A call in progress. One screen draws every one of these -- see
+  // `CallScreen.tsx` -- so what changes between two states is exactly this
+  // sentence and which buttons sit under it.
+  call_start: 'Llamar',
+  call_ringing: 'Llamando…',
+  call_incoming: 'Llamada entrante',
+  call_connecting: 'Conectando…',
+  call_active: 'En llamada',
+  call_reconnecting: 'Reconectando…',
+  call_ended_hung_up: 'Llamada finalizada',
+  call_ended_unanswered: 'Nadie ha contestado',
+  call_ended_declined: 'Llamada rechazada',
+  call_ended_failed: 'No se ha podido establecer la conexión',
+  call_ended_elsewhere: 'Atendida en otro dispositivo',
+  call_ended_unreachable: 'No se ha podido contactar con esta persona',
+  call_answer: 'Contestar',
+  call_reject: 'Rechazar',
+  call_hangup: 'Colgar',
+  call_mute: 'Silenciar el micrófono',
+  call_unmute: 'Activar el micrófono',
+  call_speaker: 'Altavoz',
+  call_dismiss: 'Cerrar',
+  call_failed_no_relay:
+    'Este servidor no tiene retransmisión de llamadas: no se ha podido llamar.',
+  call_failed_no_microphone: 'El micrófono no está disponible.',
   community_soon_title: 'Pronto: comunidades y salas',
   community_soon_why:
     'Una comunidad agrupa salas bajo un objeto seudónimo. La pestaña está reservada por la misma razón que la de las llamadas: la barra no debe moverse cuando lleguen.',
@@ -330,6 +359,10 @@ export const es: Readonly<Record<CopyKey, string>> = {
   notify_blind_title: 'Messagr',
   notify_blind_body: 'Ha llegado algo.',
   notify_channel: 'Mensajes',
+  notify_ringing_body: 'Llamada entrante',
+  notify_ringing_channel: 'Llamadas',
+  notify_answer: 'Contestar',
+  notify_decline: 'Rechazar',
   image_alt: 'Foto',
   image_unreadable: 'Esta foto no se ha podido abrir en este dispositivo.',
   conversation_attach: 'Enviar una foto',

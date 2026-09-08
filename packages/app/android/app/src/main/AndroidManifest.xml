@@ -2,6 +2,30 @@
 
     <uses-permission android:name="android.permission.INTERNET" />
 
+    <!-- THE MICROPHONE, FOR A CALL AND FOR NOTHING ELSE.
+         Declared here and asked for at the moment somebody places or answers
+         a call, never at launch: a permission dialog with no call behind it
+         is a product asking to listen for reasons of its own.
+
+         `MODIFY_AUDIO_SETTINGS` is what lets the application route the call
+         to the earpiece and switch it to the speaker. Without it the audio
+         plays wherever the system last left it, which on a telephone is
+         usually the wrong one. -->
+    <uses-permission android:name="android.permission.RECORD_AUDIO" />
+    <uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS" />
+
+    <!-- LE PLEIN ÉCRAN SUR UN TÉLÉPHONE VERROUILLÉ.
+         Sans cette permission, un appel entrant est une ligne de plus sur
+         l'écran de verrouillage, à remarquer en quatre-vingt-dix secondes.
+         Avec elle, Android allume l'écran et met l'application devant la
+         personne — ce que fait un téléphone qui sonne.
+
+         Android 14 ne l'accorde à l'installation qu'aux applications d'appel
+         et de réveil. Celle-ci en est une depuis qu'elle passe des appels ;
+         si la plateforme la refuse malgré tout, `ringNotification` reste
+         dessinée, dans la catégorie « appel » et avec ses deux réponses. -->
+    <uses-permission android:name="android.permission.USE_FULL_SCREEN_INTENT" />
+
     <!--
       React Native's own debug-build manifest fragment
       (ReactAndroid/src/debug/AndroidManifest.xml) declares this for its
@@ -54,6 +78,44 @@
             <category android:name="android.intent.category.DEFAULT" />
             <category android:name="android.intent.category.BROWSABLE" />
             <data android:scheme="messagr" />
+        </intent-filter>
+
+        <!--
+          THE https LINK, CLAIMED AT LAST, AND THE CONDITION ABOVE IS WHY IT
+          WAITED.
+
+          The comment above said this needed Digital Asset Links published at
+          the instance, and that an unverified filter would show a chooser
+          instead of opening. Both halves landed on 7 September 2026:
+          assetlinks.json serves the Play App Signing fingerprints on
+          messagr.eu (#114) and on the bench, and the invitation link became
+          https on the same day. Until then nothing here could have verified.
+
+          `autoVerify` is what makes the difference between opening and
+          offering a chooser: Android fetches the two hosts' assetlinks.json
+          at install and again on update, and a verified filter opens the
+          application with no question asked. A filter without it is the
+          chooser the old comment refused.
+
+          TWO HOSTS, BECAUSE A LINK NAMES ITS INSTANCE. The host of an
+          invitation is the homeserver of the account that invited:
+          messagr.eu in production, the bench for an invitation issued there.
+          Declaring one would leave half of them opening a browser.
+
+          WHAT THIS DOES NOT DO, said so nobody measures it and concludes the
+          filter is broken: verification is against the certificate the
+          device's copy was signed with. A build signed by the committed
+          debug keystore no longer matches anything served — that fingerprint
+          was withdrawn the same day, deliberately, because the keystore is
+          public. So the demonstration Pixel keeps opening a browser, and a
+          Play install does not.
+        -->
+        <intent-filter android:autoVerify="true">
+            <action android:name="android.intent.action.VIEW" />
+            <category android:name="android.intent.category.DEFAULT" />
+            <category android:name="android.intent.category.BROWSABLE" />
+            <data android:scheme="https" android:host="messagr.eu" android:pathPrefix="/i/" />
+            <data android:scheme="https" android:host="messagr-fork.maudet.cloud" android:pathPrefix="/i/" />
         </intent-filter>
       </activity>
     </application>

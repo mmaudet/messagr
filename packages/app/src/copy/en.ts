@@ -187,6 +187,10 @@ export const en: Readonly<Record<CopyKey, string>> = {
   promise_point_invitation: 'You enter by invitation, not by form',
   promise_action: 'Begin',
   list_title: 'Conversations',
+  list_invitation_ignored:
+    'You opened an invitation, and this phone already has an account. It was not used: it is still valid for the person it was meant for.',
+  list_not_in_yet:
+    'You are not in yet. Open the invitation link somebody sent you: it is the only door, and the application can do nothing before it.',
   list_empty: 'No conversations yet. Invite someone to start one.',
   list_nothing_said: 'Nothing has been said yet',
   list_unreadable: 'This device cannot read the last message',
@@ -295,6 +299,31 @@ export const en: Readonly<Record<CopyKey, string>> = {
     'The tab is held from V1 so the bar does not move later. V1 carries text, links and still images only; voice messages in V2, one-to-one then group calls in V3.',
   calls_soon_v2: 'V2 · voice messages',
   calls_soon_v3: 'V3 · audio + video',
+  // A call in progress. One screen draws every one of these -- see
+  // `CallScreen.tsx` -- so what changes between two states is exactly this
+  // sentence and which buttons sit under it.
+  call_start: 'Call',
+  call_ringing: 'Calling…',
+  call_incoming: 'Incoming call',
+  call_connecting: 'Connecting…',
+  call_active: 'In call',
+  call_reconnecting: 'Reconnecting…',
+  call_ended_hung_up: 'Call ended',
+  call_ended_unanswered: 'Nobody answered',
+  call_ended_declined: 'Call declined',
+  call_ended_failed: 'The connection could not be made',
+  call_ended_elsewhere: 'Answered on another device',
+  call_ended_unreachable: 'Could not reach them',
+  call_answer: 'Answer',
+  call_reject: 'Decline',
+  call_hangup: 'Hang up',
+  call_mute: 'Mute',
+  call_unmute: 'Unmute',
+  call_speaker: 'Speaker',
+  call_dismiss: 'Close',
+  call_failed_no_relay:
+    'This server has no call relay: the call could not be placed.',
+  call_failed_no_microphone: 'The microphone is not available.',
   community_soon_title: 'Coming: communities and rooms',
   community_soon_why:
     'A community groups rooms under a pseudonymous object. The tab is held for the same reason as the calls one: the bar must not move when they arrive.',
@@ -331,6 +360,10 @@ export const en: Readonly<Record<CopyKey, string>> = {
   notify_blind_title: 'Messagr',
   notify_blind_body: 'Something arrived.',
   notify_channel: 'Messages',
+  notify_ringing_body: 'Incoming call',
+  notify_ringing_channel: 'Calls',
+  notify_answer: 'Answer',
+  notify_decline: 'Decline',
   image_alt: 'Photo',
   image_unreadable: 'This photo could not be opened on this device.',
   conversation_attach: 'Send a photo',

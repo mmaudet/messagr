@@ -46,10 +46,14 @@ import {
 import { migrateKeystoreForm, type FormMigration } from './keystoreForm'
 import { openStorePassphrase } from './storePassphrase'
 import type { DeviceIdentity } from './deviceIdentity'
-import { encryptAndSendOneMessage, type SendReport } from './encryptAndSend'
+import {
+  encryptAndSendOneMessage,
+  sendIntoScope,
+  type SendReport,
+} from './encryptAndSend'
 import { getErrorMessage } from './errors'
 import { logEvent } from './log'
-import { fetchJoinedRooms } from './encryptedSend'
+import { fetchJoinedMembers, fetchJoinedRooms } from './encryptedSend'
 import { reactTo, unreact, type ReactingDeps } from './react'
 import { tallyReactions, type ReactionTally } from '../timeline/reactions'
 import { probeUnsettledEncrypt, type ProbeReport } from './panicProbe'
@@ -66,7 +70,7 @@ import type { PickedImage } from './pickImage'
 import { fetchImage, type ShownImage } from './receiveImage'
 import { sendImage, sendingThrough, type ImageSent } from './sendImage'
 import type { ReadFile } from '../timeline/imageEvent'
-import { makePumpHttp } from './pump'
+import { drainOutgoingRequests, makePumpHttp } from './pump'
 import {
   admitDrawnEntrant,
   issueInvitation,
@@ -303,36 +307,58 @@ export async function runOutgoingPump(
  * brands its scope ids so a room id cannot be handed to it by accident, and
  * this boundary is where a plain string becomes one.
  */
+/**
+ * Sends what a person typed, into the conversation they are looking at.
+ *
+ * The probe below is not this: it finds a room rather than being given one,
+ * which is right for a launch report and was catastrophic for a composer.
+ * See `sendIntoScope`.
+ */
+export async function sendTypedMessage(
+  sessionClient: ReturnType<typeof createClient>,
+  scope: string,
+  body: string,
+): Promise<{ readonly sent: boolean; readonly reason?: string }> {
+  const result = await sendIntoScope(
+    encryptingDeps(sessionClient),
+    scope,
+    'm.room.message',
+    { msgtype: 'm.text', body },
+  )
+  return result.sent ? { sent: true } : { sent: false, reason: result.reason }
+}
+
 export async function sendOneEncryptedMessage(
   sessionClient: ReturnType<typeof createClient>,
   identity: DeviceIdentity,
   /** What a person typed, when a person typed it. */
   body?: string,
 ): Promise<SendReport> {
-  return encryptAndSendOneMessage(
-    {
-      http: makePumpHttp(sessionClient),
-      machine: {
-        takeOutgoingRequests,
-        markRequestSent,
-        markRequestFailed,
-        shareScopeKey: (scope, userIds) =>
-          shareScopeKey(asCryptoScopeId(scope), [...userIds]),
-        encryptEvent: (scope, eventType, payload) =>
-          encryptEvent(asCryptoScopeId(scope), eventType, payload),
-        decryptEvent: (scope, rawEvent) =>
-          decryptEvent(asCryptoScopeId(scope), rawEvent),
-      },
-      decodeUtf8: bytes => new TextDecoder().decode(bytes),
-      // Unique per send, which is all a transaction id has to be: the
-      // homeserver uses it to recognise a retry of the same send, and
-      // nothing here retries.
-      newTransactionId: () =>
-        `messagr-${Date.now()}-${Math.floor(Math.random() * 1e6)}`,
+  return encryptAndSendOneMessage(encryptingDeps(sessionClient), identity, body)
+}
+
+/** What both send paths need from the machine and the wire. */
+export function encryptingDeps(sessionClient: ReturnType<typeof createClient>) {
+  return {
+    http: makePumpHttp(sessionClient),
+    machine: {
+      takeOutgoingRequests,
+      markRequestSent,
+      markRequestFailed,
+      shareScopeKey: (scope: string, userIds: readonly string[]) =>
+        shareScopeKey(asCryptoScopeId(scope), [...userIds]),
+      encryptEvent: (scope: string, eventType: string, payload: unknown) =>
+        encryptEvent(asCryptoScopeId(scope), eventType, payload),
+      decryptEvent: (scope: string, rawEvent: unknown) =>
+        decryptEvent(asCryptoScopeId(scope), rawEvent),
     },
-    identity,
-    body,
-  )
+    decodeUtf8: (bytes: Uint8Array) => new TextDecoder().decode(bytes),
+    // Unique per send, which is all a transaction id has to be: the
+    // homeserver uses it to recognise a retry of the same send, and
+    // nothing here retries.
+    newTransactionId: () =>
+      `messagr-${Date.now()}-${Math.floor(Math.random() * 1e6)}`,
+  }
 }
 
 /**
@@ -770,6 +796,24 @@ export async function sendPhotograph(
       // inside the event, where only a participant sees it.
       upload: ciphertext =>
         media.upload(ciphertext, 'application/octet-stream'),
+      // The same sequence the text path takes, and for the same reason.
+      shareTheKey: async shareScope => {
+        const members = await fetchJoinedMembers(http, shareScope)
+        if (members.length === 0) {
+          throw new Error(`nobody is joined to ${shareScope}`)
+        }
+        await shareScopeKey(asCryptoScopeId(shareScope), [...members])
+        const drained = await drainOutgoingRequests(http, {
+          takeOutgoingRequests,
+          markRequestSent,
+          markRequestFailed,
+        })
+        if (drained.failed > 0) {
+          throw new Error(
+            `${drained.failed} of the room key's own requests could not be sent`,
+          )
+        }
+      },
       machine: {
         encryptEvent: (encryptScope, eventType, payload) =>
           encryptEvent(asCryptoScopeId(encryptScope), eventType, payload),

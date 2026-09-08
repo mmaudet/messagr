@@ -13,6 +13,30 @@
 	     TestFlight or App Store build needs `production`, and the sygnal
 	     entry needs `platform: production` with it. The two go together,
 	     and a mismatch answers BadDeviceToken and delivers nothing. -->
+	<!-- LES LIENS UNIVERSELS, QUI N'ONT JAMAIS ETE RECLAMES.
+
+	     Le site sert son `apple-app-site-association` et y nomme
+	     KUT463DS29.eu.messagr pour /i*. Cote application, il manquait la
+	     moitie qui compte : sans cette entitlement, iOS ne va JAMAIS chercher
+	     ce fichier, donc un lien https ne peut pas ouvrir Messagr, quoi que
+	     serve le serveur.
+
+	     Le symptome est un bouton « Ouvrir dans Messagr » qui recharge la
+	     page. La page d'invitation est ecrite pour ca , son lien pointe vers
+	     sa propre adresse, et c'est le systeme qui doit l'intercepter, et
+	     son commentaire dit « si les liens universels sont en place ». Ils ne
+	     l'etaient pas. Constate le 7 septembre 2026 depuis un iPhone et un
+	     Pixel, ou rien ne se passait sur les deux.
+
+	     DEUX DOMAINES, PARCE QU'UN LIEN NOMME SON INSTANCE. L'hote d'une
+	     invitation est le homeserver du compte qui invite : messagr.eu en
+	     production, le banc pour une invitation emise depuis le banc. En
+	     declarer un seul rendrait la moitie des invitations inouvrables. -->
+	<key>com.apple.developer.associated-domains</key>
+	<array>
+		<string>applinks:messagr.eu</string>
+		<string>applinks:messagr-fork.maudet.cloud</string>
+	</array>
 	<key>aps-environment</key>
 	<!-- PRODUCTION, PARCE QUE TESTFLIGHT EST DE LA PRODUCTION.
 	     Un build distribue par TestFlight ou l'App Store recoit un jeton

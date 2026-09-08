@@ -96,6 +96,15 @@ jobs:
       - name: Assert Info.plist says what App Store Connect requires
         run: ./scripts/assert-ios-info-plist.sh
 
+      # THE FOURTH OF THE SAME SHAPE, AND THE FIRST THAT SPANS BOTH
+      # PLATFORMS. The invitation page's button is meant to be intercepted by
+      # the operating system, and was intercepted by neither: iOS had no
+      # associated-domains entitlement at all, Android claimed no https link.
+      # Reported from two devices within minutes of each other, and invisible
+      # from any build.
+      - name: Assert an invitation link opens the application
+        run: ./scripts/assert-invitation-links.sh
+
       # THE SITE, BUILT AND THEN CHECKED -- not the committed pages.
       #
       # `build-site.sh` exists because the substitution it performs used to

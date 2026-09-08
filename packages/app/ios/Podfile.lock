@@ -1889,6 +1889,8 @@ PODS:
     - ReactCommon/turbomodule/core
     - ReactNativeDependencies
     - Yoga
+  - ReactNativeIncallManager (4.2.2):
+    - React-Core
   - RNFBApp (26.4.0):
     - Firebase/CoreOnly (= 12.18.0)
     - hermes-engine
@@ -2133,6 +2135,7 @@ DEPENDENCIES:
   - ReactCommon/turbomodule/core (from `../../../node_modules/react-native/ReactCommon`)
   - ReactNativeDependencies (from `../../../node_modules/react-native/third-party-podspecs/ReactNativeDependencies.podspec`)
   - "ReactNativeFs (from `../../../node_modules/@dr.pogodin/react-native-fs`)"
+  - ReactNativeIncallManager (from `../../../node_modules/react-native-incall-manager`)
   - "RNFBApp (from `../../../node_modules/@react-native-firebase/app`)"
   - "RNFBMessaging (from `../../../node_modules/@react-native-firebase/messaging`)"
   - RNGestureHandler (from `../../../node_modules/react-native-gesture-handler`)
@@ -2342,6 +2345,8 @@ EXTERNAL SOURCES:
     :podspec: "../../../node_modules/react-native/third-party-podspecs/ReactNativeDependencies.podspec"
   ReactNativeFs:
     :path: "../../../node_modules/@dr.pogodin/react-native-fs"
+  ReactNativeIncallManager:
+    :path: "../../../node_modules/react-native-incall-manager"
   RNFBApp:
     :path: "../../../node_modules/@react-native-firebase/app"
   RNFBMessaging:
@@ -2463,6 +2468,7 @@ SPEC CHECKSUMS:
   ReactCommon: 749169e12aa3461a3df3656a00e48dbe0456b2d6
   ReactNativeDependencies: 94c922c39e0e6150ee9ad05e2ca1946e0ef55783
   ReactNativeFs: cd0d0ea408c6ed53c692650747364d181b29db49
+  ReactNativeIncallManager: c6e08cc005da0f73d5a1ecbd58ad33bc61d5d79f
   RNFBApp: 909622e738d3a923b670950f9cdc9aeac9b1e6cc
   RNFBMessaging: 5e7cd9fc16c49b0492121c1fa90c9b3aa35aaec6
   RNGestureHandler: 63727d42f0b6ea951168615f8af3160ad7b57a57

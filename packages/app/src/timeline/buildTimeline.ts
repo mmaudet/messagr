@@ -1,4 +1,5 @@
 import { getErrorMessage } from '../runtime/errors'
+import { logEvent } from '../runtime/log'
 import type { HttpRequester } from '../runtime/pump'
 import type { TimelineEntry } from './mergeTimeline'
 import { readImageEvent } from './imageEvent'
@@ -29,7 +30,7 @@ export interface TimelineMachine {
   readonly decryptEvent: (
     scope: string,
     rawEvent: unknown,
-  ) => Promise<{ ciphertext: Uint8Array }>
+  ) => Promise<{ readonly eventType: string; readonly ciphertext: Uint8Array }>
 }
 
 interface RawEvent {
@@ -86,6 +87,23 @@ export interface DecryptedEvents {
   readonly reactions: LooseReaction[]
 }
 
+/**
+ * Whether the homeserver has already told us this event was taken back.
+ *
+ * `unsigned.redacted_because` is the specification's marker and carries the
+ * redaction event itself, so its presence is the fact rather than a guess
+ * from an empty content -- which an event could have for other reasons.
+ */
+function isRedacted(event: RawEvent): boolean {
+  const unsigned = (event as { unsigned?: unknown }).unsigned
+  return (
+    typeof unsigned === 'object' &&
+    unsigned !== null &&
+    'redacted_because' in unsigned &&
+    (unsigned as { redacted_because?: unknown }).redacted_because !== undefined
+  )
+}
+
 export async function toTimelineEntries(
   machine: TimelineMachine,
   decodeUtf8: (bytes: Uint8Array) => string,
@@ -122,8 +140,45 @@ export async function toTimelineEntries(
       continue
     }
 
+    // REDACTED, WHICH IS NOT THE SAME AS UNREADABLE, AND LOOKED IDENTICAL.
+    //
+    // A redaction strips an event's content and leaves the shell behind, type
+    // and all. An `m.room.encrypted` with nothing in it cannot be decrypted
+    // -- there is no ciphertext -- so it fell into the catch below and was
+    // drawn as "its key never arrived": a phantom message, in this account's
+    // own name, on a conversation it never said anything on.
+    //
+    // Every redaction this application can make today is somebody taking a
+    // reaction back, and a reaction taken back must leave nothing. Reported
+    // from a Pixel as messages nobody had sent; the log showed four such
+    // events with no `session_id`, one of them a reaction removed minutes
+    // earlier.
+    //
+    // The day a message can be deleted, this is where that would branch: a
+    // deleted message may well deserve a line saying so, where a withdrawn
+    // reaction deserves silence.
+    if (isRedacted(event)) {
+      continue
+    }
+
     try {
       const envelope = await machine.decryptEvent(roomId, raw)
+
+      // SIGNALLING IS NOT SPEECH, AND IT WAS BEING DRAWN AS SOME.
+      //
+      // A call's `m.call.*` events go into the conversation encrypted, for
+      // the reason `session.ts` gives: an unencrypted `party_id` tells the
+      // timeline which of somebody's devices is on a call. They therefore
+      // arrive here exactly like a message, decrypt perfectly, and carry no
+      // `body` -- so every invite, answer and candidate list drew a bubble
+      // saying "message illisible sur cet appareil". A single call would
+      // have filled the conversation with them.
+      //
+      // The inner type is the only thing that tells them apart, and it is on
+      // the envelope. `inbox.ts` reads the same field to decide the
+      // opposite question.
+      if (envelope.eventType.startsWith('m.call.')) continue
+
       const content = JSON.parse(decodeUtf8(envelope.ciphertext)) as {
         body?: unknown
       }
@@ -153,12 +208,36 @@ export async function toTimelineEntries(
           : { reason: 'this message carried no text' }),
       })
     } catch (cause: unknown) {
+      const reason = getErrorMessage(cause)
+      // The screen says only "its key never arrived", which is the right
+      // sentence for somebody reading a conversation and the wrong one for
+      // anybody working out WHY. A message this device sent itself coming
+      // back unreadable means something quite different from one whose
+      // sender never shared the key, and the two look identical on screen.
+      // Metadata only: the identifier, who claimed to send it, and the
+      // library's own words. No ciphertext, and by definition no plaintext.
+      // The sender is enough to tell the two apart -- this account's own
+      // identifier there is the case worth chasing.
+      // The Megolm session, which is the field that tells the two apart: a
+      // key somebody never sent, or a session this device made and then
+      // could not read back. Both say "undecryptable" and only one of them
+      // is this application's fault.
+      const wrapper = (event as { content?: Record<string, unknown> }).content
+      logEvent('warn', 'MESSAGR_UNREADABLE', {
+        eventId,
+        claimedSender: sender,
+        session:
+          typeof wrapper?.session_id === 'string' ? wrapper.session_id : null,
+        fromDevice:
+          typeof wrapper?.device_id === 'string' ? wrapper.device_id : null,
+        reason,
+      })
       entries.push({
         eventId,
         claimedSender: sender,
         sentAt,
         body: null,
-        reason: getErrorMessage(cause),
+        reason,
       })
     }
   }
