@@ -39,7 +39,10 @@ const {
   getMessaging,
 } = require('@react-native-firebase/messaging')
 const { wake } = require('./src/runtime/wake')
-const { lookForWhatArrivedHere } = require('./src/runtime/wakeAndLook')
+const {
+  lookForWhatArrivedHere,
+  refuseTheCallHere,
+} = require('./src/runtime/wakeAndLook')
 const {
   readNotification,
   ringingNotification,
@@ -125,5 +128,7 @@ function registerTheWake() {
   //
   // Inside the guard with the handler above: both belong to being woken, and
   // a device that cannot be woken has nothing to hold a press for.
-  rememberBackgroundPresses()
+  // The refusal needs a session and a crypto machine, which is everything
+  // the notification adapter exists not to know about -- so it is handed in.
+  rememberBackgroundPresses(refuseTheCallHere)
 }

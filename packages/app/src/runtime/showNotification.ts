@@ -108,8 +108,36 @@ export function whenNotificationPressed(
  * notification through `getInitialNotification`. Answering here and there
  * both would open the conversation twice.
  */
-export function rememberBackgroundPresses(): void {
-  notifee.onBackgroundEvent(async () => {
+export function rememberBackgroundPresses(
+  /**
+   * Refuses the call in a conversation, from a process with no screen.
+   *
+   * Injected rather than imported, because this module is the notifee
+   * adapter and refusing a call is a session, a crypto machine and an
+   * encrypted send -- everything this file exists not to know about.
+   */
+  refuse?: (scope: string) => Promise<unknown>,
+): void {
+  notifee.onBackgroundEvent(async ({ type, detail }) => {
+    // REFUSING IS THE ONE PRESS THAT MUST NOT OPEN THE APPLICATION.
+    //
+    // Everything else is remembered and read again by the application that
+    // starts afterwards, through `getInitialNotification`. Saying no on a
+    // locked screen is a person deciding not to be interrupted, and opening
+    // the interface at them is the opposite of what they pressed.
+    if (type === EventType.ACTION_PRESS && detail.pressAction?.id === DECLINE) {
+      const scope = ringingOfPress(detail.notification?.id)
+      if (scope !== null) {
+        await notifee.cancelNotification(detail.notification?.id ?? '')
+        try {
+          await refuse?.(scope)
+        } catch {
+          // Nothing to report to. The notification is already down, which is
+          // the half the person pressing can see.
+        }
+      }
+      return
+    }
     // Nothing to do, and registering is the point: without a handler notifee
     // warns and the press is dropped before the application can read it.
   })
