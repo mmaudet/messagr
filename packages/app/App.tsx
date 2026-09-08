@@ -312,13 +312,29 @@ export function App({
   // they hold exists -- see `Reserved`: a bar that gains an item later moves
   // every other item under people's thumbs.
   const [tab, setTab] = useState<Tab>('chat')
-  // CONVERSATIONS, NOT MESSAGES.
+  // MESSAGES, AND IT USED TO BE CONVERSATIONS.
   //
-  // The tab's badge counts how many conversations have something waiting; the
-  // rows carry how much is waiting in each. That is the division a person
-  // reads without being told -- a tab saying `47` for one chatty conversation
-  // would send somebody looking for forty-seven places to go.
-  const unreadCount = summaries.filter(summary => summary.unread > 0).length
+  // It read: "the tab's badge counts how many conversations have something
+  // waiting; the rows carry how much is waiting in each. That is the
+  // division a person reads without being told -- a tab saying `47` for one
+  // chatty conversation would send somebody looking for forty-seven places
+  // to go." The argument is kept rather than deleted, because whoever
+  // revisits this should meet it before deciding again.
+  //
+  // It was overruled by the account holder, who reported the same thing
+  // twice: a `6` on the row and a `1` on the tab, read as "une désynchro
+  // entre les pastilles". Two numbers in one glance, in different units,
+  // with nothing on either saying which unit it is. Every messenger this
+  // product is compared to puts the message count on the tab, so the count
+  // is not what somebody has to be told -- the DIVISION is, and a screen
+  // cannot say it.
+  //
+  // The distinction the old argument was protecting is real and still there:
+  // it is the ROWS that say where to go. The tab only says how much.
+  const unreadCount = summaries.reduce(
+    (total, summary) => total + summary.unread,
+    0,
+  )
   const [legalOpen, setLegalOpen] = useState(false)
   // Whether the screen about the person is showing over the conversation.
   // The rare gestures live there rather than in the message flow -- see the
