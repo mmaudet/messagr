@@ -41,6 +41,14 @@ KEY_ID="${ASC_KEY_ID:-}"
 ISSUER_ID="${ASC_ISSUER_ID:-}"
 KEY_PATH="${ASC_KEY_PATH:-$HOME/.appstoreconnect/private_keys/AuthKey_${KEY_ID}.p8}"
 WORK="${ASC_WORK_DIR:-$(mktemp -d)}"
+# THE UPLOAD IS THE STEP THAT FAILS FOR REASONS THAT ARE NOBODY'S FAULT.
+# `altool` fetches a `Defaults.properties` from Apple mid-transfer, and a
+# network that blinks there ends a twenty-minute archive with "The file
+# doesn't exist". It happened to build 14 and again to build 16. With
+# `--upload-only` and a stable `ASC_WORK_DIR`, the retry costs the transfer
+# rather than the archive.
+ONLY_UPLOAD=no
+if [ "${1:-}" = "--upload-only" ]; then ONLY_UPLOAD=yes; fi
 
 if [ -z "$KEY_ID" ] || [ -z "$ISSUER_ID" ]; then
   echo "ASC_KEY_ID and ASC_ISSUER_ID must be set." >&2
@@ -62,21 +70,31 @@ AUTH=(-allowProvisioningUpdates
       -authenticationKeyID "$KEY_ID"
       -authenticationKeyIssuerID "$ISSUER_ID")
 
-echo "==> archiving (this registers the App ID and mints the profile if needed)"
-xcodebuild -workspace "$IOS/Messagr.xcworkspace" \
-  -scheme Messagr -configuration Release \
-  -destination 'generic/platform=iOS' \
-  -archivePath "$WORK/Messagr.xcarchive" \
-  "${AUTH[@]}" archive
-
-echo "==> exporting a signed .ipa"
-xcodebuild -exportArchive \
-  -archivePath "$WORK/Messagr.xcarchive" \
-  -exportOptionsPlist "$IOS/ExportOptions.plist" \
-  -exportPath "$WORK/export" \
-  "${AUTH[@]}"
-
 IPA="$WORK/export/Messagr.ipa"
+
+if [ "$ONLY_UPLOAD" = yes ]; then
+  if [ ! -f "$IPA" ]; then
+    echo "no .ipa at $IPA -- there is nothing to re-send." >&2
+    echo "Set ASC_WORK_DIR to the directory the archive was built in," >&2
+    echo "or drop --upload-only to build one." >&2
+    exit 2
+  fi
+  echo "==> re-sending the .ipa already built at $IPA"
+else
+  echo "==> archiving (this registers the App ID and mints the profile if needed)"
+  xcodebuild -workspace "$IOS/Messagr.xcworkspace" \
+    -scheme Messagr -configuration Release \
+    -destination 'generic/platform=iOS' \
+    -archivePath "$WORK/Messagr.xcarchive" \
+    "${AUTH[@]}" archive
+
+  echo "==> exporting a signed .ipa"
+  xcodebuild -exportArchive \
+    -archivePath "$WORK/Messagr.xcarchive" \
+    -exportOptionsPlist "$IOS/ExportOptions.plist" \
+    -exportPath "$WORK/export" \
+    "${AUTH[@]}"
+fi
 
 # THE STEP THAT EXISTS BECAUSE THE ARCHIVE LIED.
 # Not a formality: it reads the file that is about to be sent, and a

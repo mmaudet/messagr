@@ -30,3 +30,6 @@ services/**/target/
 # xcodebuild look for it by key ID alone.
 *.p8
 AuthKey_*
+
+# Kept archives, so a failed upload costs the transfer and not the build.
+.build/

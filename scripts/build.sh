@@ -66,12 +66,30 @@ if [ "$WHICH" != "android" ]; then
   echo "==> build number $CURRENT -> $NEXT"
   sed -i '' "s/CURRENT_PROJECT_VERSION = $CURRENT;/CURRENT_PROJECT_VERSION = $NEXT;/g" "$PROJECT"
 
+  # A STABLE DIRECTORY, so a failed upload does not cost the archive.
+  # `altool` fetches a file from Apple in the middle of the transfer, and a
+  # network that blinks there ends twenty minutes of work with "The file
+  # doesn't exist" -- build 14, and build 16 again today. Keeping the .ipa
+  # means the retry is the transfer alone.
+  WORK="$ROOT/.build/ios"
+  mkdir -p "$WORK"
+  export ASC_WORK_DIR="$WORK"
+
   # Archive, export, read what was exported, validate, send. The reading is
   # the step that catches an `aps-environment: development` slipping through,
   # which is a tester whose telephone never rings and nothing that says why.
-  "$ROOT/scripts/publish-ios.sh"
-
-  echo
-  echo "iOS build $NEXT is with Apple. The bump is in the working tree and"
-  echo "is not committed: commit it with whatever else this build carries."
+  if "$ROOT/scripts/publish-ios.sh"; then
+    echo
+    echo "iOS build $NEXT is with Apple. The bump is in the working tree and"
+    echo "is not committed: commit it with whatever else this build carries."
+  else
+    echo
+    echo "The iOS step failed. The archive is kept at $WORK, so if it got as"
+    echo "far as VERIFY SUCCEEDED, this re-sends it without rebuilding:"
+    echo
+    echo "    ASC_WORK_DIR=$WORK ./scripts/publish-ios.sh --upload-only"
+    echo
+    echo "Build $NEXT stays the number: it was never accepted, so do not bump."
+    exit 1
+  fi
 fi
