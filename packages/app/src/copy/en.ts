@@ -294,6 +294,14 @@ export const en: Readonly<Record<CopyKey, string>> = {
   'when_date %1$d %2$d': '%1$d/%2$d',
   list_no_directory:
     'No phone number appears anywhere in the system. You only come into contact by invitation.',
+  calls_empty: 'No calls yet.',
+  calls_taken: 'Incoming call',
+  calls_placed: 'Outgoing call',
+  calls_missed: 'Missed call',
+  calls_no_answer: 'No answer',
+  calls_declined: 'Declined',
+  calls_you_declined: 'You declined',
+  calls_unplaced: 'Could not be placed',
   calls_soon_title: 'Coming: audio calls, then video',
   calls_soon_why:
     'The tab is held from V1 so the bar does not move later. V1 carries text, links and still images only; voice messages in V2, one-to-one then group calls in V3.',

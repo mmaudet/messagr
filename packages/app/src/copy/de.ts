@@ -299,6 +299,14 @@ export const de: Readonly<Record<CopyKey, string>> = {
   'when_date %1$d %2$d': '%1$d.%2$d',
   list_no_directory:
     'Nirgendwo im System erscheint eine Telefonnummer. In Kontakt kommt man nur über eine Einladung.',
+  calls_empty: 'Noch keine Anrufe.',
+  calls_taken: 'Eingegangener Anruf',
+  calls_placed: 'Ausgehender Anruf',
+  calls_missed: 'Verpasster Anruf',
+  calls_no_answer: 'Keine Antwort',
+  calls_declined: 'Abgelehnt',
+  calls_you_declined: 'Sie haben abgelehnt',
+  calls_unplaced: 'Anruf nicht möglich',
   calls_soon_title: 'Bald: Audioanrufe, dann Video',
   calls_soon_why:
     'Der Reiter ist ab V1 reserviert, damit sich die Leiste später nicht verschiebt. V1 überträgt nur Text, Links und unbewegte Bilder; Sprachnachrichten in V2, Einzel- und dann Gruppenanrufe in V3.',

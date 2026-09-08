@@ -291,6 +291,14 @@ export const it: Readonly<Record<CopyKey, string>> = {
   'when_date %1$d %2$d': '%1$d/%2$d',
   list_no_directory:
     'Nessun numero di telefono compare in alcun punto del sistema. Si entra in relazione soltanto su invito.',
+  calls_empty: 'Ancora nessuna chiamata.',
+  calls_taken: 'Chiamata ricevuta',
+  calls_placed: 'Chiamata effettuata',
+  calls_missed: 'Chiamata persa',
+  calls_no_answer: 'Nessuna risposta',
+  calls_declined: 'Rifiutata',
+  calls_you_declined: 'Hai rifiutato',
+  calls_unplaced: 'Chiamata non riuscita',
   calls_soon_title: 'Presto: chiamate audio, poi video',
   calls_soon_why:
     'La scheda è riservata fin dalla V1 per non spostare la barra più tardi. La V1 trasporta solo testo, link e immagini fisse; note vocali in V2, chiamate individuali e poi di gruppo in V3.',

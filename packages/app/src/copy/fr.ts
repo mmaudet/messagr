@@ -459,6 +459,16 @@ export const fr = {
   list_no_directory:
     'Aucun numéro de téléphone n’apparaît nulle part dans le système. On n’entre en relation que par invitation.',
 
+  // L'onglet Appels. Ce que devient un appel, dit en toutes lettres : la
+  // couleur ne fait que répéter ces mots, elle ne les porte jamais.
+  calls_empty: 'Aucun appel pour l’instant.',
+  calls_taken: 'Appel reçu',
+  calls_placed: 'Appel passé',
+  calls_missed: 'Appel manqué',
+  calls_no_answer: 'Sans réponse',
+  calls_declined: 'Refusé',
+  calls_you_declined: 'Vous avez refusé',
+  calls_unplaced: 'Appel impossible',
   calls_soon_title: 'Bientôt : appels audio, puis vidéo',
   calls_soon_why:
     'L’onglet est réservé dès la V1 pour ne pas déplacer la barre plus tard. La V1 ne transporte que texte, liens et images statiques ; vocaux en V2, appels individuels puis de groupe en V3.',

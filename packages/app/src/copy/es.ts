@@ -293,6 +293,14 @@ export const es: Readonly<Record<CopyKey, string>> = {
   'when_date %1$d %2$d': '%1$d/%2$d',
   list_no_directory:
     'Ningún número de teléfono aparece en ninguna parte del sistema. Solo se entra en contacto por invitación.',
+  calls_empty: 'Todavía no hay llamadas.',
+  calls_taken: 'Llamada recibida',
+  calls_placed: 'Llamada realizada',
+  calls_missed: 'Llamada perdida',
+  calls_no_answer: 'Sin respuesta',
+  calls_declined: 'Rechazada',
+  calls_you_declined: 'La ha rechazado',
+  calls_unplaced: 'No se ha podido llamar',
   calls_soon_title: 'Pronto: llamadas de audio, luego vídeo',
   calls_soon_why:
     'La pestaña está reservada desde la V1 para no mover la barra más tarde. La V1 solo transporta texto, enlaces e imágenes fijas; notas de voz en V2, llamadas individuales y luego de grupo en V3.',

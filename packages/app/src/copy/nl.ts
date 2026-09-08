@@ -292,6 +292,14 @@ export const nl: Readonly<Record<CopyKey, string>> = {
   'when_date %1$d %2$d': '%1$d-%2$d',
   list_no_directory:
     'Nergens in het systeem komt een telefoonnummer voor. Contact ontstaat uitsluitend op uitnodiging.',
+  calls_empty: 'Nog geen oproepen.',
+  calls_taken: 'Ontvangen oproep',
+  calls_placed: 'Uitgaande oproep',
+  calls_missed: 'Gemiste oproep',
+  calls_no_answer: 'Geen antwoord',
+  calls_declined: 'Geweigerd',
+  calls_you_declined: 'U hebt geweigerd',
+  calls_unplaced: 'Bellen niet mogelijk',
   calls_soon_title: 'Binnenkort: audio-oproepen, daarna video',
   calls_soon_why:
     'Het tabblad is vanaf V1 gereserveerd zodat de balk later niet verschuift. V1 draagt alleen tekst, links en stilstaande beelden; spraakberichten in V2, individuele en daarna groepsoproepen in V3.',

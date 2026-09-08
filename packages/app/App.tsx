@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react'
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   AppState,
   BackHandler,
@@ -53,6 +53,12 @@ import {
   type CallOnScreen,
   type CallRuntime,
 } from './src/runtime/callPump'
+import {
+  forgetfulCallLog,
+  type CallLog,
+  type CallRecord,
+} from './src/runtime/callLogStore'
+import { CallsList } from './src/ui/CallsList'
 import { getErrorMessage } from './src/runtime/errors'
 import { computeHermesReport } from './src/runtime/hermes'
 import { logEvent } from './src/runtime/log'
@@ -380,6 +386,23 @@ export function App({
    * audio session ends with it and the next one starts at the earpiece.
    */
   const [callSpeaker, setCallSpeaker] = useState(false)
+  /**
+   * Recent calls, for the Appels tab.
+   *
+   * Read from the notebook rather than derived from the conversations:
+   * `callLogStore.ts` says why, and the shortest of its reasons is that a
+   * missed call is the row that matters most and the one nothing else can
+   * reconstruct.
+   */
+  const [calls, setCalls] = useState<readonly CallRecord[]>([])
+  const callLogRef = useRef<CallLog>(forgetfulCallLog())
+  /**
+   * Re-reads the call history. Cheap: one query against a page of the
+   * notebook, with no round trip anywhere.
+   */
+  const refreshCalls = useCallback(async () => {
+    setCalls(await callLogRef.current.recent())
+  }, [])
   const callRuntimeRef = useRef<CallRuntime | null>(null)
   /**
    * A conversation somebody already answered a call in, from a notification.
@@ -1327,8 +1350,22 @@ export function App({
                   setCallMuted(false)
                   setCallSpeaker(false)
                 }
+                // A call that ended is a line the Appels tab does not have.
+                if (onScreen === null || onScreen.state.call === 'ended') {
+                  refreshCalls().catch(() => {})
+                }
               },
+              // The notebook's call page, opened a few lines above. A device
+              // whose notebook did not open still places calls; it just has
+              // no list of them afterwards, which is what `forgetfulCallLog`
+              // answers and what ADR-0010 calls degrading.
+              opening.calls,
             )
+            callLogRef.current = opening.calls
+            refreshCalls().catch(() => {
+              // A list that did not load is an empty screen, not a failed
+              // launch.
+            })
 
             const beginLiveSync = () => {
               if (runningSyncRef.current !== null) return
@@ -1992,12 +2029,20 @@ export function App({
 */}
             {openScope === null && tab === 'calls' && (
               <View style={styles.block}>
-                <Reserved
-                  testID="calls-reserved"
-                  glyph="calls"
-                  title="calls_soon_title"
-                  why="calls_soon_why"
-                  stages={['calls_soon_v2', 'calls_soon_v3']}
+                {/* A row opens the CONVERSATION, not a call. Calling is the
+                    header's own button, one tap further, where the person
+                    can see who they are about to ring -- `CallsList.tsx`
+                    says why this screen is not a directory. */}
+                <CallsList
+                  calls={calls}
+                  now={Date.now()}
+                  shownFor={who => displayNameFor(who, names.get(who))}
+                  onOpen={scope => {
+                    setTab('chat')
+                    // The launch effect binds it; a screen drawn before the
+                    // session exists has no conversation to open anyway.
+                    openConversationRef.current?.(scope)
+                  }}
                 />
               </View>
             )}

@@ -15,6 +15,7 @@ import {
   openOutstanding,
   type Outstanding,
 } from './outstandingStore'
+import { forgetfulCallLog, openCallLog, type CallLog } from './callLogStore'
 import { openStorePassphrase } from './storePassphrase'
 
 /** What became of the notebook on this launch. Reported, not assumed. */
@@ -24,6 +25,8 @@ export interface NotebookOpening {
   readonly lastRead: LastRead
   /** Invitations issued here that nobody has been let in through yet. */
   readonly outstanding: Outstanding
+  /** Every call, which is the most revealing page of the four. */
+  readonly calls: CallLog
   readonly opened: boolean
   /** Why it did not open, when it did not. */
   readonly reason?: string
@@ -34,7 +37,7 @@ export interface NotebookOpening {
 /**
  * Opens the application's own encrypted notebook. ADR-0010.
  *
- * # Three pages, one file
+ * # Four pages, one file
  *
  * Who you call what (`given_names`), how far you have read (`last_read`),
  * and who you have invited and not yet let in
@@ -79,6 +82,7 @@ export async function openNotebook(storeDir: string): Promise<NotebookOpening> {
       names: forgetfulGivenNames(),
       lastRead: forgetfulLastRead(),
       outstanding: forgetfulOutstanding(),
+      calls: forgetfulCallLog(),
       opened: false,
       reason: 'no writable directory was supplied at launch',
     }
@@ -92,6 +96,7 @@ export async function openNotebook(storeDir: string): Promise<NotebookOpening> {
       names: forgetfulGivenNames(),
       lastRead: forgetfulLastRead(),
       outstanding: forgetfulOutstanding(),
+      calls: forgetfulCallLog(),
       opened: false,
       reason: passphrase.reason,
     }
@@ -114,6 +119,7 @@ export async function openNotebook(storeDir: string): Promise<NotebookOpening> {
       names: await openGivenNames(page),
       lastRead: await openLastRead(page),
       outstanding: await openOutstanding(page),
+      calls: await openCallLog(page),
       opened: true,
       minted: passphrase.minted,
     }
@@ -125,6 +131,7 @@ export async function openNotebook(storeDir: string): Promise<NotebookOpening> {
       names: forgetfulGivenNames(),
       lastRead: forgetfulLastRead(),
       outstanding: forgetfulOutstanding(),
+      calls: forgetfulCallLog(),
       opened: false,
       reason: getErrorMessage(cause),
       minted: passphrase.minted,
