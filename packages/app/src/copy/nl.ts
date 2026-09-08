@@ -292,6 +292,14 @@ export const nl: Readonly<Record<CopyKey, string>> = {
   'when_date %1$d %2$d': '%1$d-%2$d',
   list_no_directory:
     'Nergens in het systeem komt een telefoonnummer voor. Contact ontstaat uitsluitend op uitnodiging.',
+  calls_empty: 'Nog geen oproepen.',
+  calls_taken: 'Ontvangen oproep',
+  calls_placed: 'Uitgaande oproep',
+  calls_missed: 'Gemiste oproep',
+  calls_no_answer: 'Geen antwoord',
+  calls_declined: 'Geweigerd',
+  calls_you_declined: 'U hebt geweigerd',
+  calls_unplaced: 'Bellen niet mogelijk',
   calls_soon_title: 'Binnenkort: audio-oproepen, daarna video',
   calls_soon_why:
     'Het tabblad is vanaf V1 gereserveerd zodat de balk later niet verschuift. V1 draagt alleen tekst, links en stilstaande beelden; spraakberichten in V2, individuele en daarna groepsoproepen in V3.',
@@ -343,6 +351,10 @@ export const nl: Readonly<Record<CopyKey, string>> = {
   person_back: 'Terug',
   message_delivered_hint: 'Aan de server afgegeven',
   message_read_hint: 'Gelezen',
+  settings_full_screen: 'Een oproep het scherm laten inschakelen',
+  settings_open: 'Openen',
+  settings_full_screen_hint:
+    'Android geeft alleen telefoontoepassingen het recht om voor een oproep het scherm in te schakelen. Zonder dat is een inkomende oproep één melding meer op het vergrendelscherm.',
   settings_wake: 'Meldingen',
   settings_wake_hint:
     'Het wekseintje draagt geen afzender en geen bericht. Het apparaat ontsleutelt hier.',
@@ -359,6 +371,7 @@ export const nl: Readonly<Record<CopyKey, string>> = {
   notify_blind_body: 'Er is iets aangekomen.',
   notify_channel: 'Berichten',
   notify_ringing_body: 'Inkomende oproep',
+  'notify_missed %1$d %2$d': 'Gemiste oproep om %1$d:%2$d',
   notify_ringing_channel: 'Oproepen',
   notify_answer: 'Opnemen',
   notify_decline: 'Weigeren',

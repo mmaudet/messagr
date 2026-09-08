@@ -45,6 +45,11 @@ export interface WakeDeps {
    * nothing can be observed.
    */
   readonly ring: (calling: Calling) => Promise<void>
+  /**
+   * What a call nobody answered says once it is over. Built by the caller so
+   * the wording, and the hour's formatting, stay in the copy.
+   */
+  readonly missed: (calling: Calling, at: number) => Notification
 }
 
 /** Somebody calling, as a wake found them. */
@@ -52,6 +57,8 @@ export interface Calling {
   readonly scope: string
   readonly shown: string
   readonly from: string
+  /** When the call ended unanswered, if it did. See `Ringing.missedAt`. */
+  readonly missedAt?: number
 }
 
 export interface WhatWoke {
@@ -109,7 +116,11 @@ export async function wake(deps: WakeDeps): Promise<WakeOutcome> {
   if (woke.ringing.length > 0) {
     for (const calling of woke.ringing) {
       try {
-        await deps.ring(calling)
+        // A call that is over is drawn, not rung: same identifier, so it
+        // replaces the ringing telephone rather than stacking under it, and
+        // the two never sound alike.
+        if (calling.missedAt === undefined) await deps.ring(calling)
+        else await deps.draw(deps.missed(calling, calling.missedAt))
       } catch {
         // Nothing to report to. The next one is still attempted, for the
         // same reason the message loop below catches its own.

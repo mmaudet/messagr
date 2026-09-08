@@ -53,7 +53,12 @@ import {
 } from './encryptAndSend'
 import { getErrorMessage } from './errors'
 import { logEvent } from './log'
-import { fetchJoinedMembers, fetchJoinedRooms } from './encryptedSend'
+import {
+  fetchInvitedRooms,
+  fetchJoinedMembers,
+  fetchJoinedRooms,
+  joinRoom,
+} from './encryptedSend'
 import { reactTo, unreact, type ReactingDeps } from './react'
 import { tallyReactions, type ReactionTally } from '../timeline/reactions'
 import { probeUnsettledEncrypt, type ProbeReport } from './panicProbe'
@@ -70,6 +75,7 @@ import type { PickedImage } from './pickImage'
 import { fetchImage, type ShownImage } from './receiveImage'
 import { sendImage, sendingThrough, type ImageSent } from './sendImage'
 import type { ReadFile } from '../timeline/imageEvent'
+import { enterInvitations, type Entered } from './enterInvitations'
 import { drainOutgoingRequests, makePumpHttp } from './pump'
 import {
   admitDrawnEntrant,
@@ -433,6 +439,31 @@ export async function loadConversation(
   // Both, from one pass. ADR-0011: reactions come out of the same door the
   // messages do, and the aggregation the server would have done happens here.
   return { entries, reactions: tallyReactions(reactions, selfUserId) }
+}
+
+/**
+ * Phase twelve: walking through the door somebody held open.
+ *
+ * Pure glue. What it does and why entering is the product's business rather
+ * than a probe's side effect is `enterInvitations.ts`, tested there against
+ * injected fakes.
+ */
+export async function enterAnyInvitations(
+  sessionClient: ReturnType<typeof createClient>,
+): Promise<Entered> {
+  const entered = await enterInvitations({
+    http: makePumpHttp(sessionClient),
+    invitedRooms: fetchInvitedRooms,
+    join: joinRoom,
+  })
+  // Only when something happened: this runs on every sync tick, and a line
+  // per tick saying "nobody invited anybody" would bury the one that matters.
+  if (entered.joined.length > 0 || entered.refused.length > 0) {
+    logEvent(entered.refused.length > 0 ? 'warn' : 'info', 'MESSAGR_ENTERED', {
+      ...entered,
+    })
+  }
+  return entered
 }
 
 /**

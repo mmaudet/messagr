@@ -299,6 +299,14 @@ export const de: Readonly<Record<CopyKey, string>> = {
   'when_date %1$d %2$d': '%1$d.%2$d',
   list_no_directory:
     'Nirgendwo im System erscheint eine Telefonnummer. In Kontakt kommt man nur über eine Einladung.',
+  calls_empty: 'Noch keine Anrufe.',
+  calls_taken: 'Eingegangener Anruf',
+  calls_placed: 'Ausgehender Anruf',
+  calls_missed: 'Verpasster Anruf',
+  calls_no_answer: 'Keine Antwort',
+  calls_declined: 'Abgelehnt',
+  calls_you_declined: 'Sie haben abgelehnt',
+  calls_unplaced: 'Anruf nicht möglich',
   calls_soon_title: 'Bald: Audioanrufe, dann Video',
   calls_soon_why:
     'Der Reiter ist ab V1 reserviert, damit sich die Leiste später nicht verschiebt. V1 überträgt nur Text, Links und unbewegte Bilder; Sprachnachrichten in V2, Einzel- und dann Gruppenanrufe in V3.',
@@ -350,6 +358,10 @@ export const de: Readonly<Record<CopyKey, string>> = {
   person_back: 'Zurück',
   message_delivered_hint: 'An den Server übergeben',
   message_read_hint: 'Gelesen',
+  settings_full_screen: 'Anrufe den Bildschirm einschalten lassen',
+  settings_open: 'Öffnen',
+  settings_full_screen_hint:
+    'Android gewährt nur Telefonanwendungen das Recht, für einen Anruf den Bildschirm einzuschalten. Ohne dies ist ein eingehender Anruf nur eine weitere Benachrichtigung auf dem Sperrbildschirm.',
   settings_wake: 'Benachrichtigungen',
   settings_wake_hint:
     'Das Wecksignal trägt weder Absender noch Nachricht. Das Gerät entschlüsselt hier.',
@@ -366,6 +378,7 @@ export const de: Readonly<Record<CopyKey, string>> = {
   notify_blind_body: 'Es ist etwas angekommen.',
   notify_channel: 'Nachrichten',
   notify_ringing_body: 'Eingehender Anruf',
+  'notify_missed %1$d %2$d': 'Verpasster Anruf um %1$d:%2$d',
   notify_ringing_channel: 'Anrufe',
   notify_answer: 'Annehmen',
   notify_decline: 'Ablehnen',

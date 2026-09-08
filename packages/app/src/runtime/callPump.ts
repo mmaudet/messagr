@@ -13,7 +13,8 @@ import {
   type CallSessionFailure,
 } from '../calls/session'
 import type { CallEvent } from '../calls/wire'
-import { deviceCallAudio } from './callAudio'
+import { deviceCallAudio, type CallRole } from './callAudio'
+import type { CallLog, CallOutcome } from './callLogStore'
 import { deviceMedia } from './callMedia'
 import { encryptingDeps } from './cryptoPump'
 import { sendIntoScope } from './encryptAndSend'
@@ -185,6 +186,13 @@ export function startCallRuntime(
   sessionClient: ReturnType<typeof createClient>,
   credentials: { readonly userId: string; readonly deviceId: string },
   onChanged: (call: CallOnScreen | null) => void,
+  /**
+   * The notebook's call page. Written the moment a call begins rather than
+   * when it ends: a device that dies mid-call would otherwise have no record
+   * that the call ever happened, and "he called and my telephone died" is
+   * exactly the line somebody needs afterwards.
+   */
+  log: CallLog,
 ): CallRuntime {
   const deps = encryptingDeps(sessionClient)
   let held: (DeviceCall & CallOnScreen) | null = null
@@ -203,13 +211,20 @@ export function startCallRuntime(
     } catch (cause: unknown) {
       if (cause instanceof CallSessionError && held !== null) {
         held = { ...held, failure: cause.failure }
+        // "I tried to call you" is a fact, and three of these in a row is a
+        // misconfigured homeserver rather than somebody avoiding anybody.
+        log.settle(held.scope, 'unplaced').catch(() => {})
         onChanged({ ...held })
       }
       throw cause
     }
   }
 
-  function begin(scope: string, peerUserId: string): DeviceCall & CallOnScreen {
+  function begin(
+    scope: string,
+    peerUserId: string,
+    role: CallRole,
+  ): DeviceCall & CallOnScreen {
     const started = startDeviceCall(
       sessionClient,
       scope,
@@ -222,6 +237,15 @@ export function startCallRuntime(
         ownPartyId: credentials.deviceId,
       },
       state => {
+        // THE RINGBACK STOPS WHEN THE FAR END PICKS UP, NOT WHEN THE CALL
+        // ENDS. A tone still playing under somebody's voice is the loudest
+        // possible way of saying the application has lost track of its own
+        // call.
+        if (state.call !== 'outgoingInvite') deviceCallAudio.stopRinging()
+        const settled = outcomeOf(state)
+        if (settled !== null && held !== null) {
+          log.settle(held.scope, settled).catch(() => {})
+        }
         if (held !== null) held = { ...held, state }
         onChanged(held === null ? null : { ...held })
       },
@@ -247,7 +271,22 @@ export function startCallRuntime(
     // said `MODE_NORMAL` with no mode owner while two people were talking.
     // That is the whole hazard of this dependency -- everything works
     // without it, slightly wrong, and only a platform dump says so.
-    deviceCallAudio.begin()
+    deviceCallAudio.begin(role)
+    // `missed` is what every call starts as, and anything else is news. A
+    // call that ends without ever being settled -- the application killed
+    // mid-ring, the process frozen -- is a missed call, which is the truth.
+    log
+      .add({
+        scope,
+        peerUserId,
+        at: Date.now(),
+        direction: role === 'caller' ? 'out' : 'in',
+        outcome: 'missed',
+      })
+      .catch(() => {
+        // ADR-0010: this page degrades. A call is not undone by a notebook
+        // that would not write it down.
+      })
     onChanged({ ...call })
     return call
   }
@@ -283,14 +322,14 @@ export function startCallRuntime(
         // caller already has a session; starting a second one to be rung by
         // itself is the loop this guard exists to refuse.
         if (from === credentials.userId) continue
-        begin(scope, from).session.receive(opened)
+        begin(scope, from, 'callee').session.receive(opened)
         return
       }
     },
 
     place: async (scope, peerUserId) => {
       if (held !== null) throw new Error('a call is already running')
-      await refusable(begin(scope, peerUserId).session.place())
+      await refusable(begin(scope, peerUserId, 'caller').session.place())
     },
     answer: async () => {
       const running = held
@@ -314,4 +353,24 @@ export function startCallRuntime(
       await running?.session.stop()
     },
   }
+}
+
+/**
+ * What a state says about how the call finished, or `null` while it is still
+ * happening.
+ *
+ * Only the two that are NOT the default: a call is written as `missed` and
+ * stays that way unless something better is known, so a state that says
+ * nothing new leaves the row alone.
+ */
+function outcomeOf(state: CallState): CallOutcome | null {
+  if (state.call === 'inCall') return 'answered'
+  if (state.call !== 'ended') return null
+  // Refused, by whoever refused it. `rejectedElsewhere` is another of this
+  // account's own devices saying no, which is still a refusal from the point
+  // of view of a list of recent calls.
+  return state.reason.ended === 'rejected' ||
+    state.reason.ended === 'rejectedElsewhere'
+    ? 'declined'
+    : null
 }

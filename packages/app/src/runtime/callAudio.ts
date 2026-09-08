@@ -35,10 +35,21 @@ import InCallManager from 'react-native-incall-manager'
  * where it can be tested.
  */
 
+/** Which end of the call this device is on. */
+export type CallRole = 'caller' | 'callee'
+
 /** What a call does to the device it is on. */
 export interface CallAudio {
   /** The call has begun: take the audio session. */
-  readonly begin: () => void
+  readonly begin: (role: CallRole) => void
+  /**
+   * The far end picked up, or the call is over: stop the ringback.
+   *
+   * Separate from `end`, because a call that connects is not a call that
+   * finished, and a ringback still playing under somebody's voice is the
+   * loudest possible way of saying the application has lost track.
+   */
+  readonly stopRinging: () => void
   /** The call is over: give it back. */
   readonly end: () => void
   /**
@@ -54,23 +65,38 @@ export interface CallAudio {
 }
 
 export const deviceCallAudio: CallAudio = {
-  begin: () => {
+  begin: role => {
     InCallManager.start({
       media: 'audio',
       // `auto` lets the library follow the proximity sensor: the screen goes
       // dark when the telephone is at somebody's ear, which is what stops a
       // cheek from pressing "hang up".
       auto: true,
-      // No ringback tone. The caller's screen already says "appel en
-      // cours…", and a tone this application synthesises would be a second
-      // opinion about a state the machine already reports -- one that keeps
-      // playing if they disagree.
-      ringback: '',
+      // THE RINGBACK, WHICH THIS ARGUED ITSELF OUT OF AND WAS WRONG ABOUT.
+      //
+      // It read: "the caller's screen already says «appel en cours…», and a
+      // tone this application synthesises would be a second opinion about a
+      // state the machine already reports". The premise is true and the
+      // conclusion does not follow, and the tester said so the first time he
+      // placed a call: "je m'attendais à avoir un feedback sonore qui me dit
+      // que ça sonne (comme sur WhatsApp)".
+      //
+      // A telephone is held to an ear. The screen is against a cheek and the
+      // proximity sensor has just turned it off -- on purpose, three lines
+      // above this one. The tone is not a second opinion about the state, it
+      // is the ONLY report of it that reaches somebody in the position this
+      // product puts them in.
+      //
+      // Only for the caller. The callee is not waiting for anything: they
+      // are being rung, and the ring is the notification's own sound.
+      ringback: role === 'caller' ? '_DEFAULT_' : '',
     })
     // A call is not something to be interrupted by a screen lock, and the
     // proximity sensor above still takes the display when it should.
     InCallManager.setKeepScreenOn(true)
   },
+
+  stopRinging: () => InCallManager.stopRingback(),
 
   end: () => {
     // No busy tone, for the reason the ringback has none: the screen says

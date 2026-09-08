@@ -9,6 +9,7 @@ import notifee, {
 
 import { t } from '../copy'
 import { color } from '../design/tokens'
+import { logEvent } from './log'
 import { ringingOfPress, scopeOfPress, type Notification } from './notifying'
 
 /**
@@ -119,6 +120,18 @@ export function rememberBackgroundPresses(
   refuse?: (scope: string) => Promise<unknown>,
 ): void {
   notifee.onBackgroundEvent(async ({ type, detail }) => {
+    // THE ONLY ACCOUNT ANYBODY GETS OF A PRESS ON A LOCKED SCREEN.
+    //
+    // There is no screen here and the process is often torn down a second
+    // later. A press that did nothing and a press that never arrived look
+    // identical without this line, which is exactly where the first hour of
+    // debugging this went.
+    logEvent('info', 'MESSAGR_PRESSED', {
+      type,
+      action: detail.pressAction?.id ?? null,
+      id: detail.notification?.id ?? null,
+    })
+
     // REFUSING IS THE ONE PRESS THAT MUST NOT OPEN THE APPLICATION.
     //
     // Everything else is remembered and read again by the application that
@@ -238,7 +251,27 @@ export async function ringNotification(
       fullScreenAction: { id: 'default' },
       pressAction: { id: 'default' },
       actions: [
-        { title: t('notify_answer'), pressAction: { id: ANSWER } },
+        // ANSWERING OPENS THE APPLICATION, AND SAYING SO IS THE WHOLE POINT
+        // OF `launchActivity`.
+        //
+        // Without it a notification action fires the background handler and
+        // nothing else: no activity, no `getInitialNotification`, no call to
+        // land in. Reported from the demonstration Pixel -- "quand je clique
+        // sur Répondre ou Refuser, rien ne se passe" -- with two of these
+        // notifications behind it and four headless tasks in the log that
+        // had nowhere to send anybody.
+        //
+        // The body's own `pressAction` needs no such flag, and does not have
+        // one: notifee opens the application for a press on the notification
+        // itself. An action is the case that has to ask.
+        {
+          title: t('notify_answer'),
+          pressAction: { id: ANSWER, launchActivity: 'default' },
+        },
+        // REFUSING DELIBERATELY DOES NOT. Saying no on a locked screen is
+        // somebody deciding not to be interrupted; opening the interface at
+        // them is the opposite of what they pressed. It is handled where it
+        // lands, in `rememberBackgroundPresses`.
         { title: t('notify_decline'), pressAction: { id: DECLINE } },
       ],
       smallIcon: 'ic_notification',

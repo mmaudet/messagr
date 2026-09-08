@@ -958,9 +958,24 @@ empty thing pretends.
 **The bar is hidden while a conversation is open.** A conversation is a place
 you leave, not a fifth tab.
 
-**Badges.** Discussions carries a count of **conversations with something
-waiting**, not of messages — a tab saying `47` for one chatty conversation
-would send somebody looking for forty-seven places to go.
+**Badges.** Discussions carries a count of **unread messages**, which is the
+same unit the rows carry, so that the two numbers on one screen add up.
+
+This said the opposite until 8 September 2026: *« a count of conversations
+with something waiting, not of messages — a tab saying `47` for one chatty
+conversation would send somebody looking for forty-seven places to go »*. The
+argument is kept rather than deleted, because whoever revisits this should
+meet it before deciding again.
+
+It was overruled by the account holder, who reported the same thing twice: a
+`6` on a row and a `1` on the tab, read as a desynchronisation between the
+badges. Two numbers in one glance, in different units, with nothing on either
+saying which unit it is — and every messenger this product is compared to
+puts the message count on the tab. The count is not what somebody has to be
+told; the DIVISION is, and a screen cannot say it.
+
+What the old argument was protecting is real and still there: it is the
+**rows** that say where to go. The tab only says how much.
 
 **Communautés carries nothing.** The mockup draws a dot there and this section
 used to describe one; the component carried a prop, a style and a test

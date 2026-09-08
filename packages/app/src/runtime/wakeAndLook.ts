@@ -19,6 +19,7 @@ import {
   loadConversation,
   startCryptoMachine,
 } from './cryptoPump'
+import { encryptionSlice, receiveSyncChanges } from 'react-native-matrix-crypto'
 import {
   sessionSecrets,
   storeDirectorySecrets,
@@ -85,7 +86,7 @@ export async function lookForWhatArrivedHere(): Promise<WhatWoke | null> {
     if (!started.started) return blind(started.reason)
 
     const notebook = await openNotebook(where.dir)
-    return await lookForWhatArrived({
+    const woke = await lookForWhatArrived({
       http: makePumpHttp(sessionClient),
       since: await readSyncCursor(syncCursorSecrets),
       readConversation: async scope =>
@@ -97,10 +98,37 @@ export async function lookForWhatArrivedHere(): Promise<WhatWoke | null> {
       // timeline deliberately drops.
       openCalls: (scope, events) =>
         openCallEvents(encryptingDeps(sessionClient), scope, events),
+      // The room key for what just arrived is in this same response. The
+      // running application's loop does this on every poll; a wake did not,
+      // and reported `missing_key` for events whose key was sitting beside
+      // them.
+      takeTheKeys: sync => receiveSyncChanges(encryptionSlice(sync)),
+      now: () => Date.now(),
       names: notebook.names,
       selfUserId: session.userId,
       lastRead: await notebook.lastRead.all(),
     })
+
+    // THE ONLY WITNESS TO A CALL NOBODY WAS AWAKE FOR.
+    //
+    // A call that arrives while the application is asleep is seen by this
+    // process and by nothing else: the runtime that records calls does not
+    // exist here. Without this line the Appels tab would list the calls
+    // somebody was present for and silently omit every one they missed --
+    // which is the row a person opens that screen to find.
+    //
+    // `callLogStore.ts` folds this row together with the runtime's, when the
+    // application starts afterwards and records the same call.
+    for (const calling of woke.ringing) {
+      await notebook.calls.add({
+        scope: calling.scope,
+        peerUserId: calling.from,
+        at: calling.missedAt ?? Date.now(),
+        direction: 'in',
+        outcome: 'missed',
+      })
+    }
+    return woke
   } catch (cause: unknown) {
     return blind(getErrorMessage(cause))
   }

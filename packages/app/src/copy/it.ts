@@ -291,6 +291,14 @@ export const it: Readonly<Record<CopyKey, string>> = {
   'when_date %1$d %2$d': '%1$d/%2$d',
   list_no_directory:
     'Nessun numero di telefono compare in alcun punto del sistema. Si entra in relazione soltanto su invito.',
+  calls_empty: 'Ancora nessuna chiamata.',
+  calls_taken: 'Chiamata ricevuta',
+  calls_placed: 'Chiamata effettuata',
+  calls_missed: 'Chiamata persa',
+  calls_no_answer: 'Nessuna risposta',
+  calls_declined: 'Rifiutata',
+  calls_you_declined: 'Hai rifiutato',
+  calls_unplaced: 'Chiamata non riuscita',
   calls_soon_title: 'Presto: chiamate audio, poi video',
   calls_soon_why:
     'La scheda è riservata fin dalla V1 per non spostare la barra più tardi. La V1 trasporta solo testo, link e immagini fisse; note vocali in V2, chiamate individuali e poi di gruppo in V3.',
@@ -342,6 +350,10 @@ export const it: Readonly<Record<CopyKey, string>> = {
   person_back: 'Indietro',
   message_delivered_hint: 'Consegnato al server',
   message_read_hint: 'Letto',
+  settings_full_screen: 'Lascia che una chiamata accenda lo schermo',
+  settings_open: 'Apri',
+  settings_full_screen_hint:
+    'Android concede solo alle applicazioni telefoniche il diritto di accendere lo schermo per una chiamata. Senza, una chiamata in arrivo è una notifica in più sulla schermata di blocco.',
   settings_wake: 'Notifiche',
   settings_wake_hint:
     'Il segnale di risveglio non porta né mittente né messaggio. Il dispositivo decifra qui.',
@@ -358,6 +370,7 @@ export const it: Readonly<Record<CopyKey, string>> = {
   notify_blind_body: 'È arrivato qualcosa.',
   notify_channel: 'Messaggi',
   notify_ringing_body: 'Chiamata in arrivo',
+  'notify_missed %1$d %2$d': 'Chiamata persa alle %1$d:%2$d',
   notify_ringing_channel: 'Chiamate',
   notify_answer: 'Rispondi',
   notify_decline: 'Rifiuta',

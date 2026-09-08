@@ -1,6 +1,10 @@
 import { describe, expect, it, vi } from 'vitest'
 
-import { readNotification, type Notification } from './notifying'
+import {
+  missedNotification,
+  readNotification,
+  type Notification,
+} from './notifying'
 import { wake, type Arrival, type Calling, type WakeDeps } from './wake'
 
 function deps(over: Partial<WakeDeps> = {}): WakeDeps & {
@@ -19,6 +23,8 @@ function deps(over: Partial<WakeDeps> = {}): WakeDeps & {
     ring: async calling => {
       rang.push(calling)
     },
+    missed: (calling, at) =>
+      missedNotification(calling.scope, calling.shown, at),
     describe: (arrival: Arrival) =>
       readNotification(arrival.scope, arrival.shown, arrival.preview),
     ...over,
@@ -60,6 +66,24 @@ describe('a telephone that is ringing', () => {
     })
     expect(await wake(d)).toEqual({ drew: 'ringing', count: 1 })
     expect(d.drawn).toEqual([])
+  })
+
+  it('draws a missed call rather than ringing about one that ended', async () => {
+    // The caller hanging up produces another push, so the device that was
+    // rung is woken a second time and can say what became of the call. Same
+    // identifier, so it REPLACES the ring: a telephone that went quiet with
+    // no explanation is what this exists to stop, and a second notification
+    // would say there had been two calls.
+    const d = deps({
+      lookForWhatArrived: async () => ({
+        messages: [],
+        ringing: [{ ...CALLING, missedAt: 1_700_000_000_000 }],
+      }),
+    })
+    expect(await wake(d)).toEqual({ drew: 'ringing', count: 1 })
+    expect(d.rang).toEqual([])
+    expect(d.drawn).toHaveLength(1)
+    expect(d.drawn[0]?.id).toBe(`ringing:${CALLING.scope}`)
   })
 
   it('still rings the second when the first will not ring', async () => {

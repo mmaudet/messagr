@@ -294,6 +294,14 @@ export const en: Readonly<Record<CopyKey, string>> = {
   'when_date %1$d %2$d': '%1$d/%2$d',
   list_no_directory:
     'No phone number appears anywhere in the system. You only come into contact by invitation.',
+  calls_empty: 'No calls yet.',
+  calls_taken: 'Incoming call',
+  calls_placed: 'Outgoing call',
+  calls_missed: 'Missed call',
+  calls_no_answer: 'No answer',
+  calls_declined: 'Declined',
+  calls_you_declined: 'You declined',
+  calls_unplaced: 'Could not be placed',
   calls_soon_title: 'Coming: audio calls, then video',
   calls_soon_why:
     'The tab is held from V1 so the bar does not move later. V1 carries text, links and still images only; voice messages in V2, one-to-one then group calls in V3.',
@@ -345,6 +353,10 @@ export const en: Readonly<Record<CopyKey, string>> = {
   person_back: 'Back',
   message_delivered_hint: 'Handed to the server',
   message_read_hint: 'Read',
+  settings_full_screen: 'Let a call light the screen',
+  settings_open: 'Open',
+  settings_full_screen_hint:
+    'Android grants only telephone applications the right to light the screen for a call. Without it, an incoming call is one more notification on the lock screen.',
   settings_wake: 'Notifications',
   settings_wake_hint:
     'The wake-up signal carries no sender and no message. The device decrypts here.',
@@ -361,6 +373,7 @@ export const en: Readonly<Record<CopyKey, string>> = {
   notify_blind_body: 'Something arrived.',
   notify_channel: 'Messages',
   notify_ringing_body: 'Incoming call',
+  'notify_missed %1$d %2$d': 'Missed call at %1$d:%2$d',
   notify_ringing_channel: 'Calls',
   notify_answer: 'Answer',
   notify_decline: 'Decline',

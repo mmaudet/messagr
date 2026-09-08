@@ -1,7 +1,8 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react'
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   AppState,
   BackHandler,
+  Linking,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -37,6 +38,7 @@ import {
   readTrust,
   removeReaction,
   startCryptoMachine,
+  enterAnyInvitations,
   startLiveSync,
   vouchForEntrant,
   type CryptoPumpReport,
@@ -52,6 +54,12 @@ import {
   type CallOnScreen,
   type CallRuntime,
 } from './src/runtime/callPump'
+import {
+  forgetfulCallLog,
+  type CallLog,
+  type CallRecord,
+} from './src/runtime/callLogStore'
+import { CallsList } from './src/ui/CallsList'
 import { getErrorMessage } from './src/runtime/errors'
 import { computeHermesReport } from './src/runtime/hermes'
 import { logEvent } from './src/runtime/log'
@@ -62,6 +70,7 @@ import {
   languageSecrets,
   storeDirectorySecrets,
   termsSecrets,
+  pushkeySecrets,
   wakeSecrets,
   promiseSecrets,
   receiptSecrets,
@@ -73,7 +82,7 @@ import {
   RECEIPTS_DEFAULT,
   receiptsArePublished,
 } from './src/runtime/receiptSetting'
-import { readUpTo } from './src/runtime/receipts'
+import { readUpTo, type Receipt } from './src/runtime/receipts'
 import { hasSeenPromise, rememberPromiseSeen } from './src/runtime/promiseSeen'
 import { clearSignUp, isSignUpUnfinished } from './src/runtime/signUpMarker'
 import { color, floors, space, type as typeScale } from './src/design/tokens'
@@ -102,6 +111,7 @@ import { allowWake, wakeIsAllowed } from './src/runtime/wakeSetting'
 import { deviceLocale } from './src/runtime/deviceLocale'
 import { pickFromLibrary } from './src/runtime/imageLibrary'
 import { sendImages } from './src/runtime/sendImages'
+import { keepLastPushkey, readLastPushkey } from './src/runtime/lastPushkey'
 import { pushTokenForThisDevice } from './src/runtime/pushDevice'
 import {
   stopRinging,
@@ -302,13 +312,29 @@ export function App({
   // they hold exists -- see `Reserved`: a bar that gains an item later moves
   // every other item under people's thumbs.
   const [tab, setTab] = useState<Tab>('chat')
-  // CONVERSATIONS, NOT MESSAGES.
+  // MESSAGES, AND IT USED TO BE CONVERSATIONS.
   //
-  // The tab's badge counts how many conversations have something waiting; the
-  // rows carry how much is waiting in each. That is the division a person
-  // reads without being told -- a tab saying `47` for one chatty conversation
-  // would send somebody looking for forty-seven places to go.
-  const unreadCount = summaries.filter(summary => summary.unread > 0).length
+  // It read: "the tab's badge counts how many conversations have something
+  // waiting; the rows carry how much is waiting in each. That is the
+  // division a person reads without being told -- a tab saying `47` for one
+  // chatty conversation would send somebody looking for forty-seven places
+  // to go." The argument is kept rather than deleted, because whoever
+  // revisits this should meet it before deciding again.
+  //
+  // It was overruled by the account holder, who reported the same thing
+  // twice: a `6` on the row and a `1` on the tab, read as "une désynchro
+  // entre les pastilles". Two numbers in one glance, in different units,
+  // with nothing on either saying which unit it is. Every messenger this
+  // product is compared to puts the message count on the tab, so the count
+  // is not what somebody has to be told -- the DIVISION is, and a screen
+  // cannot say it.
+  //
+  // The distinction the old argument was protecting is real and still there:
+  // it is the ROWS that say where to go. The tab only says how much.
+  const unreadCount = summaries.reduce(
+    (total, summary) => total + summary.unread,
+    0,
+  )
   const [legalOpen, setLegalOpen] = useState(false)
   // Whether the screen about the person is showing over the conversation.
   // The rare gestures live there rather than in the message flow -- see the
@@ -358,6 +384,26 @@ export function App({
   // and a receipt arriving names an event that has to be found among the
   // entries held right now.
   const conversationRef = useRef<readonly TimelineEntry[]>([])
+  /**
+   * Every read receipt any poll has reported, by conversation.
+   *
+   * KEPT, BECAUSE A RECEIPT ARRIVES ONCE AND IS NEVER SENT AGAIN.
+   *
+   * They were read straight off the tick and applied only to the
+   * conversation that happened to be open at that instant. Somebody who read
+   * your message while you were on the list, or in another conversation, or
+   * anywhere but that screen, produced a receipt that was looked at once and
+   * dropped -- and opening the conversation afterwards showed a single tick
+   * for ever, because nothing re-sends it and `/messages` does not carry it.
+   *
+   * Reported from both ends at once: "il a bien l'accusé de lecture activé
+   * mais je ne vois rien et lui-même ne voit rien".
+   *
+   * A map rather than state: it is written from the sync loop's own callback
+   * and read when a conversation opens, and a re-render per receipt for a
+   * conversation nobody is looking at is a re-render for nothing.
+   */
+  const seenReceiptsRef = useRef<Map<string, readonly Receipt[]>>(new Map())
   const [openScope, setOpenScope] = useState<string | null>(null)
   const openScopeRef = useRef<string | null>(null)
   /**
@@ -379,6 +425,23 @@ export function App({
    * audio session ends with it and the next one starts at the earpiece.
    */
   const [callSpeaker, setCallSpeaker] = useState(false)
+  /**
+   * Recent calls, for the Appels tab.
+   *
+   * Read from the notebook rather than derived from the conversations:
+   * `callLogStore.ts` says why, and the shortest of its reasons is that a
+   * missed call is the row that matters most and the one nothing else can
+   * reconstruct.
+   */
+  const [calls, setCalls] = useState<readonly CallRecord[]>([])
+  const callLogRef = useRef<CallLog>(forgetfulCallLog())
+  /**
+   * Re-reads the call history. Cheap: one query against a page of the
+   * notebook, with no round trip anywhere.
+   */
+  const refreshCalls = useCallback(async () => {
+    setCalls(await callLogRef.current.recent())
+  }, [])
   const callRuntimeRef = useRef<CallRuntime | null>(null)
   /**
    * A conversation somebody already answered a call in, from a notification.
@@ -746,6 +809,19 @@ export function App({
                 credentials,
               )
             }
+            // THE DOOR SOMEBODY HELD OPEN, WALKED THROUGH BEFORE ANYTHING
+            // IS READ.
+            //
+            // An invitation is not membership: until this joins, the room is
+            // not in `/joined_rooms`, no message reaches this device, and the
+            // conversation list is empty on an account whose sync reports a
+            // room. `enterInvitations.ts` says how that came to be missing.
+            //
+            // Before the list rather than after: a conversation joined a
+            // moment later would be derived a moment too late and only appear
+            // at the next tick.
+            await enterAnyInvitations(sessionClient)
+
             // Attempted whether or not this run's own send worked: what is
             // being read was written by somebody else, and one direction
             // failing should not hide the other. The room is the one the
@@ -879,6 +955,19 @@ export function App({
                   mergeTimeline(held ?? [], fresh.entries),
                 )
                 setReactions(fresh.reactions)
+                // WHAT WAS READ BEFORE THIS SCREEN EXISTED.
+                //
+                // `/messages` carries no receipts -- they are ephemeral, and
+                // a receipt is sent once. Whatever the polls have seen since
+                // this launch is the only record of it, so the second tick
+                // is drawn from there rather than waiting for somebody to
+                // read the message a second time.
+                const already = seenReceiptsRef.current.get(scope)
+                if (already !== undefined) {
+                  setReadHere(
+                    readUpTo(fresh.entries, already, credentials.userId),
+                  )
+                }
                 const members = await fetchJoinedMembers(
                   makePumpHttp(sessionClient),
                   scope,
@@ -1069,12 +1158,35 @@ export function App({
                   logEvent('info', 'MESSAGR_PUSH_REMOVED', {})
                   return
                 }
+                // THE GHOST THIS DEVICE LEFT BEHIND, taken away before the
+                // new one goes up.
+                //
+                // A pusher is keyed by its token and nothing says which
+                // device it belonged to, so a token that changes leaves its
+                // pusher on the account for ever -- and the homeserver keeps
+                // pushing to it. On the tester's telephone that was a
+                // sandbox token from an old entitlement, rejected sixteen
+                // times in two hours, months after the build that minted it
+                // was gone.
+                //
+                // This device wrote its own key down, so it is the one thing
+                // that can say "that was mine". Best effort: a ghost that
+                // will not go is noise, while a new pusher that does not go
+                // up is silence.
+                const before = await readLastPushkey(pushkeySecrets)
+                if (before !== null && before !== answer.token) {
+                  await stopWakingThisDevice(sessionClient, before, answer.road)
+                  logEvent('info', 'MESSAGR_PUSH_GHOST_REMOVED', {})
+                }
                 const done = await registerThisDeviceForWaking(
                   sessionClient,
                   credentials,
                   answer.token,
                   answer.road,
                 )
+                if (done.registered) {
+                  await keepLastPushkey(pushkeySecrets, answer.token)
+                }
                 logEvent(
                   done.registered ? 'info' : 'warn',
                   done.registered
@@ -1313,8 +1425,22 @@ export function App({
                   setCallMuted(false)
                   setCallSpeaker(false)
                 }
+                // A call that ended is a line the Appels tab does not have.
+                if (onScreen === null || onScreen.state.call === 'ended') {
+                  refreshCalls().catch(() => {})
+                }
               },
+              // The notebook's call page, opened a few lines above. A device
+              // whose notebook did not open still places calls; it just has
+              // no list of them afterwards, which is what `forgetfulCallLog`
+              // answers and what ADR-0010 calls degrading.
+              opening.calls,
             )
+            callLogRef.current = opening.calls
+            refreshCalls().catch(() => {
+              // A list that did not load is an empty screen, not a failed
+              // launch.
+            })
 
             const beginLiveSync = () => {
               if (runningSyncRef.current !== null) return
@@ -1334,17 +1460,32 @@ export function App({
                   // Before the early return below: a poll can carry a
                   // receipt for a conversation whose timeline did not move --
                   // somebody reading is not somebody writing.
+                  // KEPT FOR EVERY CONVERSATION, drawn for the one on screen.
+                  // A receipt is sent once; whoever reads it later has to
+                  // find it somewhere.
+                  for (const [scope, seen] of tick.receipts) {
+                    if (seen.length > 0)
+                      seenReceiptsRef.current.set(scope, seen)
+                  }
                   const openNow = openScopeRef.current
                   if (openNow !== null) {
                     const seen = tick.receipts.get(openNow)
                     if (seen !== undefined && seen.length > 0) {
-                      setReadHere(
-                        readUpTo(
-                          conversationRef.current,
-                          seen,
-                          credentials.userId,
-                        ),
+                      const read = readUpTo(
+                        conversationRef.current,
+                        seen,
+                        credentials.userId,
                       )
+                      // The one line anybody debugging a missing second tick
+                      // has. A receipt that arrived and resolved to nothing
+                      // is a different fault from one that never arrived,
+                      // and they are indistinguishable on a screen.
+                      logEvent('info', 'MESSAGR_READ_BY', {
+                        scope: openNow,
+                        receipts: seen.length,
+                        marked: read.size,
+                      })
+                      setReadHere(read)
                     }
                   }
 
@@ -1389,6 +1530,29 @@ export function App({
                     })
                     .catch((cause: unknown) =>
                       logEvent('warn', 'MESSAGR_ADMIT_ROUND_FAILED', {
+                        reason: getErrorMessage(cause),
+                      }),
+                    )
+
+                  // AND ON EVERY TICK, BECAUSE ADMISSION IS NOT LAUNCH.
+                  //
+                  // The entrant claims a link, and the issuer admits them a
+                  // poll later -- so the invitation arrives at a device that
+                  // is already running and has finished launching. Entering
+                  // only at launch would leave them on the threshold until
+                  // they next restarted the application.
+                  //
+                  // Not awaited: nothing below depends on it, and the loop's
+                  // tick must not wait on a join.
+                  enterAnyInvitations(sessionClient)
+                    .then(walked => {
+                      // A room joined is a row the list does not have yet.
+                      if (walked.joined.length > 0) {
+                        refreshList().catch(() => {})
+                      }
+                    })
+                    .catch((cause: unknown) =>
+                      logEvent('warn', 'MESSAGR_ENTER_FAILED', {
                         reason: getErrorMessage(cause),
                       }),
                     )
@@ -1837,7 +2001,10 @@ export function App({
           dark band, into which the system drew the clock and the battery in
           white. Whatever sits on an edge paints to it. */}
         <SafeAreaView
-          style={[styles.screen, { paddingBottom: keyboardInset }]}
+          // NOT `paddingBottom: keyboardInset`. It was here, and it moved
+          // everything the keyboard was not covering while leaving the one
+          // thing that mattered where it was -- see the dock below.
+          style={styles.screen}
           edges={['left', 'right']}>
           {/* Outside the scroll view, like the tab bar and for the same reason:
             what the band says is true of the instance rather than of the
@@ -1939,9 +2106,19 @@ export function App({
             // so without this the last row of whatever is on screen sits behind
             // the tab bar -- which reads as content that will not scroll far
             // enough, and is the reason a bottom bar usually costs a padding.
+            //
+            // AND THE KEYBOARD IS PART OF THE DOCK'S HEIGHT, once it is up.
+            // The dock lifts itself by `keyboardInset`; this reserves the
+            // space it lifted into, or the last messages sit behind the
+            // composer that just rose over them. Reported from iOS the
+            // moment the composer stopped being covered: "le contenu des
+            // échanges ne se décale pas lorsque le clavier s'affiche".
+            //
+            // Two halves of one gesture, and fixing the first without the
+            // second only moved which thing was hidden.
             contentContainerStyle={[
               styles.content,
-              { paddingBottom: dockHeight + space.l },
+              { paddingBottom: dockHeight + keyboardInset + space.l },
             ]}>
             {/* THE LIST **OR** THE CONVERSATION, never both.
               Stacking them was the first shape this took, and it was wrong
@@ -1955,12 +2132,20 @@ export function App({
 */}
             {openScope === null && tab === 'calls' && (
               <View style={styles.block}>
-                <Reserved
-                  testID="calls-reserved"
-                  glyph="calls"
-                  title="calls_soon_title"
-                  why="calls_soon_why"
-                  stages={['calls_soon_v2', 'calls_soon_v3']}
+                {/* A row opens the CONVERSATION, not a call. Calling is the
+                    header's own button, one tap further, where the person
+                    can see who they are about to ring -- `CallsList.tsx`
+                    says why this screen is not a directory. */}
+                <CallsList
+                  calls={calls}
+                  now={Date.now()}
+                  shownFor={who => displayNameFor(who, names.get(who))}
+                  onOpen={scope => {
+                    setTab('chat')
+                    // The launch effect binds it; a screen drawn before the
+                    // session exists has no conversation to open anyway.
+                    openConversationRef.current?.(scope)
+                  }}
                 />
               </View>
             )}
@@ -1981,6 +2166,33 @@ export function App({
                 <Settings
                   onBack={() => setTab('chat')}
                   onLegal={() => setLegalOpen(true)}
+                  // ANDROID'S OWN SCREEN, NOT A DIALOG OF OURS. The
+                  // permission that lets a call light the display is granted
+                  // at installation only to applications registered as the
+                  // telephone; everybody else has to be taken to Settings
+                  // and shown the switch. `Settings.tsx` says what was
+                  // measured on the demonstration Pixel.
+                  //
+                  // `sendIntent` rather than a native module: this is one
+                  // intent with no answer to read back, and a module written
+                  // to open a screen would be a module to maintain for a
+                  // string.
+                  onRingFullScreen={() => {
+                    Linking.sendIntent(
+                      'android.settings.MANAGE_APP_USE_FULL_SCREEN_INTENT',
+                      [
+                        {
+                          key: 'android.provider.extra.APP_PACKAGE',
+                          value: 'eu.messagr',
+                        },
+                      ],
+                    ).catch(() => {
+                      // An older Android has no such screen. The
+                      // application's own notification settings are where
+                      // somebody would go looking anyway.
+                      Linking.openSettings().catch(() => {})
+                    })
+                  }}
                   receipts={receipts}
                   receiptsNotKept={receiptsNotKept}
                   language={language}
@@ -2256,8 +2468,17 @@ export function App({
             The action shows only on the list, and only when the invitation
             panel is not already open: a control that opens what is on screen
             is a control that does nothing. */}
+          {/* THE KEYBOARD LIFTS THE DOCK ITSELF, NOT THE VIEW AROUND IT.
+            The note above the `SafeAreaView` says why, and then the padding
+            was put there anyway: "an absolutely-positioned child is laid
+            against the border box and not the padding box". So
+            `paddingBottom` on the parent moved everything EXCEPT this, and
+            this is the composer. Reported from iOS as the keyboard covering
+            the field, twice -- the Android side never showed it because
+            `MainActivity` pads the content view natively, below React
+            Native, where an absolute child is inside what moves. */}
           <View
-            style={styles.dock}
+            style={[styles.dock, { bottom: keyboardInset }]}
             pointerEvents="box-none"
             onLayout={event => setDockHeight(event.nativeEvent.layout.height)}>
             {openScope === null &&

@@ -293,6 +293,14 @@ export const es: Readonly<Record<CopyKey, string>> = {
   'when_date %1$d %2$d': '%1$d/%2$d',
   list_no_directory:
     'Ningún número de teléfono aparece en ninguna parte del sistema. Solo se entra en contacto por invitación.',
+  calls_empty: 'Todavía no hay llamadas.',
+  calls_taken: 'Llamada recibida',
+  calls_placed: 'Llamada realizada',
+  calls_missed: 'Llamada perdida',
+  calls_no_answer: 'Sin respuesta',
+  calls_declined: 'Rechazada',
+  calls_you_declined: 'La ha rechazado',
+  calls_unplaced: 'No se ha podido llamar',
   calls_soon_title: 'Pronto: llamadas de audio, luego vídeo',
   calls_soon_why:
     'La pestaña está reservada desde la V1 para no mover la barra más tarde. La V1 solo transporta texto, enlaces e imágenes fijas; notas de voz en V2, llamadas individuales y luego de grupo en V3.',
@@ -344,6 +352,10 @@ export const es: Readonly<Record<CopyKey, string>> = {
   person_back: 'Volver',
   message_delivered_hint: 'Entregado al servidor',
   message_read_hint: 'Leído',
+  settings_full_screen: 'Permitir que una llamada encienda la pantalla',
+  settings_open: 'Abrir',
+  settings_full_screen_hint:
+    'Android solo concede a las aplicaciones de teléfono el derecho a encender la pantalla para una llamada. Sin él, una llamada entrante es una notificación más en la pantalla de bloqueo.',
   settings_wake: 'Notificaciones',
   settings_wake_hint:
     'La señal de despertar no lleva remitente ni mensaje. El dispositivo descifra aquí.',
@@ -360,6 +372,7 @@ export const es: Readonly<Record<CopyKey, string>> = {
   notify_blind_body: 'Ha llegado algo.',
   notify_channel: 'Mensajes',
   notify_ringing_body: 'Llamada entrante',
+  'notify_missed %1$d %2$d': 'Llamada perdida a las %1$d:%2$d',
   notify_ringing_channel: 'Llamadas',
   notify_answer: 'Contestar',
   notify_decline: 'Rechazar',

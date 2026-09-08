@@ -1,5 +1,12 @@
 import React from 'react'
-import { Pressable, StyleSheet, Switch, Text, View } from 'react-native'
+import {
+  Platform,
+  Pressable,
+  StyleSheet,
+  Switch,
+  Text,
+  View,
+} from 'react-native'
 
 import { t } from '../copy'
 import type { Language } from '../copy/languages'
@@ -42,6 +49,7 @@ export function Settings({
   wake,
   onWake,
   wakeNotKept,
+  onRingFullScreen,
 }: {
   readonly onBack: () => void
   readonly onLegal: () => void
@@ -49,6 +57,8 @@ export function Settings({
   readonly onReceipts: (on: boolean) => void
   /** `true` when the last change could not be kept. */
   readonly receiptsNotKept: boolean
+  /** Opens Android's own screen for the full-screen intent. Android only. */
+  readonly onRingFullScreen: () => void
   /** Which language is spoken, and changing it. Same control as #103's. */
   readonly language: Language
   readonly onLanguage: (language: Language) => void
@@ -145,6 +155,39 @@ export function Settings({
         )}
       </View>
 
+      {/* ANDROID REFUSES TO LIGHT THE SCREEN, AND ONLY THE PERSON CAN LIFT
+          THAT.
+          A ringing call asks for a full-screen intent -- the thing that
+          wakes the display and puts the call in front of somebody instead of
+          adding a line to a lock screen. Android 14 grants that at
+          installation only to applications registered as the telephone or
+          the alarm clock, and refuses it to everybody else: measured on the
+          demonstration Pixel, `USE_FULL_SCREEN_INTENT: default; rejectTime`
+          at the exact second a call rang.
+
+          THIS ROW DOES NOT KNOW WHETHER IT IS NEEDED, and says so by not
+          claiming otherwise. Neither notifee nor React Native can read that
+          permission back, so a row that appeared only when it was missing
+          would be a row guessing. It is an offer, phrased as one, rather
+          than a warning about a state nothing here can see.
+
+          Android only. On iOS a call notification interrupts by category and
+          there is nothing to ask for. */}
+      {Platform.OS === 'android' && (
+        <View style={styles.setting} testID="setting-full-screen">
+          <Pressable
+            testID="open-full-screen-settings"
+            onPress={onRingFullScreen}
+            accessibilityRole="button"
+            accessibilityLabel={t('settings_full_screen')}
+            style={styles.row}>
+            <Text style={styles.rowLabel}>{t('settings_full_screen')}</Text>
+            <Text style={styles.rowAction}>{t('settings_open')}</Text>
+          </Pressable>
+          <Text style={styles.hint}>{t('settings_full_screen_hint')}</Text>
+        </View>
+      )}
+
       <Text style={styles.nothingElse}>{t('settings_nothing_else')}</Text>
     </View>
   )
@@ -202,6 +245,10 @@ const styles = StyleSheet.create({
   rowValue: {
     ...type.bodySm,
     color: color.neutral['600'],
+  },
+  rowAction: {
+    ...type.action,
+    color: color.brand.green700,
   },
   hint: {
     ...type.caption,

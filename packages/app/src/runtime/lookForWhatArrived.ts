@@ -66,6 +66,28 @@ export interface Looking {
     scope: string,
     events: readonly unknown[],
   ) => Promise<readonly unknown[]>
+  /**
+   * Hands the sync's to-device half to the crypto machine.
+   *
+   * THE KEY AND THE EVENT IT OPENS ARRIVE IN THE SAME RESPONSE, AND ONLY ONE
+   * OF THEM WAS BEING USED. `receiveDecrypt.ts` records this exact defect on
+   * the probe's own path -- "a Megolm event is unreadable without its room
+   * key, and that key arrives as a to-device message in the very same sync
+   * response as the event it unlocks" -- and the wake had it too. A woken
+   * device read the ciphertext, ignored the key sitting beside it, and
+   * reported `missing_key`.
+   *
+   * Measured on the demonstration Pixel: a call placed from a device the
+   * Pixel had never exchanged keys with produced three
+   * `MESSAGR_CALL_EVENT_DROPPED ... missing_key` and a message notification
+   * where a telephone should have rung.
+   *
+   * It runs before anything is decrypted, and its failure is not fatal: a
+   * device that could not take the keys can still report what it can read.
+   */
+  readonly takeTheKeys: (sync: Record<string, unknown>) => Promise<void>
+  /** The clock, injected so a test needs no timer. */
+  readonly now: () => number
   readonly names: GivenNames
   readonly selfUserId: string
   /** How far each conversation had been read here before the wake. */
@@ -79,6 +101,22 @@ export interface Ringing {
   readonly shown: string
   /** Their identifier, which is what a call has to be answered towards. */
   readonly from: string
+  /**
+   * Whether the call is over rather than ringing.
+   *
+   * A CALL THAT ENDED IS STILL NEWS, AND IT IS THE SAME NOTIFICATION.
+   *
+   * The caller hanging up, or their invitation running out, produces an
+   * event in the room and therefore another push -- so the device that was
+   * rung is woken a second time and can say what became of the call it rang
+   * about. Reported as a request from the demonstration Pixel: a call
+   * nobody answered should leave "appel manqué" and the hour behind it,
+   * rather than a ringing telephone that goes quiet with no explanation.
+   *
+   * It carries the same identifier, so it REPLACES the ring rather than
+   * stacking under it.
+   */
+  readonly missedAt?: number
 }
 
 /**
@@ -92,6 +130,9 @@ export interface Ringing {
  * unadvanced makes possible.
  */
 const RINGS_FOR_MS = 90_000
+
+/** The events that mean this call is over, whoever ended it. */
+const ENDINGS = new Set(['m.call.hangup', 'm.call.reject'])
 
 export interface WhatArrived {
   readonly messages: readonly Arrival[]
@@ -107,6 +148,17 @@ export async function lookForWhatArrived(
   looking: Looking,
 ): Promise<WhatArrived> {
   const sync = await fetchOnce(looking.http, looking.since)
+
+  // BEFORE ANYTHING IS OPENED. The room key for what just arrived is in this
+  // same response, and a decryption attempted before it is handed over fails
+  // for a reason that has nothing to do with what happened.
+  try {
+    await looking.takeTheKeys(sync)
+  } catch {
+    // Not fatal. A device that could not take the keys still reports what it
+    // can already read, and there is no screen here to tell.
+  }
+
   const changed = readChangedScopes(sync)
   if (changed.length === 0) return { messages: [], ringing: [] }
 
@@ -174,6 +226,8 @@ async function whoIsCalling(
   names: ReadonlyMap<string, string>,
 ): Promise<readonly Ringing[]> {
   const found: Ringing[] = []
+  /** Conversations whose call ended inside this same poll. */
+  const ended = new Set<string>()
   for (const [scope, events] of readTimelineEvents(sync)) {
     // Guarded per conversation, like the messages below: one conversation
     // this device holds no key for must not silence a call in another.
@@ -184,12 +238,23 @@ async function whoIsCalling(
           sender?: unknown
           unsigned?: { age?: unknown }
         }
-        if (call.type !== 'm.call.invite') continue
         if (typeof call.sender !== 'string') continue
-        // This account's own invitation, placed from another of its devices.
-        // Ringing here would be a telephone ringing at the person holding
-        // the one that is calling.
+        // This account's own events, from another of its devices. Ringing
+        // here would be a telephone ringing at the person holding the one
+        // that is calling.
         if (call.sender === looking.selfUserId) continue
+
+        // THE END OF A CALL IS READ FIRST, AND IT WINS.
+        //
+        // One poll can carry the whole of a short call: the invitation and
+        // the hangup ninety seconds later both land in the same replay when
+        // a device has been asleep. Reading the invitation and ringing would
+        // be a telephone ringing about a call that is already over.
+        if (ENDINGS.has(String(call.type))) {
+          ended.add(scope)
+          continue
+        }
+        if (call.type !== 'm.call.invite') continue
         const age = call.unsigned?.age
         if (typeof age === 'number' && age > RINGS_FOR_MS) continue
         found.push({
@@ -197,14 +262,18 @@ async function whoIsCalling(
           from: call.sender,
           shown: displayNameFor(call.sender, names.get(call.sender)),
         })
-        break
       }
     } catch {
       // Nothing to report to, and a call that could not be read is a call
       // this device could not have answered anyway.
     }
   }
-  return found
+  // The hour is this device's, not the event's: `origin_server_ts` is the
+  // homeserver's clock and the person reading "appel manqué à 9h41" is
+  // reading their own.
+  return found.map(call =>
+    ended.has(call.scope) ? { ...call, missedAt: looking.now() } : call,
+  )
 }
 
 /**

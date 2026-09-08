@@ -96,6 +96,37 @@ export function ringingNotification(
 }
 
 /**
+ * A call that rang and that nobody answered.
+ *
+ * The SAME identifier as the ring it replaces: a telephone that went quiet
+ * with no explanation is what this exists to stop, and a second notification
+ * under the first would say there had been two calls.
+ *
+ * The hour is the reader's own. Minutes are padded here rather than in a
+ * copy template, exactly as `ConversationList.tsx` argues: two digits is not
+ * a question of language while the separator between them is.
+ *
+ * It is what makes the line worth keeping once the ringing has stopped --
+ * "appel manqué" alone is a fact with no when.
+ */
+export function missedNotification(
+  scope: string,
+  shown: string,
+  at: number,
+): Notification {
+  const then = new Date(at)
+  return {
+    id: `${RINGING}${scope}`,
+    title: shown,
+    body: t(
+      'notify_missed %1$d %2$d',
+      then.getHours(),
+      String(then.getMinutes()).padStart(2, '0'),
+    ),
+  }
+}
+
+/**
  * The conversation a ringing notification was about, or `null` when the
  * press was not one.
  */

@@ -34,12 +34,55 @@ function looking(over: Partial<Looking> = {}): Looking {
     // No calls unless a test says so: every assertion in this file below
     // the ringing block is about messages.
     openCalls: async () => [],
+    takeTheKeys: async () => {},
+    now: () => 1_700_000_000_000,
     names: { all: async () => new Map(), set: async () => true },
     selfUserId: ME,
     lastRead: new Map(),
     ...over,
   }
 }
+
+describe('the room key that came with it', () => {
+  it('hands the sync to the crypto machine before opening anything', async () => {
+    // THE ONE THAT WOULD HAVE CAUGHT IT. A Megolm event is unreadable
+    // without its room key, and that key arrives as a to-device message in
+    // the very same sync response as the event it unlocks --
+    // `receiveDecrypt.ts` records the same defect on the probe's path. The
+    // wake read the ciphertext and ignored the key beside it, and reported
+    // `missing_key` on the demonstration Pixel.
+    const order: string[] = []
+    await lookForWhatArrived(
+      looking({
+        takeTheKeys: async () => {
+          order.push('keys')
+        },
+        readConversation: async () => {
+          order.push('read')
+          return []
+        },
+        openCalls: async () => {
+          order.push('calls')
+          return []
+        },
+      }),
+    )
+    expect(order[0]).toBe('keys')
+  })
+
+  it('still reports what it can read when the keys could not be taken', async () => {
+    // A device that could not take them may still hold the session for
+    // something older, and there is no screen here to tell either way.
+    const { messages } = await lookForWhatArrived(
+      looking({
+        takeTheKeys: async () => {
+          throw new Error('the machine refused')
+        },
+      }),
+    )
+    expect(messages).toHaveLength(1)
+  })
+})
 
 describe('lookForWhatArrived', () => {
   it('says who and what', async () => {
