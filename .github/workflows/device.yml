@@ -277,7 +277,15 @@ jobs:
             # git does not track an empty directory, so the bundle's
             # destination does not exist on a fresh checkout.
             mkdir -p android/app/src/main/assets
-            npx react-native bundle --platform android --dev false --entry-file index.js --bundle-output android/app/src/main/assets/index.android.bundle --assets-dest android/app/src/main/res
+            # THE FLAG BELONGS ON THIS COMMAND, WHICH IS THE ONE THAT BUNDLES.
+            #
+            # It was on `detox build` underneath, and the debug variant does
+            # not bundle -- the react gradle plugin skips it, which is why
+            # this line exists at all. So the APK packaged the asset built
+            # HERE, without the flag, and the probe was compiled out of every
+            # end-to-end run. `babel.config.js` says what the other half of
+            # that bug was.
+            MESSAGR_SEND_PROBE=1 npx react-native bundle --platform android --dev false --entry-file index.js --bundle-output android/app/src/main/assets/index.android.bundle --assets-dest android/app/src/main/res
             # THE LAUNCH PROBE, ON HERE AND NOWHERE ELSE.
             #
             # It encrypts a message, puts it in a room and reads it back --
@@ -287,9 +295,10 @@ jobs:
             # in it, and he watched "encrypted by the bridge, sent by the
             # application" appear in his chat at every launch.
             #
-            # `process.env` is inlined at build time, so it belongs on the
-            # BUILD and not on the run.
-            MESSAGR_SEND_PROBE=1 npx detox build --configuration android.emu.debug
+            # `process.env.MESSAGR_SEND_PROBE` is inlined by
+            # `babel.config.js`, so it belongs on the command that runs
+            # Babel -- the bundle above, not this one.
+            npx detox build --configuration android.emu.debug
             MESSAGR_CAPTURE_STORE=1 ../../scripts/run-device-suite.sh
 
       # Only on failure, and that is the point: a green run's logs are noise,
