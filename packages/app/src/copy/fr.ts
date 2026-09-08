@@ -149,6 +149,8 @@ export const fr = {
   settings_row_not_yet: 'Pas encore',
   settings_version_footer: 'messagr %1$@ (%2$@)',
   language_endonym: 'Français',
+  language_choose: 'Choisir la langue',
+  language_close: 'Fermer',
 
   // WRITTEN HERE, NOT CARRIED OVER.
   //
@@ -462,6 +464,7 @@ export const fr = {
   // L'onglet Appels. Ce que devient un appel, dit en toutes lettres : la
   // couleur ne fait que répéter ces mots, elle ne les porte jamais.
   calls_empty: 'Aucun appel pour l’instant.',
+  'calls_ring_back %@': 'Rappeler %@',
   calls_taken: 'Appel reçu',
   calls_placed: 'Appel passé',
   calls_missed: 'Appel manqué',

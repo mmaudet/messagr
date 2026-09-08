@@ -22,7 +22,7 @@ import {
   type,
 } from '../design/tokens'
 import { BrandMark } from './BrandMark'
-import { LanguageStrip } from './LanguageStrip'
+import { LanguagePicker } from './LanguagePicker'
 import { NotchedButton } from './NotchedButton'
 
 /**
@@ -44,7 +44,7 @@ import { NotchedButton } from './NotchedButton'
  *
  * **The language.** Somebody who does not read French met a French screen and
  * had no way out of it. Now the strip is under the thumb and the screen
- * retranslates as it moves — `LanguageStrip` says why the gesture is the
+ * opens on a tap — `LanguagePicker` says why it is a dropdown and no
  * design rather than a dropdown.
  *
  * **The terms.** The action does nothing until the box is ticked, and a gate
@@ -132,16 +132,16 @@ export function FirstLaunch({
 
         <View style={styles.gate}>
           <Text style={styles.gateHeading}>{t('promise_language')}</Text>
-          {/* UNE LANGUE À LA FOIS, COMME DANS RÉGLAGES.
-              Quatre lignes ici demandaient à quelqu'un qui n'a encore rien
-              lu de choisir dans une liste, sous un écran déjà long : sur un
-              iPhone, la case des conditions passait sous le pli. Une seule
-              ligne rend l'écran plus court que ce qu'il présente, et c'est
-              le même contrôle qu'aux Réglages -- deux formes différentes
-              pour un même geste seraient deux contrôles. */}
-          <LanguageStrip
+          {/* UNE LISTE DÉROULANTE, ET NON PLUS UN RUBAN QUI DÉFILE.
+              Le ruban tenait sur une ligne pour que la case des conditions
+              ne passe pas sous le pli, et c'était le bon calcul ; ce qui
+              n'allait pas, c'est qu'on ne voyait pas que c'était un choix.
+              Un testeur a installé l'application le 8 septembre 2026 et n'a
+              pas trouvé comment changer la langue -- ici, puis aux Réglages.
+              `LanguagePicker.tsx` raconte le reste. Toujours une ligne au
+              repos, donc l'écran reste aussi court. */}
+          <LanguagePicker
             onDark
-            rows={1}
             chosen={language}
             onChoose={onLanguage}
             onSettle={onLanguageSettled}

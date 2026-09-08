@@ -125,6 +125,8 @@ export const it: Readonly<Record<CopyKey, string>> = {
   settings_row_not_yet: 'Non ancora',
   settings_version_footer: 'messagr %1$@ (%2$@)',
   language_endonym: 'Italiano',
+  language_choose: 'Scegliere la lingua',
+  language_close: 'Chiudere',
   'conversation_sender_claimed %@': 'Si presenta come %@',
   conversation_send: 'Inviare',
   conversation_empty: 'Qui non è ancora stato detto nulla.',
@@ -292,6 +294,7 @@ export const it: Readonly<Record<CopyKey, string>> = {
   list_no_directory:
     'Nessun numero di telefono compare in alcun punto del sistema. Si entra in relazione soltanto su invito.',
   calls_empty: 'Ancora nessuna chiamata.',
+  'calls_ring_back %@': 'Richiama %@',
   calls_taken: 'Chiamata ricevuta',
   calls_placed: 'Chiamata effettuata',
   calls_missed: 'Chiamata persa',

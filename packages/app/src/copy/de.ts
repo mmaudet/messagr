@@ -130,6 +130,8 @@ export const de: Readonly<Record<CopyKey, string>> = {
   settings_row_not_yet: 'Noch nicht',
   settings_version_footer: 'messagr %1$@ (%2$@)',
   language_endonym: 'Deutsch',
+  language_choose: 'Sprache wählen',
+  language_close: 'Schließen',
   'conversation_sender_claimed %@': 'Gibt sich aus als %@',
   conversation_send: 'Senden',
   conversation_empty: 'Hier wurde noch nichts gesagt.',
@@ -300,6 +302,7 @@ export const de: Readonly<Record<CopyKey, string>> = {
   list_no_directory:
     'Nirgendwo im System erscheint eine Telefonnummer. In Kontakt kommt man nur über eine Einladung.',
   calls_empty: 'Noch keine Anrufe.',
+  'calls_ring_back %@': '%@ zurückrufen',
   calls_taken: 'Eingegangener Anruf',
   calls_placed: 'Ausgehender Anruf',
   calls_missed: 'Verpasster Anruf',

@@ -123,6 +123,8 @@ export const nl: Readonly<Record<CopyKey, string>> = {
   settings_row_not_yet: 'Nog niet',
   settings_version_footer: 'messagr %1$@ (%2$@)',
   language_endonym: 'Nederlands',
+  language_choose: 'Taal kiezen',
+  language_close: 'Sluiten',
   'conversation_sender_claimed %@': 'Geeft zich uit voor %@',
   conversation_send: 'Versturen',
   conversation_empty: 'Hier is nog niets gezegd.',
@@ -293,6 +295,7 @@ export const nl: Readonly<Record<CopyKey, string>> = {
   list_no_directory:
     'Nergens in het systeem komt een telefoonnummer voor. Contact ontstaat uitsluitend op uitnodiging.',
   calls_empty: 'Nog geen oproepen.',
+  'calls_ring_back %@': '%@ terugbellen',
   calls_taken: 'Ontvangen oproep',
   calls_placed: 'Uitgaande oproep',
   calls_missed: 'Gemiste oproep',

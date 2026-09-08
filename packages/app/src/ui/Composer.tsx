@@ -102,7 +102,7 @@ export function Composer({
   // The application has a light palette and a dark one reserved for surfaces
   // that ASK for it -- the promise screen, a photograph full screen. Which
   // ground a component sits on is its parent's business, which is why
-  // `LanguageStrip` takes `onDark` and does not guess. A component that reads
+  // `LanguagePicker` takes `onDark` and does not guess. A component that reads
   // the system theme is guessing, and it guessed wrong here.
   const palette = color
 

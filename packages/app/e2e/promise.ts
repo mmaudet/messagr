@@ -43,6 +43,13 @@ export async function acceptThePromise(): Promise<void> {
   //
   // Choosing explicitly is also what a person does, so this is not a test
   // accommodating a defect: it is the test stopping being accidental.
+  //
+  // TWO TAPS SINCE THE SELECTOR BECAME A DROPDOWN. The column is gone -- a
+  // tester could not find it, which `LanguagePicker.tsx` records -- so the
+  // languages live in a sheet the closed row opens. The nested scrollable
+  // this comment spent five runs on went with it: there is nothing
+  // scrollable in the middle of the promise screen any more.
+  await element(by.id('language-picker')).tap()
   await element(by.id('language-fr')).tap()
   await element(by.id('promise-terms')).tap()
 

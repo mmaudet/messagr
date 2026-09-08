@@ -20,9 +20,9 @@ import { TabIcon } from './TabIcon'
  * numbers would be a control that cannot work.
  *
  * A row is therefore a fact about a conversation somebody already has, and
- * pressing it opens that conversation rather than placing a call. Calling is
- * the header's own button, one tap further, where the person can see who
- * they are about to ring.
+ * pressing it opens that conversation rather than placing a call. Ringing
+ * that person again is the button beside it -- see `onCall`, which says why
+ * this screen, unlike the conversation list, carries one at all.
  *
  * # THE ARROW CARRIES THE MEANING, AND THE COLOUR ONLY REPEATS IT
  *
@@ -73,13 +73,28 @@ export function CallsList({
   shownFor,
   now,
   onOpen,
+  onCall,
 }: {
   readonly calls: readonly CallRecord[]
   /** The name or the identifier, exactly as every other screen shows them. */
   readonly shownFor: (peerUserId: string) => string
   readonly now: number
-  /** Opens the conversation. Calling is its header's button, not this row. */
+  /** Opens the conversation. The row itself is not a call. */
   readonly onOpen: (scope: string) => void
+  /**
+   * Rings that person back.
+   *
+   * ADDED AFTER THE FIRST REAL CALLS. This screen said a row opens the
+   * conversation and that calling belongs to its header, one tap further,
+   * "where the person can see who they are about to ring". That reasoning
+   * holds for a list of conversations and not for a list of CALLS: somebody
+   * on this screen is already looking at who they called and when, so the
+   * second tap adds nothing except the chance to give up.
+   *
+   * It is its own target rather than the row's, because the two gestures
+   * mean different things: reading what happened, and starting it again.
+   */
+  readonly onCall: (scope: string, peerUserId: string) => void
 }) {
   if (calls.length === 0) {
     return (
@@ -95,36 +110,47 @@ export function CallsList({
         const shown = shownFor(call.peerUserId)
         const missed = isMissed(call.outcome, call.direction)
         return (
-          <Pressable
-            key={`${call.scope}-${call.at}`}
-            testID={`call-${call.at}`}
-            onPress={() => onOpen(call.scope)}
-            accessibilityRole="button"
-            // The whole row said aloud, in the order it reads: who, what
-            // became of the call, when. A screen reader must not have to
-            // piece three labels together.
-            accessibilityLabel={`${shown}. ${t(outcomeLabel(call))}. ${whenLabel(
-              stampFor(call.at, now),
-            )}`}
-            style={({ pressed }) => [styles.row, pressed && styles.pressed]}>
-            <Avatar shown={shown} />
-            <View style={styles.said}>
-              <Text
-                numberOfLines={1}
-                style={[styles.name, missed && styles.missedName]}>
-                {shown}
-              </Text>
-              <View style={styles.what}>
-                <TabIcon
-                  glyph="calls"
-                  tint={missed ? color.deny['500'] : color.neutral['400']}
-                  size={14}
-                />
-                <Text style={styles.outcome}>{t(outcomeLabel(call))}</Text>
+          <View key={`${call.scope}-${call.at}`} style={styles.line}>
+            <Pressable
+              testID={`call-${call.at}`}
+              onPress={() => onOpen(call.scope)}
+              accessibilityRole="button"
+              // The whole row said aloud, in the order it reads: who, what
+              // became of the call, when. A screen reader must not have to
+              // piece three labels together.
+              accessibilityLabel={`${shown}. ${t(outcomeLabel(call))}. ${whenLabel(
+                stampFor(call.at, now),
+              )}`}
+              style={({ pressed }) => [styles.row, pressed && styles.pressed]}>
+              <Avatar shown={shown} />
+              <View style={styles.said}>
+                <Text
+                  numberOfLines={1}
+                  style={[styles.name, missed && styles.missedName]}>
+                  {shown}
+                </Text>
+                <View style={styles.what}>
+                  <TabIcon
+                    glyph="calls"
+                    tint={missed ? color.deny['500'] : color.neutral['400']}
+                    size={14}
+                  />
+                  <Text style={styles.outcome}>{t(outcomeLabel(call))}</Text>
+                </View>
               </View>
-            </View>
-            <Text style={styles.when}>{whenLabel(stampFor(call.at, now))}</Text>
-          </Pressable>
+              <Text style={styles.when}>
+                {whenLabel(stampFor(call.at, now))}
+              </Text>
+            </Pressable>
+            <Pressable
+              testID={`call-back-${call.at}`}
+              onPress={() => onCall(call.scope, call.peerUserId)}
+              accessibilityRole="button"
+              accessibilityLabel={t('calls_ring_back %@', shown)}
+              style={({ pressed }) => [styles.back, pressed && styles.pressed]}>
+              <TabIcon glyph="calls" tint={color.brand.green700} />
+            </Pressable>
+          </View>
         )
       })}
     </View>
@@ -132,14 +158,27 @@ export function CallsList({
 }
 
 const styles = StyleSheet.create({
+  // The row and the call button sit side by side and are two targets: one
+  // reads what happened, the other starts it again.
+  line: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderBottomWidth: stroke.hairline.value,
+    borderBottomColor: color.neutral['200'],
+  },
+  back: {
+    minWidth: floors.touchTargetMin,
+    minHeight: floors.touchTargetMin,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   row: {
+    flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
     gap: space.m,
     paddingVertical: space.s,
     minHeight: floors.touchTargetMin,
-    borderBottomWidth: stroke.hairline.value,
-    borderBottomColor: color.neutral['200'],
   },
   pressed: { backgroundColor: color.neutral['200'] },
   // The name and what became of the call are one thing said in two lines,

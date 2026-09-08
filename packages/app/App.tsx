@@ -684,6 +684,18 @@ export function App({
         wait: ms => new Promise(resolve => setTimeout(resolve, ms)),
       })
       const credentials = entered.entered ? entered.session : null
+      // THE STATE THAT EXISTED AND WAS NEVER SET.
+      //
+      // `inYet` was declared, the list had its `notInYet` branch and the copy
+      // for it was written in six languages -- and nothing ever answered the
+      // question, so `inYet` stayed `null` and every device looked like a
+      // device with an account. A tester who had installed the application
+      // and not yet been invited was shown the floating action and an empty
+      // state reading "invitez quelqu'un", which is the one thing he could
+      // not do. Reported on 8 September 2026 in exactly those terms: "juste
+      // apres l'install, il ne doit rien pouvoir faire que d'attendre la
+      // reception d'une invitation".
+      setInYet(credentials !== null)
 
       let sessionStatus: SessionSyncStatus | 'not-configured'
       let pumpStatus: PumpStatus
@@ -2132,10 +2144,10 @@ export function App({
 */}
             {openScope === null && tab === 'calls' && (
               <View style={styles.block}>
-                {/* A row opens the CONVERSATION, not a call. Calling is the
-                    header's own button, one tap further, where the person
-                    can see who they are about to ring -- `CallsList.tsx`
-                    says why this screen is not a directory. */}
+                {/* A row opens the CONVERSATION; the button beside it rings
+                    the person back. `CallsList.tsx` says why this screen
+                    carries a call button where the conversation list does
+                    not, and why it is still not a directory. */}
                 <CallsList
                   calls={calls}
                   now={Date.now()}
@@ -2145,6 +2157,17 @@ export function App({
                     // The launch effect binds it; a screen drawn before the
                     // session exists has no conversation to open anyway.
                     openConversationRef.current?.(scope)
+                  }}
+                  onCall={(scope, peer) => {
+                    const runtime = callRuntimeRef.current
+                    // A call already up owns the microphone, and placing a
+                    // second one over it is the header's rule too.
+                    if (runtime === null || call !== null) return
+                    runtime.place(scope, peer).catch((cause: unknown) =>
+                      logEvent('warn', 'MESSAGR_CALL_NOT_PLACED', {
+                        reason: getErrorMessage(cause),
+                      }),
+                    )
                   }}
                 />
               </View>
@@ -2481,8 +2504,17 @@ export function App({
             style={[styles.dock, { bottom: keyboardInset }]}
             pointerEvents="box-none"
             onLayout={event => setDockHeight(event.nativeEvent.layout.height)}>
+            {/* AND ONLY ON A DEVICE THAT IS IN.
+              Inviting somebody needs an account to invite them from:
+              `inviteRef` is bound inside the branch that has credentials, so
+              on a device without one this button opened a panel whose action
+              did nothing. `inYet === true` rather than `!== false` on
+              purpose -- the answer is unknown for the fraction of a second
+              the keystore takes, and a control that appears and then leaves
+              is worse than one that arrives when it works. */}
             {openScope === null &&
               tab === 'chat' &&
+              inYet === true &&
               invite.stage === 'shut' && (
                 <FloatingAction
                   testID="invite-open"

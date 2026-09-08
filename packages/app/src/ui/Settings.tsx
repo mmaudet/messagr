@@ -11,7 +11,7 @@ import {
 import { t } from '../copy'
 import type { Language } from '../copy/languages'
 import { color, floors, layout, space, stroke, type } from '../design/tokens'
-import { LanguageStrip } from './LanguageStrip'
+import { LanguagePicker } from './LanguagePicker'
 
 /**
  * Settings.
@@ -90,23 +90,21 @@ export function Settings({
         <Text style={styles.rowLabel}>{t('settings_legal')}</Text>
       </Pressable>
 
-      {/* THE SAME STRIP AS THE FIRST SCREEN, AND THE SAME GESTURE.
-          Choosing a language once and having no way to change it is a
-          reinstall as a correction. It is the same control rather than a
-          list, because a person who picked the wrong one is exactly the
-          person who cannot read a list of language names. */}
+      {/* CHOOSING A LANGUAGE ONCE AND HAVING NO WAY TO CHANGE IT is a
+          reinstall as a correction, so it is here as well as on the first
+          screen -- and it is the same control in both places, because two
+          shapes for one gesture would be two controls. */}
       <View style={styles.setting} testID="setting-language">
         <Text style={styles.rowLabel}>{t('settings_row_lang_label')}</Text>
-        {/* ONE ROW HERE, FOUR ON THE FIRST SCREEN, AT THE ACCOUNT HOLDER'S
-            WORD. Six flags between two one-line settings read as a feature
-            rather than as a setting; one row that moves reads as a setting.
-            Same component, one number. */}
-        <LanguageStrip
+        {/* THE SAME CONTROL AS THE FIRST SCREEN, and now one anybody can
+            find: a row saying which language is on, and a list when it is
+            tapped. `LanguagePicker.tsx` says why the scrolling strip that
+            stood here was replaced. */}
+        <LanguagePicker
           chosen={language}
           onChoose={onLanguage}
           onSettle={onLanguageSettled}
-          rows={1}
-          testID="settings-language-strip"
+          testID="settings-language-picker"
         />
       </View>
 
