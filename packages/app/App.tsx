@@ -2090,9 +2090,19 @@ export function App({
             // so without this the last row of whatever is on screen sits behind
             // the tab bar -- which reads as content that will not scroll far
             // enough, and is the reason a bottom bar usually costs a padding.
+            //
+            // AND THE KEYBOARD IS PART OF THE DOCK'S HEIGHT, once it is up.
+            // The dock lifts itself by `keyboardInset`; this reserves the
+            // space it lifted into, or the last messages sit behind the
+            // composer that just rose over them. Reported from iOS the
+            // moment the composer stopped being covered: "le contenu des
+            // échanges ne se décale pas lorsque le clavier s'affiche".
+            //
+            // Two halves of one gesture, and fixing the first without the
+            // second only moved which thing was hidden.
             contentContainerStyle={[
               styles.content,
-              { paddingBottom: dockHeight + space.l },
+              { paddingBottom: dockHeight + keyboardInset + space.l },
             ]}>
             {/* THE LIST **OR** THE CONVERSATION, never both.
               Stacking them was the first shape this took, and it was wrong

@@ -10,7 +10,7 @@ function store(held: string | null | Error, refuseWrite = false): SecretStore {
       if (value instanceof Error) throw value
       return value
     },
-    write: async next => {
+    write: async (next: string) => {
       if (refuseWrite) throw new Error('the keystore refused')
       value = next
     },
