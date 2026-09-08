@@ -39,12 +39,24 @@ import type { Road } from './pusher'
  * push then goes near Google: sygnal talks to Apple, and the `app_id` in the
  * pusher says so (`pusher.ts`).
  *
- * # `getAPNSToken` can answer `null` and not be wrong
+ * # `getAPNSToken` CAN ANSWER `null`, AND WAITING ONE LAUNCH IS NOT ENOUGH
  *
  * Registration with Apple is asynchronous, and the token arrives after the
- * call that asked for it. A `null` here is "not yet", not "never" -- and the
- * next launch asks again, which is why the pusher is registered on every
- * launch rather than once.
+ * call that asked for it. This read it once and left the rest to "the next
+ * launch asks again" -- which is true and was not sufficient. On a device
+ * that loses the race every time, the pusher is never registered at all,
+ * and the account keeps whatever pusher it had: on the tester's telephone,
+ * a token minted months earlier by a build whose entitlement was still
+ * `development`, which Apple then answers `BadDeviceToken` for ever because
+ * a sandbox token pushed to production is exactly that.
+ *
+ * Sixteen rejections in two hours, one token, and a build eleven that never
+ * replaced it.
+ *
+ * So it waits, briefly, inside the launch that asked. Not for ever: a device
+ * with no Apple to answer -- a simulator, an account with notifications
+ * refused -- must not hold a launch open, and `null` after a few seconds is
+ * still an honest "not yet".
  *
  * # An empty token is an ordinary answer
  *
@@ -85,8 +97,8 @@ export async function pushTokenForThisDevice(): Promise<
       // Asked for explicitly. Without it the APNs token is never requested
       // and this reads `null` for ever rather than "not yet".
       await registerDeviceForRemoteMessages(getMessaging())
-      const apns = await getAPNSToken(getMessaging())
-      return apns === null || apns === ''
+      const apns = await waitForApple()
+      return apns === null
         ? { token: null, reason: 'Apple has not answered with a token yet' }
         : { token: apns, road: 'ios' }
     }
@@ -98,4 +110,25 @@ export async function pushTokenForThisDevice(): Promise<
   } catch (cause: unknown) {
     return { token: null, reason: getErrorMessage(cause) }
   }
+}
+
+/** How long to wait for Apple, in total, and how often to ask. */
+const APPLE_TRIES = 10
+const APPLE_GAP_MS = 500
+
+/**
+ * Apple's token, asked for until it arrives or the wait runs out.
+ *
+ * The first call almost always answers `null`: the request has only just
+ * been made. Ten looks half a second apart is five seconds, which is longer
+ * than the token has ever taken and short enough that a device which will
+ * never have one is not holding anything open.
+ */
+async function waitForApple(): Promise<string | null> {
+  for (let look = 0; look < APPLE_TRIES; look += 1) {
+    const apns = await getAPNSToken(getMessaging())
+    if (apns !== null && apns !== '') return apns
+    await new Promise(resolve => setTimeout(resolve, APPLE_GAP_MS))
+  }
+  return null
 }

@@ -70,6 +70,7 @@ import {
   languageSecrets,
   storeDirectorySecrets,
   termsSecrets,
+  pushkeySecrets,
   wakeSecrets,
   promiseSecrets,
   receiptSecrets,
@@ -110,6 +111,7 @@ import { allowWake, wakeIsAllowed } from './src/runtime/wakeSetting'
 import { deviceLocale } from './src/runtime/deviceLocale'
 import { pickFromLibrary } from './src/runtime/imageLibrary'
 import { sendImages } from './src/runtime/sendImages'
+import { keepLastPushkey, readLastPushkey } from './src/runtime/lastPushkey'
 import { pushTokenForThisDevice } from './src/runtime/pushDevice'
 import {
   stopRinging,
@@ -1140,12 +1142,35 @@ export function App({
                   logEvent('info', 'MESSAGR_PUSH_REMOVED', {})
                   return
                 }
+                // THE GHOST THIS DEVICE LEFT BEHIND, taken away before the
+                // new one goes up.
+                //
+                // A pusher is keyed by its token and nothing says which
+                // device it belonged to, so a token that changes leaves its
+                // pusher on the account for ever -- and the homeserver keeps
+                // pushing to it. On the tester's telephone that was a
+                // sandbox token from an old entitlement, rejected sixteen
+                // times in two hours, months after the build that minted it
+                // was gone.
+                //
+                // This device wrote its own key down, so it is the one thing
+                // that can say "that was mine". Best effort: a ghost that
+                // will not go is noise, while a new pusher that does not go
+                // up is silence.
+                const before = await readLastPushkey(pushkeySecrets)
+                if (before !== null && before !== answer.token) {
+                  await stopWakingThisDevice(sessionClient, before, answer.road)
+                  logEvent('info', 'MESSAGR_PUSH_GHOST_REMOVED', {})
+                }
                 const done = await registerThisDeviceForWaking(
                   sessionClient,
                   credentials,
                   answer.token,
                   answer.road,
                 )
+                if (done.registered) {
+                  await keepLastPushkey(pushkeySecrets, answer.token)
+                }
                 logEvent(
                   done.registered ? 'info' : 'warn',
                   done.registered

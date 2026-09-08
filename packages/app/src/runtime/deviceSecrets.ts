@@ -59,6 +59,25 @@ export const sessionSecrets = keychainStore('eu.messagr.session')
  */
 export const signUpSecrets = keychainStore('eu.messagr.sign-up')
 
+/**
+ * The pushkey this device last registered a pusher under.
+ *
+ * WITHOUT IT, A GHOST IS PUSHED TO FOR EVER. A pusher is keyed by its token,
+ * and nothing in the Matrix data model says which device a pusher belongs
+ * to -- so when a device's token changes, its old pusher stays on the
+ * account and every message costs a failed push to a token nobody holds.
+ *
+ * Measured on the tester's telephone: sixteen `BadDeviceToken` in two hours,
+ * all for one token minted by a build whose entitlement was still
+ * `development`, months after that build was replaced.
+ *
+ * This device writing down its own key is the only thing that can say "that
+ * one was mine, and it is not any more". A `SecretStore` because it is the
+ * only durable per-device store this application has, not because a pushkey
+ * is a secret -- it is on the homeserver already.
+ */
+export const pushkeySecrets = keychainStore('eu.messagr.pushkey')
+
 /** Where the crypto store's passphrase lives. See cryptoMachineConfig.ts. */
 export const cryptoStoreSecrets = keychainStore('eu.messagr.crypto-store')
 
