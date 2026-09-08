@@ -228,18 +228,71 @@ var copie = JSON.parse(
   fs.readFileSync(path.join(racine, 'landing/copy.json'), 'utf8')
 );
 
+// PLUS D'UNE PAGE EST ENGENDRÉE, ET LE CATALOGUE LES SERT TOUTES. La règle de
+// complétude porte donc sur leur UNION : une clé qui ne sert qu'à la page du
+// téléchargement n'est pas une clé morte, et une clé que ni l'une ni l'autre ne
+// marque en est une.
+//
+// Les sources sont lues ici plutôt que demandées à `build-landing.mjs` : ce
+// test doit pouvoir dire « la page ne marque pas cette clé » même quand la
+// construction refuse de tourner.
+// Chaque page engendrée : sa source, où la construction l'écrit, et l'adresse
+// qu'elle doit porter. Le même découpage que `PAGES` dans `build-landing.mjs`,
+// écrit ici plutôt que lu là-bas : un test qui demande au code qu'il éprouve où
+// se trouvent ses pages est d'accord avec lui quoi qu'il fasse.
+var ENGENDREES = [
+  {
+    nom: 'accueil',
+    source: 'site/index.html',
+    ou: function (code) { return code === 'fr' ? 'index.html' : code + '/index.html'; },
+    adresse: function (code) {
+      return code === 'fr' ? 'https://messagr.eu/' : 'https://messagr.eu/' + code + '/';
+    },
+    titre: 'titre',
+    chapo: 'chapo'
+  },
+  {
+    nom: 'téléchargement',
+    source: 'site/telechargement/index.html',
+    ou: function (code) {
+      return code === 'fr'
+        ? 'telechargement/index.html'
+        : code + '/telechargement/index.html';
+    },
+    adresse: function (code) {
+      return code === 'fr'
+        ? 'https://messagr.eu/telechargement/'
+        : 'https://messagr.eu/' + code + '/telechargement/';
+    },
+    titre: 'dl-titre',
+    chapo: 'dl-chapo'
+  }
+];
+var SOURCES = ENGENDREES.map(function (e) { return e.source; });
 var marqueesAccueil = [];
-(function () {
+ENGENDREES.forEach(function (engendree) {
+  engendree.cles = [];
+});
+SOURCES.forEach(function (relatif, rang) {
+  var texte = fs.readFileSync(path.join(racine, relatif), 'utf8');
   var motif = /data-t="([^"]+)"/g;
   var trouve;
-  while ((trouve = motif.exec(accueil)) !== null) {
+  var vues = 0;
+  while ((trouve = motif.exec(texte)) !== null) {
+    vues += 1;
     if (marqueesAccueil.indexOf(trouve[1]) === -1) { marqueesAccueil.push(trouve[1]); }
+    if (ENGENDREES[rang].cles.indexOf(trouve[1]) === -1) {
+      ENGENDREES[rang].cles.push(trouve[1]);
+    }
   }
-})();
+  if (vues === 0) {
+    echouer(relatif + ' ne marque plus aucune phrase');
+  }
+});
 marqueesAccueil.sort();
 
 if (marqueesAccueil.length === 0) {
-  echouer("la page d'accueil ne marque plus aucune phrase");
+  echouer("les pages engendrées ne marquent plus aucune phrase");
 }
 
 CODES.forEach(function (code) {
@@ -306,34 +359,37 @@ CODES.forEach(function (code) {
     return;
   }
 
-  // Les six pages, chacune dans sa langue, et sans une phrase de la source.
+  // CHAQUE PAGE ENGENDRÉE, DANS CHAQUE LANGUE. Douze pages : la deuxième a ses
+  // propres adresses canoniques et son propre jeu de `hreflang`, et un lien
+  // depuis `/de/telechargement/` vers `/en/` renverrait le lecteur ailleurs que
+  // là où il était.
+  ENGENDREES.forEach(function (modele) {
   CODES.forEach(function (code) {
-    var ou = code === 'fr'
-      ? path.join(bon.sortie, 'index.html')
-      : path.join(bon.sortie, code, 'index.html');
+    var quoi = 'la page ' + modele.nom + ' « ' + code + ' »';
+    var ou = path.join(bon.sortie, modele.ou(code));
     if (!fs.existsSync(ou)) {
-      echouer('la page « ' + code + ' » n\'a pas été écrite');
+      echouer(quoi + " n'a pas été écrite");
       return;
     }
     var rendue = fs.readFileSync(ou, 'utf8');
 
     if (rendue.indexOf('<html lang="' + code + '">') === -1) {
-      echouer('la page « ' + code + ' » ne se déclare pas dans sa langue');
+      echouer(quoi + ' ne se déclare pas dans sa langue');
     }
-    var adresse = code === 'fr' ? 'https://messagr.eu/' : 'https://messagr.eu/' + code + '/';
+    var adresse = modele.adresse(code);
     if (rendue.indexOf('rel="canonical" href="' + adresse + '"') === -1) {
-      echouer('la page « ' + code + ' » ne porte pas son canonical');
+      echouer(quoi + ' ne porte pas son canonical');
     }
     // Le jeu complet des hreflang, sur CHAQUE page : un lien qui ne part que
     // dans un sens ne relie rien.
     CODES.forEach(function (autre) {
-      var vers = autre === 'fr' ? 'https://messagr.eu/' : 'https://messagr.eu/' + autre + '/';
+      var vers = modele.adresse(autre);
       if (rendue.indexOf('hreflang="' + autre + '" href="' + vers + '"') === -1) {
-        echouer('la page « ' + code + ' » ne renvoie pas vers « ' + autre + ' »');
+        echouer(quoi + ' ne renvoie pas vers « ' + autre + ' »');
       }
     });
     if (rendue.indexOf('hreflang="x-default"') === -1) {
-      echouer('la page « ' + code + ' » ne porte pas x-default');
+      echouer(quoi + ' ne porte pas x-default');
     }
 
     // Et le texte : chaque phrase marquée est celle de SA langue.
@@ -352,23 +408,31 @@ CODES.forEach(function (code) {
     // `etat-verifie` en fait partie pour la même raison : le tableau des états
     // est vérifié CONTRE une construction, donc sans fichier proposé la phrase
     // « vérifié sur la construction du … » n'a rien à nommer.
-    var FAITS = ['apk-faits', 'apk-empreinte', 'etat-verifie'];
-    marqueesAccueil.filter(function (c) {
+    //
+    // `dl-retire` en fait partie aussi, dans l'autre sens : cette construction
+    // ne propose pas de fichier, donc c'est le bloc de l'OFFRE qui sort et la
+    // phrase de retrait qui reste. Les deux blocs sont éprouvés plus bas, dans
+    // leurs deux états.
+    var FAITS = [
+      'apk-faits', 'apk-empreinte', 'etat-verifie',
+      'dl-porte', 'dl-comparer', 'dl-play', 'apk-avertissement'
+    ];
+    modele.cles.filter(function (c) {
       return FAITS.indexOf(c) === -1;
     }).forEach(function (cle) {
       if (plat.indexOf(copie[code][cle]) === -1) {
-        echouer('la page « ' + code + ' » ne porte pas sa phrase « ' + cle + ' »');
+        echouer(quoi + ' ne porte pas sa phrase « ' + cle + ' »');
       }
     });
-    if (code !== 'fr' && plat.indexOf('>' + copie.fr.titre + '<') !== -1) {
-      echouer('la page « ' + code + ' » a gardé le titre français');
+    if (code !== 'fr' && plat.indexOf('>' + copie.fr[modele.titre] + '<') !== -1) {
+      echouer(quoi + ' a gardé le titre français');
     }
     // L'APERÇU DE LIEN, PAR LANGUE. Une carte française sur `/de/` annulerait
     // ce que les six adresses corrigent, et c'est la seule surface par
     // laquelle ce produit se diffuse : quelqu'un envoie un lien à quelqu'un.
     var social = [
-      ['og:title', copie[code].titre],
-      ['og:description', copie[code].chapo],
+      ['og:title', copie[code][modele.titre]],
+      ['og:description', copie[code][modele.chapo]],
       ['og:url', adresse],
       ['og:image', 'https://messagr.eu/messagr-partage-' + code + '.png']
     ];
@@ -387,6 +451,7 @@ CODES.forEach(function (code) {
     if (!fs.existsSync(carte)) {
       echouer('la carte de partage « ' + code + ' » est nommée et absente de la construction');
     }
+  });
   });
 
   // ── LES FAITS DU TÉLÉCHARGEMENT, DANS LEURS DEUX ÉTATS ─────────────────
@@ -441,6 +506,41 @@ CODES.forEach(function (code) {
     if (pageDe.indexOf('132,6 MB') === -1) {
       echouer("l'allemand devrait écrire « 132,6 MB », il ne l'écrit pas");
     }
+
+    // ── L'OFFRE ET SON ABSENCE, SUR LA PAGE DU TÉLÉCHARGEMENT ───────────
+    //
+    // `deploy.sh` accepte `MESSAGR_APK=none` : le fichier quitte le serveur.
+    // La page doit cesser de le proposer DANS LE MÊME GESTE -- un bouton qui
+    // reste avec le poids d'hier est pire qu'une page qui se tait -- et
+    // reprendre l'offre quand le fichier revient. Les deux sens sont éprouvés,
+    // parce qu'un seul laisserait passer une page qui ne propose jamais rien.
+    CODES.forEach(function (code) {
+      var relatif = code === 'fr'
+        ? 'telechargement/index.html'
+        : path.join(code, 'telechargement/index.html');
+      var aplatir = function (t) { return t.replace(/\s+/g, ' '); };
+      var avec = aplatir(fs.readFileSync(path.join(avecFaits.sortie, relatif), 'utf8'));
+      var sans = aplatir(fs.readFileSync(path.join(bon.sortie, relatif), 'utf8'));
+      if (avec.indexOf('href="/messagr.apk"') === -1) {
+        echouer('le téléchargement « ' + code + ' » ne propose pas le fichier ' +
+          "alors que la construction en mesure un");
+      }
+      if (avec.indexOf(copie[code]['dl-retire']) !== -1) {
+        echouer('le téléchargement « ' + code + ' » dit qu\'aucun fichier ' +
+          "n'est proposé alors qu'il en propose un");
+      }
+      if (sans.indexOf('href="/messagr.apk"') !== -1) {
+        echouer('le téléchargement « ' + code + ' » propose un fichier que ' +
+          "cette construction ne mesure pas : le bouton resterait après un retrait");
+      }
+      if (sans.indexOf(copie[code]['dl-retire']) === -1) {
+        echouer('le téléchargement « ' + code + ' » ne dit pas qu\'aucun ' +
+          'fichier n\'est proposé, alors qu\'il n\'en propose aucun');
+      }
+      if (/%[A-Z]+%/.test(sans) || /%[A-Z]+%/.test(avec)) {
+        echouer('le téléchargement « ' + code + ' » montre une marque');
+      }
+    });
     if (/%[A-Z]+%/.test(pageDe)) {
       echouer('une marque a survécu sur la page allemande');
     }
@@ -612,6 +712,80 @@ CODES.forEach(function (code) {
   if (sansFragment.alle.remplace !== '/nl/') {
     echouer('sans fragment, le renvoi doit rester nu, il mène à ' +
       sansFragment.alle.remplace);
+  }
+
+  // ── LE MÊME SÉLECTEUR, SUR LA PAGE DU TÉLÉCHARGEMENT ─────────────────
+  //
+  // Elle porte sa propre copie du script, avec son propre `chemin()` : il doit
+  // mener à `/de/telechargement/` et non à `/de/`, sinon changer de langue
+  // ramène le lecteur ailleurs que là où il était. Rien ne le faisait tourner,
+  // et le commentaire de la page affirmait le contraire.
+  var dl = fs.readFileSync(
+    path.join(racine, 'site/telechargement/index.html'), 'utf8'
+  );
+  var blocDl = /<script>([\s\S]*?)<\/script>/.exec(dl);
+  if (!blocDl) {
+    echouer("la page du téléchargement n'a plus de script");
+  } else {
+    var jouerDl = function (langueDeLaPage, ou, fragment) {
+      var abonnes = [];
+      var choix = {
+        value: '',
+        addEventListener: function (nom, fn) { abonnes.push(fn); }
+      };
+      var alle = { vers: null, remplace: null };
+      var stock = {};
+      var faux = {
+        document: {
+          documentElement: { lang: langueDeLaPage },
+          getElementById: function (id) { return id === 'langue' ? choix : null; }
+        },
+        navigator: { languages: ['fr-FR'] },
+        location: {
+          pathname: ou,
+          hash: fragment || '',
+          set href(v) { alle.vers = v; },
+          replace: function (v) { alle.remplace = v; }
+        },
+        sessionStorage: {
+          getItem: function (k) {
+            return Object.prototype.hasOwnProperty.call(stock, k) ? stock[k] : null;
+          },
+          setItem: function (k, v) { stock[k] = v; }
+        }
+      };
+      // eslint-disable-next-line no-new-func
+      new Function('document', 'navigator', 'location', 'sessionStorage', blocDl[1])(
+        faux.document, faux.navigator, faux.location, faux.sessionStorage
+      );
+      return { choix: choix, alle: alle, declencher: function () {
+        abonnes.forEach(function (fn) { fn(); });
+      } };
+    };
+
+    var surDl = jouerDl('fr', '/telechargement/', null);
+    if (surDl.choix.value !== 'fr') {
+      echouer('sur /telechargement/, le sélecteur devrait afficher « fr »');
+    }
+    // UNE PAGE DE LANGUE N'EST JAMAIS RENVOYÉE AILLEURS, celle-ci pas davantage.
+    if (surDl.alle.remplace !== null) {
+      echouer('/telechargement/ ne doit renvoyer nulle part, il renvoie vers ' +
+        surDl.alle.remplace);
+    }
+    surDl.choix.value = 'de';
+    surDl.declencher();
+    if (surDl.alle.vers !== '/de/telechargement/') {
+      echouer('depuis /telechargement/, choisir « de » devrait mener à ' +
+        '/de/telechargement/, il mène à ' + surDl.alle.vers);
+    }
+    // Et le retour vers le français ne doit pas retomber sur la racine.
+    var deDl = jouerDl('de', '/de/telechargement/', null);
+    deDl.choix.value = 'fr';
+    deDl.declencher();
+    if (deDl.alle.vers !== '/telechargement/') {
+      echouer('depuis /de/telechargement/, choisir « fr » devrait mener à ' +
+        '/telechargement/, il mène à ' + deDl.alle.vers);
+    }
   }
 })();
 

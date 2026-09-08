@@ -1,0 +1,223 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Messagr</title>
+<meta name="description" content="Le fichier, ce qu'il pèse, et ce qu'il faut faire du lien qu'on vous a envoyé.">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="Messagr">
+<meta property="og:title" content="Installer Messagr.">
+<meta property="og:description" content="Le fichier, ce qu'il pèse, et ce qu'il faut faire du lien qu'on vous a envoyé.">
+<meta property="og:url" content="https://messagr.eu/telechargement/">
+<meta property="og:image" content="https://messagr.eu/messagr-partage-fr.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta name="twitter:card" content="summary_large_image">
+<link rel="icon" href="/favicon.ico" sizes="any">
+<link rel="icon" href="/messagr-monogramme-r-vert.svg" type="image/svg+xml">
+<style>
+  /* ─────────────────────────────────────────────────────────────────────
+     Les mêmes valeurs que la page d'accueil, et les mêmes noms de jetons.
+     Les pages légales, plus anciennes, en emploient d'autres (`--ground`,
+     `--ink`) : c'est une seconde vérité qu'on n'aggrave pas ici.
+     Aucune police n'est chargée depuis l'extérieur : cette page affirme,
+     comme les autres, qu'elle ne contacte personne.
+     ───────────────────────────────────────────────────────────────────── */
+  :root{
+    --papier:#F7F5EF; --surface:#ffffff; --creux:#F2EFE8;
+    --encre:#0C1F19; --doux:#5A6B63;
+    --appui:#06614A; --marque:#12B76A; --bulle:#C9F2DC; --regle:#E2DED2;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0}
+  body{
+    background:var(--papier); color:var(--encre);
+    font-family:-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    font-size:17px; line-height:1.6; -webkit-font-smoothing:antialiased;
+  }
+  .bande{padding:0 20px}
+  .mesure{max-width:720px; margin:0 auto; padding:38px 0 64px}
+
+  .bar{display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between;
+       gap:18px; margin-bottom:52px}
+  .mark{display:block; width:max-content}
+  .mark:focus-visible{outline:3px solid var(--marque); outline-offset:4px}
+  .logotype{display:block; width:min(212px,52vw); height:auto}
+  .menu{display:flex; flex-wrap:wrap; align-items:center; gap:20px; font-size:15px}
+  .menu a{color:inherit; opacity:.7; text-decoration:none; border-bottom:1px solid transparent;
+          padding:6px 0}
+  .menu a:hover{opacity:1; border-bottom-color:currentColor}
+  .langue{font:inherit; font-size:15px; color:inherit; background:transparent;
+          border:1px solid currentColor; border-radius:8px; padding:9px 11px;
+          min-height:44px; opacity:.7}
+  .langue:hover{opacity:1}
+
+  h1{font-size:clamp(32px,5vw,48px); line-height:1.05; letter-spacing:-0.03em;
+     font-weight:700; margin:0 0 18px; max-width:16ch; text-wrap:balance}
+  .lead{font-size:19px; line-height:1.45; color:var(--doux); margin:0 0 44px;
+        max-width:48ch; text-wrap:pretty}
+  h2{font-size:23px; line-height:1.2; letter-spacing:-0.02em; font-weight:660;
+     margin:44px 0 14px}
+  p{margin:0 0 14px; max-width:62ch}
+  .faits{font-size:13.5px; line-height:1.55; color:var(--doux); margin:0 0 8px;
+         max-width:none; word-break:break-all}
+  code{font-family:ui-monospace, SFMono-Regular, Menlo, monospace; font-size:13px;
+       background:var(--creux); border:1px solid var(--regle); border-radius:4px;
+       padding:2px 6px; word-break:break-all}
+
+  .porte{
+    display:inline-flex; align-items:center; justify-content:center;
+    min-height:52px; padding:14px 26px; margin:6px 0 18px;
+    background:var(--encre); color:#fff; text-decoration:none;
+    font-size:16px; font-weight:620;
+    clip-path:polygon(0 0, calc(100% - 16px) 0, 100% 16px, 100% 100%, 0 100%);
+  }
+  .porte:hover{background:var(--appui)}
+  .porte:focus-visible{outline:3px solid var(--marque); outline-offset:3px}
+  .porte.creuse{background:var(--surface); color:var(--appui);
+                box-shadow:inset 0 0 0 1px var(--regle)}
+  .porte.creuse:hover{background:var(--marque); color:#fff}
+
+  /* Les étapes, numérotées par le compteur de la liste : ceci est une suite,
+     et le numéro ne peut pas se désaccorder de son rang. */
+  ol.etapes{list-style:none; counter-reset:etape; padding:0; margin:0}
+  ol.etapes li{counter-increment:etape; margin:0 0 16px; max-width:62ch}
+  ol.etapes li::before{
+    content:counter(etape); display:inline-flex; align-items:center;
+    justify-content:center; width:22px; height:22px; margin-right:10px;
+    border-radius:50%; background:var(--bulle); color:var(--appui);
+    font-size:12px; font-weight:700; vertical-align:2px;
+  }
+  .pied{border-top:1px solid var(--regle); margin-top:52px; padding-top:22px;
+        font-size:14.5px; color:var(--doux)}
+  .pied a{color:inherit}
+</style>
+</head>
+<body>
+
+<section class="bande">
+  <div class="mesure">
+
+  <div class="bar">
+    <a class="mark" href="/" aria-label="Messagr">
+      <img class="logotype" src="/messagr-logotype-vert.svg" alt="Messagr" width="260" height="60">
+    </a>
+    <nav class="menu">
+      <a href="/" data-t="menu-accueil">Accueil</a>
+      <a href="/conditions-generales/" data-t="menu-cgu">Conditions générales</a>
+      <a href="/confidentialite/" data-t="menu-confidentialite">Confidentialité</a>
+      <!-- LE SÉLECTEUR EST LE MÊME QUE SUR L'ACCUEIL, et il navigue par le même
+           script. Une page sans lui obligerait à repasser par l'accueil pour
+           changer de langue, ce qui est une manière de reprendre son choix. -->
+      <select class="langue" id="langue" aria-label="Langue">
+        <option value="fr">Français</option>
+        <option value="en">English</option>
+        <option value="de">Deutsch</option>
+        <option value="es">Español</option>
+        <option value="it">Italiano</option>
+        <option value="nl">Nederlands</option>
+      </select>
+    </nav>
+  </div>
+
+  <h1 data-t="dl-titre">Installer Messagr.</h1>
+  <p class="lead" data-t="dl-chapo">Le fichier, ce qu'il pèse, et ce qu'il faut faire du
+  lien qu'on vous a envoyé.</p>
+
+  <!-- L'OFFRE ET SON ABSENCE SONT DEUX BLOCS, ET LA CONSTRUCTION N'EN GARDE
+       QU'UN. `deploy.sh` accepte `MESSAGR_APK=none` : le fichier est retiré du
+       serveur, et la page doit cesser de le proposer dans le même geste. Un
+       bouton qui reste avec un poids d'hier est pire qu'une page qui se tait.
+
+       C'est `build-landing.mjs` qui tranche, sur la présence des mesures. -->
+  <div data-si="telechargement">
+    <h2 data-t="dl-android">Android</h2>
+    <a class="porte" href="/messagr.apk" data-t="dl-porte">Télécharger le fichier</a>
+    <p class="faits" data-t="apk-faits">Poids : %TAILLE%, mis en ligne le %DATE%.</p>
+    <p class="faits" data-t="apk-empreinte">Empreinte SHA-256 : %EMPREINTE%</p>
+    <p class="faits" data-t="dl-comparer">Comparez-la après le téléchargement, pour savoir
+    que vous avez bien ce fichier-ci :</p>
+    <p class="faits"><code>shasum -a 256 messagr.apk</code></p>
+    <p data-t="apk-avertissement">Votre téléphone demandera l'autorisation d'installer une
+    application de sources inconnues : c'est normal pour un fichier obtenu hors magasin.</p>
+    <p data-t="dl-play">Messagr n'est pas publié sur Google Play. La distribution passe par
+    ce fichier, et par lui seul.</p>
+  </div>
+
+  <div data-si="pas-de-telechargement">
+    <h2 data-t="dl-android">Android</h2>
+    <p data-t="dl-retire">Aucun fichier n'est proposé en ce moment. Cette page en portera un
+    de nouveau, avec son poids, sa date et son empreinte, le jour où il y en aura un.</p>
+  </div>
+
+  <h2 data-t="dl-apres">Après l'installation, ouvrez votre invitation</h2>
+  <p data-t="dl-apres-corps">Le compte est créé au moment où vous ouvrez le lien, pas avant.
+  L'application seule ne crée rien.</p>
+  <ol class="etapes">
+    <li data-t="dl-etape-1">Rouvrez le lien qu'on vous a envoyé. Messagr s'ouvre, et le
+    compte est créé à cet instant.</li>
+    <!-- LE CAS OÙ ÇA COINCE, ET IL N'EST PAS THÉORIQUE. Une installation hors
+         magasin ne fait vérifier à personne que Messagr peut ouvrir les adresses
+         de messagr.eu : le lien part donc au navigateur. La page d'invitation
+         porte un bouton « Copier le lien » exactement pour ce chemin-là, et
+         c'est ici qu'on l'explique plutôt que de le laisser découvrir. -->
+    <li data-t="dl-etape-2">Si le lien ouvre un navigateur au lieu de l'application, c'est
+    attendu pour une installation hors magasin : votre téléphone n'a pas vérifié que Messagr
+    sait ouvrir ces adresses.</li>
+    <li data-t="dl-etape-3">Sur la page qui s'affiche, touchez « Copier le lien ». Ouvrez
+    Messagr, et collez-le.</li>
+  </ol>
+
+  <h2 data-t="dl-iphone">iPhone</h2>
+  <!-- PAS D'ADVERBE. « Bientôt » ne convertit personne et se redate à chaque
+       visite. Il n'y a pas d'adresse à donner et pas de date à annoncer : reste
+       la troisième forme, être prévenu. Un `mailto:` ne contacte aucun tiers et
+       ne mesure rien, comme la porte de l'accueil. -->
+  <p data-t="dl-iphone-corps">Messagr pour iPhone est en cours. Il n'y a pas encore
+  d'adresse à vous donner.</p>
+  <a class="porte creuse" href="mailto:conformite@messagr.eu?subject=Messagr%20iPhone"
+     data-t="dl-iphone-porte">Me prévenir pour iPhone</a>
+  <p class="faits" data-t="dl-iphone-note">Votre message arrive à une personne, pas à un
+  formulaire.</p>
+
+  <p class="pied"><a href="/" data-t="dl-retour">Revenir à l'accueil</a></p>
+
+  </div>
+</section>
+
+<script>
+// LE MÊME SCRIPT QUE L'ACCUEIL, ET LE MÊME EN ENTIER.
+//
+// Il ne fait que deux gestes, dont un seul sert ici : le sélecteur navigue.
+// Le second -- la racine renvoie vers la langue du lecteur -- se tait de
+// lui-même, puisqu'il sort dès que le chemin n'est pas « / ».
+//
+// Recopié plutôt que partagé : un fichier de script commun serait une requête
+// de plus et un second endroit où la page peut casser. Il est court, et
+// `langues-page-invitation.js` le fait tourner sur les deux pages.
+(function () {
+  var LANGUES = ['fr', 'en', 'de', 'es', 'it', 'nl'];
+  var RACINE = 'fr';
+  var MEMOIRE = 'messagr-langue';
+
+  // LE FRAGMENT SURVIT AU DÉPLACEMENT, comme sur l'accueil : changer de langue
+  // devant une ancre ouverte doit rouvrir la même, pas revenir en haut.
+  function chemin(code) {
+    var base = code === RACINE ? '/telechargement/' : '/' + code + '/telechargement/';
+    return base + (location.hash || '');
+  }
+
+  var choix = document.getElementById('langue');
+  if (choix) {
+    choix.value = document.documentElement.lang || RACINE;
+    choix.addEventListener('change', function () {
+      try { sessionStorage.setItem(MEMOIRE, choix.value); } catch (e) {}
+      location.href = chemin(choix.value);
+    });
+  }
+  if (LANGUES.length === 0) { return; }
+})();
+</script>
+</body>
+</html>
