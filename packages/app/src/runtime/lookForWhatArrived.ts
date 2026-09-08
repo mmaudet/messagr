@@ -66,6 +66,26 @@ export interface Looking {
     scope: string,
     events: readonly unknown[],
   ) => Promise<readonly unknown[]>
+  /**
+   * Hands the sync's to-device half to the crypto machine.
+   *
+   * THE KEY AND THE EVENT IT OPENS ARRIVE IN THE SAME RESPONSE, AND ONLY ONE
+   * OF THEM WAS BEING USED. `receiveDecrypt.ts` records this exact defect on
+   * the probe's own path -- "a Megolm event is unreadable without its room
+   * key, and that key arrives as a to-device message in the very same sync
+   * response as the event it unlocks" -- and the wake had it too. A woken
+   * device read the ciphertext, ignored the key sitting beside it, and
+   * reported `missing_key`.
+   *
+   * Measured on the demonstration Pixel: a call placed from a device the
+   * Pixel had never exchanged keys with produced three
+   * `MESSAGR_CALL_EVENT_DROPPED ... missing_key` and a message notification
+   * where a telephone should have rung.
+   *
+   * It runs before anything is decrypted, and its failure is not fatal: a
+   * device that could not take the keys can still report what it can read.
+   */
+  readonly takeTheKeys: (sync: Record<string, unknown>) => Promise<void>
   readonly names: GivenNames
   readonly selfUserId: string
   /** How far each conversation had been read here before the wake. */
@@ -107,6 +127,17 @@ export async function lookForWhatArrived(
   looking: Looking,
 ): Promise<WhatArrived> {
   const sync = await fetchOnce(looking.http, looking.since)
+
+  // BEFORE ANYTHING IS OPENED. The room key for what just arrived is in this
+  // same response, and a decryption attempted before it is handed over fails
+  // for a reason that has nothing to do with what happened.
+  try {
+    await looking.takeTheKeys(sync)
+  } catch {
+    // Not fatal. A device that could not take the keys still reports what it
+    // can already read, and there is no screen here to tell.
+  }
+
   const changed = readChangedScopes(sync)
   if (changed.length === 0) return { messages: [], ringing: [] }
 

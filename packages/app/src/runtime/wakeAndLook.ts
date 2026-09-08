@@ -19,6 +19,7 @@ import {
   loadConversation,
   startCryptoMachine,
 } from './cryptoPump'
+import { encryptionSlice, receiveSyncChanges } from 'react-native-matrix-crypto'
 import {
   sessionSecrets,
   storeDirectorySecrets,
@@ -97,6 +98,11 @@ export async function lookForWhatArrivedHere(): Promise<WhatWoke | null> {
       // timeline deliberately drops.
       openCalls: (scope, events) =>
         openCallEvents(encryptingDeps(sessionClient), scope, events),
+      // The room key for what just arrived is in this same response. The
+      // running application's loop does this on every poll; a wake did not,
+      // and reported `missing_key` for events whose key was sitting beside
+      // them.
+      takeTheKeys: sync => receiveSyncChanges(encryptionSlice(sync)),
       names: notebook.names,
       selfUserId: session.userId,
       lastRead: await notebook.lastRead.all(),
