@@ -237,6 +237,9 @@ export const de: Readonly<Record<CopyKey, string>> = {
   settings_action: 'Einstellungen',
   settings_title: 'Einstellungen',
   settings_legal: 'Rechtliche Hinweise',
+  settings_disturb: 'Bei „Bitte nicht stören“ klingeln',
+  settings_disturb_hint:
+    'Android schaltet eingehende Anrufe stumm, solange Messagr keinen Zugriff auf „Bitte nicht stören“ hat. Liste öffnen, Messagr suchen, Zugriff einschalten.',
   settings_nothing_else:
     'Mehr gibt es hier vorerst nicht. Einstellungen, die diese Version noch nicht trägt, fehlen ganz, statt vorhanden und wirkungslos zu sein.',
   legal_title: 'Rechtliche Hinweise',

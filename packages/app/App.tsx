@@ -2216,6 +2216,19 @@ export function App({
                       Linking.openSettings().catch(() => {})
                     })
                   }}
+                  // THE SAME KIND OF DOOR, FOR THE MODE THAT SILENCED THE
+                  // RINGING. `ACTION_NOTIFICATION_POLICY_ACCESS_SETTINGS`
+                  // is a list of every application, with no extra to
+                  // preselect one -- unlike the full-screen screen above,
+                  // which takes a package. So this lands on the list and
+                  // the hint beside the row says what to look for.
+                  onRingWhileQuiet={() => {
+                    Linking.sendIntent(
+                      'android.settings.NOTIFICATION_POLICY_ACCESS_SETTINGS',
+                    ).catch(() => {
+                      Linking.openSettings().catch(() => {})
+                    })
+                  }}
                   receipts={receipts}
                   receiptsNotKept={receiptsNotKept}
                   language={language}

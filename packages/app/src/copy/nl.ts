@@ -230,6 +230,9 @@ export const nl: Readonly<Record<CopyKey, string>> = {
   settings_action: 'Instellingen',
   settings_title: 'Instellingen',
   settings_legal: 'Juridische informatie',
+  settings_disturb: 'Bellen tijdens „Niet storen”',
+  settings_disturb_hint:
+    'Android dempt inkomende oproepen zolang Messagr geen toegang tot „Niet storen” heeft. Open de lijst, zoek Messagr, zet de toegang aan.',
   settings_nothing_else:
     'Voorlopig staat hier niets anders. Instellingen die deze versie nog niet draagt zijn afwezig in plaats van aanwezig en werkloos.',
   legal_title: 'Juridische informatie',

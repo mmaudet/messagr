@@ -27,6 +27,28 @@
     <uses-permission android:name="android.permission.USE_FULL_SCREEN_INTENT" />
 
     <!--
+         POUR QUE LA SONNERIE TRAVERSE « NE PAS DÉRANGER ».
+
+         Mesuré sur le Pixel de démonstration le 8 septembre 2026, pendant le
+         premier appel réel entre deux personnes : les notifications étaient
+         bien émises et bien affichées, et le système les interceptait --
+         `intercepted: 0|eu.messagr|...|new:!priority`, six fois en soixante-
+         seize secondes, le composeur téléphonique de Google subissant le
+         même sort (`!allowCalls`) sur le même appareil.
+
+         Le commentaire de `showNotification.ts` disait que la catégorie
+         « appel » suffisait à faire jouer l'exception « autoriser les
+         appels » du mode. C'est faux : cette exception ne concerne que la
+         téléphonie, filtrée par contact (`matches_call_filter`). Pour une
+         notification, seul un canal marqué `bypassDnd` passe -- et le
+         système n'accepte ce marquage que d'une application à qui la
+         personne a accordé l'accès « Ne pas déranger ». D'où cette
+         permission, et la ligne des Réglages qui mène à l'écran système.
+
+         Elle ne donne rien toute seule : c'est la porte, pas la clé. -->
+    <uses-permission android:name="android.permission.ACCESS_NOTIFICATION_POLICY" />
+
+    <!--
       React Native's own debug-build manifest fragment
       (ReactAndroid/src/debug/AndroidManifest.xml) declares this for its
       DevTools local-network discovery, unrelated to anything the app or

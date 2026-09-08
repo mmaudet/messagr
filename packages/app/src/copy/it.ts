@@ -229,6 +229,9 @@ export const it: Readonly<Record<CopyKey, string>> = {
   settings_action: 'Impostazioni',
   settings_title: 'Impostazioni',
   settings_legal: 'Informazioni legali',
+  settings_disturb: 'Squillare in «Non disturbare»',
+  settings_disturb_hint:
+    'Android silenzia le chiamate in arrivo finché Messagr non ha l’accesso a «Non disturbare». Aprire l’elenco, trovare Messagr, attivare l’accesso.',
   settings_nothing_else:
     'Qui non c’è altro per ora. Le impostazioni che questa versione non porta ancora sono assenti invece che presenti e inerti.',
   legal_title: 'Informazioni legali',

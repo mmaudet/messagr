@@ -234,6 +234,9 @@ export const en: Readonly<Record<CopyKey, string>> = {
   settings_action: 'Settings',
   settings_title: 'Settings',
   settings_legal: 'Legal information',
+  settings_disturb: 'Ring during Do Not Disturb',
+  settings_disturb_hint:
+    'Android silences incoming calls until Messagr has Do Not Disturb access. Open the list, find Messagr, turn the access on.',
   settings_nothing_else:
     'There is nothing else here for now. Settings this version does not carry yet are absent rather than present and inert.',
   legal_title: 'Legal information',

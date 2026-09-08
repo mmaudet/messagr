@@ -231,6 +231,9 @@ export const es: Readonly<Record<CopyKey, string>> = {
   settings_action: 'Ajustes',
   settings_title: 'Ajustes',
   settings_legal: 'Información legal',
+  settings_disturb: 'Sonar en modo «No molestar»',
+  settings_disturb_hint:
+    'Android silencia las llamadas entrantes mientras Messagr no tenga acceso a «No molestar». Abra la lista, busque Messagr y active el acceso.',
   settings_nothing_else:
     'Aquí no hay nada más por ahora. Los ajustes que esta versión todavía no lleva están ausentes en lugar de presentes e inertes.',
   legal_title: 'Información legal',

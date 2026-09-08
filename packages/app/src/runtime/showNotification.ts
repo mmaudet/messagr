@@ -39,7 +39,21 @@ const CHANNEL = 'messages'
  * want to miss calls. Two channels are two switches, which is the only way
  * that distinction can be made on Android at all.
  */
-const RINGING_CHANNEL = 'calls'
+/**
+ * The ringing channel, and why it is not called `calls` any more.
+ *
+ * A channel's settings are fixed at creation: Android accepts a new name and
+ * a new description afterwards and nothing else, and recreating an id it has
+ * seen before restores what it had. `calls` was created without `bypassDnd`
+ * on every device that has run this application, so it can never acquire it
+ * -- the only way to a channel that rings through Do Not Disturb is a channel
+ * the system has not met.
+ *
+ * `LEGACY_RINGING_CHANNEL` is removed when this one is made, so nobody is
+ * left with two entries called « Appels » in the system's list.
+ */
+const RINGING_CHANNEL = 'ringing'
+const LEGACY_RINGING_CHANNEL = 'calls'
 
 /** What a press on a ringing notification asked for. */
 export const ANSWER = 'answer'
@@ -225,14 +239,53 @@ export async function drawNotification(
  * goes -- answered, declined, or expired -- and until then swiping it away
  * would leave somebody waiting on a telephone that stopped saying so.
  */
-export async function ringNotification(
-  notification: Notification,
-): Promise<void> {
-  const channelId = await notifee.createChannel({
+/**
+ * The channel a ringing telephone posts on, made to bypass Do Not Disturb.
+ *
+ * # THE FLAG ONLY TAKES IF THE PERSON HAS SAID SO
+ *
+ * `bypassDnd` is not a thing an application grants itself: Android accepts
+ * it only from an application holding notification-policy access, which is a
+ * switch in the system settings. Without it the channel is created exactly
+ * as before -- and this asks again on the next call, because the switch may
+ * have been thrown in between. `Settings.tsx` carries the row that leads to
+ * that screen.
+ *
+ * # AND A CHANNEL THAT DID NOT GET IT IS THROWN AWAY, ONCE PER LAUNCH
+ *
+ * Channel settings are fixed at creation, so a channel made before the
+ * access was granted keeps ringing into silence for ever. Deleting and
+ * remaking it is the only way to pick up the change. At most once per
+ * launch: any more would reset, on every call, whatever the person had
+ * chosen for that channel themselves.
+ */
+let remadeThisLaunch = false
+
+async function ringingChannel(): Promise<string> {
+  // The old one, whose id can never bypass anything. Removing it is cheap and
+  // idempotent, and it stops the system's list showing two « Appels ».
+  await notifee.deleteChannel(LEGACY_RINGING_CHANNEL).catch(() => {})
+
+  if (!remadeThisLaunch) {
+    remadeThisLaunch = true
+    const held = await notifee.getChannel(RINGING_CHANNEL).catch(() => null)
+    if (held !== null && held.bypassDnd !== true) {
+      await notifee.deleteChannel(RINGING_CHANNEL).catch(() => {})
+    }
+  }
+
+  return notifee.createChannel({
     id: RINGING_CHANNEL,
     name: t('notify_ringing_channel'),
     importance: AndroidImportance.HIGH,
+    bypassDnd: true,
   })
+}
+
+export async function ringNotification(
+  notification: Notification,
+): Promise<void> {
+  const channelId = await ringingChannel()
 
   await notifee.displayNotification({
     id: notification.id,
@@ -241,9 +294,17 @@ export async function ringNotification(
     android: {
       channelId,
       // What tells Android this is a telephone call rather than a message:
-      // it is what puts the notification above the others, keeps it out of
-      // the summarised group, and lets Do Not Disturb's "allow calls"
-      // exception apply to it.
+      // it is what puts the notification above the others and keeps it out
+      // of the summarised group.
+      //
+      // IT DOES NOT GET PAST DO NOT DISTURB, and this comment used to say it
+      // did -- that the category made the mode's "allow calls" exception
+      // apply. Measured false on the demonstration Pixel during the first
+      // real call between two people: `intercepted: 0|eu.messagr|…|
+      // new:!priority`, six times in seventy-six seconds. That exception is
+      // telephony's, filtered by contact; a notification gets through only
+      // on a channel marked `bypassDnd`, which is what `ringingChannel`
+      // asks for.
       category: AndroidCategory.CALL,
       importance: AndroidImportance.HIGH,
       ongoing: true,

@@ -50,6 +50,7 @@ export function Settings({
   onWake,
   wakeNotKept,
   onRingFullScreen,
+  onRingWhileQuiet,
 }: {
   readonly onBack: () => void
   readonly onLegal: () => void
@@ -59,6 +60,8 @@ export function Settings({
   readonly receiptsNotKept: boolean
   /** Opens Android's own screen for the full-screen intent. Android only. */
   readonly onRingFullScreen: () => void
+  /** Opens the system's Do Not Disturb access screen. */
+  readonly onRingWhileQuiet: () => void
   /** Which language is spoken, and changing it. Same control as #103's. */
   readonly language: Language
   readonly onLanguage: (language: Language) => void
@@ -183,6 +186,36 @@ export function Settings({
             <Text style={styles.rowAction}>{t('settings_open')}</Text>
           </Pressable>
           <Text style={styles.hint}>{t('settings_full_screen_hint')}</Text>
+        </View>
+      )}
+
+      {/* AND THE OTHER HALF OF THE SAME PROBLEM.
+          A telephone that rings only when nothing is set to silence it is
+          not a telephone. Measured on the demonstration Pixel during the
+          first real call between two people: every notification the
+          application posted was intercepted by Do Not Disturb, and so was
+          Google's own dialer's. The category "call" does not get past that
+          mode -- only a channel the person has allowed does, and allowing
+          one is a switch on a system screen.
+
+          An offer rather than a warning, exactly like the row above: nothing
+          here can see whether the access was granted, so a row that appeared
+          only when it was missing would be a row guessing.
+
+          Android only. iOS has its own answer -- an interruption level on
+          the notification -- and no screen to send anybody to. */}
+      {Platform.OS === 'android' && (
+        <View style={styles.setting} testID="setting-disturb">
+          <Pressable
+            testID="open-disturb-settings"
+            onPress={onRingWhileQuiet}
+            accessibilityRole="button"
+            accessibilityLabel={t('settings_disturb')}
+            style={styles.row}>
+            <Text style={styles.rowLabel}>{t('settings_disturb')}</Text>
+            <Text style={styles.rowAction}>{t('settings_open')}</Text>
+          </Pressable>
+          <Text style={styles.hint}>{t('settings_disturb_hint')}</Text>
         </View>
       )}
 

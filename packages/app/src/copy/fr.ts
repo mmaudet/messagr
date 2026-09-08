@@ -337,6 +337,9 @@ export const fr = {
   settings_action: 'Réglages',
   settings_title: 'Réglages',
   settings_legal: 'Informations légales',
+  settings_disturb: 'Sonner en mode « Ne pas déranger »',
+  settings_disturb_hint:
+    'Android fait taire les appels entrants tant que Messagr n’a pas l’accès « Ne pas déranger ». Ouvrez la liste, trouvez Messagr, activez l’accès.',
   settings_nothing_else:
     'Il n’y a rien d’autre ici pour l’instant. Les réglages que cette version ne porte pas encore sont absents plutôt que présents et inertes.',
 
