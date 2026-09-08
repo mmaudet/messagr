@@ -17,11 +17,23 @@
 # The export re-signs and `production` returns -- which is a claim, and claims
 # about push environments are checked here, not assumed.
 #
+#   ./scripts/build.sh ios          # raises the build number, then this
+#   ./scripts/publish-ios.sh        # this alone, at whatever number is set
+#
+# The two identifiers are read from ~/.appstoreconnect/env when it exists,
+# and can still be given in the environment:
+#
 #   ASC_KEY_ID=...  ASC_ISSUER_ID=...  ./scripts/publish-ios.sh
 #
-# The .p8 lives in ~/.appstoreconnect/private_keys/ at chmod 600. Never in
-# this repository: `.gitignore` refuses *.p8, and the repository is public.
+# That file and the .p8 beside it live in ~/.appstoreconnect/ at chmod 600.
+# Never in this repository: `.gitignore` refuses *.p8, and the repository is
+# public.
 set -euo pipefail
+
+if [ -f "$HOME/.appstoreconnect/env" ]; then
+  # shellcheck disable=SC1091
+  . "$HOME/.appstoreconnect/env"
+fi
 
 ROOT="$(cd "$(dirname "$0")" && pwd)/.."
 IOS="$ROOT/packages/app/ios"
@@ -32,6 +44,9 @@ WORK="${ASC_WORK_DIR:-$(mktemp -d)}"
 
 if [ -z "$KEY_ID" ] || [ -z "$ISSUER_ID" ]; then
   echo "ASC_KEY_ID and ASC_ISSUER_ID must be set." >&2
+  echo "Put them in ~/.appstoreconnect/env (chmod 600), two lines:" >&2
+  echo "  ASC_KEY_ID=..." >&2
+  echo "  ASC_ISSUER_ID=..." >&2
   echo "Both are on App Store Connect -> Users and Access -> Integrations -> Keys;" >&2
   echo "the Issuer ID is above the table, the Key ID is in the .p8 filename." >&2
   exit 2

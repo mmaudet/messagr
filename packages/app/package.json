@@ -10,7 +10,8 @@
     "test": "vitest run",
     "e2e:ios": "detox test --configuration ios.sim.release",
     "e2e:android": "detox test --configuration android.emu.debug",
-    "pixel": "../../scripts/pixel.sh"
+    "pixel": "../../scripts/pixel.sh",
+    "build": "../../scripts/build.sh"
   },
   "dependencies": {
     "@bam.tech/react-native-image-resizer": "3.0.11",

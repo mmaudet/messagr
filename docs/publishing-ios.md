@@ -72,9 +72,29 @@ main une fois, le 7 septembre 2026, et ce qu'elles ont appris est dans
 `scripts/publish-ios.sh` plutôt que dans un enchaînement de clics.
 
 ```
-export ASC_KEY_ID=BV84NRG5SB
-export ASC_ISSUER_ID=<l'Issuer ID, sur la page Clés d'App Store Connect>
-./scripts/publish-ios.sh
+./scripts/build.sh          # le Pixel puis TestFlight
+./scripts/build.sh ios      # TestFlight seulement
+```
+
+`build.sh` **incrémente le numéro de build** avant d'archiver, dans les deux
+configurations à la fois. C'est le geste qu'on oublie, et App Store Connect
+ne le dit qu'au téléversement — vingt minutes après l'archive, pour une
+information qu'un `sed` connaît. Le numéro reste dans l'arbre de travail :
+c'est à vous de le commiter avec ce que la build transporte.
+
+Les deux identifiants se lisent dans `~/.appstoreconnect/env`, deux lignes,
+`chmod 600`, hors du dépôt puisqu'il est public :
+
+```
+ASC_KEY_ID=<le Key ID, il est dans le nom du fichier .p8>
+ASC_ISSUER_ID=<l'Issuer ID, au-dessus du tableau des clés>
+```
+
+Ils peuvent toujours être passés dans l'environnement, ce que fait la CI si
+elle en fait un jour :
+
+```
+ASC_KEY_ID=... ASC_ISSUER_ID=... ./scripts/publish-ios.sh
 ```
 
 La clé `.p8` se télécharge **une seule fois** depuis App Store Connect →
