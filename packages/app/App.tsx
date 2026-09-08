@@ -102,6 +102,10 @@ import { admitAnyoneWaiting } from './src/runtime/admitAnyoneWaiting'
 import { displayNameFor } from './src/runtime/givenName'
 import { openNotebook } from './src/runtime/notebook'
 import {
+  forgetfulListCache,
+  type ListCache,
+} from './src/runtime/listCacheStore'
+import {
   readChosenLanguage,
   rememberLanguage,
 } from './src/runtime/chosenLanguage'
@@ -301,6 +305,9 @@ export function App({
    * re-render per poll.
    */
   const outstandingRef = useRef<Outstanding>(forgetfulOutstanding())
+  // The list as it was last drawn. Read once at the top of the launch and
+  // written by every derivation after it. `listCacheStore.ts` says why.
+  const listCacheRef = useRef<ListCache>(forgetfulListCache())
   // Which conversation is open, held in a ref as well as in state: the live
   // sync loop's callbacks are created once and would otherwise keep deriving
   // whichever conversation was open when the loop started.
@@ -661,6 +668,41 @@ export function App({
         return
       }
 
+      // THE NOTEBOOK FIRST, AND THE LIST OFF IT BEFORE ANY ROUND TRIP.
+      //
+      // This used to open two thirds of the way down the launch, after the
+      // crypto machine, the initial sync, two key queries, an upload and two
+      // `/joined_rooms` -- and the conversation list was derived after that
+      // again, one round trip and one decryption per conversation. Measured
+      // on the demonstration Pixel: seven seconds of empty screen, reported
+      // as « l'écran de conversations s'affiche au bout de plusieurs
+      // secondes ».
+      //
+      // None of that work is needed to draw what was drawn last time.
+      // `listCacheStore.ts` is the fifth page of the notebook and argues why
+      // keeping it is what ADR-0006 said to do when somebody finally asked.
+      // Everything here is superseded by the derivation a few seconds later;
+      // nothing waits on it, and a notebook that will not open leaves the
+      // screen exactly as empty as it was before.
+      const opening = await openNotebook(storeDir)
+      namesRef.current = opening.names
+      lastReadRef.current = opening.lastRead
+      outstandingRef.current = opening.outstanding
+      listCacheRef.current = opening.list
+      logEvent(opening.opened ? 'info' : 'warn', 'MESSAGR_GIVEN_NAMES', {
+        opened: opening.opened,
+        ...(opening.minted === undefined ? {} : { minted: opening.minted }),
+        ...(opening.reason === undefined ? {} : { reason: opening.reason }),
+      })
+      // The names before the rows, so the list draws people rather than
+      // identifiers on its first frame as well as its second.
+      setNames(await opening.names.all())
+      const lastDrawn = await opening.list.all()
+      if (lastDrawn.length > 0) {
+        setSummaries(lastDrawn)
+        logEvent('info', 'MESSAGR_LIST_REMEMBERED', { rows: lastDrawn.length })
+      }
+
       // No provisioned account: report it rather than attempt a sync that has
       // nothing to restore. This keeps the screen runnable for a developer
       // who has not run scripts/provision-bench-accounts.sh.
@@ -862,20 +904,8 @@ export function App({
               },
             )
 
-            const opening = await openNotebook(storeDir)
-            namesRef.current = opening.names
-            lastReadRef.current = opening.lastRead
-            outstandingRef.current = opening.outstanding
-            logEvent(opening.opened ? 'info' : 'warn', 'MESSAGR_GIVEN_NAMES', {
-              opened: opening.opened,
-              ...(opening.minted === undefined
-                ? {}
-                : { minted: opening.minted }),
-              ...(opening.reason === undefined
-                ? {}
-                : { reason: opening.reason }),
-            })
-            setNames(await opening.names.all())
+            // The notebook was opened at the very top of this launch, before
+            // anything asked the network a question. See there for why.
 
             // READING IS WHAT CLEARS A BADGE.
             //
@@ -1353,15 +1383,20 @@ export function App({
             // itself: see conversationList.ts for why it is not built out of
             // the sync loop's own response.
             const refreshList = async () => {
-              setSummaries(
-                await listConversations(
-                  sessionClient,
-                  credentials.userId,
-                  // Read fresh rather than held: `markRead` has just written
-                  // to it, and a held map would redraw the badge it cleared.
-                  await lastReadRef.current.all(),
-                ),
+              const derived = await listConversations(
+                sessionClient,
+                credentials.userId,
+                // Read fresh rather than held: `markRead` has just written
+                // to it, and a held map would redraw the badge it cleared.
+                await lastReadRef.current.all(),
               )
+              setSummaries(derived)
+              // AND KEPT, so the next launch draws this instantly. Not
+              // awaited by the screen: the list is already on it, and a
+              // notebook write is not something a person should wait behind.
+              // The page swallows its own failures, so there is nothing here
+              // that could reject.
+              listCacheRef.current.keep(derived).catch(() => {})
             }
             await refreshList().catch((cause: unknown) =>
               logEvent('warn', 'MESSAGR_LIST_FAILED', {

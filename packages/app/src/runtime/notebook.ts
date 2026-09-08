@@ -16,6 +16,11 @@ import {
   type Outstanding,
 } from './outstandingStore'
 import { forgetfulCallLog, openCallLog, type CallLog } from './callLogStore'
+import {
+  forgetfulListCache,
+  openListCache,
+  type ListCache,
+} from './listCacheStore'
 import { openStorePassphrase } from './storePassphrase'
 
 /** What became of the notebook on this launch. Reported, not assumed. */
@@ -25,8 +30,10 @@ export interface NotebookOpening {
   readonly lastRead: LastRead
   /** Invitations issued here that nobody has been let in through yet. */
   readonly outstanding: Outstanding
-  /** Every call, which is the most revealing page of the four. */
+  /** Every call, which is the most revealing page of the five. */
   readonly calls: CallLog
+  /** The conversation list as it was last drawn, so the next launch is instant. */
+  readonly list: ListCache
   readonly opened: boolean
   /** Why it did not open, when it did not. */
   readonly reason?: string
@@ -37,7 +44,7 @@ export interface NotebookOpening {
 /**
  * Opens the application's own encrypted notebook. ADR-0010.
  *
- * # Four pages, one file
+ * # Five pages, one file
  *
  * Who you call what (`given_names`), how far you have read (`last_read`),
  * and who you have invited and not yet let in
@@ -45,6 +52,10 @@ export interface NotebookOpening {
  * your relationships that is as revealing as the messages themselves -- so
  * they share one encrypted file and one passphrase rather than multiplying
  * either.
+ *
+ * The fifth is the conversation list itself, kept so a launch can draw it
+ * before it asks anybody anything -- ADR-0006's own "when to revisit",
+ * answered the way that ADR said it would be. `listCacheStore.ts` argues it.
  *
  * The third arrived with #118: admission used to be a poll that ran for one
  * minute after a link was issued and then stopped, which made an invitation
@@ -83,6 +94,7 @@ export async function openNotebook(storeDir: string): Promise<NotebookOpening> {
       lastRead: forgetfulLastRead(),
       outstanding: forgetfulOutstanding(),
       calls: forgetfulCallLog(),
+      list: forgetfulListCache(),
       opened: false,
       reason: 'no writable directory was supplied at launch',
     }
@@ -97,6 +109,7 @@ export async function openNotebook(storeDir: string): Promise<NotebookOpening> {
       lastRead: forgetfulLastRead(),
       outstanding: forgetfulOutstanding(),
       calls: forgetfulCallLog(),
+      list: forgetfulListCache(),
       opened: false,
       reason: passphrase.reason,
     }
@@ -120,6 +133,7 @@ export async function openNotebook(storeDir: string): Promise<NotebookOpening> {
       lastRead: await openLastRead(page),
       outstanding: await openOutstanding(page),
       calls: await openCallLog(page),
+      list: await openListCache(page),
       opened: true,
       minted: passphrase.minted,
     }
@@ -132,6 +146,7 @@ export async function openNotebook(storeDir: string): Promise<NotebookOpening> {
       lastRead: forgetfulLastRead(),
       outstanding: forgetfulOutstanding(),
       calls: forgetfulCallLog(),
+      list: forgetfulListCache(),
       opened: false,
       reason: getErrorMessage(cause),
       minted: passphrase.minted,
