@@ -63,6 +63,13 @@ var path = require('path')
 var { execFileSync } = require('child_process')
 
 var racine = path.join(__dirname, '..')
+
+// LE VOCABULAIRE VIT DANS UN FICHIER, PAS ICI. `tests/fiche-magasin.js` s'en
+// sert aussi : une seconde copie finirait par diverger de la première, et
+// c'est la faute exacte que ces deux contrôles existent pour empêcher.
+var VOCABULAIRE = JSON.parse(
+  fs.readFileSync(path.join(racine, 'landing', 'mots-des-capacites.json'), 'utf8')
+)
 var status = 0
 
 function echouer(message) {
@@ -315,78 +322,14 @@ if (tableau) {
 // et « rappelle ». Les formes fléchies sont listées à la main plutôt que
 // devinées : une racine trop courte fait un contrôle qui crie au loup, et un
 // contrôle qui crie au loup finit désarmé.
-var MOTS = {
-  appels: {
-    fr: ['appels', 'appel audio', 'appeler'],
-    en: ['audio call', 'audio calls', 'phone call'],
-    de: ['Audioanruf', 'Audioanrufe', 'anrufen'],
-    es: ['llamada de audio', 'llamadas de audio'],
-    it: ['chiamata audio', 'chiamate audio'],
-    nl: ['audiogesprek', 'audiogesprekken'],
-  },
-  video: {
-    fr: ['appel vidéo', 'appels vidéo', 'visioconférence'],
-    en: ['video call', 'video calls'],
-    de: ['Videoanruf', 'Videoanrufe'],
-    es: ['videollamada', 'videollamadas'],
-    it: ['videochiamata', 'videochiamate'],
-    nl: ['videogesprek', 'videogesprekken'],
-  },
-  vocaux: {
-    fr: ['message vocal', 'messages vocaux'],
-    en: ['voice message', 'voice messages'],
-    de: ['Sprachnachricht', 'Sprachnachrichten'],
-    es: ['mensaje de voz', 'mensajes de voz'],
-    it: ['messaggio vocale', 'messaggi vocali'],
-    nl: ['spraakbericht', 'spraakberichten'],
-  },
-  salons: {
-    fr: ['salons', 'groupes', 'conversation de groupe'],
-    en: ['group chat', 'group chats', 'channels'],
-    de: ['Gruppenchat', 'Kanäle'],
-    es: ['grupos', 'canales'],
-    it: ['gruppi', 'canali'],
-    nl: ['groepsgesprek', 'kanalen'],
-  },
-  communautes: {
-    fr: ['communautés'],
-    en: ['communities'],
-    de: ['Gemeinschaften'],
-    es: ['comunidades'],
-    it: ['comunità'],
-    nl: ['gemeenschappen'],
-  },
-  agents: {
-    fr: ['agents'],
-    en: ['agents'],
-    de: ['Agenten'],
-    es: ['agentes'],
-    it: ['agenti'],
-    nl: ['agenten'],
-  },
-  bureau: {
-    fr: ['application de bureau', 'ordinateur de bureau'],
-    en: ['desktop application', 'desktop app'],
-    de: ['Desktop-Anwendung'],
-    es: ['aplicación de escritorio'],
-    it: ['applicazione desktop'],
-    nl: ['bureaubladtoepassing'],
-  },
-}
+var MOTS = VOCABULAIRE.aVenir
 
 // LA CAPACITÉ QUI A COÛTÉ LE PLUS CHER N'EST DANS AUCUN TABLEAU. « Vos
 // messages exportables à tout moment » a vécu ici parce qu'aucune règle ne
 // regardait ce que la page promettait. L'export n'est ni livré, ni en cours,
 // ni ouvert comme ticket : il n'a donc pas de ligne, et le mot est interdit
 // partout. Le jour où il est fait, on lui donne une ligne et on retire ceci.
-var JAMAIS = {
-  fr: ['exportable', 'exportables', 'exporter vos messages'],
-  en: ['exportable', 'export your messages'],
-  de: ['exportierbar'],
-  es: ['exportable', 'exportables'],
-  it: ['esportabile', 'esportabili'],
-  nl: ['exporteerbaar'],
-}
+var JAMAIS = VOCABULAIRE.jamais
 
 function echapper(mot) {
   return mot.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
