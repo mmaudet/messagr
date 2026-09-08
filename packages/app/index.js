@@ -40,10 +40,14 @@ const {
 } = require('@react-native-firebase/messaging')
 const { wake } = require('./src/runtime/wake')
 const { lookForWhatArrivedHere } = require('./src/runtime/wakeAndLook')
-const { readNotification } = require('./src/runtime/notifying')
+const {
+  readNotification,
+  ringingNotification,
+} = require('./src/runtime/notifying')
 const {
   drawNotification,
   rememberBackgroundPresses,
+  ringNotification,
 } = require('./src/runtime/showNotification')
 const { logEvent } = require('./src/runtime/log')
 const { wakeIsAllowed } = require('./src/runtime/wakeSetting')
@@ -102,6 +106,11 @@ function registerTheWake() {
       draw: drawNotification,
       describe: arrival =>
         readNotification(arrival.scope, arrival.shown, arrival.preview),
+      // A ringing telephone, which is a different notification on a
+      // different channel with two answers on it. `wake.ts` draws this
+      // instead of the messages when a poll carried both.
+      ring: calling =>
+        ringNotification(ringingNotification(calling.scope, calling.shown)),
     })
     // The one line anybody debugging a push has. There is no screen here.
     logEvent('info', 'MESSAGR_WOKE', outcome)

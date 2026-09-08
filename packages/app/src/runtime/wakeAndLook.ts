@@ -11,7 +11,13 @@
 // it makes one here, where the boundary allows it.
 import { createClient } from 'matrix-js-sdk'
 
-import { loadConversation, startCryptoMachine } from './cryptoPump'
+import { openCallEvents } from '../calls/inbox'
+
+import {
+  encryptingDeps,
+  loadConversation,
+  startCryptoMachine,
+} from './cryptoPump'
 import {
   sessionSecrets,
   storeDirectorySecrets,
@@ -25,7 +31,7 @@ import { makePumpHttp } from './pump'
 import { loadSession } from './sessionStore'
 import { readStoreDirectory } from './storeDirectory'
 import { readSyncCursor } from './syncCursor'
-import type { Arrival } from './wake'
+import type { WhatWoke } from './wake'
 
 /**
  * What a woken device finds, or `null` when it cannot look.
@@ -48,9 +54,7 @@ import type { Arrival } from './wake'
  * There is no screen here. `MESSAGR_WAKE_BLIND` with the reason is the only
  * account anybody debugging a silent phone will ever get.
  */
-export async function lookForWhatArrivedHere(): Promise<
-  readonly Arrival[] | null
-> {
+export async function lookForWhatArrivedHere(): Promise<WhatWoke | null> {
   const blind = (reason: string) => {
     logEvent('info', 'MESSAGR_WAKE_BLIND', { reason })
     return null
@@ -83,6 +87,13 @@ export async function lookForWhatArrivedHere(): Promise<
       since: await readSyncCursor(syncCursorSecrets),
       readConversation: async scope =>
         (await loadConversation(sessionClient, scope, session.userId)).entries,
+      // The same reader the running application uses, bound to the machine
+      // this wake just started. `buildTimeline` draws no bubble for
+      // `m.call.*`, so the conversation above cannot answer this question --
+      // the raw events have to be opened again, for the one event type the
+      // timeline deliberately drops.
+      openCalls: (scope, events) =>
+        openCallEvents(encryptingDeps(sessionClient), scope, events),
       names: notebook.names,
       selfUserId: session.userId,
       lastRead: await notebook.lastRead.all(),

@@ -31,6 +31,9 @@ function looking(over: Partial<Looking> = {}): Looking {
     readConversation: async () => [
       { claimedSender: HER, sentAt: 200, body: 'see you at eight' },
     ],
+    // No calls unless a test says so: every assertion in this file below
+    // the ringing block is about messages.
+    openCalls: async () => [],
     names: { all: async () => new Map(), set: async () => true },
     selfUserId: ME,
     lastRead: new Map(),
@@ -40,7 +43,7 @@ function looking(over: Partial<Looking> = {}): Looking {
 
 describe('lookForWhatArrived', () => {
   it('says who and what', async () => {
-    const found = await lookForWhatArrived(
+    const { messages: found } = await lookForWhatArrived(
       looking({
         names: {
           all: async () => new Map([[HER, 'Maria']]),
@@ -57,18 +60,20 @@ describe('lookForWhatArrived', () => {
     // Shortened to the localpart, which is exactly what a list row shows for
     // somebody unnamed. A notification that spelled out the homeserver where
     // the list does not would read as a different person.
-    const found = await lookForWhatArrived(looking())
+    const { messages: found } = await lookForWhatArrived(looking())
     expect(found[0]?.shown).toBe('@maria')
   })
 
   it('finds nothing when nothing changed', async () => {
-    expect(await lookForWhatArrived(looking({ http: syncing([]) }))).toEqual([])
+    expect(
+      (await lookForWhatArrived(looking({ http: syncing([]) }))).messages,
+    ).toEqual([])
   })
 
   it('does not announce this account’s own message', async () => {
     // Sent from another device of the same account. A notification for
     // something you just wrote says the notifications mean nothing.
-    const found = await lookForWhatArrived(
+    const { messages: found } = await lookForWhatArrived(
       looking({
         readConversation: async () => [
           { claimedSender: ME, sentAt: 300, body: 'sent from my laptop' },
@@ -79,7 +84,7 @@ describe('lookForWhatArrived', () => {
   })
 
   it('does not announce what was already read here', async () => {
-    const found = await lookForWhatArrived(
+    const { messages: found } = await lookForWhatArrived(
       looking({ lastRead: new Map([['!a:x', 200]]) }),
     )
     expect(found).toEqual([])
@@ -88,7 +93,7 @@ describe('lookForWhatArrived', () => {
   it('announces one per conversation, the newest', async () => {
     // Not one per message: a phone that buzzes eleven times for a
     // conversation somebody is in the middle of.
-    const found = await lookForWhatArrived(
+    const { messages: found } = await lookForWhatArrived(
       looking({
         readConversation: async () => [
           { claimedSender: HER, sentAt: 100, body: 'first' },
@@ -104,7 +109,7 @@ describe('lookForWhatArrived', () => {
   it('announces a message it cannot read, with nothing quoted', async () => {
     // Still a message that arrived. The conversation itself does the same
     // with the same event.
-    const found = await lookForWhatArrived(
+    const { messages: found } = await lookForWhatArrived(
       looking({
         readConversation: async () => [
           { claimedSender: HER, sentAt: 300, body: null },
@@ -131,7 +136,7 @@ describe('lookForWhatArrived', () => {
         if (scope === '!bad:x') throw new Error('no key for this one')
         return [{ claimedSender: HER, sentAt: 300, body: 'readable' }]
       })
-    const found = await lookForWhatArrived(
+    const { messages: found } = await lookForWhatArrived(
       looking({
         http: syncing(['!bad:x', '!good:x']),
         readConversation,
@@ -142,7 +147,7 @@ describe('lookForWhatArrived', () => {
 
   it('asks for no long poll, because a wake has seconds', async () => {
     let asked = ''
-    const found = await lookForWhatArrived(
+    const { messages: found } = await lookForWhatArrived(
       looking({
         http: {
           authedRequest: async (_m: string, path: string) => {

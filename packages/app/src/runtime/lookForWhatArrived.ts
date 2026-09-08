@@ -1,6 +1,6 @@
 import { displayNameFor, type GivenNames } from './givenName'
 import type { HttpRequester } from './pump'
-import { readChangedScopes } from './syncResponse'
+import { readChangedScopes, readTimelineEvents } from './syncResponse'
 import type { Arrival } from './wake'
 
 /**
@@ -21,6 +21,20 @@ import type { Arrival } from './wake'
  * missing from the conversation with nothing to say why. So this reads and
  * puts the cursor back untouched: seeing something twice costs a redraw,
  * losing it costs a message.
+ *
+ * # A CALL IS NOT A MESSAGE, AND IT IS FOUND IN THE SAME SYNC
+ *
+ * A ringing telephone and a message that arrived are the same push and the
+ * same poll, and they are not the same notification: one is a line on a lock
+ * screen and the other takes the screen. So this returns both out of one
+ * sync rather than syncing twice -- on a wake, the second round trip is
+ * ninety seconds of somebody's invitation spent on a request that asks what
+ * the first one already answered.
+ *
+ * They are also found differently. A message comes out of the conversation
+ * this device derives; a call comes out of the raw events, because
+ * `buildTimeline` deliberately draws no bubble for `m.call.*` and would
+ * hand back a conversation with the invitation missing from it.
  *
  * # One arrival per conversation, and only from somebody else
  *
@@ -43,20 +57,61 @@ export interface Looking {
       readonly body: string | null
     }[]
   >
+  /**
+   * Opens the sealed events of one conversation and answers the `m.call.*`
+   * among them, in order. `inbox.ts`'s `openCallEvents`, bound to the
+   * device's crypto machine by whoever calls this.
+   */
+  readonly openCalls: (
+    scope: string,
+    events: readonly unknown[],
+  ) => Promise<readonly unknown[]>
   readonly names: GivenNames
   readonly selfUserId: string
   /** How far each conversation had been read here before the wake. */
   readonly lastRead: ReadonlyMap<string, number>
 }
 
+/** Somebody calling, found in a poll nobody was watching. */
+export interface Ringing {
+  readonly scope: string
+  /** Who is calling, as this device would show them. */
+  readonly shown: string
+  /** Their identifier, which is what a call has to be answered towards. */
+  readonly from: string
+}
+
+/**
+ * How old an invitation may be and still be worth ringing for.
+ *
+ * The specification's own default lifetime for `m.call.invite` is ninety
+ * seconds, and the transport already refuses a stale one. This is the same
+ * bound applied one stage earlier, so that a wake replaying a poll from
+ * before the application was closed does not ring a telephone about a call
+ * that ended ten minutes ago -- which is what a cursor deliberately left
+ * unadvanced makes possible.
+ */
+const RINGS_FOR_MS = 90_000
+
+export interface WhatArrived {
+  readonly messages: readonly Arrival[]
+  /**
+   * Calls, and they come first wherever both exist. A telephone that draws a
+   * message notification over a ringing call is a telephone somebody misses
+   * a call on.
+   */
+  readonly ringing: readonly Ringing[]
+}
+
 export async function lookForWhatArrived(
   looking: Looking,
-): Promise<readonly Arrival[]> {
+): Promise<WhatArrived> {
   const sync = await fetchOnce(looking.http, looking.since)
   const changed = readChangedScopes(sync)
-  if (changed.length === 0) return []
+  if (changed.length === 0) return { messages: [], ringing: [] }
 
   const names = await looking.names.all()
+  const ringing = await whoIsCalling(looking, sync, names)
   const found: Arrival[] = []
 
   for (const scope of changed) {
@@ -92,6 +147,63 @@ export async function lookForWhatArrived(
     }
   }
 
+  return { messages: found, ringing }
+}
+
+/**
+ * Who is calling, out of the raw events the same sync carried.
+ *
+ * # THE INVITATION IS THE ONLY EVENT WORTH WAKING A TELEPHONE FOR
+ *
+ * A poll replayed from an unadvanced cursor carries whatever the call
+ * exchanged -- the answer, the candidates, the hangup. Ringing for any of
+ * those would ring for a call that is already over, or already running on
+ * this very device. Only `m.call.invite` is somebody asking.
+ *
+ * # AND ITS OWN AGE DECIDES, NOT THE POLL'S
+ *
+ * `unsigned.age` is how long ago the homeserver received it, and it is the
+ * one thing here that survives the cursor being left where it was: a wake
+ * that replays yesterday's poll sees yesterday's invitation looking exactly
+ * as new as one from a second ago. `inbox.ts` carries the field through the
+ * decryption for this.
+ */
+async function whoIsCalling(
+  looking: Looking,
+  sync: Record<string, unknown>,
+  names: ReadonlyMap<string, string>,
+): Promise<readonly Ringing[]> {
+  const found: Ringing[] = []
+  for (const [scope, events] of readTimelineEvents(sync)) {
+    // Guarded per conversation, like the messages below: one conversation
+    // this device holds no key for must not silence a call in another.
+    try {
+      for (const event of await looking.openCalls(scope, events)) {
+        const call = event as {
+          type?: unknown
+          sender?: unknown
+          unsigned?: { age?: unknown }
+        }
+        if (call.type !== 'm.call.invite') continue
+        if (typeof call.sender !== 'string') continue
+        // This account's own invitation, placed from another of its devices.
+        // Ringing here would be a telephone ringing at the person holding
+        // the one that is calling.
+        if (call.sender === looking.selfUserId) continue
+        const age = call.unsigned?.age
+        if (typeof age === 'number' && age > RINGS_FOR_MS) continue
+        found.push({
+          scope,
+          from: call.sender,
+          shown: displayNameFor(call.sender, names.get(call.sender)),
+        })
+        break
+      }
+    } catch {
+      // Nothing to report to, and a call that could not be read is a call
+      // this device could not have answered anyway.
+    }
+  }
   return found
 }
 

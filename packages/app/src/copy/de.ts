@@ -365,6 +365,10 @@ export const de: Readonly<Record<CopyKey, string>> = {
   notify_blind_title: 'Messagr',
   notify_blind_body: 'Es ist etwas angekommen.',
   notify_channel: 'Nachrichten',
+  notify_ringing_body: 'Eingehender Anruf',
+  notify_ringing_channel: 'Anrufe',
+  notify_answer: 'Annehmen',
+  notify_decline: 'Ablehnen',
   image_alt: 'Foto',
   image_unreadable:
     'Dieses Foto konnte auf diesem Gerät nicht geöffnet werden.',
