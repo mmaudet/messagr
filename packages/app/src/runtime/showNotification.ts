@@ -54,18 +54,44 @@ export const DECLINE = 'decline'
  */
 export function whenNotificationPressed(
   open: (scope: string | null) => void,
+  /**
+   * What a press on a ringing telephone asked for.
+   *
+   * Separate from `open`, because it is a different destination: a
+   * conversation is a screen somebody navigates to, and a call is something
+   * they just said yes or no to. Absent while nothing can answer one.
+   */
+  answered?: (call: {
+    readonly scope: string
+    readonly answered: boolean
+  }) => void,
 ): () => void {
+  // A PRESS THAT ANSWERED A CALL IS NOT A PRESS THAT OPENED A CONVERSATION,
+  // and both arrive here through the same three doors.
+  const route = (id: string | undefined, action: string | undefined): void => {
+    const call = answeredCallOfPress(id, action)
+    if (call !== null) {
+      answered?.(call)
+      return
+    }
+    open(scopeOfPress(id))
+  }
+
   notifee
     .getInitialNotification()
     .then(initial => {
-      if (initial !== null) open(scopeOfPress(initial.notification.id))
+      if (initial !== null) {
+        route(initial.notification.id, initial.pressAction?.id)
+      }
     })
     .catch(() => {
       // A launch is not worth losing over a notification that may not exist.
     })
 
   return notifee.onForegroundEvent(({ type, detail }) => {
-    if (type === EventType.PRESS) open(scopeOfPress(detail.notification?.id))
+    if (type === EventType.PRESS || type === EventType.ACTION_PRESS) {
+      route(detail.notification?.id, detail.pressAction?.id)
+    }
   })
 }
 
