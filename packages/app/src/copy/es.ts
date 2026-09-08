@@ -127,6 +127,20 @@ export const es: Readonly<Record<CopyKey, string>> = {
   settings_row_not_yet: 'Todavía no',
   settings_version_footer: 'messagr %1$@ (%2$@)',
   language_endonym: 'Español',
+  language_choose: 'Elegir el idioma',
+  language_close: 'Cerrar',
+
+  emoji_title: 'Reaccionar',
+  emoji_close: 'Cerrar',
+  emoji_more: 'Más emojis',
+  emoji_group_faces: 'Caras',
+  emoji_group_gestures: 'Gestos',
+  emoji_group_hearts: 'Corazones',
+  emoji_group_people: 'Personas',
+  emoji_group_nature: 'Naturaleza',
+  emoji_group_food: 'Comida',
+  emoji_group_activity: 'Actividades',
+  emoji_group_things: 'Objetos',
   'conversation_sender_claimed %@': 'Se presenta como %@',
   conversation_send: 'Enviar',
   conversation_empty: 'Aquí todavía no se ha dicho nada.',
@@ -217,6 +231,9 @@ export const es: Readonly<Record<CopyKey, string>> = {
   settings_action: 'Ajustes',
   settings_title: 'Ajustes',
   settings_legal: 'Información legal',
+  settings_disturb: 'Sonar en modo «No molestar»',
+  settings_disturb_hint:
+    'Android silencia las llamadas entrantes mientras Messagr no tenga acceso a «No molestar». Abra la lista, busque Messagr y active el acceso.',
   settings_nothing_else:
     'Aquí no hay nada más por ahora. Los ajustes que esta versión todavía no lleva están ausentes en lugar de presentes e inertes.',
   legal_title: 'Información legal',
@@ -294,6 +311,7 @@ export const es: Readonly<Record<CopyKey, string>> = {
   list_no_directory:
     'Ningún número de teléfono aparece en ninguna parte del sistema. Solo se entra en contacto por invitación.',
   calls_empty: 'Todavía no hay llamadas.',
+  'calls_ring_back %@': 'Devolver la llamada a %@',
   calls_taken: 'Llamada recibida',
   calls_placed: 'Llamada realizada',
   calls_missed: 'Llamada perdida',

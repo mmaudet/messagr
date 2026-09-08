@@ -130,6 +130,20 @@ export const de: Readonly<Record<CopyKey, string>> = {
   settings_row_not_yet: 'Noch nicht',
   settings_version_footer: 'messagr %1$@ (%2$@)',
   language_endonym: 'Deutsch',
+  language_choose: 'Sprache wählen',
+  language_close: 'Schließen',
+
+  emoji_title: 'Reagieren',
+  emoji_close: 'Schließen',
+  emoji_more: 'Mehr Emojis',
+  emoji_group_faces: 'Gesichter',
+  emoji_group_gestures: 'Gesten',
+  emoji_group_hearts: 'Herzen',
+  emoji_group_people: 'Menschen',
+  emoji_group_nature: 'Natur',
+  emoji_group_food: 'Essen',
+  emoji_group_activity: 'Aktivitäten',
+  emoji_group_things: 'Objekte',
   'conversation_sender_claimed %@': 'Gibt sich aus als %@',
   conversation_send: 'Senden',
   conversation_empty: 'Hier wurde noch nichts gesagt.',
@@ -223,6 +237,9 @@ export const de: Readonly<Record<CopyKey, string>> = {
   settings_action: 'Einstellungen',
   settings_title: 'Einstellungen',
   settings_legal: 'Rechtliche Hinweise',
+  settings_disturb: 'Bei „Bitte nicht stören“ klingeln',
+  settings_disturb_hint:
+    'Android schaltet eingehende Anrufe stumm, solange Messagr keinen Zugriff auf „Bitte nicht stören“ hat. Liste öffnen, Messagr suchen, Zugriff einschalten.',
   settings_nothing_else:
     'Mehr gibt es hier vorerst nicht. Einstellungen, die diese Version noch nicht trägt, fehlen ganz, statt vorhanden und wirkungslos zu sein.',
   legal_title: 'Rechtliche Hinweise',
@@ -300,6 +317,7 @@ export const de: Readonly<Record<CopyKey, string>> = {
   list_no_directory:
     'Nirgendwo im System erscheint eine Telefonnummer. In Kontakt kommt man nur über eine Einladung.',
   calls_empty: 'Noch keine Anrufe.',
+  'calls_ring_back %@': '%@ zurückrufen',
   calls_taken: 'Eingegangener Anruf',
   calls_placed: 'Ausgehender Anruf',
   calls_missed: 'Verpasster Anruf',

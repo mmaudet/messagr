@@ -123,6 +123,20 @@ export const nl: Readonly<Record<CopyKey, string>> = {
   settings_row_not_yet: 'Nog niet',
   settings_version_footer: 'messagr %1$@ (%2$@)',
   language_endonym: 'Nederlands',
+  language_choose: 'Taal kiezen',
+  language_close: 'Sluiten',
+
+  emoji_title: 'Reageren',
+  emoji_close: 'Sluiten',
+  emoji_more: 'Meer emoji',
+  emoji_group_faces: 'Gezichten',
+  emoji_group_gestures: 'Gebaren',
+  emoji_group_hearts: 'Harten',
+  emoji_group_people: 'Mensen',
+  emoji_group_nature: 'Natuur',
+  emoji_group_food: 'Eten',
+  emoji_group_activity: 'Activiteiten',
+  emoji_group_things: 'Voorwerpen',
   'conversation_sender_claimed %@': 'Geeft zich uit voor %@',
   conversation_send: 'Versturen',
   conversation_empty: 'Hier is nog niets gezegd.',
@@ -216,6 +230,9 @@ export const nl: Readonly<Record<CopyKey, string>> = {
   settings_action: 'Instellingen',
   settings_title: 'Instellingen',
   settings_legal: 'Juridische informatie',
+  settings_disturb: 'Bellen tijdens „Niet storen”',
+  settings_disturb_hint:
+    'Android dempt inkomende oproepen zolang Messagr geen toegang tot „Niet storen” heeft. Open de lijst, zoek Messagr, zet de toegang aan.',
   settings_nothing_else:
     'Voorlopig staat hier niets anders. Instellingen die deze versie nog niet draagt zijn afwezig in plaats van aanwezig en werkloos.',
   legal_title: 'Juridische informatie',
@@ -293,6 +310,7 @@ export const nl: Readonly<Record<CopyKey, string>> = {
   list_no_directory:
     'Nergens in het systeem komt een telefoonnummer voor. Contact ontstaat uitsluitend op uitnodiging.',
   calls_empty: 'Nog geen oproepen.',
+  'calls_ring_back %@': '%@ terugbellen',
   calls_taken: 'Ontvangen oproep',
   calls_placed: 'Uitgaande oproep',
   calls_missed: 'Gemiste oproep',

@@ -11,7 +11,7 @@ import {
 import { t } from '../copy'
 import type { Language } from '../copy/languages'
 import { color, floors, layout, space, stroke, type } from '../design/tokens'
-import { LanguageStrip } from './LanguageStrip'
+import { LanguagePicker } from './LanguagePicker'
 
 /**
  * Settings.
@@ -50,6 +50,7 @@ export function Settings({
   onWake,
   wakeNotKept,
   onRingFullScreen,
+  onRingWhileQuiet,
 }: {
   readonly onBack: () => void
   readonly onLegal: () => void
@@ -59,6 +60,8 @@ export function Settings({
   readonly receiptsNotKept: boolean
   /** Opens Android's own screen for the full-screen intent. Android only. */
   readonly onRingFullScreen: () => void
+  /** Opens the system's Do Not Disturb access screen. */
+  readonly onRingWhileQuiet: () => void
   /** Which language is spoken, and changing it. Same control as #103's. */
   readonly language: Language
   readonly onLanguage: (language: Language) => void
@@ -90,23 +93,21 @@ export function Settings({
         <Text style={styles.rowLabel}>{t('settings_legal')}</Text>
       </Pressable>
 
-      {/* THE SAME STRIP AS THE FIRST SCREEN, AND THE SAME GESTURE.
-          Choosing a language once and having no way to change it is a
-          reinstall as a correction. It is the same control rather than a
-          list, because a person who picked the wrong one is exactly the
-          person who cannot read a list of language names. */}
+      {/* CHOOSING A LANGUAGE ONCE AND HAVING NO WAY TO CHANGE IT is a
+          reinstall as a correction, so it is here as well as on the first
+          screen -- and it is the same control in both places, because two
+          shapes for one gesture would be two controls. */}
       <View style={styles.setting} testID="setting-language">
         <Text style={styles.rowLabel}>{t('settings_row_lang_label')}</Text>
-        {/* ONE ROW HERE, FOUR ON THE FIRST SCREEN, AT THE ACCOUNT HOLDER'S
-            WORD. Six flags between two one-line settings read as a feature
-            rather than as a setting; one row that moves reads as a setting.
-            Same component, one number. */}
-        <LanguageStrip
+        {/* THE SAME CONTROL AS THE FIRST SCREEN, and now one anybody can
+            find: a row saying which language is on, and a list when it is
+            tapped. `LanguagePicker.tsx` says why the scrolling strip that
+            stood here was replaced. */}
+        <LanguagePicker
           chosen={language}
           onChoose={onLanguage}
           onSettle={onLanguageSettled}
-          rows={1}
-          testID="settings-language-strip"
+          testID="settings-language-picker"
         />
       </View>
 
@@ -185,6 +186,36 @@ export function Settings({
             <Text style={styles.rowAction}>{t('settings_open')}</Text>
           </Pressable>
           <Text style={styles.hint}>{t('settings_full_screen_hint')}</Text>
+        </View>
+      )}
+
+      {/* AND THE OTHER HALF OF THE SAME PROBLEM.
+          A telephone that rings only when nothing is set to silence it is
+          not a telephone. Measured on the demonstration Pixel during the
+          first real call between two people: every notification the
+          application posted was intercepted by Do Not Disturb, and so was
+          Google's own dialer's. The category "call" does not get past that
+          mode -- only a channel the person has allowed does, and allowing
+          one is a switch on a system screen.
+
+          An offer rather than a warning, exactly like the row above: nothing
+          here can see whether the access was granted, so a row that appeared
+          only when it was missing would be a row guessing.
+
+          Android only. iOS has its own answer -- an interruption level on
+          the notification -- and no screen to send anybody to. */}
+      {Platform.OS === 'android' && (
+        <View style={styles.setting} testID="setting-disturb">
+          <Pressable
+            testID="open-disturb-settings"
+            onPress={onRingWhileQuiet}
+            accessibilityRole="button"
+            accessibilityLabel={t('settings_disturb')}
+            style={styles.row}>
+            <Text style={styles.rowLabel}>{t('settings_disturb')}</Text>
+            <Text style={styles.rowAction}>{t('settings_open')}</Text>
+          </Pressable>
+          <Text style={styles.hint}>{t('settings_disturb_hint')}</Text>
         </View>
       )}
 

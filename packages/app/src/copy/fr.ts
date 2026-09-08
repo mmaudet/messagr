@@ -149,6 +149,20 @@ export const fr = {
   settings_row_not_yet: 'Pas encore',
   settings_version_footer: 'messagr %1$@ (%2$@)',
   language_endonym: 'Français',
+  language_choose: 'Choisir la langue',
+  language_close: 'Fermer',
+
+  emoji_title: 'Réagir',
+  emoji_close: 'Fermer',
+  emoji_more: 'Plus d’emojis',
+  emoji_group_faces: 'Visages',
+  emoji_group_gestures: 'Gestes',
+  emoji_group_hearts: 'Cœurs',
+  emoji_group_people: 'Personnes',
+  emoji_group_nature: 'Nature',
+  emoji_group_food: 'Nourriture',
+  emoji_group_activity: 'Activités',
+  emoji_group_things: 'Objets',
 
   // WRITTEN HERE, NOT CARRIED OVER.
   //
@@ -323,6 +337,9 @@ export const fr = {
   settings_action: 'Réglages',
   settings_title: 'Réglages',
   settings_legal: 'Informations légales',
+  settings_disturb: 'Sonner en mode « Ne pas déranger »',
+  settings_disturb_hint:
+    'Android fait taire les appels entrants tant que Messagr n’a pas l’accès « Ne pas déranger ». Ouvrez la liste, trouvez Messagr, activez l’accès.',
   settings_nothing_else:
     'Il n’y a rien d’autre ici pour l’instant. Les réglages que cette version ne porte pas encore sont absents plutôt que présents et inertes.',
 
@@ -462,6 +479,7 @@ export const fr = {
   // L'onglet Appels. Ce que devient un appel, dit en toutes lettres : la
   // couleur ne fait que répéter ces mots, elle ne les porte jamais.
   calls_empty: 'Aucun appel pour l’instant.',
+  'calls_ring_back %@': 'Rappeler %@',
   calls_taken: 'Appel reçu',
   calls_placed: 'Appel passé',
   calls_missed: 'Appel manqué',

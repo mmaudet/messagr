@@ -132,6 +132,20 @@ export const en: Readonly<Record<CopyKey, string>> = {
   settings_row_not_yet: 'Not yet',
   settings_version_footer: 'messagr %1$@ (%2$@)',
   language_endonym: 'English',
+  language_choose: 'Choose the language',
+  language_close: 'Close',
+
+  emoji_title: 'React',
+  emoji_close: 'Close',
+  emoji_more: 'More emoji',
+  emoji_group_faces: 'Faces',
+  emoji_group_gestures: 'Gestures',
+  emoji_group_hearts: 'Hearts',
+  emoji_group_people: 'People',
+  emoji_group_nature: 'Nature',
+  emoji_group_food: 'Food',
+  emoji_group_activity: 'Activities',
+  emoji_group_things: 'Objects',
   'conversation_sender_claimed %@': 'Presents itself as %@',
   conversation_send: 'Send',
   conversation_empty: 'Nothing has been said here yet.',
@@ -220,6 +234,9 @@ export const en: Readonly<Record<CopyKey, string>> = {
   settings_action: 'Settings',
   settings_title: 'Settings',
   settings_legal: 'Legal information',
+  settings_disturb: 'Ring during Do Not Disturb',
+  settings_disturb_hint:
+    'Android silences incoming calls until Messagr has Do Not Disturb access. Open the list, find Messagr, turn the access on.',
   settings_nothing_else:
     'There is nothing else here for now. Settings this version does not carry yet are absent rather than present and inert.',
   legal_title: 'Legal information',
@@ -295,6 +312,7 @@ export const en: Readonly<Record<CopyKey, string>> = {
   list_no_directory:
     'No phone number appears anywhere in the system. You only come into contact by invitation.',
   calls_empty: 'No calls yet.',
+  'calls_ring_back %@': 'Call %@ back',
   calls_taken: 'Incoming call',
   calls_placed: 'Outgoing call',
   calls_missed: 'Missed call',

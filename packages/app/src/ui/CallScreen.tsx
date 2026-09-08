@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react'
+import React, { useEffect, useRef, useState } from 'react'
 import { Modal, Pressable, StyleSheet, Text, View } from 'react-native'
 
 import type { CallState, EndReason } from '../calls/machine'
@@ -149,6 +149,35 @@ export function CallScreen({
   const ringing = state.call === 'incomingInvite'
   const over = state.call === 'ended' || state.call === 'idle'
 
+  // IT CLOSES ITSELF, AND IT WAITS LONG ENOUGH TO BE READ FIRST.
+  //
+  // This screen used to stay until somebody pressed "Fermer", on the
+  // argument that "a call that dies silently is the failure mode" -- which
+  // is right about the SAYING and wrong about the staying. Reported after
+  // the first real call between two people: at the end of a call the screen
+  // should go and give back the conversation, without being asked.
+  //
+  // So the ending is still shown, and then it goes. Long enough to read
+  // "personne n'a répondu" or "la connexion n'a pas pu s'établir", which is
+  // the whole reason those sentences exist; short enough that nobody is
+  // left holding a dead screen.
+  //
+  // THROUGH A REF, so the timer depends on the call's state and on nothing
+  // else. `onDismiss` is written inline at the call site, so it is a new
+  // function on every render of the application -- and a timer that listed
+  // it as a dependency would be torn down and restarted by any unrelated
+  // re-render, which on a device that syncs while the ending is on screen
+  // means a screen that never closes at all.
+  const dismiss = useRef(onDismiss)
+  dismiss.current = onDismiss
+  useEffect(() => {
+    if (!over) return undefined
+    const closing = setTimeout(() => dismiss.current(), LINGERS_MS)
+    // Cleared if the state moves again -- a second call in the same three
+    // seconds must not be closed by the previous one's timer.
+    return () => clearTimeout(closing)
+  }, [over])
+
   return (
     <Modal
       visible
@@ -295,6 +324,9 @@ function Round({
     </View>
   )
 }
+
+/** How long a finished call stays on screen before it closes itself. */
+const LINGERS_MS = 3_000
 
 const AVATAR = 96
 const ICON = 28

@@ -64,3 +64,46 @@ reversal of it.
 
 Key backup, if it ever lands, changes the third cost above but not this
 decision: it makes more history decryptable, not more of it stored in clear.
+
+## Revisited, 8 September 2026 — the conversation list, and only the list
+
+The second cost was stated as a requirement, from the demonstration Pixel:
+_« lorsque l'app s'ouvre sur mon pixel, l'écran de conversations s'affiche au
+bout de plusieurs secondes — faudrait trouver un moyen que cela s'affiche
+immédiatement. Cache… »_
+
+Measured on that telephone, the seven seconds are: three quarters of a second
+of JavaScript and keystore, then a client start and an initial sync, then two
+key queries and an upload, then two `/joined_rooms`, and only then one round
+trip and one decryption pass per conversation. The list needs none of it to
+draw what it drew last time.
+
+So the conversation list — one line per conversation, the line the list
+already shows — is kept in the application's own encrypted notebook
+(ADR-0010), as its fifth page, under the same keystore-held passphrase as the
+names, the read marks and the calls. It is read at the top of the launch,
+before anything asks the network a question, and written by every derivation
+after it.
+
+This is the answer the paragraph above predicted, taken for the narrower of
+the two requirements: **an encrypted store keyed from a keystore secret, not
+a cleartext one.**
+
+**What is kept, and what is not.** A row's preview is the opening of the last
+message, which is plaintext, and it is now on disk. What is not kept is the
+conversation: opening one still derives it from ciphertext, exactly as
+before. An attacker holding the device and defeating the keystore learns the
+openings of the last messages, which is a real cost and a bounded one, and
+not the history.
+
+**The three costs above, now.** Offline history is unchanged — there is still
+none, and a launch with no network shows the last known list and nothing
+behind it, which is more honest than a blank screen and less than a
+messenger. A relaunch is no longer slower to _look at_; it is still exactly
+as slow to be _right_. The third cost is untouched.
+
+**What did not change.** ADR-0005 still holds: the timeline is derived, and
+nothing here caches a conversation. The day somebody asks for offline
+history, that is a third decision and a much larger one — this page is one
+line per conversation, and growing it into a message store would be the
+reversal this ADR refuses rather than the amendment it invited.

@@ -17,11 +17,23 @@
 # The export re-signs and `production` returns -- which is a claim, and claims
 # about push environments are checked here, not assumed.
 #
+#   ./scripts/build.sh ios          # raises the build number, then this
+#   ./scripts/publish-ios.sh        # this alone, at whatever number is set
+#
+# The two identifiers are read from ~/.appstoreconnect/env when it exists,
+# and can still be given in the environment:
+#
 #   ASC_KEY_ID=...  ASC_ISSUER_ID=...  ./scripts/publish-ios.sh
 #
-# The .p8 lives in ~/.appstoreconnect/private_keys/ at chmod 600. Never in
-# this repository: `.gitignore` refuses *.p8, and the repository is public.
+# That file and the .p8 beside it live in ~/.appstoreconnect/ at chmod 600.
+# Never in this repository: `.gitignore` refuses *.p8, and the repository is
+# public.
 set -euo pipefail
+
+if [ -f "$HOME/.appstoreconnect/env" ]; then
+  # shellcheck disable=SC1091
+  . "$HOME/.appstoreconnect/env"
+fi
 
 ROOT="$(cd "$(dirname "$0")" && pwd)/.."
 IOS="$ROOT/packages/app/ios"
@@ -29,9 +41,20 @@ KEY_ID="${ASC_KEY_ID:-}"
 ISSUER_ID="${ASC_ISSUER_ID:-}"
 KEY_PATH="${ASC_KEY_PATH:-$HOME/.appstoreconnect/private_keys/AuthKey_${KEY_ID}.p8}"
 WORK="${ASC_WORK_DIR:-$(mktemp -d)}"
+# THE UPLOAD IS THE STEP THAT FAILS FOR REASONS THAT ARE NOBODY'S FAULT.
+# `altool` fetches a `Defaults.properties` from Apple mid-transfer, and a
+# network that blinks there ends a twenty-minute archive with "The file
+# doesn't exist". It happened to build 14 and again to build 16. With
+# `--upload-only` and a stable `ASC_WORK_DIR`, the retry costs the transfer
+# rather than the archive.
+ONLY_UPLOAD=no
+if [ "${1:-}" = "--upload-only" ]; then ONLY_UPLOAD=yes; fi
 
 if [ -z "$KEY_ID" ] || [ -z "$ISSUER_ID" ]; then
   echo "ASC_KEY_ID and ASC_ISSUER_ID must be set." >&2
+  echo "Put them in ~/.appstoreconnect/env (chmod 600), two lines:" >&2
+  echo "  ASC_KEY_ID=..." >&2
+  echo "  ASC_ISSUER_ID=..." >&2
   echo "Both are on App Store Connect -> Users and Access -> Integrations -> Keys;" >&2
   echo "the Issuer ID is above the table, the Key ID is in the .p8 filename." >&2
   exit 2
@@ -47,21 +70,31 @@ AUTH=(-allowProvisioningUpdates
       -authenticationKeyID "$KEY_ID"
       -authenticationKeyIssuerID "$ISSUER_ID")
 
-echo "==> archiving (this registers the App ID and mints the profile if needed)"
-xcodebuild -workspace "$IOS/Messagr.xcworkspace" \
-  -scheme Messagr -configuration Release \
-  -destination 'generic/platform=iOS' \
-  -archivePath "$WORK/Messagr.xcarchive" \
-  "${AUTH[@]}" archive
-
-echo "==> exporting a signed .ipa"
-xcodebuild -exportArchive \
-  -archivePath "$WORK/Messagr.xcarchive" \
-  -exportOptionsPlist "$IOS/ExportOptions.plist" \
-  -exportPath "$WORK/export" \
-  "${AUTH[@]}"
-
 IPA="$WORK/export/Messagr.ipa"
+
+if [ "$ONLY_UPLOAD" = yes ]; then
+  if [ ! -f "$IPA" ]; then
+    echo "no .ipa at $IPA -- there is nothing to re-send." >&2
+    echo "Set ASC_WORK_DIR to the directory the archive was built in," >&2
+    echo "or drop --upload-only to build one." >&2
+    exit 2
+  fi
+  echo "==> re-sending the .ipa already built at $IPA"
+else
+  echo "==> archiving (this registers the App ID and mints the profile if needed)"
+  xcodebuild -workspace "$IOS/Messagr.xcworkspace" \
+    -scheme Messagr -configuration Release \
+    -destination 'generic/platform=iOS' \
+    -archivePath "$WORK/Messagr.xcarchive" \
+    "${AUTH[@]}" archive
+
+  echo "==> exporting a signed .ipa"
+  xcodebuild -exportArchive \
+    -archivePath "$WORK/Messagr.xcarchive" \
+    -exportOptionsPlist "$IOS/ExportOptions.plist" \
+    -exportPath "$WORK/export" \
+    "${AUTH[@]}"
+fi
 
 # THE STEP THAT EXISTS BECAUSE THE ARCHIVE LIED.
 # Not a formality: it reads the file that is about to be sent, and a
