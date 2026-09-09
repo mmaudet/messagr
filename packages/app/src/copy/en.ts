@@ -346,7 +346,6 @@ export const en: Readonly<Record<CopyKey, string>> = {
   call_mute: 'Mute',
   call_unmute: 'Unmute',
   call_speaker: 'Speaker',
-  call_dismiss: 'Close',
   call_failed_no_relay:
     'This server has no call relay: the call could not be placed.',
   call_failed_no_microphone: 'The microphone is not available.',

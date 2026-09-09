@@ -351,7 +351,6 @@ export const de: Readonly<Record<CopyKey, string>> = {
   call_mute: 'Mikrofon aus',
   call_unmute: 'Mikrofon ein',
   call_speaker: 'Lautsprecher',
-  call_dismiss: 'Schließen',
   call_failed_no_relay:
     'Dieser Server hat kein Anrufrelais: Der Anruf war nicht möglich.',
   call_failed_no_microphone: 'Das Mikrofon ist nicht verfügbar.',

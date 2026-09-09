@@ -343,7 +343,6 @@ export const it: Readonly<Record<CopyKey, string>> = {
   call_mute: 'Disattiva il microfono',
   call_unmute: 'Attiva il microfono',
   call_speaker: 'Vivavoce',
-  call_dismiss: 'Chiudi',
   call_failed_no_relay:
     'Questo server non ha un relay per le chiamate: la chiamata non è partita.',
   call_failed_no_microphone: 'Il microfono non è disponibile.',

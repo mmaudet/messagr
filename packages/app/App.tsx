@@ -82,7 +82,7 @@ import {
   RECEIPTS_DEFAULT,
   receiptsArePublished,
 } from './src/runtime/receiptSetting'
-import { readUpTo, type Receipt } from './src/runtime/receipts'
+import { markUpTo, readAtMark, type Receipt } from './src/runtime/receipts'
 import { hasSeenPromise, rememberPromiseSeen } from './src/runtime/promiseSeen'
 import { clearSignUp, isSignUpUnfinished } from './src/runtime/signUpMarker'
 import { color, floors, space, type as typeScale } from './src/design/tokens'
@@ -411,6 +411,17 @@ export function App({
    * conversation nobody is looking at is a re-render for nothing.
    */
   const seenReceiptsRef = useRef<Map<string, readonly Receipt[]>>(new Map())
+  /**
+   * How far the other person has read, per conversation, as a timestamp.
+   *
+   * IT ONLY EVER GOES UP. A receipt naming an event this device has not
+   * fetched resolves to nothing, and the screen used to take that nothing as
+   * an answer -- `MESSAGR_READ_BY {"marked":2}` followed by
+   * `{"marked":0}`, over and over, which is what "les chevrons s'affichent
+   * quand Thibault m'écrit, et parfois l'état se perd" looks like from the
+   * inside. `receipts.ts` says why the mark is held apart from what it marks.
+   */
+  const readMarksRef = useRef<Map<string, number>>(new Map())
   const [openScope, setOpenScope] = useState<string | null>(null)
   const openScopeRef = useRef<string | null>(null)
   /**
@@ -645,6 +656,33 @@ export function App({
   useEffect(() => {
     conversationRef.current = conversation ?? []
   }, [conversation])
+
+  // A RECEIPT CAN ARRIVE BEFORE THE EVENT IT NAMES, and until now nothing
+  // ever looked again.
+  //
+  // The live loop resolves a receipt against the timeline it has at that
+  // instant. Two people writing at once means receipts that name a message
+  // this device merges a moment later -- they resolved to nothing, and the
+  // only thing that made them resolve was *another* receipt arriving after
+  // the message. Which is exactly the report: « les chevrons s'affichent
+  // quand Thibault m'écrit ».
+  //
+  // So the timeline moving is itself a reason to look again. The mark only
+  // rises (`receipts.ts` says why), so this can run as often as it likes.
+  useEffect(() => {
+    const scope = openScope
+    if (scope === null || selfUserId === '') return
+    const entries = conversation ?? []
+    const seen = seenReceiptsRef.current.get(scope)
+    if (seen !== undefined && seen.length > 0) {
+      const found = markUpTo(entries, seen, selfUserId)
+      const held = readMarksRef.current.get(scope) ?? 0
+      if (found !== null && found > held) readMarksRef.current.set(scope, found)
+    }
+    setReadHere(
+      readAtMark(entries, readMarksRef.current.get(scope) ?? 0, selfUserId),
+    )
+  }, [conversation, openScope, selfUserId])
 
   useEffect(() => {
     // Not started until the promise has been accepted. The effect re-runs when
@@ -1022,10 +1060,28 @@ export function App({
                 // read the message a second time.
                 const already = seenReceiptsRef.current.get(scope)
                 if (already !== undefined) {
-                  setReadHere(
-                    readUpTo(fresh.entries, already, credentials.userId),
+                  // Against the timeline that just arrived, which is the one
+                  // that can resolve a receipt the live loop could not.
+                  const found = markUpTo(
+                    fresh.entries,
+                    already,
+                    credentials.userId,
                   )
+                  const held = readMarksRef.current.get(scope) ?? 0
+                  if (found !== null && found > held) {
+                    readMarksRef.current.set(scope, found)
+                  }
                 }
+                // FROM THE MARK, AND ALWAYS -- including when it is zero,
+                // which is what clears the ticks of the conversation that
+                // was open before this one.
+                setReadHere(
+                  readAtMark(
+                    fresh.entries,
+                    readMarksRef.current.get(scope) ?? 0,
+                    credentials.userId,
+                  ),
+                )
                 const members = await fetchJoinedMembers(
                   makePumpHttp(sessionClient),
                   scope,
@@ -1536,22 +1592,41 @@ export function App({
                     if (seen.length > 0)
                       seenReceiptsRef.current.set(scope, seen)
                   }
+                  // RAISED, NEVER REPLACED, and for every conversation
+                  // rather than only the open one: a mark learnt while the
+                  // list is on screen is a mark the conversation already has
+                  // when it opens.
+                  for (const [scope, seen] of tick.receipts) {
+                    if (seen.length === 0) continue
+                    const found = markUpTo(
+                      conversationRef.current,
+                      seen,
+                      credentials.userId,
+                    )
+                    if (found === null) continue
+                    const held = readMarksRef.current.get(scope) ?? 0
+                    if (found > held) readMarksRef.current.set(scope, found)
+                  }
                   const openNow = openScopeRef.current
                   if (openNow !== null) {
                     const seen = tick.receipts.get(openNow)
                     if (seen !== undefined && seen.length > 0) {
-                      const read = readUpTo(
+                      const mark = readMarksRef.current.get(openNow) ?? 0
+                      const read = readAtMark(
                         conversationRef.current,
-                        seen,
+                        mark,
                         credentials.userId,
                       )
                       // The one line anybody debugging a missing second tick
                       // has. A receipt that arrived and resolved to nothing
                       // is a different fault from one that never arrived,
-                      // and they are indistinguishable on a screen.
+                      // and they are indistinguishable on a screen. `mark` is
+                      // in it now, because "the receipt did not resolve" and
+                      // "nothing is read yet" print the same `marked: 0`.
                       logEvent('info', 'MESSAGR_READ_BY', {
                         scope: openNow,
                         receipts: seen.length,
+                        mark,
                         marked: read.size,
                       })
                       setReadHere(read)
