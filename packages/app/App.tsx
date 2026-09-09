@@ -2309,21 +2309,16 @@ export function App({
             screen outright, safe area included, and the band comes back when
             the mode ends. Nothing else in the product hides it, because
             nothing else in the product is a mode. */}
-          {selected.size === 0 && <Header />}
-
-          {/* THE CONVERSATION'S OWN BAR, and it is chrome rather than content.
-            It was inside the scroll view, so it inherited that view's 24pt
-            padding and sat inset from both edges while the messages slid
-            under it. Here it spans the screen and stays put, like the band
-            above it and the dock below. */}
-          {/* THE BAR TAKES THE TOP OF THE SCREEN, both bands' worth.
-              Selecting changes what every tap in the conversation means, so
-              the screen says so from the top and offers exactly one way out,
-              on the left where the back arrow was. `SelectionBar.tsx`. */}
-          {openScope !== null &&
-            trust === null &&
-            !personOpen &&
-            selected.size > 0 && (
+          {/* THE BAND IS MOUNTED ONCE AND ITS CONTENTS CHANGE.
+            Selecting takes the top of the screen -- the ticket asks for the
+            bar to replace the Messagr band, not to stack under it -- and the
+            first version did that by unmounting one and mounting the other.
+            That tore down the safe area and the status-bar declaration with
+            them, for « un flash vraiment pas agréable ». `Header` takes
+            children now; nothing at the top of the screen mounts or
+            unmounts, whatever mode the screen is in. */}
+          <Header>
+            {selected.size > 0 ? (
               <SelectionBar
                 count={selected.size}
                 canCopy={canCopy(selected, conversation ?? [])}
@@ -2334,8 +2329,14 @@ export function App({
                 }}
                 onRemove={() => setRemoving(true)}
               />
-            )}
+            ) : undefined}
+          </Header>
 
+          {/* THE CONVERSATION'S OWN BAR, and it is chrome rather than content.
+            It was inside the scroll view, so it inherited that view's 24pt
+            padding and sat inset from both edges while the messages slid
+            under it. Here it spans the screen and stays put, like the band
+            above it and the dock below. */}
           {openScope !== null &&
             trust === null &&
             !personOpen &&
