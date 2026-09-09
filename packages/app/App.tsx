@@ -2299,15 +2299,24 @@ export function App({
           {/* Outside the scroll view, like the tab bar and for the same reason:
             what the band says is true of the instance rather than of the
             screen under it, and a fact about the instance that scrolls away
-            is one nobody reads twice. */}
-          <Header />
+            is one nobody reads twice.
+
+            AND IT GOES WHILE SELECTING. Two dark green bands stacked, the
+            brand's above the selection's, is what shipped first and it read
+            as two applications -- reported from the Pixel with a screenshot:
+            « le bandeau de sélection devrait se substituer au bandeau
+            supérieur Messagr ». The selection bar takes the top of the
+            screen outright, safe area included, and the band comes back when
+            the mode ends. Nothing else in the product hides it, because
+            nothing else in the product is a mode. */}
+          {selected.size === 0 && <Header />}
 
           {/* THE CONVERSATION'S OWN BAR, and it is chrome rather than content.
             It was inside the scroll view, so it inherited that view's 24pt
             padding and sat inset from both edges while the messages slid
             under it. Here it spans the screen and stays put, like the band
             above it and the dock below. */}
-          {/* THE BAR TAKES THE HEADER'S PLACE, it does not sit above it.
+          {/* THE BAR TAKES THE TOP OF THE SCREEN, both bands' worth.
               Selecting changes what every tap in the conversation means, so
               the screen says so from the top and offers exactly one way out,
               on the left where the back arrow was. `SelectionBar.tsx`. */}

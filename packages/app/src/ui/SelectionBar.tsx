@@ -1,6 +1,6 @@
 import React from 'react'
-import { Pressable, StyleSheet, Text, View } from 'react-native'
-import { useSafeAreaInsets } from 'react-native-safe-area-context'
+import { Pressable, StatusBar, StyleSheet, Text, View } from 'react-native'
+import { SafeAreaView } from 'react-native-safe-area-context'
 
 import { t } from '../copy'
 import { color, floors, layout, space, type } from '../design/tokens'
@@ -11,9 +11,16 @@ import { color, floors, layout, space, type } from '../design/tokens'
  * # A MODE, AND IT HAS TO LOOK LIKE ONE
  *
  * Selecting changes what every tap in the conversation means, so the screen
- * has to say so from the top. Taking the header's place is how: the person's
- * name goes, a count arrives, and there is exactly one way out and it is on
- * the left where a back arrow was.
+ * has to say so from the top. Taking the whole top is how: the person's name
+ * goes, the brand band goes with it, a count arrives, and there is exactly
+ * one way out and it is on the left where a back arrow was.
+ *
+ * BOTH BANDS, not one. The first version replaced the conversation's header
+ * and left the application's band above it -- two dark green bars stacked,
+ * which read as two applications. Reported from the Pixel with a screenshot:
+ * « le bandeau de sélection devrait se substituer au bandeau supérieur
+ * Messagr ». So this owns the safe area too, exactly as `Header` does, and
+ * `App.tsx` draws the band again when the mode ends.
  *
  * # ABSENT, NEVER GREYED
  *
@@ -42,62 +49,64 @@ export function SelectionBar({
   readonly onCopy: () => void
   readonly onRemove: () => void
 }) {
-  const insets = useSafeAreaInsets()
-
   return (
-    <View
-      testID="selection-bar"
-      style={[styles.bar, { paddingTop: insets.top }]}>
-      <Pressable
-        testID="selection-clear"
-        onPress={onClear}
-        accessibilityRole="button"
-        accessibilityLabel={t('selection_clear')}
-        style={styles.leave}>
-        <Text style={styles.leaveMark}>{'✕'}</Text>
-      </Pressable>
-
-      <Text style={styles.count} testID="selection-count">
-        {t('selection_count %1$d', count)}
-      </Text>
-
-      {copyable && (
+    <SafeAreaView edges={['top']} style={styles.bar} testID="selection-bar">
+      {/* The same light content the band it replaces asks for: the ground is
+          the same green, and the status bar must not change under a mode. */}
+      <StatusBar barStyle="light-content" />
+      <View style={styles.row}>
         <Pressable
-          testID="selection-copy"
-          onPress={onCopy}
+          testID="selection-clear"
+          onPress={onClear}
           accessibilityRole="button"
-          style={({ pressed }) => [styles.action, pressed && styles.pressed]}>
-          <Text style={styles.actionLabel}>{t('selection_copy')}</Text>
+          accessibilityLabel={t('selection_clear')}
+          style={styles.leave}>
+          <Text style={styles.leaveMark}>{'✕'}</Text>
         </Pressable>
-      )}
 
-      {/* ALWAYS THERE, unlike Copy. Removing has two scopes and the
+        <Text style={styles.count} testID="selection-count">
+          {t('selection_count %1$d', count)}
+        </Text>
+
+        {copyable && (
+          <Pressable
+            testID="selection-copy"
+            onPress={onCopy}
+            accessibilityRole="button"
+            style={({ pressed }) => [styles.action, pressed && styles.pressed]}>
+            <Text style={styles.actionLabel}>{t('selection_copy')}</Text>
+          </Pressable>
+        )}
+
+        {/* ALWAYS THERE, unlike Copy. Removing has two scopes and the
           narrower one -- hiding on this telephone -- applies to anything,
           including somebody else's message. Which of the two is offered is
           the sheet's question, not the bar's: see `RemoveSheet.tsx`. */}
-      <Pressable
-        testID="selection-remove"
-        onPress={onRemove}
-        accessibilityRole="button"
-        style={({ pressed }) => [styles.action, pressed && styles.pressed]}>
-        <Text style={[styles.actionLabel, styles.destructive]}>
-          {t('selection_remove')}
-        </Text>
-      </Pressable>
-    </View>
+        <Pressable
+          testID="selection-remove"
+          onPress={onRemove}
+          accessibilityRole="button"
+          style={({ pressed }) => [styles.action, pressed && styles.pressed]}>
+          <Text style={[styles.actionLabel, styles.destructive]}>
+            {t('selection_remove')}
+          </Text>
+        </Pressable>
+      </View>
+    </SafeAreaView>
   )
 }
 
 const styles = StyleSheet.create({
-  // The header's own ground, so the bar arrives in the place the header was
-  // rather than as a second thing above it.
-  bar: {
+  // The brand band's own ground, because this replaces it rather than
+  // sitting under it. The safe area belongs to the bar for the same reason:
+  // it is the top of the screen while the mode lasts.
+  bar: { backgroundColor: color.brand.green900 },
+  row: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: space.s,
     paddingHorizontal: layout.screenGutter,
-    paddingBottom: space.s,
-    backgroundColor: color.brand.green900,
+    paddingVertical: space.s,
   },
   leave: {
     minWidth: floors.touchTargetMin,
