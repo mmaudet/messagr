@@ -9,7 +9,7 @@ import {
 
 import type { IceConfig, IceTransportPolicy } from '../calls/ice'
 import type {
-  AudioTrackLike,
+  TrackLike,
   MediaConnectionState,
   MediaPorts,
   PeerConnectionLike,
@@ -23,7 +23,7 @@ import type { Candidate, SessionDescription } from '../calls/wire'
  * would make the buffering rules -- the part with the bugs in it -- testable
  * only on a device. So the library lives here, behind the same kind of seam
  * `cryptoPump.ts` puts around the crypto bridge, and everything above it is
- * written against `PeerConnectionLike` and `AudioTrackLike`.
+ * written against `PeerConnectionLike` and `TrackLike`.
  *
  * Which means this file has no tests, and that is the trade: it is the
  * translation layer, so what belongs in it is only the translation. Anything
@@ -40,6 +40,21 @@ import type { Candidate, SessionDescription } from '../calls/wire'
  * compile rather than quietly sending host candidates.
  */
 
+/**
+ * What this device promises never to exceed, per direction.
+ *
+ * The instance's coturn allows `max-bps=400000` -- 3.2 Mbit/s -- and its
+ * configuration says why: *"the product's ceiling is a relayed 1:1 video call
+ * at ~3 Mbit/s per direction"*. Half of that leaves room for the audio, the
+ * retransmissions and the relay's own framing, and 1.2 Mbit/s is a decent
+ * 720p.
+ *
+ * A NUMBER TO MEASURE, NOT TO BELIEVE. #199 asks for this compared against
+ * 2.5 Mbit/s on a real call between two telephones, because nobody can pick
+ * it from a desk -- only check it from a Pixel.
+ */
+const VIDEO_CEILING_BPS = 1_200_000
+
 /** WebRTC's word for what `ice.ts` calls `relay-only`. */
 function relayPolicy(policy: IceTransportPolicy): 'relay' {
   switch (policy) {
@@ -49,7 +64,7 @@ function relayPolicy(policy: IceTransportPolicy): 'relay' {
 }
 
 /**
- * The native track behind an `AudioTrackLike`.
+ * The native track behind an `TrackLike`.
  *
  * `addAudio` is handed the thing `captureAudio` returned, and needs the
  * library object inside it. A `WeakMap` rather than a field, because the
@@ -57,7 +72,7 @@ function relayPolicy(policy: IceTransportPolicy): 'relay' {
  * put `react-native-webrtc` back in the module this file exists to keep it
  * out of.
  */
-const behind = new WeakMap<AudioTrackLike, MediaStreamTrack>()
+const behind = new WeakMap<TrackLike, MediaStreamTrack>()
 
 /**
  * The stream a captured track belongs to.
@@ -66,7 +81,7 @@ const behind = new WeakMap<AudioTrackLike, MediaStreamTrack>()
  * receives it with no `MediaStream` to attach, and on some stacks that is a
  * call where nobody can hear anything.
  */
-const streamOf = new WeakMap<AudioTrackLike, MediaStream>()
+const streamOf = new WeakMap<TrackLike, MediaStream>()
 
 /**
  * What the connection reports, in the vocabulary the call speaks.
@@ -122,7 +137,7 @@ function connectionFor(config: IceConfig): PeerConnectionLike {
     addIceCandidate: async candidate => {
       await pc.addIceCandidate(new RTCIceCandidate(candidate))
     },
-    addAudio: track => {
+    addTrack: (kind, track) => {
       const native = behind.get(track)
       const stream = streamOf.get(track)
       if (native === undefined || stream === undefined) {
@@ -130,9 +145,30 @@ function connectionFor(config: IceConfig): PeerConnectionLike {
         // call that could not be placed, which is the truth; doing nothing
         // would give a connected call that carries silence, and silence is
         // the one failure nobody can tell from a working call.
-        throw new Error('audio track was not captured by this media adapter')
+        throw new Error(`${kind} track was not captured by this media adapter`)
       }
-      pc.addTrack(native, stream)
+      const sender = pc.addTrack(native, stream)
+      // THE CEILING, APPLIED HERE BECAUSE NOWHERE ELSE CAN.
+      //
+      // The relay allows `max-bps=400000` -- 3.2 Mbit/s a direction -- and
+      // coturn at its ceiling **drops**, which is indistinguishable from a
+      // bad network and would cost a day to diagnose. Telling the sender
+      // instead makes WebRTC drop resolution, which looks like a softer
+      // picture and says so honestly.
+      //
+      // The sender used to be discarded here, so there was no seam at all.
+      // `VIDEO_CEILING_BPS` is the one place the number lives.
+      if (kind === 'video' && sender !== undefined) {
+        const parameters = sender.getParameters()
+        const first = parameters.encodings?.[0]
+        if (first !== undefined) {
+          first.maxBitrate = VIDEO_CEILING_BPS
+          // Never awaited by the caller: a ceiling that could not be set is
+          // a call that still works, at a bitrate coturn will police less
+          // kindly. Saying so beats failing the call over it.
+          sender.setParameters(parameters).catch(() => undefined)
+        }
+      }
     },
     close: () => pc.close(),
   }
@@ -166,10 +202,14 @@ function connectionFor(config: IceConfig): PeerConnectionLike {
   return like
 }
 
-async function captureAudio(): Promise<AudioTrackLike> {
-  // Audio only, and no constraints beyond it: this lot is an audio call, and
-  // asking for a camera the interface never shows would light an indicator
-  // on somebody's telephone for a picture nobody sends.
+async function captureAudio(): Promise<TrackLike> {
+  // AUDIO ONLY, AND THAT IS STILL TRUE OF THIS FUNCTION. It used to say the
+  // reason was that the lot had no video at all -- "asking for a camera the
+  // interface never shows would light an indicator on somebody's telephone
+  // for a picture nobody sends". The lot has video now (§4.5, #199), and the
+  // rule survives in the narrower form that always mattered: the camera is
+  // opened by `captureVideo` at the moment somebody asks for a picture, and
+  // an audio call never touches it.
   const stream = await mediaDevices.getUserMedia({ audio: true, video: false })
   const [track] = stream.getAudioTracks()
   if (track === undefined) {
@@ -178,8 +218,36 @@ async function captureAudio(): Promise<AudioTrackLike> {
     // screen as a call that was not placed.
     throw new Error('the microphone was opened and carried no audio track')
   }
+  return trackLike(track, stream)
+}
 
-  const like: AudioTrackLike = {
+/**
+ * The camera, front by default.
+ *
+ * `facingMode: 'user'` rather than a device identifier: a call starts on the
+ * camera pointing at the person, and which hardware that is depends on the
+ * telephone. Switching to the other one is `applyConstraints`, and it is
+ * #201's business rather than this ticket's.
+ *
+ * ITS REJECTION IS NOT A FAILED CALL. `media.ts` says why: without a
+ * microphone there is no call, and without a camera there is still a whole
+ * one.
+ */
+async function captureVideo(): Promise<TrackLike> {
+  const stream = await mediaDevices.getUserMedia({
+    audio: false,
+    video: { facingMode: 'user' },
+  })
+  const [track] = stream.getVideoTracks()
+  if (track === undefined) {
+    throw new Error('the camera was opened and carried no video track')
+  }
+  return trackLike(track, stream)
+}
+
+/** The two captures differ in what they ask for and in nothing after it. */
+function trackLike(track: MediaStreamTrack, stream: MediaStream): TrackLike {
+  const like: TrackLike = {
     setEnabled: enabled => {
       track.enabled = enabled
       // Answering the track rather than the argument: `setMuted` reports what
@@ -205,4 +273,5 @@ async function captureAudio(): Promise<AudioTrackLike> {
 export const deviceMedia: MediaPorts = {
   createConnection: connectionFor,
   captureAudio,
+  captureVideo,
 }

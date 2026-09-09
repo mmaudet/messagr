@@ -14,6 +14,16 @@
     <uses-permission android:name="android.permission.RECORD_AUDIO" />
     <uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS" />
 
+    <!-- LA CAMÉRA, POUR UN APPEL VIDÉO ET POUR RIEN D'AUTRE.
+         Déclarée ici et demandée au moment où quelqu'un allume sa caméra
+         dans un appel, jamais au lancement — la même règle que le microphone
+         juste au-dessus, et pour la même raison.
+
+         Arrivée avec #198, le spike qui demande si `RTCView` se dessine sous
+         la nouvelle architecture. Elle reste après lui : c'est la permission
+         que tout le lot vidéo suppose. -->
+    <uses-permission android:name="android.permission.CAMERA" />
+
     <!-- LE PLEIN ÉCRAN SUR UN TÉLÉPHONE VERROUILLÉ.
          Sans cette permission, un appel entrant est une ligne de plus sur
          l'écran de verrouillage, à remarquer en quatre-vingt-dix secondes.

@@ -14,11 +14,23 @@ import type { Candidate, SessionDescription } from './wire'
  * application passes the library's while a test passes a fake. The module
  * below is the *decisions*; the library is a detail two files away.
  *
- * # Audio, and no video transceiver at all
+ * # IT ADDS VIDEO NOW, AND THE PARAGRAPH THIS REPLACES WAS RIGHT
  *
- * #88 says video is not offered, and this does not offer it: capture asks
- * for audio, and nothing here ever adds a video track. That is stronger than
- * a control that is hidden -- there is no video to un-hide.
+ * It said: *"Audio, and no video transceiver at all. #88 says video is not
+ * offered, and this does not offer it: capture asks for audio, and nothing
+ * here ever adds a video track. That is stronger than a control that is
+ * hidden -- there is no video to un-hide."*
+ *
+ * That was true of #88 and it was the right way to be true of it: a product
+ * that hides a control still has the capability, and the capability is what
+ * lights an indicator. What changed is not the argument but the scope --
+ * §4.5 puts 1:1 video in V1, and the instance's own TURN was sized for it a
+ * month before anything asked (`max-bps=400000`, "the product's ceiling is a
+ * relayed 1:1 video call at ~3 Mbit/s per direction").
+ *
+ * So the rule the old paragraph protected survives in a narrower form, and
+ * `captureVideo` below carries it: **the camera is captured at the moment
+ * somebody asks for video and at no other**. An audio call never touches it.
  *
  * Renegotiation still exists, because the *peer* may offer one and the
  * specification requires an answer. Answering a renegotiation that adds
@@ -54,8 +66,8 @@ export interface PeerConnectionLike {
     description: SessionDescription,
   ) => Promise<void>
   readonly addIceCandidate: (candidate: Candidate) => Promise<void>
-  /** Attach the captured audio, so the offer carries a track to negotiate. */
-  readonly addAudio: (track: AudioTrackLike) => void
+  /** Attach a captured track, so the offer carries one to negotiate. */
+  readonly addTrack: (kind: TrackKind, track: TrackLike) => void
   readonly close: () => void
   /** Each locally gathered candidate. An empty `candidate` ends the gathering. */
   onCandidate?: (candidate: Candidate) => void
@@ -73,7 +85,14 @@ export interface PeerConnectionLike {
 export type MediaConnectionState =
   'connecting' | 'connected' | 'disconnected' | 'failed'
 
-export interface AudioTrackLike {
+/**
+ * A captured track, of either kind.
+ *
+ * It was `TrackLike` while there was only one kind. The shape never
+ * cared: a microphone and a camera are both something you can silence and
+ * something you must stop.
+ */
+export interface TrackLike {
   /** Set the track's enabled flag and answer what it holds afterwards. */
   readonly setEnabled: (enabled: boolean) => boolean
   readonly stop: () => void
@@ -90,8 +109,22 @@ export interface MediaPorts {
    * a screen as a failure rather than as a call that silently never
    * connects.
    */
-  readonly captureAudio: () => Promise<AudioTrackLike>
+  readonly captureAudio: () => Promise<TrackLike>
+  /**
+   * Capture the camera.
+   *
+   * ITS REJECTION MEANS SOMETHING ELSE ENTIRELY. Without a microphone there
+   * is no call, so `captureAudio` rejecting is a call that cannot be placed.
+   * Without a camera there is still a whole call -- so this rejecting leaves
+   * the audio alone and the screen says the picture did not come. Failing a
+   * conversation because an image is missing would punish somebody for
+   * saying no to an optional request. #199.
+   */
+  readonly captureVideo: () => Promise<TrackLike>
 }
+
+/** Which of the two. Named, so `addTrack` cannot be given the wrong one silently. */
+export type TrackKind = 'audio' | 'video'
 
 /** What the media layer tells the transport. Every one of these is a report. */
 export interface MediaListener {
@@ -149,7 +182,7 @@ export function startCallMedia(
   listener: MediaListener,
 ): CallMedia {
   let connection: PeerConnectionLike | undefined
-  let track: AudioTrackLike | undefined
+  let track: TrackLike | undefined
   let muted = false
   let stopped = false
 
@@ -211,7 +244,7 @@ export function startCallMedia(
     // The mute state survives a renegotiation, so it is applied to the track
     // rather than assumed to be false on a fresh one.
     if (muted) captured.setEnabled(false)
-    pc.addAudio(captured)
+    pc.addTrack('audio', captured)
   }
 
   async function drainWaiting(pc: PeerConnectionLike): Promise<void> {

@@ -3,7 +3,7 @@ import { describe, expect, it, vi } from 'vitest'
 import type { IceConfig } from './ice'
 import {
   startCallMedia,
-  type AudioTrackLike,
+  type TrackLike,
   type MediaConnectionState,
   type MediaListener,
   type PeerConnectionLike,
@@ -44,7 +44,8 @@ function fakeConnection(overrides: Partial<PeerConnectionLike> = {}) {
     localDescriptions: [] as SessionDescription[],
     remoteDescriptions: [] as SessionDescription[],
     candidates: [] as Candidate[],
-    audio: [] as AudioTrackLike[],
+    audio: [] as TrackLike[],
+    video: [] as TrackLike[],
     closed: 0,
     /** The order every call arrived in, which is what some rules are about. */
     order: [] as string[],
@@ -70,9 +71,10 @@ function fakeConnection(overrides: Partial<PeerConnectionLike> = {}) {
       calls.order.push('addIceCandidate')
       calls.candidates.push(c)
     },
-    addAudio: t => {
-      calls.order.push('addAudio')
-      calls.audio.push(t)
+    addTrack: (kind, t) => {
+      calls.order.push(kind === 'audio' ? 'addAudio' : 'addVideo')
+      if (kind === 'audio') calls.audio.push(t)
+      else calls.video.push(t)
     },
     close: () => {
       calls.closed += 1
@@ -84,7 +86,7 @@ function fakeConnection(overrides: Partial<PeerConnectionLike> = {}) {
 
 function fakeTrack(answers?: (enabled: boolean) => boolean) {
   const held = { enabled: true, stopped: 0, asked: [] as boolean[] }
-  const track: AudioTrackLike = {
+  const track: TrackLike = {
     setEnabled: enabled => {
       held.asked.push(enabled)
       held.enabled = answers ? answers(enabled) : enabled
@@ -121,9 +123,12 @@ function build(options: {
   track?: ReturnType<typeof fakeTrack>
   captureRejects?: Error
   captureHangs?: boolean
+  camera?: ReturnType<typeof fakeTrack>
+  cameraRejects?: Error
 }) {
   const connection = options.connection ?? fakeConnection()
   const track = options.track ?? fakeTrack()
+  const camera = options.camera ?? fakeTrack()
   const listener = fakeListener()
   let release: (() => void) | undefined
   const media = startCallMedia(
@@ -138,11 +143,22 @@ function build(options: {
         }
         return track.track
       },
+      captureVideo: async () => {
+        if (options.cameraRejects !== undefined) throw options.cameraRejects
+        return camera.track
+      },
     },
     CONFIG,
     listener,
   )
-  return { media, connection, track, listener, release: () => release?.() }
+  return {
+    media,
+    connection,
+    track,
+    camera,
+    listener,
+    release: () => release?.(),
+  }
 }
 
 function state(
@@ -455,7 +471,11 @@ describe('renegotiation', () => {
     const captureAudio = vi.fn(async () => fakeTrack().track)
     const connection = fakeConnection()
     const media = startCallMedia(
-      { createConnection: () => connection.pc, captureAudio },
+      {
+        createConnection: () => connection.pc,
+        captureAudio,
+        captureVideo: async () => fakeTrack().track,
+      },
       CONFIG,
       fakeListener(),
     )
