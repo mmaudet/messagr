@@ -96,3 +96,43 @@ describe('mergeTimeline', () => {
     expect(mergeTimeline([], [])).toEqual([])
   })
 })
+
+describe('a removal always wins', () => {
+  it('replaces a message this device had already read', () => {
+    // THE DEFECT THIS EXISTS TO STOP. The rule below is "the readable
+    // version wins", and a tombstone is `body: null` -- so it lost to the
+    // plaintext already held, and the other person went on reading a message
+    // that had been deleted for everyone until they closed the conversation.
+    const held = [
+      { eventId: '$a', claimedSender: '@her:x', sentAt: 100, body: 'oups' },
+    ]
+    const merged = mergeTimeline(held, [
+      {
+        eventId: '$a',
+        claimedSender: '@her:x',
+        sentAt: 100,
+        body: null,
+        removed: true,
+      },
+    ])
+    expect(merged[0]?.removed).toBe(true)
+    expect(merged[0]?.body).toBeNull()
+  })
+
+  it('is not undone by a later poll that still carries the old body', () => {
+    // A removal is newer than any body, whichever order they arrive in.
+    const held = [
+      {
+        eventId: '$a',
+        claimedSender: '@her:x',
+        sentAt: 100,
+        body: null,
+        removed: true,
+      },
+    ]
+    const merged = mergeTimeline(held, [
+      { eventId: '$a', claimedSender: '@her:x', sentAt: 100, body: 'oups' },
+    ])
+    expect(merged[0]?.removed).toBe(true)
+  })
+})

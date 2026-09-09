@@ -1,4 +1,4 @@
-import React, { useRef, useState } from 'react'
+import React, { useState } from 'react'
 import { Pressable, StyleSheet, Text, View } from 'react-native'
 
 import { t, type CopyKey } from '../copy'
@@ -55,6 +55,17 @@ export interface ConversationProps {
   readonly reactions?: ReadonlyMap<string, readonly ReactionTally[]>
   /** This account's own messages somebody else has read. */
   readonly read?: ReadonlySet<string>
+  /** Which messages the selection mode holds. Empty means no mode at all. */
+  readonly selected?: ReadonlySet<string>
+  /**
+   * Adds or removes events, together. `null` clears the whole selection,
+   * which is what a tap on the background means.
+   *
+   * SEVERAL AT ONCE because a plate is one thing on screen and several
+   * events underneath: it goes in and out as a whole, which is what its
+   * single outline promises.
+   */
+  readonly onToggle?: (eventIds: readonly string[] | null) => void
   /**
    * Add or remove a reaction. `own` is the id of this account's own reaction
    * on that key, when it has one -- removing is a redaction and needs the
@@ -84,6 +95,8 @@ export function Conversation({
   selfUserId,
   sending,
   reactions = new Map(),
+  selected = EMPTY,
+  onToggle = () => {},
   read = new Set(),
   onReact,
   onLoadImage,
@@ -116,57 +129,40 @@ export function Conversation({
   const swallowed = new Set(plates.flatMap(plate => [...plate.swallowed]))
 
   /**
-   * Which message has its reaction row open, if any.
-   *
-   * HELD HERE BECAUSE A BUBBLE CANNOT CLOSE ITSELF FROM OUTSIDE. It was a
-   * boolean inside each bubble, so tapping anywhere else left the row
-   * standing -- a popover that only its own long press could take back.
-   * Reported from a Pixel on 7 September 2026.
-   *
-   * One open at a time falls out of holding it here, which is also what a
-   * person expects: two rows of emoji on one screen is a question about
-   * which one is listening.
-   */
-  const [offering, setOffering] = useState<string | null>(null)
-  /**
    * Which message has the whole catalogue open, if any.
    *
    * Separate from `offering`: the row closes on the touch that opened this,
    * and the picker is a modal that outlives it.
    */
   const [picking, setPicking] = useState<string | null>(null)
-  /**
-   * Whether the touch still on the screen is the one that just opened a row.
-   * A ref rather than state: it is read inside the same gesture that writes
-   * it, and a re-render between the two would be a re-render for nothing.
-   */
-  const justOpened = useRef(false)
 
   return (
-    <View
+    // THE ROW AND THE SELECTION ARE ONE STATE NOW.
+    //
+    // This screen used to hold `offering` and close it on any touch, through
+    // a capture-phase handler and a `justOpened` ref -- a whole mechanism
+    // built to answer "is the row still wanted?", and a subtle one: closing
+    // at touch-down unmounted the emoji under the finger before the press
+    // landed, which took a Pixel to find.
+    //
+    // A selection answers the same question by existing. The row is shown
+    // when exactly one message is selected (#192: a reaction targets one
+    // message, so it goes at the second), and leaving the selection closes
+    // it. There is nothing left to synchronise, and nothing left to race.
+    <Pressable
       testID="conversation"
       style={styles.screen}
-      // ANY TOUCH CLOSES IT, AND THE TOUCH STILL LANDS.
+      // A TAP ANYWHERE ELSE LEAVES THE MODE, and this is a `Pressable`
+      // rather than the capture-phase handler that used to live here. An
+      // inner `Pressable` -- a bubble, an emoji, a plate -- wins the gesture
+      // and this never fires, which is precisely the rule wanted and the one
+      // the old handler had to hand-build with a ref.
       //
-      // At the END of the touch, never the start. Closing on touch-down
-      // unmounted the emoji under the finger before the finger came off it,
-      // so the press it was aimed at never happened: measured on a Pixel,
-      // where tapping a reaction closed the row and reacted with nothing.
-      // By touch-end the emoji has had its press, and this only clears what
-      // is left.
-      //
-      // Capture rather than bubble so it runs whatever the touch landed on,
-      // including a child that consumed it. Nothing here claims the gesture.
-      onTouchEndCapture={() => {
-        // Except the long press that opened it, whose own finger has yet to
-        // come off the screen -- closing on that release would make the row
-        // impossible to open.
-        if (justOpened.current) {
-          justOpened.current = false
-          return
-        }
-        setOffering(held => (held === null ? held : null))
-      }}>
+      // `undefined` when nothing is selected, so a conversation nobody is
+      // selecting in has no press target over it at all.
+      onPress={selected.size > 0 ? () => onToggle(null) : undefined}
+      accessibilityRole={selected.size > 0 ? 'button' : undefined}
+      accessibilityLabel={selected.size > 0 ? t('selection_clear') : undefined}>
       {entries.length === 0 ? (
         <Text
           testID="conversation-empty"
@@ -199,16 +195,26 @@ export function Conversation({
                 entry={entry}
                 plate={plateAt.get(entry.eventId)}
                 onOpenPlate={onOpenPlate}
-                offering={offering === entry.eventId}
-                // Opens, and never toggles: the capture above has already
-                // closed whatever was open by the time this runs, so a
-                // toggle here would read the state it just cleared and
-                // reopen on every long press. A long press means "offer me
-                // reactions"; closing is any other touch's job now.
-                onOffer={() => {
-                  justOpened.current = true
-                  setOffering(entry.eventId)
-                }}
+                // ONE MESSAGE SELECTED IS ONE MESSAGE OFFERED REACTIONS.
+                // At two the row goes, because a reaction targets one
+                // message and no interface should have to explain that.
+                offering={selected.size === 1 && selected.has(entry.eventId)}
+                selected={selected.has(entry.eventId)}
+                // A long press starts the selection; once there is one, a
+                // plain tap adds and removes. One gesture in, one gesture
+                // to grow it, which is what a thumb already knows.
+                // A PLATE IS ONE THING ON SCREEN AND SEVERAL EVENTS
+                // UNDERNEATH. Selecting it took only the event it is drawn
+                // at, so the outline covered three photographs and
+                // "supprimer pour tout le monde" removed one of them. The
+                // plate's own events go in and out together, which is what
+                // the single outline promises.
+                onOffer={() => onToggle(idsOf(entry, plateAt))}
+                onToggle={
+                  selected.size > 0
+                    ? () => onToggle(idsOf(entry, plateAt))
+                    : undefined
+                }
                 // The `+`. Held on the screen rather than in the bubble
                 // because the picker is a modal over everything, and a
                 // bubble that owns one would own it per bubble.
@@ -217,7 +223,14 @@ export function Conversation({
                 palette={palette}
                 tallies={reactions.get(entry.eventId) ?? []}
                 read={read.has(entry.eventId)}
-                onReact={(key, own) => onReact?.(entry.eventId, key, own)}
+                // AND REACTING LEAVES THE MODE. A reaction is a decision;
+                // the bar and the row have done what they were opened for,
+                // and a screen still in selection afterwards is one the
+                // person has to dismiss for no reason.
+                onReact={(key, own) => {
+                  onReact?.(entry.eventId, key, own)
+                  onToggle(null)
+                }}
                 onLoadImage={onLoadImage}
                 unexpected={
                   otherParty === undefined || entry.claimedSender !== otherParty
@@ -250,10 +263,11 @@ export function Conversation({
               ?.find(tally => tally.key === key)?.mine
             onReact?.(picking, key, already ?? null)
             setPicking(null)
+            onToggle(null)
           }}
         />
       )}
-    </View>
+    </Pressable>
   )
 }
 
@@ -316,6 +330,25 @@ function dayLabel(mark: DayMark): string {
  */
 const OFFERED = ['👍', '❤️', '😂', '😮', '😢', '🙏'] as const
 
+/** Shared, so a screen with no selection does not build a set per render. */
+const EMPTY: ReadonlySet<string> = new Set()
+
+/**
+ * Every event a bubble stands for: one for a message, all of them for a
+ * plate. A plate is drawn as one thing, so it goes in and out of a selection
+ * as one thing -- otherwise the outline covers three photographs and the
+ * removal takes one.
+ */
+function idsOf(
+  entry: TimelineEntry,
+  plates: ReadonlyMap<string, Grouping>,
+): readonly string[] {
+  const plate = plates.get(entry.eventId)
+  return plate === undefined
+    ? [entry.eventId]
+    : plate.entries.map(one => one.eventId)
+}
+
 function Message({
   entry,
   mine,
@@ -324,7 +357,9 @@ function Message({
   onReact,
   read,
   offering,
+  selected,
   onOffer,
+  onToggle,
   onMore,
   onLoadImage,
   unexpected,
@@ -346,8 +381,15 @@ function Message({
   onReact: (key: string, mine: string | null) => void
   /** Whether this bubble's reaction row is the open one. Held by the screen. */
   offering: boolean
+  /** Whether this bubble is in the selection. */
+  selected: boolean
   /** Asks for it to open. Closing is the screen's business: any touch does it. */
   onOffer: () => void
+  /**
+   * A plain tap, while the screen is selecting. `undefined` otherwise, which
+   * is what keeps a tap from stealing the gesture people scroll with.
+   */
+  onToggle?: () => void
   /** Opens the whole catalogue. See `EmojiPicker.tsx`. */
   onMore: () => void
   readonly onLoadImage?: (file: ReadFile) => Promise<ShownImage>
@@ -382,19 +424,23 @@ function Message({
           {t('conversation_sender_claimed %@', entry.claimedSender)}
         </Text>
       )}
-      {/* The bubble is pressable only to offer a reaction. A long press
-          rather than a tap: a tap on a message is what a person does to read
-          it, and stealing that gesture for a menu is how a conversation stops
-          being scrollable. */}
+      {/* A LONG PRESS SELECTS; A TAP ONLY DOES SO ONCE SOMETHING IS.
+          A tap on a message is what a person does to read it, and stealing
+          that gesture outright is how a conversation stops being scrollable
+          -- so the plain tap does nothing until a long press has said this
+          screen is selecting, and then it adds and removes. */}
       <Pressable
         onLongPress={onOffer}
+        onPress={onToggle}
         delayLongPress={350}
         accessibilityRole="button"
+        accessibilityState={{ selected }}
         accessibilityLabel={t('reaction_offer')}
         testID={`bubble-${entry.eventId}`}
         style={[
           styles.bubble,
           mine ? styles.bubbleMine : styles.bubbleTheirs,
+          selected && styles.bubbleSelected,
           {
             // `green200` rather than `green100`: the pale one is a label
             // tint, and a message is not a label -- below that saturation it
@@ -410,7 +456,13 @@ function Message({
           <Plate
             plate={plate}
             fetch={onLoadImage}
-            onOpen={at => onOpenPlate(plate, at)}
+            // SELECTING WINS OVER OPENING. `Plate`'s own tiles are
+            // pressable and take the gesture before the bubble does, so
+            // without this a tap on a photograph opened the viewer while
+            // the screen was selecting -- the one gesture the mode redefines.
+            onOpen={at =>
+              onToggle === undefined ? onOpenPlate(plate, at) : onToggle()
+            }
             // The same gesture the bubble above it answers. A plate's
             // reactions annotate its first event, which is the event this
             // `Message` is: one plate, one place they attach.
@@ -431,6 +483,13 @@ function Message({
             testID={`body-${entry.eventId}`}
             style={[
               styles.body,
+              // ITALIC, so a removal does not read as words somebody wrote.
+              // It is already the muted grey every unreadable line takes,
+              // and grey alone would say "this device could not read it" --
+              // two different facts sharing one appearance. A slant is a
+              // shape rather than a colour, which is what §13 asks of any
+              // state that has to be legible without it.
+              entry.removed === true && styles.removedBody,
               {
                 color:
                   entry.body === null
@@ -438,7 +497,9 @@ function Message({
                     : palette.neutral['900'],
               },
             ]}>
-            {entry.body ?? t('conversation_unreadable')}
+            {entry.removed
+              ? t('conversation_removed')
+              : (entry.body ?? t('conversation_unreadable'))}
           </Text>
         )}
       </Pressable>
@@ -644,6 +705,15 @@ const styles = StyleSheet.create({
   // The author's own corner is squared off. It is in the token file as
   // `bubbleAuthorCorner`, and it is the one asymmetry that says which side
   // wrote a message without colour having to carry it alone.
+  // SELECTED, AND SAID BY MORE THAN A COLOUR. A border rather than a tint:
+  // the two bubble grounds are already two colours, so a third would mean
+  // one thing on an outgoing message and another on an incoming one. §13
+  // wants no state carried by colour alone, and an outline is a shape.
+  removedBody: { fontStyle: 'italic' },
+  bubbleSelected: {
+    borderWidth: stroke.accent,
+    borderColor: color.brand.green700,
+  },
   bubbleMine: { borderBottomRightRadius: radius.bubbleAuthorCorner },
   bubbleTheirs: { borderBottomLeftRadius: radius.bubbleAuthorCorner },
   body: typeScale.body,

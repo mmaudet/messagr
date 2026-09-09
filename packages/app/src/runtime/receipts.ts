@@ -43,23 +43,72 @@ export function readUpTo(
   receipts: readonly Receipt[],
   selfUserId: string,
 ): ReadonlySet<string> {
+  return readAtMark(
+    entries,
+    markUpTo(entries, receipts, selfUserId) ?? 0,
+    selfUserId,
+  )
+}
+
+/**
+ * How far somebody else has read, as a timestamp, or `null` when no receipt
+ * resolves against this timeline.
+ *
+ * # WHY THE MARK IS HELD APART FROM WHAT IT MARKS
+ *
+ * A receipt points at an event, and resolving it needs that event's
+ * timestamp -- so a receipt naming an event this device has not fetched
+ * resolves to nothing. That is not a reason to guess, and it was never a
+ * reason to *forget* either, which is the defect this split fixes.
+ *
+ * Measured on the demonstration Pixel on 9 September 2026, with two people
+ * writing to each other:
+ *
+ *     MESSAGR_READ_BY {"receipts":1,"marked":2}
+ *     MESSAGR_READ_BY {"receipts":1,"marked":0}
+ *     MESSAGR_READ_BY {"receipts":1,"marked":3}
+ *     MESSAGR_READ_BY {"receipts":1,"marked":0}
+ *
+ * The receipts arrived, resolved, and were then resolved again against a
+ * timeline that had moved -- and the caller replaced a correct set with an
+ * empty one. Reported as « les chevrons s'affichent quand Thibault m'écrit,
+ * et parfois l'état se perd ».
+ *
+ * A receipt is a high-water mark: it never goes backwards. Keeping the mark
+ * rather than the resolved set makes that true of the screen as well. A
+ * caller holds the highest mark it has ever resolved for a conversation,
+ * lets `null` leave it alone, and re-derives the ticks whenever the timeline
+ * changes -- which is also what makes a receipt that arrived *before* its
+ * event resolve when the event lands.
+ */
+export function markUpTo(
+  entries: readonly TimelineEntry[],
+  receipts: readonly Receipt[],
+  selfUserId: string,
+): number | null {
   const timestamps = new Map(
     entries.map(entry => [entry.eventId, entry.sentAt]),
   )
 
   let highest: number | null = null
   for (const receipt of receipts) {
+    // This account reading its own messages says nothing, and a screen that
+    // counted it would show every message as read the moment it was sent.
     if (receipt.reader === selfUserId) continue
     const at = timestamps.get(receipt.upTo)
-    // A receipt pointing at an event this device has not fetched is not a
-    // reason to guess. It will resolve when the event does, and until then
-    // the message is shown as sent, which it is.
     if (at === undefined) continue
     if (highest === null || at > highest) highest = at
   }
-  if (highest === null) return new Set()
+  return highest
+}
 
-  const mark = highest
+/** Which of this account's own messages sit at or below a mark. */
+export function readAtMark(
+  entries: readonly TimelineEntry[],
+  mark: number,
+  selfUserId: string,
+): ReadonlySet<string> {
+  if (mark <= 0) return new Set()
   return new Set(
     entries
       .filter(

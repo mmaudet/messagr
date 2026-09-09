@@ -130,6 +130,59 @@ describe('toTimelineEntries', () => {
     expect(entries[0]?.eventId).toBe('$a')
   })
 
+  it('leaves a line where a MESSAGE was removed', async () => {
+    // §13.7: "l'effacement-pour-tous laisse une ligne dans le journal du
+    // salon -- un retrait est un fait social, pas une disparition
+    // silencieuse". The redaction says which it was; `redactionKind.ts`
+    // explains why it has to, and why an unmarked one stays silent.
+    const entries = await entriesOf(
+      machine({ $a: 'lisible' }),
+      decodeUtf8,
+      '!room:messagr.eu',
+      [
+        encrypted('$a', 1000),
+        {
+          ...encrypted('$gone', 2000),
+          content: {},
+          unsigned: {
+            redacted_because: {
+              type: 'm.room.redaction',
+              content: { 'eu.messagr.kind': 'message' },
+            },
+          },
+        },
+      ],
+    )
+    expect(entries).toHaveLength(2)
+    const removed = entries.find(entry => entry.eventId === '$gone')
+    expect(removed?.removed).toBe(true)
+    // Not an unreadable message: there is nothing to read and nothing went
+    // wrong, and the screen must not say a key never arrived.
+    expect(removed?.body).toBeNull()
+    expect(removed?.reason).toBeUndefined()
+  })
+
+  it('still leaves nothing where a REACTION was withdrawn', async () => {
+    const entries = await entriesOf(
+      machine({}),
+      decodeUtf8,
+      '!room:messagr.eu',
+      [
+        {
+          ...encrypted('$gone', 2000),
+          content: {},
+          unsigned: {
+            redacted_because: {
+              type: 'm.room.redaction',
+              content: { 'eu.messagr.kind': 'reaction' },
+            },
+          },
+        },
+      ],
+    )
+    expect(entries).toEqual([])
+  })
+
   it('does not ask the crypto machine to open an event that is not there', async () => {
     // Not only cosmetic: a redacted event has no ciphertext, so every
     // attempt is a failure the log would report as a decryption fault.

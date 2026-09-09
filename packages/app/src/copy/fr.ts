@@ -183,6 +183,20 @@ export const fr = {
   conversation_empty: 'Rien n’a encore été dit ici.',
   conversation_unreadable:
     'Message illisible sur cet appareil : sa clé n’est pas arrivée.',
+  conversation_removed: 'Message supprimé',
+
+  'selection_count %1$d': '%1$d sélectionné(s)',
+  selection_clear: 'Quitter la sélection',
+  selection_copy: 'Copier',
+  selection_remove: 'Supprimer',
+  'remove_title %1$d': 'Supprimer %1$d message(s) ?',
+  remove_everyone: 'Supprimer pour tout le monde',
+  remove_everyone_why:
+    'Le message disparaît aussi chez votre correspondant. Une ligne reste à sa place : un retrait se voit.',
+  remove_me: 'Supprimer pour moi',
+  remove_me_why:
+    'Le message reste chez votre correspondant. Il ne s’affichera plus sur ce téléphone — mais il réapparaîtra sur un autre appareil ou après une réinstallation.',
+  remove_cancel: 'Annuler',
   conversation_sending: 'Envoi…',
   conversation_send_failed: 'Non envoyé. Réessayez.',
 
@@ -513,7 +527,6 @@ export const fr = {
   call_mute: 'Couper le micro',
   call_unmute: 'Rétablir le micro',
   call_speaker: 'Haut-parleur',
-  call_dismiss: 'Fermer',
   call_failed_no_relay:
     'Ce serveur n’a pas de relais d’appel : l’appel n’a pas pu être passé.',
   call_failed_no_microphone: 'Le micro n’est pas accessible.',
@@ -536,6 +549,7 @@ export const fr = {
   composer_emoji: 'Émojis',
   composer_photo: 'Ajouter une photo',
   composer_record: 'Message vocal',
+  composer_send: 'Envoyer',
   composer_record_soon:
     'Les messages vocaux arrivent en V2. Le bouton garde sa place pour que la barre ne bouge pas ce jour-là.',
 

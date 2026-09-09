@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 
 import type { TimelineEntry } from '../timeline/mergeTimeline'
-import { readReceiptsFor, readUpTo } from './receipts'
+import { markUpTo, readAtMark, readReceiptsFor, readUpTo } from './receipts'
 
 const ME = '@me:x'
 const HER = '@her:x'
@@ -126,5 +126,46 @@ describe('readReceiptsFor', () => {
         '!a:x',
       ),
     ).toEqual([])
+  })
+})
+
+describe('the mark, held apart from what it marks', () => {
+  it('answers the timestamp the furthest receipt reaches', () => {
+    expect(markUpTo(TIMELINE, [{ reader: HER, upTo: '$m2' }], ME)).toBe(200)
+  })
+
+  it('answers null when no receipt resolves against this timeline', () => {
+    // The event the receipt names has not been fetched. THIS IS THE WHOLE
+    // POINT of holding the mark apart: the caller keeps the mark it already
+    // had rather than replacing it with nothing.
+    expect(markUpTo(TIMELINE, [{ reader: HER, upTo: '$nope' }], ME)).toBeNull()
+  })
+
+  it('ignores this account reading its own messages', () => {
+    expect(markUpTo(TIMELINE, [{ reader: ME, upTo: '$m3' }], ME)).toBeNull()
+  })
+
+  it('marks every own message at or below the mark', () => {
+    expect([...readAtMark(TIMELINE, 200, ME)]).toEqual(['$m1', '$m2'])
+  })
+
+  it('marks nothing at a mark of zero', () => {
+    expect([...readAtMark(TIMELINE, 0, ME)]).toEqual([])
+  })
+
+  it('never marks somebody else’s message', () => {
+    expect(readAtMark(TIMELINE, 1000, ME).has('$h1')).toBe(false)
+  })
+
+  it('resolves a mark that could not resolve before, once the event lands', () => {
+    // The sequence that lost the ticks on a Pixel: a receipt arrives naming
+    // an event this device has not merged yet, so it resolves to nothing;
+    // the event lands a moment later; the same mark now marks the messages.
+    const early = markUpTo(TIMELINE, [{ reader: HER, upTo: '$m4' }], ME)
+    expect(early).toBeNull()
+    const later = [...TIMELINE, entry('$m4', ME, 400)]
+    const found = markUpTo(later, [{ reader: HER, upTo: '$m4' }], ME)
+    expect(found).toBe(400)
+    expect(readAtMark(later, found ?? 0, ME).has('$m4')).toBe(true)
   })
 })

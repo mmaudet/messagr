@@ -146,6 +146,20 @@ export const es: Readonly<Record<CopyKey, string>> = {
   conversation_empty: 'Aquí todavía no se ha dicho nada.',
   conversation_unreadable:
     'Ilegible en este dispositivo: su clave nunca llegó.',
+  conversation_removed: 'Mensaje eliminado',
+
+  'selection_count %1$d': '%1$d seleccionado(s)',
+  selection_clear: 'Salir de la selección',
+  selection_copy: 'Copiar',
+  selection_remove: 'Eliminar',
+  'remove_title %1$d': '¿Eliminar %1$d mensaje(s)?',
+  remove_everyone: 'Eliminar para todos',
+  remove_everyone_why:
+    'El mensaje desaparece también en el dispositivo de su interlocutor. Queda una línea en su lugar: una retirada se ve.',
+  remove_me: 'Eliminar para mí',
+  remove_me_why:
+    'El mensaje permanece en el dispositivo de su interlocutor. No volverá a mostrarse en este teléfono, pero reaparecerá en otro dispositivo o tras una reinstalación.',
+  remove_cancel: 'Cancelar',
   conversation_sending: 'Enviando…',
   conversation_send_failed: 'No enviado. Inténtelo de nuevo.',
   vouch_action: 'Respondo por esta persona',
@@ -345,7 +359,6 @@ export const es: Readonly<Record<CopyKey, string>> = {
   call_mute: 'Silenciar el micrófono',
   call_unmute: 'Activar el micrófono',
   call_speaker: 'Altavoz',
-  call_dismiss: 'Cerrar',
   call_failed_no_relay:
     'Este servidor no tiene retransmisión de llamadas: no se ha podido llamar.',
   call_failed_no_microphone: 'El micrófono no está disponible.',
@@ -363,6 +376,7 @@ export const es: Readonly<Record<CopyKey, string>> = {
   composer_emoji: 'Emojis',
   composer_photo: 'Añadir una foto',
   composer_record: 'Nota de voz',
+  composer_send: 'Enviar',
   composer_record_soon:
     'Las notas de voz llegan en la V2. El botón guarda su sitio para que la barra no se mueva ese día.',
   person_open: 'Sobre esta persona',

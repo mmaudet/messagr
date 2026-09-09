@@ -23,20 +23,33 @@ import { TabIcon } from './TabIcon'
  * asked for, and it is the arrangement most people already have their thumbs
  * trained on.
  *
- * # There is no send button
+ * # THE FIELD TAKES SEVERAL LINES, AND THAT IS WHY THERE IS A SEND BUTTON
  *
- * The return key sends. Asked for outright, and it is what the round button's
- * place is for: in the bar this copies, that button records, and recording is
- * V2. So it sits there greyed, holding its place so the bar does not move the
- * day voice messages arrive -- the same argument the reserved Appels tab
- * makes, and a different one from the inert switch §13.18 refuses. That one
- * lies about a capability; this one says when it is coming.
+ * This said "there is no send button. The return key sends. Asked for
+ * outright." Then a second thing was asked for outright -- « le champ doit
+ * pouvoir accepter les retours à la ligne et donc on doit pouvoir naviguer
+ * dans le champ de saisie » -- and the two cannot both be true of one key.
+ * A return that sends is a return that cannot make a paragraph.
  *
- * `state.disabled` is normative and this follows it exactly: `neutral.200`
- * plate, `neutral.300` glyph, **no opacity** -- the token forbids it, because
- * a global opacity greys the reason too and makes contrast depend on the
- * ground. And it keeps its reason, which a tap reveals rather than a line of
- * permanent noise above every conversation.
+ * So the round button carries the send now, and it does it **without the bar
+ * moving**, which was the whole reason that place was reserved. Empty, it is
+ * the microphone it always was: grey, V2, and it says so when tapped. With
+ * something written in it, it is green and it sends. The place never changes,
+ * only what stands in it -- which is what every messenger does and what
+ * anybody's thumb already expects.
+ *
+ * `state.disabled` is normative and the microphone follows it exactly:
+ * `neutral.200` plate, `neutral.300` glyph, **no opacity** -- the token
+ * forbids it, because a global opacity greys the reason too and makes
+ * contrast depend on the ground. And it keeps its reason, which a tap reveals
+ * rather than a line of permanent noise above every conversation.
+ *
+ * # HOW TALL THE FIELD GETS
+ *
+ * It grows with what is typed and stops at `TALLEST_FIELD`, after which it
+ * scrolls inside itself. A field that grew without a bound would push the
+ * conversation off the top of its own screen, which is the failure mode of
+ * every composer that forgets to stop.
  *
  * # No paperclip
  *
@@ -51,6 +64,12 @@ import { TabIcon } from './TabIcon'
  * still does everything this does not. Written down so the next person knows
  * it is a floor rather than an attempt at a ceiling.
  */
+
+/**
+ * How tall the field is allowed to grow: five lines of `body`, plus the
+ * padding above and below. Past that it scrolls inside itself.
+ */
+const TALLEST_FIELD = typeScale.body.lineHeight * 5 + space.s * 2
 
 /** What a hand reaches for. Not a Unicode inventory. */
 const OFFERED = [
@@ -175,10 +194,18 @@ export function Composer({
             testID="conversation-input"
             value={draft}
             onChangeText={setDraft}
-            onSubmitEditing={send}
-            // The return key is the send key. There is no other.
-            returnKeyType="send"
-            blurOnSubmit={false}
+            // SEVERAL LINES, AND THE RETURN KEY MAKES THEM.
+            //
+            // With `multiline` the return key inserts a newline and the
+            // caret can be put anywhere with a tap, which is the second half
+            // of what was asked for: navigating inside what you have
+            // written. Sending moved to the button beside the field -- see
+            // the note at the top for why that costs the bar nothing.
+            multiline
+            // Grows to `TALLEST_FIELD` and scrolls after that. `top` so a
+            // field that has grown fills from its first line rather than
+            // centring one line in a tall box.
+            textAlignVertical="top"
             placeholder={t('message_placeholder')}
             placeholderTextColor={palette.neutral['400']}
             style={[styles.input, { color: palette.neutral['900'] }]}
@@ -208,22 +235,46 @@ export function Composer({
           )}
         </View>
 
-        {/* Outside the field, and grey. See the header: it records, and
-            recording is V2. */}
-        <Pressable
-          testID="composer-record"
-          onPress={() => setWhyDisabled(shown => !shown)}
-          accessibilityRole="button"
-          accessibilityState={{ disabled: true }}
-          accessibilityLabel={t('composer_record')}
-          accessibilityHint={t('composer_record_soon')}
-          style={[styles.round, { backgroundColor: palette.neutral['200'] }]}>
-          {/* `neutral.300` is the only disabling grey the palette allows,
-              and it is a tint on the glyph rather than an opacity on the
-              button -- `state.disabled` forbids opacity outright, because it
-              would grey the reason too. */}
-          <TabIcon glyph="mic" tint={palette.neutral['300']} />
-        </Pressable>
+        {/* ONE PLACE, TWO CONTROLS, AND THE BAR NEVER MOVES.
+            With something written, it sends; empty, it is the microphone it
+            has always been -- grey, V2, and it says so when tapped. */}
+        {draft.trim() === '' ? (
+          <Pressable
+            testID="composer-record"
+            onPress={() => setWhyDisabled(shown => !shown)}
+            accessibilityRole="button"
+            accessibilityState={{ disabled: true }}
+            accessibilityLabel={t('composer_record')}
+            accessibilityHint={t('composer_record_soon')}
+            style={[styles.round, { backgroundColor: palette.neutral['200'] }]}>
+            {/* `neutral.300` is the only disabling grey the palette allows,
+                and it is a tint on the glyph rather than an opacity on the
+                button -- `state.disabled` forbids opacity outright, because
+                it would grey the reason too. */}
+            <TabIcon glyph="mic" tint={palette.neutral['300']} />
+          </Pressable>
+        ) : (
+          <Pressable
+            testID="composer-send"
+            onPress={send}
+            accessibilityRole="button"
+            accessibilityLabel={t('composer_send')}
+            style={({ pressed }) => [
+              styles.round,
+              { backgroundColor: palette.brand.green500 },
+              pressed && styles.pressed,
+            ]}>
+            {/* AN ARROW WRITTEN, NOT AN ICON DRAWN. The identity's set has
+                no send glyph, and `TabIcon` says why one must not be
+                invented in a component: "an icon invented in a component is
+                one the identity never agreed to". A typographic arrow is
+                the same idiom the chevron of `LanguagePicker` and the tick
+                of `EmojiPicker` use, and it costs the set nothing. */}
+            <Text style={[styles.sendMark, { color: palette.surface.paper }]}>
+              {'↑'}
+            </Text>
+          </Pressable>
+        )}
       </View>
     </View>
   )
@@ -260,6 +311,16 @@ const styles = StyleSheet.create({
     flex: 1,
     ...typeScale.body,
     paddingVertical: space.s,
+    // Five lines of `body`, then it scrolls. A composer that grows without
+    // a bound pushes the conversation off the top of its own screen.
+    maxHeight: TALLEST_FIELD,
+  },
+  pressed: { opacity: 0.8 },
+  sendMark: {
+    ...typeScale.titleMd,
+    // The arrow is the whole content of a round button, so it is centred by
+    // the button rather than by a line box that assumes a descender.
+    lineHeight: typeScale.titleMd.fontSize,
   },
   round: {
     width: floors.touchTargetMin,

@@ -40,7 +40,30 @@ import { BrandMark } from './BrandMark'
  * `TabBar` at the other edge — whatever sits on an edge paints to it.
  */
 
-export function Header({ testID = 'header' }: { readonly testID?: string }) {
+export function Header({
+  testID = 'header',
+  children,
+}: {
+  readonly testID?: string
+  /**
+   * What stands in the band instead of the wordmark.
+   *
+   * # ONE BAND, MOUNTED ONCE, WHATEVER IS IN IT
+   *
+   * The selection bar used to be its own `SafeAreaView` with its own
+   * `StatusBar`, drawn where this one had been unmounted. Entering the mode
+   * therefore tore down the top of the screen and built another one: the
+   * safe area was measured again, and the status-bar style popped back to
+   * the platform default for the frame between one declaration unmounting
+   * and the next mounting. Reported from the Pixel as « un flash vraiment
+   * pas agréable », which is exactly what that is.
+   *
+   * So the band stays mounted and only its contents change. Nothing
+   * measures the inset twice and the status bar is declared in one place,
+   * for the life of the screen.
+   */
+  readonly children?: React.ReactNode
+}) {
   return (
     <SafeAreaView edges={['top']} style={styles.band} testID={testID}>
       {/* No `backgroundColor`: React Native 0.87 dropped it, because
@@ -48,28 +71,29 @@ export function Header({ testID = 'header' }: { readonly testID?: string }) {
           any more. It does not need one -- the band behind it is `ink900`,
           which is exactly what a background colour would have painted. */}
       <StatusBar barStyle="light-content" />
-      <View style={styles.mark}>
-        <BrandMark size={space.xl} tint={color.surface.paper} />
-        <Text style={styles.wordmark}>{t('brand_name')}</Text>
-      </View>
+      {children ?? (
+        <View style={styles.mark}>
+          <BrandMark size={space.xl} tint={color.surface.paper} />
+          <Text style={styles.wordmark}>{t('brand_name')}</Text>
+        </View>
+      )}
     </SafeAreaView>
   )
 }
 
 const styles = StyleSheet.create({
   band: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: 'column',
+    justifyContent: 'center',
     // `green900`, not `ink900`. The band was near-black -- reported from a
     // device -- and `ink900`'s own token says what it is for: the ground of
     // security boundaries, which is the promise screen and not a title bar.
     // A band that is meant to read as the brand should read as the brand.
     backgroundColor: color.brand.green900,
-    paddingHorizontal: layout.screenGutter,
     paddingVertical: space.m,
-    gap: space.m,
   },
   mark: {
+    paddingHorizontal: layout.screenGutter,
     flexDirection: 'row',
     alignItems: 'center',
     gap: space.s,

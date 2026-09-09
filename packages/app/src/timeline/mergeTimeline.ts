@@ -35,6 +35,20 @@ export interface TimelineEntry {
    * dropping it would leave nothing to say when the download fails.
    */
   readonly image?: ReadImage
+  /**
+   * Whether this event was removed for everyone.
+   *
+   * §13.7 asks that such a removal leave a line -- *« un retrait est un fait
+   * social, pas une disparition silencieuse »* -- so it is an entry rather
+   * than a gap. `body` is `null` and `reason` is absent, which is what tells
+   * a screen apart from a message whose key never arrived: nothing went
+   * wrong here, there is simply nothing left to read.
+   *
+   * A withdrawn reaction is not one of these. See `redactionKind.ts` for how
+   * the two are told apart, given that a redaction leaves both looking
+   * identical on the wire.
+   */
+  readonly removed?: boolean
 }
 
 /**
@@ -72,7 +86,20 @@ export function mergeTimeline(
 
   for (const entry of incoming) {
     const held = byId.get(entry.eventId)
-    if (held === undefined || (held.body === null && entry.body !== null)) {
+    // A REMOVAL IS NEWER THAN ANY BODY, whichever order the two arrive in.
+    //
+    // The rule below is "the readable version wins", and a tombstone carries
+    // `body: null` -- so it lost to the plaintext this device already held,
+    // and the other person went on reading a message that had been deleted
+    // for everyone until they closed the conversation. The rule is right
+    // about a message whose key arrived late; a removal is not that, it is
+    // the event ceasing to exist, and nothing can supersede it afterwards.
+    if (held?.removed === true) continue
+    if (
+      held === undefined ||
+      entry.removed === true ||
+      (held.body === null && entry.body !== null)
+    ) {
       byId.set(entry.eventId, entry)
     }
   }

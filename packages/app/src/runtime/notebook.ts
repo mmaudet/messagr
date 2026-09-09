@@ -21,6 +21,7 @@ import {
   openListCache,
   type ListCache,
 } from './listCacheStore'
+import { forgetfulHidden, openHidden, type Hidden } from './hiddenStore'
 import { openStorePassphrase } from './storePassphrase'
 
 /** What became of the notebook on this launch. Reported, not assumed. */
@@ -34,6 +35,8 @@ export interface NotebookOpening {
   readonly calls: CallLog
   /** The conversation list as it was last drawn, so the next launch is instant. */
   readonly list: ListCache
+  /** Events this device has been told not to draw. §13.7's "pour moi". */
+  readonly hidden: Hidden
   readonly opened: boolean
   /** Why it did not open, when it did not. */
   readonly reason?: string
@@ -44,7 +47,7 @@ export interface NotebookOpening {
 /**
  * Opens the application's own encrypted notebook. ADR-0010.
  *
- * # Five pages, one file
+ * # Six pages, one file
  *
  * Who you call what (`given_names`), how far you have read (`last_read`),
  * and who you have invited and not yet let in
@@ -95,6 +98,7 @@ export async function openNotebook(storeDir: string): Promise<NotebookOpening> {
       outstanding: forgetfulOutstanding(),
       calls: forgetfulCallLog(),
       list: forgetfulListCache(),
+      hidden: forgetfulHidden(),
       opened: false,
       reason: 'no writable directory was supplied at launch',
     }
@@ -110,6 +114,7 @@ export async function openNotebook(storeDir: string): Promise<NotebookOpening> {
       outstanding: forgetfulOutstanding(),
       calls: forgetfulCallLog(),
       list: forgetfulListCache(),
+      hidden: forgetfulHidden(),
       opened: false,
       reason: passphrase.reason,
     }
@@ -134,6 +139,7 @@ export async function openNotebook(storeDir: string): Promise<NotebookOpening> {
       outstanding: await openOutstanding(page),
       calls: await openCallLog(page),
       list: await openListCache(page),
+      hidden: await openHidden(page),
       opened: true,
       minted: passphrase.minted,
     }
@@ -147,6 +153,7 @@ export async function openNotebook(storeDir: string): Promise<NotebookOpening> {
       outstanding: forgetfulOutstanding(),
       calls: forgetfulCallLog(),
       list: forgetfulListCache(),
+      hidden: forgetfulHidden(),
       opened: false,
       reason: getErrorMessage(cause),
       minted: passphrase.minted,

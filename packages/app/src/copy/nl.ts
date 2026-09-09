@@ -142,6 +142,20 @@ export const nl: Readonly<Record<CopyKey, string>> = {
   conversation_empty: 'Hier is nog niets gezegd.',
   conversation_unreadable:
     'Onleesbaar op dit apparaat: de sleutel is nooit aangekomen.',
+  conversation_removed: 'Bericht verwijderd',
+
+  'selection_count %1$d': '%1$d geselecteerd',
+  selection_clear: 'Selectie verlaten',
+  selection_copy: 'Kopiëren',
+  selection_remove: 'Verwijderen',
+  'remove_title %1$d': '%1$d bericht(en) verwijderen?',
+  remove_everyone: 'Voor iedereen verwijderen',
+  remove_everyone_why:
+    'Het bericht verdwijnt ook bij uw gesprekspartner. Er blijft een regel op die plek staan: een verwijdering is zichtbaar.',
+  remove_me: 'Voor mij verwijderen',
+  remove_me_why:
+    'Het bericht blijft bij uw gesprekspartner. Het wordt op deze telefoon niet meer getoond — maar het komt terug op een ander toestel of na een herinstallatie.',
+  remove_cancel: 'Annuleren',
   conversation_sending: 'Versturen…',
   conversation_send_failed: 'Niet verstuurd. Probeer opnieuw.',
   vouch_action: 'Ik sta in voor deze persoon',
@@ -344,7 +358,6 @@ export const nl: Readonly<Record<CopyKey, string>> = {
   call_mute: 'Microfoon uit',
   call_unmute: 'Microfoon aan',
   call_speaker: 'Luidspreker',
-  call_dismiss: 'Sluiten',
   call_failed_no_relay:
     'Deze server heeft geen oproeprelais: bellen was niet mogelijk.',
   call_failed_no_microphone: 'De microfoon is niet beschikbaar.',
@@ -362,6 +375,7 @@ export const nl: Readonly<Record<CopyKey, string>> = {
   composer_emoji: 'Emoji',
   composer_photo: 'Een foto toevoegen',
   composer_record: 'Spraakbericht',
+  composer_send: 'Versturen',
   composer_record_soon:
     'Spraakberichten komen in V2. De knop houdt zijn plek zodat de balk die dag niet verschuift.',
   person_open: 'Over deze persoon',

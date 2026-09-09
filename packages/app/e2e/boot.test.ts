@@ -261,11 +261,23 @@ describe('boot', () => {
 
   // ── And the two that are about the screen, which is the point of it ──
 
-  it('opens on a conversation somebody can write in', async () => {
-    // A launch into an account with one room opens that room, and the bar is
-    // in the dock rather than in the scroll -- so this is what "the
-    // application arrived somewhere usable" looks like from outside.
+  it('opens a conversation somebody can write in', async () => {
+    // THE LAUNCH LANDS ON THE LIST NOW, and a conversation is something a
+    // person opens. This used to assert that "a launch into an account with
+    // one room opens that room" -- true of the scaffold, and wrong the day
+    // there was a list: the application picked whichever room the homeserver
+    // listed first and put somebody in it without being asked.
     //
+    // So the suite does what a person does: wait for the list, tap the first
+    // row it finds.
+    // `first-conversation` rather than a row's own identifier: those are
+    // minted per invitation, so nothing outside the device knows one in
+    // advance. `ConversationList.tsx` says why the top row carries both.
+    await waitFor(element(by.id('first-conversation')))
+      .toBeVisible()
+      .withTimeout(60000)
+    await element(by.id('first-conversation')).tap()
+
     // `toExist` on the conversation and not `toBeVisible`: that node wraps
     // the whole message list, which is taller than the phone as soon as
     // there are a few, and Detox wants 75 per cent of an element's area
@@ -291,11 +303,14 @@ describe('boot', () => {
     // person does anyway -- nobody types a message one key event at a time
     // while a test watches.
     await element(by.id('conversation-input')).replaceText(written)
-    // THE RETURN KEY IS THE SEND KEY, and there is no other. The bar has no
-    // send button: its round green place belongs to recording, which is V2.
-    // A suite that tapped a button would be testing an application nobody
-    // ships.
-    await element(by.id('conversation-input')).tapReturnKey()
+    // THE BUTTON, AND THE RETURN KEY NO LONGER SENDS. This said "the return
+    // key is the send key, and there is no other" -- true until the field
+    // was asked to take several lines, at which point one key could not both
+    // send and make a paragraph. The round place still belongs to recording
+    // when there is nothing written; with something in the field it is the
+    // send button, which is what a person now presses and therefore what
+    // this presses. `Composer.tsx` argues the swap.
+    await element(by.id('composer-send')).tap()
 
     // VISIBLE, NOT MERELY PRESENT. A conversation that rendered the message
     // below the fold would satisfy `toExist` while the person who sent it saw

@@ -162,6 +162,12 @@ export function CallScreen({
   // the whole reason those sentences exist; short enough that nobody is
   // left holding a dead screen.
   //
+  // AND IT NO LONGER COVERS THE COMMONEST ENDING. Hanging up closes the
+  // screen immediately -- see the button -- so what waits here is a call
+  // that ended without this person deciding it: no answer, a refusal, a
+  // relay that could not be reached. Those are the endings with something
+  // to say, which is what the delay was always for.
+  //
   // THROUGH A REF, so the timer depends on the call's state and on nothing
   // else. `onDismiss` is written inline at the call site, so it is a new
   // function on every render of the application -- and a timer that listed
@@ -242,25 +248,30 @@ export function CallScreen({
                 onPress={() => onSpeaker(!speaker)}
                 glyph="speaker"
               />
+              {/* HANGING UP CLOSES THE SCREEN AT ONCE, and does not wait
+                  out the linger below. Somebody who hung up knows why the
+                  call ended -- the sentence that linger exists to let people
+                  read has nothing to tell them. Asked for on 9 September
+                  2026, after the first call that worked end to end. */}
               <Round
                 testID="call-hangup"
                 label={t('call_hangup')}
                 tint={color.deny['500']}
-                onPress={onHangup}
+                onPress={() => {
+                  onHangup()
+                  onDismiss()
+                }}
                 glyph="calls"
               />
             </>
           )}
 
-          {over && (
-            <Round
-              testID="call-dismiss"
-              label={t('call_dismiss')}
-              tint={color.neutral['600']}
-              onPress={onDismiss}
-              glyph="calls"
-            />
-          )}
+          {/* THERE IS NO "FERMER". It stood here while the screen waited to
+              be dismissed; the screen closes itself now -- at once when the
+              person hung up, after `LINGERS_MS` when the call ended some
+              other way -- so a button whose only job is to do what is about
+              to happen anyway is a button asking to be pressed for nothing.
+              Removed at the account holder's word on 9 September 2026. */}
         </View>
       </View>
     </Modal>

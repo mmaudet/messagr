@@ -1891,6 +1891,28 @@ PODS:
     - Yoga
   - ReactNativeIncallManager (4.2.2):
     - React-Core
+  - RNCClipboard (1.16.3):
+    - hermes-engine
+    - RCTRequired
+    - RCTTypeSafety
+    - React-bridging
+    - React-Core
+    - React-Core-prebuilt
+    - React-debug
+    - React-Fabric
+    - React-featureflags
+    - React-graphics
+    - React-ImageManager
+    - React-jsi
+    - React-NativeModulesApple
+    - React-RCTFabric
+    - React-renderercss
+    - React-rendererdebug
+    - React-utils
+    - ReactCodegen
+    - ReactCommon/turbomodule/core
+    - ReactNativeDependencies
+    - Yoga
   - RNFBApp (26.4.0):
     - Firebase/CoreOnly (= 12.18.0)
     - hermes-engine
@@ -2136,6 +2158,7 @@ DEPENDENCIES:
   - ReactNativeDependencies (from `../../../node_modules/react-native/third-party-podspecs/ReactNativeDependencies.podspec`)
   - "ReactNativeFs (from `../../../node_modules/@dr.pogodin/react-native-fs`)"
   - ReactNativeIncallManager (from `../../../node_modules/react-native-incall-manager`)
+  - "RNCClipboard (from `../../../node_modules/@react-native-clipboard/clipboard`)"
   - "RNFBApp (from `../../../node_modules/@react-native-firebase/app`)"
   - "RNFBMessaging (from `../../../node_modules/@react-native-firebase/messaging`)"
   - RNGestureHandler (from `../../../node_modules/react-native-gesture-handler`)
@@ -2347,6 +2370,8 @@ EXTERNAL SOURCES:
     :path: "../../../node_modules/@dr.pogodin/react-native-fs"
   ReactNativeIncallManager:
     :path: "../../../node_modules/react-native-incall-manager"
+  RNCClipboard:
+    :path: "../../../node_modules/@react-native-clipboard/clipboard"
   RNFBApp:
     :path: "../../../node_modules/@react-native-firebase/app"
   RNFBMessaging:
@@ -2469,6 +2494,7 @@ SPEC CHECKSUMS:
   ReactNativeDependencies: 94c922c39e0e6150ee9ad05e2ca1946e0ef55783
   ReactNativeFs: cd0d0ea408c6ed53c692650747364d181b29db49
   ReactNativeIncallManager: c6e08cc005da0f73d5a1ecbd58ad33bc61d5d79f
+  RNCClipboard: a4d3243922d75b241b7ab9c0f8b62995a601ff2b
   RNFBApp: 909622e738d3a923b670950f9cdc9aeac9b1e6cc
   RNFBMessaging: 5e7cd9fc16c49b0492121c1fa90c9b3aa35aaec6
   RNGestureHandler: 63727d42f0b6ea951168615f8af3160ad7b57a57

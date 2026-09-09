@@ -59,7 +59,7 @@ import {
   fetchJoinedRooms,
   joinRoom,
 } from './encryptedSend'
-import { reactTo, unreact, type ReactingDeps } from './react'
+import { reactTo, redactEvent, unreact, type ReactingDeps } from './react'
 import { tallyReactions, type ReactionTally } from '../timeline/reactions'
 import { probeUnsettledEncrypt, type ProbeReport } from './panicProbe'
 import { claimHistory, type HistoryClaim } from './claimHistory'
@@ -647,6 +647,8 @@ export async function listConversations(
   selfUserId: string,
   /** How far each conversation has been read on this device. */
   lastRead: ReadonlyMap<string, number>,
+  /** What this device was told not to draw. See `hiddenStore.ts`. */
+  hidden: ReadonlySet<string> = new Set(),
 ): Promise<ConversationSummary[]> {
   return fetchConversationSummaries(
     {
@@ -659,6 +661,7 @@ export async function listConversations(
     },
     selfUserId,
     lastRead,
+    hidden,
   )
 }
 
@@ -790,6 +793,18 @@ export async function removeReaction(
   reactionEventId: string,
 ) {
   return unreact(reacting(sessionClient), scope, reactionEventId)
+}
+
+/**
+ * Removes a message for everyone. The same call, saying it was a message --
+ * see `redactionKind.ts` for why that has to be said out loud.
+ */
+export async function removeMessage(
+  sessionClient: ReturnType<typeof createClient>,
+  scope: string,
+  eventId: string,
+) {
+  return redactEvent(reacting(sessionClient), scope, eventId, 'message')
 }
 
 /**
