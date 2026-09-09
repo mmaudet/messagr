@@ -234,7 +234,19 @@ export function startCallRuntime(
   // at launch and lives as long as the application does.
   watchPictures(next => {
     pictures = next
-    if (held !== null) onChanged({ ...held, pictures })
+    if (held === null) return
+    // WRITTEN BACK INTO `held`, NOT ONLY SENT ON.
+    //
+    // Sending it on was the whole of this at first, and the picture reached
+    // the screen for exactly one render: every other `onChanged` in this
+    // file spreads `held`, which still carried the empty pictures captured
+    // when the call began -- and a call ticks its state once a second. So
+    // the preview appeared and was overwritten before anybody saw it.
+    //
+    // Found on a device, after the runtime's own logs proved the picture was
+    // published, watched and delivered. Nothing upstream was wrong.
+    held = { ...held, pictures: next }
+    onChanged(held)
   })
 
   /**
