@@ -323,6 +323,7 @@ export const it: Readonly<Record<CopyKey, string>> = {
   list_no_directory:
     'Nessun numero di telefono compare in alcun punto del sistema. Si entra in relazione soltanto su invito.',
   calls_empty: 'Ancora nessuna chiamata.',
+  calls_video: 'Video',
   'calls_ring_back %@': 'Richiama %@',
   calls_taken: 'Chiamata ricevuta',
   calls_placed: 'Chiamata effettuata',

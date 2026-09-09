@@ -326,6 +326,7 @@ export const en: Readonly<Record<CopyKey, string>> = {
   list_no_directory:
     'No phone number appears anywhere in the system. You only come into contact by invitation.',
   calls_empty: 'No calls yet.',
+  calls_video: 'Video',
   'calls_ring_back %@': 'Call %@ back',
   calls_taken: 'Incoming call',
   calls_placed: 'Outgoing call',

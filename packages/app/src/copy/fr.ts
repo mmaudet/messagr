@@ -493,6 +493,7 @@ export const fr = {
   // L'onglet Appels. Ce que devient un appel, dit en toutes lettres : la
   // couleur ne fait que répéter ces mots, elle ne les porte jamais.
   calls_empty: 'Aucun appel pour l’instant.',
+  calls_video: 'Vidéo',
   'calls_ring_back %@': 'Rappeler %@',
   calls_taken: 'Appel reçu',
   calls_placed: 'Appel passé',

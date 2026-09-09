@@ -241,6 +241,8 @@ export function startCallRuntime(
   // library's own callbacks, at moments that have nothing to do with the
   // state machine's transitions.
   let pictures: Pictures = { local: null, remote: null }
+  /** Whether this call has been marked as having carried a picture. */
+  let sawVideo = false
   // FOR THE LIFE OF THE RUNTIME, NOT OF A CALL.
   //
   // This was unsubscribed in `release`, which runs at the end of every call
@@ -263,6 +265,15 @@ export function startCallRuntime(
     //
     // Found on a device, after the runtime's own logs proved the picture was
     // published, watched and delivered. Nothing upstream was wrong.
+    // "SOME VIDEO WENT THROUGH", WRITTEN WHERE EVERY WAY OF IT HAPPENING
+    // PASSES. Placed with a camera, answered with one, turned on halfway, or
+    // the far end turning theirs on -- all four arrive here and nowhere
+    // else in common. Written once and never unwritten: a call that showed a
+    // face for ten seconds was a video call, whatever it ended as. #203.
+    if (!sawVideo && (next.local !== null || next.remote !== null)) {
+      sawVideo = true
+      log.sawVideo(held.scope).catch(() => {})
+    }
     held = {
       ...held,
       pictures: next,
@@ -337,6 +348,7 @@ export function startCallRuntime(
       pictures,
       sendingVideo: false,
     }
+    sawVideo = false
     held = call
     // THE AUDIO SESSION IS TAKEN WHEN THE CALL BEGINS, NOT WHEN IT CONNECTS.
     //

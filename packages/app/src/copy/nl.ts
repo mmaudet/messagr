@@ -324,6 +324,7 @@ export const nl: Readonly<Record<CopyKey, string>> = {
   list_no_directory:
     'Nergens in het systeem komt een telefoonnummer voor. Contact ontstaat uitsluitend op uitnodiging.',
   calls_empty: 'Nog geen oproepen.',
+  calls_video: 'Video',
   'calls_ring_back %@': '%@ terugbellen',
   calls_taken: 'Ontvangen oproep',
   calls_placed: 'Uitgaande oproep',
