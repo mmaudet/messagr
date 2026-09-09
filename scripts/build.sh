@@ -44,10 +44,27 @@ if [ -f "$HOME/.appstoreconnect/env" ]; then
   . "$HOME/.appstoreconnect/env"
 fi
 
+ANDROID_SKIPPED=no
 if [ "$WHICH" != "ios" ]; then
   echo
   echo "#### ANDROID ####"
-  "$ROOT/scripts/pixel.sh"
+  # AN UNPLUGGED TELEPHONE MUST NOT TAKE THE iOS BUILD DOWN WITH IT.
+  #
+  # Android runs first so that a cable pulled out costs two minutes rather
+  # than twenty-two -- but under `set -e` that turned "the Pixel is not
+  # plugged in" into "no TestFlight build either", which is the opposite of
+  # the point. It happened the first time somebody ran `build.sh` while the
+  # cable was out. So a missing telephone is reported and the run carries on;
+  # only `build.sh android` treats it as the failure it then is.
+  if "$ROOT/scripts/pixel.sh"; then
+    :
+  elif [ "$WHICH" = "android" ]; then
+    exit 1
+  else
+    ANDROID_SKIPPED=yes
+    echo
+    echo "Android did not finish -- carrying on to iOS, which needs no telephone."
+  fi
 fi
 
 if [ "$WHICH" != "android" ]; then
@@ -92,4 +109,12 @@ if [ "$WHICH" != "android" ]; then
     echo "Build $NEXT stays the number: it was never accepted, so do not bump."
     exit 1
   fi
+fi
+
+if [ "$ANDROID_SKIPPED" = yes ]; then
+  echo
+  echo "The telephone was not updated. Plug the Pixel in and run:"
+  echo
+  echo "    ./scripts/build.sh android"
+  exit 1
 fi
