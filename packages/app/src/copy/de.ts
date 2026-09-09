@@ -369,6 +369,7 @@ export const de: Readonly<Record<CopyKey, string>> = {
   composer_emoji: 'Emojis',
   composer_photo: 'Ein Foto hinzufügen',
   composer_record: 'Sprachnachricht',
+  composer_send: 'Senden',
   composer_record_soon:
     'Sprachnachrichten kommen in V2. Der Knopf hält seinen Platz, damit sich die Leiste an dem Tag nicht verschiebt.',
   person_open: 'Über diese Person',

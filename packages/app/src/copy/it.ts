@@ -361,6 +361,7 @@ export const it: Readonly<Record<CopyKey, string>> = {
   composer_emoji: 'Emoji',
   composer_photo: 'Aggiungere una foto',
   composer_record: 'Messaggio vocale',
+  composer_send: 'Inviare',
   composer_record_soon:
     'I messaggi vocali arrivano in V2. Il pulsante tiene il suo posto perché la barra non si sposti quel giorno.',
   person_open: 'Su questa persona',

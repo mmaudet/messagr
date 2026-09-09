@@ -362,6 +362,7 @@ export const nl: Readonly<Record<CopyKey, string>> = {
   composer_emoji: 'Emoji',
   composer_photo: 'Een foto toevoegen',
   composer_record: 'Spraakbericht',
+  composer_send: 'Versturen',
   composer_record_soon:
     'Spraakberichten komen in V2. De knop houdt zijn plek zodat de balk die dag niet verschuift.',
   person_open: 'Over deze persoon',

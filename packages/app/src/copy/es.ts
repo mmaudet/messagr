@@ -363,6 +363,7 @@ export const es: Readonly<Record<CopyKey, string>> = {
   composer_emoji: 'Emojis',
   composer_photo: 'Añadir una foto',
   composer_record: 'Nota de voz',
+  composer_send: 'Enviar',
   composer_record_soon:
     'Las notas de voz llegan en la V2. El botón guarda su sitio para que la barra no se mueva ese día.',
   person_open: 'Sobre esta persona',

@@ -536,6 +536,7 @@ export const fr = {
   composer_emoji: 'Émojis',
   composer_photo: 'Ajouter une photo',
   composer_record: 'Message vocal',
+  composer_send: 'Envoyer',
   composer_record_soon:
     'Les messages vocaux arrivent en V2. Le bouton garde sa place pour que la barre ne bouge pas ce jour-là.',
 

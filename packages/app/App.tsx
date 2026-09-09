@@ -951,6 +951,20 @@ export function App({
               setOpenScope(scope)
               openScopeRef.current = scope
               setConversation(null)
+              // WHAT LANDS LATE MUST CHECK IT IS STILL WANTED.
+              //
+              // Every derivation below is a round trip, and the person can
+              // open another conversation while one is in flight. Without
+              // this, opening B while A was still loading drew A's messages
+              // under B's name -- and `mergeTimeline` merges rather than
+              // replaces, so B's own messages then arrived *on top of* A's
+              // and the two stayed mixed until something reloaded. Reported
+              // as « la précédente s'affiche pendant une seconde ».
+              //
+              // The reaction loop below already did this, under the name
+              // `stillMine`. This is the same test, hoisted to where every
+              // late arrival can use it.
+              const stillOpen = () => openScopeRef.current === scope
               setSendMessage(() => (body: string) => {
                 setSending('sending')
                 const deliver = async () => {
@@ -976,6 +990,7 @@ export function App({
                     scope,
                     credentials.userId,
                   )
+                  if (!stillOpen()) return
                   setConversation(held =>
                     mergeTimeline(held ?? [], fresh.entries),
                   )
@@ -993,6 +1008,7 @@ export function App({
                   scope,
                   credentials.userId,
                 )
+                if (!stillOpen()) return
                 setConversation(held =>
                   mergeTimeline(held ?? [], fresh.entries),
                 )
@@ -1014,6 +1030,7 @@ export function App({
                   makePumpHttp(sessionClient),
                   scope,
                 )
+                if (!stillOpen()) return
                 const other = theOtherMember(members, credentials.userId)
                 setParty(other === null ? null : { scope, other })
 
@@ -1112,6 +1129,10 @@ export function App({
             attachRef.current = () => {
               const scope = openScopeRef.current
               if (scope === null) return
+              // Its own, because this closure is built outside
+              // `showConversation` and reads the scope for itself. Same
+              // test, same reason: an upload outlives the screen it began on.
+              const stillOpen = () => openScopeRef.current === scope
               const gesture = async () => {
                 const chosen = await pickFromLibrary()
                 // Nothing chosen. Not a failure, and it must not read as one.
@@ -1145,6 +1166,7 @@ export function App({
                   scope,
                   credentials.userId,
                 )
+                if (!stillOpen()) return
                 setConversation(held =>
                   mergeTimeline(held ?? [], fresh.entries),
                 )
@@ -2586,11 +2608,25 @@ export function App({
                 />
               )}
 
-            {/* THE TABS STAY, EVEN INSIDE A CONVERSATION.
-              The mockup hides them there, which is what every other messenger
-              does, and this used to. Changed at the account holder's request:
-              the bar never moves, so muscle memory holds everywhere. Recorded
-              as a decision rather than a drift. */}
+            {/* AND THEY GO AGAIN INSIDE A CONVERSATION, WHICH IS THE THIRD
+              TIME THIS HAS MOVED, so it is written down as a decision each
+              time rather than left to look like drift.
+
+              The mockup hid them there, which is what every other messenger
+              does. They were made to stay on 7 September 2026 at the account
+              holder's request -- "the bar never moves, so muscle memory holds
+              everywhere". They go again on 9 September, at his request, for
+              the reason a conversation is not a destination but a thing you
+              are inside of: « quand nous sommes sur l'écran de discussion, il
+              faut enlever la zone des 4 onglets en bas d'écran pour récupérer
+              l'espace ».
+
+              What paid for the first decision is still true and is now paid
+              for elsewhere: the header's back arrow is the way out, and the
+              hardware back button already walks the same layers. What the
+              first decision cost is what a phone has least of -- a bar of
+              screen under the keyboard, in the one place a person is reading
+              and writing at the same time. */}
             {/* A TAB PRESS COMES BACK TO THAT TAB'S TOP, AND `setTab` ALONE
                 DID NOT. From inside a conversation, pressing Discussions set
                 the tab to the one it was already on and changed nothing
@@ -2598,24 +2634,28 @@ export function App({
                 closed it. Reported from a Pixel on 7 September 2026, in the
                 words anybody would use -- "rien ne se passe".
 
-                The same layers the hardware back button already enumerates,
-                closed in one go rather than one press at a time: a tab is
-                not a step backwards, it is a destination. `back` walks them;
-                this clears them. */}
-            <TabBar
-              current={tab}
-              onSelect={next => {
-                setOpenPlate(null)
-                setPersonOpen(false)
-                setOpenScope(null)
-                openScopeRef.current = null
-                setLegalOpen(false)
-                setInvite({ stage: 'shut' })
-                setAdmission(null)
-                setTab(next)
-              }}
-              unread={unreadCount}
-            />
+                That case cannot happen any more -- there is no tab bar
+                inside a conversation to press. The clearing stays because
+                the other layers it names can be open on the screens that do
+                have one: a photograph, a person, the legal text, an
+                invitation. A tab is not a step backwards, it is a
+                destination; `back` walks the layers, this clears them. */}
+            {openScope === null && (
+              <TabBar
+                current={tab}
+                onSelect={next => {
+                  setOpenPlate(null)
+                  setPersonOpen(false)
+                  setOpenScope(null)
+                  openScopeRef.current = null
+                  setLegalOpen(false)
+                  setInvite({ stage: 'shut' })
+                  setAdmission(null)
+                  setTab(next)
+                }}
+                unread={unreadCount}
+              />
+            )}
           </View>
         </SafeAreaView>
       </SafeAreaProvider>
