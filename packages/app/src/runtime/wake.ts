@@ -57,6 +57,8 @@ export interface Calling {
   readonly scope: string
   readonly shown: string
   readonly from: string
+  /** Whether the far end offered a picture. Absent means an audio call. */
+  readonly video?: boolean
   /** When the call ended unanswered, if it did. See `Ringing.missedAt`. */
   readonly missedAt?: number
 }

@@ -221,3 +221,45 @@ describe('lookForWhatArrived', () => {
     expect(asked).not.toContain('since=')
   })
 })
+
+describe('a ringing call that carries a picture', () => {
+  /** An invitation as the homeserver hands one back, with its offer. */
+  function invitation(sdp?: string) {
+    return {
+      type: 'm.call.invite',
+      sender: HER,
+      ...(sdp === undefined ? {} : { content: { offer: { sdp } } }),
+    }
+  }
+
+  it('is marked video when the offer sends one', async () => {
+    const { ringing } = await lookForWhatArrived(
+      looking({
+        openCalls: async () => [
+          invitation(
+            'v=0\r\nm=audio 9 RTP 111\r\nm=video 9 RTP 96\r\na=sendrecv',
+          ),
+        ],
+      }),
+    )
+    expect(ringing[0]?.video).toBe(true)
+  })
+
+  it('is not marked for an audio call', async () => {
+    const { ringing } = await lookForWhatArrived(
+      looking({
+        openCalls: async () => [invitation('v=0\r\nm=audio 9 RTP 111')],
+      }),
+    )
+    expect(ringing[0]?.video).toBeUndefined()
+  })
+
+  it('is not marked when the invitation carries no offer at all', async () => {
+    // Another client, or a malformed event. The notification says "appel"
+    // rather than guessing at a picture.
+    const { ringing } = await lookForWhatArrived(
+      looking({ openCalls: async () => [invitation()] }),
+    )
+    expect(ringing[0]?.video).toBeUndefined()
+  })
+})

@@ -114,7 +114,9 @@ function registerTheWake() {
       // different channel with two answers on it. `wake.ts` draws this
       // instead of the messages when a poll carried both.
       ring: calling =>
-        ringNotification(ringingNotification(calling.scope, calling.shown)),
+        ringNotification(
+          ringingNotification(calling.scope, calling.shown, calling.video),
+        ),
       // A call that is over, drawn over the ring it replaces.
       missed: (calling, at) =>
         missedNotification(calling.scope, calling.shown, at),

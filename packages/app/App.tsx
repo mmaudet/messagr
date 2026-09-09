@@ -2264,8 +2264,11 @@ export function App({
             shown={displayNameFor(call.peerUserId, names.get(call.peerUserId))}
             muted={callMuted}
             speaker={callSpeaker}
-            onAnswer={() =>
-              callRuntimeRef.current?.answer().catch((cause: unknown) =>
+            // WHAT THIS SIDE SENDS BACK, decided on the ringing screen and
+            // not implied by the offer: `undefined` lets the runtime mirror
+            // what was offered, and the two buttons pass an explicit answer.
+            onAnswer={wants =>
+              callRuntimeRef.current?.answer(wants).catch((cause: unknown) =>
                 logEvent('warn', 'MESSAGR_CALL_NOT_ANSWERED', {
                   reason: getErrorMessage(cause),
                 }),

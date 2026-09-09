@@ -3,6 +3,8 @@ import { Modal, Pressable, StyleSheet, Text, View } from 'react-native'
 import { RTCView } from 'react-native-webrtc'
 
 import type { CallState, EndReason } from '../calls/machine'
+import type { Wants } from '../calls/media'
+import { offersVideo } from '../calls/sdp'
 import type { CallSessionFailure } from '../calls/session'
 import type { Pictures } from '../runtime/callMedia'
 import { t, type CopyKey } from '../copy'
@@ -63,7 +65,14 @@ function refusalFor(failure: CallSessionFailure): CopyKey {
   }
 }
 
-/** What a state says, in one line. */
+/**
+ * What a state says, in one line.
+ *
+ * `incoming` is the one that reads the offer: Matrix version 1 has no "this
+ * is a video call" flag, so the only place the answer lives is the session
+ * description. `sdp.ts` says why that is a parser and not a search, and why
+ * a `recvonly` line must not announce a picture that never arrives.
+ */
 function sentenceFor(state: CallState): CopyKey {
   switch (state.call) {
     case 'idle':
@@ -71,7 +80,9 @@ function sentenceFor(state: CallState): CopyKey {
     case 'outgoingInvite':
       return 'call_ringing'
     case 'incomingInvite':
-      return 'call_incoming'
+      return offersVideo(state.offer.sdp)
+        ? 'call_incoming_video'
+        : 'call_incoming'
     case 'connecting':
       return 'call_connecting'
     case 'inCall':
@@ -141,7 +152,11 @@ export function CallScreen({
   readonly muted: boolean
   /** Whether the sound is going to the loudspeaker rather than the earpiece. */
   readonly speaker: boolean
-  readonly onAnswer: () => void
+  /**
+   * Answers. `wants` says what THIS side sends back, which the ringing
+   * screen decides and the offer does not: see the two buttons.
+   */
+  readonly onAnswer: (wants?: Wants) => void
   readonly onReject: () => void
   readonly onHangup: () => void
   readonly onMute: (muted: boolean) => void
@@ -155,6 +170,12 @@ export function CallScreen({
   readonly pictures?: Pictures
 }) {
   const ringing = state.call === 'incomingInvite'
+  // WHETHER THE FAR END IS OFFERING A PICTURE, which decides both the
+  // sentence above and whether there is a second way to answer. Read from
+  // the offer rather than from anything the invitation carries: Matrix
+  // version 1 carries nothing.
+  const offered =
+    state.call === 'incomingInvite' && offersVideo(state.offer.sdp)
   const over = state.call === 'ended' || state.call === 'idle'
   // A CALL WITH A PICTURE IN IT, which is not the same as a call that asked
   // for one: a camera that would not open leaves an audio call wearing a
@@ -259,12 +280,29 @@ export function CallScreen({
                 onPress={onReject}
                 glyph="calls"
               />
+              {/* ANSWERING WITHOUT A PICTURE, and only where there is one
+                  to decline. Two buttons rather than one, because a single
+                  one would make a ringing telephone a trap: picking it up
+                  would light the camera without anybody asking for it, and
+                  somebody in bed must be able to take the call.
+
+                  The middle of the row, so the green one that everybody
+                  reaches for stays on the right where it has always been. */}
+              {offered && (
+                <Round
+                  testID="call-answer-audio"
+                  label={t('call_answer_audio')}
+                  tint={color.neutral['600']}
+                  onPress={() => onAnswer({ video: false })}
+                  glyph="mic"
+                />
+              )}
               <Round
                 testID="call-answer"
-                label={t('call_answer')}
+                label={offered ? t('call_answer_video') : t('call_answer')}
                 tint={color.brand.green500}
-                onPress={onAnswer}
-                glyph="calls"
+                onPress={() => onAnswer(offered ? { video: true } : undefined)}
+                glyph={offered ? 'cam' : 'calls'}
               />
             </>
           )}
@@ -355,7 +393,12 @@ function Round({
   readonly label: string
   readonly tint: string
   readonly onPress: () => void
-  readonly glyph: 'calls' | 'mic' | 'speaker'
+  /**
+   * Narrower than `TabGlyph` on purpose: these are the five this screen has
+   * any business drawing, and a wider type would let a future control reach
+   * for a tab icon that means something else entirely.
+   */
+  readonly glyph: 'calls' | 'mic' | 'speaker' | 'cam'
 }) {
   return (
     <View style={styles.control}>

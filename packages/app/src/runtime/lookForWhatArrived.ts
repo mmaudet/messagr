@@ -1,3 +1,4 @@
+import { offersVideo } from '../calls/sdp'
 import { displayNameFor, type GivenNames } from './givenName'
 import type { HttpRequester } from './pump'
 import { readChangedScopes, readTimelineEvents } from './syncResponse'
@@ -101,6 +102,15 @@ export interface Ringing {
   readonly shown: string
   /** Their identifier, which is what a call has to be answered towards. */
   readonly from: string
+  /**
+   * Whether the far end offered a picture. Absent means an audio call.
+   *
+   * Read from the offer's media lines, because Matrix version 1 carries the
+   * answer nowhere else -- `sdp.ts` argues that at length. It reaches a
+   * locked screen, where the notification is the only thing anybody sees
+   * before deciding to answer.
+   */
+  readonly video?: boolean
   /**
    * Whether the call is over rather than ringing.
    *
@@ -236,6 +246,7 @@ async function whoIsCalling(
         const call = event as {
           type?: unknown
           sender?: unknown
+          content?: { offer?: { sdp?: unknown } }
           unsigned?: { age?: unknown }
         }
         if (typeof call.sender !== 'string') continue
@@ -257,8 +268,20 @@ async function whoIsCalling(
         if (call.type !== 'm.call.invite') continue
         const age = call.unsigned?.age
         if (typeof age === 'number' && age > RINGS_FOR_MS) continue
+        // WHETHER TO SAY "APPEL VIDÉO" ON A LOCKED SCREEN.
+        //
+        // The notification is the first thing anybody sees, and Matrix
+        // version 1 puts the answer nowhere but the session description --
+        // `sdp.ts` says why reading it is a parser rather than a search.
+        // ADR-0009 is untouched: this decides which of two sentences the
+        // device draws from what it has already decrypted, and no more of a
+        // push payload than a name was already.
+        const sdp = call.content?.offer?.sdp
         found.push({
           scope,
+          ...(typeof sdp === 'string' && offersVideo(sdp)
+            ? { video: true }
+            : {}),
           from: call.sender,
           shown: displayNameFor(call.sender, names.get(call.sender)),
         })
