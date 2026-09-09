@@ -171,6 +171,17 @@ export interface CallRuntime {
   readonly reject: () => void
   readonly hangup: () => void
   readonly setMuted: (muted: boolean) => boolean
+  /**
+   * Turns this side's camera on or off mid-call.
+   *
+   * Answers what the call carries afterwards, never what was asked. Turning
+   * it ON also moves the sound to the loudspeaker: nobody holds a video call
+   * against their ear. Turning it off does NOT move it back -- that would
+   * undo a choice the person may have made for reasons of their own.
+   */
+  readonly setCameraOn: (on: boolean) => Promise<boolean>
+  /** Front to back and back again. */
+  readonly switchCamera: () => void
   /** Moves the sound between the earpiece and the loudspeaker. */
   readonly setSpeaker: (on: boolean) => void
   /** Ends the call and forgets it, so the next one starts clean. */
@@ -203,6 +214,13 @@ export interface CallOnScreen {
    * for a camera.
    */
   readonly pictures: Pictures
+  /**
+   * Whether this side is sending a picture.
+   *
+   * Beside `pictures` rather than derived from it: they agree today and
+   * would part the moment a local preview outlives the sending.
+   */
+  readonly sendingVideo: boolean
 }
 
 export function startCallRuntime(
@@ -223,9 +241,48 @@ export function startCallRuntime(
   // library's own callbacks, at moments that have nothing to do with the
   // state machine's transitions.
   let pictures: Pictures = { local: null, remote: null }
-  const unwatch = watchPictures(next => {
+  /** Whether this call has been marked as having carried a picture. */
+  let sawVideo = false
+  // FOR THE LIFE OF THE RUNTIME, NOT OF A CALL.
+  //
+  // This was unsubscribed in `release`, which runs at the end of every call
+  // -- so the first video call published its picture and every one after it
+  // published into nothing. Found on a device: the offer carried `m=video`,
+  // the far end saw it, and the caller's own screen showed an avatar.
+  //
+  // There is nothing to unsubscribe from: `startCallRuntime` is called once
+  // at launch and lives as long as the application does.
+  watchPictures(next => {
     pictures = next
-    if (held !== null) onChanged({ ...held, pictures })
+    if (held === null) return
+    // WRITTEN BACK INTO `held`, NOT ONLY SENT ON.
+    //
+    // Sending it on was the whole of this at first, and the picture reached
+    // the screen for exactly one render: every other `onChanged` in this
+    // file spreads `held`, which still carried the empty pictures captured
+    // when the call began -- and a call ticks its state once a second. So
+    // the preview appeared and was overwritten before anybody saw it.
+    //
+    // Found on a device, after the runtime's own logs proved the picture was
+    // published, watched and delivered. Nothing upstream was wrong.
+    // "SOME VIDEO WENT THROUGH", WRITTEN WHERE EVERY WAY OF IT HAPPENING
+    // PASSES. Placed with a camera, answered with one, turned on halfway, or
+    // the far end turning theirs on -- all four arrive here and nowhere
+    // else in common. Written once and never unwritten: a call that showed a
+    // face for ten seconds was a video call, whatever it ended as. #203.
+    if (!sawVideo && (next.local !== null || next.remote !== null)) {
+      sawVideo = true
+      log.sawVideo(held.scope).catch(() => {})
+    }
+    held = {
+      ...held,
+      pictures: next,
+      // Read from the session rather than inferred from the handles: a
+      // preview that outlives the sending is exactly the case the two are
+      // held apart for.
+      sendingVideo: held.session.sendingVideo(),
+    }
+    onChanged(held)
   })
 
   /**
@@ -289,7 +346,9 @@ export function startCallRuntime(
       // Whatever the last call left, which is nothing: `release` clears them
       // and a connection's `close` publishes both as `null`.
       pictures,
+      sendingVideo: false,
     }
+    sawVideo = false
     held = call
     // THE AUDIO SESSION IS TAKEN WHEN THE CALL BEGINS, NOT WHEN IT CONNECTS.
     //
@@ -380,6 +439,17 @@ export function startCallRuntime(
     reject: () => held?.session.reject(),
     hangup: () => held?.session.hangup(),
     setMuted: muted => held?.session.setMuted(muted) ?? muted,
+    switchCamera: () => held?.session.switchCamera(),
+    setCameraOn: async on => {
+      const running = held
+      if (running === null) return false
+      const carrying = await running.session.setCameraOn(on)
+      // Only on the way on, and only when it actually came on. The
+      // asymmetry is the decision: switching is obvious, unswitching would
+      // undo a choice somebody may have made themselves.
+      if (on && carrying) deviceCallAudio.speaker(true)
+      return carrying
+    },
     setSpeaker: on => deviceCallAudio.speaker(on),
     release: async () => {
       const running = held
@@ -392,7 +462,6 @@ export function startCallRuntime(
       // must not leave a telephone that behaves as though it is still on
       // one.
       deviceCallAudio.end()
-      unwatch()
       await running?.session.stop()
     },
   }

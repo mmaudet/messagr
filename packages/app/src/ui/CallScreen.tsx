@@ -3,6 +3,8 @@ import { Modal, Pressable, StyleSheet, Text, View } from 'react-native'
 import { RTCView } from 'react-native-webrtc'
 
 import type { CallState, EndReason } from '../calls/machine'
+import type { Wants } from '../calls/media'
+import { offersVideo } from '../calls/sdp'
 import type { CallSessionFailure } from '../calls/session'
 import type { Pictures } from '../runtime/callMedia'
 import { t, type CopyKey } from '../copy'
@@ -63,7 +65,14 @@ function refusalFor(failure: CallSessionFailure): CopyKey {
   }
 }
 
-/** What a state says, in one line. */
+/**
+ * What a state says, in one line.
+ *
+ * `incoming` is the one that reads the offer: Matrix version 1 has no "this
+ * is a video call" flag, so the only place the answer lives is the session
+ * description. `sdp.ts` says why that is a parser and not a search, and why
+ * a `recvonly` line must not announce a picture that never arrives.
+ */
 function sentenceFor(state: CallState): CopyKey {
   switch (state.call) {
     case 'idle':
@@ -71,7 +80,9 @@ function sentenceFor(state: CallState): CopyKey {
     case 'outgoingInvite':
       return 'call_ringing'
     case 'incomingInvite':
-      return 'call_incoming'
+      return offersVideo(state.offer.sdp)
+        ? 'call_incoming_video'
+        : 'call_incoming'
     case 'connecting':
       return 'call_connecting'
     case 'inCall':
@@ -130,8 +141,11 @@ export function CallScreen({
   onHangup,
   onMute,
   onSpeaker,
+  onCamera,
+  onSwitchCamera,
   onDismiss,
   pictures = { local: null, remote: null },
+  sendingVideo = false,
 }: {
   readonly state: CallState
   /** Why it never started, when that is what happened. */
@@ -141,11 +155,19 @@ export function CallScreen({
   readonly muted: boolean
   /** Whether the sound is going to the loudspeaker rather than the earpiece. */
   readonly speaker: boolean
-  readonly onAnswer: () => void
+  /**
+   * Answers. `wants` says what THIS side sends back, which the ringing
+   * screen decides and the offer does not: see the two buttons.
+   */
+  readonly onAnswer: (wants?: Wants) => void
   readonly onReject: () => void
   readonly onHangup: () => void
   readonly onMute: (muted: boolean) => void
   readonly onSpeaker: (on: boolean) => void
+  /** Turns this side's camera on or off during the call. */
+  readonly onCamera: (on: boolean) => void
+  /** Front to back and back again. */
+  readonly onSwitchCamera: () => void
   /** Leaves the call screen. Only offered once the call is over. */
   readonly onDismiss: () => void
   /**
@@ -153,8 +175,22 @@ export function CallScreen({
    * which is every call that never asked for a camera.
    */
   readonly pictures?: Pictures
+  /**
+   * Whether this side is sending a picture.
+   *
+   * Not derived from `pictures.local`: the two are the same today and would
+   * drift the moment a preview is kept while the sending stops. What the
+   * control draws is what the call carries.
+   */
+  readonly sendingVideo?: boolean
 }) {
   const ringing = state.call === 'incomingInvite'
+  // WHETHER THE FAR END IS OFFERING A PICTURE, which decides both the
+  // sentence above and whether there is a second way to answer. Read from
+  // the offer rather than from anything the invitation carries: Matrix
+  // version 1 carries nothing.
+  const offered =
+    state.call === 'incomingInvite' && offersVideo(state.offer.sdp)
   const over = state.call === 'ended' || state.call === 'idle'
   // A CALL WITH A PICTURE IN IT, which is not the same as a call that asked
   // for one: a camera that would not open leaves an audio call wearing a
@@ -259,12 +295,29 @@ export function CallScreen({
                 onPress={onReject}
                 glyph="calls"
               />
+              {/* ANSWERING WITHOUT A PICTURE, and only where there is one
+                  to decline. Two buttons rather than one, because a single
+                  one would make a ringing telephone a trap: picking it up
+                  would light the camera without anybody asking for it, and
+                  somebody in bed must be able to take the call.
+
+                  The middle of the row, so the green one that everybody
+                  reaches for stays on the right where it has always been. */}
+              {offered && (
+                <Round
+                  testID="call-answer-audio"
+                  label={t('call_answer_audio')}
+                  tint={color.neutral['600']}
+                  onPress={() => onAnswer({ video: false })}
+                  glyph="mic"
+                />
+              )}
               <Round
                 testID="call-answer"
-                label={t('call_answer')}
+                label={offered ? t('call_answer_video') : t('call_answer')}
                 tint={color.brand.green500}
-                onPress={onAnswer}
-                glyph="calls"
+                onPress={() => onAnswer(offered ? { video: true } : undefined)}
+                glyph={offered ? 'cam' : 'calls'}
               />
             </>
           )}
@@ -288,6 +341,34 @@ export function CallScreen({
                 onPress={() => onSpeaker(!speaker)}
                 glyph="speaker"
               />
+              {/* THE FIFTH AND FOURTH SLOTS §4.5 NAMES: "camera on/off,
+                  switch camera". Green when the camera is on, like the two
+                  toggles beside it -- one convention for "this is on",
+                  learnt once.
+
+                  Switching only appears while there IS a camera to switch.
+                  A control that turns nothing is worse than an absent one,
+                  and this screen has said so since #88. */}
+              <Round
+                testID="call-camera"
+                label={
+                  sendingVideo ? t('call_camera_off') : t('call_camera_on')
+                }
+                tint={
+                  sendingVideo ? color.brand.green500 : color.neutral['600']
+                }
+                onPress={() => onCamera(!sendingVideo)}
+                glyph="cam"
+              />
+              {sendingVideo && (
+                <Round
+                  testID="call-switch-camera"
+                  label={t('call_switch_camera')}
+                  tint={color.neutral['600']}
+                  onPress={onSwitchCamera}
+                  glyph="cam"
+                />
+              )}
               {/* HANGING UP CLOSES THE SCREEN AT ONCE, and does not wait
                   out the linger below. Somebody who hung up knows why the
                   call ended -- the sentence that linger exists to let people
@@ -355,7 +436,12 @@ function Round({
   readonly label: string
   readonly tint: string
   readonly onPress: () => void
-  readonly glyph: 'calls' | 'mic' | 'speaker'
+  /**
+   * Narrower than `TabGlyph` on purpose: these are the five this screen has
+   * any business drawing, and a wider type would let a future control reach
+   * for a tab icon that means something else entirely.
+   */
+  readonly glyph: 'calls' | 'mic' | 'speaker' | 'cam'
 }) {
   return (
     <View style={styles.control}>
@@ -403,6 +489,11 @@ const styles = StyleSheet.create({
   // label on it. The avatar goes: a photograph of somebody's face over a
   // moving picture of the same face is one of them too many.
   whoAside: { gap: space.xs },
+  aside: {
+    ...type.bodySm,
+    color: color.agent['400'],
+    textAlign: 'center',
+  },
   far: { ...StyleSheet.absoluteFill },
   // A QUARTER OF THE WIDTH, at the top so the controls at the bottom stay
   // reachable and so a thumb does not rest on it.

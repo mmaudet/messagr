@@ -41,6 +41,7 @@ function fakeConnection() {
       seen.candidates.push(c)
     },
     addTrack: () => undefined,
+    removeTrack: () => undefined,
     close: () => {
       seen.closed += 1
     },

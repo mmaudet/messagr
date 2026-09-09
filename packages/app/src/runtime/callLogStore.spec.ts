@@ -175,3 +175,64 @@ describe('a device with no notebook', () => {
     expect(await log.settle('!a:x', 'answered')).toBe(false)
   })
 })
+
+describe('whether a call carried a picture', () => {
+  it('writes the bit with the row', async () => {
+    const { database, ran } = fake()
+    const log = await openCallLog(database)
+    await log.add({
+      scope: '!a:x',
+      peerUserId: '@her:x',
+      at: 1,
+      direction: 'in',
+      outcome: 'answered',
+      video: true,
+    })
+    const insert = ran.find(one => one.sql.startsWith('INSERT'))
+    expect(insert?.params?.slice(-1)).toEqual([1])
+  })
+
+  it('writes zero for a call with no picture', async () => {
+    const { database, ran } = fake()
+    const log = await openCallLog(database)
+    await log.add({
+      scope: '!a:x',
+      peerUserId: '@her:x',
+      at: 1,
+      direction: 'in',
+      outcome: 'answered',
+    })
+    const insert = ran.find(one => one.sql.startsWith('INSERT'))
+    expect(insert?.params?.slice(-1)).toEqual([0])
+  })
+
+  it('reads the bit back', async () => {
+    const log = await openCallLog(fake([{ ...ROW, video: 1 }]).database)
+    expect((await log.recent())[0]?.video).toBe(true)
+  })
+
+  it('reads a row from before the column existed as an audio call', async () => {
+    // `ALTER TABLE ... DEFAULT 0` gives those rows a zero, and zero is the
+    // truth about them: the application could not place any other kind.
+    const log = await openCallLog(fake([{ ...ROW, video: 0 }]).database)
+    expect((await log.recent())[0]?.video).toBeUndefined()
+  })
+
+  it('marks the newest call of a conversation', async () => {
+    const { database, ran } = fake([ROW])
+    const log = await openCallLog(database)
+    expect(await log.sawVideo('!a:x')).toBe(true)
+    expect(
+      ran.some(one => one.sql.startsWith('UPDATE call_log SET video')),
+    ).toBe(true)
+  })
+
+  it('says so when there is no call to mark', async () => {
+    const log = await openCallLog(fake([]).database)
+    expect(await log.sawVideo('!a:x')).toBe(false)
+  })
+
+  it('a device without a notebook says the mark did not hold', async () => {
+    expect(await forgetfulCallLog().sawVideo('!a:x')).toBe(false)
+  })
+})

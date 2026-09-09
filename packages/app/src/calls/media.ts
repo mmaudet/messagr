@@ -68,6 +68,17 @@ export interface PeerConnectionLike {
   readonly addIceCandidate: (candidate: Candidate) => Promise<void>
   /** Attach a captured track, so the offer carries one to negotiate. */
   readonly addTrack: (kind: TrackKind, track: TrackLike) => void
+  /**
+   * Take one away again.
+   *
+   * DISABLING IS NOT ENOUGH, which is why this exists rather than a call to
+   * `setEnabled(false)`. A disabled video track keeps its transceiver and
+   * keeps sending -- black frames, or the last one, depending on the stack.
+   * #202 is explicit that the far end must see an avatar and never a frozen
+   * face, and that is only true once the track is gone from the connection
+   * and the sides have renegotiated without it.
+   */
+  readonly removeTrack: (kind: TrackKind, track: TrackLike) => void
   readonly close: () => void
   /** Each locally gathered candidate. An empty `candidate` ends the gathering. */
   onCandidate?: (candidate: Candidate) => void
@@ -121,6 +132,17 @@ export interface MediaPorts {
    * saying no to an optional request. #199.
    */
   readonly captureVideo: () => Promise<TrackLike>
+  /** Told when the camera refused, so a silent decision leaves a trace. */
+  readonly onCameraRefused?: (cause: unknown) => void
+  /**
+   * Front camera to back and back again, on a track already captured.
+   *
+   * A port rather than a method on `TrackLike`, because switching is the one
+   * thing this layer asks of a track that is not "silence it" or "stop it" --
+   * and the two devices behind it are a fact about hardware, which is
+   * exactly what a port is for. Absent on a platform that cannot.
+   */
+  readonly switchCamera?: (track: TrackLike) => void
 }
 
 /** Which of the two. Named, so `addTrack` cannot be given the wrong one silently. */
@@ -188,6 +210,23 @@ export interface CallMedia {
   readonly muted: () => boolean
   /** Whether this side is sending a picture. */
   readonly sendingVideo: () => boolean
+  /**
+   * Turns this side's camera on or off during a call.
+   *
+   * Answers **the offer to renegotiate with**, or `null` when nothing
+   * changed -- already in that state, or a camera that would not open. The
+   * caller sends it; this module does not know what a Matrix event is.
+   *
+   * A CAMERA THAT REFUSES ANSWERS `null` RATHER THAN THROWING, exactly as
+   * `captureVideo` does at the start of a call: the call is whole either
+   * way, and `sendingVideo()` afterwards is what a screen draws from.
+   */
+  readonly setCameraOn: (on: boolean) => Promise<SessionDescription | null>
+  /**
+   * Front to back and back again. Costs no renegotiation: the track stays,
+   * only what it points at changes.
+   */
+  readonly switchCamera: () => void
   /** Tear down: tracks stopped, connection closed, buffers dropped. */
   readonly stop: () => void
 }
@@ -266,7 +305,13 @@ export function startCallMedia(
     let captured: TrackLike
     try {
       captured = await ports.captureVideo()
-    } catch {
+    } catch (cause: unknown) {
+      // SWALLOWED, AND SAID. Swallowing is the decision -- a camera that
+      // will not open leaves a whole call standing -- but a failure with no
+      // trace at all is what made a missing picture take an hour to explain
+      // on 9 September, when the cause turned out to be somewhere else
+      // entirely. `onCameraRefused` is a report, never a failure.
+      ports.onCameraRefused?.(cause)
       return
     }
     // Between the await and here somebody may have hung up. The same window
@@ -350,6 +395,37 @@ export function startCallMedia(
       for (const candidate of candidates) {
         await pc.addIceCandidate(candidate).catch(() => undefined)
       }
+    },
+
+    setCameraOn: async on => {
+      // Nothing to renegotiate when the call is already in that state. Said
+      // here rather than at the screen, so a double press costs nothing
+      // rather than costing an offer.
+      if (on === (camera !== undefined)) return null
+      const pc = connect()
+      if (on) {
+        await captureCamera(pc)
+        // The camera refused. `captureCamera` has already reported it and
+        // swallowed it; there is simply nothing to offer.
+        if (camera === undefined) return null
+      } else {
+        const going = camera
+        camera = undefined
+        if (going !== undefined) {
+          pc.removeTrack('video', going)
+          // Stopped after it leaves the connection, not before: a track
+          // stopped while still attached is the frozen-face case #202
+          // refuses, for the window between the two.
+          going.stop()
+        }
+      }
+      const description = await pc.createOffer()
+      await pc.setLocalDescription(description)
+      return description
+    },
+
+    switchCamera: () => {
+      if (camera !== undefined) ports.switchCamera?.(camera)
     },
 
     answerRenegotiation: async remote => {

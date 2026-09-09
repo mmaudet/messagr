@@ -87,11 +87,21 @@ const RINGING = 'ringing:'
 export function ringingNotification(
   scope: string,
   shown: string,
+  /**
+   * Whether the far end offered a picture.
+   *
+   * On a locked screen this notification is the first thing anybody sees,
+   * and answering from it turns on whatever the call asked for. Somebody who
+   * is not told that is somebody whose camera lights up unannounced.
+   * `lookForWhatArrived.ts` reads it from the offer, since Matrix version 1
+   * carries the answer nowhere else.
+   */
+  video = false,
 ): Notification {
   return {
     id: `${RINGING}${scope}`,
     title: shown,
-    body: t('notify_ringing_body'),
+    body: video ? t('notify_ringing_video_body') : t('notify_ringing_body'),
   }
 }
 

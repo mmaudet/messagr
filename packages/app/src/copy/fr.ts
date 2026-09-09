@@ -493,6 +493,11 @@ export const fr = {
   // L'onglet Appels. Ce que devient un appel, dit en toutes lettres : la
   // couleur ne fait que répéter ces mots, elle ne les porte jamais.
   calls_empty: 'Aucun appel pour l’instant.',
+  calls_video: 'Vidéo',
+
+  pick_title: 'Vers quelle conversation ?',
+  pick_cancel: 'Annuler',
+  pick_empty: 'Vous n’avez pas d’autre conversation.',
   'calls_ring_back %@': 'Rappeler %@',
   calls_taken: 'Appel reçu',
   calls_placed: 'Appel passé',
@@ -513,6 +518,9 @@ export const fr = {
   call_start_video: 'Appel vidéo',
   call_ringing: 'Appel en cours…',
   call_incoming: 'Appel entrant',
+  call_incoming_video: 'Appel vidéo entrant',
+  call_answer_video: 'Répondre en vidéo',
+  call_answer_audio: 'Répondre sans vidéo',
   call_connecting: 'Connexion…',
   call_active: 'En communication',
   call_reconnecting: 'Reconnexion…',
@@ -528,6 +536,10 @@ export const fr = {
   call_mute: 'Couper le micro',
   call_unmute: 'Rétablir le micro',
   call_speaker: 'Haut-parleur',
+  call_camera_on: 'Caméra',
+  call_camera_off: 'Couper la caméra',
+  call_switch_camera: 'Changer de caméra',
+  call_their_camera_off: 'Sa caméra est coupée',
   call_failed_no_relay:
     'Ce serveur n’a pas de relais d’appel : l’appel n’a pas pu être passé.',
   call_failed_no_microphone: 'Le micro n’est pas accessible.',
@@ -586,6 +598,7 @@ export const fr = {
   notify_blind_body: 'Quelque chose est arrivé.',
   notify_channel: 'Messages',
   notify_ringing_body: 'Appel entrant',
+  notify_ringing_video_body: 'Appel vidéo entrant',
   'notify_missed %1$d %2$d': 'Appel manqué à %1$dh%2$d',
   notify_ringing_channel: 'Appels',
   notify_answer: 'Répondre',

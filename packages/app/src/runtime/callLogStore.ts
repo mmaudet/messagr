@@ -62,6 +62,25 @@ export interface CallRecord {
   readonly at: number
   readonly direction: CallDirection
   readonly outcome: CallOutcome
+  /**
+   * Whether a picture ever went either way.
+   *
+   * "SOME VIDEO WENT THROUGH", NOT "IT WAS PLACED AS A VIDEO CALL". #201
+   * lets a camera come on halfway, so the second sentence would be false
+   * about half the calls it described. A row says what the call turned out
+   * to be.
+   *
+   * ADR-0010 refuses a duration, because it "would make a stolen notebook
+   * say how long two people spoke". This bit was weighed the same way: it
+   * says nothing about duration or content, it is what the row would show
+   * anyway, and « appel vidéo à 21 h » tells a reader of the notebook
+   * almost nothing that « appel à 21 h » did not. Unlike a duration, it is
+   * also the difference between a truthful row and a misleading one.
+   *
+   * Absent on every row written before this existed, and those are audio
+   * calls -- the application could not place any other kind.
+   */
+  readonly video?: boolean
 }
 
 export interface CallLog {
@@ -77,6 +96,15 @@ export interface CallLog {
    * later. `true` when a row was found and changed.
    */
   readonly settle: (scope: string, outcome: CallOutcome) => Promise<boolean>
+  /**
+   * Marks the newest call in a conversation as having carried a picture.
+   *
+   * Separate from `settle` because it happens at a different moment and can
+   * happen more than once: a call is written when it begins, its outcome is
+   * known when it ends, and a camera can come on at any point between.
+   * `true` when a row was found and changed.
+   */
+  readonly sawVideo: (scope: string) => Promise<boolean>
 }
 
 /**
@@ -91,6 +119,19 @@ const SCHEMA = `CREATE TABLE IF NOT EXISTS call_log (
   direction TEXT NOT NULL,
   outcome TEXT NOT NULL
 )`
+
+/**
+ * The column added for #203, and why it is added rather than in `SCHEMA`.
+ *
+ * `CREATE TABLE IF NOT EXISTS` does nothing to a table that already exists,
+ * so a notebook written before today keeps the four-column shape. `ALTER
+ * TABLE ... ADD COLUMN` is the migration, and it is run unguarded and its
+ * failure swallowed: the only reason it fails is that the column is already
+ * there, which is exactly the state it is trying to reach. Reading
+ * `PRAGMA table_info` first would be a second way of asking the same
+ * question, and two ways of asking is how they come to disagree.
+ */
+const ADD_VIDEO = `ALTER TABLE call_log ADD COLUMN video INTEGER NOT NULL DEFAULT 0`
 
 const DIRECTIONS = new Set<string>(['in', 'out'])
 const OUTCOMES = new Set<string>(['answered', 'missed', 'declined', 'unplaced'])
@@ -119,11 +160,14 @@ export async function openCallLog(
   database: EncryptedDatabase,
 ): Promise<CallLog> {
   await database.execute(SCHEMA)
+  // Fails on a notebook that already has the column, which is the state it
+  // wants. See `ADD_VIDEO`.
+  await database.execute(ADD_VIDEO).catch(() => undefined)
 
   return {
     recent: async (limit = A_SCREENFUL) => {
       const { rows } = await database.execute(
-        'SELECT scope, peer, at, direction, outcome FROM call_log ' +
+        'SELECT scope, peer, at, direction, outcome, video FROM call_log ' +
           'ORDER BY at DESC, id DESC LIMIT ?',
         [limit],
       )
@@ -132,7 +176,7 @@ export async function openCallLog(
         // Read defensively rather than cast, for the reason the names store
         // gives: this is a file on a device, and a row of the wrong shape is
         // a row to drop rather than a screen to crash.
-        const { scope, peer, at, direction, outcome } = row as Record<
+        const { scope, peer, at, direction, outcome, video } = row as Record<
           string,
           unknown
         >
@@ -147,6 +191,10 @@ export async function openCallLog(
           at,
           direction: direction as CallDirection,
           outcome: outcome as CallOutcome,
+          // SQLite has no boolean. A row from before the column existed
+          // reads as `0`, which is the truth about it: the application could
+          // not place a video call then.
+          ...(video === 1 || video === true ? { video: true } : {}),
         })
       }
       return collapsed(found)
@@ -155,14 +203,15 @@ export async function openCallLog(
     add: async record => {
       try {
         await database.execute(
-          'INSERT INTO call_log (scope, peer, at, direction, outcome) ' +
-            'VALUES (?, ?, ?, ?, ?)',
+          'INSERT INTO call_log (scope, peer, at, direction, outcome, video) ' +
+            'VALUES (?, ?, ?, ?, ?, ?)',
           [
             record.scope,
             record.peerUserId,
             record.at,
             record.direction,
             record.outcome,
+            record.video === true ? 1 : 0,
           ],
         )
         return true
@@ -187,6 +236,26 @@ export async function openCallLog(
         if (typeof id !== 'number') return false
         await database.execute('UPDATE call_log SET outcome = ? WHERE id = ?', [
           outcome,
+          id,
+        ])
+        return true
+      } catch {
+        return false
+      }
+    },
+
+    sawVideo: async scope => {
+      try {
+        // The same two steps `settle` explains: `EncryptedDatabase.execute`
+        // answers rows and no count of what it touched, so the only way to
+        // know a call was there is to have looked.
+        const { rows } = await database.execute(
+          'SELECT id FROM call_log WHERE scope = ? ORDER BY at DESC, id DESC LIMIT 1',
+          [scope],
+        )
+        const id = (rows[0] as { id?: unknown } | undefined)?.id
+        if (typeof id !== 'number') return false
+        await database.execute('UPDATE call_log SET video = 1 WHERE id = ?', [
           id,
         ])
         return true
@@ -231,5 +300,6 @@ export function forgetfulCallLog(): CallLog {
     recent: async () => [],
     add: async () => false,
     settle: async () => false,
+    sawVideo: async () => false,
   }
 }

@@ -40,7 +40,15 @@ function candidate(name: string): Candidate {
 
 /** A peer connection that records what it was told and lets a test drive it. */
 function fakeConnection(overrides: Partial<PeerConnectionLike> = {}) {
-  const calls = {
+  const calls: {
+    localDescriptions: SessionDescription[]
+    remoteDescriptions: SessionDescription[]
+    candidates: Candidate[]
+    audio: TrackLike[]
+    video: TrackLike[]
+    closed: number
+    order: string[]
+  } = {
     localDescriptions: [] as SessionDescription[],
     remoteDescriptions: [] as SessionDescription[],
     candidates: [] as Candidate[],
@@ -75,6 +83,10 @@ function fakeConnection(overrides: Partial<PeerConnectionLike> = {}) {
       calls.order.push(kind === 'audio' ? 'addAudio' : 'addVideo')
       if (kind === 'audio') calls.audio.push(t)
       else calls.video.push(t)
+    },
+    removeTrack: (kind, t) => {
+      calls.order.push(kind === 'audio' ? 'removeAudio' : 'removeVideo')
+      if (kind === 'video') calls.video = calls.video.filter(one => one !== t)
     },
     close: () => {
       calls.closed += 1
@@ -542,5 +554,62 @@ describe('the camera', () => {
     media.stop()
     await offering.catch(() => undefined)
     expect(camera.state.stopped).toBe(1)
+  })
+})
+
+describe('turning the camera on and off during a call', () => {
+  it('offers a renegotiation when it comes on', async () => {
+    const { media, connection } = build({})
+    await media.offer()
+    expect(media.sendingVideo()).toBe(false)
+    const offer = await media.setCameraOn(true)
+    expect(offer?.type).toBe('offer')
+    expect(connection.calls.video).toHaveLength(1)
+    expect(media.sendingVideo()).toBe(true)
+  })
+
+  it('offers one when it goes off, and takes the track away', async () => {
+    // NOT `setEnabled(false)`: a disabled video track keeps its transceiver
+    // and keeps sending, which is the frozen face #202 refuses.
+    const { media, connection, camera } = build({})
+    await media.offer({ video: true })
+    const offer = await media.setCameraOn(false)
+    expect(offer?.type).toBe('offer')
+    expect(connection.calls.order).toContain('removeVideo')
+    expect(camera.state.stopped).toBe(1)
+    expect(media.sendingVideo()).toBe(false)
+  })
+
+  it('costs nothing when it is already in that state', async () => {
+    // A double press must not cost an offer, and the rule lives here rather
+    // than in a screen that would have to remember it.
+    const { media } = build({})
+    await media.offer({ video: true })
+    expect(await media.setCameraOn(true)).toBeNull()
+    await media.setCameraOn(false)
+    expect(await media.setCameraOn(false)).toBeNull()
+  })
+
+  it('answers null rather than throwing when the camera refuses', async () => {
+    const { media, connection } = build({
+      cameraRejects: new Error('permission denied'),
+    })
+    await media.offer()
+    expect(await media.setCameraOn(true)).toBeNull()
+    expect(connection.calls.video).toHaveLength(0)
+    expect(media.sendingVideo()).toBe(false)
+  })
+
+  it('can be turned on, off and on again in one call', async () => {
+    const { media, connection } = build({})
+    await media.offer()
+    await media.setCameraOn(true)
+    await media.setCameraOn(false)
+    const again = await media.setCameraOn(true)
+    expect(again?.type).toBe('offer')
+    expect(media.sendingVideo()).toBe(true)
+    expect(
+      connection.calls.order.filter(one => one === 'addVideo'),
+    ).toHaveLength(2)
   })
 })

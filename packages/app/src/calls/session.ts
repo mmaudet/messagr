@@ -108,6 +108,18 @@ export interface CallSession {
   readonly hangup: () => void
   /** Mute or unmute, answering what the microphone actually holds afterwards. */
   readonly setMuted: (muted: boolean) => boolean
+  /**
+   * Turns this side's camera on or off mid-call, and renegotiates.
+   *
+   * Answers what the call actually carries afterwards, not what was asked --
+   * the same contract `setMuted` has, and for the same reason: a camera that
+   * would not open must not leave a screen drawing a picture nobody sends.
+   */
+  readonly setCameraOn: (on: boolean) => Promise<boolean>
+  /** Front to back and back again. */
+  readonly switchCamera: () => void
+  /** Whether this side is sending a picture. */
+  readonly sendingVideo: () => boolean
   readonly muted: () => boolean
   /** One sync's worth of raw room events. Throws nothing. */
   readonly receive: (rawEvents: readonly unknown[]) => void
@@ -326,6 +338,23 @@ export function startCallSession(
     hangup: () => transportOrStart().hangup(USER_HANGUP),
 
     setMuted: muted => media?.setMuted(muted) ?? muted,
+
+    switchCamera: () => media?.switchCamera(),
+    sendingVideo: () => media?.sendingVideo() ?? false,
+
+    setCameraOn: async on => {
+      const carrier = transport
+      // Before a call exists there is nothing to renegotiate, and nothing to
+      // draw either. Answering `false` says the camera is not on, which is
+      // true.
+      if (media === undefined || carrier === undefined) return false
+      const offer = await media.setCameraOn(on)
+      // `null` is "nothing changed": already in that state, or a camera that
+      // refused. Either way there is no offer to send, and `sendingVideo`
+      // is the honest answer.
+      if (offer !== null) carrier.requestNegotiation(offer)
+      return media.sendingVideo()
+    },
     muted: () => media?.muted() ?? false,
 
     receive: rawEvents => transportOrStart().receive(rawEvents),
