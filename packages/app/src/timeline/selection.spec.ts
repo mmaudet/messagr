@@ -1,7 +1,13 @@
 import { describe, expect, it } from 'vitest'
 
 import type { TimelineEntry } from './mergeTimeline'
-import { canCopy, canRemoveForEveryone, copyText, toggle } from './selection'
+import {
+  canCopy,
+  canForward,
+  canRemoveForEveryone,
+  copyText,
+  toggle,
+} from './selection'
 
 const ME = '@me:x'
 const HER = '@her:x'
@@ -123,5 +129,39 @@ describe('copying', () => {
       body: null,
     }
     expect(copyText(new Set(['$u', '$m1']), [MINE, unreadable])).toBe('bonjour')
+  })
+})
+
+describe('forwarding', () => {
+  it('is offered on words and on photographs alike', () => {
+    // Unlike Copy: forwarding a picture is most of why anybody forwards.
+    expect(canForward(new Set(['$m1', '$p1']), [MINE, MY_PHOTO])).toBe(true)
+  })
+
+  it('is absent on an empty selection', () => {
+    expect(canForward(new Set(), [MINE])).toBe(false)
+  })
+
+  it('is absent as soon as one cannot be read', () => {
+    // Nothing to send on. Sending part of a selection silently is the thing
+    // this screen refuses everywhere else.
+    const unreadable: TimelineEntry = {
+      eventId: '$u',
+      claimedSender: HER,
+      sentAt: 0,
+      body: null,
+    }
+    expect(canForward(new Set(['$m1', '$u']), [MINE, unreadable])).toBe(false)
+  })
+
+  it('is absent on a message that was removed', () => {
+    const gone: TimelineEntry = {
+      eventId: '$g',
+      claimedSender: HER,
+      sentAt: 0,
+      body: null,
+      removed: true,
+    }
+    expect(canForward(new Set(['$g']), [gone])).toBe(false)
   })
 })

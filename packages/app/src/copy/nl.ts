@@ -147,6 +147,7 @@ export const nl: Readonly<Record<CopyKey, string>> = {
   'selection_count %1$d': '%1$d geselecteerd',
   selection_clear: 'Selectie verlaten',
   selection_copy: 'Kopiëren',
+  selection_forward: 'Doorsturen',
   selection_remove: 'Verwijderen',
   'remove_title %1$d': '%1$d bericht(en) verwijderen?',
   remove_everyone: 'Voor iedereen verwijderen',

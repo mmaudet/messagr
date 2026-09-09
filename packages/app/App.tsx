@@ -102,10 +102,12 @@ import { admitAnyoneWaiting } from './src/runtime/admitAnyoneWaiting'
 import { displayNameFor } from './src/runtime/givenName'
 import Clipboard from '@react-native-clipboard/clipboard'
 import { removeMessage } from './src/runtime/cryptoPump'
+import { photographForForward } from './src/runtime/cryptoPump'
 import { openNotebook } from './src/runtime/notebook'
 import { forgetfulHidden, type Hidden } from './src/runtime/hiddenStore'
 import {
   canCopy,
+  canForward,
   canRemoveForEveryone,
   copyText,
   toggle,
@@ -146,6 +148,7 @@ import type { Wants } from './src/calls/media'
 import { CallScreen } from './src/ui/CallScreen'
 import { SelectionBar } from './src/ui/SelectionBar'
 import { RemoveSheet } from './src/ui/RemoveSheet'
+import { PickConversation } from './src/ui/PickConversation'
 import { ConversationHeader } from './src/ui/ConversationHeader'
 import { Legal } from './src/ui/Legal'
 import { Reserved } from './src/ui/Reserved'
@@ -404,6 +407,14 @@ export function App({
   const [selected, setSelected] = useState<ReadonlySet<string>>(new Set())
   const [removing, setRemoving] = useState(false)
   /**
+   * The events waiting for a destination, while the picker is up.
+   *
+   * Taken from the selection at the moment the gesture starts rather than
+   * read from it later: the sheet clears the selection so the bar can go,
+   * and a forward that read `selected` afterwards would forward nothing.
+   */
+  const [forwarding, setForwarding] = useState<readonly string[] | null>(null)
+  /**
    * Places a call, audio or video, from wherever the gesture came from.
    *
    * One function rather than three copies of the same six lines: the header
@@ -517,6 +528,10 @@ export function App({
   const attachRef = useRef<(() => void) | null>(null)
   /** Redacts messages for everyone. Bound with the session, like the rest. */
   const removeRef = useRef<((eventIds: readonly string[]) => void) | null>(null)
+  /** Sends the chosen events on to another conversation. See `forwardImage.ts`. */
+  const forwardRef = useRef<
+    ((scope: string, eventIds: readonly string[]) => void) | null
+  >(null)
   // Registering or removing this device's pusher. Held in a ref because the
   // settings switch is rendered outside the launch effect that binds it.
   const wakeThisDeviceRef = useRef<((on: boolean) => void) | null>(null)
@@ -1184,6 +1199,77 @@ export function App({
             // per event. `buildTimeline` now draws a line where a message
             // was removed -- see `redactionKind.ts` for how it can tell that
             // from a reaction being taken back.
+            // FORWARDING, WHICH IS A COPY AND NEVER A HANDOVER.
+            //
+            // Words go as words: a forwarded message is a new message in the
+            // destination, sent by this account, which is the truth about
+            // who put it there.
+            //
+            // A photograph is downloaded, decrypted and sealed afresh --
+            // `forwardImage.ts` argues why sending the `m.image` on would
+            // hand the destination the original file's key rather than a
+            // copy of the picture.
+            //
+            // In order and one at a time, like every other send in this
+            // file: the destination reads what somebody meant to send in the
+            // order they meant it, and one failure is one line rather than a
+            // batch reporting a single outcome for five.
+            forwardRef.current = (target, eventIds) => {
+              const going = async () => {
+                setSending('sending')
+                const held = conversationRef.current
+                for (const eventId of eventIds) {
+                  const entry = held.find(one => one.eventId === eventId)
+                  if (entry === undefined) continue
+                  if (entry.image !== undefined) {
+                    const ready = await photographForForward(
+                      credentials,
+                      entry.image,
+                    )
+                    if (!ready.ready) {
+                      logEvent('warn', 'MESSAGR_NOT_FORWARDED', {
+                        reason: ready.reason,
+                      })
+                      continue
+                    }
+                    const sent = await sendPhotograph(
+                      sessionClient,
+                      credentials,
+                      target,
+                      ready.image,
+                    )
+                    if (!sent.sent) {
+                      logEvent('warn', 'MESSAGR_NOT_FORWARDED', {
+                        reason: sent.reason,
+                      })
+                    }
+                    continue
+                  }
+                  if (entry.body === null) continue
+                  const sent = await sendTypedMessage(
+                    sessionClient,
+                    target,
+                    entry.body,
+                  )
+                  if (!sent.sent) {
+                    logEvent('warn', 'MESSAGR_NOT_FORWARDED', {
+                      reason: sent.reason,
+                    })
+                  }
+                }
+                setSending('idle')
+                // The list, because a conversation nobody is looking at just
+                // gained its newest message and its row has to say so.
+                await refreshList().catch(() => {})
+              }
+              going().catch((cause: unknown) => {
+                setSending('failed')
+                logEvent('warn', 'MESSAGR_NOT_FORWARDED', {
+                  reason: getErrorMessage(cause),
+                })
+              })
+            }
+
             removeRef.current = eventIds => {
               const scope = openScopeRef.current
               if (scope === null) return
@@ -2331,6 +2417,23 @@ export function App({
           />
         )}
 
+        {forwarding !== null && (
+          <PickConversation
+            summaries={summaries}
+            names={names}
+            // Not the one it came from: forwarding a message into the
+            // conversation it is already in is not a gesture.
+            {...(openScope === null ? {} : { except: openScope })}
+            onPick={scope => {
+              const chosen = forwarding
+              setForwarding(null)
+              setSelected(new Set())
+              if (scope === null) return
+              forwardRef.current?.(scope, chosen)
+            }}
+          />
+        )}
+
         {removing && openScope !== null && (
           <RemoveSheet
             count={selected.size}
@@ -2418,11 +2521,13 @@ export function App({
               <SelectionBar
                 count={selected.size}
                 canCopy={canCopy(selected, conversation ?? [])}
+                canForward={canForward(selected, conversation ?? [])}
                 onClear={() => setSelected(new Set())}
                 onCopy={() => {
                   Clipboard.setString(copyText(selected, conversation ?? []))
                   setSelected(new Set())
                 }}
+                onForward={() => setForwarding([...selected])}
                 onRemove={() => setRemoving(true)}
               />
             ) : undefined}

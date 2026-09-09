@@ -72,6 +72,7 @@ import {
   type Road,
 } from './pusher'
 import type { PickedImage } from './pickImage'
+import { openForForward } from './forwardImage'
 import { fetchImage, type ShownImage } from './receiveImage'
 import { sendImage, sendingThrough, type ImageSent } from './sendImage'
 import type { ReadFile } from '../timeline/imageEvent'
@@ -901,6 +902,32 @@ export async function stopWakingThisDevice(
  * address and a key of its own -- the caller decides which of the two it
  * wants, and nothing down here needs to know which it was given.
  */
+/**
+ * A photograph taken out of one conversation and made ready for another.
+ *
+ * The same media repository and the same decryption `openPhotograph` uses,
+ * answering bytes rather than a `data:` URI -- `forwardImage.ts` says why a
+ * forward pays for its own round trip rather than the cache holding two
+ * shapes of every picture.
+ */
+export async function photographForForward(
+  credentials: { readonly baseUrl: string; readonly accessToken: string },
+  image: ReadFile,
+) {
+  const media = mediaRepository(
+    credentials.baseUrl,
+    credentials.accessToken,
+    fetch,
+  )
+  return openForForward(
+    {
+      download: url => media.download(url),
+      open: (ciphertext, secret) => decryptAttachment(ciphertext, secret),
+    },
+    image,
+  )
+}
+
 export async function openPhotograph(
   credentials: { readonly baseUrl: string; readonly accessToken: string },
   image: ReadFile,

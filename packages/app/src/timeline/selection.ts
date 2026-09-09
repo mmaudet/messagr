@@ -75,6 +75,26 @@ export function canRemoveForEveryone(
   return found.every(entry => entry.claimedSender === selfUserId)
 }
 
+/**
+ * Whether the selection can be forwarded.
+ *
+ * Everything readable can: a message this device could not open has nothing
+ * to send on, and a removed one has nothing left at all. Unlike Copy, a
+ * photograph counts -- forwarding a picture is most of why anybody forwards.
+ */
+export function canForward(
+  selected: ReadonlySet<string>,
+  entries: readonly TimelineEntry[],
+): boolean {
+  const found = chosen(selected, entries)
+  if (found.length === 0) return false
+  return found.every(
+    entry =>
+      entry.removed !== true &&
+      (entry.image !== undefined || entry.body !== null),
+  )
+}
+
 /** Whether anything selected has words in it. */
 export function canCopy(
   selected: ReadonlySet<string>,

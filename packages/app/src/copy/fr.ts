@@ -188,6 +188,7 @@ export const fr = {
   'selection_count %1$d': '%1$d sélectionné(s)',
   selection_clear: 'Quitter la sélection',
   selection_copy: 'Copier',
+  selection_forward: 'Transférer',
   selection_remove: 'Supprimer',
   'remove_title %1$d': 'Supprimer %1$d message(s) ?',
   remove_everyone: 'Supprimer pour tout le monde',

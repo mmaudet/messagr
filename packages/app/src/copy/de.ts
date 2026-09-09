@@ -154,6 +154,7 @@ export const de: Readonly<Record<CopyKey, string>> = {
   'selection_count %1$d': '%1$d ausgewählt',
   selection_clear: 'Auswahl verlassen',
   selection_copy: 'Kopieren',
+  selection_forward: 'Weiterleiten',
   selection_remove: 'Löschen',
   'remove_title %1$d': '%1$d Nachricht(en) löschen?',
   remove_everyone: 'Für alle löschen',

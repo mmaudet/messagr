@@ -151,6 +151,7 @@ export const es: Readonly<Record<CopyKey, string>> = {
   'selection_count %1$d': '%1$d seleccionado(s)',
   selection_clear: 'Salir de la selección',
   selection_copy: 'Copiar',
+  selection_forward: 'Reenviar',
   selection_remove: 'Eliminar',
   'remove_title %1$d': '¿Eliminar %1$d mensaje(s)?',
   remove_everyone: 'Eliminar para todos',
