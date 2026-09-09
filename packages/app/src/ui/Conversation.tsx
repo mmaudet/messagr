@@ -483,6 +483,13 @@ function Message({
             testID={`body-${entry.eventId}`}
             style={[
               styles.body,
+              // ITALIC, so a removal does not read as words somebody wrote.
+              // It is already the muted grey every unreadable line takes,
+              // and grey alone would say "this device could not read it" --
+              // two different facts sharing one appearance. A slant is a
+              // shape rather than a colour, which is what §13 asks of any
+              // state that has to be legible without it.
+              entry.removed === true && styles.removedBody,
               {
                 color:
                   entry.body === null
@@ -702,6 +709,7 @@ const styles = StyleSheet.create({
   // the two bubble grounds are already two colours, so a third would mean
   // one thing on an outgoing message and another on an incoming one. §13
   // wants no state carried by colour alone, and an outline is a shape.
+  removedBody: { fontStyle: 'italic' },
   bubbleSelected: {
     borderWidth: stroke.accent,
     borderColor: color.brand.green700,

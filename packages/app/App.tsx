@@ -1156,7 +1156,30 @@ export function App({
                     logEvent('warn', 'MESSAGR_NOT_REMOVED', {
                       reason: gone.reason ?? 'unknown',
                     })
+                    continue
                   }
+                  // DRAWN THE MOMENT IT IS TRUE, not when the homeserver
+                  // gets round to agreeing.
+                  //
+                  // The redaction has been accepted -- that is what the
+                  // request resolving means -- so the message is gone, and
+                  // this device is entitled to say so from what it did
+                  // rather than from what it is told. Re-reading first is
+                  // what shipped, and on a Pixel the message stayed on
+                  // screen until the conversation was closed and reopened:
+                  // `/messages` still served the copy from before the
+                  // redaction, and the derivation dutifully brought it back.
+                  //
+                  // The re-read below still runs and still wins, so nothing
+                  // here is a claim that outlives being wrong.
+                  if (openScopeRef.current !== scope) continue
+                  setConversation(held =>
+                    (held ?? []).map(entry =>
+                      entry.eventId === eventId
+                        ? { ...entry, body: null, removed: true }
+                        : entry,
+                    ),
+                  )
                 }
                 const fresh = await loadConversation(
                   sessionClient,
