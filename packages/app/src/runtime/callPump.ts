@@ -13,8 +13,10 @@ import {
   type CallSessionFailure,
 } from '../calls/session'
 import type { Wants } from '../calls/media'
+import { offersVideo } from '../calls/sdp'
 import type { CallEvent } from '../calls/wire'
 import { deviceCallAudio, type CallRole } from './callAudio'
+import { watchPictures, type Pictures } from './callMedia'
 import type { CallLog, CallOutcome } from './callLogStore'
 import { deviceMedia } from './callMedia'
 import { encryptingDeps } from './cryptoPump'
@@ -158,7 +160,14 @@ export interface CallRuntime {
     peerUserId: string,
     wants?: Wants,
   ) => Promise<void>
-  readonly answer: () => Promise<void>
+  /**
+   * Answers the ringing call, with or without a picture of one's own.
+   *
+   * For #199 this mirrors what was offered: a video call is answered with
+   * video. Choosing to answer one without a camera is #200's gesture, and
+   * `wants` is the argument it will use.
+   */
+  readonly answer: (wants?: Wants) => Promise<void>
   readonly reject: () => void
   readonly hangup: () => void
   readonly setMuted: (muted: boolean) => boolean
@@ -185,6 +194,15 @@ export interface CallOnScreen {
    * `messagr-fork.maudet.cloud`, which answers 404 there.
    */
   readonly failure?: CallSessionFailure
+  /**
+   * The two pictures, as handles a video view understands.
+   *
+   * `callMedia.ts` says why they arrive by subscription rather than through
+   * the ports: `media.ts` is pure and must not learn what a stream handle
+   * is. Both `null` on an audio call, which is every call that never asked
+   * for a camera.
+   */
+  readonly pictures: Pictures
 }
 
 export function startCallRuntime(
@@ -201,6 +219,14 @@ export function startCallRuntime(
 ): CallRuntime {
   const deps = encryptingDeps(sessionClient)
   let held: (DeviceCall & CallOnScreen) | null = null
+  // Held beside the call rather than inside it: the pictures arrive on the
+  // library's own callbacks, at moments that have nothing to do with the
+  // state machine's transitions.
+  let pictures: Pictures = { local: null, remote: null }
+  const unwatch = watchPictures(next => {
+    pictures = next
+    if (held !== null) onChanged({ ...held, pictures })
+  })
 
   /**
    * Runs a gesture that can be refused, and keeps the refusal on the screen.
@@ -219,7 +245,7 @@ export function startCallRuntime(
         // "I tried to call you" is a fact, and three of these in a row is a
         // misconfigured homeserver rather than somebody avoiding anybody.
         log.settle(held.scope, 'unplaced').catch(() => {})
-        onChanged({ ...held })
+        onChanged({ ...held, pictures })
       }
       throw cause
     }
@@ -260,6 +286,9 @@ export function startCallRuntime(
       scope,
       peerUserId,
       state: started.session.state(),
+      // Whatever the last call left, which is nothing: `release` clears them
+      // and a connection's `close` publishes both as `null`.
+      pictures,
     }
     held = call
     // THE AUDIO SESSION IS TAKEN WHEN THE CALL BEGINS, NOT WHEN IT CONNECTS.
@@ -292,7 +321,7 @@ export function startCallRuntime(
         // ADR-0010: this page degrades. A call is not undone by a notebook
         // that would not write it down.
       })
-    onChanged({ ...call })
+    onChanged({ ...call, pictures })
     return call
   }
 
@@ -336,10 +365,17 @@ export function startCallRuntime(
       if (held !== null) throw new Error('a call is already running')
       await refusable(begin(scope, peerUserId, 'caller').session.place(wants))
     },
-    answer: async () => {
+    answer: async wants => {
       const running = held
       if (running === null) return
-      await refusable(running.session.answer())
+      // MIRRORS WHAT WAS OFFERED, unless the caller of this says otherwise.
+      // A video call answered without a picture is a whole gesture and it is
+      // #200's; until then, somebody who rings with a camera is answered
+      // with one, and an audio call stays audio.
+      const now = running.state
+      const offered =
+        now.call === 'incomingInvite' && offersVideo(now.offer.sdp)
+      await refusable(running.session.answer(wants ?? { video: offered }))
     },
     reject: () => held?.session.reject(),
     hangup: () => held?.session.hangup(),
@@ -348,6 +384,7 @@ export function startCallRuntime(
     release: async () => {
       const running = held
       held = null
+      pictures = { local: null, remote: null }
       onChanged(null)
       // Before the session stops, and unconditionally: giving the audio
       // session back is what returns the device to its ringer volume and
@@ -355,6 +392,7 @@ export function startCallRuntime(
       // must not leave a telephone that behaves as though it is still on
       // one.
       deviceCallAudio.end()
+      unwatch()
       await running?.session.stop()
     },
   }

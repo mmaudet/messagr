@@ -113,6 +113,52 @@ function described(description: unknown): SessionDescription {
   }
 }
 
+/**
+ * The two pictures a call screen draws, as handles `RTCView` understands.
+ *
+ * # WHY THEY COME OUT THIS WAY AND NOT THROUGH `media.ts`
+ *
+ * `media.ts` is pure and knows nothing of `MediaStream`, `RTCView` or the
+ * string those two agree on -- that is the whole point of the ports, and
+ * threading a rendering handle through them would put a react-native-webrtc
+ * concept into a module that is tested without a device.
+ *
+ * So the handles leave from here, which is already the only file that
+ * imports the library. A screen subscribes, and a call publishes.
+ *
+ * # ONE SUBSCRIBER, BECAUSE THERE IS ONE CALL
+ *
+ * A module-level watcher rather than one per connection: this application
+ * refuses a second call while one is up, so "the pictures" is a fact about
+ * the device rather than about a particular connection. `callPump.ts` holds
+ * the one subscription and the screen reads it from there.
+ */
+export interface Pictures {
+  /** This side's own camera, or `null` while it is not sending one. */
+  readonly local: string | null
+  /** The far end's, or `null` until a track arrives. */
+  readonly remote: string | null
+}
+
+let pictures: Pictures = { local: null, remote: null }
+let watcher: ((pictures: Pictures) => void) | null = null
+
+function publish(next: Pictures): void {
+  pictures = next
+  watcher?.(next)
+}
+
+/** Replaces the previous watcher: there is one call, so there is one screen. */
+export function watchPictures(
+  onPictures: (pictures: Pictures) => void,
+): () => void {
+  watcher = onPictures
+  onPictures(pictures)
+  return () => {
+    if (watcher === onPictures) watcher = null
+  }
+}
+
 function connectionFor(config: IceConfig): PeerConnectionLike {
   const pc = new RTCPeerConnection({
     iceServers: [
@@ -148,6 +194,7 @@ function connectionFor(config: IceConfig): PeerConnectionLike {
         throw new Error(`${kind} track was not captured by this media adapter`)
       }
       const sender = pc.addTrack(native, stream)
+      if (kind === 'video') publish({ ...pictures, local: stream.toURL() })
       // THE CEILING, APPLIED HERE BECAUSE NOWHERE ELSE CAN.
       //
       // The relay allows `max-bps=400000` -- 3.2 Mbit/s a direction -- and
@@ -170,7 +217,14 @@ function connectionFor(config: IceConfig): PeerConnectionLike {
         }
       }
     },
-    close: () => pc.close(),
+    close: () => {
+      // BEFORE THE CONNECTION GOES, not after: a screen still drawing a
+      // handle whose stream has been released renders whatever the native
+      // side last held, which on a call that just ended is the other
+      // person's face, frozen.
+      publish({ local: null, remote: null })
+      pc.close()
+    },
   }
 
   // The `on*` setters rather than `addEventListener`: the library's own
@@ -192,6 +246,19 @@ function connectionFor(config: IceConfig): PeerConnectionLike {
               : { sdpMLineIndex: found.sdpMLineIndex }),
           } satisfies Candidate),
     )
+  }
+
+  // THE FAR END'S PICTURE. Only video: an audio track arrives here too, and
+  // it has nothing to draw.
+  pc.ontrack = (event: unknown) => {
+    const arrived = event as {
+      track?: { kind?: string }
+      streams?: readonly MediaStream[]
+    }
+    if (arrived.track?.kind !== 'video') return
+    const stream = arrived.streams?.[0]
+    if (stream === undefined) return
+    publish({ ...pictures, remote: stream.toURL() })
   }
 
   pc.onconnectionstatechange = () => {

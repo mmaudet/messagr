@@ -70,6 +70,7 @@ export function ConversationHeader({
   onBack,
   onOpenPerson,
   onCall,
+  onVideoCall,
 }: {
   /** The name or the identifier, exactly as the list row shows it. */
   readonly shown: string
@@ -83,6 +84,12 @@ export function ConversationHeader({
    * header, and #88 says a control that cannot act is worse than none.
    */
   readonly onCall?: () => void
+  /**
+   * Places a video call. Absent under the same rule as `onCall`, and for the
+   * same reason -- §4.5 asks for both buttons here, and a camera button in a
+   * conversation with nobody to point it at is a control that cannot act.
+   */
+  readonly onVideoCall?: () => void
 }) {
   return (
     <View style={styles.bar} testID="conversation-header">
@@ -114,6 +121,22 @@ export function ConversationHeader({
           </Text>
         </View>
       </Pressable>
+
+      {/* THE CAMERA BEFORE THE HANDSET, reading left to right, because §4.5
+          names them in that order -- "audio and video buttons" -- and
+          because the handset next to the menu is where a thumb has been
+          finding it since #88. Adding the new one to the left moves nothing
+          that anybody has learnt. */}
+      {onVideoCall !== undefined && (
+        <Pressable
+          testID="conversation-video-call"
+          onPress={onVideoCall}
+          accessibilityRole="button"
+          accessibilityLabel={t('call_start_video')}
+          style={styles.more}>
+          <TabIcon glyph="cam" tint={color.neutral['600']} />
+        </Pressable>
+      )}
 
       {onCall !== undefined && (
         <Pressable

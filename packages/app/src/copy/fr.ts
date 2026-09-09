@@ -510,6 +510,7 @@ export const fr = {
   // `CallScreen.tsx` -- so what changes between two states is exactly this
   // sentence and which buttons sit under it.
   call_start: 'Appeler',
+  call_start_video: 'Appel vidéo',
   call_ringing: 'Appel en cours…',
   call_incoming: 'Appel entrant',
   call_connecting: 'Connexion…',

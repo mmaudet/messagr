@@ -1,8 +1,10 @@
 import React, { useEffect, useRef, useState } from 'react'
 import { Modal, Pressable, StyleSheet, Text, View } from 'react-native'
+import { RTCView } from 'react-native-webrtc'
 
 import type { CallState, EndReason } from '../calls/machine'
 import type { CallSessionFailure } from '../calls/session'
+import type { Pictures } from '../runtime/callMedia'
 import { t, type CopyKey } from '../copy'
 import { color, floors, radius, space, type } from '../design/tokens'
 import { Avatar } from './Avatar'
@@ -129,6 +131,7 @@ export function CallScreen({
   onMute,
   onSpeaker,
   onDismiss,
+  pictures = { local: null, remote: null },
 }: {
   readonly state: CallState
   /** Why it never started, when that is what happened. */
@@ -145,9 +148,19 @@ export function CallScreen({
   readonly onSpeaker: (on: boolean) => void
   /** Leaves the call screen. Only offered once the call is over. */
   readonly onDismiss: () => void
+  /**
+   * The two pictures, when there are any. Both `null` on an audio call,
+   * which is every call that never asked for a camera.
+   */
+  readonly pictures?: Pictures
 }) {
   const ringing = state.call === 'incomingInvite'
   const over = state.call === 'ended' || state.call === 'idle'
+  // A CALL WITH A PICTURE IN IT, which is not the same as a call that asked
+  // for one: a camera that would not open leaves an audio call wearing a
+  // video call's intent, and the screen draws what arrived rather than what
+  // was wanted.
+  const showing = !over && (pictures.remote !== null || pictures.local !== null)
 
   // IT CLOSES ITSELF, AND IT WAITS LONG ENOUGH TO BE READ FIRST.
   //
@@ -195,8 +208,35 @@ export function CallScreen({
       onRequestClose={over ? onDismiss : onHangup}
       testID="call-screen">
       <View style={styles.ground}>
-        <View style={styles.who}>
-          <Avatar shown={shown} size={AVATAR} testID="call-avatar" />
+        {/* THE FAR END FILLS THE SCREEN, and this side sits in a corner --
+            the arrangement every video call has had for fifteen years, and
+            one nobody has to be taught. `cover` rather than `contain`: a
+            letterboxed face on a telephone wastes the half of the screen
+            that matters. */}
+        {pictures.remote !== null && !over && (
+          <RTCView
+            streamURL={pictures.remote}
+            style={styles.far}
+            objectFit="cover"
+            testID="call-far"
+          />
+        )}
+        {pictures.local !== null && !over && (
+          // MIRRORED, because a camera pointing at you is a mirror to you
+          // and a window to everybody else. Unmirrored, people move the
+          // wrong way when they frame themselves.
+          <RTCView
+            streamURL={pictures.local}
+            style={styles.near}
+            objectFit="cover"
+            mirror
+            testID="call-near"
+          />
+        )}
+        <View style={[styles.who, showing && styles.whoAside]}>
+          {!showing && (
+            <Avatar shown={shown} size={AVATAR} testID="call-avatar" />
+          )}
           <Text style={styles.name} numberOfLines={1} testID="call-name">
             {shown}
           </Text>
@@ -358,6 +398,22 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: space.m,
     paddingHorizontal: space.xl,
+  },
+  // WITH A PICTURE BEHIND IT, the name stops being the screen and becomes a
+  // label on it. The avatar goes: a photograph of somebody's face over a
+  // moving picture of the same face is one of them too many.
+  whoAside: { gap: space.xs },
+  far: { ...StyleSheet.absoluteFill },
+  // A QUARTER OF THE WIDTH, at the top so the controls at the bottom stay
+  // reachable and so a thumb does not rest on it.
+  near: {
+    position: 'absolute',
+    top: space.xxl * 2,
+    right: space.m,
+    width: '26%',
+    aspectRatio: 3 / 4,
+    borderRadius: radius.bubble,
+    overflow: 'hidden',
   },
   name: {
     ...type.titleLg,

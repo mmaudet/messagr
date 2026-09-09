@@ -142,6 +142,7 @@ import { FloatingAction } from './src/ui/FloatingAction'
 import { Header } from './src/ui/Header'
 import { Composer } from './src/ui/Composer'
 import { FullScreenPlate } from './src/ui/FullScreenPlate'
+import type { Wants } from './src/calls/media'
 import { CallScreen } from './src/ui/CallScreen'
 import { SelectionBar } from './src/ui/SelectionBar'
 import { RemoveSheet } from './src/ui/RemoveSheet'
@@ -402,6 +403,26 @@ export function App({
    */
   const [selected, setSelected] = useState<ReadonlySet<string>>(new Set())
   const [removing, setRemoving] = useState(false)
+  /**
+   * Places a call, audio or video, from wherever the gesture came from.
+   *
+   * One function rather than three copies of the same six lines: the header
+   * has two buttons now and the calls list a third, and a `place` that
+   * differed between them would differ in the failure handling first.
+   */
+  const placeCall = (
+    scope: string | null,
+    peerUserId: string,
+    wants?: Wants,
+  ) => {
+    const runtime = callRuntimeRef.current
+    if (runtime === null || scope === null) return
+    runtime.place(scope, peerUserId, wants).catch((cause: unknown) =>
+      logEvent('warn', 'MESSAGR_CALL_NOT_PLACED', {
+        reason: getErrorMessage(cause),
+      }),
+    )
+  }
   /** What this device has been told not to draw. `hiddenStore.ts` says why. */
   const hiddenRef = useRef<Hidden>(forgetfulHidden())
   const [hidden, setHidden] = useState<ReadonlySet<string>>(new Set())
@@ -2263,6 +2284,7 @@ export function App({
               callRuntimeRef.current?.setSpeaker(wanted)
               setCallSpeaker(wanted)
             }}
+            pictures={call.pictures}
             onDismiss={() =>
               callRuntimeRef.current?.release().catch((cause: unknown) =>
                 logEvent('warn', 'MESSAGR_CALL_NOT_RELEASED', {
@@ -2403,17 +2425,14 @@ export function App({
                 onCall={
                   party === null || call !== null
                     ? undefined
-                    : () => {
-                        const runtime = callRuntimeRef.current
-                        if (runtime === null || openScope === null) return
-                        runtime
-                          .place(openScope, party.other)
-                          .catch((cause: unknown) =>
-                            logEvent('warn', 'MESSAGR_CALL_NOT_PLACED', {
-                              reason: getErrorMessage(cause),
-                            }),
-                          )
-                      }
+                    : () => placeCall(openScope, party.other)
+                }
+                // THE SAME GUARD, because the same two things make either
+                // call impossible: nobody to name, or one already up.
+                onVideoCall={
+                  party === null || call !== null
+                    ? undefined
+                    : () => placeCall(openScope, party.other, { video: true })
                 }
               />
             )}
@@ -2509,15 +2528,10 @@ export function App({
                     openConversationRef.current?.(scope)
                   }}
                   onCall={(scope, peer) => {
-                    const runtime = callRuntimeRef.current
                     // A call already up owns the microphone, and placing a
                     // second one over it is the header's rule too.
-                    if (runtime === null || call !== null) return
-                    runtime.place(scope, peer).catch((cause: unknown) =>
-                      logEvent('warn', 'MESSAGR_CALL_NOT_PLACED', {
-                        reason: getErrorMessage(cause),
-                      }),
-                    )
+                    if (call !== null) return
+                    placeCall(scope, peer)
                   }}
                 />
               </View>
