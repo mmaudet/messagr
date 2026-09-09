@@ -643,7 +643,28 @@ export function App({
     }
     const subscription = AppState.addEventListener('change', state => {
       if (state === 'active') resumeSyncRef.current?.()
-      else pause()
+      else {
+        pause()
+        // AND THE CAMERA GOES WITH THE FOREGROUND. #202.
+        //
+        // Filming while the application is not on screen needs a foreground
+        // service of type `camera` on Android, and Android revokes the
+        // camera without one. We are not declaring it: an application able
+        // to film when it is not on screen is a thing this product should
+        // not know how to be, and the platform wants the same answer.
+        //
+        // Not merely letting the capture die, either -- a video track whose
+        // camera stops does not go quiet, it sends the last frame for ever,
+        // and the far end watches a face frozen mid-sentence. Turning it off
+        // renegotiates the track away, so they see an avatar and a line
+        // saying the camera is off.
+        //
+        // The audio is untouched. A call continues.
+        callRuntimeRef.current?.setCameraOn(false).catch(() => {
+          // A camera that would not go off is not a call to end. The
+          // platform revokes it a moment later anyway.
+        })
+      }
     })
     return () => {
       subscription.remove()

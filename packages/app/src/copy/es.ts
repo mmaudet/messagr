@@ -367,6 +367,7 @@ export const es: Readonly<Record<CopyKey, string>> = {
   call_camera_on: 'Cámara',
   call_camera_off: 'Apagar la cámara',
   call_switch_camera: 'Cambiar de cámara',
+  call_their_camera_off: 'Su cámara está apagada',
   call_failed_no_relay:
     'Este servidor no tiene retransmisión de llamadas: no se ha podido llamar.',
   call_failed_no_microphone: 'El micrófono no está disponible.',

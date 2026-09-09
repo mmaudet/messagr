@@ -535,6 +535,7 @@ export const fr = {
   call_camera_on: 'Caméra',
   call_camera_off: 'Couper la caméra',
   call_switch_camera: 'Changer de caméra',
+  call_their_camera_off: 'Sa caméra est coupée',
   call_failed_no_relay:
     'Ce serveur n’a pas de relais d’appel : l’appel n’a pas pu être passé.',
   call_failed_no_microphone: 'Le micro n’est pas accessible.',

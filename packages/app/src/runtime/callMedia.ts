@@ -7,6 +7,7 @@ import {
   RTCSessionDescription,
 } from 'react-native-webrtc'
 
+import { offersVideo } from '../calls/sdp'
 import { logEvent } from './log'
 import type { IceConfig, IceTransportPolicy } from '../calls/ice'
 import type {
@@ -180,6 +181,19 @@ function connectionFor(config: IceConfig): PeerConnectionLike {
     },
     setRemoteDescription: async description => {
       await pc.setRemoteDescription(new RTCSessionDescription(description))
+      // THE FAR END'S PICTURE GOING AWAY LEAVES NO EVENT WORTH WAITING FOR.
+      //
+      // `ontrack` fires when one arrives and nothing reliable fires when one
+      // is renegotiated away -- and a view still holding the old handle
+      // draws the last frame it received, which is the frozen face #202
+      // exists to prevent. The description that just arrived says whether
+      // they are still sending, so this reads it.
+      //
+      // Only on the way down: `ontrack` is what turns it back on, with a
+      // handle this cannot invent.
+      if (!offersVideo(description.sdp) && pictures.remote !== null) {
+        publish({ ...pictures, remote: null })
+      }
     },
     addIceCandidate: async candidate => {
       await pc.addIceCandidate(new RTCIceCandidate(candidate))

@@ -489,6 +489,11 @@ const styles = StyleSheet.create({
   // label on it. The avatar goes: a photograph of somebody's face over a
   // moving picture of the same face is one of them too many.
   whoAside: { gap: space.xs },
+  aside: {
+    ...type.bodySm,
+    color: color.agent['400'],
+    textAlign: 'center',
+  },
   far: { ...StyleSheet.absoluteFill },
   // A QUARTER OF THE WIDTH, at the top so the controls at the bottom stay
   // reachable and so a thumb does not rest on it.
