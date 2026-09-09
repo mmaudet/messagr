@@ -325,6 +325,10 @@ export const nl: Readonly<Record<CopyKey, string>> = {
     'Nergens in het systeem komt een telefoonnummer voor. Contact ontstaat uitsluitend op uitnodiging.',
   calls_empty: 'Nog geen oproepen.',
   calls_video: 'Video',
+
+  pick_title: 'Naar welk gesprek?',
+  pick_cancel: 'Annuleren',
+  pick_empty: 'U hebt geen ander gesprek.',
   'calls_ring_back %@': '%@ terugbellen',
   calls_taken: 'Ontvangen oproep',
   calls_placed: 'Uitgaande oproep',

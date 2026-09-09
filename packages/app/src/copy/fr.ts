@@ -494,6 +494,10 @@ export const fr = {
   // couleur ne fait que répéter ces mots, elle ne les porte jamais.
   calls_empty: 'Aucun appel pour l’instant.',
   calls_video: 'Vidéo',
+
+  pick_title: 'Vers quelle conversation ?',
+  pick_cancel: 'Annuler',
+  pick_empty: 'Vous n’avez pas d’autre conversation.',
   'calls_ring_back %@': 'Rappeler %@',
   calls_taken: 'Appel reçu',
   calls_placed: 'Appel passé',

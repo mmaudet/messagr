@@ -332,6 +332,10 @@ export const de: Readonly<Record<CopyKey, string>> = {
     'Nirgendwo im System erscheint eine Telefonnummer. In Kontakt kommt man nur über eine Einladung.',
   calls_empty: 'Noch keine Anrufe.',
   calls_video: 'Video',
+
+  pick_title: 'In welche Unterhaltung?',
+  pick_cancel: 'Abbrechen',
+  pick_empty: 'Sie haben keine andere Unterhaltung.',
   'calls_ring_back %@': '%@ zurückrufen',
   calls_taken: 'Eingegangener Anruf',
   calls_placed: 'Ausgehender Anruf',

@@ -326,6 +326,10 @@ export const es: Readonly<Record<CopyKey, string>> = {
     'Ningún número de teléfono aparece en ninguna parte del sistema. Solo se entra en contacto por invitación.',
   calls_empty: 'Todavía no hay llamadas.',
   calls_video: 'Vídeo',
+
+  pick_title: '¿A qué conversación?',
+  pick_cancel: 'Cancelar',
+  pick_empty: 'No tiene ninguna otra conversación.',
   'calls_ring_back %@': 'Devolver la llamada a %@',
   calls_taken: 'Llamada recibida',
   calls_placed: 'Llamada realizada',
