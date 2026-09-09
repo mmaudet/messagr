@@ -150,6 +150,20 @@ export const en: Readonly<Record<CopyKey, string>> = {
   conversation_send: 'Send',
   conversation_empty: 'Nothing has been said here yet.',
   conversation_unreadable: 'Unreadable on this device: its key never arrived.',
+  conversation_removed: 'Message deleted',
+
+  'selection_count %1$d': '%1$d selected',
+  selection_clear: 'Leave selection',
+  selection_copy: 'Copy',
+  selection_remove: 'Delete',
+  'remove_title %1$d': 'Delete %1$d message(s)?',
+  remove_everyone: 'Delete for everyone',
+  remove_everyone_why:
+    'The message goes from the other person’s copy too. A line stays where it was: a removal is visible.',
+  remove_me: 'Delete for me',
+  remove_me_why:
+    'The message stays with the other person. It will not be shown on this telephone again — but it comes back on another device or after a reinstall.',
+  remove_cancel: 'Cancel',
   conversation_sending: 'Sending…',
   conversation_send_failed: 'Not sent. Try again.',
   vouch_action: 'I vouch for this person',

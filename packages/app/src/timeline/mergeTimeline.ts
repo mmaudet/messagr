@@ -35,6 +35,20 @@ export interface TimelineEntry {
    * dropping it would leave nothing to say when the download fails.
    */
   readonly image?: ReadImage
+  /**
+   * Whether this event was removed for everyone.
+   *
+   * §13.7 asks that such a removal leave a line -- *« un retrait est un fait
+   * social, pas une disparition silencieuse »* -- so it is an entry rather
+   * than a gap. `body` is `null` and `reason` is absent, which is what tells
+   * a screen apart from a message whose key never arrived: nothing went
+   * wrong here, there is simply nothing left to read.
+   *
+   * A withdrawn reaction is not one of these. See `redactionKind.ts` for how
+   * the two are told apart, given that a redaction leaves both looking
+   * identical on the wire.
+   */
+  readonly removed?: boolean
 }
 
 /**

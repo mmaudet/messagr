@@ -1,5 +1,6 @@
 import { sendEncryptedEvent } from './encryptedSend'
 import { getErrorMessage } from './errors'
+import { redactionBody, type RedactedKind } from '../timeline/redactionKind'
 import type { HttpRequester } from './pump'
 
 /**
@@ -89,28 +90,44 @@ export async function reactTo(
 }
 
 /**
- * Removes a reaction this account made, by redacting the event that made it.
+ * Redacts an event, saying what kind of thing it was.
  *
- * `true` or a reason, never a throw: a reaction that would not come off is a
- * chip that stays on screen, which a person can act on, and not a failure
+ * `true` or a reason, never a throw: something that would not come off is a
+ * line that stays on screen, which a person can act on, and not a failure
  * worth losing a conversation over.
+ *
+ * THE KIND IS NOT DECORATION. A redaction strips the content and keeps the
+ * shell, and in this product both messages and reactions are encrypted -- so
+ * afterwards the two are indistinguishable, and §13.7 asks for a line where
+ * one was removed and silence where the other was. `redactionKind.ts` argues
+ * it in full.
  */
-export async function unreact(
+export async function redactEvent(
   deps: ReactingDeps,
   scope: string,
-  reactionEventId: string,
+  eventId: string,
+  kind: RedactedKind,
 ): Promise<{ readonly removed: boolean; readonly reason?: string }> {
   try {
     await deps.http.authedRequest(
       'PUT',
       `/_matrix/client/v3/rooms/${encodeURIComponent(scope)}/redact/` +
-        `${encodeURIComponent(reactionEventId)}/` +
+        `${encodeURIComponent(eventId)}/` +
         `${encodeURIComponent(deps.newTransactionId())}`,
       {},
-      JSON.stringify({}),
+      JSON.stringify(redactionBody(kind)),
     )
     return { removed: true }
   } catch (cause: unknown) {
     return { removed: false, reason: getErrorMessage(cause) }
   }
+}
+
+/** Removes a reaction this account made, by redacting the event that made it. */
+export async function unreact(
+  deps: ReactingDeps,
+  scope: string,
+  reactionEventId: string,
+): Promise<{ readonly removed: boolean; readonly reason?: string }> {
+  return redactEvent(deps, scope, reactionEventId, 'reaction')
 }

@@ -142,6 +142,20 @@ export const nl: Readonly<Record<CopyKey, string>> = {
   conversation_empty: 'Hier is nog niets gezegd.',
   conversation_unreadable:
     'Onleesbaar op dit apparaat: de sleutel is nooit aangekomen.',
+  conversation_removed: 'Bericht verwijderd',
+
+  'selection_count %1$d': '%1$d geselecteerd',
+  selection_clear: 'Selectie verlaten',
+  selection_copy: 'Kopiëren',
+  selection_remove: 'Verwijderen',
+  'remove_title %1$d': '%1$d bericht(en) verwijderen?',
+  remove_everyone: 'Voor iedereen verwijderen',
+  remove_everyone_why:
+    'Het bericht verdwijnt ook bij uw gesprekspartner. Er blijft een regel op die plek staan: een verwijdering is zichtbaar.',
+  remove_me: 'Voor mij verwijderen',
+  remove_me_why:
+    'Het bericht blijft bij uw gesprekspartner. Het wordt op deze telefoon niet meer getoond — maar het komt terug op een ander toestel of na een herinstallatie.',
+  remove_cancel: 'Annuleren',
   conversation_sending: 'Versturen…',
   conversation_send_failed: 'Niet verstuurd. Probeer opnieuw.',
   vouch_action: 'Ik sta in voor deze persoon',

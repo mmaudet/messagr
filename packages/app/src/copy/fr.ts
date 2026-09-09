@@ -183,6 +183,20 @@ export const fr = {
   conversation_empty: 'Rien n’a encore été dit ici.',
   conversation_unreadable:
     'Message illisible sur cet appareil : sa clé n’est pas arrivée.',
+  conversation_removed: 'Message supprimé',
+
+  'selection_count %1$d': '%1$d sélectionné(s)',
+  selection_clear: 'Quitter la sélection',
+  selection_copy: 'Copier',
+  selection_remove: 'Supprimer',
+  'remove_title %1$d': 'Supprimer %1$d message(s) ?',
+  remove_everyone: 'Supprimer pour tout le monde',
+  remove_everyone_why:
+    'Le message disparaît aussi chez votre correspondant. Une ligne reste à sa place : un retrait se voit.',
+  remove_me: 'Supprimer pour moi',
+  remove_me_why:
+    'Le message reste chez votre correspondant. Il ne s’affichera plus sur ce téléphone — mais il réapparaîtra sur un autre appareil ou après une réinstallation.',
+  remove_cancel: 'Annuler',
   conversation_sending: 'Envoi…',
   conversation_send_failed: 'Non envoyé. Réessayez.',
 

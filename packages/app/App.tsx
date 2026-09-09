@@ -100,7 +100,16 @@ import {
 } from './src/runtime/outstandingStore'
 import { admitAnyoneWaiting } from './src/runtime/admitAnyoneWaiting'
 import { displayNameFor } from './src/runtime/givenName'
+import Clipboard from '@react-native-clipboard/clipboard'
+import { removeMessage } from './src/runtime/cryptoPump'
 import { openNotebook } from './src/runtime/notebook'
+import { forgetfulHidden, type Hidden } from './src/runtime/hiddenStore'
+import {
+  canCopy,
+  canRemoveForEveryone,
+  copyText,
+  toggle,
+} from './src/timeline/selection'
 import {
   forgetfulListCache,
   type ListCache,
@@ -134,6 +143,8 @@ import { Header } from './src/ui/Header'
 import { Composer } from './src/ui/Composer'
 import { FullScreenPlate } from './src/ui/FullScreenPlate'
 import { CallScreen } from './src/ui/CallScreen'
+import { SelectionBar } from './src/ui/SelectionBar'
+import { RemoveSheet } from './src/ui/RemoveSheet'
 import { ConversationHeader } from './src/ui/ConversationHeader'
 import { Legal } from './src/ui/Legal'
 import { Reserved } from './src/ui/Reserved'
@@ -384,6 +395,16 @@ export function App({
   const [wakeNotKept, setWakeNotKept] = useState(false)
   const wakeRef = useRef(true)
   const [readHere, setReadHere] = useState<ReadonlySet<string>>(new Set())
+  /**
+   * The messages the selection mode holds, and whether the removal sheet is
+   * up. Empty means there is no mode: `Conversation.tsx` derives the reaction
+   * row from it too, so the two cannot disagree.
+   */
+  const [selected, setSelected] = useState<ReadonlySet<string>>(new Set())
+  const [removing, setRemoving] = useState(false)
+  /** What this device has been told not to draw. `hiddenStore.ts` says why. */
+  const hiddenRef = useRef<Hidden>(forgetfulHidden())
+  const [hidden, setHidden] = useState<ReadonlySet<string>>(new Set())
   // The same starting value as the state above, so a receipt sent before the
   // keystore has answered follows the default rather than the opposite of it.
   const receiptsRef = useRef(RECEIPTS_DEFAULT)
@@ -473,6 +494,8 @@ export function App({
   // Choosing and sending a photograph, and opening one that arrived. Held in
   // refs like every other gesture the launch effect binds.
   const attachRef = useRef<(() => void) | null>(null)
+  /** Redacts messages for everyone. Bound with the session, like the rest. */
+  const removeRef = useRef<((eventIds: readonly string[]) => void) | null>(null)
   // Registering or removing this device's pusher. Held in a ref because the
   // settings switch is rendered outside the launch effect that binds it.
   const wakeThisDeviceRef = useRef<((on: boolean) => void) | null>(null)
@@ -727,6 +750,8 @@ export function App({
       lastReadRef.current = opening.lastRead
       outstandingRef.current = opening.outstanding
       listCacheRef.current = opening.list
+      hiddenRef.current = opening.hidden
+      setHidden(await opening.hidden.all())
       logEvent(opening.opened ? 'info' : 'warn', 'MESSAGR_GIVEN_NAMES', {
         opened: opening.opened,
         ...(opening.minted === undefined ? {} : { minted: opening.minted }),
@@ -1106,6 +1131,52 @@ export function App({
             // again: tapping a chip one is in is how a person takes a
             // reaction back, and offering the same key twice would make a
             // count of two from one person.
+            // REMOVING FOR EVERYONE, one event at a time.
+            //
+            // In order, and each failure said on its own: a redaction that
+            // did not land is a message still in the conversation at both
+            // ends, and a batch that reported one outcome for five would
+            // hide exactly the case somebody needs to know about.
+            //
+            // The conversation is re-derived once at the end rather than
+            // per event. `buildTimeline` now draws a line where a message
+            // was removed -- see `redactionKind.ts` for how it can tell that
+            // from a reaction being taken back.
+            removeRef.current = eventIds => {
+              const scope = openScopeRef.current
+              if (scope === null) return
+              const erase = async () => {
+                for (const eventId of eventIds) {
+                  const gone = await removeMessage(
+                    sessionClient,
+                    scope,
+                    eventId,
+                  )
+                  if (!gone.removed) {
+                    logEvent('warn', 'MESSAGR_NOT_REMOVED', {
+                      reason: gone.reason ?? 'unknown',
+                    })
+                  }
+                }
+                const fresh = await loadConversation(
+                  sessionClient,
+                  scope,
+                  credentials.userId,
+                )
+                if (openScopeRef.current !== scope) return
+                // REPLACED, not merged. `mergeTimeline` keeps what it
+                // already has, and what was just removed is precisely what
+                // must not be kept.
+                setConversation(fresh.entries)
+                setReactions(fresh.reactions)
+              }
+              erase().catch((cause: unknown) =>
+                logEvent('warn', 'MESSAGR_NOT_REMOVED', {
+                  reason: getErrorMessage(cause),
+                }),
+              )
+            }
+
             reactRef.current = (target, key, own) => {
               const scope = openScopeRef.current
               if (scope === null) return
@@ -2128,6 +2199,45 @@ export function App({
           />
         )}
 
+        {removing && openScope !== null && (
+          <RemoveSheet
+            count={selected.size}
+            forEveryone={canRemoveForEveryone(
+              selected,
+              conversation ?? [],
+              selfUserId,
+            )}
+            onCancel={() => setRemoving(false)}
+            onForMe={() => {
+              const scope = openScope
+              const chosen = [...selected]
+              setRemoving(false)
+              setSelected(new Set())
+              // SHOWN FIRST, KEPT SECOND, like every other gesture in this
+              // application -- and the failure is said rather than swallowed,
+              // because unlike the rest of the notebook a hiding that did not
+              // hold is a message still on screen after somebody asked for it
+              // to go.
+              setHidden(held => new Set([...held, ...chosen]))
+              hiddenRef.current
+                .hide(scope, chosen)
+                .then(kept => {
+                  if (!kept) logEvent('warn', 'MESSAGR_HIDE_NOT_KEPT', {})
+                })
+                .catch(() => logEvent('warn', 'MESSAGR_HIDE_NOT_KEPT', {}))
+            }}
+            onForEveryone={() => {
+              const chosen = [...selected]
+              setRemoving(false)
+              setSelected(new Set())
+              // Bound where the session lives, like every other gesture in
+              // this screen. A device drawn before the launch finished has
+              // nothing to redact with anyway.
+              removeRef.current?.(chosen)
+            }}
+          />
+        )}
+
         {openPlate !== null && (
           <FullScreenPlate
             plate={openPlate.plate}
@@ -2161,44 +2271,68 @@ export function App({
             padding and sat inset from both edges while the messages slid
             under it. Here it spans the screen and stays put, like the band
             above it and the dock below. */}
-          {openScope !== null && trust === null && !personOpen && (
-            <ConversationHeader
-              shown={
-                party === null
-                  ? openScope
-                  : displayNameFor(party.other, names.get(party.other))
-              }
-              named={party !== null && names.get(party.other) !== undefined}
-              onBack={() => {
-                setOpenScope(null)
-                openScopeRef.current = null
-                setTrust(null)
-                // Otherwise the next conversation opens on the person screen of
-                // the one before it.
-                setPersonOpen(false)
-              }}
-              onOpenPerson={() => setPersonOpen(true)}
-              // Only with somebody to call. `theOtherMember` answers null in
-              // a conversation that is not two people, and a call button in
-              // a room of three is a button with no peer to name -- #88 is
-              // 1:1, and the control says so by being absent.
-              onCall={
-                party === null || call !== null
-                  ? undefined
-                  : () => {
-                      const runtime = callRuntimeRef.current
-                      if (runtime === null || openScope === null) return
-                      runtime
-                        .place(openScope, party.other)
-                        .catch((cause: unknown) =>
-                          logEvent('warn', 'MESSAGR_CALL_NOT_PLACED', {
-                            reason: getErrorMessage(cause),
-                          }),
-                        )
-                    }
-              }
-            />
-          )}
+          {/* THE BAR TAKES THE HEADER'S PLACE, it does not sit above it.
+              Selecting changes what every tap in the conversation means, so
+              the screen says so from the top and offers exactly one way out,
+              on the left where the back arrow was. `SelectionBar.tsx`. */}
+          {openScope !== null &&
+            trust === null &&
+            !personOpen &&
+            selected.size > 0 && (
+              <SelectionBar
+                count={selected.size}
+                canCopy={canCopy(selected, conversation ?? [])}
+                onClear={() => setSelected(new Set())}
+                onCopy={() => {
+                  Clipboard.setString(copyText(selected, conversation ?? []))
+                  setSelected(new Set())
+                }}
+                onRemove={() => setRemoving(true)}
+              />
+            )}
+
+          {openScope !== null &&
+            trust === null &&
+            !personOpen &&
+            selected.size === 0 && (
+              <ConversationHeader
+                shown={
+                  party === null
+                    ? openScope
+                    : displayNameFor(party.other, names.get(party.other))
+                }
+                named={party !== null && names.get(party.other) !== undefined}
+                onBack={() => {
+                  setOpenScope(null)
+                  openScopeRef.current = null
+                  setSelected(new Set())
+                  setTrust(null)
+                  // Otherwise the next conversation opens on the person screen of
+                  // the one before it.
+                  setPersonOpen(false)
+                }}
+                onOpenPerson={() => setPersonOpen(true)}
+                // Only with somebody to call. `theOtherMember` answers null in
+                // a conversation that is not two people, and a call button in
+                // a room of three is a button with no peer to name -- #88 is
+                // 1:1, and the control says so by being absent.
+                onCall={
+                  party === null || call !== null
+                    ? undefined
+                    : () => {
+                        const runtime = callRuntimeRef.current
+                        if (runtime === null || openScope === null) return
+                        runtime
+                          .place(openScope, party.other)
+                          .catch((cause: unknown) =>
+                            logEvent('warn', 'MESSAGR_CALL_NOT_PLACED', {
+                              reason: getErrorMessage(cause),
+                            }),
+                          )
+                      }
+                }
+              />
+            )}
 
           {/* ONE FRAME, AND A NEW ONE PER SCREEN.
             It was `diagnostic-scroll` and it was honestly named: the readout
@@ -2472,7 +2606,23 @@ export function App({
                     onReact={(target, key, own) =>
                       reactRef.current?.(target, key, own)
                     }
-                    entries={conversation}
+                    // WITHOUT WHAT THIS DEVICE WAS TOLD NOT TO DRAW.
+                    // Filtered here rather than in `buildTimeline`, which
+                    // derives from the room and should keep saying what the
+                    // room holds: hiding is this telephone's own decision,
+                    // and mixing it into the derivation would make the
+                    // timeline mean something different per device.
+                    entries={
+                      hidden.size === 0
+                        ? conversation
+                        : conversation.filter(
+                            entry => !hidden.has(entry.eventId),
+                          )
+                    }
+                    selected={selected}
+                    onToggle={eventId =>
+                      setSelected(held => toggle(held, eventId))
+                    }
                     selfUserId={selfUserId}
                     sending={sending}
                     onLoadImage={loadImage}

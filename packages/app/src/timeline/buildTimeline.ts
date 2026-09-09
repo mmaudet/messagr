@@ -2,6 +2,7 @@ import { getErrorMessage } from '../runtime/errors'
 import { logEvent } from '../runtime/log'
 import type { HttpRequester } from '../runtime/pump'
 import type { TimelineEntry } from './mergeTimeline'
+import { leavesALine } from './redactionKind'
 import { readImageEvent } from './imageEvent'
 import { readReaction, type LooseReaction } from './reactions'
 
@@ -148,16 +149,29 @@ export async function toTimelineEntries(
     // drawn as "its key never arrived": a phantom message, in this account's
     // own name, on a conversation it never said anything on.
     //
-    // Every redaction this application can make today is somebody taking a
-    // reaction back, and a reaction taken back must leave nothing. Reported
-    // from a Pixel as messages nobody had sent; the log showed four such
-    // events with no `session_id`, one of them a reaction removed minutes
-    // earlier.
+    // A reaction taken back must leave nothing. Reported from a Pixel as
+    // messages nobody had sent; the log showed four such events with no
+    // `session_id`, one of them a reaction removed minutes earlier.
     //
-    // The day a message can be deleted, this is where that would branch: a
-    // deleted message may well deserve a line saying so, where a withdrawn
-    // reaction deserves silence.
+    // AND HERE IS THE BRANCH THIS COMMENT PROMISED. It said: "the day a
+    // message can be deleted, this is where that would branch -- a deleted
+    // message may well deserve a line saying so, where a withdrawn reaction
+    // deserves silence." §13.7 asks for exactly that line. What tells the
+    // two apart is not in this event, which is a stripped shell either way;
+    // it is in the redaction, and `redactionKind.ts` says why it had to be
+    // put there and what an unmarked one means.
     if (isRedacted(event)) {
+      if (leavesALine(event)) {
+        // No `reason`: nothing went wrong. A `body` of `null` with a reason
+        // is a message whose key never arrived, and this is not that.
+        entries.push({
+          eventId,
+          claimedSender: sender,
+          sentAt,
+          body: null,
+          removed: true,
+        })
+      }
       continue
     }
 
