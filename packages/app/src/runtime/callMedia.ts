@@ -7,6 +7,7 @@ import {
   RTCSessionDescription,
 } from 'react-native-webrtc'
 
+import { logEvent } from './log'
 import type { IceConfig, IceTransportPolicy } from '../calls/ice'
 import type {
   TrackLike,
@@ -341,4 +342,8 @@ export const deviceMedia: MediaPorts = {
   createConnection: connectionFor,
   captureAudio,
   captureVideo,
+  onCameraRefused: cause =>
+    logEvent('warn', 'MESSAGR_CAMERA_REFUSED', {
+      reason: cause instanceof Error ? cause.message : String(cause),
+    }),
 }

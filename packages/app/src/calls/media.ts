@@ -121,6 +121,8 @@ export interface MediaPorts {
    * saying no to an optional request. #199.
    */
   readonly captureVideo: () => Promise<TrackLike>
+  /** Told when the camera refused, so a silent decision leaves a trace. */
+  readonly onCameraRefused?: (cause: unknown) => void
 }
 
 /** Which of the two. Named, so `addTrack` cannot be given the wrong one silently. */
@@ -266,7 +268,13 @@ export function startCallMedia(
     let captured: TrackLike
     try {
       captured = await ports.captureVideo()
-    } catch {
+    } catch (cause: unknown) {
+      // SWALLOWED, AND SAID. Swallowing is the decision -- a camera that
+      // will not open leaves a whole call standing -- but a failure with no
+      // trace at all is what made a missing picture take an hour to explain
+      // on 9 September, when the cause turned out to be somewhere else
+      // entirely. `onCameraRefused` is a report, never a failure.
+      ports.onCameraRefused?.(cause)
       return
     }
     // Between the await and here somebody may have hung up. The same window

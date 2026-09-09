@@ -223,7 +223,16 @@ export function startCallRuntime(
   // library's own callbacks, at moments that have nothing to do with the
   // state machine's transitions.
   let pictures: Pictures = { local: null, remote: null }
-  const unwatch = watchPictures(next => {
+  // FOR THE LIFE OF THE RUNTIME, NOT OF A CALL.
+  //
+  // This was unsubscribed in `release`, which runs at the end of every call
+  // -- so the first video call published its picture and every one after it
+  // published into nothing. Found on a device: the offer carried `m=video`,
+  // the far end saw it, and the caller's own screen showed an avatar.
+  //
+  // There is nothing to unsubscribe from: `startCallRuntime` is called once
+  // at launch and lives as long as the application does.
+  watchPictures(next => {
     pictures = next
     if (held !== null) onChanged({ ...held, pictures })
   })
@@ -392,7 +401,6 @@ export function startCallRuntime(
       // must not leave a telephone that behaves as though it is still on
       // one.
       deviceCallAudio.end()
-      unwatch()
       await running?.session.stop()
     },
   }
