@@ -218,6 +218,17 @@ function connectionFor(config: IceConfig): PeerConnectionLike {
         }
       }
     },
+    removeTrack: (kind, track) => {
+      const native = behind.get(track)
+      if (native === undefined) return
+      // BY SENDER, because that is what `removeTrack` takes and what the
+      // renegotiation has to stop describing. `getSenders` is read fresh:
+      // the sender kept at `addTrack` time would be stale after any earlier
+      // renegotiation.
+      const sender = pc.getSenders().find(one => one.track === native)
+      if (sender !== undefined) pc.removeTrack(sender)
+      if (kind === 'video') publish({ ...pictures, local: null })
+    },
     close: () => {
       // BEFORE THE CONNECTION GOES, not after: a screen still drawing a
       // handle whose stream has been released renders whatever the native
@@ -342,6 +353,17 @@ export const deviceMedia: MediaPorts = {
   createConnection: connectionFor,
   captureAudio,
   captureVideo,
+  // `_switchCamera` is marked deprecated in favour of `applyConstraints`,
+  // and it is still the only call that flips the facing mode without
+  // renegotiating: `applyConstraints` needs the mode named, which means this
+  // adapter would have to remember which way the camera is pointing. One
+  // fact in two places is how they come to disagree. Revisit when the
+  // library offers a flip that does not.
+  switchCamera: track => {
+    const native = behind.get(track)
+    if (native === undefined) return
+    native._switchCamera()
+  },
   onCameraRefused: cause =>
     logEvent('warn', 'MESSAGR_CAMERA_REFUSED', {
       reason: cause instanceof Error ? cause.message : String(cause),

@@ -171,6 +171,17 @@ export interface CallRuntime {
   readonly reject: () => void
   readonly hangup: () => void
   readonly setMuted: (muted: boolean) => boolean
+  /**
+   * Turns this side's camera on or off mid-call.
+   *
+   * Answers what the call carries afterwards, never what was asked. Turning
+   * it ON also moves the sound to the loudspeaker: nobody holds a video call
+   * against their ear. Turning it off does NOT move it back -- that would
+   * undo a choice the person may have made for reasons of their own.
+   */
+  readonly setCameraOn: (on: boolean) => Promise<boolean>
+  /** Front to back and back again. */
+  readonly switchCamera: () => void
   /** Moves the sound between the earpiece and the loudspeaker. */
   readonly setSpeaker: (on: boolean) => void
   /** Ends the call and forgets it, so the next one starts clean. */
@@ -203,6 +214,13 @@ export interface CallOnScreen {
    * for a camera.
    */
   readonly pictures: Pictures
+  /**
+   * Whether this side is sending a picture.
+   *
+   * Beside `pictures` rather than derived from it: they agree today and
+   * would part the moment a local preview outlives the sending.
+   */
+  readonly sendingVideo: boolean
 }
 
 export function startCallRuntime(
@@ -245,7 +263,14 @@ export function startCallRuntime(
     //
     // Found on a device, after the runtime's own logs proved the picture was
     // published, watched and delivered. Nothing upstream was wrong.
-    held = { ...held, pictures: next }
+    held = {
+      ...held,
+      pictures: next,
+      // Read from the session rather than inferred from the handles: a
+      // preview that outlives the sending is exactly the case the two are
+      // held apart for.
+      sendingVideo: held.session.sendingVideo(),
+    }
     onChanged(held)
   })
 
@@ -310,6 +335,7 @@ export function startCallRuntime(
       // Whatever the last call left, which is nothing: `release` clears them
       // and a connection's `close` publishes both as `null`.
       pictures,
+      sendingVideo: false,
     }
     held = call
     // THE AUDIO SESSION IS TAKEN WHEN THE CALL BEGINS, NOT WHEN IT CONNECTS.
@@ -401,6 +427,17 @@ export function startCallRuntime(
     reject: () => held?.session.reject(),
     hangup: () => held?.session.hangup(),
     setMuted: muted => held?.session.setMuted(muted) ?? muted,
+    switchCamera: () => held?.session.switchCamera(),
+    setCameraOn: async on => {
+      const running = held
+      if (running === null) return false
+      const carrying = await running.session.setCameraOn(on)
+      // Only on the way on, and only when it actually came on. The
+      // asymmetry is the decision: switching is obvious, unswitching would
+      // undo a choice somebody may have made themselves.
+      if (on && carrying) deviceCallAudio.speaker(true)
+      return carrying
+    },
     setSpeaker: on => deviceCallAudio.speaker(on),
     release: async () => {
       const running = held

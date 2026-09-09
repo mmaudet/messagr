@@ -141,8 +141,11 @@ export function CallScreen({
   onHangup,
   onMute,
   onSpeaker,
+  onCamera,
+  onSwitchCamera,
   onDismiss,
   pictures = { local: null, remote: null },
+  sendingVideo = false,
 }: {
   readonly state: CallState
   /** Why it never started, when that is what happened. */
@@ -161,6 +164,10 @@ export function CallScreen({
   readonly onHangup: () => void
   readonly onMute: (muted: boolean) => void
   readonly onSpeaker: (on: boolean) => void
+  /** Turns this side's camera on or off during the call. */
+  readonly onCamera: (on: boolean) => void
+  /** Front to back and back again. */
+  readonly onSwitchCamera: () => void
   /** Leaves the call screen. Only offered once the call is over. */
   readonly onDismiss: () => void
   /**
@@ -168,6 +175,14 @@ export function CallScreen({
    * which is every call that never asked for a camera.
    */
   readonly pictures?: Pictures
+  /**
+   * Whether this side is sending a picture.
+   *
+   * Not derived from `pictures.local`: the two are the same today and would
+   * drift the moment a preview is kept while the sending stops. What the
+   * control draws is what the call carries.
+   */
+  readonly sendingVideo?: boolean
 }) {
   const ringing = state.call === 'incomingInvite'
   // WHETHER THE FAR END IS OFFERING A PICTURE, which decides both the
@@ -326,6 +341,34 @@ export function CallScreen({
                 onPress={() => onSpeaker(!speaker)}
                 glyph="speaker"
               />
+              {/* THE FIFTH AND FOURTH SLOTS §4.5 NAMES: "camera on/off,
+                  switch camera". Green when the camera is on, like the two
+                  toggles beside it -- one convention for "this is on",
+                  learnt once.
+
+                  Switching only appears while there IS a camera to switch.
+                  A control that turns nothing is worse than an absent one,
+                  and this screen has said so since #88. */}
+              <Round
+                testID="call-camera"
+                label={
+                  sendingVideo ? t('call_camera_off') : t('call_camera_on')
+                }
+                tint={
+                  sendingVideo ? color.brand.green500 : color.neutral['600']
+                }
+                onPress={() => onCamera(!sendingVideo)}
+                glyph="cam"
+              />
+              {sendingVideo && (
+                <Round
+                  testID="call-switch-camera"
+                  label={t('call_switch_camera')}
+                  tint={color.neutral['600']}
+                  onPress={onSwitchCamera}
+                  glyph="cam"
+                />
+              )}
               {/* HANGING UP CLOSES THE SCREEN AT ONCE, and does not wait
                   out the linger below. Somebody who hung up knows why the
                   call ended -- the sentence that linger exists to let people

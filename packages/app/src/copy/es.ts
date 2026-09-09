@@ -363,6 +363,9 @@ export const es: Readonly<Record<CopyKey, string>> = {
   call_mute: 'Silenciar el micrófono',
   call_unmute: 'Activar el micrófono',
   call_speaker: 'Altavoz',
+  call_camera_on: 'Cámara',
+  call_camera_off: 'Apagar la cámara',
+  call_switch_camera: 'Cambiar de cámara',
   call_failed_no_relay:
     'Este servidor no tiene retransmisión de llamadas: no se ha podido llamar.',
   call_failed_no_microphone: 'El micrófono no está disponible.',

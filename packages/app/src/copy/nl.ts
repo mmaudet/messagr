@@ -362,6 +362,9 @@ export const nl: Readonly<Record<CopyKey, string>> = {
   call_mute: 'Microfoon uit',
   call_unmute: 'Microfoon aan',
   call_speaker: 'Luidspreker',
+  call_camera_on: 'Camera',
+  call_camera_off: 'Camera uitzetten',
+  call_switch_camera: 'Camera wisselen',
   call_failed_no_relay:
     'Deze server heeft geen oproeprelais: bellen was niet mogelijk.',
   call_failed_no_microphone: 'De microfoon is niet beschikbaar.',

@@ -2288,6 +2288,18 @@ export function App({
               setCallSpeaker(wanted)
             }}
             pictures={call.pictures}
+            sendingVideo={call.sendingVideo}
+            // WHAT THE CALL CARRIES AFTERWARDS, not what was asked: the
+            // runtime answers with the truth, and a camera that refused
+            // leaves the control where it was rather than lit.
+            onCamera={on => {
+              callRuntimeRef.current?.setCameraOn(on).catch((cause: unknown) =>
+                logEvent('warn', 'MESSAGR_CAMERA_NOT_SET', {
+                  reason: getErrorMessage(cause),
+                }),
+              )
+            }}
+            onSwitchCamera={() => callRuntimeRef.current?.switchCamera()}
             onDismiss={() =>
               callRuntimeRef.current?.release().catch((cause: unknown) =>
                 logEvent('warn', 'MESSAGR_CALL_NOT_RELEASED', {
