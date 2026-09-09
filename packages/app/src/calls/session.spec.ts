@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest'
 
 import type { CallState } from './machine'
-import type { AudioTrackLike, PeerConnectionLike } from './media'
+import type { TrackLike, PeerConnectionLike } from './media'
 import {
   CallSessionError,
   startCallSession,
@@ -40,7 +40,7 @@ function fakeConnection() {
     addIceCandidate: async c => {
       seen.candidates.push(c)
     },
-    addAudio: () => undefined,
+    addTrack: () => undefined,
     close: () => {
       seen.closed += 1
     },
@@ -48,7 +48,7 @@ function fakeConnection() {
   return { pc, seen }
 }
 
-function fakeTrack(): AudioTrackLike {
+function fakeTrack(): TrackLike {
   let enabled = true
   return {
     setEnabled: next => {
@@ -74,6 +74,7 @@ function build(
     media: {
       createConnection: () => connection.pc,
       captureAudio: async () => fakeTrack(),
+      captureVideo: async () => fakeTrack(),
     },
     now: () => clock,
     newCallId: () => 'call-1',
@@ -152,6 +153,7 @@ describe('a call that cannot be placed is not placed', () => {
         captureAudio: async () => {
           throw new Error('permission denied')
         },
+        captureVideo: async () => fakeTrack(),
       },
     })
     const refusal = await session.place().catch((e: unknown) => e)
@@ -164,7 +166,11 @@ describe('a call that cannot be placed is not placed', () => {
     // the recording indicator dark for a gesture that cannot work.
     const captureAudio = vi.fn(async () => fakeTrack())
     const { session } = build({
-      media: { createConnection: () => fakeConnection().pc, captureAudio },
+      media: {
+        createConnection: () => fakeConnection().pc,
+        captureAudio,
+        captureVideo: async () => fakeTrack(),
+      },
     })
     await expect(session.answer()).rejects.toThrow('no ringing call')
     expect(captureAudio).not.toHaveBeenCalled()

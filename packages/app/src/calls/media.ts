@@ -14,11 +14,23 @@ import type { Candidate, SessionDescription } from './wire'
  * application passes the library's while a test passes a fake. The module
  * below is the *decisions*; the library is a detail two files away.
  *
- * # Audio, and no video transceiver at all
+ * # IT ADDS VIDEO NOW, AND THE PARAGRAPH THIS REPLACES WAS RIGHT
  *
- * #88 says video is not offered, and this does not offer it: capture asks
- * for audio, and nothing here ever adds a video track. That is stronger than
- * a control that is hidden -- there is no video to un-hide.
+ * It said: *"Audio, and no video transceiver at all. #88 says video is not
+ * offered, and this does not offer it: capture asks for audio, and nothing
+ * here ever adds a video track. That is stronger than a control that is
+ * hidden -- there is no video to un-hide."*
+ *
+ * That was true of #88 and it was the right way to be true of it: a product
+ * that hides a control still has the capability, and the capability is what
+ * lights an indicator. What changed is not the argument but the scope --
+ * §4.5 puts 1:1 video in V1, and the instance's own TURN was sized for it a
+ * month before anything asked (`max-bps=400000`, "the product's ceiling is a
+ * relayed 1:1 video call at ~3 Mbit/s per direction").
+ *
+ * So the rule the old paragraph protected survives in a narrower form, and
+ * `captureVideo` below carries it: **the camera is captured at the moment
+ * somebody asks for video and at no other**. An audio call never touches it.
  *
  * Renegotiation still exists, because the *peer* may offer one and the
  * specification requires an answer. Answering a renegotiation that adds
@@ -54,8 +66,8 @@ export interface PeerConnectionLike {
     description: SessionDescription,
   ) => Promise<void>
   readonly addIceCandidate: (candidate: Candidate) => Promise<void>
-  /** Attach the captured audio, so the offer carries a track to negotiate. */
-  readonly addAudio: (track: AudioTrackLike) => void
+  /** Attach a captured track, so the offer carries one to negotiate. */
+  readonly addTrack: (kind: TrackKind, track: TrackLike) => void
   readonly close: () => void
   /** Each locally gathered candidate. An empty `candidate` ends the gathering. */
   onCandidate?: (candidate: Candidate) => void
@@ -73,7 +85,14 @@ export interface PeerConnectionLike {
 export type MediaConnectionState =
   'connecting' | 'connected' | 'disconnected' | 'failed'
 
-export interface AudioTrackLike {
+/**
+ * A captured track, of either kind.
+ *
+ * It was `TrackLike` while there was only one kind. The shape never
+ * cared: a microphone and a camera are both something you can silence and
+ * something you must stop.
+ */
+export interface TrackLike {
   /** Set the track's enabled flag and answer what it holds afterwards. */
   readonly setEnabled: (enabled: boolean) => boolean
   readonly stop: () => void
@@ -90,8 +109,22 @@ export interface MediaPorts {
    * a screen as a failure rather than as a call that silently never
    * connects.
    */
-  readonly captureAudio: () => Promise<AudioTrackLike>
+  readonly captureAudio: () => Promise<TrackLike>
+  /**
+   * Capture the camera.
+   *
+   * ITS REJECTION MEANS SOMETHING ELSE ENTIRELY. Without a microphone there
+   * is no call, so `captureAudio` rejecting is a call that cannot be placed.
+   * Without a camera there is still a whole call -- so this rejecting leaves
+   * the audio alone and the screen says the picture did not come. Failing a
+   * conversation because an image is missing would punish somebody for
+   * saying no to an optional request. #199.
+   */
+  readonly captureVideo: () => Promise<TrackLike>
 }
+
+/** Which of the two. Named, so `addTrack` cannot be given the wrong one silently. */
+export type TrackKind = 'audio' | 'video'
 
 /** What the media layer tells the transport. Every one of these is a report. */
 export interface MediaListener {
@@ -105,10 +138,24 @@ export interface MediaListener {
 }
 
 export interface CallMedia {
-  /** The caller's offer. Starts capture and gathering. */
-  readonly offer: () => Promise<SessionDescription>
-  /** The callee's answer to a remote offer. Starts capture and gathering. */
-  readonly answer: (remote: SessionDescription) => Promise<SessionDescription>
+  /**
+   * The caller's offer. Starts capture and gathering.
+   *
+   * `video` opens the camera as well as the microphone. A camera that
+   * refuses leaves the call whole and audio-only -- see `captureVideo`.
+   */
+  readonly offer: (wants?: Wants) => Promise<SessionDescription>
+  /**
+   * The callee's answer to a remote offer. Starts capture and gathering.
+   *
+   * `video` is what THIS side sends back, and it is not implied by what was
+   * offered: answering a video call without a picture is a whole gesture
+   * (#200), and the caller keeps sending theirs either way.
+   */
+  readonly answer: (
+    remote: SessionDescription,
+    wants?: Wants,
+  ) => Promise<SessionDescription>
   /** The caller applies the answer it selected. */
   readonly applyAnswer: (remote: SessionDescription) => Promise<void>
   /** Remote candidates, buffered when there is nothing to apply them to yet. */
@@ -139,8 +186,15 @@ export interface CallMedia {
    */
   readonly setMuted: (muted: boolean) => boolean
   readonly muted: () => boolean
-  /** Tear down: track stopped, connection closed, buffers dropped. */
+  /** Whether this side is sending a picture. */
+  readonly sendingVideo: () => boolean
+  /** Tear down: tracks stopped, connection closed, buffers dropped. */
   readonly stop: () => void
+}
+
+/** What a side asks to send. Absent means audio, which is every audio call. */
+export interface Wants {
+  readonly video?: boolean
 }
 
 export function startCallMedia(
@@ -149,7 +203,8 @@ export function startCallMedia(
   listener: MediaListener,
 ): CallMedia {
   let connection: PeerConnectionLike | undefined
-  let track: AudioTrackLike | undefined
+  let track: TrackLike | undefined
+  let camera: TrackLike | undefined
   let muted = false
   let stopped = false
 
@@ -197,6 +252,34 @@ export function startCallMedia(
     return made
   }
 
+  /**
+   * Opens the camera, and does not fail the call if it will not open.
+   *
+   * `media.ts`'s own note on `captureVideo` says why: without a microphone
+   * there is no call, and without a camera there is still a whole one. So
+   * the refusal is swallowed here rather than propagated, and
+   * `sendingVideo()` afterwards is what tells a screen the picture did not
+   * come.
+   */
+  async function captureCamera(pc: PeerConnectionLike): Promise<void> {
+    if (camera !== undefined) return
+    let captured: TrackLike
+    try {
+      captured = await ports.captureVideo()
+    } catch {
+      return
+    }
+    // Between the await and here somebody may have hung up. The same window
+    // the microphone has, and the same answer: stop it, or the camera
+    // indicator stays lit on a call that has ended.
+    if (stopped) {
+      captured.stop()
+      return
+    }
+    camera = captured
+    pc.addTrack('video', captured)
+  }
+
   async function capture(pc: PeerConnectionLike): Promise<void> {
     if (track !== undefined) return
     const captured = await ports.captureAudio()
@@ -211,7 +294,7 @@ export function startCallMedia(
     // The mute state survives a renegotiation, so it is applied to the track
     // rather than assumed to be false on a fresh one.
     if (muted) captured.setEnabled(false)
-    pc.addAudio(captured)
+    pc.addTrack('audio', captured)
   }
 
   async function drainWaiting(pc: PeerConnectionLike): Promise<void> {
@@ -225,22 +308,24 @@ export function startCallMedia(
   }
 
   return {
-    offer: async () => {
+    offer: async wants => {
       const pc = connect()
       await capture(pc)
+      if (wants?.video === true) await captureCamera(pc)
       const description = await pc.createOffer()
       await pc.setLocalDescription(description)
       await drainWaiting(pc)
       return description
     },
 
-    answer: async remote => {
+    answer: async (remote, wants) => {
       const pc = connect()
       // The remote description first: the answer has to be produced against
       // what was offered, and a candidate applied before it has nothing to
       // attach to.
       await pc.setRemoteDescription(remote)
       await capture(pc)
+      if (wants?.video === true) await captureCamera(pc)
       const description = await pc.createAnswer()
       await pc.setLocalDescription(description)
       await drainWaiting(pc)
@@ -291,6 +376,8 @@ export function startCallMedia(
       listener.onCandidates(held)
     },
 
+    sendingVideo: () => camera !== undefined,
+
     setMuted: next => {
       muted = next
       const held = track
@@ -315,6 +402,11 @@ export function startCallMedia(
       waiting.length = 0
       track?.stop()
       track = undefined
+      // The camera too, and this is the one that shows: a call that ends
+      // with the indicator still lit is the failure this whole module is
+      // careful about.
+      camera?.stop()
+      camera = undefined
       connection?.close()
       connection = undefined
     },

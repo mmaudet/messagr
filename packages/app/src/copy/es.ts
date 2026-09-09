@@ -342,6 +342,7 @@ export const es: Readonly<Record<CopyKey, string>> = {
   // `CallScreen.tsx` -- so what changes between two states is exactly this
   // sentence and which buttons sit under it.
   call_start: 'Llamar',
+  call_start_video: 'Videollamada',
   call_ringing: 'Llamando…',
   call_incoming: 'Llamada entrante',
   call_connecting: 'Conectando…',

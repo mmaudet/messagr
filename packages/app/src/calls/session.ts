@@ -5,7 +5,12 @@ import {
   type TurnServerAnswer,
 } from './ice'
 import { CallError, type CallAction, type CallState } from './machine'
-import { startCallMedia, type CallMedia, type MediaPorts } from './media'
+import {
+  startCallMedia,
+  type CallMedia,
+  type MediaPorts,
+  type Wants,
+} from './media'
 import { startCallTransport, type CallTransport } from './transport'
 import type { CallEvent, SentHangupReason } from './wire'
 
@@ -91,9 +96,14 @@ export interface CallSessionConfig {
 export interface CallSession {
   readonly state: () => CallState
   /** Place a call. Rejects with `CallSessionError` when it cannot be placed. */
-  readonly place: () => Promise<void>
-  /** Answer the ringing call. Rejects the same way. */
-  readonly answer: () => Promise<void>
+  readonly place: (wants?: Wants) => Promise<void>
+  /**
+   * Answer the ringing call. Rejects the same way.
+   *
+   * `wants` is what THIS side sends back, not what was offered: answering a
+   * video call without a picture is a gesture of its own (#200).
+   */
+  readonly answer: (wants?: Wants) => Promise<void>
   readonly reject: () => void
   readonly hangup: () => void
   /** Mute or unmute, answering what the microphone actually holds afterwards. */
@@ -283,17 +293,17 @@ export function startCallSession(
   return {
     state: () => transportOrStart().state(),
 
-    place: async () => {
+    place: async wants => {
       // The transport first: `relayed` builds a media layer whose listener
       // calls into it, and a candidate gathered before it exists would have
       // nowhere to go.
       const carrier = transportOrStart()
       const captured = await relayed()
-      const offer = await withMicrophone(() => captured.offer())
+      const offer = await withMicrophone(() => captured.offer(wants))
       carrier.placeCall(offer)
     },
 
-    answer: async () => {
+    answer: async wants => {
       const carrier = transportOrStart()
       const now = carrier.state()
       if (now.call !== 'incomingInvite') {
@@ -302,7 +312,9 @@ export function startCallSession(
         throw new Error(`there is no ringing call to answer (${now.call})`)
       }
       const captured = await relayed()
-      const answer = await withMicrophone(() => captured.answer(now.offer))
+      const answer = await withMicrophone(() =>
+        captured.answer(now.offer, wants),
+      )
       carrier.accept(answer)
     },
 
