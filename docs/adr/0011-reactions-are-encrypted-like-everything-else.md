@@ -66,3 +66,43 @@ Reactions go through `encryptEvent` with their own event type and the ordinary
 novel — only where the boundary sits. `buildTimeline.ts` learns to recognise a
 decrypted reaction and fold it into the message it points at, which is where
 the aggregation the server would have done now happens.
+
+## Amended 9 September 2026 — a redaction has to say what it removed
+
+Encrypting reactions made a message and a reaction indistinguishable once
+either is **redacted**, and #192 needs to tell them apart.
+
+A redaction strips the content and keeps the shell, type and all. Encryption
+already moved the real type inside the ciphertext, so both a removed message
+and a withdrawn reaction arrive as an `m.room.encrypted` with nothing in it.
+There is no third field to consult: the event has been emptied, and the only
+thing that ever knew is gone with it.
+
+That matters because the two must be drawn differently. §13.7 asks that an
+erasure-for-all leave a line — _"a removal is a social fact, not a silent
+disappearance"_ — while a withdrawn reaction must leave nothing. Drawing a
+line for both produced the phantom messages reported from a Pixel and fixed on
+8 September; drawing none for both loses §13.7.
+
+**So the redaction carries `eu.messagr.kind`, one of `message` or
+`reaction`,** in its own unencrypted content. `unsigned.redacted_because` is
+the whole redaction event, so it reaches the other participant and any device
+that arrives afterwards, which is what rules out keeping the answer on the
+device that made the redaction.
+
+**What this publishes.** That a message was removed rather than a reaction.
+A strict subset of what the homeserver already sees: it knows a redaction
+happened, when, by whom, and against which event, and — since a reaction is a
+separate event with its own identifier — it can already distinguish the two by
+watching which event was redacted against which relations it has served. This
+does not widen the boundary this ADR drew; it names something on the outside
+of it.
+
+**An unmarked redaction stays silent.** Another client, or a Messagr from
+before this key, leaves no kind. Silence is the honest migration — every
+redaction this application made before today was a reaction being taken back —
+and the safe direction, since a missing line is what yesterday already did
+while a spurious one is the phantom.
+
+`redactionKind.ts` holds the reading and the writing; `buildTimeline.ts`
+branches on it.

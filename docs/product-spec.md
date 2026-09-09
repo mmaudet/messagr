@@ -558,7 +558,15 @@ The V3 briefing identified seven ambiguities to resolve. All are closed and mate
 
 ### 13.7 Erasure, export, GDPR (§8.3)
 
-**Screen 12 — Erase a message.** Two scopes named without euphemism: for me, for everyone. Retraction delay shown in seconds on the bubble. Erasure-for-all leaves a line in the room journal — a removal is a social fact, not a silent disappearance.
+**Screen 12 — Erase a message.** Two scopes named without euphemism: for me, for everyone. Erasure-for-all leaves a line in the room journal — a removal is a social fact, not a silent disappearance.
+
+> **Amended 9 September 2026, on implementation (#192).** This paragraph asked for a *"retraction delay shown in seconds on the bubble"*, and that clause is withdrawn rather than built. **Matrix does not bound a redaction in time**: it works indefinitely, and any other client on the same account ignores whatever limit this one draws. A countdown on the bubble would claim the protocol enforces a rule it does not — the same shape of defect as the code that believed `AndroidCategory.CALL` got past Do Not Disturb, which a telephone disproved the day before.
+>
+> Two clarifications the implementation forced, kept here because a reader of this screen needs them:
+>
+> **"For me" cannot mean erasing a local copy.** ADR-0006 keeps nothing decrypted on disk, so there is none. It means this device stops drawing the message — a row in the encrypted notebook (`hiddenStore.ts`). It does not travel: another device of the same account still draws it, and a reinstall brings it back. The screen says so, because somebody not told will find the message again and conclude the product lied.
+>
+> **"For everyone" is offered only on your own messages.** Redacting somebody else's is a moderation power, not a delete button. That the room defaults grant it to whoever created the conversation is unintended and tracked as #196.
 
 **Screen 13 — Erase my account.** Ceremony assumed: what disappears, what stays at other people's, what is irreversible, before any button. Colour does the sorting. The GDPR export is offered before deletion; the seven-day retraction window is announced. Type-a-word confirmation is the only place in the product where typing something is required to continue.
 

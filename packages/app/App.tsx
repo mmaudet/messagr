@@ -1164,10 +1164,17 @@ export function App({
                   credentials.userId,
                 )
                 if (openScopeRef.current !== scope) return
-                // REPLACED, not merged. `mergeTimeline` keeps what it
-                // already has, and what was just removed is precisely what
-                // must not be kept.
-                setConversation(fresh.entries)
+                // MERGED, like every other derivation. Replacing was the
+                // first shape of this, on the argument that `mergeTimeline`
+                // keeps what it already holds -- true then, and fixed at the
+                // source instead: a removal now wins the merge, whichever
+                // order the two arrive in. Replacing would have thrown away
+                // everything past `loadConversation`'s forty-event window,
+                // so deleting one message in a long conversation would have
+                // taken the top of it off the screen.
+                setConversation(held =>
+                  mergeTimeline(held ?? [], fresh.entries),
+                )
                 setReactions(fresh.reactions)
               }
               erase().catch((cause: unknown) =>
@@ -1538,6 +1545,11 @@ export function App({
                 // Read fresh rather than held: `markRead` has just written
                 // to it, and a held map would redraw the badge it cleared.
                 await lastReadRef.current.all(),
+                // Same argument, and the state is behind the ref by one
+                // render after a hiding: a row that previewed a message
+                // somebody had just hidden would break the promise in the
+                // one place they look first.
+                await hiddenRef.current.all(),
               )
               setSummaries(derived)
               // AND KEPT, so the next launch draws this instantly. Not
@@ -2036,6 +2048,19 @@ export function App({
         setOpenPlate(null)
         return true
       }
+      // THE SHEET, THEN THE MODE, BEFORE THE CONVERSATION UNDER THEM.
+      // Without this, back closed the conversation and left the selection
+      // alive: the next conversation opened showing "N selected" for event
+      // ids belonging to the room just left, and "supprimer pour moi" would
+      // have hidden those ids under the new scope.
+      if (removing) {
+        setRemoving(false)
+        return true
+      }
+      if (selected.size > 0) {
+        setSelected(new Set())
+        return true
+      }
       if (personOpen) {
         setPersonOpen(false)
         return true
@@ -2043,6 +2068,7 @@ export function App({
       if (openScope !== null) {
         setOpenScope(null)
         openScopeRef.current = null
+        setSelected(new Set())
         return true
       }
       if (legalOpen) {
@@ -2062,7 +2088,17 @@ export function App({
     }
     const subscription = BackHandler.addEventListener('hardwareBackPress', back)
     return () => subscription.remove()
-  }, [trust, openPlate, personOpen, openScope, legalOpen, invite.stage, tab])
+  }, [
+    trust,
+    openPlate,
+    removing,
+    selected,
+    personOpen,
+    openScope,
+    legalOpen,
+    invite.stage,
+    tab,
+  ])
 
   // STABLE ACROSS RENDERS, AND THAT IS THE WHOLE POINT.
   //
@@ -2620,8 +2656,13 @@ export function App({
                           )
                     }
                     selected={selected}
-                    onToggle={eventId =>
-                      setSelected(held => toggle(held, eventId))
+                    // `null` is the background tap: it clears rather than
+                    // toggling, which is the only way out that does not
+                    // require aiming at the ✕.
+                    onToggle={eventIds =>
+                      setSelected(held =>
+                        eventIds === null ? new Set() : toggle(held, eventIds),
+                      )
                     }
                     selfUserId={selfUserId}
                     sending={sending}
@@ -2823,9 +2864,14 @@ export function App({
               it scrolled away with the messages and somebody had to reach the
               bottom of the thread to type. Here it is where the thumb left
               it. */}
+            {/* AND NOT WHILE SELECTING. #192: "la barre remplace l'en-tête ;
+              le composeur disparaît -- ses taps se battraient avec un mode
+              où chaque tap sélectionne." It also takes back the screen the
+              bar needs to be read on. */}
             {openScope !== null &&
               trust === null &&
               !personOpen &&
+              selected.size === 0 &&
               sendMessage !== null && (
                 <Composer
                   onSend={sendMessage}
@@ -2871,6 +2917,7 @@ export function App({
                 onSelect={next => {
                   setOpenPlate(null)
                   setPersonOpen(false)
+                  setSelected(new Set())
                   setOpenScope(null)
                   openScopeRef.current = null
                   setLegalOpen(false)

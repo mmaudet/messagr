@@ -27,9 +27,28 @@ const MY_PHOTO = shown('$p1', ME)
 
 describe('the selection', () => {
   it('adds and removes on the same gesture', () => {
-    expect([...toggle(new Set(), '$m1')]).toEqual(['$m1'])
-    expect([...toggle(new Set(['$m1']), '$m1')]).toEqual([])
-    expect([...toggle(new Set(['$m1']), '$m2')]).toEqual(['$m1', '$m2'])
+    expect([...toggle(new Set(), ['$m1'])]).toEqual(['$m1'])
+    expect([...toggle(new Set(['$m1']), ['$m1'])]).toEqual([])
+    expect([...toggle(new Set(['$m1']), ['$m2'])]).toEqual(['$m1', '$m2'])
+  })
+
+  it('moves a plate’s events together, in the first one’s direction', () => {
+    // A plate is one thing on screen. Half in and half out is a state its
+    // single outline cannot draw -- and a removal that took one photograph
+    // of three is what that state produced.
+    expect([...toggle(new Set(), ['$p1', '$p2', '$p3'])]).toEqual([
+      '$p1',
+      '$p2',
+      '$p3',
+    ])
+    expect([...toggle(new Set(['$p1', '$p2']), ['$p1', '$p2', '$p3'])]).toEqual(
+      [],
+    )
+  })
+
+  it('changes nothing when asked to toggle nothing', () => {
+    const held = new Set(['$m1'])
+    expect(toggle(held, [])).toBe(held)
   })
 })
 

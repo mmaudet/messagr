@@ -57,8 +57,15 @@ export interface ConversationProps {
   readonly read?: ReadonlySet<string>
   /** Which messages the selection mode holds. Empty means no mode at all. */
   readonly selected?: ReadonlySet<string>
-  /** Adds or removes one. See `selection.ts`. */
-  readonly onToggle?: (eventId: string) => void
+  /**
+   * Adds or removes events, together. `null` clears the whole selection,
+   * which is what a tap on the background means.
+   *
+   * SEVERAL AT ONCE because a plate is one thing on screen and several
+   * events underneath: it goes in and out as a whole, which is what its
+   * single outline promises.
+   */
+  readonly onToggle?: (eventIds: readonly string[] | null) => void
   /**
    * Add or remove a reaction. `own` is the id of this account's own reaction
    * on that key, when it has one -- removing is a redaction and needs the
@@ -142,7 +149,20 @@ export function Conversation({
     // when exactly one message is selected (#192: a reaction targets one
     // message, so it goes at the second), and leaving the selection closes
     // it. There is nothing left to synchronise, and nothing left to race.
-    <View testID="conversation" style={styles.screen}>
+    <Pressable
+      testID="conversation"
+      style={styles.screen}
+      // A TAP ANYWHERE ELSE LEAVES THE MODE, and this is a `Pressable`
+      // rather than the capture-phase handler that used to live here. An
+      // inner `Pressable` -- a bubble, an emoji, a plate -- wins the gesture
+      // and this never fires, which is precisely the rule wanted and the one
+      // the old handler had to hand-build with a ref.
+      //
+      // `undefined` when nothing is selected, so a conversation nobody is
+      // selecting in has no press target over it at all.
+      onPress={selected.size > 0 ? () => onToggle(null) : undefined}
+      accessibilityRole={selected.size > 0 ? 'button' : undefined}
+      accessibilityLabel={selected.size > 0 ? t('selection_clear') : undefined}>
       {entries.length === 0 ? (
         <Text
           testID="conversation-empty"
@@ -183,9 +203,17 @@ export function Conversation({
                 // A long press starts the selection; once there is one, a
                 // plain tap adds and removes. One gesture in, one gesture
                 // to grow it, which is what a thumb already knows.
-                onOffer={() => onToggle(entry.eventId)}
+                // A PLATE IS ONE THING ON SCREEN AND SEVERAL EVENTS
+                // UNDERNEATH. Selecting it took only the event it is drawn
+                // at, so the outline covered three photographs and
+                // "supprimer pour tout le monde" removed one of them. The
+                // plate's own events go in and out together, which is what
+                // the single outline promises.
+                onOffer={() => onToggle(idsOf(entry, plateAt))}
                 onToggle={
-                  selected.size > 0 ? () => onToggle(entry.eventId) : undefined
+                  selected.size > 0
+                    ? () => onToggle(idsOf(entry, plateAt))
+                    : undefined
                 }
                 // The `+`. Held on the screen rather than in the bubble
                 // because the picker is a modal over everything, and a
@@ -195,7 +223,14 @@ export function Conversation({
                 palette={palette}
                 tallies={reactions.get(entry.eventId) ?? []}
                 read={read.has(entry.eventId)}
-                onReact={(key, own) => onReact?.(entry.eventId, key, own)}
+                // AND REACTING LEAVES THE MODE. A reaction is a decision;
+                // the bar and the row have done what they were opened for,
+                // and a screen still in selection afterwards is one the
+                // person has to dismiss for no reason.
+                onReact={(key, own) => {
+                  onReact?.(entry.eventId, key, own)
+                  onToggle(null)
+                }}
                 onLoadImage={onLoadImage}
                 unexpected={
                   otherParty === undefined || entry.claimedSender !== otherParty
@@ -228,10 +263,11 @@ export function Conversation({
               ?.find(tally => tally.key === key)?.mine
             onReact?.(picking, key, already ?? null)
             setPicking(null)
+            onToggle(null)
           }}
         />
       )}
-    </View>
+    </Pressable>
   )
 }
 
@@ -296,6 +332,22 @@ const OFFERED = ['👍', '❤️', '😂', '😮', '😢', '🙏'] as const
 
 /** Shared, so a screen with no selection does not build a set per render. */
 const EMPTY: ReadonlySet<string> = new Set()
+
+/**
+ * Every event a bubble stands for: one for a message, all of them for a
+ * plate. A plate is drawn as one thing, so it goes in and out of a selection
+ * as one thing -- otherwise the outline covers three photographs and the
+ * removal takes one.
+ */
+function idsOf(
+  entry: TimelineEntry,
+  plates: ReadonlyMap<string, Grouping>,
+): readonly string[] {
+  const plate = plates.get(entry.eventId)
+  return plate === undefined
+    ? [entry.eventId]
+    : plate.entries.map(one => one.eventId)
+}
 
 function Message({
   entry,
@@ -404,7 +456,13 @@ function Message({
           <Plate
             plate={plate}
             fetch={onLoadImage}
-            onOpen={at => onOpenPlate(plate, at)}
+            // SELECTING WINS OVER OPENING. `Plate`'s own tiles are
+            // pressable and take the gesture before the bubble does, so
+            // without this a tap on a photograph opened the viewer while
+            // the screen was selecting -- the one gesture the mode redefines.
+            onOpen={at =>
+              onToggle === undefined ? onOpenPlate(plate, at) : onToggle()
+            }
             // The same gesture the bubble above it answers. A plate's
             // reactions annotate its first event, which is the event this
             // `Message` is: one plate, one place they attach.

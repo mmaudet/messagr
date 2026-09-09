@@ -89,6 +89,8 @@ export async function fetchConversationSummaries(
   selfUserId: string,
   /** How far each conversation has been read here. Empty means none of them. */
   lastRead: ReadonlyMap<string, number>,
+  /** What this device was told not to draw. See `hiddenStore.ts`. */
+  hidden: ReadonlySet<string> = new Set(),
 ): Promise<ConversationSummary[]> {
   const scopes = await fetchJoinedRooms(deps.http)
 
@@ -98,7 +100,7 @@ export async function fetchConversationSummaries(
   // its rows going wrong.
   const summaries = await Promise.all(
     scopes.map(scope =>
-      summarise(deps, scope, selfUserId, lastRead.get(scope) ?? 0),
+      summarise(deps, scope, selfUserId, lastRead.get(scope) ?? 0, hidden),
     ),
   )
 
@@ -115,6 +117,7 @@ async function summarise(
   scope: string,
   selfUserId: string,
   lastReadAt: number,
+  hidden: ReadonlySet<string>,
 ): Promise<ConversationSummary> {
   let other: string | null = null
   try {
@@ -131,12 +134,19 @@ async function summarise(
     // Only the entries: a row shows the last thing said, and a reaction is
     // not something said. The reactions come back too and are dropped here
     // deliberately rather than by omission.
-    const { entries } = await toTimelineEntries(
+    const { entries: everything } = await toTimelineEntries(
       deps.machine,
       deps.decodeUtf8,
       scope,
       await fetchRoomMessages(deps.http, scope, LOOK_BACK),
     )
+    // WITHOUT WHAT THIS DEVICE WAS TOLD NOT TO DRAW. Hiding a message and
+    // then reading it in the list is the promise broken in the one place
+    // somebody looks first, and the count would go on counting it too.
+    const entries =
+      hidden.size === 0
+        ? everything
+        : everything.filter(entry => !hidden.has(entry.eventId))
     // The newest first, so the search below stops at the first readable one.
     const newest = [...entries].sort((a, b) => b.sentAt - a.sentAt)
     const readable = newest.find(entry => entry.body !== null)
@@ -153,8 +163,17 @@ async function summarise(
             reason:
               newest.length === 0
                 ? 'nothing has been said yet'
-                : (newest[0]?.reason ??
-                  'this device cannot read the last message'),
+                : // A REMOVAL IS NOT A KEY THAT NEVER ARRIVED, and the row
+                  // said it was. A tombstone carries `body: null` like an
+                  // unreadable message and nothing else here told them
+                  // apart, so a conversation whose last message had been
+                  // deleted for everyone reported "this device cannot read
+                  // the last message" -- a fault claimed where the truth is
+                  // that somebody deleted something.
+                  newest[0]?.removed === true
+                  ? 'the last message was removed'
+                  : (newest[0]?.reason ??
+                    'this device cannot read the last message'),
           }
         : {}),
       lastAt: newest[0]?.sentAt ?? 0,

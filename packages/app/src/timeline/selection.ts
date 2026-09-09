@@ -23,13 +23,26 @@ import type { TimelineEntry } from './mergeTimeline'
  * Copy at all.
  */
 
-/** Adds what is not there, removes what is. One gesture, both directions. */
+/**
+ * Adds what is not there, removes what is. One gesture, both directions.
+ *
+ * SEVERAL AT ONCE, and all in the same direction, because a plate is one
+ * thing on screen and several events underneath: it goes in and out as a
+ * whole, which is what its single outline promises. The direction is the
+ * first one's -- a plate half in and half out is a state nothing can draw.
+ */
 export function toggle(
   selected: ReadonlySet<string>,
-  eventId: string,
+  eventIds: readonly string[],
 ): ReadonlySet<string> {
+  const first = eventIds[0]
+  if (first === undefined) return selected
+  const adding = !selected.has(first)
   const next = new Set(selected)
-  if (!next.delete(eventId)) next.add(eventId)
+  for (const eventId of eventIds) {
+    if (adding) next.add(eventId)
+    else next.delete(eventId)
+  }
   return next
 }
 

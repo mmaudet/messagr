@@ -647,6 +647,8 @@ export async function listConversations(
   selfUserId: string,
   /** How far each conversation has been read on this device. */
   lastRead: ReadonlyMap<string, number>,
+  /** What this device was told not to draw. See `hiddenStore.ts`. */
+  hidden: ReadonlySet<string> = new Set(),
 ): Promise<ConversationSummary[]> {
   return fetchConversationSummaries(
     {
@@ -659,6 +661,7 @@ export async function listConversations(
     },
     selfUserId,
     lastRead,
+    hidden,
   )
 }
 

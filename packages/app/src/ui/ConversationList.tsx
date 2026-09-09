@@ -252,6 +252,9 @@ function previewOf(summary: ConversationSummary): string {
   if (summary.reason === 'nothing has been said yet') {
     return t('list_nothing_said')
   }
+  if (summary.reason === 'the last message was removed') {
+    return t('conversation_removed')
+  }
   return summary.lastAt === 0 ? t('list_unreachable') : t('list_unreadable')
 }
 

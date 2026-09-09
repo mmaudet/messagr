@@ -86,7 +86,20 @@ export function mergeTimeline(
 
   for (const entry of incoming) {
     const held = byId.get(entry.eventId)
-    if (held === undefined || (held.body === null && entry.body !== null)) {
+    // A REMOVAL IS NEWER THAN ANY BODY, whichever order the two arrive in.
+    //
+    // The rule below is "the readable version wins", and a tombstone carries
+    // `body: null` -- so it lost to the plaintext this device already held,
+    // and the other person went on reading a message that had been deleted
+    // for everyone until they closed the conversation. The rule is right
+    // about a message whose key arrived late; a removal is not that, it is
+    // the event ceasing to exist, and nothing can supersede it afterwards.
+    if (held?.removed === true) continue
+    if (
+      held === undefined ||
+      entry.removed === true ||
+      (held.body === null && entry.body !== null)
+    ) {
       byId.set(entry.eventId, entry)
     }
   }
