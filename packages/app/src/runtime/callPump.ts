@@ -12,6 +12,7 @@ import {
   type CallSessionConfig,
   type CallSessionFailure,
 } from '../calls/session'
+import type { Wants } from '../calls/media'
 import type { CallEvent } from '../calls/wire'
 import { deviceCallAudio, type CallRole } from './callAudio'
 import type { CallLog, CallOutcome } from './callLogStore'
@@ -152,7 +153,11 @@ export interface CallRuntime {
   /** Hand it one completed poll. Starts a call if the poll is a ring. */
   readonly deliver: (tick: SyncTick) => Promise<void>
   /** Places a call. Rejects with `CallSessionError` when it cannot be placed. */
-  readonly place: (scope: string, peerUserId: string) => Promise<void>
+  readonly place: (
+    scope: string,
+    peerUserId: string,
+    wants?: Wants,
+  ) => Promise<void>
   readonly answer: () => Promise<void>
   readonly reject: () => void
   readonly hangup: () => void
@@ -327,9 +332,9 @@ export function startCallRuntime(
       }
     },
 
-    place: async (scope, peerUserId) => {
+    place: async (scope, peerUserId, wants) => {
       if (held !== null) throw new Error('a call is already running')
-      await refusable(begin(scope, peerUserId, 'caller').session.place())
+      await refusable(begin(scope, peerUserId, 'caller').session.place(wants))
     },
     answer: async () => {
       const running = held

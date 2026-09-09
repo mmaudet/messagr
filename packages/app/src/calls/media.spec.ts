@@ -484,3 +484,63 @@ describe('renegotiation', () => {
     expect(captureAudio).toHaveBeenCalledTimes(1)
   })
 })
+
+describe('the camera', () => {
+  it('is not opened by an audio call', async () => {
+    const { media, connection, camera } = build({})
+    await media.offer()
+    expect(connection.calls.video).toHaveLength(0)
+    expect(camera.state.stopped).toBe(0)
+    expect(media.sendingVideo()).toBe(false)
+  })
+
+  it('is added to the offer when the call asks for a picture', async () => {
+    const { media, connection } = build({})
+    await media.offer({ video: true })
+    expect(connection.calls.video).toHaveLength(1)
+    expect(media.sendingVideo()).toBe(true)
+  })
+
+  it('is added to the answer when this side sends one back', async () => {
+    const { media, connection } = build({})
+    await media.answer(description('offer'), { video: true })
+    expect(connection.calls.video).toHaveLength(1)
+  })
+
+  it('is left shut when a video call is answered without one', async () => {
+    // #200's gesture, and the media layer is where it has to be true: the
+    // caller keeps sending a picture, and this side sends none.
+    const { media, connection } = build({})
+    await media.answer(description('offer'))
+    expect(connection.calls.video).toHaveLength(0)
+    expect(media.sendingVideo()).toBe(false)
+  })
+
+  it('leaves the call whole when it refuses to open', async () => {
+    // WITHOUT A MICROPHONE THERE IS NO CALL; without a camera there is a
+    // whole one. A refusal here must not reach the caller as a rejection.
+    const { media, connection } = build({
+      cameraRejects: new Error('permission denied'),
+    })
+    const offer = await media.offer({ video: true })
+    expect(offer.type).toBe('offer')
+    expect(connection.calls.audio).toHaveLength(1)
+    expect(connection.calls.video).toHaveLength(0)
+    expect(media.sendingVideo()).toBe(false)
+  })
+
+  it('is stopped when the call is torn down', async () => {
+    const { media, camera } = build({})
+    await media.offer({ video: true })
+    media.stop()
+    expect(camera.state.stopped).toBe(1)
+  })
+
+  it('is stopped rather than left lit when the call ends during capture', async () => {
+    const { media, camera } = build({})
+    const offering = media.offer({ video: true })
+    media.stop()
+    await offering.catch(() => undefined)
+    expect(camera.state.stopped).toBe(1)
+  })
+})
