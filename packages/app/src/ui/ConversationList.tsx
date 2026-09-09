@@ -127,6 +127,7 @@ export function ConversationList({
               }
               onOpen={onOpen}
               now={now}
+              first={index === 0}
             />
           </View>
         ))
@@ -170,10 +171,13 @@ function Row({
   name,
   onOpen,
   now,
+  first = false,
 }: {
   readonly summary: ConversationSummary
   readonly name: string | undefined
   readonly onOpen: (scope: string) => void
+  /** Whether this is the top row. See the identifier below. */
+  readonly first?: boolean
   /** Passed in rather than read here, so a row is a pure function of it. */
   readonly now: number
 }) {
@@ -192,7 +196,16 @@ function Row({
   const named = summary.other !== null && name !== undefined
   return (
     <Pressable
-      testID={`conversation-row-${summary.scope}`}
+      // TWO IDENTIFIERS, AND THE SECOND IS FOR THE SUITE.
+      // A row is addressed by its scope, which is what any assertion about a
+      // particular conversation needs. Nothing outside this device knows
+      // those identifiers in advance, though -- they are minted per
+      // invitation -- so the end-to-end suite, which has to open *a*
+      // conversation the way a person does, has no name to reach for. The
+      // first row gets a stable one.
+      testID={
+        first ? 'first-conversation' : `conversation-row-${summary.scope}`
+      }
       onPress={() => onOpen(summary.scope)}
       style={styles.row}
       accessibilityRole="button"

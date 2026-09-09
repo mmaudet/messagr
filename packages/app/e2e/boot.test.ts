@@ -261,11 +261,23 @@ describe('boot', () => {
 
   // ── And the two that are about the screen, which is the point of it ──
 
-  it('opens on a conversation somebody can write in', async () => {
-    // A launch into an account with one room opens that room, and the bar is
-    // in the dock rather than in the scroll -- so this is what "the
-    // application arrived somewhere usable" looks like from outside.
+  it('opens a conversation somebody can write in', async () => {
+    // THE LAUNCH LANDS ON THE LIST NOW, and a conversation is something a
+    // person opens. This used to assert that "a launch into an account with
+    // one room opens that room" -- true of the scaffold, and wrong the day
+    // there was a list: the application picked whichever room the homeserver
+    // listed first and put somebody in it without being asked.
     //
+    // So the suite does what a person does: wait for the list, tap the first
+    // row it finds.
+    // `first-conversation` rather than a row's own identifier: those are
+    // minted per invitation, so nothing outside the device knows one in
+    // advance. `ConversationList.tsx` says why the top row carries both.
+    await waitFor(element(by.id('first-conversation')))
+      .toBeVisible()
+      .withTimeout(60000)
+    await element(by.id('first-conversation')).tap()
+
     // `toExist` on the conversation and not `toBeVisible`: that node wraps
     // the whole message list, which is taller than the phone as soon as
     // there are a few, and Detox wants 75 per cent of an element's area

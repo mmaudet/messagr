@@ -1944,10 +1944,25 @@ export function App({
                 setClaimed(historyClaim)
               }
 
-              // And the conversation itself, through the same path a row of
-              // the list takes. One way to open a conversation, so a launch
-              // and a tap cannot drift into two.
-              showConversation(roomId)
+              // AND THE LAUNCH DOES NOT OPEN IT. It used to, "through the
+              // same path a row of the list takes", and that was right when
+              // there was one screen and one conversation on it.
+              //
+              // With a list, opening a conversation nobody asked for is the
+              // application deciding where somebody is. And it picked badly
+              // by construction: the room is the one this launch's own probe
+              // resolved, or else `firstJoinedRoom` -- whichever the
+              // homeserver happens to list first, which on this account is
+              // the bench room full of "encrypted by the bridge, sent by the
+              // application". Reported from the Pixel: « au bout de quelques
+              // secondes sans action de ma part, je me retrouve
+              // systématiquement sur cette discussion ».
+              //
+              // What runs above still runs: the member list, the other
+              // participant and the offered history are facts the launch
+              // report carries, and `claimOfferedHistory` imports Megolm
+              // sessions that every conversation then benefits from.
+              // Deriving them was never the same thing as navigating.
             }
 
             // Started last, after the `Received` probe above has had its
