@@ -159,6 +159,8 @@ export const en: Readonly<Record<CopyKey, string>> = {
   selection_keep: 'Save',
   selection_kept: 'Photograph saved to this device’s photo library.',
   selection_keep_failed: 'The photograph could not be saved.',
+  selection_favourite: 'Favourite',
+  selection_unfavourite: 'Remove from favourites',
   selection_remove: 'Delete',
   'remove_title %1$d': 'Delete %1$d message(s)?',
   remove_everyone: 'Delete for everyone',

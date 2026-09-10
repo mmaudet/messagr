@@ -48,8 +48,11 @@ export function SelectionBar({
   canCopy: copyable,
   canForward: forwardable,
   canKeep: keepable,
+  canFavourite: favouritable,
+  alreadyFavourite,
   onClear,
   onCopy,
+  onFavourite,
   onForward,
   onKeep,
   onRemove,
@@ -62,7 +65,18 @@ export function SelectionBar({
    * kept. Words have no gallery to go to.
    */
   readonly canKeep: boolean
+  /** Whether the selection is something that could be found again. */
+  readonly canFavourite: boolean
+  /**
+   * Whether every selected message is already kept.
+   *
+   * The same control does both, and it has to say which it will do: a button
+   * reading « Favori » on something already kept is a button whose effect
+   * nobody can predict.
+   */
+  readonly alreadyFavourite: boolean
   readonly onClear: () => void
+  readonly onFavourite: () => void
   readonly onCopy: () => void
   readonly onForward: () => void
   readonly onKeep: () => void
@@ -100,6 +114,26 @@ export function SelectionBar({
           accessibilityRole="button"
           style={({ pressed }) => [styles.action, pressed && styles.pressed]}>
           <Text style={styles.actionLabel}>{t('selection_forward')}</Text>
+        </Pressable>
+      )}
+
+      {/* ONE CONTROL, TWO DIRECTIONS, AND IT SAYS WHICH.
+          A second press takes the mark back, which is what every messenger
+          does and what the ticket asks for. The label follows the selection
+          rather than the gesture: « Favori » on something not kept, « Retirer
+          des favoris » on something that is. A single word that meant both
+          would be a button whose effect nobody can predict. */}
+      {favouritable && (
+        <Pressable
+          testID="selection-favourite"
+          onPress={onFavourite}
+          accessibilityRole="button"
+          style={({ pressed }) => [styles.action, pressed && styles.pressed]}>
+          <Text style={styles.actionLabel}>
+            {alreadyFavourite
+              ? t('selection_unfavourite')
+              : t('selection_favourite')}
+          </Text>
         </Pressable>
       )}
 

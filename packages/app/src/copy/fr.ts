@@ -197,6 +197,12 @@ export const fr = {
   selection_kept:
     'Photographie enregistrée dans la photothèque de cet appareil.',
   selection_keep_failed: 'La photographie n’a pas pu être enregistrée.',
+  // UN SEUL CONTRÔLE, DEUX SENS, ET IL DIT LEQUEL. Un second appui retire la
+  // marque ; le libellé suit la sélection plutôt que le geste, parce qu'un
+  // mot unique voulant dire les deux serait un bouton dont personne ne peut
+  // prédire l'effet.
+  selection_favourite: 'Favori',
+  selection_unfavourite: 'Retirer des favoris',
   selection_remove: 'Supprimer',
   'remove_title %1$d': 'Supprimer %1$d message(s) ?',
   remove_everyone: 'Supprimer pour tout le monde',

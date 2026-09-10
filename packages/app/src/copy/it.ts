@@ -153,6 +153,8 @@ export const it: Readonly<Record<CopyKey, string>> = {
   selection_keep: 'Salvare',
   selection_kept: 'Fotografia salvata nella fototeca di questo dispositivo.',
   selection_keep_failed: 'Non è stato possibile salvare la fotografia.',
+  selection_favourite: 'Preferito',
+  selection_unfavourite: 'Togliere dai preferiti',
   selection_remove: 'Eliminare',
   'remove_title %1$d': 'Eliminare %1$d messaggio/i?',
   remove_everyone: 'Eliminare per tutti',

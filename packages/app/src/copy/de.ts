@@ -158,6 +158,8 @@ export const de: Readonly<Record<CopyKey, string>> = {
   selection_keep: 'Sichern',
   selection_kept: 'Foto in der Fotomediathek dieses Geräts gesichert.',
   selection_keep_failed: 'Das Foto konnte nicht gesichert werden.',
+  selection_favourite: 'Favorit',
+  selection_unfavourite: 'Aus Favoriten entfernen',
   selection_remove: 'Löschen',
   'remove_title %1$d': '%1$d Nachricht(en) löschen?',
   remove_everyone: 'Für alle löschen',

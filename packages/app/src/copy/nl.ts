@@ -151,6 +151,8 @@ export const nl: Readonly<Record<CopyKey, string>> = {
   selection_keep: 'Bewaren',
   selection_kept: 'Foto bewaard in de fotobibliotheek van dit toestel.',
   selection_keep_failed: 'De foto kon niet worden bewaard.',
+  selection_favourite: 'Favoriet',
+  selection_unfavourite: 'Uit favorieten halen',
   selection_remove: 'Verwijderen',
   'remove_title %1$d': '%1$d bericht(en) verwijderen?',
   remove_everyone: 'Voor iedereen verwijderen',

@@ -113,9 +113,14 @@ import { removeMessage } from './src/runtime/cryptoPump'
 import { photographForForward } from './src/runtime/cryptoPump'
 import { openNotebook } from './src/runtime/notebook'
 import { forgetfulHidden, type Hidden } from './src/runtime/hiddenStore'
+import {
+  forgetfulFavourites,
+  type Favourites,
+} from './src/runtime/favouriteStore'
 import { forgetfulReadBy, type ReadBy } from './src/runtime/readByStore'
 import {
   canCopy,
+  canFavourite,
   canForward,
   canRemoveForEveryone,
   copyText,
@@ -465,6 +470,15 @@ export function App({
   const [reinstalled, setReinstalled] = useState<
     'reentered' | 'stranded' | null
   >(null)
+  /**
+   * The messages this device has been told to keep.
+   *
+   * State as well as a page, for the reason the read marks are both: the bar
+   * has to say « Favori » or « Retirer des favoris » on the frame the finger
+   * lands, and a notebook read is a round trip.
+   */
+  const [favourites, setFavourites] = useState<ReadonlySet<string>>(new Set())
+  const favouritesRef = useRef<Favourites>(forgetfulFavourites())
   // AND IT GOES AWAY ON ITS OWN. A line that stayed would be a line still
   // there next time the conversation is opened, describing a photograph
   // saved yesterday. Long enough to read twice, short enough that nobody
@@ -922,6 +936,8 @@ export function App({
       // first frame already knows how far it was read.
       readMarksRef.current = new Map(await opening.readBy.all())
       setHidden(await opening.hidden.all())
+      favouritesRef.current = opening.favourites
+      setFavourites(await opening.favourites.marks())
       logEvent(opening.opened ? 'info' : 'warn', 'MESSAGR_GIVEN_NAMES', {
         opened: opening.opened,
         ...(opening.minted === undefined ? {} : { minted: opening.minted }),
@@ -2757,7 +2773,47 @@ export function App({
                   onlyPhotograph(selected, conversation ?? [])?.image !==
                   undefined
                 }
+                canFavourite={canFavourite(selected, conversation ?? [])}
+                // EVERY one, not any: the control does one thing to the whole
+                // selection, and a mixed one has to pick a direction. Keeping
+                // is the safe half -- a mark added to something already kept
+                // changes nothing, where a removal would silently drop marks
+                // somebody did not ask about.
+                alreadyFavourite={
+                  selected.size > 0 &&
+                  [...selected].every(id => favourites.has(id))
+                }
                 onClear={() => setSelected(new Set())}
+                onFavourite={() => {
+                  const chosen = [...selected]
+                  const already = chosen.every(id => favourites.has(id))
+                  setSelected(new Set())
+                  // Drawn before the notebook answers: the mark is this
+                  // device's own and the page is a formality. A failure is a
+                  // line in the log rather than a screen -- the person is
+                  // looking at a message, not at a database.
+                  setFavourites(had => {
+                    const next = new Set(had)
+                    for (const id of chosen) {
+                      if (already) next.delete(id)
+                      else next.add(id)
+                    }
+                    return next
+                  })
+                  const page = favouritesRef.current
+                  const written = already
+                    ? page.drop(chosen)
+                    : page.keep(openScope ?? '', chosen)
+                  written
+                    .then(held => {
+                      if (!held) {
+                        logEvent('warn', 'MESSAGR_FAVOURITE_NOT_KEPT', {
+                          how: already ? 'drop' : 'keep',
+                        })
+                      }
+                    })
+                    .catch(() => {})
+                }}
                 onCopy={() => {
                   const held = conversation ?? []
                   const words = copyText(selected, held)

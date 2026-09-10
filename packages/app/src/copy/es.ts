@@ -155,6 +155,8 @@ export const es: Readonly<Record<CopyKey, string>> = {
   selection_keep: 'Guardar',
   selection_kept: 'Fotografía guardada en la fototeca de este dispositivo.',
   selection_keep_failed: 'No se ha podido guardar la fotografía.',
+  selection_favourite: 'Favorito',
+  selection_unfavourite: 'Quitar de favoritos',
   selection_remove: 'Eliminar',
   'remove_title %1$d': '¿Eliminar %1$d mensaje(s)?',
   remove_everyone: 'Eliminar para todos',
