@@ -130,12 +130,20 @@ export function CallsList({
                   {shown}
                 </Text>
                 <View style={styles.what}>
+                  {/* THE GLYPH SAYS WHICH KIND and the words say what became
+                      of it. A camera rather than a handset when a picture
+                      went through -- §13 wants no state carried by colour
+                      alone, and a different shape is not a colour. */}
                   <TabIcon
-                    glyph="calls"
+                    glyph={call.video === true ? 'cam' : 'calls'}
                     tint={missed ? color.deny['500'] : color.neutral['400']}
                     size={14}
                   />
-                  <Text style={styles.outcome}>{t(outcomeLabel(call))}</Text>
+                  <Text style={styles.outcome}>
+                    {call.video === true
+                      ? `${t('calls_video')} · ${t(outcomeLabel(call))}`
+                      : t(outcomeLabel(call))}
+                  </Text>
                 </View>
               </View>
               <Text style={styles.when}>

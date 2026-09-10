@@ -270,12 +270,27 @@ export function CallScreen({
           />
         )}
         <View style={[styles.who, showing && styles.whoAside]}>
-          {!showing && (
+          {/* THE AVATAR IS THE FAR END'S ABSENCE, not the absence of any
+              picture at all. It was hidden whenever *this* side had a camera
+              on -- so a caller whose peer answered without video saw a dark
+              rectangle with a name on it and no face anywhere. The question
+              an avatar answers is "who is not on screen", and only
+              `pictures.remote` can answer it. */}
+          {pictures.remote === null && (
             <Avatar shown={shown} size={AVATAR} testID="call-avatar" />
           )}
           <Text style={styles.name} numberOfLines={1} testID="call-name">
             {shown}
           </Text>
+          {/* THEIR CAMERA IS OFF, said rather than left to be guessed from
+              an avatar. Only while this side is sending one: two people on
+              an audio call are not "camera off", they are on an audio call,
+              and the line on every call would be noise. #202. */}
+          {pictures.local !== null && pictures.remote === null && !over && (
+            <Text style={styles.aside} testID="call-their-camera-off">
+              {t('call_their_camera_off')}
+            </Text>
+          )}
           <Text style={styles.sentence} testID="call-state">
             {t(
               failure === undefined ? sentenceFor(state) : refusalFor(failure),
