@@ -1,7 +1,15 @@
 import React from 'react'
 import { Pressable, StyleSheet, Text, View } from 'react-native'
 
-import { color, elevation, floors, radius, space, type } from '../design/tokens'
+import {
+  color,
+  elevation,
+  floors,
+  radius,
+  space,
+  stroke,
+  type,
+} from '../design/tokens'
 
 /**
  * The green circle above the tab bar, and the only way to invite somebody.
@@ -19,17 +27,38 @@ import { color, elevation, floors, radius, space, type } from '../design/tokens'
  *
  * `green500` is *« action principale »* in the token's own words. If the
  * floating action is not the principal action, nothing is.
+ *
+ * # And a second circle, which is why `quiet` exists
+ *
+ * Returning to the newest message wants the same corner: it is the same
+ * thumb, reaching for the same place, and a person scrolled into last week's
+ * history should not have to find a new one. It is not the same claim, so it
+ * is not the same green -- see `quietCircle`. The two never show at once:
+ * inviting belongs to the list, returning belongs to a conversation.
  */
 
 export function FloatingAction({
   label,
   onPress,
   testID,
+  mark,
+  quiet = false,
 }: {
   /** Read aloud. The circle itself carries a sign, not a word. */
   readonly label: string
   readonly onPress: () => void
   readonly testID: string
+  /**
+   * What the circle carries. `+` when nothing says otherwise, because that
+   * is what this button was built for -- inviting somebody.
+   */
+  readonly mark?: string
+  /**
+   * A quieter circle, for an action that helps rather than one that starts
+   * something. Returning to the newest message is the second kind: it is
+   * always available and never the point of the screen.
+   */
+  readonly quiet?: boolean
 }) {
   return (
     // LAID OUT ABOVE THE BAR, NOT POSITIONED OVER IT.
@@ -49,12 +78,18 @@ export function FloatingAction({
         onPress={onPress}
         accessibilityRole="button"
         accessibilityLabel={label}
-        style={({ pressed }) => [styles.circle, pressed && styles.pressed]}>
+        style={({ pressed }) => [
+          styles.circle,
+          quiet && styles.quietCircle,
+          pressed && (quiet ? styles.quietPressed : styles.pressed),
+        ]}>
         {/* A sign rather than an icon file: `design/icons/` has no plus, and
             a plus drawn here would be this repository's hand in an identity
             that has a voice. The character is the same stroke weight as the
             typeface around it, which is more than a redrawn one would be. */}
-        <Text style={styles.sign}>+</Text>
+        <Text style={[styles.sign, quiet && styles.quietSign]}>
+          {mark ?? '+'}
+        </Text>
       </Pressable>
     </View>
   )
@@ -85,6 +120,28 @@ const styles = StyleSheet.create({
   },
   pressed: {
     backgroundColor: color.brand.green700,
+  },
+  // THE QUIET CIRCLE IS THE SAME CIRCLE, PAINTED PAPER.
+  //
+  // Same size, same place, same elevation: it has to be reachable by the
+  // thumb that already knows where the green one is. What changes is what it
+  // claims -- `raised` is the value of a surface that is offered rather than
+  // one that is the point of the screen, and green500 is *« action
+  // principale »* in the token's own words. Returning to the newest message
+  // is not the principal action of a conversation; typing in it is.
+  quietCircle: {
+    backgroundColor: color.surface.raised,
+    // Without it, a white circle on `sunk` is a white circle with a shadow
+    // and nothing else -- readable, but only because of the shadow, which is
+    // the one part of this that Android draws differently.
+    borderWidth: stroke.base,
+    borderColor: color.neutral['200'],
+  },
+  quietPressed: {
+    backgroundColor: color.surface.sunk,
+  },
+  quietSign: {
+    color: color.neutral['900'],
   },
   sign: {
     ...type.titleLg,

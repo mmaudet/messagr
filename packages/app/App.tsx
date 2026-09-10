@@ -292,6 +292,21 @@ export function App({
   const frame = useRef<React.ComponentRef<typeof ScrollView>>(null)
   const atBottom = useRef(true)
   /**
+   * Whether the conversation is far enough up its history to offer a way back.
+   *
+   * State rather than a second ref, and that is the whole reason it exists
+   * separately from `atBottom`: a ref changes nothing on screen, and this one
+   * has to make a button appear. `atBottom` stays a ref because its job is to
+   * be read inside a callback, and turning it into state would re-render the
+   * conversation on every scroll event for no one's benefit.
+   *
+   * Two questions, two thresholds. `atBottom` asks "should an arriving
+   * message scroll the frame?", and a line short of the end still means yes.
+   * This asks "is this person somewhere else?", which only starts being true
+   * further up -- see `A_WAY_BACK`.
+   */
+  const [awayFromNewest, setAwayFromNewest] = useState(false)
+  /**
    * Which screen `atBottom` is an answer about.
    *
    * The flag is a ref, so it outlives the container `key` rebuilds: scrolling
@@ -1098,6 +1113,12 @@ export function App({
               setOpenScope(scope)
               openScopeRef.current = scope
               setConversation(null)
+              // A conversation opens at its newest message, so nothing is
+              // away from it yet. `onContentSizeChange` says the same thing
+              // when the frame lays out, but a frame away from the newest
+              // renders once before that -- and the once is the flash of a
+              // button pointing down at where the screen already is.
+              setAwayFromNewest(false)
               // WHAT LANDS LATE MUST CHECK IT IS STILL WANTED.
               //
               // Every derivation below is a round trip, and the person can
@@ -2663,12 +2684,21 @@ export function App({
                 : event => {
                     const { contentOffset, layoutMeasurement, contentSize } =
                       event.nativeEvent
+                    const fromEnd =
+                      contentSize.height -
+                      (contentOffset.y + layoutMeasurement.height)
                     // A margin, because a scroll rarely stops on the exact
                     // pixel and "within a message's height of the end" is what
                     // a person means by being at the bottom.
-                    atBottom.current =
-                      contentOffset.y + layoutMeasurement.height >=
-                      contentSize.height - NEAR_THE_END
+                    atBottom.current = fromEnd <= NEAR_THE_END
+                    // Set on every event and usually the same value: React
+                    // stops at an identical one, and the alternative -- a ref
+                    // holding the last answer so the setter is called less --
+                    // is a second copy of the truth to keep in step, which is
+                    // what `restedIn` already exists to apologise for.
+                    setAwayFromNewest(
+                      fromEnd > layoutMeasurement.height * A_WAY_BACK,
+                    )
                   }
             }
             scrollEventThrottle={100}
@@ -2677,6 +2707,7 @@ export function App({
               if (restedIn.current !== openScope) {
                 restedIn.current = openScope
                 atBottom.current = true
+                setAwayFromNewest(false)
               }
               if (!atBottom.current) return
               // Not animated: on the first layout there is nothing to animate
@@ -3122,6 +3153,33 @@ export function App({
                 />
               )}
 
+            {/* AND THE WAY BACK DOWN, in the same corner as the green one.
+              Reported from the Pixel: « lorsqu'on remonte dans l'historique
+              [...] un bouton qui permette de revenir au dernier message avec
+              une flèche qui descend vers le bas ». Above the composer rather
+              than beside it: the composer is where the thumb rests, and a
+              control that scrolls the screen has no business sharing a row
+              with the field that types into it.
+
+              `trust` and `personOpen` are what tell the conversation apart
+              from the two panels that open over it -- neither of them
+              scrolls the timeline, so neither of them has a newest message
+              to return to. Selection is not in the list: the bar takes the
+              header, not the frame, and somebody selecting a message from
+              last week still wants the way back. */}
+            {openScope !== null &&
+              trust === null &&
+              !personOpen &&
+              awayFromNewest && (
+                <FloatingAction
+                  testID="scroll-to-newest"
+                  label={t('back_to_newest')}
+                  mark="↓"
+                  quiet
+                  onPress={() => frame.current?.scrollToEnd({ animated: true })}
+                />
+              )}
+
             {/* THE INPUT BAR IS PART OF THE DOCK, above the tabs.
               It was the last thing in the conversation's own scroll view, so
               it scrolled away with the messages and somebody had to reach the
@@ -3215,6 +3273,18 @@ export function App({
  * Roughly a message's height.
  */
 const NEAR_THE_END = 80
+
+/**
+ * How far up the history counts as being somewhere else, as a share of the
+ * frame's own height.
+ *
+ * `NEAR_THE_END` is the wrong threshold for the button: it is 80 points, so
+ * the way back would appear after one flick and sit there through a slow
+ * read. Half a screen is what a person means by having gone looking for
+ * something -- and being a share of the frame rather than a number of points
+ * makes it the same gesture on a phone and on a tablet.
+ */
+const A_WAY_BACK = 0.5
 
 const styles = StyleSheet.create({
   // GESTURE HANDLER WANTS A ROOT, AND IT WANTS ONE THAT FILLS THE SCREEN.

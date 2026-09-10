@@ -430,4 +430,5 @@ export const en: Readonly<Record<CopyKey, string>> = {
   conversation_attaching: 'Encrypting and sending the photo…',
   'list_unread %1$d': '%1$d unread messages',
   invite_open: 'Invite someone',
+  back_to_newest: 'Back to the latest message',
 }

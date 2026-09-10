@@ -617,6 +617,7 @@ export const fr = {
   // it, since "3" alone tells somebody nothing.
   'list_unread %1$d': '%1$d messages non lus',
   invite_open: 'Inviter quelqu’un',
+  back_to_newest: 'Revenir au dernier message',
 } as const
 
 /** Every key any screen may ask for. A typo is a compile error, not a blank. */
