@@ -227,7 +227,20 @@ function Row({
           not", and it is a typographic answer rather than a badge -- a badge
           would be a second thing on the row saying what the first already
           says. */}
-      <Avatar shown={shown} testID={`avatar-${summary.scope}`} />
+      {/* THE AVATAR TAKES THE IDENTIFIER, NOT THE SENTENCE.
+          `initialsOf` gives the first letter of each of the first two words,
+          which is right for a name and meaningless for a phrase -- and
+          « Personne d'autre ici » reduces to two letters that are a slur in
+          French. Seen on the bench the moment the row learnt to say it.
+
+          The scope is what the row is about when no person is, and its
+          initial is a mark rather than a word. Both nameless cases go the
+          same way: `shown` already is the scope for a conversation of
+          three. */}
+      <Avatar
+        shown={summary.other === null ? summary.scope : shown}
+        testID={`avatar-${summary.scope}`}
+      />
       <View style={styles.said}>
         <Text numberOfLines={1} style={named ? styles.name : styles.identifier}>
           {shown}
