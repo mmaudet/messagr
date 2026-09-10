@@ -108,6 +108,21 @@ export function Composer({
   readonly onAttach?: () => void
 }) {
   const [draft, setDraft] = useState('')
+  /**
+   * How tall the field has grown, in points, or `null` for its own minimum.
+   *
+   * # WHY THE HEIGHT IS HELD HERE AND NOT LEFT TO THE NATIVE VIEW
+   *
+   * A `multiline` field measures itself from its content and keeps what it
+   * measured. Emptying `value` does not make it measure again -- so after a
+   * message with a line break in it, or simply a long one, the bar stayed
+   * three lines tall over an empty field, and only shrank when somebody
+   * typed the next character. Reported from the Pixel in both forms.
+   *
+   * Holding the height makes sending able to reset it, which is the only
+   * moment that knows the field is empty on purpose.
+   */
+  const [grown, setGrown] = useState<number | null>(null)
   const [emojiOpen, setEmojiOpen] = useState(false)
   const [whyDisabled, setWhyDisabled] = useState(false)
   // THE LIGHT PALETTE, NOT THE SYSTEM'S THEME.
@@ -129,6 +144,9 @@ export function Composer({
     const body = draft.trim()
     if (body === '') return
     setDraft('')
+    // Back to one line, with the text that made it taller. Anything else
+    // leaves a bar sized for a message that has gone.
+    setGrown(null)
     setEmojiOpen(false)
     onSend(body)
   }
@@ -208,7 +226,20 @@ export function Composer({
             textAlignVertical="top"
             placeholder={t('message_placeholder')}
             placeholderTextColor={palette.neutral['400']}
-            style={[styles.input, { color: palette.neutral['900'] }]}
+            // MEASURED BY THE FIELD, BOUNDED HERE. `TALLEST_FIELD` is the
+            // ceiling and the field's own minimum is the floor; between them
+            // it grows with what is typed. Reset by `send`, which is the one
+            // moment that knows the emptiness is deliberate.
+            onContentSizeChange={event =>
+              setGrown(event.nativeEvent.contentSize.height)
+            }
+            style={[
+              styles.input,
+              { color: palette.neutral['900'] },
+              grown === null
+                ? null
+                : { height: Math.min(grown, TALLEST_FIELD) },
+            ]}
           />
 
           {onAttach !== undefined && (
