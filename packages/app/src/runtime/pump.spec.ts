@@ -128,11 +128,86 @@ describe('sendOutgoingRequest', () => {
     expect(seen.body).toBe(JSON.stringify(body))
   })
 
+  it('routes room_key_backup with the version in the query string', async () => {
+    // This test used to assert the opposite. It named `room_key_backup`
+    // as the example of a kind this app refuses to route, and it was right
+    // to: nothing here backed keys up, so a request of that kind could only
+    // have come from a surface this app did not understand.
+    //
+    // ADR-0013 changed the decision, not the reasoning. `/room_keys` is
+    // Matrix protocol and belongs on the protocol's path; a second place
+    // that talks to the homeserver with rules of its own is how two places
+    // come to disagree. So the kind is routed, and the rule it used to
+    // stand for is asserted below on a kind that really is unknown.
+    const seen: {
+      method?: string
+      path?: string
+      query?: Record<string, string>
+      body?: string
+    } = {}
+    const http = fakeHttp(async (m, p, q, b) => {
+      seen.method = m
+      seen.path = p
+      seen.query = q
+      seen.body = b
+      return '{"etag":"opaque","count":1}'
+    })
+    const rooms = {
+      '!room:example.org': {
+        sessions: { 'session-id': { is_verified: true } },
+      },
+    }
+
+    await sendOutgoingRequest(
+      http,
+      request('room_key_backup', { version: '947281', rooms }),
+    )
+
+    expect(seen.method).toBe('PUT')
+    expect(seen.path).toBe('/_matrix/client/v3/room_keys/keys')
+    expect(seen.query).toEqual({ version: '947281' })
+    // `rooms` alone: the version travels in the body only because the query
+    // string needs a value the wire body does not carry, the same way
+    // to_device's event type and transaction id do.
+    expect(seen.body).toBe(JSON.stringify({ rooms }))
+  })
+
+  it('never turns the backup version into a number', async () => {
+    // Six digits, which is what Continuwuity 26.7.2 answers with where
+    // Synapse answers with a counter from "1". The specification makes the
+    // field an opaque string, so a client that parsed it would work against
+    // one homeserver and fail against the other. The leading zero is the
+    // assertion: a number would lose it.
+    const seen: { query?: Record<string, string> } = {}
+    const http = fakeHttp(async (_m, _p, q) => {
+      seen.query = q
+      return '{"etag":"opaque","count":1}'
+    })
+
+    await sendOutgoingRequest(
+      http,
+      request('room_key_backup', { version: '047281', rooms: {} }),
+    )
+
+    expect(seen.query).toEqual({ version: '047281' })
+  })
+
+  it('refuses a room_key_backup that names no version', async () => {
+    // The version belongs in the query string, so a request without one has
+    // nowhere to go. Refused here rather than sent to a URL with an empty
+    // `?version=`, which a homeserver answers for some other backup or for
+    // none.
+    const http = fakeHttp(async () => '{}')
+    await expect(
+      sendOutgoingRequest(http, request('room_key_backup', { rooms: {} })),
+    ).rejects.toThrow(/version/)
+  })
+
   it('refuses a request of a kind it cannot route', async () => {
     const http = fakeHttp(async () => '{}')
     await expect(
-      sendOutgoingRequest(http, request('room_key_backup', {})),
-    ).rejects.toThrow(/room_key_backup/)
+      sendOutgoingRequest(http, request('m.some.future.kind', {})),
+    ).rejects.toThrow(/m\.some\.future\.kind/)
   })
 
   it('lets the http failure propagate to the caller', async () => {
