@@ -80,10 +80,28 @@ backup as making encryption optional.
 
 ## The shape, and why each part is as it is
 
-**The secret is generated, not chosen.** Six words, the same mnemonic
-vocabulary the verification gesture uses and the data export already borrows.
-A passphrase somebody invents is weak and reused, and this is the single
-secret that opens an entire history.
+**The secret is generated, not chosen, and it is 256 bits.** Shown in
+Matrix's own base58 form — `EsTx…`, some forty characters — and not as a
+phrase.
+
+A first draft said six words, borrowing the mnemonic vocabulary the
+verification gesture uses and the data export already has. **The arithmetic
+refuses it.** A backup key is 32 bytes; six words drawn from a list of 7,776
+carry 77 bits. Carrying 256 would need a list of four thousand billion words.
+The spec's six-word phrase is a _passphrase a key is derived from_, which is
+right for the data export and cannot represent a generated key.
+
+Deriving from six words instead — 77 bits behind PBKDF2 — was the other way
+out, and the threat model accepted above argues against it: having granted
+that a compromised homeserver can substitute keys, this decision will not also
+hand it a short secret to break offline. A passphrase somebody invents is
+weaker still, and this is the single secret that opens an entire history.
+
+What it costs is that the screen says _copy this_ rather than _write down
+these six words_, which is less handsome. It is also truer to where a secret
+like this survives: a password manager, not a piece of paper. The mnemonic
+mechanism stays where it earns its place — verification, and the data export,
+which really does derive from a phrase.
 
 **It is shown once and never again, and it can be replaced.** Showing it again
 means anyone holding an unlocked telephone can read it; never being able to

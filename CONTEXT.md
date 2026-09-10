@@ -199,10 +199,11 @@ A secondary device attached to an account, desktop companions included. A
 device never appears quietly: verified contacts see it arrive.
 
 **Recovery key**:
-The generated secret that opens a key backup, shown once as six words and
-never shown again. It can be replaced, which retires the old one.
+The generated 256-bit secret that opens a key backup, shown once in Matrix's
+base58 form and never shown again. It can be replaced, which retires the old
+one.
 _Avoid_: Password, passphrase, code — a passphrase is chosen by a person and
-this is not
+derived from; this is generated and is the key itself
 
 **Key backup**:
 The account's room keys kept on the homeserver, encrypted by the recovery key
