@@ -451,6 +451,27 @@ export async function loadConversation(
  * than a probe's side effect is `enterInvitations.ts`, tested there against
  * injected fakes.
  */
+/**
+ * Conversations this runtime has already declined.
+ *
+ * A DECLINED INVITATION CAN COME BACK, twice over. The homeserver goes on
+ * listing the room in a fresh `rooms.invite` for a while after the refusal
+ * lands, and the issuer's own admission loop goes on naming this account
+ * until its invitation settles -- so it invites again, and the next tick
+ * finds a new invitation to the same conversation.
+ *
+ * Both end on their own, and the end state was right either way: no second
+ * conversation. What this stops is the churn in between -- a refusal per
+ * sync tick, and a `403 Event is not authorized` in the log every time the
+ * server had already recorded the first one. Measured on the bench, in the
+ * minute after a collapse.
+ *
+ * For the life of the runtime, which is the life of the application: a
+ * relaunch asks again, and asking again is correct. Somebody may genuinely
+ * have been invited back after a conversation ended.
+ */
+const declined = new Set<string>()
+
 export async function enterAnyInvitations(
   sessionClient: ReturnType<typeof createClient>,
   selfUserId: string,
@@ -458,7 +479,8 @@ export async function enterAnyInvitations(
   const http = makePumpHttp(sessionClient)
   const entered = await enterInvitations({
     http,
-    invitedRooms: fetchInvitations,
+    invitedRooms: async asking =>
+      (await fetchInvitations(asking)).filter(one => !declined.has(one.scope)),
     join: joinRoom,
     decline: declineRoom,
     // ONE CALL PER CONVERSATION, and `enterInvitations` is careful about
@@ -477,6 +499,7 @@ export async function enterAnyInvitations(
       return already
     },
   })
+  for (const one of entered.collapsed) declined.add(one.scope)
   // Only when something happened: this runs on every sync tick, and a line
   // per tick saying "nobody invited anybody" would bury the one that matters.
   if (
