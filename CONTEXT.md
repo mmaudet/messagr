@@ -198,13 +198,32 @@ participant; the `:server` suffix is never imposed on screen.
 A secondary device attached to an account, desktop companions included. A
 device never appears quietly: verified contacts see it arrive.
 
-**Recovery bundle**:
-The product-facing artifact that restores encrypted account continuity.
-_Avoid_: Backup, export, vault
+**Recovery key**:
+The generated secret that opens a key backup, shown once as six words and
+never shown again. It can be replaced, which retires the old one.
+_Avoid_: Password, passphrase, code — a passphrase is chosen by a person and
+this is not
+
+**Key backup**:
+The account's room keys kept on the homeserver, encrypted by the recovery key
+the server never holds. Off until accepted. It restores readability, never a
+message store.
+_Avoid_: Recovery bundle, vault, sync
+
+**Key vault**:
+The exported file of room keys, in Matrix's own format and under a passphrase
+of its own, readable by any Matrix client. The second route for somebody who
+wants no key material on a server.
+_Avoid_: Backup, export, archive
 
 **Data export**:
 The GDPR archive, produced on the device and readable elsewhere. It restores
-nothing, and is not a recovery bundle.
+nothing and is not a key vault: **the vault holds keys, the export holds
+messages.** Somebody handed a file of keys has not received their data.
+
+**Recovery bundle**:
+Retired. It named one artifact when there was one; there are now three, and
+each is named above.
 
 ### Design
 
