@@ -76,6 +76,15 @@
 	<string>Messagr n’utilise pas l’appareil photo. Ce texte est exigé par iOS parce que la bibliothèque d’appels référence cette API ; l’autorisation ne vous sera pas demandée.</string>
 	<key>NSPhotoLibraryUsageDescription</key>
 	<string>Pour choisir une image à envoyer dans une conversation. L’image est chiffrée sur cet appareil avant d’être envoyée : ni le serveur ni Messagr ne peuvent la lire.</string>
+	<!-- DEUX CLES ET NON UNE, ET LA DIFFERENCE COMPTE.
+	     Celle du dessus est le droit de LIRE la photothèque, demande pour
+	     choisir une image a envoyer. Celle-ci est le droit d'y AJOUTER, et
+	     iOS ne la reclame que lorsque quelqu'un enregistre une photographie
+	     — geste par geste, jamais a l'ouverture. Declarer la premiere pour
+	     les deux usages demanderait un acces en lecture dont ce geste n'a
+	     pas besoin. -->
+	<key>NSPhotoLibraryAddUsageDescription</key>
+	<string>Pour enregistrer dans votre photothèque une photographie reçue dans une conversation, lorsque vous le demandez. Une image enregistrée quitte Messagr : elle suit ensuite les sauvegardes et les autorisations de votre photothèque.</string>
 	<key>RCTNewArchEnabled</key>
 	<true/>
 	<!-- L'EXPORT, DECLARE EXEMPTE, ET C'EST LE COMPTE QUI LE DIT.

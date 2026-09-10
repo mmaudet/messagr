@@ -47,17 +47,25 @@ export function SelectionBar({
   count,
   canCopy: copyable,
   canForward: forwardable,
+  canKeep: keepable,
   onClear,
   onCopy,
   onForward,
+  onKeep,
   onRemove,
 }: {
   readonly count: number
   readonly canCopy: boolean
   readonly canForward: boolean
+  /**
+   * Whether the selection is one photograph, and so has somewhere to be
+   * kept. Words have no gallery to go to.
+   */
+  readonly canKeep: boolean
   readonly onClear: () => void
   readonly onCopy: () => void
   readonly onForward: () => void
+  readonly onKeep: () => void
   readonly onRemove: () => void
 }) {
   return (
@@ -92,6 +100,24 @@ export function SelectionBar({
           accessibilityRole="button"
           style={({ pressed }) => [styles.action, pressed && styles.pressed]}>
           <Text style={styles.actionLabel}>{t('selection_forward')}</Text>
+        </Pressable>
+      )}
+
+      {/* THE ONLY ACTION HERE THAT LEAVES THE PRODUCT. Copy and Forward move
+          a photograph to another place this application still stands behind;
+          this one puts it in the gallery, where the camera's pictures live,
+          and stops standing behind it. `keepPhotograph.ts` says what that
+          costs and ADR-0006 carries the amendment.
+
+          Offered only on a single photograph: a gallery takes pictures, and
+          a selection with a word in it has no picture to give. */}
+      {keepable && (
+        <Pressable
+          testID="selection-keep"
+          onPress={onKeep}
+          accessibilityRole="button"
+          style={({ pressed }) => [styles.action, pressed && styles.pressed]}>
+          <Text style={styles.actionLabel}>{t('selection_keep')}</Text>
         </Pressable>
       )}
 

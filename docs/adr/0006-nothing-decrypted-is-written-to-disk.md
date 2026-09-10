@@ -107,3 +107,46 @@ nothing here caches a conversation. The day somebody asks for offline
 history, that is a third decision and a much larger one — this page is one
 line per conversation, and growing it into a message store would be the
 reversal this ADR refuses rather than the amendment it invited.
+
+## Revisited, 10 September 2026 — a photograph the person asks to keep
+
+#169's third action: an image received in a conversation can be saved to the
+telephone's photo library. That writes a decrypted photograph to disk, which
+is the thing this document is named after refusing.
+
+It is allowed, and the shape of the allowance is the whole of it.
+
+**The gallery is not this application's storage.** Every other place this
+decision governs is somewhere the product chose and the person did not: a
+cache, a database, a file the application reads back. The gallery is where
+the camera's own pictures go — the person's own shelf, on their own device,
+which they already open every day. Refusing to put anything there is not
+protecting them, it is deciding for them about their own picture.
+
+**Once, per photograph, because somebody asked.** Never on arrival, never in
+the background, never as a side effect of looking at something. The
+automatic version — a toggle that keeps every image as it arrives, which the
+account holder has asked for and which is what WhatsApp does — is a
+different decision and is not taken here. It would turn the exception back
+into a cache: everything received, on disk, in clear, without a gesture.
+
+**The plaintext exists for the length of one call.** A photograph reaches the
+screen as a `data:` URI and neither platform's gallery takes one, so the
+bytes are written to the temporary directory, handed over by path, and
+unlinked in a `finally` — including when the hand-over fails, which is the
+case a happy path would have left the plaintext behind for.
+
+**What it costs, said plainly.** A saved photograph is outside everything
+this product provides. It is backed up by whatever backs the gallery up, it
+is readable by every application the person has given photo access to, and
+nobody at the other end of the conversation can remove it any more. Saving
+is the end of Messagr's part in that picture, and the screen says the
+photograph went to the photo library rather than pretending it merely
+"downloaded".
+
+**What did not change.** Nothing is written for the application to read
+back: there is still no path from the gallery into this product, and a saved
+photograph is not a cache of anything. ADR-0006's amendment of 8 September —
+the conversation list's openings — is the other exception, and the two are
+alike in the way that matters: both are bounded, both are named, and neither
+is a message store.

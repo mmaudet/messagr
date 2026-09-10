@@ -173,6 +173,8 @@ import type { Language } from './src/copy/languages'
 import { enterWithASession, type InvitationOutcome } from './src/runtime/entry'
 import { initialLink, watchLinks } from './src/runtime/incomingLink'
 import { useKeyboardInset } from './src/ui/keyboardInset'
+import { keepPhotograph } from './src/runtime/keepPhotograph'
+import { photoLibrary } from './src/runtime/photoLibrary'
 import { servicePoster } from './src/runtime/servicePoster'
 import {
   fetchSessionSyncStatus,
@@ -430,6 +432,24 @@ export function App({
    */
   const [selected, setSelected] = useState<ReadonlySet<string>>(new Set())
   const [removing, setRemoving] = useState(false)
+  /**
+   * What became of the last photograph somebody asked to keep.
+   *
+   * A sentence rather than a spinner: the gesture is one call and answers in
+   * a moment, and what a person needs afterwards is to know their picture is
+   * in the gallery -- or that it is not, which is the only case they can act
+   * on. `null` when nobody has asked, which is nearly always.
+   */
+  const [photoKept, setPhotoKept] = useState<'kept' | 'failed' | null>(null)
+  // AND IT GOES AWAY ON ITS OWN. A line that stayed would be a line still
+  // there next time the conversation is opened, describing a photograph
+  // saved yesterday. Long enough to read twice, short enough that nobody
+  // has to dismiss it.
+  useEffect(() => {
+    if (photoKept === null) return
+    const going = setTimeout(() => setPhotoKept(null), KEPT_SHOWN_MS)
+    return () => clearTimeout(going)
+  }, [photoKept])
   /**
    * The events waiting for a destination, while the picker is up.
    *
@@ -2614,6 +2634,10 @@ export function App({
                 count={selected.size}
                 canCopy={canCopy(selected, conversation ?? [])}
                 canForward={canForward(selected, conversation ?? [])}
+                canKeep={
+                  onlyPhotograph(selected, conversation ?? [])?.image !==
+                  undefined
+                }
                 onClear={() => setSelected(new Set())}
                 onCopy={() => {
                   const held = conversation ?? []
@@ -2647,6 +2671,38 @@ export function App({
                         reason: getErrorMessage(cause),
                       }),
                     )
+                }}
+                onKeep={() => {
+                  const alone = onlyPhotograph(selected, conversation ?? [])
+                  setSelected(new Set())
+                  if (alone?.image === undefined) return
+                  // THE SAME BYTES THE SCREEN IS DRAWING. `openImageRef`
+                  // answers the viewer's own cache, so saving costs no round
+                  // trip and cannot save something other than what the person
+                  // is looking at.
+                  openImageRef
+                    .current?.(alone.image)
+                    .then(async shown => {
+                      if (!shown.shown) {
+                        setPhotoKept('failed')
+                        return
+                      }
+                      const done = await keepPhotograph(photoLibrary, shown.uri)
+                      setPhotoKept(done.kept ? 'kept' : 'failed')
+                      if (!done.kept) {
+                        // §13.27: the reason is for whoever is diagnosing it,
+                        // never for the person holding the telephone.
+                        logEvent('warn', 'MESSAGR_KEEP_PHOTOGRAPH', {
+                          reason: done.reason,
+                        })
+                      }
+                    })
+                    .catch((cause: unknown) => {
+                      setPhotoKept('failed')
+                      logEvent('warn', 'MESSAGR_KEEP_PHOTOGRAPH', {
+                        reason: getErrorMessage(cause),
+                      })
+                    })
                 }}
                 onForward={() => setForwarding([...selected])}
                 onRemove={() => setRemoving(true)}
@@ -3000,6 +3056,7 @@ export function App({
                     }
                     selfUserId={selfUserId}
                     sending={sending}
+                    kept={photoKept}
                     onLoadImage={loadImage}
                     otherParty={party?.other}
                     onOpenPlate={(plate, at) => setOpenPlate({ plate, at })}
@@ -3341,6 +3398,9 @@ export function App({
  * Roughly a message's height.
  */
 const NEAR_THE_END = 80
+
+/** How long the line about a saved photograph stays on the screen. */
+const KEPT_SHOWN_MS = 4000
 
 /**
  * How far up the history counts as being somewhere else, as a share of the

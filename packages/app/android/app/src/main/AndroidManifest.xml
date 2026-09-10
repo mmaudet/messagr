@@ -24,6 +24,22 @@
          que tout le lot vidéo suppose. -->
     <uses-permission android:name="android.permission.CAMERA" />
 
+    <!-- ENREGISTRER UNE PHOTOGRAPHIE DANS LA PHOTOTHEQUE, ET SEULEMENT
+         JUSQU'A ANDROID 9.
+
+         Depuis Android 10 le stockage cloisonne fait passer l'ajout par
+         MediaStore, qui ne demande rien : une application peut deposer une
+         image dans la galerie sans autorisation. Avant, il fallait ecrire
+         dans le stockage externe, d'ou cette permission — bornee par
+         maxSdkVersion pour qu'elle ne soit pas demandee la ou elle n'a plus
+         de sens, et pour que la fiche du magasin n'annonce pas un droit que
+         l'application n'exerce pas.
+
+         minSdkVersion vaut 24, donc la fenetre 24-28 existe reellement. -->
+    <uses-permission
+        android:name="android.permission.WRITE_EXTERNAL_STORAGE"
+        android:maxSdkVersion="28" />
+
     <!-- LE PLEIN ÉCRAN SUR UN TÉLÉPHONE VERROUILLÉ.
          Sans cette permission, un appel entrant est une ligne de plus sur
          l'écran de verrouillage, à remarquer en quatre-vingt-dix secondes.
