@@ -40,6 +40,7 @@ import { LanguagePicker } from './LanguagePicker'
 export function Settings({
   onBack,
   onLegal,
+  onFavourites,
   receipts,
   onReceipts,
   receiptsNotKept,
@@ -54,6 +55,14 @@ export function Settings({
 }: {
   readonly onBack: () => void
   readonly onLegal: () => void
+  /**
+   * The way to the messages somebody kept.
+   *
+   * Here rather than in a fifth tab, which `TabBar.tsx` forbids, and rather
+   * than in a conversation's own menu, which would scope to one conversation
+   * something that crosses them. See `Favourites.tsx`.
+   */
+  readonly onFavourites: () => void
   readonly receipts: boolean
   readonly onReceipts: (on: boolean) => void
   /** `true` when the last change could not be kept. */
@@ -83,6 +92,15 @@ export function Settings({
       </Pressable>
 
       <Text style={styles.title}>{t('settings_title')}</Text>
+
+      <Pressable
+        testID="settings-favourites"
+        onPress={onFavourites}
+        accessibilityRole="button"
+        accessibilityLabel={t('settings_favourites')}
+        style={styles.row}>
+        <Text style={styles.rowLabel}>{t('settings_favourites')}</Text>
+      </Pressable>
 
       <Pressable
         testID="settings-legal"

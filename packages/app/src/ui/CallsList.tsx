@@ -4,9 +4,10 @@ import { Pressable, StyleSheet, Text, View } from 'react-native'
 import type { CallOutcome, CallRecord } from '../runtime/callLogStore'
 import { t, type CopyKey } from '../copy'
 import { color, floors, layout, space, stroke, type } from '../design/tokens'
-import { stampFor, type Stamp } from '../timeline/whenShown'
+import { stampFor } from '../timeline/whenShown'
 import { Avatar } from './Avatar'
 import { spokenFor } from './callDuration'
+import { whenLabel } from './whenLabel'
 import { TabIcon } from './TabIcon'
 
 /**
@@ -60,23 +61,6 @@ function outcomeLabel(record: CallRecord): CopyKey {
 /** The one outcome a person scans the list for. */
 function isMissed(outcome: CallOutcome, direction: string): boolean {
   return outcome === 'missed' && direction === 'in'
-}
-
-function whenLabel(stamp: Stamp): string {
-  switch (stamp.kind) {
-    case 'time':
-      return t(
-        'when_time %1$d %2$d',
-        stamp.hours,
-        String(stamp.minutes).padStart(2, '0'),
-      )
-    case 'yesterday':
-      return t('yesterday')
-    case 'weekday':
-      return t(`day_short_${stamp.day}` as CopyKey)
-    case 'date':
-      return t('when_date %1$d %2$d', stamp.day, stamp.month)
-  }
 }
 
 export function CallsList({
