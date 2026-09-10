@@ -207,14 +207,14 @@ export const fr = {
   // personne sur un autre appareil et ne survit pas à une réinstallation ».
   // En premier sous le titre, parce que quelqu'un qui décide de s'y fier a
   // besoin de le savoir avant de s'y fier et non après.
-  favourites_title: 'Messages gardés',
+  favourites_title: 'Messages favoris',
   favourites_cost:
-    'Ces messages sont gardés sur cet appareil seulement. Ils ne vous suivent pas sur un autre téléphone et ne survivent pas à une réinstallation.',
+    'Ces messages sont en favori sur cet appareil seulement. Ils ne vous suivent pas sur un autre téléphone et ne survivent pas à une réinstallation.',
   favourites_empty:
-    'Aucun message gardé. Un appui long sur un message propose « Favori ».',
+    'Aucun message en favori. Un appui long sur un message propose « Favori ».',
   favourites_lost: 'Ce message n’est plus lisible sur cet appareil.',
   'favourites_where %1$@ %2$@': '%1$@ · %2$@',
-  settings_favourites: 'Messages gardés',
+  settings_favourites: 'Messages favoris',
   selection_remove: 'Supprimer',
   'remove_title %1$d': 'Supprimer %1$d message(s) ?',
   remove_everyone: 'Supprimer pour tout le monde',

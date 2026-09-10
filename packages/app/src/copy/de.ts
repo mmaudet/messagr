@@ -160,14 +160,14 @@ export const de: Readonly<Record<CopyKey, string>> = {
   selection_keep_failed: 'Das Foto konnte nicht gesichert werden.',
   selection_favourite: 'Favorit',
   selection_unfavourite: 'Aus Favoriten entfernen',
-  favourites_title: 'Aufbewahrte Nachrichten',
+  favourites_title: 'Favorisierte Nachrichten',
   favourites_cost:
-    'Diese Nachrichten werden nur auf diesem Gerät aufbewahrt. Sie folgen Ihnen nicht auf ein anderes Telefon und überstehen keine Neuinstallation.',
+    'Diese Nachrichten sind nur auf diesem Gerät favorisiert. Sie folgen Ihnen nicht auf ein anderes Telefon und überstehen keine Neuinstallation.',
   favourites_empty:
-    'Keine Nachricht aufbewahrt. Ein langer Druck auf eine Nachricht bietet „Favorit“ an.',
+    'Keine favorisierten Nachrichten. Ein langer Druck auf eine Nachricht bietet „Favorit“ an.',
   favourites_lost: 'Diese Nachricht ist auf diesem Gerät nicht mehr lesbar.',
   'favourites_where %1$@ %2$@': '%1$@ · %2$@',
-  settings_favourites: 'Aufbewahrte Nachrichten',
+  settings_favourites: 'Favorisierte Nachrichten',
   selection_remove: 'Löschen',
   'remove_title %1$d': '%1$d Nachricht(en) löschen?',
   remove_everyone: 'Für alle löschen',
