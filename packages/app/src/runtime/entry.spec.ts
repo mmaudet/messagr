@@ -156,7 +156,15 @@ describe('enterWithASession', () => {
       link: async () => 'https://messagr.eu/i/abc123',
       signUp: markerStore().secrets,
     })
-    expect(result).toEqual({ entered: true, session: SESSION, claimed: true })
+    expect(result).toEqual({
+      entered: true,
+      session: SESSION,
+      claimed: true,
+      // Carried out of the claim rather than kept here: #190 needs it to
+      // come back as a new device after a reinstall, and this module decides
+      // entry rather than where a credential lives.
+      password: 'unused',
+    })
     // Kept, or the next launch claims again and finds the token spent.
     expect(JSON.parse((await secrets.read()) ?? '')).toEqual(SESSION)
   })
@@ -218,6 +226,7 @@ describe('enterWithASession', () => {
       session: SESSION,
       claimed: true,
       kept: false,
+      password: 'unused',
     })
   })
 

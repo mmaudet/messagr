@@ -238,6 +238,10 @@ export const de: Readonly<Record<CopyKey, string>> = {
     'Sie haben bereits ein Gespräch mit %@. Dieses läuft weiter: die Einladung hat kein zweites eröffnet.',
   list_not_in_yet:
     'Sie sind noch nicht drin. Öffnen Sie den Einladungslink, den Ihnen jemand geschickt hat: er ist die einzige Tür, und davor kann die Anwendung nichts tun.',
+  list_reinstalled_back:
+    'Dieses Gerät wurde neu installiert. Es ist mit einer neuen Geräteidentität zurück, und Nachrichten von vor der Neuinstallation bleiben unlesbar: ihre Schlüssel sind mit der alten Installation gegangen.',
+  list_reinstalled_stranded:
+    'Dieses Gerät hat seine Verschlüsselungsschlüssel verloren, vermutlich bei einer Neuinstallation. Zuvor empfangene Nachrichten sind unlesbar und nicht wiederherstellbar. Um hier wieder zu schreiben, braucht es eine neue Einladung.',
   list_empty:
     'Noch keine Unterhaltung. Laden Sie jemanden ein, um eine zu beginnen.',
   list_nothing_said: 'Es wurde noch nichts gesagt',

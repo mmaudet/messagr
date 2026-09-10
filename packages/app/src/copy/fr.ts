@@ -341,6 +341,14 @@ export const fr = {
     'Vous êtes déjà en conversation avec %@. C’est celle-ci qui continue : l’invitation n’en a pas ouvert une seconde.',
   list_not_in_yet:
     'Vous n’êtes pas encore entré. Ouvrez le lien d’invitation qu’on vous a envoyé : c’est la seule porte, et l’application ne peut rien faire avant.',
+  // #190. Deux issues, deux phrases : revenir sous une identité neuve est la
+  // bonne, et c'est quand même une perte ; rester dehors est l'autre, et là
+  // la personne a quelque chose à faire. Ni l'une ni l'autre ne prétend que
+  // les messages d'avant existent encore.
+  list_reinstalled_back:
+    'Cet appareil a été réinstallé. Il est revenu sous une nouvelle identité d’appareil, et les messages reçus avant la réinstallation restent illisibles : leurs clés sont parties avec l’ancienne installation.',
+  list_reinstalled_stranded:
+    'Cet appareil a perdu ses clés de chiffrement, sans doute lors d’une réinstallation. Les messages reçus avant sont illisibles et ne peuvent pas être retrouvés. Pour continuer à écrire ici, il faut une nouvelle invitation.',
   list_empty:
     'Aucune conversation pour l’instant. Invitez quelqu’un pour en commencer une.',
   list_nothing_said: 'Rien n’a encore été dit',

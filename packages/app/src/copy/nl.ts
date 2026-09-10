@@ -230,6 +230,10 @@ export const nl: Readonly<Record<CopyKey, string>> = {
     'U hebt al een gesprek met %@. Dat loopt door: de uitnodiging heeft geen tweede geopend.',
   list_not_in_yet:
     'U bent er nog niet in. Open de uitnodigingslink die iemand u heeft gestuurd: dat is de enige deur, en daarvoor kan de applicatie niets doen.',
+  list_reinstalled_back:
+    'Dit toestel is opnieuw geïnstalleerd. Het is teruggekomen met een nieuwe toestelidentiteit, en berichten van vóór de herinstallatie blijven onleesbaar: hun sleutels zijn met de vorige installatie verdwenen.',
+  list_reinstalled_stranded:
+    'Dit toestel heeft zijn versleutelingssleutels verloren, waarschijnlijk bij een herinstallatie. Eerder ontvangen berichten zijn onleesbaar en niet terug te halen. Om hier weer te schrijven is een nieuwe uitnodiging nodig.',
   list_empty:
     'Voorlopig geen gesprekken. Nodig iemand uit om er een te beginnen.',
   list_nothing_said: 'Er is nog niets gezegd',

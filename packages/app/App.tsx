@@ -74,6 +74,7 @@ import {
   wakeSecrets,
   promiseSecrets,
   receiptSecrets,
+  recoverySecrets,
   sessionSecrets,
   signUpSecrets,
 } from './src/runtime/deviceSecrets'
@@ -174,7 +175,18 @@ import { enterWithASession, type InvitationOutcome } from './src/runtime/entry'
 import { initialLink, watchLinks } from './src/runtime/incomingLink'
 import { useKeyboardInset } from './src/ui/keyboardInset'
 import { sweepWhatThePickerLeft } from './src/runtime/imageLibrary'
+import { afterReinstall } from './src/runtime/afterReinstall'
+import {
+  cryptoStoreExists,
+  homeserverCalls,
+} from './src/runtime/homeserverCalls'
 import { keepPhotograph } from './src/runtime/keepPhotograph'
+import {
+  keepRecoverySecret,
+  readRecoverySecret,
+} from './src/runtime/recoverySecret'
+import { saveSession } from './src/runtime/sessionStore'
+import { reenterWithPassword, retireDevice } from './src/runtime/reenter'
 import { photoLibrary } from './src/runtime/photoLibrary'
 import { servicePoster } from './src/runtime/servicePoster'
 import {
@@ -442,6 +454,17 @@ export function App({
    * on. `null` when nobody has asked, which is nearly always.
    */
   const [photoKept, setPhotoKept] = useState<'kept' | 'failed' | null>(null)
+  /**
+   * Whether this launch found a session whose crypto store was gone.
+   *
+   * `'reentered'` came back as a new device and lost only the past;
+   * `'stranded'` could not, and the person has to be told rather than shown
+   * an application that looks like it is working. `null` on every ordinary
+   * launch, which is almost all of them. See afterReinstall.ts.
+   */
+  const [reinstalled, setReinstalled] = useState<
+    'reentered' | 'stranded' | null
+  >(null)
   // AND IT GOES AWAY ON ITS OWN. A line that stayed would be a line still
   // there next time the conversation is opened, describing a photograph
   // saved yesterday. Long enough to read twice, short enough that nobody
@@ -935,7 +958,84 @@ export function App({
         // a device with nothing else changed.
         wait: ms => new Promise(resolve => setTimeout(resolve, ms)),
       })
-      const credentials = entered.entered ? entered.session : null
+      // THE PASSWORD, KEPT AT THE ONE MOMENT IT IS EVER OFFERED.
+      //
+      // The service hands it back with the claim and nowhere else. A device
+      // that misses it here has no way back from a reinstall, which is the
+      // behaviour there was before, so its failure is logged rather than
+      // fatal. See recoverySecret.ts for what it costs to keep.
+      if (
+        entered.entered &&
+        entered.claimed &&
+        entered.password !== undefined
+      ) {
+        const kept = await keepRecoverySecret(recoverySecrets, entered.password)
+        if (!kept) logEvent('warn', 'MESSAGR_RECOVERY_SECRET_NOT_KEPT', {})
+      }
+
+      // A SESSION WHOSE CRYPTO STORE IS GONE, AND WHAT TO DO ABOUT IT.
+      //
+      // #190: an iOS reinstall takes the data directory and leaves the
+      // keychain, so this launch would find an account, a session and a
+      // device identifier intact and an empty store -- and publish fresh
+      // identity keys under a device the homeserver already knows. To
+      // everybody on the other side that is not a reinstall, it is an
+      // existing device whose keys changed underneath them.
+      //
+      // BEFORE THE PUMP, and that is the whole reason this sits here rather
+      // than anywhere more convenient: the pump is what publishes.
+      let session = entered.entered ? entered.session : null
+      let lostStore: 'reentered' | 'stranded' | null = null
+      if (session !== null) {
+        const what = afterReinstall({
+          claimed: entered.entered && entered.claimed,
+          storeExists: await cryptoStoreExists(storeDir, session.deviceId),
+          password: await readRecoverySecret(recoverySecrets),
+        })
+        if (what.kind !== 'ordinary') {
+          logEvent('warn', 'MESSAGR_REINSTALLED', { answer: what.kind })
+        }
+        if (what.kind === 'reenter') {
+          const dead = session
+          const asking = homeserverCalls(dead.baseUrl)
+          const back = await reenterWithPassword(asking, {
+            baseUrl: dead.baseUrl,
+            userId: dead.userId,
+            password: what.password,
+          })
+          if (back.reentered) {
+            // Kept before anything is done with it: a launch interrupted
+            // here would otherwise have made a device it can never find
+            // again, and the next one would make another.
+            await saveSession(sessionSecrets, back.session)
+            session = back.session
+            lostStore = 'reentered'
+            // Untidy rather than dangerous if it fails: the dead device
+            // holds keys nobody has, and its owner has already come back as
+            // somebody else.
+            const retired = await retireDevice(asking, {
+              deviceId: dead.deviceId,
+              userId: dead.userId,
+              password: what.password,
+              accessToken: back.session.accessToken,
+            })
+            logEvent('info', 'MESSAGR_REENTERED', {
+              retired,
+              was: dead.deviceId,
+              now: back.session.deviceId,
+            })
+          } else {
+            lostStore = 'stranded'
+            logEvent('warn', 'MESSAGR_REENTRY_REFUSED', {
+              reason: back.reason,
+            })
+          }
+        } else if (what.kind === 'stranded') {
+          lostStore = 'stranded'
+        }
+      }
+      setReinstalled(lostStore)
+      const credentials = lostStore === 'stranded' ? null : session
       // THE STATE THAT EXISTED AND WAS NEVER SET.
       //
       // `inYet` was declared, the list had its `notInYet` branch and the copy
@@ -2994,6 +3094,7 @@ export function App({
                     summaries={summaries}
                     names={names}
                     invitation={linkOutcome}
+                    reinstalled={reinstalled}
                     notInYet={inYet === false}
                     onOpen={scope => openConversationRef.current?.(scope)}
                   />
