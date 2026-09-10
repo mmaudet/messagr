@@ -204,6 +204,12 @@ base58 form and never shown again. It can be replaced, which retires the old
 one.
 _Avoid_: Password, passphrase, code — a passphrase is chosen by a person and
 derived from; this is generated and is the key itself
+_In the bridge it is called_ `restoreKey`, and the difference is deliberate
+rather than drift: `react-native-matrix-crypto` already owns `recoveryKey`
+for the **secret storage** key that `createRecovery` produces, which opens an
+account's private signing keys and is a different secret with the same shape.
+A library serving many products has to keep them apart; this product holds
+only one of the two and calls it what its users will understand.
 
 **Key backup**:
 The account's room keys kept on the homeserver, encrypted by the recovery key
