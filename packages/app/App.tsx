@@ -85,7 +85,14 @@ import {
 import { markUpTo, readAtMark, type Receipt } from './src/runtime/receipts'
 import { hasSeenPromise, rememberPromiseSeen } from './src/runtime/promiseSeen'
 import { clearSignUp, isSignUpUnfinished } from './src/runtime/signUpMarker'
-import { color, floors, space, type as typeScale } from './src/design/tokens'
+import {
+  color,
+  floors,
+  layout,
+  space,
+  stroke,
+  type as typeScale,
+} from './src/design/tokens'
 import { mergeTimeline, type TimelineEntry } from './src/timeline/mergeTimeline'
 import { makePumpHttp } from './src/runtime/pump'
 import { fetchJoinedMembers } from './src/runtime/encryptedSend'
@@ -102,12 +109,16 @@ import { admitAnyoneWaiting } from './src/runtime/admitAnyoneWaiting'
 import { displayNameFor } from './src/runtime/givenName'
 import Clipboard from '@react-native-clipboard/clipboard'
 import { removeMessage } from './src/runtime/cryptoPump'
+import { photographForForward } from './src/runtime/cryptoPump'
 import { openNotebook } from './src/runtime/notebook'
 import { forgetfulHidden, type Hidden } from './src/runtime/hiddenStore'
+import { forgetfulReadBy, type ReadBy } from './src/runtime/readByStore'
 import {
   canCopy,
+  canForward,
   canRemoveForEveryone,
   copyText,
+  onlyPhotograph,
   toggle,
 } from './src/timeline/selection'
 import {
@@ -146,6 +157,7 @@ import type { Wants } from './src/calls/media'
 import { CallScreen } from './src/ui/CallScreen'
 import { SelectionBar } from './src/ui/SelectionBar'
 import { RemoveSheet } from './src/ui/RemoveSheet'
+import { PickConversation } from './src/ui/PickConversation'
 import { ConversationHeader } from './src/ui/ConversationHeader'
 import { Legal } from './src/ui/Legal'
 import { Reserved } from './src/ui/Reserved'
@@ -158,7 +170,7 @@ import { Evict } from './src/ui/Evict'
 import { Vouch } from './src/ui/Vouch'
 import { setCatalogue, t } from './src/copy'
 import type { Language } from './src/copy/languages'
-import { enterWithASession } from './src/runtime/entry'
+import { enterWithASession, type InvitationOutcome } from './src/runtime/entry'
 import { initialLink, watchLinks } from './src/runtime/incomingLink'
 import { useKeyboardInset } from './src/ui/keyboardInset'
 import { servicePoster } from './src/runtime/servicePoster'
@@ -287,6 +299,21 @@ export function App({
   const frame = useRef<React.ComponentRef<typeof ScrollView>>(null)
   const atBottom = useRef(true)
   /**
+   * Whether the conversation is far enough up its history to offer a way back.
+   *
+   * State rather than a second ref, and that is the whole reason it exists
+   * separately from `atBottom`: a ref changes nothing on screen, and this one
+   * has to make a button appear. `atBottom` stays a ref because its job is to
+   * be read inside a callback, and turning it into state would re-render the
+   * conversation on every scroll event for no one's benefit.
+   *
+   * Two questions, two thresholds. `atBottom` asks "should an arriving
+   * message scroll the frame?", and a line short of the end still means yes.
+   * This asks "is this person somewhere else?", which only starts being true
+   * further up -- see `A_WAY_BACK`.
+   */
+  const [awayFromNewest, setAwayFromNewest] = useState(false)
+  /**
    * Which screen `atBottom` is an answer about.
    *
    * The flag is a ref, so it outlives the container `key` rebuilds: scrolling
@@ -404,6 +431,14 @@ export function App({
   const [selected, setSelected] = useState<ReadonlySet<string>>(new Set())
   const [removing, setRemoving] = useState(false)
   /**
+   * The events waiting for a destination, while the picker is up.
+   *
+   * Taken from the selection at the moment the gesture starts rather than
+   * read from it later: the sheet clears the selection so the bar can go,
+   * and a forward that read `selected` afterwards would forward nothing.
+   */
+  const [forwarding, setForwarding] = useState<readonly string[] | null>(null)
+  /**
    * Places a call, audio or video, from wherever the gesture came from.
    *
    * One function rather than three copies of the same six lines: the header
@@ -464,6 +499,21 @@ export function App({
    * inside. `receipts.ts` says why the mark is held apart from what it marks.
    */
   const readMarksRef = useRef<Map<string, number>>(new Map())
+  /**
+   * The notebook page that makes those marks survive a relaunch.
+   *
+   * A Matrix receipt is ephemeral and sent once, so a mark held only in the
+   * map above is a second tick that disappears every time the application
+   * starts -- and comes back only if the correspondent reads something new,
+   * which on a quiet conversation is never. Reported twice in the same
+   * words. `readByStore.ts` argues the page.
+   *
+   * The map stays as the fast path the screen draws from; this is where it
+   * is read from at launch and written to as it rises. The "never goes
+   * backwards" rule is the store's, so the file cannot hold a lower mark
+   * whatever a caller does.
+   */
+  const readByRef = useRef<ReadBy>(forgetfulReadBy())
   const [openScope, setOpenScope] = useState<string | null>(null)
   const openScopeRef = useRef<string | null>(null)
   /**
@@ -517,6 +567,10 @@ export function App({
   const attachRef = useRef<(() => void) | null>(null)
   /** Redacts messages for everyone. Bound with the session, like the rest. */
   const removeRef = useRef<((eventIds: readonly string[]) => void) | null>(null)
+  /** Sends the chosen events on to another conversation. See `forwardImage.ts`. */
+  const forwardRef = useRef<
+    ((scope: string, eventIds: readonly string[]) => void) | null
+  >(null)
   // Registering or removing this device's pusher. Held in a ref because the
   // settings switch is rendered outside the launch effect that binds it.
   const wakeThisDeviceRef = useRef<((on: boolean) => void) | null>(null)
@@ -554,7 +608,9 @@ export function App({
   // Set once, at entry, and never cleared: the launch either was opened with
   // an unspent invitation or it was not, and a note that disappeared while
   // somebody read it would be worse than none.
-  const [invitationIgnored, setInvitationIgnored] = useState(false)
+  // What became of an invitation this launch was opened with. `null` when
+  // there was none, which is almost every launch.
+  const [linkOutcome, setLinkOutcome] = useState<InvitationOutcome | null>(null)
   // `null` until the launch has answered. Distinguishing "not in" from "not
   // yet known" keeps the list from telling somebody they are locked out for
   // the second the keystore takes to answer.
@@ -742,7 +798,13 @@ export function App({
     if (seen !== undefined && seen.length > 0) {
       const found = markUpTo(entries, seen, selfUserId)
       const held = readMarksRef.current.get(scope) ?? 0
-      if (found !== null && found > held) readMarksRef.current.set(scope, found)
+      if (found !== null && found > held) {
+        readMarksRef.current.set(scope, found)
+        // AND INTO THE NOTEBOOK, so the tick survives the next launch. Not
+        // awaited: the screen already has the mark, and a page that would
+        // not take it costs a tick after a relaunch rather than now.
+        readByRef.current.raise(scope, found).catch(() => {})
+      }
     }
     setReadHere(
       readAtMark(entries, readMarksRef.current.get(scope) ?? 0, selfUserId),
@@ -793,6 +855,10 @@ export function App({
       outstandingRef.current = opening.outstanding
       listCacheRef.current = opening.list
       hiddenRef.current = opening.hidden
+      readByRef.current = opening.readBy
+      // SEEDED BEFORE ANYTHING IS DRAWN, so a conversation opened on the
+      // first frame already knows how far it was read.
+      readMarksRef.current = new Map(await opening.readBy.all())
       setHidden(await opening.hidden.all())
       logEvent(opening.opened ? 'info' : 'warn', 'MESSAGR_GIVEN_NAMES', {
         opened: opening.opened,
@@ -931,8 +997,19 @@ export function App({
             // Everything uncertain resolves to `restored-session`, which
             // creates nothing. See signUpMarker.ts.
             setInYet(entered.entered)
-            if (entered.entered && entered.invitationIgnored === true) {
-              setInvitationIgnored(true)
+            if (entered.entered && entered.invitation !== undefined) {
+              setLinkOutcome(entered.invitation)
+              // THE REASON GOES HERE AND NOT ON THE SCREEN. §13.27: no
+              // diagnostic text on a screen a person reads, and the two
+              // sentences the list draws are what it means for them. This
+              // is the line somebody diagnosing a link that will not open
+              // has to have -- the service distinguishes several refusals
+              // and the screen deliberately does not.
+              logEvent(
+                entered.invitation.kind === 'used' ? 'info' : 'warn',
+                'MESSAGR_INVITATION',
+                { ...entered.invitation },
+              )
             }
 
             const entitlement =
@@ -979,7 +1056,7 @@ export function App({
             // Before the list rather than after: a conversation joined a
             // moment later would be derived a moment too late and only appear
             // at the next tick.
-            await enterAnyInvitations(sessionClient)
+            await enterAnyInvitations(sessionClient, credentials.userId)
 
             // Attempted whether or not this run's own send worked: what is
             // being read was written by somebody else, and one direction
@@ -1056,6 +1133,12 @@ export function App({
               setOpenScope(scope)
               openScopeRef.current = scope
               setConversation(null)
+              // A conversation opens at its newest message, so nothing is
+              // away from it yet. `onContentSizeChange` says the same thing
+              // when the frame lays out, but a frame away from the newest
+              // renders once before that -- and the once is the flash of a
+              // button pointing down at where the screen already is.
+              setAwayFromNewest(false)
               // WHAT LANDS LATE MUST CHECK IT IS STILL WANTED.
               //
               // Every derivation below is a round trip, and the person can
@@ -1137,6 +1220,7 @@ export function App({
                   const held = readMarksRef.current.get(scope) ?? 0
                   if (found !== null && found > held) {
                     readMarksRef.current.set(scope, found)
+                    readByRef.current.raise(scope, found).catch(() => {})
                   }
                 }
                 // FROM THE MARK, AND ALWAYS -- including when it is zero,
@@ -1184,6 +1268,77 @@ export function App({
             // per event. `buildTimeline` now draws a line where a message
             // was removed -- see `redactionKind.ts` for how it can tell that
             // from a reaction being taken back.
+            // FORWARDING, WHICH IS A COPY AND NEVER A HANDOVER.
+            //
+            // Words go as words: a forwarded message is a new message in the
+            // destination, sent by this account, which is the truth about
+            // who put it there.
+            //
+            // A photograph is downloaded, decrypted and sealed afresh --
+            // `forwardImage.ts` argues why sending the `m.image` on would
+            // hand the destination the original file's key rather than a
+            // copy of the picture.
+            //
+            // In order and one at a time, like every other send in this
+            // file: the destination reads what somebody meant to send in the
+            // order they meant it, and one failure is one line rather than a
+            // batch reporting a single outcome for five.
+            forwardRef.current = (target, eventIds) => {
+              const going = async () => {
+                setSending('sending')
+                const held = conversationRef.current
+                for (const eventId of eventIds) {
+                  const entry = held.find(one => one.eventId === eventId)
+                  if (entry === undefined) continue
+                  if (entry.image !== undefined) {
+                    const ready = await photographForForward(
+                      credentials,
+                      entry.image,
+                    )
+                    if (!ready.ready) {
+                      logEvent('warn', 'MESSAGR_NOT_FORWARDED', {
+                        reason: ready.reason,
+                      })
+                      continue
+                    }
+                    const sent = await sendPhotograph(
+                      sessionClient,
+                      credentials,
+                      target,
+                      ready.image,
+                    )
+                    if (!sent.sent) {
+                      logEvent('warn', 'MESSAGR_NOT_FORWARDED', {
+                        reason: sent.reason,
+                      })
+                    }
+                    continue
+                  }
+                  if (entry.body === null) continue
+                  const sent = await sendTypedMessage(
+                    sessionClient,
+                    target,
+                    entry.body,
+                  )
+                  if (!sent.sent) {
+                    logEvent('warn', 'MESSAGR_NOT_FORWARDED', {
+                      reason: sent.reason,
+                    })
+                  }
+                }
+                setSending('idle')
+                // The list, because a conversation nobody is looking at just
+                // gained its newest message and its row has to say so.
+                await refreshList().catch(() => {})
+              }
+              going().catch((cause: unknown) => {
+                setSending('failed')
+                logEvent('warn', 'MESSAGR_NOT_FORWARDED', {
+                  reason: getErrorMessage(cause),
+                })
+              })
+            }
+
             removeRef.current = eventIds => {
               const scope = openScopeRef.current
               if (scope === null) return
@@ -1580,12 +1735,16 @@ export function App({
                 // Somebody came through inside the minute, so there is
                 // nothing left to ask about.
                 await outstandingRef.current.forget(issued.invitationId)
-                if (name !== null) {
-                  const kept = await namesRef.current.set(
-                    admitted.entrant,
-                    name,
-                  )
-                  setNames(held => new Map(held).set(admitted.entrant, name))
+                // THE LAST ONE NAMED, not the first. On a link opened by
+                // somebody who already has an account there are two: the
+                // account the service drew, which cedes its place and
+                // deactivates itself, and then the real person. Naming the
+                // drawn one would put the given name on an account that no
+                // longer exists.
+                const who = admitted.entrants[admitted.entrants.length - 1]
+                if (name !== null && who !== undefined) {
+                  const kept = await namesRef.current.set(who, name)
+                  setNames(held => new Map(held).set(who, name))
                   if (!kept) {
                     logEvent('warn', 'MESSAGR_GIVEN_NAME_NOT_KEPT', {})
                   }
@@ -1753,7 +1912,10 @@ export function App({
                     )
                     if (found === null) continue
                     const held = readMarksRef.current.get(scope) ?? 0
-                    if (found > held) readMarksRef.current.set(scope, found)
+                    if (found > held) {
+                      readMarksRef.current.set(scope, found)
+                      readByRef.current.raise(scope, found).catch(() => {})
+                    }
                   }
                   const openNow = openScopeRef.current
                   if (openNow !== null) {
@@ -1836,11 +1998,27 @@ export function App({
                   //
                   // Not awaited: nothing below depends on it, and the loop's
                   // tick must not wait on a join.
-                  enterAnyInvitations(sessionClient)
+                  enterAnyInvitations(sessionClient, credentials.userId)
                     .then(walked => {
                       // A room joined is a row the list does not have yet.
-                      if (walked.joined.length > 0) {
+                      // A room declined is one it may still be showing: the
+                      // issuer's second conversation was refused, and the
+                      // list has to stop offering it.
+                      if (
+                        walked.joined.length > 0 ||
+                        walked.collapsed.length > 0
+                      ) {
                         refreshList().catch(() => {})
+                      }
+                      // AND THE LINE ON THE LIST STOPS PROMISING A
+                      // CONVERSATION THAT WAS DECLINED. Entry says « la
+                      // conversation qu'elle ouvre va apparaître dans votre
+                      // liste », which is true of every invitation except
+                      // this one. Seen on the bench: the banner said it
+                      // while the runtime was declining the conversation.
+                      const first = walked.collapsed[0]
+                      if (first !== undefined) {
+                        setLinkOutcome({ kind: 'already', from: first.from })
                       }
                     })
                     .catch((cause: unknown) =>
@@ -2331,6 +2509,23 @@ export function App({
           />
         )}
 
+        {forwarding !== null && (
+          <PickConversation
+            summaries={summaries}
+            names={names}
+            // Not the one it came from: forwarding a message into the
+            // conversation it is already in is not a gesture.
+            {...(openScope === null ? {} : { except: openScope })}
+            onPick={scope => {
+              const chosen = forwarding
+              setForwarding(null)
+              setSelected(new Set())
+              if (scope === null) return
+              forwardRef.current?.(scope, chosen)
+            }}
+          />
+        )}
+
         {removing && openScope !== null && (
           <RemoveSheet
             count={selected.size}
@@ -2418,11 +2613,42 @@ export function App({
               <SelectionBar
                 count={selected.size}
                 canCopy={canCopy(selected, conversation ?? [])}
+                canForward={canForward(selected, conversation ?? [])}
                 onClear={() => setSelected(new Set())}
                 onCopy={() => {
-                  Clipboard.setString(copyText(selected, conversation ?? []))
+                  const held = conversation ?? []
+                  const words = copyText(selected, held)
+                  const alone = onlyPhotograph(selected, held)
                   setSelected(new Set())
+                  // WORDS WIN WHEN THERE ARE BOTH. A clipboard holds one
+                  // thing and `setImage` would replace `setString`, so
+                  // `onlyPhotograph` answers `null` beside any text --
+                  // choosing silently would put half of a selection
+                  // somewhere nobody can see it.
+                  if (words !== '') {
+                    Clipboard.setString(words)
+                    return
+                  }
+                  if (alone?.image === undefined) return
+                  // The picture is already decrypted and base64 in the
+                  // viewer's cache, so this is the same bytes `Photograph`
+                  // is drawing. `setImage` wants them without the `data:`
+                  // preamble that makes them a URI.
+                  openImageRef
+                    .current?.(alone.image)
+                    .then(shown => {
+                      if (!shown.shown) return
+                      const at = shown.uri.indexOf('base64,')
+                      if (at === -1) return
+                      Clipboard.setImage(shown.uri.slice(at + 'base64,'.length))
+                    })
+                    .catch((cause: unknown) =>
+                      logEvent('warn', 'MESSAGR_NOT_COPIED', {
+                        reason: getErrorMessage(cause),
+                      }),
+                    )
                 }}
+                onForward={() => setForwarding([...selected])}
                 onRemove={() => setRemoving(true)}
               />
             ) : undefined}
@@ -2498,12 +2724,21 @@ export function App({
                 : event => {
                     const { contentOffset, layoutMeasurement, contentSize } =
                       event.nativeEvent
+                    const fromEnd =
+                      contentSize.height -
+                      (contentOffset.y + layoutMeasurement.height)
                     // A margin, because a scroll rarely stops on the exact
                     // pixel and "within a message's height of the end" is what
                     // a person means by being at the bottom.
-                    atBottom.current =
-                      contentOffset.y + layoutMeasurement.height >=
-                      contentSize.height - NEAR_THE_END
+                    atBottom.current = fromEnd <= NEAR_THE_END
+                    // Set on every event and usually the same value: React
+                    // stops at an identical one, and the alternative -- a ref
+                    // holding the last answer so the setter is called less --
+                    // is a second copy of the truth to keep in step, which is
+                    // what `restedIn` already exists to apologise for.
+                    setAwayFromNewest(
+                      fromEnd > layoutMeasurement.height * A_WAY_BACK,
+                    )
                   }
             }
             scrollEventThrottle={100}
@@ -2512,6 +2747,7 @@ export function App({
               if (restedIn.current !== openScope) {
                 restedIn.current = openScope
                 atBottom.current = true
+                setAwayFromNewest(false)
               }
               if (!atBottom.current) return
               // Not animated: on the first layout there is nothing to animate
@@ -2682,7 +2918,7 @@ export function App({
                   <ConversationList
                     summaries={summaries}
                     names={names}
-                    invitationIgnored={invitationIgnored}
+                    invitation={linkOutcome}
                     notInYet={inYet === false}
                     onOpen={scope => openConversationRef.current?.(scope)}
                   />
@@ -2782,18 +3018,36 @@ export function App({
                     Every other kind is a failure nobody on this screen can
                     do anything about, and it is in the launch report under
                     `history`, which is where somebody diagnosing it looks. */}
+                  {/* A NOTICE, NOT A MESSAGE, and it has to look like
+                    neither a bubble nor the running text of the screen.
+                    It was `typeScale.body` on no ground at all, laid
+                    straight into the block -- so it arrived wider than
+                    every bubble above it and flush against the glass, in
+                    the largest type on the screen. Seen on the emulator
+                    the moment the vouching bench proved itself.
+
+                    The ochre is `Trust.tsx`'s word for the same thing:
+                    « une personne a jugé », waiting on something stronger.
+                    Both sentences here are that -- one says a past
+                    arrived because somebody answered for you, the other
+                    that one was offered and not taken up. Neither is a
+                    measure, so neither is red. */}
                   {claimed !== null && claimed.claimed === 'imported' && (
-                    <Text testID="history-claim" style={styles.historyNote}>
-                      {t('vouch_history_arrived')}
-                    </Text>
+                    <View style={styles.historyNote}>
+                      <Text testID="history-claim" style={styles.historyText}>
+                        {t('vouch_history_arrived')}
+                      </Text>
+                    </View>
                   )}
                   {claimed !== null &&
                     claimed.claimed !== 'none' &&
                     claimed.claimed !== 'imported' &&
                     claimed.kind === 'untrusted' && (
-                      <Text testID="history-claim" style={styles.historyNote}>
-                        {t('vouch_history_untrusted')}
-                      </Text>
+                      <View style={styles.historyNote}>
+                        <Text testID="history-claim" style={styles.historyText}>
+                          {t('vouch_history_untrusted')}
+                        </Text>
+                      </View>
                     )}
                 </View>
               )}
@@ -2803,7 +3057,17 @@ export function App({
               gestures that cannot be undone. One tap from the conversation
               and out of the way of reading it. */}
             {openScope !== null && trust === null && personOpen && (
-              <View style={styles.block}>
+              // AND THIS ONE CARRIES ITS OWN GUTTER, because it is the one
+              // screen written here rather than in a component.
+              //
+              // `content` used to pad every screen by `space.xl`, on top of
+              // the gutter each component already had -- so it was removed
+              // when the conversation list came out too narrow. Every other
+              // screen has `layout.screenGutter` of its own; this one had
+              // been living on the padding that went, and its text was
+              // flush against the edge of the telephone. Measured on the
+              // emulator: every row of it began at x = 0.
+              <View style={[styles.block, styles.person]}>
                 <Pressable
                   testID="person-back"
                   onPress={() => setPersonOpen(false)}
@@ -2957,6 +3221,33 @@ export function App({
                 />
               )}
 
+            {/* AND THE WAY BACK DOWN, in the same corner as the green one.
+              Reported from the Pixel: « lorsqu'on remonte dans l'historique
+              [...] un bouton qui permette de revenir au dernier message avec
+              une flèche qui descend vers le bas ». Above the composer rather
+              than beside it: the composer is where the thumb rests, and a
+              control that scrolls the screen has no business sharing a row
+              with the field that types into it.
+
+              `trust` and `personOpen` are what tell the conversation apart
+              from the two panels that open over it -- neither of them
+              scrolls the timeline, so neither of them has a newest message
+              to return to. Selection is not in the list: the bar takes the
+              header, not the frame, and somebody selecting a message from
+              last week still wants the way back. */}
+            {openScope !== null &&
+              trust === null &&
+              !personOpen &&
+              awayFromNewest && (
+                <FloatingAction
+                  testID="scroll-to-newest"
+                  label={t('back_to_newest')}
+                  mark="↓"
+                  quiet
+                  onPress={() => frame.current?.scrollToEnd({ animated: true })}
+                />
+              )}
+
             {/* THE INPUT BAR IS PART OF THE DOCK, above the tabs.
               It was the last thing in the conversation's own scroll view, so
               it scrolled away with the messages and somebody had to reach the
@@ -3051,6 +3342,18 @@ export function App({
  */
 const NEAR_THE_END = 80
 
+/**
+ * How far up the history counts as being somewhere else, as a share of the
+ * frame's own height.
+ *
+ * `NEAR_THE_END` is the wrong threshold for the button: it is 80 points, so
+ * the way back would appear after one flick and sit there through a slow
+ * read. Half a screen is what a person means by having gone looking for
+ * something -- and being a share of the frame rather than a number of points
+ * makes it the same gesture on a phone and on a tablet.
+ */
+const A_WAY_BACK = 0.5
+
 const styles = StyleSheet.create({
   // GESTURE HANDLER WANTS A ROOT, AND IT WANTS ONE THAT FILLS THE SCREEN.
   // Its native handlers attach to this view; without `flex: 1` it lays out at
@@ -3094,12 +3397,36 @@ const styles = StyleSheet.create({
   // the file forbids its own intermediate values outright. `xxl` is the
   // answer the scale gives, and a screen that needed more would be a
   // composition error rather than a missing token.
-  content: { padding: space.xl },
+  // NO HORIZONTAL PADDING, BECAUSE EVERY SCREEN ALREADY CARRIES ITS OWN.
+  //
+  // This was `padding: space.xl`, and each screen inside it adds
+  // `layout.screenGutter` -- so a conversation row sat forty points from
+  // each edge and the list looked narrow on a telephone that is not.
+  // Reported from the Pixel: « toute la largeur de l'écran n'est pas
+  // utilisée ». The same doubling pushed the first row thirty-two points
+  // below the band.
+  //
+  // The gutter belongs to the screen, not to the thing that scrolls it: a
+  // list wants its separators to run edge to edge and its text inset, and
+  // only the list knows that.
+  content: { paddingTop: space.s },
   // Anchored to the bottom, over whatever is scrolling behind it.
   dock: { position: 'absolute', left: 0, right: 0, bottom: 0 },
   block: { marginBottom: space.xxl },
+  person: { paddingHorizontal: layout.screenGutter },
   // Spread rather than picked apart: size, leading, weight and tracking
   // travel together, and separating them is how a line-height floor gets
   // broken without anyone deciding to break it.
-  historyNote: typeScale.body,
+  historyNote: {
+    marginHorizontal: layout.screenGutter,
+    marginTop: space.m,
+    padding: space.m,
+    backgroundColor: color.wait['100'],
+    borderLeftWidth: stroke.accent,
+    borderLeftColor: color.wait['500'],
+  },
+  historyText: {
+    ...typeScale.bodySm,
+    color: color.wait['700'],
+  },
 })

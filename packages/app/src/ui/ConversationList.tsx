@@ -2,6 +2,7 @@ import React from 'react'
 import { Pressable, StyleSheet, Text, View } from 'react-native'
 
 import { t, type CopyKey } from '../copy'
+import type { InvitationOutcome } from '../runtime/entry'
 import {
   color,
   floors,
@@ -50,10 +51,11 @@ export interface ConversationListProps {
   readonly names: ReadonlyMap<string, string>
   readonly onOpen: (scope: string) => void
   /**
-   * Whether this launch was opened with an invitation it did not spend,
-   * because the device already had an account. See `entry.ts`.
+   * What became of an invitation this launch was opened with, when the
+   * device already had an account. `null` when there was none. See
+   * `entry.ts`.
    */
-  readonly invitationIgnored?: boolean
+  readonly invitation?: InvitationOutcome | null
   /**
    * Whether this device has no session at all.
    *
@@ -76,29 +78,38 @@ export function ConversationList({
   summaries,
   names,
   onOpen,
-  invitationIgnored = false,
+  invitation = null,
   notInYet = false,
   now = Date.now(),
 }: ConversationListProps) {
   return (
     <View style={styles.screen} testID="conversation-list">
       {/* AN INVITATION THAT ARRIVED ON A PHONE THAT ALREADY HAS AN ACCOUNT.
-          `entry.ts` refuses to spend it, and that refusal is right: an
-          invitation must not be able to replace an account somebody already
-          has, and leaving the token unspent keeps it working for whoever it
-          was meant for.
+          The account is never replaced -- `entry.ts` says why at length --
+          but the link is no longer thrown away either: it is spent for the
+          account this device already has, so the conversation the issuer
+          meant to start does start.
 
-          What was missing is this line. The application drew this list
-          exactly as if the icon had been tapped, so somebody who scanned an
-          invitation could not tell whether the code had even been read.
-          Reported from a Pixel on 7 September 2026.
+          Two sentences because there are two outcomes and they are not the
+          same news. One says a conversation is on its way; the other says
+          the link could not be used, and the technical reason for that goes
+          to the log rather than here (§13.19.6).
 
-          It says the second half too -- that the invitation still works --
-          because the first thing anybody fears here is having burnt somebody
-          else's link. */}
-      {invitationIgnored && (
+          A conversation with somebody already known is the third, and it
+          replaces the first: `enterInvitations.ts` declines it, so the
+          sentence promising a conversation would be promising one that was
+          refused a second later. What it says instead names the person, so
+          the row to open is the one already on this screen. */}
+      {invitation !== null && invitation !== undefined && (
         <Text style={styles.ignored} testID="list-invitation-ignored">
-          {t('list_invitation_ignored')}
+          {invitation.kind === 'used'
+            ? t('list_invitation_used')
+            : invitation.kind === 'already'
+              ? t(
+                  'list_invitation_already %@',
+                  displayNameFor(invitation.from, names.get(invitation.from)),
+                )
+              : t('list_invitation_refused')}
         </Text>
       )}
       {/* Plain rows rather than a `FlatList`, because this sits inside the
@@ -191,8 +202,37 @@ function Row({
   // identifier, in the same mono role an unnamed participant gets, because
   // that is what it is: an identifier standing in for a name nobody has
   // given yet.
+  // AND NOBODY ELSE IS NOT THE SAME AS SEVERAL PEOPLE, though `other` says
+  // `null` to both. A conversation this account is now alone in -- the only
+  // other member removed, or gone -- has a true sentence, and printing a raw
+  // `!room:server` instead is the diagnostic string on a product screen that
+  // §13.27 refuses. Seen on the bench the moment an eviction landed.
+  //
+  // `others === null` is a third answer again: the membership could not be
+  // read. That one keeps the identifier, because nothing truthful is known.
+  // AND BEING ALONE HAS TWO SHAPES, which are two different things to say.
+  //
+  // Alone after somebody was removed or left: there is a past, and « personne
+  // d'autre ici » is the whole of it.
+  //
+  // Alone with nothing ever said: this is an invitation nobody took up. The
+  // conversation is created the moment the link is minted -- it has to be,
+  // the service reads its power levels before it will mint anything -- so
+  // every unclaimed invitation leaves one of these on the issuer's list,
+  // looking exactly like a conversation. Reported from the Pixel, from the
+  // other end of an invitation that was never claimed: « de son côté, une
+  // nouvelle conversation a été créée ».
+  //
+  // The sentence is true whichever way it happened -- never opened, expired,
+  // or declined because the two of them already had a conversation.
   const shown =
-    summary.other === null ? summary.scope : displayNameFor(summary.other, name)
+    summary.other !== null
+      ? displayNameFor(summary.other, name)
+      : summary.others === 0
+        ? summary.lastAt === 0 && summary.preview === null
+          ? t('list_nobody_joined')
+          : t('list_nobody_else')
+        : summary.scope
   const named = summary.other !== null && name !== undefined
   return (
     <Pressable
@@ -215,7 +255,20 @@ function Row({
           not", and it is a typographic answer rather than a badge -- a badge
           would be a second thing on the row saying what the first already
           says. */}
-      <Avatar shown={shown} testID={`avatar-${summary.scope}`} />
+      {/* THE AVATAR TAKES THE IDENTIFIER, NOT THE SENTENCE.
+          `initialsOf` gives the first letter of each of the first two words,
+          which is right for a name and meaningless for a phrase -- and
+          « Personne d'autre ici » reduces to two letters that are a slur in
+          French. Seen on the bench the moment the row learnt to say it.
+
+          The scope is what the row is about when no person is, and its
+          initial is a mark rather than a word. Both nameless cases go the
+          same way: `shown` already is the scope for a conversation of
+          three. */}
+      <Avatar
+        shown={summary.other === null ? summary.scope : shown}
+        testID={`avatar-${summary.scope}`}
+      />
       <View style={styles.said}>
         <Text numberOfLines={1} style={named ? styles.name : styles.identifier}>
           {shown}

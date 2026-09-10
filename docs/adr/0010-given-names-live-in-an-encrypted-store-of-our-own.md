@@ -56,3 +56,44 @@ without a separate rule). Two devices belonging to the same person can hold
 different given names for the same participant, and that is correct rather
 than a synchronisation defect: a given name says who somebody is _to you_, on
 the device where you said it.
+
+## Revisited, 10 September 2026 — a call may say how long it lasted
+
+The notebook grew past given names into a small set of pages that all keep
+the same kind of thing: what this device knows about the people it talks to,
+in a form only this device can read. The fourth of them is the call log, and
+it was written refusing one field — **a duration is the one field that would
+make a stolen notebook say how long two people spoke.**
+
+The refusal was asked to be lifted, by the person whose notebook it is, and
+it is lifted.
+
+**The line was drawn at the wrong field.** The page already keeps who, when,
+and how often. This document calls that class of fact « as revealing as what
+you said to them, and often more »; `callLogStore.ts` opens by calling a list
+of who you telephone and when « the most revealing thing this product holds
+— the shape of a life ». Against a reader who has all of that, _and it lasted
+thirty-two minutes_ is the smaller sentence. It is not the field that turns
+the page dangerous; the page was already the dangerous one, and it is kept
+anyway because the alternative is a product that cannot show a missed call.
+
+**The threat is answered where it is answered.** « A stolen notebook » is a
+reader who has both the file and the keystore secret. Everything on these
+seven pages is lost at once to that reader — the names, the read marks, the
+call log, the openings of the last messages ADR-0006 put here on 8 September.
+A per-field refusal does not defend against them; it only makes the product
+worse for everybody else. What defends against them is ADR-0008: the
+passphrase is `ThisDeviceOnly`, so the file does not travel and does not
+restore.
+
+**What is still refused, and this has not moved.** No content of any kind. A
+duration is a fact about the call, of the same kind as its outcome and its
+hour; what was said inside it is not this device's business to keep, and no
+page of this notebook holds any of it. The duration is measured from the
+pick-up rather than from the first ring, so a row says how long two people
+were connected and never how long one of them waited.
+
+**What this cost.** One integer column per call, and a threat model that is
+now written down instead of assumed. The `-1` default is the column saying it
+does not know, kept distinct from a zero, which is a call that ended in the
+second it began.

@@ -54,11 +54,13 @@ import {
 import { getErrorMessage } from './errors'
 import { logEvent } from './log'
 import {
-  fetchInvitedRooms,
+  fetchInvitations,
+  declineRoom,
   fetchJoinedMembers,
   fetchJoinedRooms,
   joinRoom,
 } from './encryptedSend'
+import { theOtherMember } from './vouch'
 import { reactTo, redactEvent, unreact, type ReactingDeps } from './react'
 import { tallyReactions, type ReactionTally } from '../timeline/reactions'
 import { probeUnsettledEncrypt, type ProbeReport } from './panicProbe'
@@ -72,6 +74,7 @@ import {
   type Road,
 } from './pusher'
 import type { PickedImage } from './pickImage'
+import { openForForward } from './forwardImage'
 import { fetchImage, type ShownImage } from './receiveImage'
 import { sendImage, sendingThrough, type ImageSent } from './sendImage'
 import type { ReadFile } from '../timeline/imageEvent'
@@ -448,17 +451,62 @@ export async function loadConversation(
  * than a probe's side effect is `enterInvitations.ts`, tested there against
  * injected fakes.
  */
+/**
+ * Conversations this runtime has already declined.
+ *
+ * A DECLINED INVITATION CAN COME BACK, twice over. The homeserver goes on
+ * listing the room in a fresh `rooms.invite` for a while after the refusal
+ * lands, and the issuer's own admission loop goes on naming this account
+ * until its invitation settles -- so it invites again, and the next tick
+ * finds a new invitation to the same conversation.
+ *
+ * Both end on their own, and the end state was right either way: no second
+ * conversation. What this stops is the churn in between -- a refusal per
+ * sync tick, and a `403 Event is not authorized` in the log every time the
+ * server had already recorded the first one. Measured on the bench, in the
+ * minute after a collapse.
+ *
+ * For the life of the runtime, which is the life of the application: a
+ * relaunch asks again, and asking again is correct. Somebody may genuinely
+ * have been invited back after a conversation ended.
+ */
+const declined = new Set<string>()
+
 export async function enterAnyInvitations(
   sessionClient: ReturnType<typeof createClient>,
+  selfUserId: string,
 ): Promise<Entered> {
+  const http = makePumpHttp(sessionClient)
   const entered = await enterInvitations({
-    http: makePumpHttp(sessionClient),
-    invitedRooms: fetchInvitedRooms,
+    http,
+    invitedRooms: async asking =>
+      (await fetchInvitations(asking)).filter(one => !declined.has(one.scope)),
     join: joinRoom,
+    decline: declineRoom,
+    // ONE CALL PER CONVERSATION, and `enterInvitations` is careful about
+    // when it asks: never on a tick with no invitation on it, which is
+    // almost every tick. Direct conversations only -- a room of three has
+    // no single person to be already talking to.
+    alreadyWith: async asking => {
+      const already = new Set<string>()
+      for (const scope of await fetchJoinedRooms(asking)) {
+        const other = theOtherMember(
+          await fetchJoinedMembers(asking, scope),
+          selfUserId,
+        )
+        if (other !== null) already.add(other)
+      }
+      return already
+    },
   })
+  for (const one of entered.collapsed) declined.add(one.scope)
   // Only when something happened: this runs on every sync tick, and a line
   // per tick saying "nobody invited anybody" would bury the one that matters.
-  if (entered.joined.length > 0 || entered.refused.length > 0) {
+  if (
+    entered.joined.length > 0 ||
+    entered.refused.length > 0 ||
+    entered.collapsed.length > 0
+  ) {
     logEvent(entered.refused.length > 0 ? 'warn' : 'info', 'MESSAGR_ENTERED', {
       ...entered,
     })
@@ -901,6 +949,32 @@ export async function stopWakingThisDevice(
  * address and a key of its own -- the caller decides which of the two it
  * wants, and nothing down here needs to know which it was given.
  */
+/**
+ * A photograph taken out of one conversation and made ready for another.
+ *
+ * The same media repository and the same decryption `openPhotograph` uses,
+ * answering bytes rather than a `data:` URI -- `forwardImage.ts` says why a
+ * forward pays for its own round trip rather than the cache holding two
+ * shapes of every picture.
+ */
+export async function photographForForward(
+  credentials: { readonly baseUrl: string; readonly accessToken: string },
+  image: ReadFile,
+) {
+  const media = mediaRepository(
+    credentials.baseUrl,
+    credentials.accessToken,
+    fetch,
+  )
+  return openForForward(
+    {
+      download: url => media.download(url),
+      open: (ciphertext, secret) => decryptAttachment(ciphertext, secret),
+    },
+    image,
+  )
+}
+
 export async function openPhotograph(
   credentials: { readonly baseUrl: string; readonly accessToken: string },
   image: ReadFile,

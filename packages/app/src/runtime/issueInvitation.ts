@@ -248,7 +248,27 @@ async function setTheRules(http: HttpRequester, scope: string): Promise<void> {
 }
 
 export type Admission =
-  | { readonly admitted: true; readonly entrant: string }
+  | {
+      readonly admitted: true
+      /**
+       * Everybody let in for this invitation, in the order they were named.
+       *
+       * A LIST BECAUSE THERE CAN BE TWO, and the second is the one that
+       * matters. A newcomer's link needs exactly one invite: the account the
+       * service drew. A link opened by somebody who already has an account
+       * needs two -- the drawn account first, so it can join and try to hand
+       * its place over, and then the real person, because the drawn account
+       * is refused when it tries.
+       *
+       * That refusal is the design rather than a fault, and the service says
+       * so in the log line it writes: « the reserved account may not invite
+       * into this room, which is the designed state; the target is now named
+       * to the inviter's client, which holds the right and invites on its
+       * next poll ». The conversation costs 50 to invite into and the drawn
+       * account holds 0. Only the issuer can let the second one in.
+       */
+      readonly entrants: readonly string[]
+    }
   | { readonly admitted: false; readonly reason: string }
 
 /**
@@ -278,13 +298,32 @@ export async function admitDrawnEntrant(
   invitationId: string,
   scope: string,
 ): Promise<Admission> {
+  // Everybody this loop has tried, whether the invite held or not: a second
+  // attempt at the same person is a round trip that would fail the same way.
+  const admitted: string[] = []
+  const held: string[] = []
+  let failure: string | null = null
+
   for (let attempt = 0; attempt < ATTEMPTS; attempt += 1) {
     let entrant: string | null = null
+    let settled = false
     try {
       const answer = await deps.service.status(invitationId)
       if (answer.status >= 200 && answer.status < 300) {
-        const named = (JSON.parse(answer.body) as { entrant_user_id?: unknown })
-          .entrant_user_id
+        const read = JSON.parse(answer.body) as {
+          entrant_user_id?: unknown
+          status?: unknown
+        }
+        // CLAIMED, REVOKED OR EXPIRED MEANS THERE IS NOBODY LEFT TO LET IN,
+        // and going on asking would be asking a question already answered.
+        //
+        // Said this way round on purpose: a body with no `status` at all is
+        // not a settled invitation, it is a shape this code did not expect,
+        // and stopping the wait on it would strand whoever is on the other
+        // side of the link. Only an explicit answer other than `pending`
+        // ends the wait.
+        settled = typeof read.status === 'string' && read.status !== 'pending'
+        const named = read.entrant_user_id
         if (typeof named === 'string' && named !== '') entrant = named
       }
     } catch {
@@ -292,7 +331,12 @@ export async function admitDrawnEntrant(
       // again, and the link is unaffected by this application's connectivity.
     }
 
-    if (entrant !== null) {
+    if (settled) break
+
+    // ALREADY LET IN IS NOT SOMEBODY TO LET IN AGAIN. The service goes on
+    // naming whoever is still waiting, and re-inviting a person who is
+    // already invited is a round trip that changes nothing.
+    if (entrant !== null && !admitted.includes(entrant)) {
       try {
         await deps.http.authedRequest(
           'POST',
@@ -300,20 +344,41 @@ export async function admitDrawnEntrant(
           {},
           JSON.stringify({ user_id: entrant }),
         )
-        return { admitted: true, entrant }
+        admitted.push(entrant)
+        held.push(entrant)
       } catch (cause: unknown) {
-        return {
-          admitted: false,
-          reason: `${entrant} was drawn and could not be invited: ${getErrorMessage(cause)}`,
-        }
+        // KEPT, AND THE LOOP GOES ON. It used to return here, and on the
+        // path with two invites that turned a harmless refusal into a
+        // reported failure: the homeserver answers `403 Event is not
+        // authorized` for inviting somebody who is already in the room, and
+        // by the time the second poll names the real person they sometimes
+        // are -- the claim completed and their device walked through the
+        // door on its own sync tick. Measured on the bench: the person was
+        // in the conversation and the issuer's log said they could not be
+        // invited.
+        //
+        // Nobody in at the end is still a failure, and the reason below is
+        // the last one there was.
+        failure = `${entrant} was named and could not be invited: ${getErrorMessage(cause)}`
+        // Not retried on the next turn either: the same call would fail the
+        // same way, and the service goes on naming them until it settles.
+        admitted.push(entrant)
       }
     }
 
     await deps.wait?.(BETWEEN_MS)
   }
 
+  // IT USED TO RETURN AT THE FIRST INVITE, and that is the whole of the
+  // defect this loop now answers. One invite is the newcomer's whole path,
+  // so nothing was ever wrong for a newcomer; a link opened by somebody who
+  // already has an account needs a second, and the polling had stopped by
+  // then. Measured from both ends on the bench: the issuer's screen said
+  // « c'est fait : cette personne peut entrer » while the service answered
+  // the other telephone `403 Forbidden` every two seconds until it gave up.
+  if (held.length > 0) return { admitted: true, entrants: held }
   return {
     admitted: false,
-    reason: 'nobody has opened the link yet',
+    reason: failure ?? 'nobody has opened the link yet',
   }
 }

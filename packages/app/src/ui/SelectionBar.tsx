@@ -46,14 +46,18 @@ import { color, floors, layout, space, type } from '../design/tokens'
 export function SelectionBar({
   count,
   canCopy: copyable,
+  canForward: forwardable,
   onClear,
   onCopy,
+  onForward,
   onRemove,
 }: {
   readonly count: number
   readonly canCopy: boolean
+  readonly canForward: boolean
   readonly onClear: () => void
   readonly onCopy: () => void
+  readonly onForward: () => void
   readonly onRemove: () => void
 }) {
   return (
@@ -78,6 +82,16 @@ export function SelectionBar({
           accessibilityRole="button"
           style={({ pressed }) => [styles.action, pressed && styles.pressed]}>
           <Text style={styles.actionLabel}>{t('selection_copy')}</Text>
+        </Pressable>
+      )}
+
+      {forwardable && (
+        <Pressable
+          testID="selection-forward"
+          onPress={onForward}
+          accessibilityRole="button"
+          style={({ pressed }) => [styles.action, pressed && styles.pressed]}>
+          <Text style={styles.actionLabel}>{t('selection_forward')}</Text>
         </Pressable>
       )}
 

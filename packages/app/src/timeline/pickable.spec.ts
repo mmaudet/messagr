@@ -4,7 +4,14 @@ import type { ConversationSummary } from '../runtime/conversationList'
 import { pickable } from './pickable'
 
 function summary(scope: string): ConversationSummary {
-  return { scope, other: '@her:x', preview: null, lastAt: 0, unread: 0 }
+  return {
+    scope,
+    other: '@her:x',
+    others: 1,
+    preview: null,
+    lastAt: 0,
+    unread: 0,
+  }
 }
 
 const LIST = [summary('!a:x'), summary('!b:x'), summary('!c:x')]

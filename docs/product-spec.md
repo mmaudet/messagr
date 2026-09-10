@@ -1158,6 +1158,26 @@ arriving while somebody reads history would pull them back down. The
 frame follows only for somebody already resting within a message's height
 of the end.
 
+**And there is a way back down.** A person who scrolled up to find
+something has no gesture to return but the flicks that took them there,
+which is a screen holding somebody where they did not mean to stay. A
+circle appears in the corner the floating action uses on the list —
+*« [...] à la même position que le bouton flottant pour ajouter et inviter
+des utilisateurs un bouton qui permette de revenir au dernier message avec
+une flèche qui descend vers le bas »* — and the two never show at once,
+since inviting belongs to the list and returning belongs to a
+conversation.
+
+It is not green. §13.21 gives `brand.green500` to the principal action of
+a screen, and the principal action of a conversation is typing in it.
+
+The threshold that shows it is not the one that follows the newest.
+Following asks whether an arriving message should scroll the frame, and a
+line short of the end still means yes; the circle asks whether this person
+is somewhere else, which starts being true half a frame further up. One
+threshold for both put the circle on screen after a single flick and left
+it there through a slow read.
+
 **The diagnostic readout is gone, and the log is not.** The application's
 screen carried a readout — New Architecture, Runtime gaps, Matrix
 transport, Entry, Session sync, Crypto bridge, Crypto pump, Encrypted

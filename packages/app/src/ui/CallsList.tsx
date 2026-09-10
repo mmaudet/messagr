@@ -3,9 +3,10 @@ import { Pressable, StyleSheet, Text, View } from 'react-native'
 
 import type { CallOutcome, CallRecord } from '../runtime/callLogStore'
 import { t, type CopyKey } from '../copy'
-import { color, floors, space, stroke, type } from '../design/tokens'
+import { color, floors, layout, space, stroke, type } from '../design/tokens'
 import { stampFor, type Stamp } from '../timeline/whenShown'
 import { Avatar } from './Avatar'
+import { spokenFor } from './callDuration'
 import { TabIcon } from './TabIcon'
 
 /**
@@ -30,6 +31,16 @@ import { TabIcon } from './TabIcon'
  * telephone ever made. It is also the one that must not depend on colour:
  * the direction glyph and the words underneath say it without it, which is
  * the rule §13 states for every state in this product.
+ *
+ * # WHAT A ROW SAYS, AND WHAT IT DOES NOT
+ *
+ * Who, which way, when, whether a picture went through, and -- since
+ * 10 September 2026 -- how long it lasted. The duration was refused when
+ * this screen was built and the refusal was lifted by the person whose
+ * notebook it is; ADR-0010 carries the amendment and the reasoning.
+ *
+ * Nothing about what was said. There is nothing to say it with: no page of
+ * the notebook holds any of it.
  */
 
 /** What a row says under the name. */
@@ -118,9 +129,16 @@ export function CallsList({
               // The whole row said aloud, in the order it reads: who, what
               // became of the call, when. A screen reader must not have to
               // piece three labels together.
-              accessibilityLabel={`${shown}. ${t(outcomeLabel(call))}. ${whenLabel(
-                stampFor(call.at, now),
-              )}`}
+              accessibilityLabel={[
+                shown,
+                t(outcomeLabel(call)),
+                // Words here, a clock on screen. A screen reader saying
+                // "three forty-two" of a row is saying a time of day.
+                ...(call.seconds === undefined
+                  ? []
+                  : [t('calls_lasted %@', spokenFor(call.seconds))]),
+                whenLabel(stampFor(call.at, now)),
+              ].join('. ')}
               style={({ pressed }) => [styles.row, pressed && styles.pressed]}>
               <Avatar shown={shown} />
               <View style={styles.said}>
@@ -130,12 +148,40 @@ export function CallsList({
                   {shown}
                 </Text>
                 <View style={styles.what}>
+                  {/* THE GLYPH SAYS WHICH KIND and the words say what became
+                      of it. A camera rather than a handset when a picture
+                      went through -- §13 wants no state carried by colour
+                      alone, and a different shape is not a colour. */}
+                  {/* THE HANDSET STAYS AND THE CAMERA IS ADDED, rather
+                      than one replacing the other. A video call is a call
+                      that also carried a picture, and swapping the glyph
+                      said it was a different kind of thing. Asked for from
+                      the Pixel in those words: « rajouter une icône vidéo à
+                      côté de l'appel audio ». */}
                   <TabIcon
                     glyph="calls"
                     tint={missed ? color.deny['500'] : color.neutral['400']}
                     size={14}
                   />
+                  {call.video === true && (
+                    <TabIcon
+                      glyph="cam"
+                      tint={missed ? color.deny['500'] : color.neutral['400']}
+                      size={14}
+                    />
+                  )}
                   <Text style={styles.outcome}>{t(outcomeLabel(call))}</Text>
+                  {/* THE DURATION IS ONLY ON A CALL THAT HAD ONE.
+                      A missed call has no duration to print, and printing
+                      `0:00` beside « Appel manqué » would be a row saying
+                      somebody spoke for no time rather than not at all.
+                      `undefined` is the column's own way of saying it does
+                      not know -- see `callLogStore.ts`. */}
+                  {call.seconds !== undefined && (
+                    <Text style={styles.outcome}>
+                      {`· ${spokenFor(call.seconds)}`}
+                    </Text>
+                  )}
                 </View>
               </View>
               <Text style={styles.when}>
@@ -177,6 +223,9 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: space.m,
+    // ITS OWN, like every other screen. It had none and was carried by the
+    // scroll container's padding, which no longer exists -- see `App.tsx`.
+    paddingLeft: layout.screenGutter,
     paddingVertical: space.s,
     minHeight: floors.touchTargetMin,
   },

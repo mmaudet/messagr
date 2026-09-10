@@ -155,6 +155,7 @@ export const en: Readonly<Record<CopyKey, string>> = {
   'selection_count %1$d': '%1$d selected',
   selection_clear: 'Leave selection',
   selection_copy: 'Copy',
+  selection_forward: 'Forward',
   selection_remove: 'Delete',
   'remove_title %1$d': 'Delete %1$d message(s)?',
   remove_everyone: 'Delete for everyone',
@@ -166,15 +167,19 @@ export const en: Readonly<Record<CopyKey, string>> = {
   remove_cancel: 'Cancel',
   conversation_sending: 'Sending…',
   conversation_send_failed: 'Not sent. Try again.',
+  consequence_irreversible: 'Irreversible',
   vouch_action: 'I vouch for this person',
   vouch_hint:
     'To be done when you are sure who is writing to you — not before.',
-  vouch_explain_title: 'What this does',
+  vouch_explain_title: 'What you are giving them',
+  vouch_explain_lead: 'Everything this gesture hands over, before you decide.',
   vouch_explain_history:
     'They will be able to read everything said here from the beginning, including before they arrived.',
   vouch_explain_history_empty:
     'Nothing has been said here yet, so there is no past to pass on.',
   vouch_explain_invite: 'They will be able to invite other people.',
+  vouch_fact_history: 'The past becomes readable to them',
+  vouch_fact_invite: 'They will be able to let somebody in',
   vouch_explain_final:
     'This cannot be undone: the keys they receive, they keep.',
   vouch_confirm: 'Yes, I vouch for this person',
@@ -190,11 +195,15 @@ export const en: Readonly<Record<CopyKey, string>> = {
     'A past was offered to you, from a device this one cannot tie to its owner. It was not taken up.',
   evict_action: 'Remove this person',
   evict_hint: 'They will not be able to read anything said here afterwards.',
-  evict_explain_title: 'What this does',
+  evict_explain_title: 'What stops, and what stays',
+  evict_explain_lead:
+    'Messagr cannot take back what is already on their device. Here is the whole truth, before you decide.',
   evict_explain_future:
     'They will leave the conversation and will not be able to read what is said in it.',
   evict_explain_past:
     'What they have already read, they keep. Nothing can take it back — not this app, not the server.',
+  evict_fact_future: 'What comes next is out of their reach',
+  evict_fact_past: 'What they have read stays theirs',
   evict_explain_final:
     'This cannot be undone: bringing them back needs a new invitation.',
   evict_confirm: 'Yes, remove this person',
@@ -215,8 +224,12 @@ export const en: Readonly<Record<CopyKey, string>> = {
   promise_point_invitation: 'You enter by invitation, not by form',
   promise_action: 'Begin',
   list_title: 'Conversations',
-  list_invitation_ignored:
-    'You opened an invitation, and this phone already has an account. It was not used: it is still valid for the person it was meant for.',
+  list_invitation_used:
+    'You opened an invitation. The conversation it opens will appear in your list.',
+  list_invitation_refused:
+    'This invitation could not be used. Ask the person who sent it for a new one.',
+  'list_invitation_already %@':
+    'You already have a conversation with %@. That one carries on: the invitation did not open a second.',
   list_not_in_yet:
     'You are not in yet. Open the invitation link somebody sent you: it is the only door, and the application can do nothing before it.',
   list_empty: 'No conversations yet. Invite someone to start one.',
@@ -250,7 +263,7 @@ export const en: Readonly<Record<CopyKey, string>> = {
   settings_legal: 'Legal information',
   settings_disturb: 'Ring during Do Not Disturb',
   settings_disturb_hint:
-    'Android silences incoming calls until Messagr has Do Not Disturb access. Open the list, find Messagr, turn the access on.',
+    'Without this, Android silences Messagr’s calls whenever the mode is on. The screen that opens lists every application: find Messagr and turn the access on.',
   settings_nothing_else:
     'There is nothing else here for now. Settings this version does not carry yet are absent rather than present and inert.',
   legal_title: 'Legal information',
@@ -332,6 +345,7 @@ export const en: Readonly<Record<CopyKey, string>> = {
   pick_cancel: 'Cancel',
   pick_empty: 'You have no other conversation.',
   'calls_ring_back %@': 'Call %@ back',
+  'calls_lasted %@': 'Lasted %@',
   calls_taken: 'Incoming call',
   calls_placed: 'Outgoing call',
   calls_missed: 'Missed call',
@@ -371,7 +385,7 @@ export const en: Readonly<Record<CopyKey, string>> = {
   call_speaker: 'Speaker',
   call_camera_on: 'Camera',
   call_camera_off: 'Turn camera off',
-  call_switch_camera: 'Switch camera',
+  call_switch_camera: 'Flip',
   call_their_camera_off: 'Their camera is off',
   call_failed_no_relay:
     'This server has no call relay: the call could not be placed.',
@@ -398,10 +412,10 @@ export const en: Readonly<Record<CopyKey, string>> = {
   person_back: 'Back',
   message_delivered_hint: 'Handed to the server',
   message_read_hint: 'Read',
-  settings_full_screen: 'Let a call light the screen',
   settings_open: 'Open',
+  settings_full_screen: 'Full-screen calls',
   settings_full_screen_hint:
-    'Android grants only telephone applications the right to light the screen for a call. Without it, an incoming call is one more notification on the lock screen.',
+    'An incoming call takes the whole screen, even locked, instead of one more notification line. Android reserves this for telephone applications: the screen that opens is where you grant it.',
   settings_wake: 'Notifications',
   settings_wake_hint:
     'The wake-up signal carries no sender and no message. The device decrypts here.',
@@ -428,5 +442,8 @@ export const en: Readonly<Record<CopyKey, string>> = {
   conversation_attach: 'Send a photo',
   conversation_attaching: 'Encrypting and sending the photo…',
   'list_unread %1$d': '%1$d unread messages',
+  list_nobody_else: 'Nobody else here',
+  list_nobody_joined: 'Nobody joined this conversation',
   invite_open: 'Invite someone',
+  back_to_newest: 'Back to the latest message',
 }

@@ -17,10 +17,17 @@ import type { TimelineEntry } from './mergeTimeline'
  * action to the part of a selection it happens to fit -- destroying three
  * messages of five, silently -- is worse than both.
  *
- * Copying is the one deliberate exception, and #192 writes it down: a
- * photograph contributes nothing to a clipboard, so it is skipped rather
- * than blocking the action; a selection of nothing but photographs has no
- * Copy at all.
+ * Copying is the one deliberate exception, and it has moved once. #192 said
+ * a photograph contributes nothing to a clipboard and a selection of nothing
+ * but photographs had no Copy at all -- true then, because there was no way
+ * to put a picture on a clipboard. The dependency added for text
+ * (`@react-native-clipboard/clipboard`) turned out to carry `setImage`, so
+ * the constraint that justified the rule was gone and nobody had gone back
+ * to it. Asked for from the Pixel: « je ne sais plus pourquoi on ne peut pas
+ * copier une image ».
+ *
+ * A photograph is skipped when it sits beside words, and copied on its own.
+ * `onlyPhotograph` says why a clipboard cannot hold both.
  */
 
 /**
@@ -75,12 +82,61 @@ export function canRemoveForEveryone(
   return found.every(entry => entry.claimedSender === selfUserId)
 }
 
-/** Whether anything selected has words in it. */
+/**
+ * Whether the selection can be forwarded.
+ *
+ * Everything readable can: a message this device could not open has nothing
+ * to send on, and a removed one has nothing left at all. Unlike Copy, a
+ * photograph counts -- forwarding a picture is most of why anybody forwards.
+ */
+export function canForward(
+  selected: ReadonlySet<string>,
+  entries: readonly TimelineEntry[],
+): boolean {
+  const found = chosen(selected, entries)
+  if (found.length === 0) return false
+  return found.every(
+    entry =>
+      entry.removed !== true &&
+      (entry.image !== undefined || entry.body !== null),
+  )
+}
+
+/**
+ * The one photograph a copy would put on the clipboard, if there is exactly
+ * one and nothing else.
+ *
+ * # WHY EXACTLY ONE, AND WHY NOT BESIDE TEXT
+ *
+ * A clipboard holds one thing. `setString` and `setImage` are two calls to
+ * the same clipboard, and the second replaces the first -- so a selection of
+ * words *and* a picture cannot be copied as both, and choosing silently
+ * would put half of what somebody selected somewhere they cannot see. Words
+ * win in that case, because they are what "copy" means to most people, and
+ * the picture is what forwarding is for.
+ *
+ * Two photographs cannot be copied at all for the same reason: the second
+ * would overwrite the first.
+ */
+export function onlyPhotograph(
+  selected: ReadonlySet<string>,
+  entries: readonly TimelineEntry[],
+): TimelineEntry | null {
+  const found = chosen(selected, entries)
+  const one = found[0]
+  if (found.length !== 1 || one === undefined) return null
+  return one.image !== undefined && one.removed !== true ? one : null
+}
+
+/** Whether anything selected has words in it, or is a single photograph. */
 export function canCopy(
   selected: ReadonlySet<string>,
   entries: readonly TimelineEntry[],
 ): boolean {
-  return copyText(selected, entries) !== ''
+  return (
+    copyText(selected, entries) !== '' ||
+    onlyPhotograph(selected, entries) !== null
+  )
 }
 
 /**

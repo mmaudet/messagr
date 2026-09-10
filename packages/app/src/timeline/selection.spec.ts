@@ -1,7 +1,14 @@
 import { describe, expect, it } from 'vitest'
 
 import type { TimelineEntry } from './mergeTimeline'
-import { canCopy, canRemoveForEveryone, copyText, toggle } from './selection'
+import {
+  canCopy,
+  canForward,
+  canRemoveForEveryone,
+  copyText,
+  onlyPhotograph,
+  toggle,
+} from './selection'
 
 const ME = '@me:x'
 const HER = '@her:x'
@@ -86,11 +93,11 @@ describe('copying', () => {
     expect(canCopy(new Set(['$m1', '$p1']), [MINE, MY_PHOTO])).toBe(true)
   })
 
-  it('is absent when the selection is only photographs', () => {
-    // The one deliberate exception to "absent unless it applies to all of
-    // it": a photograph contributes nothing to a clipboard, and there is no
-    // image clipboard without a native module. Written down in #192.
-    expect(canCopy(new Set(['$p1']), [MY_PHOTO])).toBe(false)
+  it('puts nothing in the text clipboard for a photograph', () => {
+    // `copyText` still skips it -- pasting a file name is pasting something
+    // nobody wrote. What changed is that a lone photograph now has a
+    // clipboard of its own; see the block at the end of this file.
+    expect(copyText(new Set(['$p1']), [MY_PHOTO])).toBe('')
   })
 
   it('is absent on an empty selection', () => {
@@ -123,5 +130,76 @@ describe('copying', () => {
       body: null,
     }
     expect(copyText(new Set(['$u', '$m1']), [MINE, unreadable])).toBe('bonjour')
+  })
+})
+
+describe('forwarding', () => {
+  it('is offered on words and on photographs alike', () => {
+    // Unlike Copy: forwarding a picture is most of why anybody forwards.
+    expect(canForward(new Set(['$m1', '$p1']), [MINE, MY_PHOTO])).toBe(true)
+  })
+
+  it('is absent on an empty selection', () => {
+    expect(canForward(new Set(), [MINE])).toBe(false)
+  })
+
+  it('is absent as soon as one cannot be read', () => {
+    // Nothing to send on. Sending part of a selection silently is the thing
+    // this screen refuses everywhere else.
+    const unreadable: TimelineEntry = {
+      eventId: '$u',
+      claimedSender: HER,
+      sentAt: 0,
+      body: null,
+    }
+    expect(canForward(new Set(['$m1', '$u']), [MINE, unreadable])).toBe(false)
+  })
+
+  it('is absent on a message that was removed', () => {
+    const gone: TimelineEntry = {
+      eventId: '$g',
+      claimedSender: HER,
+      sentAt: 0,
+      body: null,
+      removed: true,
+    }
+    expect(canForward(new Set(['$g']), [gone])).toBe(false)
+  })
+})
+
+describe('copying a photograph', () => {
+  it('is offered on a lone photograph', () => {
+    // The rule moved once: #192 refused it because there was no way to put a
+    // picture on a clipboard, and the dependency added for text turned out
+    // to carry `setImage`.
+    expect(canCopy(new Set(['$p1']), [MY_PHOTO])).toBe(true)
+    expect(onlyPhotograph(new Set(['$p1']), [MY_PHOTO])?.eventId).toBe('$p1')
+  })
+
+  it('is not offered for two photographs', () => {
+    // A clipboard holds one thing; the second would overwrite the first.
+    const other = shown('$p2', ME)
+    expect(
+      onlyPhotograph(new Set(['$p1', '$p2']), [MY_PHOTO, other]),
+    ).toBeNull()
+  })
+
+  it('gives way to the words when both are selected', () => {
+    // `setString` and `setImage` are the same clipboard. Choosing silently
+    // would put half of a selection somewhere nobody can see it.
+    expect(onlyPhotograph(new Set(['$m1', '$p1']), [MINE, MY_PHOTO])).toBeNull()
+    expect(copyText(new Set(['$m1', '$p1']), [MINE, MY_PHOTO])).toBe('bonjour')
+  })
+
+  it('is not offered on a photograph that was removed', () => {
+    const gone: TimelineEntry = {
+      eventId: '$g',
+      claimedSender: ME,
+      sentAt: 0,
+      body: null,
+      removed: true,
+      image: {} as TimelineEntry['image'],
+    }
+    expect(onlyPhotograph(new Set(['$g']), [gone])).toBeNull()
   })
 })

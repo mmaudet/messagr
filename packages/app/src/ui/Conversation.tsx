@@ -6,6 +6,7 @@ import {
   color,
   elevation,
   floors,
+  layout,
   radius,
   space,
   stroke,
@@ -639,7 +640,18 @@ const CHIP_REACH = {
 }
 
 const styles = StyleSheet.create({
-  screen: { gap: space.m },
+  // THE GUTTER IS THE SCREEN'S OWN, like every other screen's.
+  //
+  // `App.tsx` used to pad every screen by `space.xl`, and this one was
+  // living on it -- so when that went (the conversation list came out too
+  // narrow with both) the bubbles ended up flush against the glass on both
+  // sides. Reported from the emulator with a screenshot: *« les espaces en
+  // largeur sont à revoir »*.
+  //
+  // `bubble`'s own `paddingHorizontal` is the space inside a bubble and
+  // never was this: it is why the text did not touch the edge while the
+  // bubble did.
+  screen: { gap: space.m, paddingHorizontal: layout.screenGutter },
   empty: typeScale.bodySm,
   mine: { alignItems: 'flex-end' },
   theirs: { alignItems: 'flex-start' },

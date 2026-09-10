@@ -4,7 +4,7 @@ import { fetchJoinedMembers, fetchJoinedRooms } from './encryptedSend'
 import { getErrorMessage } from './errors'
 import type { HttpRequester } from './pump'
 import { countUnread } from './unread'
-import { theOtherMember } from './vouch'
+import { howManyOthers, theOtherMember } from './vouch'
 
 /**
  * The list of conversations, derived rather than stored.
@@ -40,6 +40,16 @@ export interface ConversationSummary {
    * whose membership could not be read.
    */
   readonly other: string | null
+  /**
+   * How many people other than this account are in it.
+   *
+   * `other` cannot answer this: it is `null` both for a conversation with
+   * three people in it and for one this account is now alone in. A row needs
+   * them apart -- there is a true sentence for the second and none for the
+   * first. `null` when the membership could not be read, which is a third
+   * thing again and not a zero.
+   */
+  readonly others: number | null
   /**
    * The opening of the last message this device could read, or `null`.
    *
@@ -120,11 +130,11 @@ async function summarise(
   hidden: ReadonlySet<string>,
 ): Promise<ConversationSummary> {
   let other: string | null = null
+  let others: number | null = null
   try {
-    other = theOtherMember(
-      await fetchJoinedMembers(deps.http, scope),
-      selfUserId,
-    )
+    const members = await fetchJoinedMembers(deps.http, scope)
+    other = theOtherMember(members, selfUserId)
+    others = howManyOthers(members, selfUserId)
   } catch {
     // Left null. A conversation whose membership could not be read is still a
     // conversation, and the row shows what it can.
@@ -154,6 +164,7 @@ async function summarise(
     return {
       scope,
       other,
+      others,
       preview: readable?.body ?? null,
       // Named separately from a missing preview, because "nothing has been
       // said" and "this device cannot read what was said" look identical on a
@@ -183,6 +194,7 @@ async function summarise(
     return {
       scope,
       other,
+      others,
       preview: null,
       reason: getErrorMessage(cause),
       lastAt: 0,

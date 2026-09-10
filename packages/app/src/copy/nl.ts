@@ -147,6 +147,7 @@ export const nl: Readonly<Record<CopyKey, string>> = {
   'selection_count %1$d': '%1$d geselecteerd',
   selection_clear: 'Selectie verlaten',
   selection_copy: 'Kopiëren',
+  selection_forward: 'Doorsturen',
   selection_remove: 'Verwijderen',
   'remove_title %1$d': '%1$d bericht(en) verwijderen?',
   remove_everyone: 'Voor iedereen verwijderen',
@@ -158,14 +159,18 @@ export const nl: Readonly<Record<CopyKey, string>> = {
   remove_cancel: 'Annuleren',
   conversation_sending: 'Versturen…',
   conversation_send_failed: 'Niet verstuurd. Probeer opnieuw.',
+  consequence_irreversible: 'Onomkeerbaar',
   vouch_action: 'Ik sta in voor deze persoon',
   vouch_hint: 'Te doen wanneer u zeker weet wie u schrijft — niet eerder.',
-  vouch_explain_title: 'Wat dit doet',
+  vouch_explain_title: 'Wat u deze persoon geeft',
+  vouch_explain_lead: 'Alles wat dit gebaar overdraagt, voordat u beslist.',
   vouch_explain_history:
     'Deze persoon zal alles kunnen lezen wat hier vanaf het begin is gezegd, ook van vóór haar komst.',
   vouch_explain_history_empty:
     'Hier is nog niets gezegd, dus er is geen verleden om door te geven.',
   vouch_explain_invite: 'Deze persoon zal anderen kunnen uitnodigen.',
+  vouch_fact_history: 'Het verleden wordt voor deze persoon leesbaar',
+  vouch_fact_invite: 'Deze persoon kan iemand binnenlaten',
   vouch_explain_final:
     'Dit kan niet ongedaan worden gemaakt: de sleutels die zij krijgt, houdt zij.',
   vouch_confirm: 'Ja, ik sta in voor deze persoon',
@@ -183,11 +188,15 @@ export const nl: Readonly<Record<CopyKey, string>> = {
   evict_action: 'Deze persoon verwijderen',
   evict_hint:
     'Zij zal niets meer kunnen lezen van wat hierna hier wordt gezegd.',
-  evict_explain_title: 'Wat dit doet',
+  evict_explain_title: 'Wat stopt en wat blijft',
+  evict_explain_lead:
+    'Messagr kan niet terugnemen wat al op het toestel van deze persoon staat. Dit is de hele waarheid, voordat u beslist.',
   evict_explain_future:
     'Zij verlaat het gesprek en kan niet meer lezen wat daar wordt gezegd.',
   evict_explain_past:
     'Wat zij al heeft gelezen, houdt zij. Niets kan het terugnemen — deze app niet, en de server ook niet.',
+  evict_fact_future: 'Wat hierna komt, blijft buiten bereik',
+  evict_fact_past: 'Wat deze persoon heeft gelezen, blijft van hen',
   evict_explain_final:
     'Dit kan niet ongedaan worden gemaakt: om haar terug te laten komen is een nieuwe uitnodiging nodig.',
   evict_confirm: 'Ja, deze persoon verwijderen',
@@ -210,8 +219,12 @@ export const nl: Readonly<Record<CopyKey, string>> = {
     'U komt binnen op uitnodiging, niet via een formulier',
   promise_action: 'Beginnen',
   list_title: 'Gesprekken',
-  list_invitation_ignored:
-    'U hebt een uitnodiging geopend, en deze telefoon heeft al een account. Ze is niet gebruikt en blijft geldig voor de persoon voor wie ze bedoeld was.',
+  list_invitation_used:
+    'U hebt een uitnodiging geopend. Het gesprek dat ze opent, verschijnt zo in uw lijst.',
+  list_invitation_refused:
+    'Deze uitnodiging kon niet worden gebruikt. Vraag de afzender om een nieuwe.',
+  'list_invitation_already %@':
+    'U hebt al een gesprek met %@. Dat loopt door: de uitnodiging heeft geen tweede geopend.',
   list_not_in_yet:
     'U bent er nog niet in. Open de uitnodigingslink die iemand u heeft gestuurd: dat is de enige deur, en daarvoor kan de applicatie niets doen.',
   list_empty:
@@ -244,9 +257,9 @@ export const nl: Readonly<Record<CopyKey, string>> = {
   settings_action: 'Instellingen',
   settings_title: 'Instellingen',
   settings_legal: 'Juridische informatie',
-  settings_disturb: 'Bellen tijdens „Niet storen”',
+  settings_disturb: 'Bellen ondanks „Niet storen”',
   settings_disturb_hint:
-    'Android dempt inkomende oproepen zolang Messagr geen toegang tot „Niet storen” heeft. Open de lijst, zoek Messagr, zet de toegang aan.',
+    'Zonder deze toestemming dempt Android de oproepen van Messagr zodra de modus aanstaat. Het scherm dat opent toont alle apps: zoek Messagr en zet de toegang aan.',
   settings_nothing_else:
     'Voorlopig staat hier niets anders. Instellingen die deze versie nog niet draagt zijn afwezig in plaats van aanwezig en werkloos.',
   legal_title: 'Juridische informatie',
@@ -330,6 +343,7 @@ export const nl: Readonly<Record<CopyKey, string>> = {
   pick_cancel: 'Annuleren',
   pick_empty: 'U hebt geen ander gesprek.',
   'calls_ring_back %@': '%@ terugbellen',
+  'calls_lasted %@': 'Duur: %@',
   calls_taken: 'Ontvangen oproep',
   calls_placed: 'Uitgaande oproep',
   calls_missed: 'Gemiste oproep',
@@ -369,7 +383,7 @@ export const nl: Readonly<Record<CopyKey, string>> = {
   call_speaker: 'Luidspreker',
   call_camera_on: 'Camera',
   call_camera_off: 'Camera uitzetten',
-  call_switch_camera: 'Camera wisselen',
+  call_switch_camera: 'Wisselen',
   call_their_camera_off: 'Hun camera staat uit',
   call_failed_no_relay:
     'Deze server heeft geen oproeprelais: bellen was niet mogelijk.',
@@ -396,10 +410,10 @@ export const nl: Readonly<Record<CopyKey, string>> = {
   person_back: 'Terug',
   message_delivered_hint: 'Aan de server afgegeven',
   message_read_hint: 'Gelezen',
-  settings_full_screen: 'Een oproep het scherm laten inschakelen',
   settings_open: 'Openen',
+  settings_full_screen: 'Oproepen op het volledige scherm',
   settings_full_screen_hint:
-    'Android geeft alleen telefoontoepassingen het recht om voor een oproep het scherm in te schakelen. Zonder dat is een inkomende oproep één melding meer op het vergrendelscherm.',
+    'Een inkomende oproep neemt het hele scherm in, ook vergrendeld, in plaats van nog een meldingsregel. Android houdt dit voor telefoon-apps: op het scherm dat opent geeft u het.',
   settings_wake: 'Meldingen',
   settings_wake_hint:
     'Het wekseintje draagt geen afzender en geen bericht. Het apparaat ontsleutelt hier.',
@@ -426,5 +440,8 @@ export const nl: Readonly<Record<CopyKey, string>> = {
   conversation_attach: 'Een foto versturen',
   conversation_attaching: 'De foto wordt versleuteld en verstuurd…',
   'list_unread %1$d': '%1$d ongelezen berichten',
+  list_nobody_else: 'Verder niemand hier',
+  list_nobody_joined: 'Niemand heeft aan dit gesprek deelgenomen',
   invite_open: 'Iemand uitnodigen',
+  back_to_newest: 'Terug naar het nieuwste bericht',
 }

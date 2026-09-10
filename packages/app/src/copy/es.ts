@@ -151,6 +151,7 @@ export const es: Readonly<Record<CopyKey, string>> = {
   'selection_count %1$d': '%1$d seleccionado(s)',
   selection_clear: 'Salir de la selección',
   selection_copy: 'Copiar',
+  selection_forward: 'Reenviar',
   selection_remove: 'Eliminar',
   'remove_title %1$d': '¿Eliminar %1$d mensaje(s)?',
   remove_everyone: 'Eliminar para todos',
@@ -162,14 +163,18 @@ export const es: Readonly<Record<CopyKey, string>> = {
   remove_cancel: 'Cancelar',
   conversation_sending: 'Enviando…',
   conversation_send_failed: 'No enviado. Inténtelo de nuevo.',
+  consequence_irreversible: 'Irreversible',
   vouch_action: 'Respondo por esta persona',
   vouch_hint: 'Hágalo cuando esté seguro de saber quién le escribe — no antes.',
-  vouch_explain_title: 'Lo que esto hace',
+  vouch_explain_title: 'Lo que le está dando',
+  vouch_explain_lead: 'Todo lo que este gesto entrega, antes de decidir.',
   vouch_explain_history:
     'Podrá leer todo lo que se ha dicho aquí desde el principio, incluso antes de su llegada.',
   vouch_explain_history_empty:
     'Aquí todavía no se ha dicho nada, así que no hay pasado que transmitirle.',
   vouch_explain_invite: 'Podrá invitar a otras personas.',
+  vouch_fact_history: 'El pasado le queda legible',
+  vouch_fact_invite: 'Podrá hacer entrar a alguien',
   vouch_explain_final:
     'Esto no se deshace: las claves que reciba, se las queda.',
   vouch_confirm: 'Sí, respondo por esta persona',
@@ -186,11 +191,15 @@ export const es: Readonly<Record<CopyKey, string>> = {
     'Se le ha ofrecido un pasado, desde un dispositivo que este no sabe atribuir a su propietario. No se ha aceptado.',
   evict_action: 'Retirar a esta persona',
   evict_hint: 'Ya no podrá leer nada de lo que se diga aquí a partir de ahora.',
-  evict_explain_title: 'Lo que esto hace',
+  evict_explain_title: 'Lo que se detiene y lo que permanece',
+  evict_explain_lead:
+    'Messagr no puede recuperar lo que ya está en su dispositivo. Esta es toda la verdad, antes de decidir.',
   evict_explain_future:
     'Saldrá de la conversación y ya no podrá leer lo que se diga en ella.',
   evict_explain_past:
     'Lo que ya ha leído, se lo queda. Nada puede quitárselo — ni esta aplicación, ni el servidor.',
+  evict_fact_future: 'Lo que venga después queda fuera de su alcance',
+  evict_fact_past: 'Lo que ya ha leído es suyo',
   evict_explain_final:
     'Esto no se deshace: para que vuelva hará falta una nueva invitación.',
   evict_confirm: 'Sí, retirar a esta persona',
@@ -212,8 +221,12 @@ export const es: Readonly<Record<CopyKey, string>> = {
   promise_point_invitation: 'Se entra por invitación, no por formulario',
   promise_action: 'Empezar',
   list_title: 'Conversaciones',
-  list_invitation_ignored:
-    'Ha abierto una invitación y este teléfono ya tiene una cuenta. No se ha usado: sigue siendo válida para la persona a la que estaba destinada.',
+  list_invitation_used:
+    'Ha abierto una invitación. La conversación que abre aparecerá en su lista.',
+  list_invitation_refused:
+    'Esta invitación no ha podido usarse. Pida una nueva a quien se la envió.',
+  'list_invitation_already %@':
+    'Ya tiene una conversación con %@. Es la que continúa: la invitación no ha abierto una segunda.',
   list_not_in_yet:
     'Todavía no ha entrado. Abra el enlace de invitación que le enviaron: es la única puerta, y la aplicación no puede hacer nada antes.',
   list_empty:
@@ -245,9 +258,9 @@ export const es: Readonly<Record<CopyKey, string>> = {
   settings_action: 'Ajustes',
   settings_title: 'Ajustes',
   settings_legal: 'Información legal',
-  settings_disturb: 'Sonar en modo «No molestar»',
+  settings_disturb: 'Sonar pese a «No molestar»',
   settings_disturb_hint:
-    'Android silencia las llamadas entrantes mientras Messagr no tenga acceso a «No molestar». Abra la lista, busque Messagr y active el acceso.',
+    'Sin este permiso, Android silencia las llamadas de Messagr en cuanto el modo está activo. La pantalla que se abre enumera todas las aplicaciones: busque Messagr y active el acceso.',
   settings_nothing_else:
     'Aquí no hay nada más por ahora. Los ajustes que esta versión todavía no lleva están ausentes en lugar de presentes e inertes.',
   legal_title: 'Información legal',
@@ -331,6 +344,7 @@ export const es: Readonly<Record<CopyKey, string>> = {
   pick_cancel: 'Cancelar',
   pick_empty: 'No tiene ninguna otra conversación.',
   'calls_ring_back %@': 'Devolver la llamada a %@',
+  'calls_lasted %@': 'Duración: %@',
   calls_taken: 'Llamada recibida',
   calls_placed: 'Llamada realizada',
   calls_missed: 'Llamada perdida',
@@ -370,7 +384,7 @@ export const es: Readonly<Record<CopyKey, string>> = {
   call_speaker: 'Altavoz',
   call_camera_on: 'Cámara',
   call_camera_off: 'Apagar la cámara',
-  call_switch_camera: 'Cambiar de cámara',
+  call_switch_camera: 'Cambiar',
   call_their_camera_off: 'Su cámara está apagada',
   call_failed_no_relay:
     'Este servidor no tiene retransmisión de llamadas: no se ha podido llamar.',
@@ -397,10 +411,10 @@ export const es: Readonly<Record<CopyKey, string>> = {
   person_back: 'Volver',
   message_delivered_hint: 'Entregado al servidor',
   message_read_hint: 'Leído',
-  settings_full_screen: 'Permitir que una llamada encienda la pantalla',
   settings_open: 'Abrir',
+  settings_full_screen: 'Llamadas a pantalla completa',
   settings_full_screen_hint:
-    'Android solo concede a las aplicaciones de teléfono el derecho a encender la pantalla para una llamada. Sin él, una llamada entrante es una notificación más en la pantalla de bloqueo.',
+    'Una llamada entrante ocupa toda la pantalla, incluso bloqueada, en lugar de una línea de notificación más. Android lo reserva a las aplicaciones de telefonía: la pantalla que se abre es donde se concede.',
   settings_wake: 'Notificaciones',
   settings_wake_hint:
     'La señal de despertar no lleva remitente ni mensaje. El dispositivo descifra aquí.',
@@ -427,5 +441,8 @@ export const es: Readonly<Record<CopyKey, string>> = {
   conversation_attach: 'Enviar una foto',
   conversation_attaching: 'Cifrando y enviando la foto…',
   'list_unread %1$d': '%1$d mensajes sin leer',
+  list_nobody_else: 'Nadie más aquí',
+  list_nobody_joined: 'Nadie se ha unido a esta conversación',
   invite_open: 'Invitar a alguien',
+  back_to_newest: 'Volver al último mensaje',
 }

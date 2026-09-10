@@ -188,6 +188,7 @@ export const fr = {
   'selection_count %1$d': '%1$d sélectionné(s)',
   selection_clear: 'Quitter la sélection',
   selection_copy: 'Copier',
+  selection_forward: 'Transférer',
   selection_remove: 'Supprimer',
   'remove_title %1$d': 'Supprimer %1$d message(s) ?',
   remove_everyone: 'Supprimer pour tout le monde',
@@ -216,15 +217,28 @@ export const fr = {
   //
   // "Vérifier" appears nowhere, for the reason `conversation_sender_claimed`
   // states: verification is a real act in this product and this is not it.
+  // Shared by the two gestures nothing takes back. Written in sentence case
+  // and drawn in capitals: `type.monoLabel` carries the transform, so a
+  // catalogue that shouted would be shouting twice and a translator would
+  // have no lowercase to work from.
+  //
+  // A label rather than a sentence: somebody scanning the screen has
+  // to be able to find the word without reading, and a sentence that merely
+  // contains it is not findable. The prototype prints it the same way, on
+  // « Effacer mon identité ».
+  consequence_irreversible: 'Irréversible',
   vouch_action: 'Je réponds de cette personne',
   vouch_hint:
     'À faire quand vous êtes sûr de savoir qui vous écrit — pas avant.',
-  vouch_explain_title: 'Ce que cela fait',
+  vouch_explain_title: 'Ce que vous lui donnez',
+  vouch_explain_lead: 'Tout ce que ce geste transmet, avant de décider.',
   vouch_explain_history:
     'Elle pourra lire tout ce qui a été dit ici depuis le début, y compris avant son arrivée.',
   vouch_explain_history_empty:
     'Rien n’a encore été dit ici, donc il n’y a pas de passé à lui transmettre.',
   vouch_explain_invite: 'Elle pourra inviter d’autres personnes.',
+  vouch_fact_history: 'Le passé lui devient lisible',
+  vouch_fact_invite: 'Elle pourra faire entrer quelqu’un',
   vouch_explain_final:
     'Cela ne s’annule pas : les clés qu’elle reçoit, elle les garde.',
   vouch_confirm: 'Oui, je réponds de cette personne',
@@ -253,11 +267,15 @@ export const fr = {
   // difference between a person choosing this and a person discovering it.
   evict_action: 'Retirer cette personne',
   evict_hint: 'Elle ne pourra plus rien lire de ce qui sera dit ici ensuite.',
-  evict_explain_title: 'Ce que cela fait',
+  evict_explain_title: 'Ce qui s’arrête, ce qui reste',
+  evict_explain_lead:
+    'Messagr ne peut pas reprendre ce qui est déjà chez elle. Voici la vérité complète, avant de décider.',
   evict_explain_future:
     'Elle sortira de la conversation et ne pourra plus lire ce qui s’y dira.',
   evict_explain_past:
     'Ce qu’elle a déjà lu, elle le garde. Rien ne peut le lui reprendre — ni cette application, ni le serveur.',
+  evict_fact_future: 'La suite lui échappe',
+  evict_fact_past: 'Ce qu’elle a lu lui reste',
   evict_explain_final:
     'Cela ne s’annule pas : pour la faire revenir, il faudra une nouvelle invitation.',
   evict_confirm: 'Oui, retirer cette personne',
@@ -298,8 +316,21 @@ export const fr = {
   // word "federation" -- §13.19 invariant 6. What went wrong technically goes
   // to the log; a row says what it means for the person reading it.
   list_title: 'Conversations',
-  list_invitation_ignored:
-    'Vous avez ouvert une invitation, et ce téléphone a déjà un compte. Elle n’a pas été utilisée : elle reste valable pour la personne à qui elle était destinée.',
+  // TWO OUTCOMES, NOT ONE POLITE REFUSAL. The line used to say « elle n'a
+  // pas été utilisée : elle reste valable pour la personne à qui elle était
+  // destinée », which was true and useless -- the person it was destined for
+  // was the one reading it. The link is spent for the account this device
+  // already has now, so the news is that a conversation is coming.
+  list_invitation_used:
+    'Vous avez ouvert une invitation. La conversation qu’elle ouvre va apparaître dans votre liste.',
+  list_invitation_refused:
+    'Cette invitation n’a pas pu être utilisée. Demandez-en une nouvelle à la personne qui vous l’a envoyée.',
+  // THE THIRD OUTCOME, and it replaces the first rather than adding to it.
+  // Two people in contact can each issue the other a link; nothing at the
+  // issuing end can know who will open one, so the refusal happens here.
+  // The person is named because the row to open is already on this screen.
+  'list_invitation_already %@':
+    'Vous êtes déjà en conversation avec %@. C’est celle-ci qui continue : l’invitation n’en a pas ouvert une seconde.',
   list_not_in_yet:
     'Vous n’êtes pas encore entré. Ouvrez le lien d’invitation qu’on vous a envoyé : c’est la seule porte, et l’application ne peut rien faire avant.',
   list_empty:
@@ -351,9 +382,9 @@ export const fr = {
   settings_action: 'Réglages',
   settings_title: 'Réglages',
   settings_legal: 'Informations légales',
-  settings_disturb: 'Sonner en mode « Ne pas déranger »',
+  settings_disturb: 'Sonner malgré « Ne pas déranger »',
   settings_disturb_hint:
-    'Android fait taire les appels entrants tant que Messagr n’a pas l’accès « Ne pas déranger ». Ouvrez la liste, trouvez Messagr, activez l’accès.',
+    'Sans cette autorisation, Android fait taire les appels Messagr dès que le mode est actif. L’écran qui s’ouvre liste toutes les applications : cherchez Messagr et activez l’accès.',
   settings_nothing_else:
     'Il n’y a rien d’autre ici pour l’instant. Les réglages que cette version ne porte pas encore sont absents plutôt que présents et inertes.',
 
@@ -499,6 +530,7 @@ export const fr = {
   pick_cancel: 'Annuler',
   pick_empty: 'Vous n’avez pas d’autre conversation.',
   'calls_ring_back %@': 'Rappeler %@',
+  'calls_lasted %@': 'Durée : %@',
   calls_taken: 'Appel reçu',
   calls_placed: 'Appel passé',
   calls_missed: 'Appel manqué',
@@ -538,7 +570,7 @@ export const fr = {
   call_speaker: 'Haut-parleur',
   call_camera_on: 'Caméra',
   call_camera_off: 'Couper la caméra',
-  call_switch_camera: 'Changer de caméra',
+  call_switch_camera: 'Changer',
   call_their_camera_off: 'Sa caméra est coupée',
   call_failed_no_relay:
     'Ce serveur n’a pas de relais d’appel : l’appel n’a pas pu être passé.',
@@ -572,10 +604,10 @@ export const fr = {
   person_back: 'Retour',
   message_delivered_hint: 'Remis au serveur',
   message_read_hint: 'Lu',
-  settings_full_screen: 'Faire sonner l’écran',
   settings_open: 'Ouvrir',
+  settings_full_screen: 'Appels en plein écran',
   settings_full_screen_hint:
-    'Android n’accorde qu’aux applications de téléphonie le droit d’allumer l’écran pour un appel. Sans cela, un appel entrant est une notification de plus sur l’écran verrouillé.',
+    'Un appel entrant prend tout l’écran, même verrouillé, au lieu d’une ligne de notification de plus. Android réserve ce droit aux applications de téléphonie : l’écran qui s’ouvre est là pour le lui accorder.',
   settings_wake: 'Notifications',
   settings_wake_hint:
     'Le signal de réveil ne porte ni expéditeur ni message. L’appareil déchiffre ici.',
@@ -615,7 +647,19 @@ export const fr = {
   // needs no translation; what needs one is what a screen reader says about
   // it, since "3" alone tells somebody nothing.
   'list_unread %1$d': '%1$d messages non lus',
+  // The name a conversation takes when this account is the only one left in
+  // it. Not the room's identifier, which is what the row printed before: an
+  // identifier on a screen a person reads is the diagnostic string §13.27
+  // refuses, and this is a fact with a true sentence.
+  list_nobody_else: 'Personne d’autre ici',
+  // The other shape of being alone: an invitation nobody took up. A
+  // conversation is created the moment a link is minted, so every unclaimed
+  // invitation leaves one of these on the issuer's list. True whichever way
+  // it happened -- never opened, expired, or declined because the two of
+  // them already had a conversation.
+  list_nobody_joined: 'Personne n’a rejoint cette conversation',
   invite_open: 'Inviter quelqu’un',
+  back_to_newest: 'Revenir au dernier message',
 } as const
 
 /** Every key any screen may ask for. A typo is a compile error, not a blank. */

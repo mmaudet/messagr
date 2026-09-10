@@ -154,6 +154,7 @@ export const de: Readonly<Record<CopyKey, string>> = {
   'selection_count %1$d': '%1$d ausgewählt',
   selection_clear: 'Auswahl verlassen',
   selection_copy: 'Kopieren',
+  selection_forward: 'Weiterleiten',
   selection_remove: 'Löschen',
   'remove_title %1$d': '%1$d Nachricht(en) löschen?',
   remove_everyone: 'Für alle löschen',
@@ -165,15 +166,20 @@ export const de: Readonly<Record<CopyKey, string>> = {
   remove_cancel: 'Abbrechen',
   conversation_sending: 'Wird gesendet …',
   conversation_send_failed: 'Nicht gesendet. Versuchen Sie es erneut.',
+  consequence_irreversible: 'Unwiderruflich',
   vouch_action: 'Ich stehe für diese Person ein',
   vouch_hint:
     'Zu tun, wenn Sie sicher wissen, wer Ihnen schreibt — nicht vorher.',
-  vouch_explain_title: 'Was das bewirkt',
+  vouch_explain_title: 'Was Sie ihr geben',
+  vouch_explain_lead:
+    'Alles, was diese Geste übergibt – bevor Sie entscheiden.',
   vouch_explain_history:
     'Sie wird alles lesen können, was hier von Anfang an gesagt wurde, auch vor ihrer Ankunft.',
   vouch_explain_history_empty:
     'Hier wurde noch nichts gesagt, es gibt also keine Vergangenheit weiterzugeben.',
   vouch_explain_invite: 'Sie wird andere Personen einladen können.',
+  vouch_fact_history: 'Die Vergangenheit wird für sie lesbar',
+  vouch_fact_invite: 'Sie kann jemanden hereinholen',
   vouch_explain_final:
     'Das lässt sich nicht rückgängig machen: die Schlüssel, die sie erhält, behält sie.',
   vouch_confirm: 'Ja, ich stehe für diese Person ein',
@@ -190,11 +196,15 @@ export const de: Readonly<Record<CopyKey, string>> = {
     'Ihnen wurde eine Vergangenheit angeboten, von einem Gerät, das dieses hier nicht seiner Inhaberin oder seinem Inhaber zuordnen kann. Sie wurde nicht übernommen.',
   evict_action: 'Diese Person entfernen',
   evict_hint: 'Sie wird nichts mehr lesen können, was hier danach gesagt wird.',
-  evict_explain_title: 'Was das bewirkt',
+  evict_explain_title: 'Was endet und was bleibt',
+  evict_explain_lead:
+    'Messagr kann nicht zurückholen, was bereits auf ihrem Gerät liegt. Hier ist die ganze Wahrheit, bevor Sie entscheiden.',
   evict_explain_future:
     'Sie verlässt die Unterhaltung und kann nicht mehr lesen, was dort gesagt wird.',
   evict_explain_past:
     'Was sie bereits gelesen hat, behält sie. Nichts kann es ihr wieder nehmen — weder diese App noch der Server.',
+  evict_fact_future: 'Was danach kommt, bleibt ihr verschlossen',
+  evict_fact_past: 'Was sie gelesen hat, bleibt ihr',
   evict_explain_final:
     'Das lässt sich nicht rückgängig machen: für eine Rückkehr braucht es eine neue Einladung.',
   evict_confirm: 'Ja, diese Person entfernen',
@@ -217,8 +227,12 @@ export const de: Readonly<Record<CopyKey, string>> = {
     'Sie kommen per Einladung herein, nicht per Formular',
   promise_action: 'Beginnen',
   list_title: 'Unterhaltungen',
-  list_invitation_ignored:
-    'Sie haben eine Einladung geöffnet, und dieses Telefon hat bereits ein Konto. Sie wurde nicht verbraucht und gilt weiterhin für die Person, für die sie bestimmt war.',
+  list_invitation_used:
+    'Sie haben eine Einladung geöffnet. Das Gespräch, das sie eröffnet, erscheint gleich in Ihrer Liste.',
+  list_invitation_refused:
+    'Diese Einladung konnte nicht verwendet werden. Bitten Sie die absendende Person um eine neue.',
+  'list_invitation_already %@':
+    'Sie haben bereits ein Gespräch mit %@. Dieses läuft weiter: die Einladung hat kein zweites eröffnet.',
   list_not_in_yet:
     'Sie sind noch nicht drin. Öffnen Sie den Einladungslink, den Ihnen jemand geschickt hat: er ist die einzige Tür, und davor kann die Anwendung nichts tun.',
   list_empty:
@@ -251,9 +265,9 @@ export const de: Readonly<Record<CopyKey, string>> = {
   settings_action: 'Einstellungen',
   settings_title: 'Einstellungen',
   settings_legal: 'Rechtliche Hinweise',
-  settings_disturb: 'Bei „Bitte nicht stören“ klingeln',
+  settings_disturb: 'Trotz „Bitte nicht stören“ klingeln',
   settings_disturb_hint:
-    'Android schaltet eingehende Anrufe stumm, solange Messagr keinen Zugriff auf „Bitte nicht stören“ hat. Liste öffnen, Messagr suchen, Zugriff einschalten.',
+    'Ohne diese Erlaubnis schaltet Android Messagr-Anrufe stumm, sobald der Modus aktiv ist. Der sich öffnende Bildschirm listet alle Apps: Messagr suchen und Zugriff einschalten.',
   settings_nothing_else:
     'Mehr gibt es hier vorerst nicht. Einstellungen, die diese Version noch nicht trägt, fehlen ganz, statt vorhanden und wirkungslos zu sein.',
   legal_title: 'Rechtliche Hinweise',
@@ -337,6 +351,7 @@ export const de: Readonly<Record<CopyKey, string>> = {
   pick_cancel: 'Abbrechen',
   pick_empty: 'Sie haben keine andere Unterhaltung.',
   'calls_ring_back %@': '%@ zurückrufen',
+  'calls_lasted %@': 'Dauer: %@',
   calls_taken: 'Eingegangener Anruf',
   calls_placed: 'Ausgehender Anruf',
   calls_missed: 'Verpasster Anruf',
@@ -376,7 +391,7 @@ export const de: Readonly<Record<CopyKey, string>> = {
   call_speaker: 'Lautsprecher',
   call_camera_on: 'Kamera',
   call_camera_off: 'Kamera ausschalten',
-  call_switch_camera: 'Kamera wechseln',
+  call_switch_camera: 'Wechseln',
   call_their_camera_off: 'Die Kamera der anderen Person ist aus',
   call_failed_no_relay:
     'Dieser Server hat kein Anrufrelais: Der Anruf war nicht möglich.',
@@ -403,10 +418,10 @@ export const de: Readonly<Record<CopyKey, string>> = {
   person_back: 'Zurück',
   message_delivered_hint: 'An den Server übergeben',
   message_read_hint: 'Gelesen',
-  settings_full_screen: 'Anrufe den Bildschirm einschalten lassen',
   settings_open: 'Öffnen',
+  settings_full_screen: 'Anrufe im Vollbild',
   settings_full_screen_hint:
-    'Android gewährt nur Telefonanwendungen das Recht, für einen Anruf den Bildschirm einzuschalten. Ohne dies ist ein eingehender Anruf nur eine weitere Benachrichtigung auf dem Sperrbildschirm.',
+    'Ein eingehender Anruf nimmt den ganzen Bildschirm ein, auch gesperrt, statt einer weiteren Benachrichtigungszeile. Android behält das Telefon-Apps vor: auf dem sich öffnenden Bildschirm erteilen Sie es.',
   settings_wake: 'Benachrichtigungen',
   settings_wake_hint:
     'Das Wecksignal trägt weder Absender noch Nachricht. Das Gerät entschlüsselt hier.',
@@ -434,5 +449,8 @@ export const de: Readonly<Record<CopyKey, string>> = {
   conversation_attach: 'Ein Foto senden',
   conversation_attaching: 'Foto wird verschlüsselt und gesendet …',
   'list_unread %1$d': '%1$d ungelesene Nachrichten',
+  list_nobody_else: 'Sonst niemand hier',
+  list_nobody_joined: 'Niemand ist diesem Gespräch beigetreten',
   invite_open: 'Jemanden einladen',
+  back_to_newest: 'Zurück zur neuesten Nachricht',
 }

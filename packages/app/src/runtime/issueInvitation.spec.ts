@@ -26,6 +26,7 @@ function harness(
     powerLevels?: Record<string, unknown>
     refuseState?: boolean
     refuseInvite?: boolean
+    refuseInviteWhen?: (who: string) => boolean
     issue?: { status: number; body: string } | Error
     status?: readonly ({ status: number; body: string } | Error)[]
   } = {},
@@ -49,6 +50,10 @@ function harness(
       }
       if (path.endsWith('/invite')) {
         if (options.refuseInvite === true) throw new Error('forbidden')
+        const who = (JSON.parse(body ?? '{}') as { user_id?: string }).user_id
+        if (options.refuseInviteWhen?.(who ?? '') === true) {
+          throw new Error('Event is not authorized')
+        }
         return '{}'
       }
       return '{}'
@@ -232,11 +237,13 @@ describe('admitDrawnEntrant', () => {
     body: JSON.stringify({ entrant_user_id: who }),
   })
   const nobody = { status: 200, body: JSON.stringify({}) }
+  /** The invitation is spent: there is nobody left to let in. */
+  const claimed = { status: 200, body: JSON.stringify({ status: 'claimed' }) }
 
   it('invites the account the service drew', async () => {
     const { deps, calls } = harness({ status: [drawn('@her:x')] })
     const admission = await admitDrawnEntrant(deps, 'inv-1', '!made:x')
-    expect(admission).toEqual({ admitted: true, entrant: '@her:x' })
+    expect(admission).toEqual({ admitted: true, entrants: ['@her:x'] })
     const invite = calls.find(call => call.path.endsWith('/invite'))
     expect(JSON.parse(invite?.body ?? '{}')).toEqual({ user_id: '@her:x' })
   })
@@ -246,7 +253,7 @@ describe('admitDrawnEntrant', () => {
       status: [nobody, nobody, drawn('@her:x')],
     })
     const admission = await admitDrawnEntrant(deps, 'inv-1', '!made:x')
-    expect(admission).toEqual({ admitted: true, entrant: '@her:x' })
+    expect(admission).toEqual({ admitted: true, entrants: ['@her:x'] })
     expect(calls.filter(call => call.path.endsWith('/invite'))).toHaveLength(1)
   })
 
@@ -256,7 +263,59 @@ describe('admitDrawnEntrant', () => {
     })
     expect(await admitDrawnEntrant(deps, 'inv-1', '!made:x')).toEqual({
       admitted: true,
-      entrant: '@her:x',
+      entrants: ['@her:x'],
+    })
+  })
+
+  it('lets in the second person the service names, not only the first', async () => {
+    // A LINK OPENED BY SOMEBODY WHO ALREADY HAS AN ACCOUNT NEEDS TWO
+    // INVITES. The drawn account goes in first and tries to hand its place
+    // over; the conversation costs 50 to invite into and it holds 0, so it
+    // is refused -- « which is the designed state », in the service's own
+    // words -- and names the real person instead. Only the issuer can let
+    // that one in, and this used to have stopped asking by then.
+    const { deps, calls } = harness({
+      status: [drawn('@drawn:x'), drawn('@her:x'), claimed],
+    })
+    const admission = await admitDrawnEntrant(deps, 'inv-1', '!made:x')
+    expect(admission).toEqual({
+      admitted: true,
+      entrants: ['@drawn:x', '@her:x'],
+    })
+    expect(calls.filter(call => call.path.endsWith('/invite'))).toHaveLength(2)
+  })
+
+  it('does not invite the same person twice while the service keeps naming them', async () => {
+    const { deps, calls } = harness({
+      status: [drawn('@her:x'), drawn('@her:x'), drawn('@her:x')],
+    })
+    await admitDrawnEntrant(deps, 'inv-1', '!made:x')
+    expect(calls.filter(call => call.path.endsWith('/invite'))).toHaveLength(1)
+  })
+
+  it('stops asking once the invitation is no longer pending', async () => {
+    // Claimed, revoked or expired: the wait is over, and everything after it
+    // would answer the same thing. Asserted by what does NOT happen -- the
+    // third answer is never reached, so nobody is let in on it.
+    const { deps, calls } = harness({
+      status: [drawn('@her:x'), claimed, drawn('@late:x')],
+    })
+    const admission = await admitDrawnEntrant(deps, 'inv-1', '!made:x')
+    expect(admission).toEqual({ admitted: true, entrants: ['@her:x'] })
+    const invited = calls
+      .filter(call => call.path.endsWith('/invite'))
+      .map(call => JSON.parse(call.body ?? '{}').user_id)
+    expect(invited).toEqual(['@her:x'])
+  })
+
+  it('keeps waiting on an answer that does not say, rather than giving up', async () => {
+    // A body with no `status` is a shape this code did not expect, not a
+    // settled invitation. Stopping on it would strand whoever is on the
+    // other side of the link.
+    const { deps } = harness({ status: [nobody, nobody, drawn('@her:x')] })
+    expect(await admitDrawnEntrant(deps, 'inv-1', '!made:x')).toEqual({
+      admitted: true,
+      entrants: ['@her:x'],
     })
   })
 
@@ -267,6 +326,26 @@ describe('admitDrawnEntrant', () => {
       admitted: false,
       reason: 'nobody has opened the link yet',
     })
+  })
+
+  it('lets the second person in when the first invite was refused', async () => {
+    // The homeserver answers `403 Event is not authorized` for inviting
+    // somebody already in the room, and on the two-invite path that happens:
+    // by the time the second poll names the real person, their device may
+    // already have walked through. Returning on the first refusal reported a
+    // failure about a person who was in the conversation.
+    let refusals = 0
+    const { deps } = harness({
+      status: [drawn('@drawn:x'), drawn('@her:x'), claimed],
+      refuseInviteWhen: who => {
+        if (who !== '@drawn:x') return false
+        refusals += 1
+        return true
+      },
+    })
+    const admission = await admitDrawnEntrant(deps, 'inv-1', '!made:x')
+    expect(refusals).toBe(1)
+    expect(admission).toEqual({ admitted: true, entrants: ['@her:x'] })
   })
 
   it('names who was drawn when inviting them failed', async () => {

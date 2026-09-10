@@ -9,7 +9,15 @@ import {
 } from 'react-native'
 
 import { t } from '../copy'
-import { color, floors, radius, space, stroke, type } from '../design/tokens'
+import {
+  color,
+  floors,
+  layout,
+  radius,
+  space,
+  stroke,
+  type,
+} from '../design/tokens'
 import { normaliseGivenName } from '../runtime/givenName'
 import { NotchedButton } from './NotchedButton'
 import { QrCode } from './QrCode'
@@ -205,9 +213,14 @@ const styles = StyleSheet.create({
     gap: space.s,
   },
   centred: { alignItems: 'center' },
+  // AND ITS OWN GUTTER, for the reason `Conversation.tsx` gives at length:
+  // this screen was living on the `space.xl` that `App.tsx` used to put
+  // around everything, and its field and its link ran edge to edge once
+  // that went. `field`'s `paddingHorizontal` is the space inside the input.
   resting: {
     gap: space.m,
     paddingVertical: space.m,
+    paddingHorizontal: layout.screenGutter,
   },
   who: {
     ...type.titleMd,

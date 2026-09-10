@@ -21,12 +21,37 @@ export interface ServicePoster {
   post: (
     url: string,
     body: string,
+    /**
+     * The caller's own Matrix access token, when the caller is somebody.
+     *
+     * Absent for a newcomer, who is nobody yet -- that is the whole point of
+     * the claim being unauthenticated. Present on the existing-user path,
+     * where it is not optional at all: naming a third party in
+     * `existing_user_id` without proving you are that person would let
+     * anyone with a link have an arbitrary identifier invited into a real
+     * room. The service refuses it, `401 M_UNAUTHORIZED`, and says so in
+     * `claim.rs` -- « format validation says nothing about IDENTITY ».
+     */
+    bearer?: string,
   ) => Promise<{ readonly status: number; readonly body: string }>
 }
 
 export type ClaimResult =
   | { readonly claimed: true; readonly session: RestoreCredentials }
   | { readonly claimed: false; readonly reason: string }
+
+/**
+ * What spending an invitation does for a device that already has an account.
+ *
+ * No session comes back, and that is the whole difference: there is nothing
+ * to hand over, because the caller already is somebody. What happens instead
+ * is that the account is invited into the conversation the invitation was
+ * for -- so the invitation does what its issuer meant it to do rather than
+ * being thrown away.
+ */
+export type JoinResult =
+  | { readonly invited: true }
+  | { readonly invited: false; readonly reason: string }
 
 interface ClaimResponse {
   user_id?: unknown
@@ -73,19 +98,96 @@ export async function claimInvitation(
   link: InvitationLink,
   wait?: (ms: number) => Promise<void>,
 ): Promise<ClaimResult> {
+  const answer = await postWithPatience(poster, link, {}, wait, undefined)
+  if (!answer.answered) return { claimed: false, reason: answer.reason }
+  return sessionFrom(answer.status, answer.body, link)
+}
+
+/**
+ * Spends an invitation on behalf of an account that already exists.
+ *
+ * # WHY THIS IS NOT "IGNORE THE LINK"
+ *
+ * A held session beats a link, and it must: an invitation that could replace
+ * an account somebody already has would be a way of taking their account
+ * from them. That rule is not in question and does not move.
+ *
+ * What it does not follow from is that the link is worthless. Somebody
+ * issued it deliberately, to reach the person holding this telephone, and
+ * throwing it away leaves them looking at « personne n'a encore ouvert le
+ * lien » forever while the person they invited is looking at a message
+ * saying the invitation was not used. Reported exactly that way, from both
+ * ends of the same invitation.
+ *
+ * The service has always known how to do the other thing. `claim.rs` calls
+ * it the *existing user* path: the account it drew for the link cedes its
+ * place -- joins the conversation, invites the real person into it, leaves,
+ * and deactivates itself. Nothing here is new on the wire; what was missing
+ * was any client ever sending `existing_user_id`.
+ *
+ * # WHAT COMES BACK, AND WHAT DOES NOT
+ *
+ * No session. `ClaimResponse.device_id` is documented as « empty on the
+ * "existing user" path, like the other two secrets: the caller already has
+ * its own session there ». So a 200 is the whole of the good news, and
+ * reading the body for credentials would be reading for something the
+ * service says it does not send.
+ */
+export async function claimForExistingAccount(
+  poster: ServicePoster,
+  link: InvitationLink,
+  account: { readonly userId: string; readonly accessToken: string },
+  wait?: (ms: number) => Promise<void>,
+): Promise<JoinResult> {
+  const answer = await postWithPatience(
+    poster,
+    link,
+    { existing_user_id: account.userId },
+    wait,
+    account.accessToken,
+  )
+  if (!answer.answered) return { invited: false, reason: answer.reason }
+  // A 200 and nothing else. The conversation this invitation was for now
+  // carries a Matrix invitation to this account, and `enterInvitations.ts`
+  // is what walks through it.
+  return answer.status === 200
+    ? { invited: true }
+    : { invited: false, reason: REFUSED }
+}
+
+type Answered =
+  | { readonly answered: true; readonly status: number; readonly body: string }
+  | { readonly answered: false; readonly reason: string }
+
+/**
+ * The claim call, with the handshake's pause built into it.
+ *
+ * Shared by both paths because the pause belongs to the service's protocol
+ * rather than to either caller: whichever way a link is spent, the drawn
+ * account has to be let into the conversation by the issuer's application
+ * before the second call can succeed.
+ */
+async function postWithPatience(
+  poster: ServicePoster,
+  link: InvitationLink,
+  extra: Readonly<Record<string, string>>,
+  wait: ((ms: number) => Promise<void>) | undefined,
+  bearer: string | undefined,
+): Promise<Answered> {
   let answer: { status: number; body: string }
   for (let attempt = 0; ; attempt += 1) {
     try {
       answer = await poster.post(
         `${link.service}/invitations/claim`,
-        JSON.stringify({ token: link.token }),
+        JSON.stringify({ token: link.token, ...extra }),
+        bearer,
       )
     } catch {
       // Deliberately different from a refusal, because a person can act on
       // the difference: this one is worth trying again, a refused link never
       // will be.
       return {
-        claimed: false,
+        answered: false,
         reason: 'the invitation service could not be reached',
       }
     }
@@ -99,21 +201,27 @@ export async function claimInvitation(
       // not happen is the other person's application letting it in, and
       // saying "this invitation cannot be used" would send somebody to ask
       // for a new link that would fail the same way.
-      return {
-        claimed: false,
-        reason: 'nobody has let this account in yet',
-      }
+      return { answered: false, reason: 'nobody has let this account in yet' }
     }
     await wait?.(BETWEEN_MS)
   }
 
-  if (answer.status !== 200) {
+  return { answered: true, status: answer.status, body: answer.body }
+}
+
+/** The session a newcomer's claim answers with, or why there is none. */
+function sessionFrom(
+  status: number,
+  body: string,
+  link: InvitationLink,
+): ClaimResult {
+  if (status !== 200) {
     return { claimed: false, reason: REFUSED }
   }
 
   let response: ClaimResponse
   try {
-    response = JSON.parse(answer.body) as ClaimResponse
+    response = JSON.parse(body) as ClaimResponse
   } catch {
     return { claimed: false, reason: REFUSED }
   }

@@ -50,12 +50,17 @@ function markerStore() {
 }
 
 describe('enterWithASession', () => {
-  it('uses the session it already has, without spending an invitation', async () => {
-    let posted = false
+  it('spends an invitation for the account it already has, not against it', async () => {
+    // THE ACCOUNT IS NEVER REPLACED, which is the rule, and it is not the
+    // same rule as "throw the link away". The service's existing-user path
+    // invites this account into the conversation the invitation was for.
+    let sent: unknown = null
+    let bearer: string | undefined
     const watching: ServicePoster = {
-      post: async () => {
-        posted = true
-        return { status: 200, body: GRANTED }
+      post: async (_url, body, carried) => {
+        sent = JSON.parse(body)
+        bearer = carried
+        return { status: 200, body: '{}' }
       },
     }
     const result = await enterWithASession({
@@ -64,18 +69,60 @@ describe('enterWithASession', () => {
       link: async () => 'https://messagr.eu/i/abc123',
       signUp: markerStore().secrets,
     })
-    // `invitationIgnored` is the half that was missing: the rule was right
-    // and the application drew its conversation list as if nothing had
-    // happened, so somebody who scanned an invitation on a phone that
-    // already had Messagr could not tell whether the code had been read.
     expect(result).toEqual({
       entered: true,
       session: SESSION,
       claimed: false,
-      invitationIgnored: true,
+      invitation: { kind: 'used' },
     })
-    // An invitation is single-use. Spending one for an account that already
-    // exists would destroy a link somebody was given.
+    // Its own identifier, and the token. Nothing it holds is handed over.
+    expect(sent).toEqual({
+      token: 'abc123',
+      existing_user_id: SESSION.userId,
+    })
+    // AND THE PROOF THAT IT IS THAT ACCOUNT. The service refuses this path
+    // without it -- naming a third party would otherwise let anyone holding
+    // a link have an arbitrary identifier invited into a real room.
+    // Measured against the bench before it was sent: `401 M_UNAUTHORIZED`,
+    // "unauthenticated caller".
+    expect(bearer).toBe(SESSION.accessToken)
+  })
+
+  it('says so when the link could not be used, and keeps the session', async () => {
+    const saysNo: ServicePoster = {
+      post: async () => ({ status: 404, body: '{}' }),
+    }
+    const result = await enterWithASession({
+      secrets: store(JSON.stringify(SESSION)),
+      poster: saysNo,
+      link: async () => 'https://messagr.eu/i/abc123',
+      signUp: markerStore().secrets,
+    })
+    expect(result).toEqual({
+      entered: true,
+      session: SESSION,
+      claimed: false,
+      invitation: { kind: 'refused', reason: 'this invitation cannot be used' },
+    })
+  })
+
+  it('asks the service nothing when the link is not an invitation', async () => {
+    // Opening the application from its icon is this, every time. A call per
+    // launch to say "there was no link" would be a call per launch.
+    let posted = false
+    const watching: ServicePoster = {
+      post: async () => {
+        posted = true
+        return { status: 200, body: '{}' }
+      },
+    }
+    const result = await enterWithASession({
+      secrets: store(JSON.stringify(SESSION)),
+      poster: watching,
+      link: async () => null,
+      signUp: markerStore().secrets,
+    })
+    expect(result).toEqual({ entered: true, session: SESSION, claimed: false })
     expect(posted).toBe(false)
   })
 

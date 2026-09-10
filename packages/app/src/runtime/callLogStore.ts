@@ -31,9 +31,21 @@ import type { EncryptedDatabase } from './givenNameStore'
  *
  * # WHAT A ROW IS NOT
  *
- * No duration, and no content of any kind. What happened inside a call is
- * not this device's business to keep, and a duration is the one field that
- * would make a stolen notebook say how long two people spoke.
+ * No content of any kind. What happened inside a call is not this device's
+ * business to keep.
+ *
+ * A duration was refused here too, in the same words ADR-0010 used: it
+ * "would make a stolen notebook say how long two people spoke". The
+ * refusal was withdrawn on 10 September 2026, by the person whose notebook
+ * it is, and the ADR carries the amendment. The reasoning, so that reading
+ * this file is enough: **the line was drawn at the wrong field.** This page
+ * already keeps who, when, and how often -- which ADR-0010 itself calls the
+ * most revealing thing the product holds, and which is the shape of a life.
+ * Against a reader who has all of that, "and it lasted thirty-two minutes"
+ * is the smaller sentence, not the one that turns the page dangerous. The
+ * threat the ADR names is real and is answered where it is answered: the
+ * page is encrypted, and the passphrase is in the platform keystore
+ * (ADR-0008).
  */
 
 /** Which way the call went. */
@@ -81,6 +93,20 @@ export interface CallRecord {
    * calls -- the application could not place any other kind.
    */
   readonly video?: boolean
+  /**
+   * How long the two of them were connected, in seconds.
+   *
+   * FROM `inCall` TO THE END, not from the first ring: the wait before
+   * somebody picks up is not time anybody spent talking, and a row saying
+   * « 4 min » about a call that rang for three and lasted one would be
+   * worse than a row saying nothing.
+   *
+   * Absent on a call that never connected, which is not the same as zero --
+   * `missed`, `declined` and `unplaced` rows have no duration to have, and
+   * a call that connected and ended within the same second has one that
+   * happens to round to nothing.
+   */
+  readonly seconds?: number
 }
 
 export interface CallLog {
@@ -105,6 +131,18 @@ export interface CallLog {
    * `true` when a row was found and changed.
    */
   readonly sawVideo: (scope: string) => Promise<boolean>
+  /**
+   * Records how long the newest call in a conversation was connected.
+   *
+   * Its own gesture rather than an argument to `settle`, because the two
+   * know different things at different moments: `settle` marks a call
+   * answered the instant it connects, and how long it lasted is only known
+   * once it is over. Passing a duration to the call that fires at the start
+   * of a conversation would be passing a number nobody has yet.
+   *
+   * `true` when a row was found and changed.
+   */
+  readonly lasted: (scope: string, seconds: number) => Promise<boolean>
 }
 
 /**
@@ -132,6 +170,16 @@ const SCHEMA = `CREATE TABLE IF NOT EXISTS call_log (
  * question, and two ways of asking is how they come to disagree.
  */
 const ADD_VIDEO = `ALTER TABLE call_log ADD COLUMN video INTEGER NOT NULL DEFAULT 0`
+
+/**
+ * The column added when the duration was allowed, migrated the same way and
+ * for the same reason. See `ADD_VIDEO`.
+ *
+ * `-1` rather than `0` for "no answer": zero is a duration a real call can
+ * have, and a default that collides with a real value is a column that
+ * cannot say it does not know.
+ */
+const ADD_SECONDS = `ALTER TABLE call_log ADD COLUMN seconds INTEGER NOT NULL DEFAULT -1`
 
 const DIRECTIONS = new Set<string>(['in', 'out'])
 const OUTCOMES = new Set<string>(['answered', 'missed', 'declined', 'unplaced'])
@@ -163,11 +211,12 @@ export async function openCallLog(
   // Fails on a notebook that already has the column, which is the state it
   // wants. See `ADD_VIDEO`.
   await database.execute(ADD_VIDEO).catch(() => undefined)
+  await database.execute(ADD_SECONDS).catch(() => undefined)
 
   return {
     recent: async (limit = A_SCREENFUL) => {
       const { rows } = await database.execute(
-        'SELECT scope, peer, at, direction, outcome, video FROM call_log ' +
+        'SELECT scope, peer, at, direction, outcome, video, seconds FROM call_log ' +
           'ORDER BY at DESC, id DESC LIMIT ?',
         [limit],
       )
@@ -176,10 +225,8 @@ export async function openCallLog(
         // Read defensively rather than cast, for the reason the names store
         // gives: this is a file on a device, and a row of the wrong shape is
         // a row to drop rather than a screen to crash.
-        const { scope, peer, at, direction, outcome, video } = row as Record<
-          string,
-          unknown
-        >
+        const { scope, peer, at, direction, outcome, video, seconds } =
+          row as Record<string, unknown>
         if (typeof scope !== 'string' || typeof peer !== 'string') continue
         if (typeof at !== 'number') continue
         if (typeof direction !== 'string' || !DIRECTIONS.has(direction))
@@ -195,6 +242,13 @@ export async function openCallLog(
           // reads as `0`, which is the truth about it: the application could
           // not place a video call then.
           ...(video === 1 || video === true ? { video: true } : {}),
+          // Anything but a whole number of seconds that a call could have
+          // lasted is the column saying it does not know: the `-1` default
+          // on a row written before this existed, and any other shape a
+          // file on a device can turn out to hold.
+          ...(typeof seconds === 'number' && seconds >= 0
+            ? { seconds: Math.round(seconds) }
+            : {}),
         })
       }
       return collapsed(found)
@@ -263,6 +317,30 @@ export async function openCallLog(
         return false
       }
     },
+
+    lasted: async (scope, seconds) => {
+      // A negative duration is a clock that went backwards -- the device's
+      // own, since both ends of this measurement are read from it. Refused
+      // rather than stored, because `-1` is how the column says it does not
+      // know and a row must not claim to know something absurd.
+      if (!Number.isFinite(seconds) || seconds < 0) return false
+      try {
+        // The same two steps `settle` explains.
+        const { rows } = await database.execute(
+          'SELECT id FROM call_log WHERE scope = ? ORDER BY at DESC, id DESC LIMIT 1',
+          [scope],
+        )
+        const id = (rows[0] as { id?: unknown } | undefined)?.id
+        if (typeof id !== 'number') return false
+        await database.execute('UPDATE call_log SET seconds = ? WHERE id = ?', [
+          Math.round(seconds),
+          id,
+        ])
+        return true
+      } catch {
+        return false
+      }
+    },
   }
 }
 
@@ -287,8 +365,22 @@ function collapsed(rows: readonly CallRecord[]): readonly CallRecord[] {
       kept.push(row)
       continue
     }
-    if (last.outcome === 'missed' && row.outcome !== 'missed') {
-      kept[kept.length - 1] = { ...last, outcome: row.outcome }
+    // WHAT EITHER ROW KNOWS, THE FOLDED ROW KNOWS.
+    //
+    // Only the outcome was carried across at first, which was right while
+    // the outcome was the only thing a second writer could learn. It is not
+    // any more: the wake writes the ring and the runtime writes the call,
+    // and dropping the half the older row happens to hold would lose a
+    // picture or a duration to a fold nobody can see.
+    kept[kept.length - 1] = {
+      ...last,
+      ...(last.outcome === 'missed' && row.outcome !== 'missed'
+        ? { outcome: row.outcome }
+        : {}),
+      ...(last.video === true || row.video === true ? { video: true } : {}),
+      ...(last.seconds === undefined && row.seconds !== undefined
+        ? { seconds: row.seconds }
+        : {}),
     }
   }
   return kept
@@ -301,5 +393,6 @@ export function forgetfulCallLog(): CallLog {
     add: async () => false,
     settle: async () => false,
     sawVideo: async () => false,
+    lasted: async () => false,
   }
 }
