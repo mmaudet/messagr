@@ -90,6 +90,7 @@ import {
   floors,
   layout,
   space,
+  stroke,
   type as typeScale,
 } from './src/design/tokens'
 import { mergeTimeline, type TimelineEntry } from './src/timeline/mergeTimeline'
@@ -2984,18 +2985,36 @@ export function App({
                     Every other kind is a failure nobody on this screen can
                     do anything about, and it is in the launch report under
                     `history`, which is where somebody diagnosing it looks. */}
+                  {/* A NOTICE, NOT A MESSAGE, and it has to look like
+                    neither a bubble nor the running text of the screen.
+                    It was `typeScale.body` on no ground at all, laid
+                    straight into the block -- so it arrived wider than
+                    every bubble above it and flush against the glass, in
+                    the largest type on the screen. Seen on the emulator
+                    the moment the vouching bench proved itself.
+
+                    The ochre is `Trust.tsx`'s word for the same thing:
+                    « une personne a jugé », waiting on something stronger.
+                    Both sentences here are that -- one says a past
+                    arrived because somebody answered for you, the other
+                    that one was offered and not taken up. Neither is a
+                    measure, so neither is red. */}
                   {claimed !== null && claimed.claimed === 'imported' && (
-                    <Text testID="history-claim" style={styles.historyNote}>
-                      {t('vouch_history_arrived')}
-                    </Text>
+                    <View style={styles.historyNote}>
+                      <Text testID="history-claim" style={styles.historyText}>
+                        {t('vouch_history_arrived')}
+                      </Text>
+                    </View>
                   )}
                   {claimed !== null &&
                     claimed.claimed !== 'none' &&
                     claimed.claimed !== 'imported' &&
                     claimed.kind === 'untrusted' && (
-                      <Text testID="history-claim" style={styles.historyNote}>
-                        {t('vouch_history_untrusted')}
-                      </Text>
+                      <View style={styles.historyNote}>
+                        <Text testID="history-claim" style={styles.historyText}>
+                          {t('vouch_history_untrusted')}
+                        </Text>
+                      </View>
                     )}
                 </View>
               )}
@@ -3365,5 +3384,16 @@ const styles = StyleSheet.create({
   // Spread rather than picked apart: size, leading, weight and tracking
   // travel together, and separating them is how a line-height floor gets
   // broken without anyone deciding to break it.
-  historyNote: typeScale.body,
+  historyNote: {
+    marginHorizontal: layout.screenGutter,
+    marginTop: space.m,
+    padding: space.m,
+    backgroundColor: color.wait['100'],
+    borderLeftWidth: stroke.accent,
+    borderLeftColor: color.wait['500'],
+  },
+  historyText: {
+    ...typeScale.bodySm,
+    color: color.wait['700'],
+  },
 })
