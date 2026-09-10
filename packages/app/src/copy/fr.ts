@@ -189,6 +189,14 @@ export const fr = {
   selection_clear: 'Quitter la sélection',
   selection_copy: 'Copier',
   selection_forward: 'Transférer',
+  // « Enregistrer » et non « Télécharger » : rien n'est téléchargé, la
+  // photographie est déjà là. Ce que le geste fait est la sortir d'ici pour
+  // la mettre où la personne garde ses propres images -- voir
+  // `keepPhotograph.ts` pour ce que cela coûte.
+  selection_keep: 'Enregistrer',
+  selection_kept:
+    'Photographie enregistrée dans la photothèque de cet appareil.',
+  selection_keep_failed: 'La photographie n’a pas pu être enregistrée.',
   selection_remove: 'Supprimer',
   'remove_title %1$d': 'Supprimer %1$d message(s) ?',
   remove_everyone: 'Supprimer pour tout le monde',

@@ -18,6 +18,7 @@
     "@dr.pogodin/react-native-fs": "2.40.2",
     "@notifee/react-native": "^9.1.8",
     "@op-engineering/op-sqlite": "18.2.0",
+    "@react-native-camera-roll/camera-roll": "7.10.2",
     "@react-native-clipboard/clipboard": "1.16.3",
     "@react-native-firebase/app": "^26.4.0",
     "@react-native-firebase/messaging": "^26.4.0",

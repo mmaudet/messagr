@@ -52,6 +52,15 @@ export interface ConversationProps {
   /** Used only to tell this account's own messages from everyone else's. */
   readonly selfUserId: string
   readonly sending: 'idle' | 'sending' | 'failed'
+  /**
+   * What became of the last photograph somebody asked to keep, or `null`.
+   *
+   * Beside `sending` because it is the same kind of thing -- a line under
+   * the conversation saying what just happened to a picture -- and in a
+   * different field because the two can be true at once: a photograph can
+   * be saved while another is still being sent.
+   */
+  readonly kept: 'kept' | 'failed' | null
   /** Reactions, grouped by the message they point at. */
   readonly reactions?: ReadonlyMap<string, readonly ReactionTally[]>
   /** This account's own messages somebody else has read. */
@@ -95,6 +104,7 @@ export function Conversation({
   entries,
   selfUserId,
   sending,
+  kept,
   reactions = new Map(),
   selected = EMPTY,
   onToggle = () => {},
@@ -240,6 +250,18 @@ export function Conversation({
             )}
           </React.Fragment>
         ))
+      )}
+
+      {/* SAID, AND NOT ONLY DONE. A photograph that leaves for the gallery
+          leaves silently otherwise: nothing on this screen changes, and the
+          person has to open another application to find out whether the
+          gesture worked. The failing half is the one they can act on. */}
+      {kept !== null && (
+        <Text
+          testID="conversation-kept"
+          style={[styles.note, { color: palette.neutral['600'] }]}>
+          {kept === 'kept' ? t('selection_kept') : t('selection_keep_failed')}
+        </Text>
       )}
 
       {sending !== 'idle' && (
