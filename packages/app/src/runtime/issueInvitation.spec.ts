@@ -231,6 +231,57 @@ describe('issueInvitation', () => {
   })
 })
 
+describe('what a conversation is created with', () => {
+  it('asks for a room version whose creator is an ordinary member', async () => {
+    // MEASURED. In version 12 the creator's power is implicit and infinite,
+    // so no `redact` value can be put above it: set to 101 and accepted, the
+    // creator still redacted the other person's message with a 200. In
+    // version 11 the same experiment answers 403 in both directions, which
+    // is the symmetry #196 asks for.
+    const { deps, calls } = harness()
+    await issueInvitation(deps, 'messagr.eu')
+    const made = calls.find(call => call.path.endsWith('/createRoom'))
+    expect(JSON.parse(made?.body ?? '{}')).toEqual({
+      preset: 'private_chat',
+      room_version: '11',
+    })
+  })
+
+  it("puts redacting somebody else out of everybody's reach", async () => {
+    const { deps, calls } = harness()
+    await issueInvitation(deps, 'messagr.eu')
+    const rules = calls.find(
+      call =>
+        call.method === 'PUT' && call.path.endsWith('/m.room.power_levels'),
+    )
+    const written = JSON.parse(rules?.body ?? '{}')
+    // Above the 100 `createRoom` gives the creator, so nobody clears it.
+    // What survives is Matrix's own rule: anybody may redact their own.
+    expect(written.redact).toBe(101)
+    expect(written.invite).toBe(50)
+    expect(written.users_default).toBe(0)
+  })
+
+  it('keeps whatever else the homeserver put in the power levels', async () => {
+    // A PUT replaces the whole event, so building one from scratch would
+    // drop the server's own entries. The two the fork writes are here.
+    const { deps, calls } = harness({
+      powerLevels: {
+        users: { '@me:x': 100 },
+        events: { 'm.room.tombstone': 150 },
+      },
+    })
+    await issueInvitation(deps, 'messagr.eu')
+    const rules = calls.find(
+      call =>
+        call.method === 'PUT' && call.path.endsWith('/m.room.power_levels'),
+    )
+    expect(JSON.parse(rules?.body ?? '{}').events).toEqual({
+      'm.room.tombstone': 150,
+    })
+  })
+})
+
 describe('admitDrawnEntrant', () => {
   const drawn = (who: string) => ({
     status: 200,

@@ -65,8 +65,16 @@ function chosen(
  * Whether "remove for everyone" is offered.
  *
  * Only on this account's own events. Redacting somebody else's message is a
- * moderation power, not a delete button -- and in a one-to-one it exists
+ * moderation power, not a delete button -- and in a one-to-one it existed
  * only by an accident of room defaults that nobody chose (#196).
+ *
+ * THE PROTOCOL AGREES NOW, and this rule stops being the only thing holding
+ * it. A conversation is created with `redact` above every level anybody
+ * holds, so the homeserver refuses a redaction of somebody else's event from
+ * either side -- measured, `403 M_FORBIDDEN` both ways. This screen was the
+ * whole of the answer while the asymmetry was live in the room; it is now
+ * the screen agreeing with the room rather than covering for it, which is
+ * what makes it safe against another Matrix client on the same account.
  *
  * A selected event the timeline does not carry blocks it too: nothing can
  * say whose it is, so nothing offers to destroy it.
