@@ -105,6 +105,7 @@ import { removeMessage } from './src/runtime/cryptoPump'
 import { photographForForward } from './src/runtime/cryptoPump'
 import { openNotebook } from './src/runtime/notebook'
 import { forgetfulHidden, type Hidden } from './src/runtime/hiddenStore'
+import { forgetfulReadBy, type ReadBy } from './src/runtime/readByStore'
 import {
   canCopy,
   canForward,
@@ -475,6 +476,21 @@ export function App({
    * inside. `receipts.ts` says why the mark is held apart from what it marks.
    */
   const readMarksRef = useRef<Map<string, number>>(new Map())
+  /**
+   * The notebook page that makes those marks survive a relaunch.
+   *
+   * A Matrix receipt is ephemeral and sent once, so a mark held only in the
+   * map above is a second tick that disappears every time the application
+   * starts -- and comes back only if the correspondent reads something new,
+   * which on a quiet conversation is never. Reported twice in the same
+   * words. `readByStore.ts` argues the page.
+   *
+   * The map stays as the fast path the screen draws from; this is where it
+   * is read from at launch and written to as it rises. The "never goes
+   * backwards" rule is the store's, so the file cannot hold a lower mark
+   * whatever a caller does.
+   */
+  const readByRef = useRef<ReadBy>(forgetfulReadBy())
   const [openScope, setOpenScope] = useState<string | null>(null)
   const openScopeRef = useRef<string | null>(null)
   /**
@@ -757,7 +773,13 @@ export function App({
     if (seen !== undefined && seen.length > 0) {
       const found = markUpTo(entries, seen, selfUserId)
       const held = readMarksRef.current.get(scope) ?? 0
-      if (found !== null && found > held) readMarksRef.current.set(scope, found)
+      if (found !== null && found > held) {
+        readMarksRef.current.set(scope, found)
+        // AND INTO THE NOTEBOOK, so the tick survives the next launch. Not
+        // awaited: the screen already has the mark, and a page that would
+        // not take it costs a tick after a relaunch rather than now.
+        readByRef.current.raise(scope, found).catch(() => {})
+      }
     }
     setReadHere(
       readAtMark(entries, readMarksRef.current.get(scope) ?? 0, selfUserId),
@@ -808,6 +830,10 @@ export function App({
       outstandingRef.current = opening.outstanding
       listCacheRef.current = opening.list
       hiddenRef.current = opening.hidden
+      readByRef.current = opening.readBy
+      // SEEDED BEFORE ANYTHING IS DRAWN, so a conversation opened on the
+      // first frame already knows how far it was read.
+      readMarksRef.current = new Map(await opening.readBy.all())
       setHidden(await opening.hidden.all())
       logEvent(opening.opened ? 'info' : 'warn', 'MESSAGR_GIVEN_NAMES', {
         opened: opening.opened,
@@ -1152,6 +1178,7 @@ export function App({
                   const held = readMarksRef.current.get(scope) ?? 0
                   if (found !== null && found > held) {
                     readMarksRef.current.set(scope, found)
+                    readByRef.current.raise(scope, found).catch(() => {})
                   }
                 }
                 // FROM THE MARK, AND ALWAYS -- including when it is zero,
@@ -1839,7 +1866,10 @@ export function App({
                     )
                     if (found === null) continue
                     const held = readMarksRef.current.get(scope) ?? 0
-                    if (found > held) readMarksRef.current.set(scope, found)
+                    if (found > held) {
+                      readMarksRef.current.set(scope, found)
+                      readByRef.current.raise(scope, found).catch(() => {})
+                    }
                   }
                   const openNow = openScopeRef.current
                   if (openNow !== null) {

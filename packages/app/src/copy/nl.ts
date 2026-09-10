@@ -370,7 +370,7 @@ export const nl: Readonly<Record<CopyKey, string>> = {
   call_speaker: 'Luidspreker',
   call_camera_on: 'Camera',
   call_camera_off: 'Camera uitzetten',
-  call_switch_camera: 'Camera wisselen',
+  call_switch_camera: 'Wisselen',
   call_their_camera_off: 'Hun camera staat uit',
   call_failed_no_relay:
     'Deze server heeft geen oproeprelais: bellen was niet mogelijk.',

@@ -377,7 +377,7 @@ export const de: Readonly<Record<CopyKey, string>> = {
   call_speaker: 'Lautsprecher',
   call_camera_on: 'Kamera',
   call_camera_off: 'Kamera ausschalten',
-  call_switch_camera: 'Kamera wechseln',
+  call_switch_camera: 'Wechseln',
   call_their_camera_off: 'Die Kamera der anderen Person ist aus',
   call_failed_no_relay:
     'Dieser Server hat kein Anrufrelais: Der Anruf war nicht möglich.',

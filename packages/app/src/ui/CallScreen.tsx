@@ -472,7 +472,12 @@ function Round({
         ]}>
         <TabIcon glyph={glyph} tint={color.surface.paper} size={ICON} />
       </Pressable>
-      <Text style={styles.label}>{label}</Text>
+      {/* TWO LINES AND NO MORE. A label is what tells somebody which
+          control this is, and one that wrapped to three lines pushed the
+          row's height around as the call changed state. */}
+      <Text style={styles.label} numberOfLines={2}>
+        {label}
+      </Text>
     </View>
   )
 }
@@ -481,8 +486,22 @@ function Round({
 const LINGERS_MS = 3_000
 
 const AVATAR = 96
-const ICON = 28
-const ROUND = 64
+const ICON = 24
+/**
+ * How wide a control is.
+ *
+ * IT WAS 64, AND FIVE OF THEM DID NOT FIT. Three controls at 64 with `xxl`
+ * between them came to 288 points, which any telephone has. §4.5 then asked
+ * for five -- mute, speaker, camera, switch camera, hang up -- and nobody
+ * retook the measurement: 5 x 64 + 4 x 32 is 448, against roughly 328 on a
+ * narrow screen. Reported from the Pixel as icons running off the edge, with
+ * the functions beyond them unreachable.
+ *
+ * 56 is 27 per cent above `floors.touchTargetMin` and leaves the row room to
+ * breathe at five. The slots share the width evenly, so the row is right at
+ * three as well.
+ */
+const ROUND = 56
 
 const styles = StyleSheet.create({
   ground: {
@@ -537,10 +556,16 @@ const styles = StyleSheet.create({
   },
   controls: {
     flexDirection: 'row',
-    justifyContent: 'center',
-    gap: space.xxl,
+    // EVENLY, AND EACH SLOT TAKES ITS SHARE. Centring a row with a fixed gap
+    // is a row that grows with what is in it; sharing the width is a row
+    // that fits whatever it holds.
+    justifyContent: 'space-evenly',
+    alignItems: 'flex-start',
+    paddingHorizontal: space.s,
   },
-  control: { alignItems: 'center', gap: space.xs },
+  // `minWidth: 0` so a long label -- "Changer de caméra" -- shrinks its slot
+  // instead of pushing the others off the screen.
+  control: { flex: 1, minWidth: 0, alignItems: 'center', gap: space.xs },
   round: {
     width: ROUND,
     height: ROUND,
@@ -552,6 +577,7 @@ const styles = StyleSheet.create({
   },
   pressed: { opacity: 0.7 },
   label: {
+    textAlign: 'center',
     ...type.caption,
     color: color.agent['400'],
   },

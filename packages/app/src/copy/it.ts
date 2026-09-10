@@ -369,7 +369,7 @@ export const it: Readonly<Record<CopyKey, string>> = {
   call_speaker: 'Vivavoce',
   call_camera_on: 'Fotocamera',
   call_camera_off: 'Spegnere la fotocamera',
-  call_switch_camera: 'Cambiare fotocamera',
+  call_switch_camera: 'Cambiare',
   call_their_camera_off: 'La sua fotocamera è spenta',
   call_failed_no_relay:
     'Questo server non ha un relay per le chiamate: la chiamata non è partita.',
