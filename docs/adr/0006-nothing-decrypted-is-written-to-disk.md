@@ -150,3 +150,43 @@ photograph is not a cache of anything. ADR-0006's amendment of 8 September —
 the conversation list's openings — is the other exception, and the two are
 alike in the way that matters: both are bounded, both are named, and neither
 is a message store.
+
+## Clarified, 10 September 2026 — a dependency's cache is disk
+
+#209, found while checking that #169's own temporary file was removed:
+choosing **one** photograph and sending it left three readable JPEGs in this
+application's cache — two written by the image picker, one by the resizer
+that makes the thumbnail. All three began `FF D8 FF`, and they were still
+there minutes later.
+
+Nothing had decided that. `imageLibrary.ts` carried an argument that this
+decision was not bent by reading a file the picker had written, since the
+photograph came from the person's own gallery and was on that disk before
+the application existed. **That argument is right about the source and says
+nothing about the copies**, which is how three of them came to sit in a
+cache indefinitely.
+
+**The rule this states, which was assumed and never written.** A directory a
+dependency writes into is this application's disk. It does not matter that
+the library chose the path, that the bytes came from the person's own
+gallery, or that the directory is private to the process: if the application
+caused a file to exist, this decision governs it.
+
+**Why it matters even though the source was already on the device.** The
+copies outlive what they copy. Delete the photograph from the gallery and
+Messagr still has it, in a directory nobody thinks of as holding
+photographs, on a device somebody may hand to a repair shop. That is a
+different fact from "the picture is on this telephone", and nobody chose it.
+
+**What is done about it.** Each copy is unlinked as soon as its bytes are in
+memory, including on the path where a thumbnail is judged too large to keep
+— which was one of the three. Nothing is unlinked unless it sits in a
+directory this application owns, because a module that removes whatever path
+it is handed is one bad answer away from deleting a photograph out of
+somebody's gallery. And a sweep at launch clears what earlier versions left,
+which is what the telephones in use are carrying now.
+
+**This is a clarification and not an exception.** No new place is allowed to
+hold plaintext. What changes is that the sentence at the top of this
+document is now understood to reach a library's cache, which it always
+meant.
