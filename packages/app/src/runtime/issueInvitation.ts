@@ -86,10 +86,78 @@ const TTL_SECONDS = 3600
 const INVITE_COST = 50
 
 /**
+ * The level required to redact somebody else's event, set above every level
+ * anybody in a conversation of this product ever holds.
+ *
+ * # WHY THERE IS A NUMBER HERE AT ALL
+ *
+ * #196: nobody decided that the inviter could delete the other person's
+ * words, and in a conversation between two people that is what was true.
+ * `createRoom` writes no `redact` key and the specification's default is 50,
+ * so the creator (100) cleared it and the other person (0, or 50 once
+ * vouched for) did not. An asymmetry of moderation at the centre of a
+ * relationship the product presents as symmetric, and the glossary knows
+ * neither a privileged inviter nor a moderator in a tête-à-tête.
+ *
+ * Above 100, which is what `createRoom` gives the creator, so **nobody**
+ * reaches it. What survives is the rule Matrix always applies: a person may
+ * redact their own events whatever the level says. Two people, each able to
+ * withdraw their own words and neither able to touch the other's.
+ *
+ * # WHY 101 AND NOT SOMETHING DERIVED
+ *
+ * The levels this product hands out are known and few -- 100 to the creator,
+ * 50 to somebody vouched for, 0 to an entrant -- so one above the top is a
+ * fact rather than a guess. A value computed from whatever the homeserver
+ * happened to write would be a number that changes meaning when the server
+ * does, which is the opposite of what this is for.
+ */
+const NOBODY_ELSE_REDACTS = 101
+
+/**
+ * The room version a conversation is created in, and it is pinned on purpose.
+ *
+ * MEASURED, NOT REASONED. The homeserver makes version 12 rooms by default,
+ * and in version 12 the creator's power is **implicit and infinite**: `users`
+ * comes back empty and no finite `redact` can be put above them. Tried on
+ * 10 September 2026 against a real conversation -- `redact` set to 101,
+ * accepted, and the creator still redacted the other person's message with a
+ * `200`.
+ *
+ * The same experiment in version 11, where the creator is an ordinary member
+ * at 100:
+ *
+ * | | their own words | the other's |
+ * |---|---|---|
+ * | the inviter (creator) | 200 | **403** |
+ * | the other person | 200 | **403** |
+ *
+ * So the symmetry this product claims is only reachable below version 12.
+ * What version 12 adds is a creator nobody can strip of power, which exists
+ * to stop a room being taken over -- worth having where there is a hierarchy
+ * to protect, and worth nothing between two people who are supposed to be
+ * equals. Given the choice between the two, this product wants the equality.
+ *
+ * CONVERSATIONS MADE BEFORE THIS ARE VERSION 12 AND STAY THAT WAY. Nothing
+ * short of upgrading a room changes its version, and an upgrade is a visible,
+ * disruptive act -- a new room, a tombstone in the old one. The asymmetry
+ * remains in conversations already started, which is worth knowing rather
+ * than quietly assuming otherwise.
+ */
+const ROOM_VERSION = '11'
+
+/**
  * Creates the conversation, sets the rules it must carry, and mints one
  * single-use invitation for it.
  *
  * # The rules are not decoration
+ *
+ * `createRoom` leaves no `redact` key either, and there the default is 50 --
+ * which the creator clears and nobody else does. #196: that made the inviter
+ * able to delete the other person's words in a conversation of two, which
+ * nobody decided and which the glossary has no word for. See
+ * `NOBODY_ELSE_REDACTS`, and `ROOM_VERSION` for why the room version is
+ * pinned rather than left to the homeserver.
  *
  * `createRoom` leaves no `invite` key, and the specification's default for a
  * missing one is **0**: every member may invite. A conversation of this
@@ -120,7 +188,7 @@ export async function issueInvitation(
       'POST',
       '/_matrix/client/v3/createRoom',
       {},
-      JSON.stringify({ preset: 'private_chat' }),
+      JSON.stringify({ preset: 'private_chat', room_version: ROOM_VERSION }),
     )
     const roomId = (JSON.parse(created) as { room_id?: unknown }).room_id
     if (typeof roomId !== 'string' || roomId === '') {
@@ -213,8 +281,8 @@ export async function issueInvitation(
 }
 
 /**
- * Reads the power levels, raises the cost of inviting, and turns encryption
- * on.
+ * Reads the power levels, raises the cost of inviting, puts redaction of
+ * somebody else's words out of everybody's reach, and turns encryption on.
  *
  * Read then write, touching only what has to change: `powerLevels.ts` carries
  * the content as an opaque object for exactly this reason — a PUT replaces
@@ -236,7 +304,12 @@ async function setTheRules(http: HttpRequester, scope: string): Promise<void> {
     'PUT',
     `${path}/m.room.power_levels`,
     {},
-    JSON.stringify({ ...held, invite: INVITE_COST, users_default: 0 }),
+    JSON.stringify({
+      ...held,
+      invite: INVITE_COST,
+      users_default: 0,
+      redact: NOBODY_ELSE_REDACTS,
+    }),
   )
 
   await http.authedRequest(
