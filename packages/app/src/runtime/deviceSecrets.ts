@@ -112,6 +112,28 @@ export const pushkeySecrets = keychainStore('eu.messagr.pushkey')
  */
 export const backupSecrets = keychainStore('eu.messagr.backup')
 
+/**
+ * Whether this device has ever put the backup question. See backupPrompt.ts:
+ * a refusal is recorded for good, so this is what stops the product asking
+ * twice.
+ *
+ * Its own entry rather than a field beside the commitment, because the two
+ * are written at unrelated moments by unrelated code and either can be true
+ * without the other: sharing one would let a message arriving rewrite the
+ * record of what somebody answered.
+ */
+export const backupAskedSecrets = keychainStore('eu.messagr.backup-asked')
+
+/**
+ * Whether a message from somebody else has ever arrived on this device.
+ *
+ * Received, not sent, and `offerBackup.ts` carries the reason: sending
+ * proves the account works, receiving is the first time this device holds a
+ * key nobody else has. Not a secret; here because `SecretStore` is the only
+ * durable per-device store this application has.
+ */
+export const backupReceivedSecrets = keychainStore('eu.messagr.backup-received')
+
 /** Where the crypto store's passphrase lives. See cryptoMachineConfig.ts. */
 export const cryptoStoreSecrets = keychainStore('eu.messagr.crypto-store')
 
