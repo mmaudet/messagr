@@ -155,6 +155,16 @@ export async function pickFromLibrary(): Promise<readonly PickedImage[]> {
     // is a copy nothing will ask for again.
     await forget(asset.uri)
   }
+  // AND THE ONES IT NEVER NAMED. The picker writes more copies than it
+  // answers paths for -- measured, two files for one photograph chosen, and
+  // `asset.uri` is one of them. Chasing the second through the library's
+  // internals would be guessing at a version; sweeping its own directory for
+  // its own prefix is what it actually leaves, whatever it decides to leave.
+  //
+  // Safe here for the reason it is safe at launch: the shapes are the
+  // library's own and the directories are this application's. See
+  // `pickedLitter.ts`.
+  await sweepWhatThePickerLeft().catch(() => undefined)
   return picked
 }
 
