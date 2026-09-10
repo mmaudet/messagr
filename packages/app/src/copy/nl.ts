@@ -219,8 +219,10 @@ export const nl: Readonly<Record<CopyKey, string>> = {
     'U komt binnen op uitnodiging, niet via een formulier',
   promise_action: 'Beginnen',
   list_title: 'Gesprekken',
-  list_invitation_ignored:
-    'U hebt een uitnodiging geopend, en deze telefoon heeft al een account. Ze is niet gebruikt en blijft geldig voor de persoon voor wie ze bedoeld was.',
+  list_invitation_used:
+    'U hebt een uitnodiging geopend. Het gesprek dat ze opent, verschijnt zo in uw lijst.',
+  list_invitation_refused:
+    'Deze uitnodiging kon niet worden gebruikt. Vraag de afzender om een nieuwe.',
   list_not_in_yet:
     'U bent er nog niet in. Open de uitnodigingslink die iemand u heeft gestuurd: dat is de enige deur, en daarvoor kan de applicatie niets doen.',
   list_empty:
@@ -437,6 +439,7 @@ export const nl: Readonly<Record<CopyKey, string>> = {
   conversation_attaching: 'De foto wordt versleuteld en verstuurd…',
   'list_unread %1$d': '%1$d ongelezen berichten',
   list_nobody_else: 'Verder niemand hier',
+  list_nobody_joined: 'Niemand heeft aan dit gesprek deelgenomen',
   invite_open: 'Iemand uitnodigen',
   back_to_newest: 'Terug naar het nieuwste bericht',
 }

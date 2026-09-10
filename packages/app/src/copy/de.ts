@@ -227,8 +227,10 @@ export const de: Readonly<Record<CopyKey, string>> = {
     'Sie kommen per Einladung herein, nicht per Formular',
   promise_action: 'Beginnen',
   list_title: 'Unterhaltungen',
-  list_invitation_ignored:
-    'Sie haben eine Einladung geöffnet, und dieses Telefon hat bereits ein Konto. Sie wurde nicht verbraucht und gilt weiterhin für die Person, für die sie bestimmt war.',
+  list_invitation_used:
+    'Sie haben eine Einladung geöffnet. Das Gespräch, das sie eröffnet, erscheint gleich in Ihrer Liste.',
+  list_invitation_refused:
+    'Diese Einladung konnte nicht verwendet werden. Bitten Sie die absendende Person um eine neue.',
   list_not_in_yet:
     'Sie sind noch nicht drin. Öffnen Sie den Einladungslink, den Ihnen jemand geschickt hat: er ist die einzige Tür, und davor kann die Anwendung nichts tun.',
   list_empty:
@@ -446,6 +448,7 @@ export const de: Readonly<Record<CopyKey, string>> = {
   conversation_attaching: 'Foto wird verschlüsselt und gesendet …',
   'list_unread %1$d': '%1$d ungelesene Nachrichten',
   list_nobody_else: 'Sonst niemand hier',
+  list_nobody_joined: 'Niemand ist diesem Gespräch beigetreten',
   invite_open: 'Jemanden einladen',
   back_to_newest: 'Zurück zur neuesten Nachricht',
 }

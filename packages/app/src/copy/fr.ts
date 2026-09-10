@@ -316,8 +316,15 @@ export const fr = {
   // word "federation" -- §13.19 invariant 6. What went wrong technically goes
   // to the log; a row says what it means for the person reading it.
   list_title: 'Conversations',
-  list_invitation_ignored:
-    'Vous avez ouvert une invitation, et ce téléphone a déjà un compte. Elle n’a pas été utilisée : elle reste valable pour la personne à qui elle était destinée.',
+  // TWO OUTCOMES, NOT ONE POLITE REFUSAL. The line used to say « elle n'a
+  // pas été utilisée : elle reste valable pour la personne à qui elle était
+  // destinée », which was true and useless -- the person it was destined for
+  // was the one reading it. The link is spent for the account this device
+  // already has now, so the news is that a conversation is coming.
+  list_invitation_used:
+    'Vous avez ouvert une invitation. La conversation qu’elle ouvre va apparaître dans votre liste.',
+  list_invitation_refused:
+    'Cette invitation n’a pas pu être utilisée. Demandez-en une nouvelle à la personne qui vous l’a envoyée.',
   list_not_in_yet:
     'Vous n’êtes pas encore entré. Ouvrez le lien d’invitation qu’on vous a envoyé : c’est la seule porte, et l’application ne peut rien faire avant.',
   list_empty:
@@ -639,6 +646,12 @@ export const fr = {
   // identifier on a screen a person reads is the diagnostic string §13.27
   // refuses, and this is a fact with a true sentence.
   list_nobody_else: 'Personne d’autre ici',
+  // The other shape of being alone: an invitation nobody took up. A
+  // conversation is created the moment a link is minted, so every unclaimed
+  // invitation leaves one of these on the issuer's list. True whichever way
+  // it happened -- never opened, expired, or declined because the two of
+  // them already had a conversation.
+  list_nobody_joined: 'Personne n’a rejoint cette conversation',
   invite_open: 'Inviter quelqu’un',
   back_to_newest: 'Revenir au dernier message',
 } as const

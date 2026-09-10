@@ -54,11 +54,13 @@ import {
 import { getErrorMessage } from './errors'
 import { logEvent } from './log'
 import {
-  fetchInvitedRooms,
+  fetchInvitations,
+  declineRoom,
   fetchJoinedMembers,
   fetchJoinedRooms,
   joinRoom,
 } from './encryptedSend'
+import { theOtherMember } from './vouch'
 import { reactTo, redactEvent, unreact, type ReactingDeps } from './react'
 import { tallyReactions, type ReactionTally } from '../timeline/reactions'
 import { probeUnsettledEncrypt, type ProbeReport } from './panicProbe'
@@ -451,15 +453,37 @@ export async function loadConversation(
  */
 export async function enterAnyInvitations(
   sessionClient: ReturnType<typeof createClient>,
+  selfUserId: string,
 ): Promise<Entered> {
+  const http = makePumpHttp(sessionClient)
   const entered = await enterInvitations({
-    http: makePumpHttp(sessionClient),
-    invitedRooms: fetchInvitedRooms,
+    http,
+    invitedRooms: fetchInvitations,
     join: joinRoom,
+    decline: declineRoom,
+    // ONE CALL PER CONVERSATION, and `enterInvitations` is careful about
+    // when it asks: never on a tick with no invitation on it, which is
+    // almost every tick. Direct conversations only -- a room of three has
+    // no single person to be already talking to.
+    alreadyWith: async asking => {
+      const already = new Set<string>()
+      for (const scope of await fetchJoinedRooms(asking)) {
+        const other = theOtherMember(
+          await fetchJoinedMembers(asking, scope),
+          selfUserId,
+        )
+        if (other !== null) already.add(other)
+      }
+      return already
+    },
   })
   // Only when something happened: this runs on every sync tick, and a line
   // per tick saying "nobody invited anybody" would bury the one that matters.
-  if (entered.joined.length > 0 || entered.refused.length > 0) {
+  if (
+    entered.joined.length > 0 ||
+    entered.refused.length > 0 ||
+    entered.collapsed.length > 0
+  ) {
     logEvent(entered.refused.length > 0 ? 'warn' : 'info', 'MESSAGR_ENTERED', {
       ...entered,
     })

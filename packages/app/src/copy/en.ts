@@ -224,8 +224,10 @@ export const en: Readonly<Record<CopyKey, string>> = {
   promise_point_invitation: 'You enter by invitation, not by form',
   promise_action: 'Begin',
   list_title: 'Conversations',
-  list_invitation_ignored:
-    'You opened an invitation, and this phone already has an account. It was not used: it is still valid for the person it was meant for.',
+  list_invitation_used:
+    'You opened an invitation. The conversation it opens will appear in your list.',
+  list_invitation_refused:
+    'This invitation could not be used. Ask the person who sent it for a new one.',
   list_not_in_yet:
     'You are not in yet. Open the invitation link somebody sent you: it is the only door, and the application can do nothing before it.',
   list_empty: 'No conversations yet. Invite someone to start one.',
@@ -439,6 +441,7 @@ export const en: Readonly<Record<CopyKey, string>> = {
   conversation_attaching: 'Encrypting and sending the photo…',
   'list_unread %1$d': '%1$d unread messages',
   list_nobody_else: 'Nobody else here',
+  list_nobody_joined: 'Nobody joined this conversation',
   invite_open: 'Invite someone',
   back_to_newest: 'Back to the latest message',
 }

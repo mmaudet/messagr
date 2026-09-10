@@ -170,7 +170,7 @@ import { Evict } from './src/ui/Evict'
 import { Vouch } from './src/ui/Vouch'
 import { setCatalogue, t } from './src/copy'
 import type { Language } from './src/copy/languages'
-import { enterWithASession } from './src/runtime/entry'
+import { enterWithASession, type InvitationOutcome } from './src/runtime/entry'
 import { initialLink, watchLinks } from './src/runtime/incomingLink'
 import { useKeyboardInset } from './src/ui/keyboardInset'
 import { servicePoster } from './src/runtime/servicePoster'
@@ -608,7 +608,9 @@ export function App({
   // Set once, at entry, and never cleared: the launch either was opened with
   // an unspent invitation or it was not, and a note that disappeared while
   // somebody read it would be worse than none.
-  const [invitationIgnored, setInvitationIgnored] = useState(false)
+  // What became of an invitation this launch was opened with. `null` when
+  // there was none, which is almost every launch.
+  const [linkOutcome, setLinkOutcome] = useState<InvitationOutcome | null>(null)
   // `null` until the launch has answered. Distinguishing "not in" from "not
   // yet known" keeps the list from telling somebody they are locked out for
   // the second the keystore takes to answer.
@@ -995,8 +997,8 @@ export function App({
             // Everything uncertain resolves to `restored-session`, which
             // creates nothing. See signUpMarker.ts.
             setInYet(entered.entered)
-            if (entered.entered && entered.invitationIgnored === true) {
-              setInvitationIgnored(true)
+            if (entered.entered && entered.invitation !== undefined) {
+              setLinkOutcome(entered.invitation)
             }
 
             const entitlement =
@@ -1043,7 +1045,7 @@ export function App({
             // Before the list rather than after: a conversation joined a
             // moment later would be derived a moment too late and only appear
             // at the next tick.
-            await enterAnyInvitations(sessionClient)
+            await enterAnyInvitations(sessionClient, credentials.userId)
 
             // Attempted whether or not this run's own send worked: what is
             // being read was written by somebody else, and one direction
@@ -1981,10 +1983,16 @@ export function App({
                   //
                   // Not awaited: nothing below depends on it, and the loop's
                   // tick must not wait on a join.
-                  enterAnyInvitations(sessionClient)
+                  enterAnyInvitations(sessionClient, credentials.userId)
                     .then(walked => {
                       // A room joined is a row the list does not have yet.
-                      if (walked.joined.length > 0) {
+                      // A room declined is one it may still be showing: the
+                      // issuer's second conversation was refused, and the
+                      // list has to stop offering it.
+                      if (
+                        walked.joined.length > 0 ||
+                        walked.collapsed.length > 0
+                      ) {
                         refreshList().catch(() => {})
                       }
                     })
@@ -2885,7 +2893,7 @@ export function App({
                   <ConversationList
                     summaries={summaries}
                     names={names}
-                    invitationIgnored={invitationIgnored}
+                    invitation={linkOutcome}
                     notInYet={inYet === false}
                     onOpen={scope => openConversationRef.current?.(scope)}
                   />

@@ -1,4 +1,8 @@
-import { claimInvitation, type ServicePoster } from './claimInvitation'
+import {
+  claimForExistingAccount,
+  claimInvitation,
+  type ServicePoster,
+} from './claimInvitation'
 import type { LinkSource } from './incomingLink'
 import { parseInvitationLink } from './invitationLink'
 import type { RestoreCredentials } from './sessionCredentials'
@@ -12,10 +16,22 @@ import { markSignUpStarted } from './signUpMarker'
  * invitation to spend, or neither. The order is the decision, and it is not
  * about convenience.
  *
- * **A held session always wins over a link.** An invitation is single-use, so
- * spending one for an account that already exists destroys a link somebody
- * was given and gets nothing in return. An application opened by tapping an
- * invitation it does not need must ignore it.
+ * **A held session always wins over a link.** An invitation must never be
+ * able to replace an account somebody already has: that would be a way of
+ * taking their account from them, and no link may do that.
+ *
+ * **Which is not the same as throwing the link away**, and for a while this
+ * module did. Somebody issued it deliberately, to reach the person holding
+ * this telephone; ignoring it left the issuer watching « personne n'a encore
+ * ouvert le lien » forever while the person they invited read that the
+ * invitation had not been used. Both ends of the same invitation, both
+ * stuck, and a conversation on the issuer's device that nobody would ever
+ * join.
+ *
+ * So a held session spends the link the other way: `claimForExistingAccount`
+ * asks the service to invite *this* account into the conversation instead of
+ * drawing a new one. The account is untouched, the invitation does what it
+ * was for, and there is one conversation rather than two halves of none.
  *
  * There is no third source. Nothing is baked into the build any more, which
  * is what makes this application installable by somebody who did not build
@@ -41,6 +57,19 @@ export interface EntryDeps {
   readonly wait?: (ms: number) => Promise<void>
 }
 
+/**
+ * What happened to an invitation offered to a device that already has an
+ * account.
+ *
+ * `used` is the ordinary path: the service invited this account into the
+ * conversation the invitation was for, and the Matrix invitation is on its
+ * way. Walking through it is `enterInvitations.ts`'s job, not this one's --
+ * which is why this says *invited* and never *joined*.
+ */
+export type InvitationOutcome =
+  | { readonly kind: 'used' }
+  | { readonly kind: 'refused'; readonly reason: string }
+
 export type EntryResult =
   | {
       readonly entered: true
@@ -54,22 +83,28 @@ export type EntryResult =
        */
       readonly kept?: boolean
       /**
-       * `true` when this launch was opened with a usable invitation and did
-       * not spend it, because the device already had a session.
+       * What became of an invitation this launch was opened with, when it
+       * was opened with one and already had a session.
        *
-       * SILENCE WAS THE DEFECT. The rule above is right and stays: an
-       * invitation must not be able to replace an account somebody already
-       * has, and the token is left unspent so it still works for whoever it
-       * was meant for. But the application simply drew its conversation list,
-       * exactly as if the icon had been tapped -- so somebody who scanned an
-       * invitation on a phone that already had Messagr saw nothing at all and
-       * could not tell whether the code had even been read. Reported from a
-       * Pixel on 7 September 2026.
+       * Absent when there was no link, or when the link was the thing that
+       * created the session -- that case is `claimed`.
+       *
+       * SILENCE WAS THE FIRST DEFECT: the application drew its conversation
+       * list exactly as if the icon had been tapped, so somebody who scanned
+       * an invitation on a telephone that already had Messagr saw nothing at
+       * all and could not tell whether the code had been read. Reported from
+       * a Pixel on 7 September 2026, and answered with a line on the list.
+       *
+       * THE LINE WAS NOT ENOUGH, which is the second defect and the reason
+       * this is no longer a boolean. Saying « elle n'a pas été utilisée »
+       * politely is still not using it. Now the link is spent for the account
+       * this device already has, and what a screen needs to know is which of
+       * three things happened.
        *
        * Reported rather than acted on: what to draw is a screen's business,
        * and this module decides entry.
        */
-      readonly invitationIgnored?: boolean
+      readonly invitation?: InvitationOutcome
     }
   | { readonly entered: false; readonly reason: string }
 
@@ -78,17 +113,29 @@ export async function enterWithASession(deps: EntryDeps): Promise<EntryResult> {
 
   const held = await loadSession(secrets)
   if (held !== null) {
-    // The link is read even though it will not be spent: the only way to
-    // tell "opened with an invitation" from "opened from the home screen"
-    // is to look, and a screen cannot say what happened without knowing.
-    // `getInitialURL` is a read and consumes nothing.
     const offered = await link()
-    const usable = offered !== null && parseInvitationLink(offered) !== null
+    const usable = offered === null ? null : parseInvitationLink(offered)
+    if (usable === null) {
+      return { entered: true, session: held, claimed: false }
+    }
+    // SPENT FOR THE ACCOUNT THIS DEVICE ALREADY HAS, never against it. The
+    // service draws nobody on this path: it invites `held.userId` into the
+    // conversation and neutralises the account it had reserved. Nothing this
+    // device holds is touched, which is the property the rule above exists
+    // to protect.
+    const invited = await claimForExistingAccount(
+      poster,
+      usable,
+      held.userId,
+      wait,
+    )
     return {
       entered: true,
       session: held,
       claimed: false,
-      ...(usable ? { invitationIgnored: true } : {}),
+      invitation: invited.invited
+        ? { kind: 'used' }
+        : { kind: 'refused', reason: invited.reason },
     }
   }
 

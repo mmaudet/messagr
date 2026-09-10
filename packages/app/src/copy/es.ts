@@ -221,8 +221,10 @@ export const es: Readonly<Record<CopyKey, string>> = {
   promise_point_invitation: 'Se entra por invitación, no por formulario',
   promise_action: 'Empezar',
   list_title: 'Conversaciones',
-  list_invitation_ignored:
-    'Ha abierto una invitación y este teléfono ya tiene una cuenta. No se ha usado: sigue siendo válida para la persona a la que estaba destinada.',
+  list_invitation_used:
+    'Ha abierto una invitación. La conversación que abre aparecerá en su lista.',
+  list_invitation_refused:
+    'Esta invitación no ha podido usarse. Pida una nueva a quien se la envió.',
   list_not_in_yet:
     'Todavía no ha entrado. Abra el enlace de invitación que le enviaron: es la única puerta, y la aplicación no puede hacer nada antes.',
   list_empty:
@@ -438,6 +440,7 @@ export const es: Readonly<Record<CopyKey, string>> = {
   conversation_attaching: 'Cifrando y enviando la foto…',
   'list_unread %1$d': '%1$d mensajes sin leer',
   list_nobody_else: 'Nadie más aquí',
+  list_nobody_joined: 'Nadie se ha unido a esta conversación',
   invite_open: 'Invitar a alguien',
   back_to_newest: 'Volver al último mensaje',
 }
