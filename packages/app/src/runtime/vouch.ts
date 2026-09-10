@@ -255,6 +255,23 @@ export function theOtherMember(
   members: readonly string[],
   selfUserId: string,
 ): string | null {
-  const others = members.filter(member => member !== selfUserId)
-  return others.length === 1 ? others[0]! : null
+  return howManyOthers(members, selfUserId) === 1
+    ? members.filter(member => member !== selfUserId)[0]!
+    : null
+}
+
+/**
+ * How many people other than this account are in a conversation.
+ *
+ * `theOtherMember` collapses every answer but one into `null`, which is
+ * right for naming somebody and wrong for a screen: *nobody else* and *three
+ * other people* are different facts, and a row that treated them the same
+ * printed a raw `!room:server` identifier once the only other member was
+ * removed. Seen on the bench, right after an eviction.
+ */
+export function howManyOthers(
+  members: readonly string[],
+  selfUserId: string,
+): number {
+  return members.filter(member => member !== selfUserId).length
 }

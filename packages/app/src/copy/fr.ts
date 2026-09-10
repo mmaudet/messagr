@@ -634,6 +634,11 @@ export const fr = {
   // needs no translation; what needs one is what a screen reader says about
   // it, since "3" alone tells somebody nothing.
   'list_unread %1$d': '%1$d messages non lus',
+  // The name a conversation takes when this account is the only one left in
+  // it. Not the room's identifier, which is what the row printed before: an
+  // identifier on a screen a person reads is the diagnostic string §13.27
+  // refuses, and this is a fact with a true sentence.
+  list_nobody_else: 'Personne d’autre ici',
   invite_open: 'Inviter quelqu’un',
   back_to_newest: 'Revenir au dernier message',
 } as const

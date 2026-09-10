@@ -436,6 +436,7 @@ export const nl: Readonly<Record<CopyKey, string>> = {
   conversation_attach: 'Een foto versturen',
   conversation_attaching: 'De foto wordt versleuteld en verstuurd…',
   'list_unread %1$d': '%1$d ongelezen berichten',
+  list_nobody_else: 'Verder niemand hier',
   invite_open: 'Iemand uitnodigen',
   back_to_newest: 'Terug naar het nieuwste bericht',
 }

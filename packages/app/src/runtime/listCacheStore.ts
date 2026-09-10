@@ -79,6 +79,23 @@ const SCHEMA = `CREATE TABLE IF NOT EXISTS list_cache (
   unread INTEGER NOT NULL
 )`
 
+/**
+ * The column added when a row learnt to say « personne d'autre ici », and
+ * why it is added rather than written into `SCHEMA`.
+ *
+ * `CREATE TABLE IF NOT EXISTS` does nothing to a table that already exists,
+ * so a notebook written before today keeps the six-column shape. The
+ * `ALTER TABLE` is the migration, run unguarded with its failure swallowed:
+ * the only reason it fails is that the column is already there, which is the
+ * state it is trying to reach. See `callLogStore.ts`, which says the same at
+ * more length.
+ *
+ * `-1` rather than `0`: zero is a real answer here -- a conversation this
+ * account is alone in -- so a default that collided with it would be a
+ * column unable to say it does not know.
+ */
+const ADD_OTHERS = `ALTER TABLE list_cache ADD COLUMN others INTEGER NOT NULL DEFAULT -1`
+
 export function forgetfulListCache(): ListCache {
   return { all: async () => [], keep: async () => false }
 }
@@ -87,12 +104,15 @@ export async function openListCache(
   database: EncryptedDatabase,
 ): Promise<ListCache> {
   await database.execute(SCHEMA)
+  // Fails on a notebook that already has the column, which is the state it
+  // wants. See `ADD_OTHERS`.
+  await database.execute(ADD_OTHERS).catch(() => undefined)
 
   return {
     all: async () => {
       try {
         const { rows } = await database.execute(
-          'SELECT scope, other, preview, reason, last_at, unread ' +
+          'SELECT scope, other, preview, reason, last_at, unread, others ' +
             'FROM list_cache ORDER BY last_at DESC',
         )
         const found: ConversationSummary[] = []
@@ -100,7 +120,7 @@ export async function openListCache(
           // Read defensively rather than cast, for the reason the names store
           // gives: this is a file on a device, and a row of the wrong shape is
           // a row to drop rather than a screen to crash.
-          const { scope, other, preview, reason, last_at, unread } =
+          const { scope, other, preview, reason, last_at, unread, others } =
             row as Record<string, unknown>
           if (typeof scope !== 'string' || scope === '') continue
           if (typeof last_at !== 'number' || typeof unread !== 'number')
@@ -111,6 +131,10 @@ export async function openListCache(
             preview:
               typeof preview === 'string' && preview !== '' ? preview : null,
             ...(typeof reason === 'string' && reason !== '' ? { reason } : {}),
+            // A row from before the column existed reads `-1`, which is
+            // this page saying it does not know -- not a conversation with
+            // nobody else in it.
+            others: typeof others === 'number' && others >= 0 ? others : null,
             lastAt: last_at,
             unread,
           })
@@ -131,8 +155,8 @@ export async function openListCache(
         for (const summary of summaries) {
           await database.execute(
             'INSERT INTO list_cache ' +
-              '(scope, other, preview, reason, last_at, unread) ' +
-              'VALUES (?, ?, ?, ?, ?, ?)',
+              '(scope, other, preview, reason, last_at, unread, others) ' +
+              'VALUES (?, ?, ?, ?, ?, ?, ?)',
             // THE EMPTY STRING IS HOW THIS PAGE SPELLS `null`.
             // `EncryptedDatabase.execute` takes strings and numbers, which
             // is the right shape for four of the five pages; widening it so
@@ -147,6 +171,9 @@ export async function openListCache(
               summary.reason ?? '',
               summary.lastAt,
               summary.unread,
+              // `-1` is how this column spells "not known", for the reason
+              // the empty string spells it above.
+              summary.others ?? -1,
             ],
           )
         }

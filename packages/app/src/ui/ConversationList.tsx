@@ -191,8 +191,20 @@ function Row({
   // identifier, in the same mono role an unnamed participant gets, because
   // that is what it is: an identifier standing in for a name nobody has
   // given yet.
+  // AND NOBODY ELSE IS NOT THE SAME AS SEVERAL PEOPLE, though `other` says
+  // `null` to both. A conversation this account is now alone in -- the only
+  // other member removed, or gone -- has a true sentence, and printing a raw
+  // `!room:server` instead is the diagnostic string on a product screen that
+  // §13.27 refuses. Seen on the bench the moment an eviction landed.
+  //
+  // `others === null` is a third answer again: the membership could not be
+  // read. That one keeps the identifier, because nothing truthful is known.
   const shown =
-    summary.other === null ? summary.scope : displayNameFor(summary.other, name)
+    summary.other !== null
+      ? displayNameFor(summary.other, name)
+      : summary.others === 0
+        ? t('list_nobody_else')
+        : summary.scope
   const named = summary.other !== null && name !== undefined
   return (
     <Pressable

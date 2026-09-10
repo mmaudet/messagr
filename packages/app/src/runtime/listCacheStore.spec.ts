@@ -46,12 +46,27 @@ const ROW = {
 const SUMMARY: ConversationSummary = {
   scope: '!a:x',
   other: '@her:x',
+  // A row written before the column existed. `-1` on the way out of SQLite,
+  // `null` on the way into a summary: the page does not know.
+  others: null,
   preview: 'à tout à l’heure',
   lastAt: 1_700_000_000_000,
   unread: 2,
 }
 
 describe('the remembered conversation list', () => {
+  it('reads a count of other members back', async () => {
+    const cache = await openListCache(fake([{ ...ROW, others: 0 }]).database)
+    // Zero is a real answer -- a conversation this account is alone in --
+    // and the row says « personne d'autre ici » rather than a room id.
+    expect((await cache.all())[0]?.others).toBe(0)
+  })
+
+  it('reads a row from before the column existed as not knowing', async () => {
+    const cache = await openListCache(fake([{ ...ROW, others: -1 }]).database)
+    expect((await cache.all())[0]?.others).toBeNull()
+  })
+
   it('reads a row back as it was written', async () => {
     const cache = await openListCache(fake([ROW]).database)
     expect(await cache.all()).toEqual([SUMMARY])
@@ -61,10 +76,17 @@ describe('the remembered conversation list', () => {
     const { database, ran } = fake()
     const cache = await openListCache(database)
     await cache.keep([
-      { scope: '!b:x', other: null, preview: null, lastAt: 0, unread: 0 },
+      {
+        scope: '!b:x',
+        other: null,
+        others: null,
+        preview: null,
+        lastAt: 0,
+        unread: 0,
+      },
     ])
     const insert = ran.find(one => one.sql.startsWith('INSERT'))
-    expect(insert?.params).toEqual(['!b:x', '', '', '', 0, 0])
+    expect(insert?.params).toEqual(['!b:x', '', '', '', 0, 0, -1])
   })
 
   it('reads those empty strings back as nothing', async () => {
@@ -81,7 +103,14 @@ describe('the remembered conversation list', () => {
       ]).database,
     )
     expect(await cache.all()).toEqual([
-      { scope: '!b:x', other: null, preview: null, lastAt: 0, unread: 0 },
+      {
+        scope: '!b:x',
+        other: null,
+        others: null,
+        preview: null,
+        lastAt: 0,
+        unread: 0,
+      },
     ])
   })
 
