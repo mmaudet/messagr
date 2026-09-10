@@ -79,13 +79,24 @@ export function Vouch({ entrantId, hasHistory, onVouch, state }: VouchProps) {
   // the system theme is guessing, and it guessed wrong here.
   const palette = color
 
-  // `!asked` GUARDS THIS, AND WITHOUT IT THE BUTTON BELOW IS A LIE.
+  // `!asked` GUARDS THE FAILURE, AND ONLY THE FAILURE.
   //
-  // The outcome outlives the gesture -- it is held above, in `App.tsx` --
-  // so somebody pressing "try again" would set `asked` and then be shown
-  // this same outcome, because `state` had not changed. A control that
+  // A failed outcome outlives the gesture -- it is held above, in `App.tsx`
+  // -- so somebody pressing "try again" would set `asked` and then be shown
+  // that same outcome, because `state` had not changed. A control that
   // answers the finger and changes nothing is worse than no control.
-  if (!asked && state !== 'idle' && state !== 'working') {
+  //
+  // IT GUARDED THE SUCCESS TOO, WHICH WAS THE DEFECT. Confirming leaves
+  // `asked` true, so a vouch that worked fell past this branch and rendered
+  // the explanation again -- the same panel, the same confirm button, and
+  // no word that anything had happened. Measured on two emulators while
+  // re-proving #87: the runtime logged
+  // `MESSAGR_VOUCH {"vouched":true,"shared":2,...}` and the screen said
+  // nothing at all. Nothing failed, so nothing showed.
+  //
+  // A success is never something to ask again, so `asked` has no business
+  // suppressing it.
+  if (state !== 'idle' && state !== 'working' && (!asked || state.vouched)) {
     // A FAILURE IS A STATE YOU CAN LEAVE. A SUCCESS IS NOT.
     //
     // This rendered the outcome and nothing else, whichever it was -- so a
