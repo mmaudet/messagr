@@ -352,9 +352,9 @@ export const fr = {
   settings_action: 'Réglages',
   settings_title: 'Réglages',
   settings_legal: 'Informations légales',
-  settings_disturb: 'Sonner en mode « Ne pas déranger »',
+  settings_disturb: 'Sonner malgré « Ne pas déranger »',
   settings_disturb_hint:
-    'Android fait taire les appels entrants tant que Messagr n’a pas l’accès « Ne pas déranger ». Ouvrez la liste, trouvez Messagr, activez l’accès.',
+    'Sans cette autorisation, Android fait taire les appels Messagr dès que le mode est actif. L’écran qui s’ouvre liste toutes les applications : cherchez Messagr et activez l’accès.',
   settings_nothing_else:
     'Il n’y a rien d’autre ici pour l’instant. Les réglages que cette version ne porte pas encore sont absents plutôt que présents et inertes.',
 
@@ -573,10 +573,10 @@ export const fr = {
   person_back: 'Retour',
   message_delivered_hint: 'Remis au serveur',
   message_read_hint: 'Lu',
-  settings_full_screen: 'Faire sonner l’écran',
   settings_open: 'Ouvrir',
+  settings_full_screen: 'Appels en plein écran',
   settings_full_screen_hint:
-    'Android n’accorde qu’aux applications de téléphonie le droit d’allumer l’écran pour un appel. Sans cela, un appel entrant est une notification de plus sur l’écran verrouillé.',
+    'Un appel entrant prend tout l’écran, même verrouillé, au lieu d’une ligne de notification de plus. Android réserve ce droit aux applications de téléphonie : l’écran qui s’ouvre est là pour le lui accorder.',
   settings_wake: 'Notifications',
   settings_wake_hint:
     'Le signal de réveil ne porte ni expéditeur ni message. L’appareil déchiffre ici.',

@@ -261,14 +261,28 @@ const styles = StyleSheet.create({
     ...type.titleLg,
     color: color.neutral['900'],
   },
+  // A ROW, WHICH IT WAS NOT. It had `justifyContent: 'center'` and no
+  // direction, so every child stacked: each switch sat under its own label
+  // and each "Ouvrir" under its own title, right-aligned, looking like a
+  // second setting. Reported from the Pixel with a screenshot -- « aligner
+  // verticalement les textes et les toggles ».
+  //
+  // `space-between` is what puts the control at the far edge, and
+  // `alignItems: 'center'` is what lines it up with the words it belongs to.
   row: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: space.m,
     minHeight: floors.touchTargetMin,
-    justifyContent: 'center',
     borderTopWidth: stroke.hairline.value,
     borderBottomWidth: stroke.hairline.value,
     borderColor: color.neutral['200'],
   },
+  // `flexShrink` so a long title gives way to the control rather than
+  // pushing it off the edge.
   rowLabel: {
+    flexShrink: 1,
     ...type.titleMd,
     color: color.neutral['900'],
   },

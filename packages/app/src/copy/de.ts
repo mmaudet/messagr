@@ -252,9 +252,9 @@ export const de: Readonly<Record<CopyKey, string>> = {
   settings_action: 'Einstellungen',
   settings_title: 'Einstellungen',
   settings_legal: 'Rechtliche Hinweise',
-  settings_disturb: 'Bei „Bitte nicht stören“ klingeln',
+  settings_disturb: 'Trotz „Bitte nicht stören“ klingeln',
   settings_disturb_hint:
-    'Android schaltet eingehende Anrufe stumm, solange Messagr keinen Zugriff auf „Bitte nicht stören“ hat. Liste öffnen, Messagr suchen, Zugriff einschalten.',
+    'Ohne diese Erlaubnis schaltet Android Messagr-Anrufe stumm, sobald der Modus aktiv ist. Der sich öffnende Bildschirm listet alle Apps: Messagr suchen und Zugriff einschalten.',
   settings_nothing_else:
     'Mehr gibt es hier vorerst nicht. Einstellungen, die diese Version noch nicht trägt, fehlen ganz, statt vorhanden und wirkungslos zu sein.',
   legal_title: 'Rechtliche Hinweise',
@@ -404,10 +404,10 @@ export const de: Readonly<Record<CopyKey, string>> = {
   person_back: 'Zurück',
   message_delivered_hint: 'An den Server übergeben',
   message_read_hint: 'Gelesen',
-  settings_full_screen: 'Anrufe den Bildschirm einschalten lassen',
   settings_open: 'Öffnen',
+  settings_full_screen: 'Anrufe im Vollbild',
   settings_full_screen_hint:
-    'Android gewährt nur Telefonanwendungen das Recht, für einen Anruf den Bildschirm einzuschalten. Ohne dies ist ein eingehender Anruf nur eine weitere Benachrichtigung auf dem Sperrbildschirm.',
+    'Ein eingehender Anruf nimmt den ganzen Bildschirm ein, auch gesperrt, statt einer weiteren Benachrichtigungszeile. Android behält das Telefon-Apps vor: auf dem sich öffnenden Bildschirm erteilen Sie es.',
   settings_wake: 'Benachrichtigungen',
   settings_wake_hint:
     'Das Wecksignal trägt weder Absender noch Nachricht. Das Gerät entschlüsselt hier.',

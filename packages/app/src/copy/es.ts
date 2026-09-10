@@ -246,9 +246,9 @@ export const es: Readonly<Record<CopyKey, string>> = {
   settings_action: 'Ajustes',
   settings_title: 'Ajustes',
   settings_legal: 'Información legal',
-  settings_disturb: 'Sonar en modo «No molestar»',
+  settings_disturb: 'Sonar pese a «No molestar»',
   settings_disturb_hint:
-    'Android silencia las llamadas entrantes mientras Messagr no tenga acceso a «No molestar». Abra la lista, busque Messagr y active el acceso.',
+    'Sin este permiso, Android silencia las llamadas de Messagr en cuanto el modo está activo. La pantalla que se abre enumera todas las aplicaciones: busque Messagr y active el acceso.',
   settings_nothing_else:
     'Aquí no hay nada más por ahora. Los ajustes que esta versión todavía no lleva están ausentes en lugar de presentes e inertes.',
   legal_title: 'Información legal',
@@ -398,10 +398,10 @@ export const es: Readonly<Record<CopyKey, string>> = {
   person_back: 'Volver',
   message_delivered_hint: 'Entregado al servidor',
   message_read_hint: 'Leído',
-  settings_full_screen: 'Permitir que una llamada encienda la pantalla',
   settings_open: 'Abrir',
+  settings_full_screen: 'Llamadas a pantalla completa',
   settings_full_screen_hint:
-    'Android solo concede a las aplicaciones de teléfono el derecho a encender la pantalla para una llamada. Sin él, una llamada entrante es una notificación más en la pantalla de bloqueo.',
+    'Una llamada entrante ocupa toda la pantalla, incluso bloqueada, en lugar de una línea de notificación más. Android lo reserva a las aplicaciones de telefonía: la pantalla que se abre es donde se concede.',
   settings_wake: 'Notificaciones',
   settings_wake_hint:
     'La señal de despertar no lleva remitente ni mensaje. El dispositivo descifra aquí.',

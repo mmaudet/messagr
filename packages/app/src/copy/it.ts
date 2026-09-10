@@ -244,9 +244,9 @@ export const it: Readonly<Record<CopyKey, string>> = {
   settings_action: 'Impostazioni',
   settings_title: 'Impostazioni',
   settings_legal: 'Informazioni legali',
-  settings_disturb: 'Squillare in «Non disturbare»',
+  settings_disturb: 'Squillare nonostante «Non disturbare»',
   settings_disturb_hint:
-    'Android silenzia le chiamate in arrivo finché Messagr non ha l’accesso a «Non disturbare». Aprire l’elenco, trovare Messagr, attivare l’accesso.',
+    'Senza questa autorizzazione, Android silenzia le chiamate di Messagr appena il modo è attivo. La schermata che si apre elenca tutte le applicazioni: cercare Messagr e attivare l’accesso.',
   settings_nothing_else:
     'Qui non c’è altro per ora. Le impostazioni che questa versione non porta ancora sono assenti invece che presenti e inerti.',
   legal_title: 'Informazioni legali',
@@ -396,10 +396,10 @@ export const it: Readonly<Record<CopyKey, string>> = {
   person_back: 'Indietro',
   message_delivered_hint: 'Consegnato al server',
   message_read_hint: 'Letto',
-  settings_full_screen: 'Lascia che una chiamata accenda lo schermo',
-  settings_open: 'Apri',
+  settings_open: 'Aprire',
+  settings_full_screen: 'Chiamate a schermo intero',
   settings_full_screen_hint:
-    'Android concede solo alle applicazioni telefoniche il diritto di accendere lo schermo per una chiamata. Senza, una chiamata in arrivo è una notifica in più sulla schermata di blocco.',
+    'Una chiamata in arrivo occupa tutto lo schermo, anche bloccato, invece di una riga di notifica in più. Android lo riserva alle applicazioni telefoniche: la schermata che si apre serve a concederlo.',
   settings_wake: 'Notifiche',
   settings_wake_hint:
     'Il segnale di risveglio non porta né mittente né messaggio. Il dispositivo decifra qui.',

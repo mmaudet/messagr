@@ -251,7 +251,7 @@ export const en: Readonly<Record<CopyKey, string>> = {
   settings_legal: 'Legal information',
   settings_disturb: 'Ring during Do Not Disturb',
   settings_disturb_hint:
-    'Android silences incoming calls until Messagr has Do Not Disturb access. Open the list, find Messagr, turn the access on.',
+    'Without this, Android silences Messagr’s calls whenever the mode is on. The screen that opens lists every application: find Messagr and turn the access on.',
   settings_nothing_else:
     'There is nothing else here for now. Settings this version does not carry yet are absent rather than present and inert.',
   legal_title: 'Legal information',
@@ -399,10 +399,10 @@ export const en: Readonly<Record<CopyKey, string>> = {
   person_back: 'Back',
   message_delivered_hint: 'Handed to the server',
   message_read_hint: 'Read',
-  settings_full_screen: 'Let a call light the screen',
   settings_open: 'Open',
+  settings_full_screen: 'Full-screen calls',
   settings_full_screen_hint:
-    'Android grants only telephone applications the right to light the screen for a call. Without it, an incoming call is one more notification on the lock screen.',
+    'An incoming call takes the whole screen, even locked, instead of one more notification line. Android reserves this for telephone applications: the screen that opens is where you grant it.',
   settings_wake: 'Notifications',
   settings_wake_hint:
     'The wake-up signal carries no sender and no message. The device decrypts here.',

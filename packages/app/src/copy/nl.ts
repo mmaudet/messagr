@@ -245,9 +245,9 @@ export const nl: Readonly<Record<CopyKey, string>> = {
   settings_action: 'Instellingen',
   settings_title: 'Instellingen',
   settings_legal: 'Juridische informatie',
-  settings_disturb: 'Bellen tijdens „Niet storen”',
+  settings_disturb: 'Bellen ondanks „Niet storen”',
   settings_disturb_hint:
-    'Android dempt inkomende oproepen zolang Messagr geen toegang tot „Niet storen” heeft. Open de lijst, zoek Messagr, zet de toegang aan.',
+    'Zonder deze toestemming dempt Android de oproepen van Messagr zodra de modus aanstaat. Het scherm dat opent toont alle apps: zoek Messagr en zet de toegang aan.',
   settings_nothing_else:
     'Voorlopig staat hier niets anders. Instellingen die deze versie nog niet draagt zijn afwezig in plaats van aanwezig en werkloos.',
   legal_title: 'Juridische informatie',
@@ -397,10 +397,10 @@ export const nl: Readonly<Record<CopyKey, string>> = {
   person_back: 'Terug',
   message_delivered_hint: 'Aan de server afgegeven',
   message_read_hint: 'Gelezen',
-  settings_full_screen: 'Een oproep het scherm laten inschakelen',
   settings_open: 'Openen',
+  settings_full_screen: 'Oproepen op het volledige scherm',
   settings_full_screen_hint:
-    'Android geeft alleen telefoontoepassingen het recht om voor een oproep het scherm in te schakelen. Zonder dat is een inkomende oproep één melding meer op het vergrendelscherm.',
+    'Een inkomende oproep neemt het hele scherm in, ook vergrendeld, in plaats van nog een meldingsregel. Android houdt dit voor telefoon-apps: op het scherm dat opent geeft u het.',
   settings_wake: 'Meldingen',
   settings_wake_hint:
     'Het wekseintje draagt geen afzender en geen bericht. Het apparaat ontsleutelt hier.',
