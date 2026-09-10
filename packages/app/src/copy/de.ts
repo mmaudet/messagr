@@ -469,5 +469,26 @@ export const de: Readonly<Record<CopyKey, string>> = {
   list_nobody_else: 'Sonst niemand hier',
   list_nobody_joined: 'Niemand ist diesem Gespräch beigetreten',
   invite_open: 'Jemanden einladen',
+  backup_offer_title:
+    'Ihre Nachrichten zurückbekommen, wenn Sie dieses Telefon verlieren',
+  backup_offer_lead:
+    'Die Schlüssel, die Ihre Unterhaltungen öffnen, gibt es nur auf diesem Gerät. Messagr kann eine Kopie auf dem Server aufbewahren, verschlossen mit einem Schlüssel, den nur Sie haben.',
+  backup_offer_loss:
+    'Ohne ihn verliert eine Neuinstallation von Messagr alles Gesagte. Das Konto kommt zurück, die Nachrichten bleiben unlesbar.',
+  backup_offer_scope:
+    'Die Sicherung bewahrt die Nachrichten. Die Namen, die Sie vergeben, Ihre Favoriten und Ihre Lesemarken bleiben auf diesem Gerät und gehen mit ihm verloren.',
+  backup_offer_trust:
+    'Der Server kann die Sicherung nicht lesen. Er kann auch nicht belegen, dass darin nichts ausgetauscht wurde: Wer Ihr Konto oder den Server bekäme, könnte andere Schlüssel hineinlegen, ohne dass etwas darauf hinweist.',
+  backup_offer_accept: 'Meine Schlüssel sichern',
+  backup_offer_refuse: 'Jetzt nicht',
+  backup_offer_later: 'Sie können es später in den Einstellungen einschalten.',
+  backup_key_title: 'Ihr Wiederherstellungsschlüssel',
+  backup_key_lead:
+    'Kopieren Sie ihn jetzt und legen Sie ihn in einem Passwortmanager ab.',
+  backup_key_once:
+    'Er wird nie wieder angezeigt. Ohne ihn lässt sich die Sicherung nicht öffnen.',
+  backup_key_copy: 'Schlüssel kopieren',
+  backup_key_copied: 'Schlüssel kopiert.',
+  backup_key_done: 'Ich habe meinen Schlüssel abgelegt',
   back_to_newest: 'Zurück zur neuesten Nachricht',
 }

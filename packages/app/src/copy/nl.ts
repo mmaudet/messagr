@@ -460,5 +460,24 @@ export const nl: Readonly<Record<CopyKey, string>> = {
   list_nobody_else: 'Verder niemand hier',
   list_nobody_joined: 'Niemand heeft aan dit gesprek deelgenomen',
   invite_open: 'Iemand uitnodigen',
+  backup_offer_title: 'Uw berichten terugkrijgen als u deze telefoon verliest',
+  backup_offer_lead:
+    'De sleutels die uw gesprekken openen, bestaan alleen op dit toestel. Messagr kan er een kopie van op de server bewaren, gesloten met een sleutel die alleen u heeft.',
+  backup_offer_loss:
+    'Zonder die sleutel verliest u bij het opnieuw installeren van Messagr alles wat er is gezegd. Het account komt terug; de berichten blijven onleesbaar.',
+  backup_offer_scope:
+    'De reservekopie bewaart de berichten. De namen die u geeft, uw favorieten en uw leesmarkeringen blijven op dit toestel en verdwijnen ermee.',
+  backup_offer_trust:
+    'De server kan de reservekopie niet lezen. Hij kan ook niet aantonen dat er niets in is vervangen: wie uw account of de server in handen kreeg, zou er andere sleutels in kunnen schuiven zonder dat iets dat meldt.',
+  backup_offer_accept: 'Mijn sleutels bewaren',
+  backup_offer_refuse: 'Nu niet',
+  backup_offer_later: 'U kunt het later inschakelen bij Instellingen.',
+  backup_key_title: 'Uw herstelsleutel',
+  backup_key_lead: 'Kopieer hem nu en bewaar hem in een wachtwoordmanager.',
+  backup_key_once:
+    'Hij wordt nooit meer getoond. Zonder hem gaat de reservekopie niet open.',
+  backup_key_copy: 'Sleutel kopiëren',
+  backup_key_copied: 'Sleutel gekopieerd.',
+  backup_key_done: 'Ik heb mijn sleutel opgeborgen',
   back_to_newest: 'Terug naar het nieuwste bericht',
 }

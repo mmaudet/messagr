@@ -461,5 +461,24 @@ export const it: Readonly<Record<CopyKey, string>> = {
   list_nobody_else: 'Nessun altro qui',
   list_nobody_joined: 'Nessuno si è unito a questa conversazione',
   invite_open: 'Invitare qualcuno',
+  backup_offer_title: 'Ritrovare i suoi messaggi se perde questo telefono',
+  backup_offer_lead:
+    'Le chiavi che aprono le sue conversazioni esistono solo su questo dispositivo. Messagr può conservarne una copia sul server, chiusa da una chiave che ha soltanto lei.',
+  backup_offer_loss:
+    'Senza di essa, reinstallare Messagr perde tutto quello che è stato detto. L’account torna; i messaggi restano illeggibili.',
+  backup_offer_scope:
+    'La copia conserva i messaggi. I nomi che lei assegna, i suoi preferiti e i suoi segnalibri di lettura restano su questo dispositivo e spariscono con esso.',
+  backup_offer_trust:
+    'Il server non può leggere la copia. Non può nemmeno dimostrare che nulla vi sia stato sostituito: chi ottenesse il suo account o il server potrebbe infilarvi altre chiavi senza che nulla lo segnali.',
+  backup_offer_accept: 'Salvare le mie chiavi',
+  backup_offer_refuse: 'Non ora',
+  backup_offer_later: 'Potrà attivarlo più tardi dalle Impostazioni.',
+  backup_key_title: 'La sua chiave di recupero',
+  backup_key_lead: 'La copi adesso e la conservi in un gestore di password.',
+  backup_key_once:
+    'Non verrà più mostrata. Senza di essa, la copia non si apre.',
+  backup_key_copy: 'Copiare la chiave',
+  backup_key_copied: 'Chiave copiata.',
+  backup_key_done: 'Ho messo via la mia chiave',
   back_to_newest: 'Torna all’ultimo messaggio',
 }

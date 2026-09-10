@@ -44,6 +44,23 @@ describe('the copy catalogue', () => {
     expect(offending).toEqual([])
   })
 
+  it('never explains encryption where a backup is accepted or refused', () => {
+    // ADR-0013, and it is a product rule rather than a wording preference:
+    // « Rien de la promesse ne change. "Chiffrée de bout en bout, sans
+    // réglage" parle du chiffrement, qui reste automatique et non
+    // configurable. La durabilité devient un choix ; le chiffrement, non. »
+    //
+    // The safest way to keep a screen from implying otherwise is for it not
+    // to talk about encryption at all in the place where somebody is
+    // deciding something. The offer says what the server can and cannot do
+    // -- read it, prove nothing was replaced -- which is the substance,
+    // without putting the word next to a pair of buttons.
+    const talking = Object.entries(fr).filter(
+      ([key, value]) => key.startsWith('backup_') && /chiffr/i.test(value),
+    )
+    expect(talking).toEqual([])
+  })
+
   it('never says "vérifier" anywhere, in any string', () => {
     // #34's own acceptance criterion, kept as a test rather than as
     // something somebody re-reads. Verification is a real act in this
