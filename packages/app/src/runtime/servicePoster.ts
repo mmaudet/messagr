@@ -2,11 +2,17 @@ import type { ServicePoster } from './claimInvitation'
 import type { InvitationService } from './issueInvitation'
 
 /**
- * The plain, unauthenticated poster the invitation service is reached with.
+ * The poster the invitation service's claim endpoint is reached with.
  *
  * Not the pump's authenticated path, and not matrix-js-sdk at all: claiming
- * an invitation happens before any account exists, so there is nothing to
- * authenticate as and no client to authenticate with.
+ * an invitation usually happens before any account exists, so there is
+ * nothing to authenticate as and no client to authenticate with.
+ *
+ * USUALLY, AND NOT ALWAYS. A device that already has an account spends a
+ * link the other way -- the service invites that account into the
+ * conversation rather than drawing a new one -- and there it must prove
+ * whose account it is. So the bearer is optional here rather than absent:
+ * the two paths are the same call, and only one of them has anybody to be.
  *
  * A non-200 is returned rather than thrown. The service answers a refused
  * invitation with a status, and that is an answer — distinguishing it from a
@@ -14,10 +20,16 @@ import type { InvitationService } from './issueInvitation'
  * which of the two happened.
  */
 export const servicePoster: ServicePoster = {
-  post: async (url, body) => {
+  post: async (url, body, bearer) => {
     const response = await fetch(url, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: {
+        'Content-Type': 'application/json',
+        // Only when there is one. A newcomer has nothing to send and the
+        // service wants nothing; a device that already has an account has to
+        // prove it is the account it names, or the service answers 401.
+        ...(bearer === undefined ? {} : { Authorization: `Bearer ${bearer}` }),
+      },
       body,
     })
     return { status: response.status, body: await response.text() }

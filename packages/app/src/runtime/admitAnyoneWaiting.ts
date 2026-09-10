@@ -31,7 +31,7 @@ import type { Outstanding, OutstandingInvitation } from './outstandingStore'
 
 export interface Admitted {
   readonly admitted: true
-  readonly entrant: string
+  readonly entrants: readonly string[]
 }
 export interface NotAdmitted {
   readonly admitted: false
@@ -87,7 +87,7 @@ export async function admitAnyoneWaiting(
     try {
       const answer = await asking.admit(invitation)
       if (answer.admitted) {
-        admitted.push(answer.entrant)
+        admitted.push(...answer.entrants)
         // Forgotten only once somebody is actually in. Anything else -- not
         // yet claimed, a refused invite, a dropped request -- leaves the row,
         // because the next tick is what this whole file is for.

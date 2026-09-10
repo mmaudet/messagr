@@ -999,6 +999,17 @@ export function App({
             setInYet(entered.entered)
             if (entered.entered && entered.invitation !== undefined) {
               setLinkOutcome(entered.invitation)
+              // THE REASON GOES HERE AND NOT ON THE SCREEN. §13.27: no
+              // diagnostic text on a screen a person reads, and the two
+              // sentences the list draws are what it means for them. This
+              // is the line somebody diagnosing a link that will not open
+              // has to have -- the service distinguishes several refusals
+              // and the screen deliberately does not.
+              logEvent(
+                entered.invitation.kind === 'used' ? 'info' : 'warn',
+                'MESSAGR_INVITATION',
+                { ...entered.invitation },
+              )
             }
 
             const entitlement =
@@ -1724,12 +1735,16 @@ export function App({
                 // Somebody came through inside the minute, so there is
                 // nothing left to ask about.
                 await outstandingRef.current.forget(issued.invitationId)
-                if (name !== null) {
-                  const kept = await namesRef.current.set(
-                    admitted.entrant,
-                    name,
-                  )
-                  setNames(held => new Map(held).set(admitted.entrant, name))
+                // THE LAST ONE NAMED, not the first. On a link opened by
+                // somebody who already has an account there are two: the
+                // account the service drew, which cedes its place and
+                // deactivates itself, and then the real person. Naming the
+                // drawn one would put the given name on an account that no
+                // longer exists.
+                const who = admitted.entrants[admitted.entrants.length - 1]
+                if (name !== null && who !== undefined) {
+                  const kept = await namesRef.current.set(who, name)
+                  setNames(held => new Map(held).set(who, name))
                   if (!kept) {
                     logEvent('warn', 'MESSAGR_GIVEN_NAME_NOT_KEPT', {})
                   }

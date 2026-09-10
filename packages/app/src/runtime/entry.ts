@@ -123,12 +123,7 @@ export async function enterWithASession(deps: EntryDeps): Promise<EntryResult> {
     // conversation and neutralises the account it had reserved. Nothing this
     // device holds is touched, which is the property the rule above exists
     // to protect.
-    const invited = await claimForExistingAccount(
-      poster,
-      usable,
-      held.userId,
-      wait,
-    )
+    const invited = await claimForExistingAccount(poster, usable, held, wait)
     return {
       entered: true,
       session: held,

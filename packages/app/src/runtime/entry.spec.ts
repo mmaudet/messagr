@@ -55,9 +55,11 @@ describe('enterWithASession', () => {
     // same rule as "throw the link away". The service's existing-user path
     // invites this account into the conversation the invitation was for.
     let sent: unknown = null
+    let bearer: string | undefined
     const watching: ServicePoster = {
-      post: async (_url, body) => {
+      post: async (_url, body, carried) => {
         sent = JSON.parse(body)
+        bearer = carried
         return { status: 200, body: '{}' }
       },
     }
@@ -78,6 +80,12 @@ describe('enterWithASession', () => {
       token: 'abc123',
       existing_user_id: SESSION.userId,
     })
+    // AND THE PROOF THAT IT IS THAT ACCOUNT. The service refuses this path
+    // without it -- naming a third party would otherwise let anyone holding
+    // a link have an arbitrary identifier invited into a real room.
+    // Measured against the bench before it was sent: `401 M_UNAUTHORIZED`,
+    // "unauthenticated caller".
+    expect(bearer).toBe(SESSION.accessToken)
   })
 
   it('says so when the link could not be used, and keeps the session', async () => {

@@ -21,6 +21,18 @@ export interface ServicePoster {
   post: (
     url: string,
     body: string,
+    /**
+     * The caller's own Matrix access token, when the caller is somebody.
+     *
+     * Absent for a newcomer, who is nobody yet -- that is the whole point of
+     * the claim being unauthenticated. Present on the existing-user path,
+     * where it is not optional at all: naming a third party in
+     * `existing_user_id` without proving you are that person would let
+     * anyone with a link have an arbitrary identifier invited into a real
+     * room. The service refuses it, `401 M_UNAUTHORIZED`, and says so in
+     * `claim.rs` -- « format validation says nothing about IDENTITY ».
+     */
+    bearer?: string,
   ) => Promise<{ readonly status: number; readonly body: string }>
 }
 
@@ -86,7 +98,7 @@ export async function claimInvitation(
   link: InvitationLink,
   wait?: (ms: number) => Promise<void>,
 ): Promise<ClaimResult> {
-  const answer = await postWithPatience(poster, link, {}, wait)
+  const answer = await postWithPatience(poster, link, {}, wait, undefined)
   if (!answer.answered) return { claimed: false, reason: answer.reason }
   return sessionFrom(answer.status, answer.body, link)
 }
@@ -124,14 +136,15 @@ export async function claimInvitation(
 export async function claimForExistingAccount(
   poster: ServicePoster,
   link: InvitationLink,
-  userId: string,
+  account: { readonly userId: string; readonly accessToken: string },
   wait?: (ms: number) => Promise<void>,
 ): Promise<JoinResult> {
   const answer = await postWithPatience(
     poster,
     link,
-    { existing_user_id: userId },
+    { existing_user_id: account.userId },
     wait,
+    account.accessToken,
   )
   if (!answer.answered) return { invited: false, reason: answer.reason }
   // A 200 and nothing else. The conversation this invitation was for now
@@ -158,7 +171,8 @@ async function postWithPatience(
   poster: ServicePoster,
   link: InvitationLink,
   extra: Readonly<Record<string, string>>,
-  wait?: (ms: number) => Promise<void>,
+  wait: ((ms: number) => Promise<void>) | undefined,
+  bearer: string | undefined,
 ): Promise<Answered> {
   let answer: { status: number; body: string }
   for (let attempt = 0; ; attempt += 1) {
@@ -166,6 +180,7 @@ async function postWithPatience(
       answer = await poster.post(
         `${link.service}/invitations/claim`,
         JSON.stringify({ token: link.token, ...extra }),
+        bearer,
       )
     } catch {
       // Deliberately different from a refusal, because a person can act on

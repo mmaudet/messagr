@@ -44,7 +44,7 @@ describe('admitAnyoneWaiting', () => {
     const store = held({ ...ONE, issuedAt: NOW - 60 * 60_000 + 1 })
     const admit = vi.fn(async (): Promise<Admitted> => ({
       admitted: true,
-      entrant: '@her:x',
+      entrants: ['@her:x'],
     }))
 
     const report = await admitAnyoneWaiting({
@@ -65,7 +65,7 @@ describe('admitAnyoneWaiting', () => {
       outstanding: store,
       admit: async (): Promise<Admitted> => ({
         admitted: true,
-        entrant: '@her:x',
+        entrants: ['@her:x'],
       }),
       now: () => NOW,
     })
@@ -94,7 +94,7 @@ describe('admitAnyoneWaiting', () => {
     const store = held({ ...ONE, issuedAt: NOW - STOP_ASKING_AFTER_MS - 1 })
     const admit = vi.fn(async (): Promise<Admitted> => ({
       admitted: true,
-      entrant: '@her:x',
+      entrants: ['@her:x'],
     }))
 
     await admitAnyoneWaiting({ outstanding: store, admit, now: () => NOW })
@@ -132,7 +132,10 @@ describe('admitAnyoneWaiting', () => {
     const admit = vi
       .fn()
       .mockRejectedValueOnce(new Error('the service could not be reached'))
-      .mockResolvedValueOnce({ admitted: true, entrant: '@him:x' } as Admitted)
+      .mockResolvedValueOnce({
+        admitted: true,
+        entrants: ['@him:x'],
+      } as Admitted)
 
     const report = await admitAnyoneWaiting({
       outstanding: store,
