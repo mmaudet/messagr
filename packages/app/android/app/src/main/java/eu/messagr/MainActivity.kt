@@ -55,19 +55,34 @@ class MainActivity : ReactActivity() {
    * keyboard's height as bottom padding, and returns the insets untouched so
    * nothing else that wants them is deprived.
    *
-   * `ime()` and not `systemBars()`: the navigation bar's inset is already
-   * handled by the safe-area context on the JavaScript side, and adding it
-   * here would push the tab bar up by a bar's height that is not there.
+   * `ime()` and not `systemBars()`: the bars are the window's own furniture
+   * and this listener is about the keyboard.
+   *
+   * # THE WHOLE KEYBOARD, AND IT USED TO SUBTRACT THE NAVIGATION BAR
+   *
+   * It padded by `keyboard.bottom - bars.bottom`, on the reasoning that the
+   * navigation bar's inset was "already handled by the safe-area context on
+   * the JavaScript side". **It is not.** `App.tsx` takes
+   * `edges={['left', 'right']}` -- the bottom edge is deliberately not
+   * reserved, because the tab bar is meant to sit against the bottom of the
+   * screen. So the subtraction removed a reservation nobody was making, and
+   * the composer stopped exactly one navigation bar short of the keyboard.
+   *
+   * Reported from a Pixel 10 Pro Fold with a screenshot: « le clavier
+   * recouvre à moitié le champ de saisie ». Measured on the emulator, where
+   * it very nearly did not show: the keyboard's top at 1580, the composer's
+   * controls ending at 1557 -- twenty-three pixels of clearance, which a
+   * different screen turns negative.
+   *
+   * While the keyboard is up the navigation bar is behind it, so there is
+   * nothing there to leave room for. And while it is down `ime()` is zero,
+   * so this changes nothing at rest.
    */
   private fun liftTheContentAboveTheKeyboard() {
     val content: View = findViewById(android.R.id.content)
     ViewCompat.setOnApplyWindowInsetsListener(content) { view, insets ->
       val keyboard: Insets = insets.getInsets(WindowInsetsCompat.Type.ime())
-      val bars: Insets = insets.getInsets(WindowInsetsCompat.Type.systemBars())
-      // The keyboard's inset already contains the navigation bar it covers,
-      // so subtracting it is what keeps the composer flush with the keyboard
-      // rather than a bar's height above it.
-      view.setPadding(0, 0, 0, (keyboard.bottom - bars.bottom).coerceAtLeast(0))
+      view.setPadding(0, 0, 0, keyboard.bottom)
       insets
     }
   }
