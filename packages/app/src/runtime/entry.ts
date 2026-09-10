@@ -117,6 +117,15 @@ export type EntryResult =
        * and this module decides entry.
        */
       readonly invitation?: InvitationOutcome
+      /**
+       * The account's password, present only on the launch that claimed it.
+       *
+       * Passed through rather than kept here: this module decides entry, and
+       * where a credential lives is `deviceSecrets.ts`'s answer. The caller
+       * keeps it, because it is the one moment the service ever offers it --
+       * see `recoverySecret.ts` and #190.
+       */
+      readonly password?: string
     }
   | { readonly entered: false; readonly reason: string }
 
@@ -177,13 +186,24 @@ export async function enterWithASession(deps: EntryDeps): Promise<EntryResult> {
   // loss than the account.
   await markSignUpStarted(signUp)
 
+  // Carried out only on this launch. A restore has none to pass on, which is
+  // right: the password is offered once, when the account is made.
+  const password =
+    claim.password === undefined ? {} : { password: claim.password }
+
   const kept = await saveSession(secrets, claim.session)
   if (kept) {
-    return { entered: true, session: claim.session, claimed: true }
+    return { entered: true, session: claim.session, claimed: true, ...password }
   }
 
   // Entered anyway. The token is spent and the account exists; refusing here
   // would throw away an invitation that has already been consumed and cannot
   // be consumed again.
-  return { entered: true, session: claim.session, claimed: true, kept: false }
+  return {
+    entered: true,
+    session: claim.session,
+    claimed: true,
+    kept: false,
+    ...password,
+  }
 }

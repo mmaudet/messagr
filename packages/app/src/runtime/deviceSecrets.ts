@@ -60,6 +60,24 @@ export const sessionSecrets = keychainStore('eu.messagr.session')
 export const signUpSecrets = keychainStore('eu.messagr.sign-up')
 
 /**
+ * The password this account was created with, kept so a reinstalled device
+ * can come back as a NEW device rather than republishing keys under a dead
+ * identifier (#190).
+ *
+ * Its own entry rather than a field of the session, for the reason
+ * `recoverySecret.ts` gives at length: the session is what restores, this is
+ * what replaces, and `RestoreCredentials` must not carry a credential the
+ * SDK is never meant to see.
+ *
+ * It is the heaviest thing this application keeps. A password makes devices
+ * at will and cannot be revoked device by device, so whoever defeats the
+ * keystore gets the account rather than a session. Weighed and accepted on
+ * 10 September 2026 against somebody being locked out by a reinstall they
+ * did nothing wrong to cause.
+ */
+export const recoverySecrets = keychainStore('eu.messagr.recovery')
+
+/**
  * The pushkey this device last registered a pusher under.
  *
  * WITHOUT IT, A GHOST IS PUSHED TO FOR EVER. A pusher is keyed by its token,

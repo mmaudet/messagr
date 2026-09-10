@@ -235,6 +235,10 @@ export const en: Readonly<Record<CopyKey, string>> = {
     'You already have a conversation with %@. That one carries on: the invitation did not open a second.',
   list_not_in_yet:
     'You are not in yet. Open the invitation link somebody sent you: it is the only door, and the application can do nothing before it.',
+  list_reinstalled_back:
+    'This device was reinstalled. It has come back under a new device identity, and messages received before the reinstall stay unreadable: their keys went with the old installation.',
+  list_reinstalled_stranded:
+    'This device has lost its encryption keys, most likely in a reinstall. Messages received before are unreadable and cannot be recovered. To write here again you need a new invitation.',
   list_empty: 'No conversations yet. Invite someone to start one.',
   list_nothing_said: 'Nothing has been said yet',
   list_unreadable: 'This device cannot read the last message',

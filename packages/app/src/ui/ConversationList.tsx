@@ -57,6 +57,11 @@ export interface ConversationListProps {
    */
   readonly invitation?: InvitationOutcome | null
   /**
+   * Whether this launch found a session whose crypto store was gone, and
+   * what became of it. See `afterReinstall.ts`.
+   */
+  readonly reinstalled?: 'reentered' | 'stranded' | null
+  /**
    * Whether this device has no session at all.
    *
    * AN APPLICATION THAT CANNOT DO ANYTHING MUST NOT LOOK AS IF IT CAN. Entry
@@ -79,6 +84,7 @@ export function ConversationList({
   names,
   onOpen,
   invitation = null,
+  reinstalled = null,
   notInYet = false,
   now = Date.now(),
 }: ConversationListProps) {
@@ -100,6 +106,24 @@ export function ConversationList({
           sentence promising a conversation would be promising one that was
           refused a second later. What it says instead names the person, so
           the row to open is the one already on this screen. */}
+      {/* A DEVICE THAT LOST ITS KEYS SAYS SO, in both outcomes.
+          #190: reinstalling takes the crypto store and leaves the keychain,
+          so the past becomes unreadable whatever else happens. The product
+          does not have those messages any more and must not draw a screen
+          that behaves as though it does.
+
+          Coming back as a new device is the good outcome and still a loss:
+          everything said before is gone. Being stranded is the other, and
+          there the person has something to do -- ask for an invitation --
+          which is why it is said in those words rather than as an error. */}
+      {reinstalled !== null && (
+        <Text style={styles.ignored} testID="list-reinstalled">
+          {reinstalled === 'reentered'
+            ? t('list_reinstalled_back')
+            : t('list_reinstalled_stranded')}
+        </Text>
+      )}
+
       {invitation !== null && invitation !== undefined && (
         <Text style={styles.ignored} testID="list-invitation-ignored">
           {invitation.kind === 'used'
@@ -120,7 +144,11 @@ export function ConversationList({
           its own round trips, and the day either is wrong they are wrong
           together. */}
       {summaries.length === 0 ? (
-        notInYet ? (
+        // A stranded device has an account and cannot use it. Saying « ouvrez
+        // le lien d'invitation qu'on vous a envoyé » to somebody who did that
+        // months ago and has just reinstalled would be telling them to do the
+        // thing they already did.
+        notInYet && reinstalled === null ? (
           <Text style={styles.empty} testID="list-not-in-yet">
             {t('list_not_in_yet')}
           </Text>

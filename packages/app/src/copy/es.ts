@@ -232,6 +232,10 @@ export const es: Readonly<Record<CopyKey, string>> = {
     'Ya tiene una conversación con %@. Es la que continúa: la invitación no ha abierto una segunda.',
   list_not_in_yet:
     'Todavía no ha entrado. Abra el enlace de invitación que le enviaron: es la única puerta, y la aplicación no puede hacer nada antes.',
+  list_reinstalled_back:
+    'Este dispositivo se ha reinstalado. Ha vuelto con una nueva identidad de dispositivo, y los mensajes recibidos antes de la reinstalación siguen siendo ilegibles: sus claves se fueron con la instalación anterior.',
+  list_reinstalled_stranded:
+    'Este dispositivo ha perdido sus claves de cifrado, probablemente en una reinstalación. Los mensajes recibidos antes son ilegibles y no pueden recuperarse. Para volver a escribir aquí hace falta una nueva invitación.',
   list_empty:
     'Ninguna conversación por ahora. Invite a alguien para empezar una.',
   list_nothing_said: 'Todavía no se ha dicho nada',
