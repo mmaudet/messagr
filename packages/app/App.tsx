@@ -85,7 +85,13 @@ import {
 import { markUpTo, readAtMark, type Receipt } from './src/runtime/receipts'
 import { hasSeenPromise, rememberPromiseSeen } from './src/runtime/promiseSeen'
 import { clearSignUp, isSignUpUnfinished } from './src/runtime/signUpMarker'
-import { color, floors, space, type as typeScale } from './src/design/tokens'
+import {
+  color,
+  floors,
+  layout,
+  space,
+  type as typeScale,
+} from './src/design/tokens'
 import { mergeTimeline, type TimelineEntry } from './src/timeline/mergeTimeline'
 import { makePumpHttp } from './src/runtime/pump'
 import { fetchJoinedMembers } from './src/runtime/encryptedSend'
@@ -2999,7 +3005,17 @@ export function App({
               gestures that cannot be undone. One tap from the conversation
               and out of the way of reading it. */}
             {openScope !== null && trust === null && personOpen && (
-              <View style={styles.block}>
+              // AND THIS ONE CARRIES ITS OWN GUTTER, because it is the one
+              // screen written here rather than in a component.
+              //
+              // `content` used to pad every screen by `space.xl`, on top of
+              // the gutter each component already had -- so it was removed
+              // when the conversation list came out too narrow. Every other
+              // screen has `layout.screenGutter` of its own; this one had
+              // been living on the padding that went, and its text was
+              // flush against the edge of the telephone. Measured on the
+              // emulator: every row of it began at x = 0.
+              <View style={[styles.block, styles.person]}>
                 <Pressable
                   testID="person-back"
                   onPress={() => setPersonOpen(false)}
@@ -3345,6 +3361,7 @@ const styles = StyleSheet.create({
   // Anchored to the bottom, over whatever is scrolling behind it.
   dock: { position: 'absolute', left: 0, right: 0, bottom: 0 },
   block: { marginBottom: space.xxl },
+  person: { paddingHorizontal: layout.screenGutter },
   // Spread rather than picked apart: size, leading, weight and tracking
   // travel together, and separating them is how a line-height floor gets
   // broken without anyone deciding to break it.
