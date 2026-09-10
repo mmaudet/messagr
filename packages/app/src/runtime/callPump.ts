@@ -243,6 +243,37 @@ export function startCallRuntime(
   let pictures: Pictures = { local: null, remote: null }
   /** Whether this call has been marked as having carried a picture. */
   let sawVideo = false
+  /**
+   * When the two of them were connected, or `null` if they never were.
+   *
+   * The start of the duration a row carries, and it is `inCall` rather than
+   * the first ring: what somebody wants from « 32 min » is how long they
+   * talked, and the wait before a pick-up is not that.
+   *
+   * Cleared by `writeDuration`, which is what makes writing it idempotent --
+   * two paths reach the end of a call and both call it.
+   */
+  let connectedAt: number | null = null
+
+  /**
+   * Writes how long the call lasted, once.
+   *
+   * TWO WAYS OUT OF A CALL, and only one of them is a state. Ending is a
+   * transition the machine makes and reports; hanging up is a gesture whose
+   * teardown runs through `release`, which clears `held` -- so a duration
+   * written only from the state callback is a duration missing from every
+   * call this device ended itself. Written from both, and `connectedAt` is
+   * cleared here so the second one finds nothing to do.
+   */
+  function writeDuration(scope: string): void {
+    const began = connectedAt
+    connectedAt = null
+    if (began === null) return
+    log.lasted(scope, (Date.now() - began) / 1000).catch(() => {
+      // ADR-0010: this page degrades. A row without its duration is a line
+      // that says a little less, not a call that did not happen.
+    })
+  }
   // FOR THE LIFE OF THE RUNTIME, NOT OF A CALL.
   //
   // This was unsubscribed in `release`, which runs at the end of every call
@@ -334,6 +365,14 @@ export function startCallRuntime(
         if (settled !== null && held !== null) {
           log.settle(held.scope, settled).catch(() => {})
         }
+        // The clock starts at the pick-up and is read at the end. `inCall`
+        // is reported on every tick of a running call, so the first one is
+        // the one that counts -- hence the `null` check rather than a plain
+        // assignment.
+        if (state.call === 'inCall' && connectedAt === null) {
+          connectedAt = Date.now()
+        }
+        if (state.call === 'ended' && held !== null) writeDuration(held.scope)
         if (held !== null) held = { ...held, state }
         onChanged(held === null ? null : { ...held })
       },
@@ -349,6 +388,7 @@ export function startCallRuntime(
       sendingVideo: false,
     }
     sawVideo = false
+    connectedAt = null
     held = call
     // THE AUDIO SESSION IS TAKEN WHEN THE CALL BEGINS, NOT WHEN IT CONNECTS.
     //
@@ -453,6 +493,10 @@ export function startCallRuntime(
     setSpeaker: on => deviceCallAudio.speaker(on),
     release: async () => {
       const running = held
+      // Before `held` goes: this is the path a call ended from this device
+      // takes, and `writeDuration` needs the conversation the row is in.
+      // Does nothing when the state callback already wrote it.
+      if (running !== null) writeDuration(running.scope)
       held = null
       pictures = { local: null, remote: null }
       onChanged(null)

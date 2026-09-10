@@ -500,6 +500,7 @@ export const fr = {
   pick_cancel: 'Annuler',
   pick_empty: 'Vous n’avez pas d’autre conversation.',
   'calls_ring_back %@': 'Rappeler %@',
+  'calls_lasted %@': 'Durée : %@',
   calls_taken: 'Appel reçu',
   calls_placed: 'Appel passé',
   calls_missed: 'Appel manqué',

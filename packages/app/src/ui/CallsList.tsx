@@ -6,6 +6,7 @@ import { t, type CopyKey } from '../copy'
 import { color, floors, layout, space, stroke, type } from '../design/tokens'
 import { stampFor, type Stamp } from '../timeline/whenShown'
 import { Avatar } from './Avatar'
+import { spokenFor } from './callDuration'
 import { TabIcon } from './TabIcon'
 
 /**
@@ -118,9 +119,16 @@ export function CallsList({
               // The whole row said aloud, in the order it reads: who, what
               // became of the call, when. A screen reader must not have to
               // piece three labels together.
-              accessibilityLabel={`${shown}. ${t(outcomeLabel(call))}. ${whenLabel(
-                stampFor(call.at, now),
-              )}`}
+              accessibilityLabel={[
+                shown,
+                t(outcomeLabel(call)),
+                // Words here, a clock on screen. A screen reader saying
+                // "three forty-two" of a row is saying a time of day.
+                ...(call.seconds === undefined
+                  ? []
+                  : [t('calls_lasted %@', spokenFor(call.seconds))]),
+                whenLabel(stampFor(call.at, now)),
+              ].join('. ')}
               style={({ pressed }) => [styles.row, pressed && styles.pressed]}>
               <Avatar shown={shown} />
               <View style={styles.said}>
@@ -153,6 +161,17 @@ export function CallsList({
                     />
                   )}
                   <Text style={styles.outcome}>{t(outcomeLabel(call))}</Text>
+                  {/* THE DURATION IS ONLY ON A CALL THAT HAD ONE.
+                      A missed call has no duration to print, and printing
+                      `0:00` beside « Appel manqué » would be a row saying
+                      somebody spoke for no time rather than not at all.
+                      `undefined` is the column's own way of saying it does
+                      not know -- see `callLogStore.ts`. */}
+                  {call.seconds !== undefined && (
+                    <Text style={styles.outcome}>
+                      {`· ${spokenFor(call.seconds)}`}
+                    </Text>
+                  )}
                 </View>
               </View>
               <Text style={styles.when}>

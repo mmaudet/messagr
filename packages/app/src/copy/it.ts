@@ -330,6 +330,7 @@ export const it: Readonly<Record<CopyKey, string>> = {
   pick_cancel: 'Annullare',
   pick_empty: 'Non ha altre conversazioni.',
   'calls_ring_back %@': 'Richiama %@',
+  'calls_lasted %@': 'Durata: %@',
   calls_taken: 'Chiamata ricevuta',
   calls_placed: 'Chiamata effettuata',
   calls_missed: 'Chiamata persa',

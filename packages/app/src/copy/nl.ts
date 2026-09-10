@@ -331,6 +331,7 @@ export const nl: Readonly<Record<CopyKey, string>> = {
   pick_cancel: 'Annuleren',
   pick_empty: 'U hebt geen ander gesprek.',
   'calls_ring_back %@': '%@ terugbellen',
+  'calls_lasted %@': 'Duur: %@',
   calls_taken: 'Ontvangen oproep',
   calls_placed: 'Uitgaande oproep',
   calls_missed: 'Gemiste oproep',

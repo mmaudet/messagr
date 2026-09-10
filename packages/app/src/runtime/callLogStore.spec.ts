@@ -146,6 +146,22 @@ describe('two writers, one call', () => {
     expect(await log.recent()).toHaveLength(2)
   })
 
+  it('carries what either row knows across the fold', async () => {
+    // The newer write wins the row, and for a while it won the whole row --
+    // so a picture or a duration the older one held was lost to a fold
+    // nobody can see.
+    const log = await openCallLog(
+      pair(
+        { ...ROW, at, outcome: 'answered' },
+        { ...ROW, at: at - 3_000, video: 1, seconds: 222 },
+      ),
+    )
+    const recent = await log.recent()
+    expect(recent).toHaveLength(1)
+    expect(recent[0]?.video).toBe(true)
+    expect(recent[0]?.seconds).toBe(222)
+  })
+
   it('keeps a call out and a call in, however close together', async () => {
     // Calling somebody back a second after they rang is two calls, and the
     // arrows point opposite ways.
@@ -234,5 +250,67 @@ describe('whether a call carried a picture', () => {
 
   it('a device without a notebook says the mark did not hold', async () => {
     expect(await forgetfulCallLog().sawVideo('!a:x')).toBe(false)
+  })
+})
+
+describe('how long the call lasted', () => {
+  // Allowed on 10 September 2026, amending ADR-0010. The file says why.
+  it('reads a duration back', async () => {
+    const log = await openCallLog(fake([{ ...ROW, seconds: 222 }]).database)
+    expect((await log.recent())[0]?.seconds).toBe(222)
+  })
+
+  it('reads a row from before the column existed as having no duration', async () => {
+    // `-1` is the default, and it is the column saying it does not know --
+    // which is not the same as a call that lasted no time.
+    const log = await openCallLog(fake([{ ...ROW, seconds: -1 }]).database)
+    expect((await log.recent())[0]?.seconds).toBeUndefined()
+  })
+
+  it('keeps a zero, because a call can end in the second it began', async () => {
+    const log = await openCallLog(fake([{ ...ROW, seconds: 0 }]).database)
+    expect((await log.recent())[0]?.seconds).toBe(0)
+  })
+
+  it('drops a duration of the wrong shape rather than printing it', async () => {
+    const log = await openCallLog(
+      fake([{ ...ROW, seconds: 'a while' }]).database,
+    )
+    expect((await log.recent())[0]?.seconds).toBeUndefined()
+  })
+
+  it('writes the duration onto the newest call of a conversation', async () => {
+    const { database, ran } = fake([ROW])
+    const log = await openCallLog(database)
+    expect(await log.lasted('!a:x', 222.4)).toBe(true)
+    const written = ran.find(one =>
+      one.sql.startsWith('UPDATE call_log SET seconds'),
+    )
+    // Rounded on the way in: a column of whole seconds is what the screen
+    // reads back.
+    expect(written?.params).toEqual([222, 7])
+  })
+
+  it('refuses a duration a clock could not have produced', async () => {
+    // Both ends of the measurement are read from this device's own clock,
+    // so a negative one is a clock that went backwards. `-1` is how the
+    // column says it does not know, and a row must not claim to know
+    // something absurd.
+    const { database, ran } = fake([ROW])
+    const log = await openCallLog(database)
+    expect(await log.lasted('!a:x', -3)).toBe(false)
+    expect(await log.lasted('!a:x', Number.NaN)).toBe(false)
+    expect(
+      ran.some(one => one.sql.startsWith('UPDATE call_log SET seconds')),
+    ).toBe(false)
+  })
+
+  it('says so when there is no call to write it onto', async () => {
+    const log = await openCallLog(fake([]).database)
+    expect(await log.lasted('!a:x', 30)).toBe(false)
+  })
+
+  it('a device without a notebook says the duration did not hold', async () => {
+    expect(await forgetfulCallLog().lasted('!a:x', 30)).toBe(false)
   })
 })

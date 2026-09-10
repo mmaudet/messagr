@@ -333,6 +333,7 @@ export const en: Readonly<Record<CopyKey, string>> = {
   pick_cancel: 'Cancel',
   pick_empty: 'You have no other conversation.',
   'calls_ring_back %@': 'Call %@ back',
+  'calls_lasted %@': 'Lasted %@',
   calls_taken: 'Incoming call',
   calls_placed: 'Outgoing call',
   calls_missed: 'Missed call',
