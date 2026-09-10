@@ -97,6 +97,31 @@ export function canRemoveForEveryone(
  * to send on, and a removed one has nothing left at all. Unlike Copy, a
  * photograph counts -- forwarding a picture is most of why anybody forwards.
  */
+/**
+ * Whether the selection can be kept as a favourite.
+ *
+ * The same reading as forwarding, and for a related reason: a favourite is a
+ * promise that this can be found again, and a message this device could not
+ * open has nothing to find. A removed one has nothing at all -- keeping a
+ * tombstone would fill the screen with lines saying something used to be
+ * here.
+ *
+ * Unlike forwarding, nothing leaves the device, so there is no second
+ * question about what it would cost to send.
+ */
+export function canFavourite(
+  selected: ReadonlySet<string>,
+  entries: readonly TimelineEntry[],
+): boolean {
+  const found = chosen(selected, entries)
+  if (found.length === 0) return false
+  return found.every(
+    entry =>
+      entry.removed !== true &&
+      (entry.image !== undefined || entry.body !== null),
+  )
+}
+
 export function canForward(
   selected: ReadonlySet<string>,
   entries: readonly TimelineEntry[],

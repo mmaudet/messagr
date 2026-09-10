@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest'
 import type { TimelineEntry } from './mergeTimeline'
 import {
   canCopy,
+  canFavourite,
   canForward,
   canRemoveForEveryone,
   copyText,
@@ -201,5 +202,40 @@ describe('copying a photograph', () => {
       image: {} as TimelineEntry['image'],
     }
     expect(onlyPhotograph(new Set(['$g']), [gone])).toBeNull()
+  })
+})
+
+describe('what can be kept as a favourite', () => {
+  it('keeps anything readable, words or a photograph', () => {
+    const held = [MINE, shown('$p1', HER)]
+    expect(canFavourite(new Set(['$m1']), held)).toBe(true)
+    expect(canFavourite(new Set(['$p1']), held)).toBe(true)
+    expect(canFavourite(new Set(['$m1', '$p1']), held)).toBe(true)
+  })
+
+  it('refuses a message this device could not open', () => {
+    // A favourite is a promise that this can be found again, and there is
+    // nothing to find in a message whose key never arrived.
+    const unreadable: TimelineEntry[] = [
+      { eventId: '$x', claimedSender: '@her:x', sentAt: 1, body: null },
+    ]
+    expect(canFavourite(new Set(['$x']), unreadable)).toBe(false)
+  })
+
+  it('refuses a message that was removed for everyone', () => {
+    const gone: TimelineEntry[] = [
+      {
+        eventId: '$x',
+        claimedSender: '@her:x',
+        sentAt: 1,
+        body: null,
+        removed: true,
+      },
+    ]
+    expect(canFavourite(new Set(['$x']), gone)).toBe(false)
+  })
+
+  it('refuses an empty selection', () => {
+    expect(canFavourite(new Set(), [MINE])).toBe(false)
   })
 })

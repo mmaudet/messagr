@@ -106,6 +106,50 @@ describe('toTimelineEntries', () => {
     expect(entries[1]?.reason).toBeTruthy()
   })
 
+  it('carries who each event claims to be from, on every shape it makes', async () => {
+    // #123 TURNED ON THIS QUESTION FOR SEVEN CONTINUOUS-INTEGRATION RUNS.
+    // The screen names an incoming sender through « Se présente comme %@ »,
+    // and the theory was that this derivation might produce entries without
+    // a `claimedSender` -- which would render the sentence with its
+    // placeholder showing and match no assertion.
+    //
+    // It cannot. The loop skips any event whose `sender` is not a string
+    // before it builds anything, so an entry without one is not a thing that
+    // exists. Pinned here rather than observed on a device, because a guard
+    // is stronger evidence than a screenshot: a screenshot says it did not
+    // happen once.
+    const entries = await entriesOf(
+      machine({ $a: 'lisible' }),
+      decodeUtf8,
+      '!room:messagr.eu',
+      [encrypted('$a', 1000), encrypted('$b', 2000, '@him:messagr.eu')],
+    )
+    expect(entries.map(entry => entry.claimedSender)).toEqual([
+      '@her:messagr.eu',
+      '@him:messagr.eu',
+    ])
+    // The unreadable one carries it too: a message this device could not
+    // open is still a message somebody claims to have sent, and the screen
+    // names them above the gap exactly as it does above words.
+    expect(entries[1]?.body).toBeNull()
+  })
+
+  it('drops an event that names no sender rather than carrying a gap', async () => {
+    // The alternative would be an entry whose sender is `undefined`, which
+    // reaches the screen as « Se présente comme %@ » -- a sentence that
+    // looks unfinished and names nobody. Nothing can deduplicate such an
+    // event either. See the guard's own note.
+    const nameless: Record<string, unknown> = { ...encrypted('$x', 1000) }
+    delete nameless.sender
+    const entries = await entriesOf(
+      machine({ $a: 'lisible', $x: 'aussi' }),
+      decodeUtf8,
+      '!room:messagr.eu',
+      [encrypted('$a', 1000), nameless],
+    )
+    expect(entries.map(entry => entry.eventId)).toEqual(['$a'])
+  })
+
   it('draws nothing at all for an event that was taken back', async () => {
     // THE ONE THAT WOULD HAVE CAUGHT IT. A redaction strips the content and
     // leaves the shell: an `m.room.encrypted` with no ciphertext, which

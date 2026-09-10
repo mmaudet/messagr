@@ -21,6 +21,11 @@ import {
   openListCache,
   type ListCache,
 } from './listCacheStore'
+import {
+  forgetfulFavourites,
+  openFavourites,
+  type Favourites,
+} from './favouriteStore'
 import { forgetfulHidden, openHidden, type Hidden } from './hiddenStore'
 import { forgetfulReadBy, openReadBy, type ReadBy } from './readByStore'
 import { openStorePassphrase } from './storePassphrase'
@@ -38,6 +43,8 @@ export interface NotebookOpening {
   readonly list: ListCache
   /** Events this device has been told not to draw. §13.7's "pour moi". */
   readonly hidden: Hidden
+  /** The eighth page: the messages somebody kept. See favouriteStore.ts. */
+  readonly favourites: Favourites
   /**
    * How far the other person has read, per conversation.
    *
@@ -109,6 +116,7 @@ export async function openNotebook(storeDir: string): Promise<NotebookOpening> {
       calls: forgetfulCallLog(),
       list: forgetfulListCache(),
       hidden: forgetfulHidden(),
+      favourites: forgetfulFavourites(),
       readBy: forgetfulReadBy(),
       opened: false,
       reason: 'no writable directory was supplied at launch',
@@ -126,6 +134,7 @@ export async function openNotebook(storeDir: string): Promise<NotebookOpening> {
       calls: forgetfulCallLog(),
       list: forgetfulListCache(),
       hidden: forgetfulHidden(),
+      favourites: forgetfulFavourites(),
       readBy: forgetfulReadBy(),
       opened: false,
       reason: passphrase.reason,
@@ -152,6 +161,7 @@ export async function openNotebook(storeDir: string): Promise<NotebookOpening> {
       calls: await openCallLog(page),
       list: await openListCache(page),
       hidden: await openHidden(page),
+      favourites: await openFavourites(page),
       readBy: await openReadBy(page),
       opened: true,
       minted: passphrase.minted,
@@ -167,6 +177,7 @@ export async function openNotebook(storeDir: string): Promise<NotebookOpening> {
       calls: forgetfulCallLog(),
       list: forgetfulListCache(),
       hidden: forgetfulHidden(),
+      favourites: forgetfulFavourites(),
       readBy: forgetfulReadBy(),
       opened: false,
       reason: getErrorMessage(cause),

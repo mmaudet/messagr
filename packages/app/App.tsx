@@ -113,9 +113,17 @@ import { removeMessage } from './src/runtime/cryptoPump'
 import { photographForForward } from './src/runtime/cryptoPump'
 import { openNotebook } from './src/runtime/notebook'
 import { forgetfulHidden, type Hidden } from './src/runtime/hiddenStore'
+import {
+  forgetfulFavourites,
+  // Aliased: the page and the screen that draws it want the same word, and
+  // the screen is the one a reader of this file meets first.
+  type Favourites as FavouritesPage,
+} from './src/runtime/favouriteStore'
 import { forgetfulReadBy, type ReadBy } from './src/runtime/readByStore'
+import { readFavourites, type KeptMessage } from './src/runtime/readFavourites'
 import {
   canCopy,
+  canFavourite,
   canForward,
   canRemoveForEveryone,
   copyText,
@@ -150,6 +158,7 @@ import type { HistoryClaim } from './src/runtime/claimHistory'
 import { Conversation } from './src/ui/Conversation'
 import { ConversationList } from './src/ui/ConversationList'
 import { Invite, type InviteStage } from './src/ui/Invite'
+import { Favourites } from './src/ui/Favourites'
 import { FloatingAction } from './src/ui/FloatingAction'
 import { Header } from './src/ui/Header'
 import { Composer } from './src/ui/Composer'
@@ -397,6 +406,20 @@ export function App({
     0,
   )
   const [legalOpen, setLegalOpen] = useState(false)
+  const [favouritesOpen, setFavouritesOpen] = useState(false)
+  /**
+   * The kept messages, with their words, while that screen is open.
+   *
+   * `null` means nobody has asked or the answer has not arrived -- the
+   * screen draws its empty line either way, which is honest for the second
+   * or two a derivation takes and correct for good if nothing was kept.
+   */
+  const [keptMessages, setKeptMessages] = useState<
+    readonly KeptMessage[] | null
+  >(null)
+  const readKeptRef = useRef<(() => Promise<readonly KeptMessage[]>) | null>(
+    null,
+  )
   // Whether the screen about the person is showing over the conversation.
   // The rare gestures live there rather than in the message flow -- see the
   // conversation's own comment for why.
@@ -465,6 +488,15 @@ export function App({
   const [reinstalled, setReinstalled] = useState<
     'reentered' | 'stranded' | null
   >(null)
+  /**
+   * The messages this device has been told to keep.
+   *
+   * State as well as a page, for the reason the read marks are both: the bar
+   * has to say « Favori » or « Retirer des favoris » on the frame the finger
+   * lands, and a notebook read is a round trip.
+   */
+  const [favourites, setFavourites] = useState<ReadonlySet<string>>(new Set())
+  const favouritesRef = useRef<FavouritesPage>(forgetfulFavourites())
   // AND IT GOES AWAY ON ITS OWN. A line that stayed would be a line still
   // there next time the conversation is opened, describing a photograph
   // saved yesterday. Long enough to read twice, short enough that nobody
@@ -922,6 +954,8 @@ export function App({
       // first frame already knows how far it was read.
       readMarksRef.current = new Map(await opening.readBy.all())
       setHidden(await opening.hidden.all())
+      favouritesRef.current = opening.favourites
+      setFavourites(await opening.favourites.marks())
       logEvent(opening.opened ? 'info' : 'warn', 'MESSAGR_GIVEN_NAMES', {
         opened: opening.opened,
         ...(opening.minted === undefined ? {} : { minted: opening.minted }),
@@ -1389,6 +1423,25 @@ export function App({
               )
             }
             openConversationRef.current = showConversation
+
+            // THE WORDS BEHIND THE MARKS, bound where the client is.
+            // `readFavourites.ts` says why they are derived rather than
+            // written down: the notebook keeps which messages were kept and
+            // never what they said.
+            readKeptRef.current = async () =>
+              readFavourites(
+                {
+                  entries: async scope =>
+                    (
+                      await loadConversation(
+                        sessionClient,
+                        scope,
+                        credentials.userId,
+                      )
+                    ).entries,
+                },
+                await favouritesRef.current.all(),
+              )
 
             // REACTING, AND TAKING IT BACK. ADR-0011.
             //
@@ -2757,7 +2810,47 @@ export function App({
                   onlyPhotograph(selected, conversation ?? [])?.image !==
                   undefined
                 }
+                canFavourite={canFavourite(selected, conversation ?? [])}
+                // EVERY one, not any: the control does one thing to the whole
+                // selection, and a mixed one has to pick a direction. Keeping
+                // is the safe half -- a mark added to something already kept
+                // changes nothing, where a removal would silently drop marks
+                // somebody did not ask about.
+                alreadyFavourite={
+                  selected.size > 0 &&
+                  [...selected].every(id => favourites.has(id))
+                }
                 onClear={() => setSelected(new Set())}
+                onFavourite={() => {
+                  const chosen = [...selected]
+                  const already = chosen.every(id => favourites.has(id))
+                  setSelected(new Set())
+                  // Drawn before the notebook answers: the mark is this
+                  // device's own and the page is a formality. A failure is a
+                  // line in the log rather than a screen -- the person is
+                  // looking at a message, not at a database.
+                  setFavourites(had => {
+                    const next = new Set(had)
+                    for (const id of chosen) {
+                      if (already) next.delete(id)
+                      else next.add(id)
+                    }
+                    return next
+                  })
+                  const page = favouritesRef.current
+                  const written = already
+                    ? page.drop(chosen)
+                    : page.keep(openScope ?? '', chosen)
+                  written
+                    .then(held => {
+                      if (!held) {
+                        logEvent('warn', 'MESSAGR_FAVOURITE_NOT_KEPT', {
+                          how: already ? 'drop' : 'keep',
+                        })
+                      }
+                    })
+                    .catch(() => {})
+                }}
                 onCopy={() => {
                   const held = conversation ?? []
                   const words = copyText(selected, held)
@@ -2995,91 +3088,137 @@ export function App({
               </View>
             )}
 
-            {openScope === null && tab === 'settings' && !legalOpen && (
-              <View style={styles.block}>
-                <Settings
-                  onBack={() => setTab('chat')}
-                  onLegal={() => setLegalOpen(true)}
-                  // ANDROID'S OWN SCREEN, NOT A DIALOG OF OURS. The
-                  // permission that lets a call light the display is granted
-                  // at installation only to applications registered as the
-                  // telephone; everybody else has to be taken to Settings
-                  // and shown the switch. `Settings.tsx` says what was
-                  // measured on the demonstration Pixel.
-                  //
-                  // `sendIntent` rather than a native module: this is one
-                  // intent with no answer to read back, and a module written
-                  // to open a screen would be a module to maintain for a
-                  // string.
-                  onRingFullScreen={() => {
-                    Linking.sendIntent(
-                      'android.settings.MANAGE_APP_USE_FULL_SCREEN_INTENT',
-                      [
-                        {
-                          key: 'android.provider.extra.APP_PACKAGE',
-                          value: 'eu.messagr',
-                        },
-                      ],
-                    ).catch(() => {
-                      // An older Android has no such screen. The
-                      // application's own notification settings are where
-                      // somebody would go looking anyway.
-                      Linking.openSettings().catch(() => {})
-                    })
-                  }}
-                  // THE SAME KIND OF DOOR, FOR THE MODE THAT SILENCED THE
-                  // RINGING. `ACTION_NOTIFICATION_POLICY_ACCESS_SETTINGS`
-                  // is a list of every application, with no extra to
-                  // preselect one -- unlike the full-screen screen above,
-                  // which takes a package. So this lands on the list and
-                  // the hint beside the row says what to look for.
-                  onRingWhileQuiet={() => {
-                    Linking.sendIntent(
-                      'android.settings.NOTIFICATION_POLICY_ACCESS_SETTINGS',
-                    ).catch(() => {
-                      Linking.openSettings().catch(() => {})
-                    })
-                  }}
-                  receipts={receipts}
-                  receiptsNotKept={receiptsNotKept}
-                  language={language}
-                  onLanguage={chooseLanguage}
-                  onLanguageSettled={keepLanguage}
-                  wake={wake}
-                  wakeNotKept={wakeNotKept}
-                  onWake={on => {
-                    // Shown first, kept second, like the switch above.
-                    setWake(on)
-                    wakeRef.current = on
-                    allowWake(wakeSecrets, on)
-                      .then(kept => setWakeNotKept(!kept))
-                      .catch(() => setWakeNotKept(true))
-                    // AND THE PUSHER ITSELF, WHICH IS WHAT MAKES OFF MEAN OFF.
+            {openScope === null &&
+              tab === 'settings' &&
+              !legalOpen &&
+              !favouritesOpen && (
+                <View style={styles.block}>
+                  <Settings
+                    onBack={() => setTab('chat')}
+                    onLegal={() => setLegalOpen(true)}
+                    onFavourites={() => {
+                      setFavouritesOpen(true)
+                      // FETCHED ON OPENING AND DROPPED ON CLOSING, exactly as a
+                      // conversation is. The notebook says which messages were
+                      // kept and never what they said -- `readFavourites.ts`
+                      // gives the reasoning at length -- so the words have to
+                      // be derived, and this is the moment somebody asked for
+                      // them.
+                      setKeptMessages(null)
+                      readKeptRef
+                        .current?.()
+                        .then(setKeptMessages, () => setKeptMessages([]))
+                    }}
+                    // ANDROID'S OWN SCREEN, NOT A DIALOG OF OURS. The
+                    // permission that lets a call light the display is granted
+                    // at installation only to applications registered as the
+                    // telephone; everybody else has to be taken to Settings
+                    // and shown the switch. `Settings.tsx` says what was
+                    // measured on the demonstration Pixel.
                     //
-                    // Stopping the next launch registering one is not turning
-                    // notifications off: the pusher already on the homeserver
-                    // keeps firing, and the switch reads as off while it is on.
-                    // Caught in review, and the ticket says how -- the same
-                    // route with `kind: null`.
-                    wakeThisDeviceRef.current?.(on)
-                  }}
-                  onReceipts={on => {
-                    // Shown first, kept second. A switch that waited on a
-                    // keystore would feel broken; one that reverts silently at
-                    // the next launch would be worse, which is what the
-                    // sentence under it is for.
-                    setReceipts(on)
-                    publishReceipts(receiptSecrets, on)
-                      .then(kept => setReceiptsNotKept(!kept))
-                      .catch(() => setReceiptsNotKept(true))
-                  }}
-                />
-              </View>
-            )}
+                    // `sendIntent` rather than a native module: this is one
+                    // intent with no answer to read back, and a module written
+                    // to open a screen would be a module to maintain for a
+                    // string.
+                    onRingFullScreen={() => {
+                      Linking.sendIntent(
+                        'android.settings.MANAGE_APP_USE_FULL_SCREEN_INTENT',
+                        [
+                          {
+                            key: 'android.provider.extra.APP_PACKAGE',
+                            value: 'eu.messagr',
+                          },
+                        ],
+                      ).catch(() => {
+                        // An older Android has no such screen. The
+                        // application's own notification settings are where
+                        // somebody would go looking anyway.
+                        Linking.openSettings().catch(() => {})
+                      })
+                    }}
+                    // THE SAME KIND OF DOOR, FOR THE MODE THAT SILENCED THE
+                    // RINGING. `ACTION_NOTIFICATION_POLICY_ACCESS_SETTINGS`
+                    // is a list of every application, with no extra to
+                    // preselect one -- unlike the full-screen screen above,
+                    // which takes a package. So this lands on the list and
+                    // the hint beside the row says what to look for.
+                    onRingWhileQuiet={() => {
+                      Linking.sendIntent(
+                        'android.settings.NOTIFICATION_POLICY_ACCESS_SETTINGS',
+                      ).catch(() => {
+                        Linking.openSettings().catch(() => {})
+                      })
+                    }}
+                    receipts={receipts}
+                    receiptsNotKept={receiptsNotKept}
+                    language={language}
+                    onLanguage={chooseLanguage}
+                    onLanguageSettled={keepLanguage}
+                    wake={wake}
+                    wakeNotKept={wakeNotKept}
+                    onWake={on => {
+                      // Shown first, kept second, like the switch above.
+                      setWake(on)
+                      wakeRef.current = on
+                      allowWake(wakeSecrets, on)
+                        .then(kept => setWakeNotKept(!kept))
+                        .catch(() => setWakeNotKept(true))
+                      // AND THE PUSHER ITSELF, WHICH IS WHAT MAKES OFF MEAN OFF.
+                      //
+                      // Stopping the next launch registering one is not turning
+                      // notifications off: the pusher already on the homeserver
+                      // keeps firing, and the switch reads as off while it is on.
+                      // Caught in review, and the ticket says how -- the same
+                      // route with `kind: null`.
+                      wakeThisDeviceRef.current?.(on)
+                    }}
+                    onReceipts={on => {
+                      // Shown first, kept second. A switch that waited on a
+                      // keystore would feel broken; one that reverts silently at
+                      // the next launch would be worse, which is what the
+                      // sentence under it is for.
+                      setReceipts(on)
+                      publishReceipts(receiptSecrets, on)
+                        .then(kept => setReceiptsNotKept(!kept))
+                        .catch(() => setReceiptsNotKept(true))
+                    }}
+                  />
+                </View>
+              )}
 
             {openScope === null && tab === 'settings' && legalOpen && (
               <View style={styles.block}>
                 <Legal onBack={() => setLegalOpen(false)} />
+              </View>
+            )}
+
+            {openScope === null && tab === 'settings' && favouritesOpen && (
+              <View style={styles.block}>
+                <Favourites
+                  kept={keptMessages ?? []}
+                  shownFor={scope => {
+                    const other = summaries.find(
+                      one => one.scope === scope,
+                    )?.other
+                    return other === undefined || other === null
+                      ? scope
+                      : displayNameFor(other, names.get(other))
+                  }}
+                  onBack={() => {
+                    setFavouritesOpen(false)
+                    // Dropped rather than kept for the next opening: these
+                    // are decrypted messages, and holding them in memory
+                    // behind a screen nobody is looking at is the thing
+                    // ADR-0006 is about.
+                    setKeptMessages(null)
+                  }}
+                  onOpen={scope => {
+                    setFavouritesOpen(false)
+                    setKeptMessages(null)
+                    setTab('chat')
+                    openConversationRef.current?.(scope)
+                  }}
+                />
               </View>
             )}
 
@@ -3421,7 +3560,28 @@ export function App({
                   label={t('back_to_newest')}
                   mark="↓"
                   quiet
-                  onPress={() => frame.current?.scrollToEnd({ animated: true })}
+                  onPress={() => {
+                    // SAID HERE AND NOT WAITED FOR. The circle used to go
+                    // away only when the scroll events from the animation
+                    // said the frame had arrived -- which is one throttled
+                    // event away from never, and on a long conversation the
+                    // animation can land short of an end that is still
+                    // measuring itself. Reported from the Pixel: « cela
+                    // fonctionne mais l'icône devrait disparaître
+                    // automatiquement ».
+                    //
+                    // Pressing this button IS the statement that somebody
+                    // wants to be at the newest message. Nothing the frame
+                    // reports afterwards is better evidence of it, and if
+                    // they scroll away again the next event says so.
+                    setAwayFromNewest(false)
+                    // And the frame follows the newest from now on, so an
+                    // animation that lands short is carried the rest of the
+                    // way by `onContentSizeChange` rather than leaving
+                    // somebody just above the end.
+                    atBottom.current = true
+                    frame.current?.scrollToEnd({ animated: true })
+                  }}
                 />
               )}
 

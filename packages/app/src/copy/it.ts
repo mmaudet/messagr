@@ -153,6 +153,17 @@ export const it: Readonly<Record<CopyKey, string>> = {
   selection_keep: 'Salvare',
   selection_kept: 'Fotografia salvata nella fototeca di questo dispositivo.',
   selection_keep_failed: 'Non è stato possibile salvare la fotografia.',
+  selection_favourite: 'Preferito',
+  selection_unfavourite: 'Togliere dai preferiti',
+  favourites_title: 'Messaggi preferiti',
+  favourites_cost:
+    'Questi messaggi sono preferiti solo su questo dispositivo. Non vi seguono su un altro telefono e non sopravvivono a una reinstallazione.',
+  favourites_empty:
+    'Nessun messaggio preferito. Una pressione lunga su un messaggio propone «Preferito».',
+  favourites_lost:
+    'Questo messaggio non è più leggibile su questo dispositivo.',
+  'favourites_where %1$@ %2$@': '%1$@ · %2$@',
+  settings_favourites: 'Messaggi preferiti',
   selection_remove: 'Eliminare',
   'remove_title %1$d': 'Eliminare %1$d messaggio/i?',
   remove_everyone: 'Eliminare per tutti',

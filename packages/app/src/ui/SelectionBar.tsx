@@ -3,6 +3,7 @@ import { Pressable, StyleSheet, Text, View } from 'react-native'
 
 import { t } from '../copy'
 import { color, floors, layout, space, type } from '../design/tokens'
+import { TabIcon } from './TabIcon'
 
 /**
  * What replaces the conversation's header while messages are selected.
@@ -48,8 +49,11 @@ export function SelectionBar({
   canCopy: copyable,
   canForward: forwardable,
   canKeep: keepable,
+  canFavourite: favouritable,
+  alreadyFavourite,
   onClear,
   onCopy,
+  onFavourite,
   onForward,
   onKeep,
   onRemove,
@@ -62,7 +66,18 @@ export function SelectionBar({
    * kept. Words have no gallery to go to.
    */
   readonly canKeep: boolean
+  /** Whether the selection is something that could be found again. */
+  readonly canFavourite: boolean
+  /**
+   * Whether every selected message is already kept.
+   *
+   * The same control does both, and it has to say which it will do: a button
+   * reading « Favori » on something already kept is a button whose effect
+   * nobody can predict.
+   */
+  readonly alreadyFavourite: boolean
   readonly onClear: () => void
+  readonly onFavourite: () => void
   readonly onCopy: () => void
   readonly onForward: () => void
   readonly onKeep: () => void
@@ -79,17 +94,32 @@ export function SelectionBar({
         <Text style={styles.leaveMark}>{'✕'}</Text>
       </Pressable>
 
-      <Text style={styles.count} testID="selection-count">
-        {t('selection_count %1$d', count)}
+      {/* IT WAS `flex: 1` AND IT BROKE. With three actions the count took
+          the space left over; with five there is none left, so flex handed
+          it a column one character wide and the words fell down the screen
+          -- « 1 sé cti on né (s) », measured on a Pixel 10 Pro Fold.
+
+          A bare number now: it is what a person reads anyway, it cannot
+          wrap, and the sentence survives where it was doing the work, in
+          what a screen reader says. */}
+      <Text
+        style={styles.count}
+        numberOfLines={1}
+        accessibilityLabel={t('selection_count %1$d', count)}
+        testID="selection-count">
+        {String(count)}
       </Text>
+
+      <View style={styles.spacer} />
 
       {copyable && (
         <Pressable
           testID="selection-copy"
           onPress={onCopy}
           accessibilityRole="button"
+          accessibilityLabel={t('selection_copy')}
           style={({ pressed }) => [styles.action, pressed && styles.pressed]}>
-          <Text style={styles.actionLabel}>{t('selection_copy')}</Text>
+          <TabIcon glyph="copy" tint={color.surface.paper} />
         </Pressable>
       )}
 
@@ -98,8 +128,36 @@ export function SelectionBar({
           testID="selection-forward"
           onPress={onForward}
           accessibilityRole="button"
+          accessibilityLabel={t('selection_forward')}
           style={({ pressed }) => [styles.action, pressed && styles.pressed]}>
-          <Text style={styles.actionLabel}>{t('selection_forward')}</Text>
+          <TabIcon glyph="forward" tint={color.surface.paper} />
+        </Pressable>
+      )}
+
+      {/* ONE CONTROL, TWO DIRECTIONS, AND IT SAYS WHICH.
+          A second press takes the mark back, which is what every messenger
+          does and what the ticket asks for. The label follows the selection
+          rather than the gesture: « Favori » on something not kept, « Retirer
+          des favoris » on something that is. A single word that meant both
+          would be a button whose effect nobody can predict. */}
+      {favouritable && (
+        <Pressable
+          testID="selection-favourite"
+          onPress={onFavourite}
+          accessibilityRole="button"
+          accessibilityLabel={
+            alreadyFavourite
+              ? t('selection_unfavourite')
+              : t('selection_favourite')
+          }
+          style={({ pressed }) => [styles.action, pressed && styles.pressed]}>
+          {/* FULL AGAINST EMPTY, not one colour against another. The star
+              says which way the gesture goes, and §13 refuses a state
+              carried by colour alone -- a filled shape is a shape. */}
+          <TabIcon
+            glyph={alreadyFavourite ? 'star.on' : 'star'}
+            tint={color.surface.paper}
+          />
         </Pressable>
       )}
 
@@ -116,8 +174,9 @@ export function SelectionBar({
           testID="selection-keep"
           onPress={onKeep}
           accessibilityRole="button"
+          accessibilityLabel={t('selection_keep')}
           style={({ pressed }) => [styles.action, pressed && styles.pressed]}>
-          <Text style={styles.actionLabel}>{t('selection_keep')}</Text>
+          <TabIcon glyph="save" tint={color.surface.paper} />
         </Pressable>
       )}
 
@@ -129,10 +188,13 @@ export function SelectionBar({
         testID="selection-remove"
         onPress={onRemove}
         accessibilityRole="button"
+        accessibilityLabel={t('selection_remove')}
         style={({ pressed }) => [styles.action, pressed && styles.pressed]}>
-        <Text style={[styles.actionLabel, styles.destructive]}>
-          {t('selection_remove')}
-        </Text>
+        {/* The one that keeps its colour. Red on a dark green ground is
+            unreadable as text, which is why this used to be a word placed
+            last; as a shape at 1.5 stroke the light red of the palette
+            carries, and the bin says the rest. */}
+        <TabIcon glyph="bin" tint={color.deny['200']} />
       </Pressable>
     </View>
   )
@@ -154,7 +216,11 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   leaveMark: { ...type.titleMd, color: color.surface.paper },
-  count: { ...type.titleMd, color: color.surface.paper, flex: 1 },
+  // `flexShrink: 0` and a spacer instead of `flex: 1`: the count is the one
+  // thing on this row that must never be squeezed, because squeezing text is
+  // how it becomes a column.
+  count: { ...type.titleMd, color: color.surface.paper, flexShrink: 0 },
+  spacer: { flex: 1 },
   action: {
     minHeight: floors.touchTargetMin,
     justifyContent: 'center',
