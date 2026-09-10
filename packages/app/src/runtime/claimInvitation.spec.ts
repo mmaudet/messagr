@@ -44,16 +44,47 @@ describe('claimInvitation', () => {
         deviceId: 'DEVICE1',
         accessToken: 'syt_secret',
       },
+      password: 'a-password-nobody-asked-for',
     })
   })
 
-  it('does not carry the password anywhere', async () => {
-    // A restored session needs the triple and nothing else. Keeping the
-    // password would be holding a second credential that nothing here uses
-    // and that could be lost.
+  it('carries the password, and this used to be a test that it did not', async () => {
+    // THE DECISION CHANGED, so the test that pinned the old one is rewritten
+    // rather than deleted. It read: "a restored session needs the triple and
+    // nothing else. Keeping the password would be holding a second
+    // credential that nothing here uses and that could be lost."
+    //
+    // Right about restoring a session, and silent about replacing one. #190:
+    // an iOS reinstall leaves the keychain and takes the crypto store, so a
+    // launch that carried on republished fresh identity keys under a device
+    // identifier the homeserver already knew -- the shape of an attack. What
+    // fixes it is coming back as a NEW device, and only a password can make
+    // one: measured against the homeserver, a token cannot.
+    //
+    // `recoverySecret.ts` is the only thing that keeps it and `reenter.ts` is
+    // the only thing that spends it.
     const p = poster(() => ({ status: 200, body: GRANTED }))
     const result = await claimInvitation(p, LINK)
-    expect(JSON.stringify(result)).not.toContain('a-password-nobody-asked-for')
+    expect(result.claimed && result.password).toBe(
+      'a-password-nobody-asked-for',
+    )
+  })
+
+  it('is content with a service that sends no password', async () => {
+    // The session is what entry needs; the password is what recovery needs.
+    // A service that sends none leaves this working and that device with no
+    // way back from a reinstall, which is the behaviour there was before.
+    const p = poster(() => ({
+      status: 200,
+      body: JSON.stringify({
+        user_id: '@uvq:messagr.eu',
+        device_id: 'DEVICE1',
+        access_token: 'syt_secret',
+      }),
+    }))
+    const result = await claimInvitation(p, LINK)
+    expect(result.claimed).toBe(true)
+    expect(result.claimed && result.password).toBeUndefined()
   })
 
   it('gives one refusal for a link that is unknown, spent, revoked or expired', async () => {

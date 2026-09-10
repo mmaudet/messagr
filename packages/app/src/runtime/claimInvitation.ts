@@ -37,7 +37,29 @@ export interface ServicePoster {
 }
 
 export type ClaimResult =
-  | { readonly claimed: true; readonly session: RestoreCredentials }
+  | {
+      readonly claimed: true
+      readonly session: RestoreCredentials
+      /**
+       * The account's password, when the service sent one.
+       *
+       * KEPT NOW, AND IT WAS DELIBERATELY DROPPED BEFORE. The reasoning was
+       * that a restored session needs the triple and nothing else, and that
+       * holding a second credential nothing uses is holding something that
+       * can only be lost. That was right about *restoring* a session and had
+       * nothing to say about *replacing* one.
+       *
+       * #190: an iOS reinstall leaves the keychain and takes the crypto
+       * store, so the next launch republished fresh identity keys under a
+       * device identifier the homeserver already knew -- which is the shape
+       * of an attack rather than of a reinstall. Coming back as a *new*
+       * device is what fixes that, and a new device needs a password: a
+       * token cannot mint one, measured against the homeserver.
+       *
+       * `reenter.ts` carries the measurements and what this costs.
+       */
+      readonly password?: string
+    }
   | { readonly claimed: false; readonly reason: string }
 
 /**
@@ -57,6 +79,7 @@ interface ClaimResponse {
   user_id?: unknown
   device_id?: unknown
   access_token?: unknown
+  password?: unknown
 }
 
 /**
@@ -238,10 +261,12 @@ function sessionFrom(
     return { claimed: false, reason: REFUSED }
   }
 
-  // The answer also carries a password. It is deliberately not read here and
-  // not carried anywhere: a restored session needs the triple and nothing
-  // else, and holding a second credential nothing uses is holding something
-  // that can only be lost.
+  // The answer also carries a password, and it is read now. See the field's
+  // own note: it is what lets a reinstalled device come back as a new one
+  // instead of republishing keys under a dead identifier. Optional because a
+  // service that sends none is a service this still works with -- the
+  // session is what entry needs, and the password is what recovery needs.
+  const { password } = response
   return {
     claimed: true,
     session: {
@@ -250,5 +275,6 @@ function sessionFrom(
       deviceId,
       accessToken: token,
     },
+    ...(typeof password === 'string' && password !== '' ? { password } : {}),
   }
 }
