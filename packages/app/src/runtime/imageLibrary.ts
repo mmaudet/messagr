@@ -2,10 +2,17 @@
 // reason `notebook.ts` and `cryptoPump.ts` are: it is a native module, so
 // nothing worth unit-testing lives here. What it adapts to is
 // `pickImage.ts`'s `ImagePicker`, which the tests drive with a function.
-import { readFile } from '@dr.pogodin/react-native-fs'
+import {
+  CachesDirectoryPath,
+  TemporaryDirectoryPath,
+  readDir,
+  readFile,
+  unlink,
+} from '@dr.pogodin/react-native-fs'
 import ImageResizer from '@bam.tech/react-native-image-resizer'
 import { launchImageLibrary } from 'react-native-image-picker'
 
+import { isOurs, sweepPickedLitter } from './pickedLitter'
 import { THUMBNAIL_EDGE, type ImageBytes, type PickedImage } from './pickImage'
 import { MOST_AT_ONCE } from './sendImages'
 
@@ -76,11 +83,28 @@ import { MOST_AT_ONCE } from './sendImages'
  * is one the **picker already wrote**, from a photograph the person chose out
  * of their own gallery, which the system had on that disk before this
  * application existed. Nothing this application decrypted is written
- * anywhere, and the resized copy is read once and dropped.
+ * anywhere.
  *
  * What would breach ADR-0006 is caching a *received* photograph to disk after
  * decrypting it. That remains forbidden, and `receiveImage.ts` still holds
  * plaintext in memory only.
+ *
+ * # AND THE COPIES ARE REMOVED, WHICH THE PARAGRAPH ABOVE USED TO SKIP
+ *
+ * That argument is right about the source and said nothing about what is
+ * left behind. Measured on a device: choosing **one** photograph and sending
+ * it left three readable JPEGs in this application's cache -- two the picker
+ * wrote, one the resizer did -- still there minutes later (#209).
+ *
+ * The surprising part is not that they exist, it is what they outlive.
+ * Delete the photograph from the gallery and Messagr still has it, in a
+ * directory nobody thinks of as holding photographs. So each is unlinked as
+ * soon as its bytes are in memory, which is the moment it stops being needed.
+ *
+ * Nothing is unlinked unless it sits in a directory this application owns.
+ * See `pickedLitter.ts`: the picker answers a path, and a module that
+ * removed whatever path it was handed would be one bad answer away from
+ * deleting somebody's photograph out of their gallery.
  *
  * # A failed thumbnail is not a failed photograph
  *
@@ -126,8 +150,46 @@ export async function pickFromLibrary(): Promise<readonly PickedImage[]> {
       ...photograph,
       thumbnail: await thumbnailOf(asset.uri, photograph),
     })
+    // AFTER THE THUMBNAIL, because the resizer reads this same file. The
+    // bytes are in `photograph` by now either way, so what is being removed
+    // is a copy nothing will ask for again.
+    await forget(asset.uri)
   }
   return picked
+}
+
+/** The directories this application may delete inside of. */
+const OURS = [TemporaryDirectoryPath, CachesDirectoryPath]
+
+/**
+ * Removes what earlier versions of this module left behind.
+ *
+ * The unlinks above stop new copies appearing; this is for the telephones
+ * that have been accumulating them, the demonstration Pixel included. Bound
+ * to the real filesystem here for the reason everything else in this file is:
+ * `pickedLitter.ts` holds the decisions and is tested against four
+ * functions.
+ */
+export async function sweepWhatThePickerLeft(): Promise<number> {
+  return sweepPickedLitter({
+    directories: OURS,
+    list: async directory => (await readDir(directory)).map(one => one.name),
+    forget: async path => {
+      await unlink(path)
+    },
+  })
+}
+
+/**
+ * Removes a file this application put there, and nothing else.
+ *
+ * Swallows its own failure: a copy that will not delete is one the system
+ * clears on its own, and a photograph the person is trying to send must not
+ * fail over housekeeping.
+ */
+async function forget(path: string | undefined): Promise<void> {
+  if (path === undefined || !isOurs(path, OURS)) return
+  await unlink(path).catch(() => undefined)
 }
 
 /**
@@ -174,14 +236,21 @@ async function thumbnailOf(
       false,
       { onlyScaleDown: true },
     )
-    // A resize that came back no smaller is a resize worth dropping: a second
-    // file to seal, upload and fetch, for no fewer bytes.
-    if (small.size >= photograph.bytes.length) return undefined
-    return {
-      bytes: bytesOf(await readFile(small.path, 'base64')),
-      mimeType: 'image/jpeg',
-      width: small.width,
-      height: small.height,
+    try {
+      // A resize that came back no smaller is a resize worth dropping: a
+      // second file to seal, upload and fetch, for no fewer bytes.
+      if (small.size >= photograph.bytes.length) return undefined
+      return {
+        bytes: bytesOf(await readFile(small.path, 'base64')),
+        mimeType: 'image/jpeg',
+        width: small.width,
+        height: small.height,
+      }
+    } finally {
+      // INCLUDING ON THE EARLY RETURN, which is why this is a `finally` and
+      // not a line after the read: a resize judged too big was dropped and
+      // its file kept, which is one of the three #209 measured.
+      await forget(small.path)
     }
   } catch {
     // Deliberately swallowed. See the note above: a thumbnail that could not

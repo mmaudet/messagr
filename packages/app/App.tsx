@@ -173,6 +173,7 @@ import type { Language } from './src/copy/languages'
 import { enterWithASession, type InvitationOutcome } from './src/runtime/entry'
 import { initialLink, watchLinks } from './src/runtime/incomingLink'
 import { useKeyboardInset } from './src/ui/keyboardInset'
+import { sweepWhatThePickerLeft } from './src/runtime/imageLibrary'
 import { keepPhotograph } from './src/runtime/keepPhotograph'
 import { photoLibrary } from './src/runtime/photoLibrary'
 import { servicePoster } from './src/runtime/servicePoster'
@@ -758,6 +759,24 @@ export function App({
       }),
     [],
   )
+
+  // WHAT EARLIER VERSIONS LEFT IN THE CACHE, cleared once per launch.
+  //
+  // #209: choosing one photograph and sending it left three readable JPEGs
+  // there, and they outlived the photograph in the gallery. `imageLibrary`
+  // removes them at source now; this clears the telephones that have been
+  // accumulating them, and then finds nothing on every launch after.
+  //
+  // Not awaited and not on the startup path's critical line: it is a
+  // directory listing, it blocks nothing, and a launch must not be slower
+  // for housekeeping. Logged only when it found something.
+  useEffect(() => {
+    sweepWhatThePickerLeft()
+      .then(swept => {
+        if (swept > 0) logEvent('info', 'MESSAGR_SWEPT_PICKER_CACHE', { swept })
+      })
+      .catch(() => undefined)
+  }, [])
 
   // Asked once, before anything else. A keystore read and nothing more: no
   // network, which is what lets it run under the promise rather than after it.
