@@ -31,6 +31,16 @@ import { TabIcon } from './TabIcon'
  * telephone ever made. It is also the one that must not depend on colour:
  * the direction glyph and the words underneath say it without it, which is
  * the rule §13 states for every state in this product.
+ *
+ * # WHAT A ROW SAYS, AND WHAT IT DOES NOT
+ *
+ * Who, which way, when, whether a picture went through, and -- since
+ * 10 September 2026 -- how long it lasted. The duration was refused when
+ * this screen was built and the refusal was lifted by the person whose
+ * notebook it is; ADR-0010 carries the amendment and the reasoning.
+ *
+ * Nothing about what was said. There is nothing to say it with: no page of
+ * the notebook holds any of it.
  */
 
 /** What a row says under the name. */
