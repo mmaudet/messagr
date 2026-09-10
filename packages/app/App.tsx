@@ -111,6 +111,7 @@ import {
   canForward,
   canRemoveForEveryone,
   copyText,
+  onlyPhotograph,
   toggle,
 } from './src/timeline/selection'
 import {
@@ -2554,8 +2555,37 @@ export function App({
                 canForward={canForward(selected, conversation ?? [])}
                 onClear={() => setSelected(new Set())}
                 onCopy={() => {
-                  Clipboard.setString(copyText(selected, conversation ?? []))
+                  const held = conversation ?? []
+                  const words = copyText(selected, held)
+                  const alone = onlyPhotograph(selected, held)
                   setSelected(new Set())
+                  // WORDS WIN WHEN THERE ARE BOTH. A clipboard holds one
+                  // thing and `setImage` would replace `setString`, so
+                  // `onlyPhotograph` answers `null` beside any text --
+                  // choosing silently would put half of a selection
+                  // somewhere nobody can see it.
+                  if (words !== '') {
+                    Clipboard.setString(words)
+                    return
+                  }
+                  if (alone?.image === undefined) return
+                  // The picture is already decrypted and base64 in the
+                  // viewer's cache, so this is the same bytes `Photograph`
+                  // is drawing. `setImage` wants them without the `data:`
+                  // preamble that makes them a URI.
+                  openImageRef
+                    .current?.(alone.image)
+                    .then(shown => {
+                      if (!shown.shown) return
+                      const at = shown.uri.indexOf('base64,')
+                      if (at === -1) return
+                      Clipboard.setImage(shown.uri.slice(at + 'base64,'.length))
+                    })
+                    .catch((cause: unknown) =>
+                      logEvent('warn', 'MESSAGR_NOT_COPIED', {
+                        reason: getErrorMessage(cause),
+                      }),
+                    )
                 }}
                 onForward={() => setForwarding([...selected])}
                 onRemove={() => setRemoving(true)}
@@ -3229,7 +3259,19 @@ const styles = StyleSheet.create({
   // the file forbids its own intermediate values outright. `xxl` is the
   // answer the scale gives, and a screen that needed more would be a
   // composition error rather than a missing token.
-  content: { padding: space.xl },
+  // NO HORIZONTAL PADDING, BECAUSE EVERY SCREEN ALREADY CARRIES ITS OWN.
+  //
+  // This was `padding: space.xl`, and each screen inside it adds
+  // `layout.screenGutter` -- so a conversation row sat forty points from
+  // each edge and the list looked narrow on a telephone that is not.
+  // Reported from the Pixel: « toute la largeur de l'écran n'est pas
+  // utilisée ». The same doubling pushed the first row thirty-two points
+  // below the band.
+  //
+  // The gutter belongs to the screen, not to the thing that scrolls it: a
+  // list wants its separators to run edge to edge and its text inset, and
+  // only the list knows that.
+  content: { paddingTop: space.s },
   // Anchored to the bottom, over whatever is scrolling behind it.
   dock: { position: 'absolute', left: 0, right: 0, bottom: 0 },
   block: { marginBottom: space.xxl },

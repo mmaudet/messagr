@@ -3,7 +3,7 @@ import { Pressable, StyleSheet, Text, View } from 'react-native'
 
 import type { CallOutcome, CallRecord } from '../runtime/callLogStore'
 import { t, type CopyKey } from '../copy'
-import { color, floors, space, stroke, type } from '../design/tokens'
+import { color, floors, layout, space, stroke, type } from '../design/tokens'
 import { stampFor, type Stamp } from '../timeline/whenShown'
 import { Avatar } from './Avatar'
 import { TabIcon } from './TabIcon'
@@ -134,16 +134,25 @@ export function CallsList({
                       of it. A camera rather than a handset when a picture
                       went through -- §13 wants no state carried by colour
                       alone, and a different shape is not a colour. */}
+                  {/* THE HANDSET STAYS AND THE CAMERA IS ADDED, rather
+                      than one replacing the other. A video call is a call
+                      that also carried a picture, and swapping the glyph
+                      said it was a different kind of thing. Asked for from
+                      the Pixel in those words: « rajouter une icône vidéo à
+                      côté de l'appel audio ». */}
                   <TabIcon
-                    glyph={call.video === true ? 'cam' : 'calls'}
+                    glyph="calls"
                     tint={missed ? color.deny['500'] : color.neutral['400']}
                     size={14}
                   />
-                  <Text style={styles.outcome}>
-                    {call.video === true
-                      ? `${t('calls_video')} · ${t(outcomeLabel(call))}`
-                      : t(outcomeLabel(call))}
-                  </Text>
+                  {call.video === true && (
+                    <TabIcon
+                      glyph="cam"
+                      tint={missed ? color.deny['500'] : color.neutral['400']}
+                      size={14}
+                    />
+                  )}
+                  <Text style={styles.outcome}>{t(outcomeLabel(call))}</Text>
                 </View>
               </View>
               <Text style={styles.when}>
@@ -185,6 +194,9 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: space.m,
+    // ITS OWN, like every other screen. It had none and was carried by the
+    // scroll container's padding, which no longer exists -- see `App.tsx`.
+    paddingLeft: layout.screenGutter,
     paddingVertical: space.s,
     minHeight: floors.touchTargetMin,
   },
