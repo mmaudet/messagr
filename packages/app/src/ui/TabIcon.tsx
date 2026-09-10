@@ -44,12 +44,35 @@ export type TabGlyph =
   | 'mic'
   | 'plus'
   | 'camera'
+  | 'copy'
+  | 'forward'
+  | 'star'
+  | 'star.on'
+  | 'save'
+  | 'bin'
   // The loudspeaker, for the in-call control. NOT from `design/icons/`: the
   // identity has no speaker glyph, because until there were calls there was
   // nothing to draw one for. Built on the same rules as the set it joins --
   // 24 grid, 1.5 stroke, `currentColor` -- so it sits beside them without
   // announcing that it came later. It is a cone and two waves, which is what
   // every speaker glyph has been since the first one.
+  //
+  // FOUR MORE, FOR THE SELECTION BAR, and the same door as the speaker.
+  //
+  // The bar said its actions in words, deliberately: the identity has no bin
+  // and no clipboard, two words survive six catalogues without anybody
+  // guessing at a pictogram, and they read aloud for free. That held while
+  // there were three actions. There are five now -- copy, forward, keep,
+  // save, remove -- and measured on a Pixel 10 Pro Fold the row broke: the
+  // count was squeezed into a one-character-wide column reading « 1 sé le
+  // cti on né (s) » down the screen. Reported with a screenshot and the ask
+  // that it be « un bandeau sur une ligne uniquement, comme WhatsApp ».
+  //
+  // So these are drawn here on the identity's own rules, exactly as the
+  // speaker was, and each is the shape its action has had since long before
+  // this product: two sheets, an arrow leaving, a star, a tray, a bin. The
+  // words do not disappear -- they become the accessibility labels, which is
+  // where they were doing the work that mattered.
   | 'speaker'
 
 const STROKE = {
@@ -102,6 +125,85 @@ export function TabIcon({
           <Path d="M18.1 6.6a7.7 7.7 0 0 1 0 10.8" stroke={tint} {...STROKE} />
         </>
       )}
+      {/* Two sheets, the back one offset. Every clipboard glyph since the
+          first one is this, and a clipboard with a clip on it would be a
+          board rather than the act of copying. */}
+      {glyph === 'copy' && (
+        <>
+          <Rect
+            x={9}
+            y={9}
+            width={11}
+            height={11}
+            rx={2}
+            stroke={tint}
+            {...STROKE}
+          />
+          <Path
+            d="M5 15H4.5A1.5 1.5 0 0 1 3 13.5v-9A1.5 1.5 0 0 1 4.5 3h9A1.5 1.5 0 0 1 15 4.5V5"
+            stroke={tint}
+            {...STROKE}
+          />
+        </>
+      )}
+
+      {/* An arrow leaving to the right, over a line that stays. Forwarding is
+          a copy that goes somewhere, so the arrow leaves and nothing is
+          drawn as removed. */}
+      {glyph === 'forward' && (
+        <>
+          <Path d="m14 6 6 6-6 6" stroke={tint} {...STROKE} />
+          <Path d="M20 12H8a4 4 0 0 0-4 4v2" stroke={tint} {...STROKE} />
+        </>
+      )}
+
+      {/* A five-pointed star, outlined when the message is not kept and
+          filled when it is. The fill is the whole state: §13 refuses a state
+          carried by colour alone, and full against empty is a shape. */}
+      {(glyph === 'star' || glyph === 'star.on') && (
+        <Path
+          d="M12 3.6l2.6 5.3 5.9.9-4.3 4.1 1 5.8-5.2-2.7-5.2 2.7 1-5.8-4.3-4.1 5.9-.9z"
+          stroke={tint}
+          {...STROKE}
+          {...(glyph === 'star.on' ? { fill: tint } : {})}
+        />
+      )}
+
+      {/* An arrow coming down into a tray. Not a cloud and not a disk: the
+          photograph is already here, and what the gesture does is put it
+          somewhere else on this same telephone. */}
+      {glyph === 'save' && (
+        <>
+          <Path d="M12 3.5v10" stroke={tint} {...STROKE} />
+          <Path d="m8 9.6 4 4 4-4" stroke={tint} {...STROKE} />
+          <Path
+            d="M4 15.5v3A1.5 1.5 0 0 0 5.5 20h13a1.5 1.5 0 0 0 1.5-1.5v-3"
+            stroke={tint}
+            {...STROKE}
+          />
+        </>
+      )}
+
+      {/* A bin with a lid and two staves. The one glyph the identity most
+          conspicuously lacks, and the one whose meaning is least in doubt. */}
+      {glyph === 'bin' && (
+        <>
+          <Path d="M4 6.5h16" stroke={tint} {...STROKE} />
+          <Path
+            d="M9.5 6.5V4.8A1.3 1.3 0 0 1 10.8 3.5h2.4a1.3 1.3 0 0 1 1.3 1.3v1.7"
+            stroke={tint}
+            {...STROKE}
+          />
+          <Path
+            d="M6 6.5l.9 12.1A1.5 1.5 0 0 0 8.4 20h7.2a1.5 1.5 0 0 0 1.5-1.4L18 6.5"
+            stroke={tint}
+            {...STROKE}
+          />
+          <Path d="M10.3 10v6" stroke={tint} {...STROKE} />
+          <Path d="M13.7 10v6" stroke={tint} {...STROKE} />
+        </>
+      )}
+
       {glyph === 'calls' && (
         <Path
           d="M5 3.5h3l1.7 4.2-2.1 1.6a11.5 11.5 0 0 0 5.6 5.6l1.6-2.1 4.2 1.7v3a1.7 1.7 0 0 1-1.9 1.7C9.6 18.6 5.4 14.4 3.8 5.4A1.7 1.7 0 0 1 5 3.5z"
