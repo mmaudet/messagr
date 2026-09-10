@@ -3560,7 +3560,28 @@ export function App({
                   label={t('back_to_newest')}
                   mark="↓"
                   quiet
-                  onPress={() => frame.current?.scrollToEnd({ animated: true })}
+                  onPress={() => {
+                    // SAID HERE AND NOT WAITED FOR. The circle used to go
+                    // away only when the scroll events from the animation
+                    // said the frame had arrived -- which is one throttled
+                    // event away from never, and on a long conversation the
+                    // animation can land short of an end that is still
+                    // measuring itself. Reported from the Pixel: « cela
+                    // fonctionne mais l'icône devrait disparaître
+                    // automatiquement ».
+                    //
+                    // Pressing this button IS the statement that somebody
+                    // wants to be at the newest message. Nothing the frame
+                    // reports afterwards is better evidence of it, and if
+                    // they scroll away again the next event says so.
+                    setAwayFromNewest(false)
+                    // And the frame follows the newest from now on, so an
+                    // animation that lands short is carried the rest of the
+                    // way by `onContentSizeChange` rather than leaving
+                    // somebody just above the end.
+                    atBottom.current = true
+                    frame.current?.scrollToEnd({ animated: true })
+                  }}
                 />
               )}
 
