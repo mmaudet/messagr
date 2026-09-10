@@ -95,15 +95,21 @@ export function ConversationList({
           the link could not be used, and the technical reason for that goes
           to the log rather than here (§13.19.6).
 
-          A conversation with somebody already known is a third case, and it
-          is deliberately silent: `enterInvitations.ts` declines it, the list
-          already shows the conversation they have, and a line explaining
-          that nothing new appeared would be explaining an absence. */}
+          A conversation with somebody already known is the third, and it
+          replaces the first: `enterInvitations.ts` declines it, so the
+          sentence promising a conversation would be promising one that was
+          refused a second later. What it says instead names the person, so
+          the row to open is the one already on this screen. */}
       {invitation !== null && invitation !== undefined && (
         <Text style={styles.ignored} testID="list-invitation-ignored">
           {invitation.kind === 'used'
             ? t('list_invitation_used')
-            : t('list_invitation_refused')}
+            : invitation.kind === 'already'
+              ? t(
+                  'list_invitation_already %@',
+                  displayNameFor(invitation.from, names.get(invitation.from)),
+                )
+              : t('list_invitation_refused')}
         </Text>
       )}
       {/* Plain rows rather than a `FlatList`, because this sits inside the

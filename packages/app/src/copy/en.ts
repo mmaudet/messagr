@@ -228,6 +228,8 @@ export const en: Readonly<Record<CopyKey, string>> = {
     'You opened an invitation. The conversation it opens will appear in your list.',
   list_invitation_refused:
     'This invitation could not be used. Ask the person who sent it for a new one.',
+  'list_invitation_already %@':
+    'You already have a conversation with %@. That one carries on: the invitation did not open a second.',
   list_not_in_yet:
     'You are not in yet. Open the invitation link somebody sent you: it is the only door, and the application can do nothing before it.',
   list_empty: 'No conversations yet. Invite someone to start one.',

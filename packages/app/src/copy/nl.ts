@@ -223,6 +223,8 @@ export const nl: Readonly<Record<CopyKey, string>> = {
     'U hebt een uitnodiging geopend. Het gesprek dat ze opent, verschijnt zo in uw lijst.',
   list_invitation_refused:
     'Deze uitnodiging kon niet worden gebruikt. Vraag de afzender om een nieuwe.',
+  'list_invitation_already %@':
+    'U hebt al een gesprek met %@. Dat loopt door: de uitnodiging heeft geen tweede geopend.',
   list_not_in_yet:
     'U bent er nog niet in. Open de uitnodigingslink die iemand u heeft gestuurd: dat is de enige deur, en daarvoor kan de applicatie niets doen.',
   list_empty:

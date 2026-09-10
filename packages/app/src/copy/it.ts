@@ -222,6 +222,8 @@ export const it: Readonly<Record<CopyKey, string>> = {
     'Avete aperto un invito. La conversazione che apre comparirà nel vostro elenco.',
   list_invitation_refused:
     'Questo invito non ha potuto essere usato. Chiedetene uno nuovo a chi ve l’ha mandato.',
+  'list_invitation_already %@':
+    'Avete già una conversazione con %@. È quella che prosegue: l’invito non ne ha aperta una seconda.',
   list_not_in_yet:
     'Non è ancora entrato. Apra il link di invito che le hanno mandato: è l’unica porta, e prima l’applicazione non può fare nulla.',
   list_empty:

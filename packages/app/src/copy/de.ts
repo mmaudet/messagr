@@ -231,6 +231,8 @@ export const de: Readonly<Record<CopyKey, string>> = {
     'Sie haben eine Einladung geöffnet. Das Gespräch, das sie eröffnet, erscheint gleich in Ihrer Liste.',
   list_invitation_refused:
     'Diese Einladung konnte nicht verwendet werden. Bitten Sie die absendende Person um eine neue.',
+  'list_invitation_already %@':
+    'Sie haben bereits ein Gespräch mit %@. Dieses läuft weiter: die Einladung hat kein zweites eröffnet.',
   list_not_in_yet:
     'Sie sind noch nicht drin. Öffnen Sie den Einladungslink, den Ihnen jemand geschickt hat: er ist die einzige Tür, und davor kann die Anwendung nichts tun.',
   list_empty:

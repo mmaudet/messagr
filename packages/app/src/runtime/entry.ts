@@ -69,6 +69,18 @@ export interface EntryDeps {
 export type InvitationOutcome =
   | { readonly kind: 'used' }
   | { readonly kind: 'refused'; readonly reason: string }
+  /**
+   * Used, and the conversation it opened was declined because one with that
+   * person already exists.
+   *
+   * NOT PRODUCED HERE. Entry spends the link; whether the conversation it
+   * opens is one to keep is decided a moment later, when the Matrix
+   * invitation arrives and `enterInvitations.ts` looks at who it is from.
+   * The kind lives in this type because a screen has one question -- what
+   * became of the link I opened -- and three answers, and splitting them
+   * across two vocabularies would put that question in two places.
+   */
+  | { readonly kind: 'already'; readonly from: string }
 
 export type EntryResult =
   | {

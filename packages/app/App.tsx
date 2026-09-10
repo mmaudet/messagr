@@ -2010,6 +2010,16 @@ export function App({
                       ) {
                         refreshList().catch(() => {})
                       }
+                      // AND THE LINE ON THE LIST STOPS PROMISING A
+                      // CONVERSATION THAT WAS DECLINED. Entry says « la
+                      // conversation qu'elle ouvre va apparaître dans votre
+                      // liste », which is true of every invitation except
+                      // this one. Seen on the bench: the banner said it
+                      // while the runtime was declining the conversation.
+                      const first = walked.collapsed[0]
+                      if (first !== undefined) {
+                        setLinkOutcome({ kind: 'already', from: first.from })
+                      }
                     })
                     .catch((cause: unknown) =>
                       logEvent('warn', 'MESSAGR_ENTER_FAILED', {

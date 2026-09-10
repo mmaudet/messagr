@@ -325,6 +325,12 @@ export const fr = {
     'Vous avez ouvert une invitation. La conversation qu’elle ouvre va apparaître dans votre liste.',
   list_invitation_refused:
     'Cette invitation n’a pas pu être utilisée. Demandez-en une nouvelle à la personne qui vous l’a envoyée.',
+  // THE THIRD OUTCOME, and it replaces the first rather than adding to it.
+  // Two people in contact can each issue the other a link; nothing at the
+  // issuing end can know who will open one, so the refusal happens here.
+  // The person is named because the row to open is already on this screen.
+  'list_invitation_already %@':
+    'Vous êtes déjà en conversation avec %@. C’est celle-ci qui continue : l’invitation n’en a pas ouvert une seconde.',
   list_not_in_yet:
     'Vous n’êtes pas encore entré. Ouvrez le lien d’invitation qu’on vous a envoyé : c’est la seule porte, et l’application ne peut rien faire avant.',
   list_empty:
