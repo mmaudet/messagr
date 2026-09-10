@@ -161,14 +161,18 @@ export const it: Readonly<Record<CopyKey, string>> = {
   remove_cancel: 'Annullare',
   conversation_sending: 'Invio…',
   conversation_send_failed: 'Non inviato. Riprovi.',
+  consequence_irreversible: 'Irreversibile',
   vouch_action: 'Rispondo io di questa persona',
   vouch_hint: 'Da fare quando è sicuro di sapere chi le scrive — non prima.',
-  vouch_explain_title: 'Cosa comporta',
+  vouch_explain_title: 'Che cosa le state dando',
+  vouch_explain_lead: 'Tutto ciò che questo gesto consegna, prima di decidere.',
   vouch_explain_history:
     'Potrà leggere tutto ciò che è stato detto qui dall’inizio, anche prima del suo arrivo.',
   vouch_explain_history_empty:
     'Qui non è ancora stato detto nulla, quindi non c’è passato da trasmettere.',
   vouch_explain_invite: 'Potrà invitare altre persone.',
+  vouch_fact_history: 'Il passato le diventa leggibile',
+  vouch_fact_invite: 'Potrà far entrare qualcuno',
   vouch_explain_final: 'Non si annulla: le chiavi che riceve, se le tiene.',
   vouch_confirm: 'Sì, rispondo io di questa persona',
   vouch_cancel: 'Annullare',
@@ -184,11 +188,15 @@ export const it: Readonly<Record<CopyKey, string>> = {
     'Le è stato offerto un passato, da un dispositivo che questo non sa ricondurre a chi lo possiede. Non è stato accettato.',
   evict_action: 'Togliere questa persona',
   evict_hint: 'Non potrà più leggere nulla di ciò che si dirà qui in seguito.',
-  evict_explain_title: 'Cosa comporta',
+  evict_explain_title: 'Ciò che si ferma e ciò che resta',
+  evict_explain_lead:
+    'Messagr non può riprendersi ciò che è già sul suo dispositivo. Ecco tutta la verità, prima di decidere.',
   evict_explain_future:
     'Uscirà dalla conversazione e non potrà più leggere ciò che vi si dirà.',
   evict_explain_past:
     'Ciò che ha già letto, se lo tiene. Nulla può riprenderglielo — né questa applicazione, né il server.',
+  evict_fact_future: 'Il seguito le sfugge',
+  evict_fact_past: 'Ciò che ha letto resta suo',
   evict_explain_final:
     'Non si annulla: per farla tornare servirà un nuovo invito.',
   evict_confirm: 'Sì, togliere questa persona',

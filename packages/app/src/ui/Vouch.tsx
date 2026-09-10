@@ -2,14 +2,9 @@ import { useState } from 'react'
 import { StyleSheet, Text, View } from 'react-native'
 
 import { t } from '../copy'
-import {
-  color,
-  radius,
-  space,
-  stroke,
-  type as typeScale,
-} from '../design/tokens'
+import { color, space, type as typeScale } from '../design/tokens'
 import type { VouchOutcome } from '../runtime/vouch'
+import { Consequences } from './Consequences'
 import { NotchedButton } from './NotchedButton'
 
 /**
@@ -23,7 +18,10 @@ import { NotchedButton } from './NotchedButton'
  * that would be a single tap somebody could make by mistake, once, forever.
  *
  * So the first press does nothing but explain, in the plainest words the
- * product has, and the second press is the one that acts. That is the same
+ * product has, and the second press is the one that acts. What the
+ * explanation looks like is `Consequences.tsx`, which is the shape the
+ * prototype draws for a gesture nothing takes back -- #87 was about exactly
+ * that: the ordering was proven and the form was invented. That is the same
  * shape the crypto library gives its own surface, and for the same reason:
  * `buildHistoryBundle` has no side effect and reports what the gesture would
  * give away, precisely so a screen can put it in front of a person before
@@ -161,58 +159,45 @@ export function Vouch({ entrantId, hasHistory, onVouch, state }: VouchProps) {
   }
 
   return (
-    <View
+    <Consequences
       testID="vouch-explain"
-      style={[
-        styles.panel,
+      title={t('vouch_explain_title')}
+      lead={t('vouch_explain_lead')}
+      facts={[
         {
-          backgroundColor: palette.surface.sunk,
-          borderColor: palette.neutral['300'],
+          // OCHRE, NOT RED. Handing over the past is the thing to weigh, and
+          // it is not a measure taken against anybody: `deny` is « action de
+          // mesure. Jamais un avertissement » in the token's own words, and
+          // this is neither.
+          tone: 'weigh',
+          said: t('vouch_fact_history'),
+          body:
+            hasHistory === false
+              ? t('vouch_explain_history_empty')
+              : t('vouch_explain_history'),
+          testID: 'vouch-fact-history',
         },
-      ]}>
-      <Text style={[styles.title, { color: palette.neutral['900'] }]}>
-        {t('vouch_explain_title')}
-      </Text>
-      <Text style={[styles.line, { color: palette.neutral['900'] }]}>
-        {hasHistory === false
-          ? t('vouch_explain_history_empty')
-          : t('vouch_explain_history')}
-      </Text>
-      <Text style={[styles.line, { color: palette.neutral['900'] }]}>
-        {t('vouch_explain_invite')}
-      </Text>
-      {/* Last, and on its own, because it is the sentence somebody has to have
-          read before the button below means anything. */}
-      <Text
-        testID="vouch-final"
-        style={[styles.final, { color: palette.neutral['900'] }]}>
-        {t('vouch_explain_final')}
-      </Text>
-      <Text style={[styles.target, { color: palette.neutral['600'] }]}>
-        {entrantId}
-      </Text>
-
-      <View style={styles.actions}>
-        {/* THE REFUSAL IS A BUTTON OF THE SAME RANK.
-            It was a grey text link beside a filled button -- on a gesture
-            that cannot be undone, which is exactly backwards. The prototype
-            states the rule on its verification screen and it applies here
-            with more force: "Le refus est un bouton de même rang que
-            l'acceptation." Same height, same target, same weight; the colour
-            is what distinguishes them, not the size. */}
-        <NotchedButton
-          label={t('vouch_confirm')}
-          testID="vouch-confirm"
-          onPress={onVouch}
-        />
-        <NotchedButton
-          label={t('vouch_cancel')}
-          testID="vouch-cancel"
-          tone="quiet"
-          onPress={() => setAsked(false)}
-        />
-      </View>
-    </View>
+        {
+          tone: 'weigh',
+          said: t('vouch_fact_invite'),
+          body: t('vouch_explain_invite'),
+          testID: 'vouch-fact-invite',
+        },
+      ]}
+      finally={t('vouch_explain_final')}
+      target={entrantId}>
+      <NotchedButton
+        label={t('vouch_confirm')}
+        testID="vouch-confirm"
+        onPress={onVouch}
+      />
+      <NotchedButton
+        label={t('vouch_cancel')}
+        testID="vouch-cancel"
+        tone="quiet"
+        onPress={() => setAsked(false)}
+      />
+    </Consequences>
   )
 }
 
@@ -220,17 +205,4 @@ const styles = StyleSheet.create({
   block: { gap: space.s, marginTop: space.m },
   hint: typeScale.caption,
   outcome: { ...typeScale.bodySm, marginTop: space.m },
-  panel: {
-    gap: space.s,
-    marginTop: space.m,
-    padding: space.m,
-    borderRadius: radius.bubble,
-    borderWidth: stroke.base,
-  },
-  title: typeScale.bodySm,
-  line: typeScale.bodySm,
-  final: typeScale.bodySm,
-  target: typeScale.caption,
-  actions: { gap: space.s, marginTop: space.s },
-  cancel: typeScale.caption,
 })

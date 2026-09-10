@@ -166,15 +166,20 @@ export const de: Readonly<Record<CopyKey, string>> = {
   remove_cancel: 'Abbrechen',
   conversation_sending: 'Wird gesendet …',
   conversation_send_failed: 'Nicht gesendet. Versuchen Sie es erneut.',
+  consequence_irreversible: 'Unwiderruflich',
   vouch_action: 'Ich stehe für diese Person ein',
   vouch_hint:
     'Zu tun, wenn Sie sicher wissen, wer Ihnen schreibt — nicht vorher.',
-  vouch_explain_title: 'Was das bewirkt',
+  vouch_explain_title: 'Was Sie ihr geben',
+  vouch_explain_lead:
+    'Alles, was diese Geste übergibt – bevor Sie entscheiden.',
   vouch_explain_history:
     'Sie wird alles lesen können, was hier von Anfang an gesagt wurde, auch vor ihrer Ankunft.',
   vouch_explain_history_empty:
     'Hier wurde noch nichts gesagt, es gibt also keine Vergangenheit weiterzugeben.',
   vouch_explain_invite: 'Sie wird andere Personen einladen können.',
+  vouch_fact_history: 'Die Vergangenheit wird für sie lesbar',
+  vouch_fact_invite: 'Sie kann jemanden hereinholen',
   vouch_explain_final:
     'Das lässt sich nicht rückgängig machen: die Schlüssel, die sie erhält, behält sie.',
   vouch_confirm: 'Ja, ich stehe für diese Person ein',
@@ -191,11 +196,15 @@ export const de: Readonly<Record<CopyKey, string>> = {
     'Ihnen wurde eine Vergangenheit angeboten, von einem Gerät, das dieses hier nicht seiner Inhaberin oder seinem Inhaber zuordnen kann. Sie wurde nicht übernommen.',
   evict_action: 'Diese Person entfernen',
   evict_hint: 'Sie wird nichts mehr lesen können, was hier danach gesagt wird.',
-  evict_explain_title: 'Was das bewirkt',
+  evict_explain_title: 'Was endet und was bleibt',
+  evict_explain_lead:
+    'Messagr kann nicht zurückholen, was bereits auf ihrem Gerät liegt. Hier ist die ganze Wahrheit, bevor Sie entscheiden.',
   evict_explain_future:
     'Sie verlässt die Unterhaltung und kann nicht mehr lesen, was dort gesagt wird.',
   evict_explain_past:
     'Was sie bereits gelesen hat, behält sie. Nichts kann es ihr wieder nehmen — weder diese App noch der Server.',
+  evict_fact_future: 'Was danach kommt, bleibt ihr verschlossen',
+  evict_fact_past: 'Was sie gelesen hat, bleibt ihr',
   evict_explain_final:
     'Das lässt sich nicht rückgängig machen: für eine Rückkehr braucht es eine neue Einladung.',
   evict_confirm: 'Ja, diese Person entfernen',

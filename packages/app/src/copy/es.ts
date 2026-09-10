@@ -163,14 +163,18 @@ export const es: Readonly<Record<CopyKey, string>> = {
   remove_cancel: 'Cancelar',
   conversation_sending: 'Enviando…',
   conversation_send_failed: 'No enviado. Inténtelo de nuevo.',
+  consequence_irreversible: 'Irreversible',
   vouch_action: 'Respondo por esta persona',
   vouch_hint: 'Hágalo cuando esté seguro de saber quién le escribe — no antes.',
-  vouch_explain_title: 'Lo que esto hace',
+  vouch_explain_title: 'Lo que le está dando',
+  vouch_explain_lead: 'Todo lo que este gesto entrega, antes de decidir.',
   vouch_explain_history:
     'Podrá leer todo lo que se ha dicho aquí desde el principio, incluso antes de su llegada.',
   vouch_explain_history_empty:
     'Aquí todavía no se ha dicho nada, así que no hay pasado que transmitirle.',
   vouch_explain_invite: 'Podrá invitar a otras personas.',
+  vouch_fact_history: 'El pasado le queda legible',
+  vouch_fact_invite: 'Podrá hacer entrar a alguien',
   vouch_explain_final:
     'Esto no se deshace: las claves que reciba, se las queda.',
   vouch_confirm: 'Sí, respondo por esta persona',
@@ -187,11 +191,15 @@ export const es: Readonly<Record<CopyKey, string>> = {
     'Se le ha ofrecido un pasado, desde un dispositivo que este no sabe atribuir a su propietario. No se ha aceptado.',
   evict_action: 'Retirar a esta persona',
   evict_hint: 'Ya no podrá leer nada de lo que se diga aquí a partir de ahora.',
-  evict_explain_title: 'Lo que esto hace',
+  evict_explain_title: 'Lo que se detiene y lo que permanece',
+  evict_explain_lead:
+    'Messagr no puede recuperar lo que ya está en su dispositivo. Esta es toda la verdad, antes de decidir.',
   evict_explain_future:
     'Saldrá de la conversación y ya no podrá leer lo que se diga en ella.',
   evict_explain_past:
     'Lo que ya ha leído, se lo queda. Nada puede quitárselo — ni esta aplicación, ni el servidor.',
+  evict_fact_future: 'Lo que venga después queda fuera de su alcance',
+  evict_fact_past: 'Lo que ya ha leído es suyo',
   evict_explain_final:
     'Esto no se deshace: para que vuelva hará falta una nueva invitación.',
   evict_confirm: 'Sí, retirar a esta persona',

@@ -1,15 +1,10 @@
 import { useState } from 'react'
-import { StyleSheet, Text, useColorScheme, View } from 'react-native'
+import { StyleSheet, Text, View } from 'react-native'
 
 import { t } from '../copy'
-import {
-  color,
-  radius,
-  space,
-  stroke,
-  type as typeScale,
-} from '../design/tokens'
+import { color, space, type as typeScale } from '../design/tokens'
 import type { EvictOutcome } from '../runtime/evict'
+import { Consequences } from './Consequences'
 import { NotchedButton } from './NotchedButton'
 
 /**
@@ -18,6 +13,9 @@ import { NotchedButton } from './NotchedButton'
  * # Why it asks twice, and what the second screen has to say
  *
  * The same shape as vouching, and for the same reason: this cannot be undone.
+ * `Consequences.tsx` is that shape, taken from the one screen the prototype
+ * draws for an irreversible gesture -- #87, which was about the form rather
+ * than the ordering.
  * But the sentence it owes a person is a different one, and it is the one a
  * product is tempted to leave off.
  *
@@ -51,8 +49,18 @@ export interface EvictProps {
 
 export function Evict({ memberId, onEvict, state }: EvictProps) {
   const [asked, setAsked] = useState(false)
-  const dark = useColorScheme() === 'dark'
-  const palette = dark ? color.dark : color
+  // THE LIGHT PALETTE, NOT THE SYSTEM'S THEME.
+  //
+  // The fifth component, and the one the fix missed. `Vouch`, `Composer`,
+  // `Conversation` and `NotchedButton` all read `useColorScheme()` and
+  // switched to `color.dark`, which turned them dark inside screens that
+  // stayed pale -- reported from an iPhone on 7 September 2026 as "meme pb
+  // de fond". Four were changed and this one was not, so on a telephone set
+  // to dark mode the removal panel was a black plate on a paper screen.
+  //
+  // Which ground a component sits on is its parent's business. A component
+  // that reads the system theme is guessing, and it guessed wrong here.
+  const palette = color
 
   if (state !== 'idle' && state !== 'working') {
     return (
@@ -98,59 +106,47 @@ export function Evict({ memberId, onEvict, state }: EvictProps) {
   }
 
   return (
-    <View
+    <Consequences
       testID="evict-explain"
-      style={[
-        styles.panel,
+      title={t('evict_explain_title')}
+      lead={t('evict_explain_lead')}
+      facts={[
         {
-          backgroundColor: palette.surface.sunk,
-          borderColor: palette.neutral['300'],
+          // RED, BECAUSE THIS ONE IS THE MEASURE. Putting somebody out of a
+          // conversation is « action de mesure » in the token's own words,
+          // which is the one thing `deny` is for.
+          tone: 'measure',
+          said: t('evict_fact_future'),
+          body: t('evict_explain_future'),
+          testID: 'evict-fact-future',
         },
-      ]}>
-      <Text style={[styles.title, { color: palette.neutral['900'] }]}>
-        {t('evict_explain_title')}
-      </Text>
-      <Text style={[styles.line, { color: palette.neutral['900'] }]}>
-        {t('evict_explain_future')}
-      </Text>
-      {/* The sentence the ticket requires, and the one nobody volunteers:
-          what they already read is theirs, and nothing takes it back. */}
-      <Text
-        testID="evict-past"
-        style={[styles.line, { color: palette.neutral['900'] }]}>
-        {t('evict_explain_past')}
-      </Text>
-      <Text
-        testID="evict-final"
-        style={[styles.final, { color: palette.neutral['900'] }]}>
-        {t('evict_explain_final')}
-      </Text>
-      <Text style={[styles.target, { color: palette.neutral['600'] }]}>
-        {memberId}
-      </Text>
-
-      <View style={styles.actions}>
-        {/* THE REFUSAL IS A BUTTON OF THE SAME RANK.
-            It was a grey text link beside a filled button -- on a gesture
-            that cannot be undone, which is exactly backwards. The prototype
-            states the rule on its verification screen and it applies here
-            with more force: "Le refus est un bouton de même rang que
-            l'acceptation." Same height, same target, same weight; the colour
-            is what distinguishes them, not the size. */}
-        <NotchedButton
-          label={t('evict_confirm')}
-          testID="evict-confirm"
-          tone="measure"
-          onPress={onEvict}
-        />
-        <NotchedButton
-          label={t('evict_cancel')}
-          testID="evict-cancel"
-          tone="quiet"
-          onPress={() => setAsked(false)}
-        />
-      </View>
-    </View>
+        {
+          // AND THIS ONE IS NOT A WARNING. The sentence the ticket requires,
+          // and the one nobody volunteers: what they already read is theirs,
+          // and nothing takes it back. It is simply true -- neither a thing
+          // to weigh nor a measure -- so it is drawn as the ordinary state
+          // rather than dressed as a danger.
+          tone: 'plain',
+          said: t('evict_fact_past'),
+          body: t('evict_explain_past'),
+          testID: 'evict-past',
+        },
+      ]}
+      finally={t('evict_explain_final')}
+      target={memberId}>
+      <NotchedButton
+        label={t('evict_confirm')}
+        testID="evict-confirm"
+        tone="measure"
+        onPress={onEvict}
+      />
+      <NotchedButton
+        label={t('evict_cancel')}
+        testID="evict-cancel"
+        tone="quiet"
+        onPress={() => setAsked(false)}
+      />
+    </Consequences>
   )
 }
 
@@ -158,17 +154,4 @@ const styles = StyleSheet.create({
   block: { gap: space.s, marginTop: space.m },
   hint: typeScale.caption,
   outcome: { ...typeScale.bodySm, marginTop: space.m },
-  panel: {
-    gap: space.s,
-    marginTop: space.m,
-    padding: space.m,
-    borderRadius: radius.bubble,
-    borderWidth: stroke.base,
-  },
-  title: typeScale.bodySm,
-  line: typeScale.bodySm,
-  final: typeScale.bodySm,
-  target: typeScale.caption,
-  actions: { gap: space.s, marginTop: space.s },
-  cancel: typeScale.caption,
 })

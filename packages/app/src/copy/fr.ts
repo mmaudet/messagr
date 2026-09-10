@@ -217,15 +217,28 @@ export const fr = {
   //
   // "Vérifier" appears nowhere, for the reason `conversation_sender_claimed`
   // states: verification is a real act in this product and this is not it.
+  // Shared by the two gestures nothing takes back. Written in sentence case
+  // and drawn in capitals: `type.monoLabel` carries the transform, so a
+  // catalogue that shouted would be shouting twice and a translator would
+  // have no lowercase to work from.
+  //
+  // A label rather than a sentence: somebody scanning the screen has
+  // to be able to find the word without reading, and a sentence that merely
+  // contains it is not findable. The prototype prints it the same way, on
+  // « Effacer mon identité ».
+  consequence_irreversible: 'Irréversible',
   vouch_action: 'Je réponds de cette personne',
   vouch_hint:
     'À faire quand vous êtes sûr de savoir qui vous écrit — pas avant.',
-  vouch_explain_title: 'Ce que cela fait',
+  vouch_explain_title: 'Ce que vous lui donnez',
+  vouch_explain_lead: 'Tout ce que ce geste transmet, avant de décider.',
   vouch_explain_history:
     'Elle pourra lire tout ce qui a été dit ici depuis le début, y compris avant son arrivée.',
   vouch_explain_history_empty:
     'Rien n’a encore été dit ici, donc il n’y a pas de passé à lui transmettre.',
   vouch_explain_invite: 'Elle pourra inviter d’autres personnes.',
+  vouch_fact_history: 'Le passé lui devient lisible',
+  vouch_fact_invite: 'Elle pourra faire entrer quelqu’un',
   vouch_explain_final:
     'Cela ne s’annule pas : les clés qu’elle reçoit, elle les garde.',
   vouch_confirm: 'Oui, je réponds de cette personne',
@@ -254,11 +267,15 @@ export const fr = {
   // difference between a person choosing this and a person discovering it.
   evict_action: 'Retirer cette personne',
   evict_hint: 'Elle ne pourra plus rien lire de ce qui sera dit ici ensuite.',
-  evict_explain_title: 'Ce que cela fait',
+  evict_explain_title: 'Ce qui s’arrête, ce qui reste',
+  evict_explain_lead:
+    'Messagr ne peut pas reprendre ce qui est déjà chez elle. Voici la vérité complète, avant de décider.',
   evict_explain_future:
     'Elle sortira de la conversation et ne pourra plus lire ce qui s’y dira.',
   evict_explain_past:
     'Ce qu’elle a déjà lu, elle le garde. Rien ne peut le lui reprendre — ni cette application, ni le serveur.',
+  evict_fact_future: 'La suite lui échappe',
+  evict_fact_past: 'Ce qu’elle a lu lui reste',
   evict_explain_final:
     'Cela ne s’annule pas : pour la faire revenir, il faudra une nouvelle invitation.',
   evict_confirm: 'Oui, retirer cette personne',

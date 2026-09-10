@@ -159,14 +159,18 @@ export const nl: Readonly<Record<CopyKey, string>> = {
   remove_cancel: 'Annuleren',
   conversation_sending: 'Versturen…',
   conversation_send_failed: 'Niet verstuurd. Probeer opnieuw.',
+  consequence_irreversible: 'Onomkeerbaar',
   vouch_action: 'Ik sta in voor deze persoon',
   vouch_hint: 'Te doen wanneer u zeker weet wie u schrijft — niet eerder.',
-  vouch_explain_title: 'Wat dit doet',
+  vouch_explain_title: 'Wat u deze persoon geeft',
+  vouch_explain_lead: 'Alles wat dit gebaar overdraagt, voordat u beslist.',
   vouch_explain_history:
     'Deze persoon zal alles kunnen lezen wat hier vanaf het begin is gezegd, ook van vóór haar komst.',
   vouch_explain_history_empty:
     'Hier is nog niets gezegd, dus er is geen verleden om door te geven.',
   vouch_explain_invite: 'Deze persoon zal anderen kunnen uitnodigen.',
+  vouch_fact_history: 'Het verleden wordt voor deze persoon leesbaar',
+  vouch_fact_invite: 'Deze persoon kan iemand binnenlaten',
   vouch_explain_final:
     'Dit kan niet ongedaan worden gemaakt: de sleutels die zij krijgt, houdt zij.',
   vouch_confirm: 'Ja, ik sta in voor deze persoon',
@@ -184,11 +188,15 @@ export const nl: Readonly<Record<CopyKey, string>> = {
   evict_action: 'Deze persoon verwijderen',
   evict_hint:
     'Zij zal niets meer kunnen lezen van wat hierna hier wordt gezegd.',
-  evict_explain_title: 'Wat dit doet',
+  evict_explain_title: 'Wat stopt en wat blijft',
+  evict_explain_lead:
+    'Messagr kan niet terugnemen wat al op het toestel van deze persoon staat. Dit is de hele waarheid, voordat u beslist.',
   evict_explain_future:
     'Zij verlaat het gesprek en kan niet meer lezen wat daar wordt gezegd.',
   evict_explain_past:
     'Wat zij al heeft gelezen, houdt zij. Niets kan het terugnemen — deze app niet, en de server ook niet.',
+  evict_fact_future: 'Wat hierna komt, blijft buiten bereik',
+  evict_fact_past: 'Wat deze persoon heeft gelezen, blijft van hen',
   evict_explain_final:
     'Dit kan niet ongedaan worden gemaakt: om haar terug te laten komen is een nieuwe uitnodiging nodig.',
   evict_confirm: 'Ja, deze persoon verwijderen',
