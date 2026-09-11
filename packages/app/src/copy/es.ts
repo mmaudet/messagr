@@ -542,6 +542,38 @@ export const es: Readonly<Record<CopyKey, string>> = {
     '%1$d claves han vuelto. Sus mensajes antiguos vuelven a ser legibles.',
   restore_done_none:
     'La copia se abrió, pero no contenía ninguna clave para lo que este dispositivo muestra.',
+  vault_title: 'Una caja de claves, para guardar donde quiera',
+  vault_lead:
+    'Un archivo con las claves de sus conversaciones, cerrado por una contraseña suya.',
+  vault_standard:
+    'Es el formato estándar de Matrix: cualquier cliente Matrix lo abre, Element incluido. No es un archivo que solo Messagr sepa leer.',
+  vault_worth:
+    'Este archivo abre todo lo que se ha dicho. Vale lo que valga el sitio donde lo guarde.',
+  vault_not_export:
+    'No es una exportación de sus datos: una caja contiene claves, una exportación contiene mensajes.',
+  vault_passphrase_field: 'Una contraseña para este archivo',
+  vault_passphrase_hint:
+    'Distinta de su clave de recuperación, y anotada en otro sitio. Sin ella el archivo no se abre, ni siquiera por nosotros.',
+  vault_create: 'Crear la caja',
+  vault_working: 'Preparando la caja…',
+  vault_failed: 'No se ha podido crear la caja.',
+  vault_cancel: 'Cancelar',
+  vault_open_title: 'Abrir una caja de claves',
+  vault_open_lead:
+    'Un archivo hecho por Messagr o por otro cliente Matrix. Hará legibles las conversaciones cuyas claves contiene.',
+  vault_open_choose: 'Elegir un archivo',
+  vault_open_passphrase: 'La contraseña de este archivo',
+  vault_open_working: 'Abriendo la caja…',
+  vault_open_wrong: 'Esta contraseña no abre este archivo.',
+  vault_open_not_a_vault: 'Este archivo no es una caja de claves.',
+  vault_open_failed: 'No se ha podido abrir la caja. Inténtelo de nuevo.',
+  'vault_opened %1$d':
+    '%1$d claves han vuelto. Las conversaciones que abren vuelven a ser legibles.',
+  vault_opened_none:
+    'La caja se abrió, pero no contenía ninguna clave que este dispositivo no tuviera ya.',
+  settings_vault: 'Caja de claves',
+  settings_vault_hint:
+    'Un archivo, para quien no quiere dejar nada en un servidor.',
   restore_done_close: 'Cerrar',
   settings_restore: 'Recuperar mis mensajes antiguos',
   settings_restore_hint: 'Si tiene su clave de recuperación.',

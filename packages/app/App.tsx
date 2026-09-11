@@ -38,6 +38,8 @@ import {
   readTrust,
   removeReaction,
   acceptKeyBackup,
+  exportKeyVault,
+  importKeyVault,
   findBackupOnAccount,
   replaceKeyBackup,
   restoreFromKey,
@@ -191,6 +193,7 @@ import { BackupSettings, type BackupReading } from './src/ui/BackupSettings'
 import { Favourites } from './src/ui/Favourites'
 import { RecoveryKeyEntry } from './src/ui/RecoveryKeyEntry'
 import { RecoveryKeyShown } from './src/ui/RecoveryKeyShown'
+import { KeyVault } from './src/ui/KeyVault'
 import { RestoreOffer } from './src/ui/RestoreOffer'
 import { FloatingAction } from './src/ui/FloatingAction'
 import { Header } from './src/ui/Header'
@@ -449,6 +452,8 @@ export function App({
   const [legalOpen, setLegalOpen] = useState(false)
   const [favouritesOpen, setFavouritesOpen] = useState(false)
   const [backupOpen, setBackupOpen] = useState(false)
+  /** Whether the key vault screen is showing. ADR-0013's second route. */
+  const [vaultOpen, setVaultOpen] = useState(false)
   /**
    * Bumped by the retry on the backup screen, and read by nothing else.
    *
@@ -3503,6 +3508,7 @@ export function App({
                     onBack={() => setTab('chat')}
                     onLegal={() => setLegalOpen(true)}
                     onBackup={() => setBackupOpen(true)}
+                    onVault={() => setVaultOpen(true)}
                     onFavourites={() => {
                       setFavouritesOpen(true)
                       // FETCHED ON OPENING AND DROPPED ON CLOSING, exactly as a
@@ -4251,6 +4257,63 @@ export function App({
                   .catch(() => setBackupPrompt(null))
               }}
               onRefuse={() => setBackupPrompt(null)}
+            />
+          </SafeAreaView>
+        )}
+
+        {/* THE VAULT, which covers everything like the others: making one
+            takes half a million PBKDF2 iterations and a share sheet, and
+            neither belongs behind a settings row. */}
+        {vaultOpen && (
+          <SafeAreaView
+            testID="vault-overlay"
+            style={[StyleSheet.absoluteFill, styles.root]}
+            edges={['top', 'bottom', 'left', 'right']}>
+            <KeyVault
+              onCancel={() => setVaultOpen(false)}
+              onOpen={async passphrase => {
+                const outcome = await importKeyVault(passphrase)
+                logEvent(
+                  outcome.opened ? 'info' : 'warn',
+                  'MESSAGR_VAULT_OPEN',
+                  {
+                    // NEVER THE PASSPHRASE AND NEVER THE ARMOUR. What a report
+                    // wants is whether it opened and how much came back.
+                    opened: outcome.opened,
+                    ...(outcome.opened
+                      ? { imported: outcome.imported }
+                      : { because: outcome.because }),
+                  },
+                )
+                // A DISMISSED PICKER SAYS NOTHING. Somebody who opened it and
+                // changed their mind has done a normal thing, and a screen
+                // that reported a failure for it would be the product telling
+                // them they made a mistake.
+                if (!outcome.opened) {
+                  return outcome.because === 'cancelled'
+                    ? null
+                    : outcome.because
+                }
+                // The keys are in the store; every row derived before they
+                // arrived is stale. Same reason as the restore's.
+                await refreshListRef.current?.().catch(() => {})
+                return { imported: outcome.imported }
+              }}
+              onCreate={async passphrase => {
+                const reason = await exportKeyVault(passphrase)
+                logEvent(reason === null ? 'info' : 'warn', 'MESSAGR_VAULT', {
+                  // NEVER THE PASSPHRASE, and never the armour. What is
+                  // useful in a report is whether the gesture completed.
+                  shared: reason === null,
+                  ...(reason === null ? {} : { reason }),
+                })
+                // LEFT OPEN ON SUCCESS, and closed by the person. The share
+                // sheet has just covered this screen and dismissing it
+                // returns here; a screen that had closed underneath would
+                // drop somebody back in Réglages with no idea whether the
+                // file left.
+                return reason
+              }}
             />
           </SafeAreaView>
         )}

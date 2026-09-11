@@ -787,6 +787,38 @@ export const fr = {
     '%1$d clés sont revenues. Vos anciens messages redeviennent lisibles.',
   restore_done_none:
     "La sauvegarde s'est ouverte, mais elle ne contenait aucune clé pour ce que cet appareil affiche.",
+  vault_title: 'Un coffre de clés, à garder où vous voulez',
+  vault_lead:
+    'Un fichier qui contient les clés de vos conversations, fermé par une phrase de passe à vous.',
+  vault_standard:
+    "C'est le format standard de Matrix : n'importe quel client Matrix l'ouvre, Element compris. Ce n'est pas un fichier que seul Messagr sait lire.",
+  vault_worth:
+    "Ce fichier ouvre tout ce qui a été dit. Il vaut ce que vaut l'endroit où vous le rangez.",
+  vault_not_export:
+    "Ce n'est pas un export de vos données : un coffre contient des clés, un export contient des messages.",
+  vault_passphrase_field: 'Une phrase de passe pour ce fichier',
+  vault_passphrase_hint:
+    "Différente de votre clé de récupération, et notée ailleurs. Sans elle, le fichier ne s'ouvre pas — pas même par nous.",
+  vault_create: 'Créer le coffre',
+  vault_working: 'Préparation du coffre…',
+  vault_failed: "Le coffre n'a pas pu être créé.",
+  vault_cancel: 'Annuler',
+  vault_open_title: 'Ouvrir un coffre de clés',
+  vault_open_lead:
+    'Un fichier fait par Messagr ou par un autre client Matrix. Il rendra lisibles les conversations dont il porte les clés.',
+  vault_open_choose: 'Choisir un fichier',
+  vault_open_passphrase: 'La phrase de passe de ce fichier',
+  vault_open_working: 'Ouverture du coffre…',
+  vault_open_wrong: "Cette phrase de passe n'ouvre pas ce fichier.",
+  vault_open_not_a_vault: "Ce fichier n'est pas un coffre de clés.",
+  vault_open_failed: "Le coffre n'a pas pu être ouvert. Réessayez.",
+  'vault_opened %1$d':
+    "%1$d clés sont revenues. Les conversations qu'elles ouvrent redeviennent lisibles.",
+  vault_opened_none:
+    "Le coffre s'est ouvert, mais il ne contenait aucune clé nouvelle pour cet appareil.",
+  settings_vault: 'Coffre de clés',
+  settings_vault_hint:
+    'Un fichier, pour qui ne veut rien laisser sur un serveur.',
   restore_done_close: 'Fermer',
   settings_restore: 'Retrouver mes anciens messages',
   settings_restore_hint: 'Si vous avez votre clé de récupération.',

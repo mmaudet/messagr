@@ -542,6 +542,38 @@ export const it: Readonly<Record<CopyKey, string>> = {
     '%1$d chiavi sono tornate. I suoi vecchi messaggi tornano leggibili.',
   restore_done_none:
     'Il backup si è aperto, ma non conteneva nessuna chiave per ciò che questo dispositivo mostra.',
+  vault_title: 'Una cassetta di chiavi, da tenere dove vuole',
+  vault_lead:
+    'Un file che contiene le chiavi delle sue conversazioni, chiuso da una frase segreta sua.',
+  vault_standard:
+    'È il formato standard di Matrix: qualunque client Matrix lo apre, Element compreso. Non è un file che solo Messagr sa leggere.',
+  vault_worth:
+    'Questo file apre tutto ciò che è stato detto. Vale quanto vale il posto in cui lo mette.',
+  vault_not_export:
+    "Non è un'esportazione dei suoi dati: una cassetta contiene chiavi, un'esportazione contiene messaggi.",
+  vault_passphrase_field: 'Una frase segreta per questo file',
+  vault_passphrase_hint:
+    'Diversa dalla sua chiave di recupero, e annotata altrove. Senza di essa il file non si apre, nemmeno da noi.',
+  vault_create: 'Creare la cassetta',
+  vault_working: 'Preparazione della cassetta…',
+  vault_failed: 'La cassetta non è stata creata.',
+  vault_cancel: 'Annullare',
+  vault_open_title: 'Aprire una cassetta di chiavi',
+  vault_open_lead:
+    'Un file fatto da Messagr o da un altro client Matrix. Renderà leggibili le conversazioni di cui porta le chiavi.',
+  vault_open_choose: 'Scegliere un file',
+  vault_open_passphrase: 'La frase segreta di questo file',
+  vault_open_working: 'Apertura della cassetta…',
+  vault_open_wrong: 'Questa frase segreta non apre questo file.',
+  vault_open_not_a_vault: 'Questo file non è una cassetta di chiavi.',
+  vault_open_failed: 'La cassetta non è stata aperta. Riprovare.',
+  'vault_opened %1$d':
+    '%1$d chiavi sono tornate. Le conversazioni che aprono tornano leggibili.',
+  vault_opened_none:
+    'La cassetta si è aperta, ma non conteneva nessuna chiave che questo dispositivo non avesse già.',
+  settings_vault: 'Cassetta di chiavi',
+  settings_vault_hint:
+    'Un file, per chi non vuole lasciare nulla su un server.',
   restore_done_close: 'Chiudere',
   settings_restore: 'Ritrovare i miei vecchi messaggi',
   settings_restore_hint: 'Se ha la sua chiave di recupero.',

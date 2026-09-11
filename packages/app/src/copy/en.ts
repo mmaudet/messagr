@@ -543,6 +543,38 @@ export const en: Readonly<Record<CopyKey, string>> = {
     '%1$d keys came back. Your older messages are readable again.',
   restore_done_none:
     'The backup opened, but it held no key for anything this device is showing.',
+  vault_title: 'A key vault, to keep where you like',
+  vault_lead:
+    'A file holding the keys to your conversations, closed by a passphrase of your own.',
+  vault_standard:
+    'It is the standard Matrix format: any Matrix client opens it, Element included. It is not a file only Messagr can read.',
+  vault_worth:
+    'This file opens everything that was said. It is worth what the place you put it is worth.',
+  vault_not_export:
+    'It is not an export of your data: a vault holds keys, an export holds messages.',
+  vault_passphrase_field: 'A passphrase for this file',
+  vault_passphrase_hint:
+    'Different from your recovery key, and written down somewhere else. Without it the file does not open — not even by us.',
+  vault_create: 'Create the vault',
+  vault_working: 'Preparing the vault…',
+  vault_failed: 'The vault could not be created.',
+  vault_cancel: 'Cancel',
+  vault_open_title: 'Open a key vault',
+  vault_open_lead:
+    'A file made by Messagr or by another Matrix client. It will make readable the conversations it holds the keys to.',
+  vault_open_choose: 'Choose a file',
+  vault_open_passphrase: 'The passphrase for this file',
+  vault_open_working: 'Opening the vault…',
+  vault_open_wrong: 'That passphrase does not open this file.',
+  vault_open_not_a_vault: 'This file is not a key vault.',
+  vault_open_failed: 'The vault could not be opened. Try again.',
+  'vault_opened %1$d':
+    '%1$d keys came back. The conversations they open are readable again.',
+  vault_opened_none:
+    'The vault opened, but it held no key this device did not already have.',
+  settings_vault: 'Key vault',
+  settings_vault_hint:
+    'A file, for somebody who wants nothing left on a server.',
   restore_done_close: 'Close',
   settings_restore: 'Get my older messages back',
   settings_restore_hint: 'If you have your recovery key.',

@@ -18,6 +18,8 @@ import {
   createCrossSigningIdentity,
   decryptAttachment,
   createKeyBackup,
+  createKeyVault,
+  openKeyVault,
   decryptEvent,
   disableKeyBackup,
   discardScopeKey,
@@ -45,6 +47,10 @@ import {
 import { acceptBackup, type BackupAccepted } from './acceptBackup'
 import type { EventCache } from './eventCacheStore'
 import { eventsToBuildFrom } from './eventsToBuildFrom'
+import { pickTextFile } from './documentFile'
+import { openVault, type VaultOpened } from './openVault'
+import { shareKeyVault } from './shareKeyVault'
+import { vaultPlatform } from './vaultPlatform'
 import { replaceBackup, type BackupReplaced } from './replaceBackup'
 import {
   downloadKeys,
@@ -1176,6 +1182,46 @@ export async function replaceKeyBackup(
     },
     retire: version => retireVersion(http, version),
   })
+}
+
+/**
+ * Makes a key vault and hands it to the share sheet.
+ *
+ * ADR-0013's second route: a file, for somebody with a reason to want no key
+ * material on a server at all. The sequence and its `finally` are in
+ * `shareKeyVault.ts`; the platform is `vaultPlatform.ts`; this binds the
+ * bridge to both, and is the only place that can, because the bridge is
+ * imported here and nowhere a test can reach.
+ *
+ * Answers a reason when it did not go, and nothing when it did.
+ */
+export async function exportKeyVault(
+  passphrase: string,
+): Promise<string | null> {
+  const outcome = await shareKeyVault(
+    vaultPlatform(theirPassphrase => createKeyVault(theirPassphrase)),
+    passphrase,
+  )
+  return outcome.shared ? null : outcome.reason
+}
+
+/**
+ * Opens a key vault somebody chose, and imports what is in it.
+ *
+ * The other half of `exportKeyVault`, and it takes a file from anywhere: the
+ * whole reason for the standard Matrix format rather than one of this
+ * product's own is that a vault made by Element opens here. The sequence and
+ * its four answers are in `openVault.ts`; the picker is `documentFile.ts`;
+ * this binds the bridge to both.
+ */
+export async function importKeyVault(passphrase: string): Promise<VaultOpened> {
+  return openVault(
+    {
+      choose: pickTextFile,
+      open: (vault, theirPassphrase) => openKeyVault(vault, theirPassphrase),
+    },
+    passphrase,
+  )
 }
 
 /**

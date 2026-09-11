@@ -558,6 +558,38 @@ export const uz: Readonly<Record<CopyKey, string>> = {
     '%1$d ta kalit qaytdi. Eski xabarlaringiz yana oʻqiladigan boʻldi.',
   restore_done_none:
     'Zaxira ochildi, ammo unda bu qurilma koʻrsatayotgan narsa uchun birorta kalit yoʻq edi.',
+  vault_title: 'Kalitlar sandigʻi — xohlagan joyingizda saqlang',
+  vault_lead:
+    'Suhbatlaringiz kalitlarini saqlaydigan fayl, oʻzingiz qoʻygan maxfiy ibora bilan yopilgan.',
+  vault_standard:
+    'Bu Matrix ning standart formati: har qanday Matrix mijozi uni ochadi, Element ham. Bu faqat Messagr oʻqiy oladigan fayl emas.',
+  vault_worth:
+    'Bu fayl aytilgan hamma narsani ochadi. U siz qoʻygan joy qancha tursa, shuncha turadi.',
+  vault_not_export:
+    'Bu maʼlumotlaringiz eksporti emas: sandiqda kalitlar, eksportda xabarlar boʻladi.',
+  vault_passphrase_field: 'Bu fayl uchun maxfiy ibora',
+  vault_passphrase_hint:
+    'Tiklash kalitingizdan boshqa, va boshqa joyga yozib qoʻyilgan. Usiz fayl ochilmaydi — biz ham ocha olmaymiz.',
+  vault_create: 'Sandiqni yaratish',
+  vault_working: 'Sandiq tayyorlanmoqda…',
+  vault_failed: 'Sandiqni yaratib boʻlmadi.',
+  vault_cancel: 'Bekor qilish',
+  vault_open_title: 'Kalitlar sandigʻini ochish',
+  vault_open_lead:
+    'Messagr yoki boshqa Matrix mijozi yaratgan fayl. U kalitlari oʻzida boʻlgan suhbatlarni oʻqiladigan qiladi.',
+  vault_open_choose: 'Fayl tanlash',
+  vault_open_passphrase: 'Bu fayl uchun maxfiy ibora',
+  vault_open_working: 'Sandiq ochilmoqda…',
+  vault_open_wrong: 'Bu maxfiy ibora bu faylni ochmaydi.',
+  vault_open_not_a_vault: 'Bu fayl kalitlar sandigʻi emas.',
+  vault_open_failed: 'Sandiqni ochib boʻlmadi. Qayta urinib koʻring.',
+  'vault_opened %1$d':
+    '%1$d ta kalit qaytdi. Ular ochadigan suhbatlar yana oʻqiladigan boʻldi.',
+  vault_opened_none:
+    'Sandiq ochildi, ammo unda bu qurilmada boʻlmagan birorta kalit yoʻq edi.',
+  settings_vault: 'Kalitlar sandigʻi',
+  settings_vault_hint:
+    'Fayl — serverda hech nima qoldirishni istamaganlar uchun.',
   restore_done_close: 'Yopish',
   settings_restore: 'Eski xabarlarimni qaytarish',
   settings_restore_hint: 'Agar tiklash kalitingiz boʻlsa.',
