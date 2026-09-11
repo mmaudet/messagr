@@ -438,6 +438,39 @@ export function App({
     'offering' | { readonly restoreKey: string } | null
   >(null)
   /**
+   * Reads the backup's state whenever that screen is showing and nothing is
+   * covering it.
+   *
+   * **An effect rather than a read at each place that opens the screen**, and
+   * that is a correction rather than a preference. It was two reads -- one in
+   * the row that opens, one when the key screen was dismissed -- and the
+   * second depended on a value captured when its closure was created. A
+   * device run caught it: after accepting, the screen behind still said « vos
+   * messages ne sont pas sauvegardés » about a backup the homeserver had
+   * already acknowledged, because the reading was the one taken before the
+   * acceptance.
+   *
+   * Keyed on the prompt as well as the screen, so dismissing the key is
+   * itself what asks again. Nothing has to remember to.
+   */
+  useEffect(() => {
+    if (!backupOpen || backupPrompt !== null) return
+    let stale = false
+    readKeyBackupState()
+      .then(state => {
+        if (!stale) setBackupState(state)
+      })
+      .catch(() => {
+        // A bridge that cannot answer leaves the screen undrawn rather than
+        // drawn wrong: every sentence on it turns on whether the backup is
+        // on.
+        if (!stale) setBackupState(null)
+      })
+    return () => {
+      stale = true
+    }
+  }, [backupOpen, backupPrompt])
+  /**
    * What the bridge says about the backup, while that screen is open.
    *
    * `null` means nobody has asked or the answer has not arrived. The screen
@@ -2823,13 +2856,7 @@ export function App({
               // was left: a Réglages screen that said « vos messages ne sont
               // pas sauvegardés » before this key existed would be lying the
               // moment it came back into view.
-              onDone={() => {
-                setBackupPrompt(null)
-                if (!backupOpen) return
-                readKeyBackupState()
-                  .then(setBackupState)
-                  .catch(() => setBackupState(null))
-              }}
+              onDone={() => setBackupPrompt(null)}
             />
           </View>
         )}
@@ -3289,21 +3316,7 @@ export function App({
                   <Settings
                     onBack={() => setTab('chat')}
                     onLegal={() => setLegalOpen(true)}
-                    onBackup={() => {
-                      setBackupOpen(true)
-                      // ASKED ON OPENING, NOT HELD BETWEEN OPENINGS. The two
-                      // counts move with every sync, so a value kept from
-                      // last time would be a screen describing a backup as it
-                      // was rather than as it is.
-                      readKeyBackupState()
-                        .then(setBackupState)
-                        .catch(() =>
-                          // A bridge that cannot answer leaves the screen
-                          // undrawn rather than drawn wrong: every sentence
-                          // on it turns on whether the backup is on.
-                          setBackupState(null),
-                        )
-                    }}
+                    onBackup={() => setBackupOpen(true)}
                     onFavourites={() => {
                       setFavouritesOpen(true)
                       // FETCHED ON OPENING AND DROPPED ON CLOSING, exactly as a
