@@ -108,7 +108,7 @@ export function Settings({
         onPress={onFavourites}
         accessibilityRole="button"
         accessibilityLabel={t('settings_favourites')}
-        style={styles.row}>
+        style={[styles.rowLayout, styles.divider]}>
         <Text style={styles.rowLabel}>{t('settings_favourites')}</Text>
       </Pressable>
 
@@ -120,7 +120,7 @@ export function Settings({
         onPress={onBackup}
         accessibilityRole="button"
         accessibilityLabel={t('settings_backup')}
-        style={styles.row}>
+        style={[styles.rowLayout, styles.divider]}>
         <Text style={styles.rowLabel}>{t('settings_backup')}</Text>
       </Pressable>
 
@@ -129,7 +129,7 @@ export function Settings({
         onPress={onLegal}
         accessibilityRole="button"
         accessibilityLabel={t('settings_legal')}
-        style={styles.row}>
+        style={[styles.rowLayout, styles.divider]}>
         <Text style={styles.rowLabel}>{t('settings_legal')}</Text>
       </Pressable>
 
@@ -137,7 +137,7 @@ export function Settings({
           reinstall as a correction, so it is here as well as on the first
           screen -- and it is the same control in both places, because two
           shapes for one gesture would be two controls. */}
-      <View style={styles.setting} testID="setting-language">
+      <View style={[styles.setting, styles.divider]} testID="setting-language">
         <Text style={styles.rowLabel}>{t('settings_row_lang_label')}</Text>
         {/* THE SAME CONTROL AS THE FIRST SCREEN, and now one anybody can
             find: a row saying which language is on, and a list when it is
@@ -154,8 +154,8 @@ export function Settings({
       {/* The one setting this lot's own features need. Its hint says what
           turning it on costs rather than what it does: everybody knows what a
           read receipt does, and nobody is told who else finds out. */}
-      <View style={styles.setting} testID="setting-receipts">
-        <View style={styles.row}>
+      <View style={[styles.setting, styles.divider]} testID="setting-receipts">
+        <View style={styles.rowLayout}>
           <Text style={styles.rowLabel}>{t('settings_receipts')}</Text>
           <Switch
             testID="toggle-receipts"
@@ -178,8 +178,8 @@ export function Settings({
           the other on. The hint says what crosses and what does not, because
           "notifications" is the setting people most reasonably assume leaks
           their messages. */}
-      <View style={styles.setting} testID="setting-wake">
-        <View style={styles.row}>
+      <View style={[styles.setting, styles.divider]} testID="setting-wake">
+        <View style={styles.rowLayout}>
           <Text style={styles.rowLabel}>{t('settings_wake')}</Text>
           <Switch
             testID="toggle-wake"
@@ -215,13 +215,15 @@ export function Settings({
           Android only. On iOS a call notification interrupts by category and
           there is nothing to ask for. */}
       {Platform.OS === 'android' && (
-        <View style={styles.setting} testID="setting-full-screen">
+        <View
+          style={[styles.setting, styles.divider]}
+          testID="setting-full-screen">
           <Pressable
             testID="open-full-screen-settings"
             onPress={onRingFullScreen}
             accessibilityRole="button"
             accessibilityLabel={t('settings_full_screen')}
-            style={styles.row}>
+            style={styles.rowLayout}>
             <Text style={styles.rowLabel}>{t('settings_full_screen')}</Text>
             <Text style={styles.rowAction}>{t('settings_open')}</Text>
           </Pressable>
@@ -245,13 +247,13 @@ export function Settings({
           Android only. iOS has its own answer -- an interruption level on
           the notification -- and no screen to send anybody to. */}
       {Platform.OS === 'android' && (
-        <View style={styles.setting} testID="setting-disturb">
+        <View style={[styles.setting, styles.divider]} testID="setting-disturb">
           <Pressable
             testID="open-disturb-settings"
             onPress={onRingWhileQuiet}
             accessibilityRole="button"
             accessibilityLabel={t('settings_disturb')}
-            style={styles.row}>
+            style={styles.rowLayout}>
             <Text style={styles.rowLabel}>{t('settings_disturb')}</Text>
             <Text style={styles.rowAction}>{t('settings_open')}</Text>
           </Pressable>
@@ -309,14 +311,35 @@ const styles = StyleSheet.create({
   //
   // `space-between` is what puts the control at the far edge, and
   // `alignItems: 'center'` is what lines it up with the words it belongs to.
-  row: {
+  //
+  // THE LINE IS NOT PART OF IT ANY MORE, and that is the second correction
+  // this style has needed. See `divider` below.
+  rowLayout: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     gap: space.m,
     minHeight: floors.touchTargetMin,
+  },
+  // ONE LINE BETWEEN TWO THINGS, AND IT LEADS THE SECOND.
+  //
+  // It was `borderTopWidth` AND `borderBottomWidth` on every row, which
+  // draws TWO adjacent hairlines between any two consecutive rows. Three
+  // rows in a column carried four lines, two of them double the weight of
+  // the others -- on a screen whose entire rhythm is separators, and next to
+  // a language block that carried none at all.
+  //
+  // A leading divider also settles what a line MEANS: everything below one
+  // and above the next is one setting. The hint under a switch used to sit
+  // beneath its own row's bottom border, equidistant from the setting it
+  // explains and the one after it -- the same detachment the backup screen
+  // had between a warning and the control it warns about, and the same fix.
+  //
+  // Composed rather than folded into the two styles that want it: a `row`
+  // carrying its own line is exactly what could not be reused inside a
+  // group, which is how the doubling got in.
+  divider: {
     borderTopWidth: stroke.hairline.value,
-    borderBottomWidth: stroke.hairline.value,
     borderColor: color.neutral['200'],
   },
   // `flexShrink` so a long title gives way to the control rather than
@@ -326,7 +349,9 @@ const styles = StyleSheet.create({
     ...type.titleMd,
     color: color.neutral['900'],
   },
-  setting: { gap: space.s },
+  // `paddingBottom` so a hint does not sit flush against the next line: the
+  // gap under a setting is what tells it apart from the one below.
+  setting: { gap: space.s, paddingBottom: space.s },
   rowValue: {
     ...type.bodySm,
     color: color.neutral['600'],
