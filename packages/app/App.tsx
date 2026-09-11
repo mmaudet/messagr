@@ -435,6 +435,18 @@ export function App({
    */
   const [attempt, setAttempt] = useState(0)
   /**
+   * Whether the replacement's confirmation is standing.
+   *
+   * Here rather than inside `BackupSettings`, because closing it is
+   * something only this can know how to do: the gesture it guards runs from
+   * here, so this is where the promise settles. It was local to that screen
+   * and nothing put it back -- the replacement succeeded, the key screen
+   * covered everything, and dismissing it revealed the confirmation panel
+   * again, offering to replace what had just been replaced. The E2E test
+   * found it on its last line, waiting for a row that never came back.
+   */
+  const [replaceConfirming, setReplaceConfirming] = useState(false)
+  /**
    * The offer, and then the key it produced.
    *
    * `'offering'` draws the soft prompt; a string is the restore key, shown
@@ -3411,8 +3423,14 @@ export function App({
                 <BackupSettings
                   reading={backupState}
                   onRetry={() => setAttempt(attempt + 1)}
+                  confirming={replaceConfirming}
+                  onConfirming={setReplaceConfirming}
                   onBack={() => {
                     setBackupOpen(false)
+                    // The question is abandoned rather than remembered:
+                    // coming back here must not find somebody mid-decision
+                    // about a gesture nothing takes back.
+                    setReplaceConfirming(false)
                     // Dropped rather than kept: the next opening asks
                     // again, and a value held between them would be the
                     // screen describing a backup as it was.
@@ -3468,6 +3486,13 @@ export function App({
                     if (session === null) return
                     replaceKeyBackup(session)
                       .then(outcome => {
+                        // CLOSED HERE, and only here. The finger is long
+                        // gone by the time this settles, and the key screen
+                        // is about to cover everything anyway -- so nothing
+                        // is unmounted under a gesture, and what is behind
+                        // the key is the row rather than the panel that
+                        // produced it.
+                        setReplaceConfirming(false)
                         setBackupPrompt(
                           outcome.replaced
                             ? {
@@ -3483,7 +3508,10 @@ export function App({
                             : null,
                         )
                       })
-                      .catch(() => setBackupPrompt(null))
+                      .catch(() => {
+                        setReplaceConfirming(false)
+                        setBackupPrompt(null)
+                      })
                   }}
                 />
               </View>

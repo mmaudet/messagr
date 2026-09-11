@@ -1,4 +1,4 @@
-import React, { useState } from 'react'
+import React from 'react'
 import { Pressable, StyleSheet, Text, View } from 'react-native'
 
 import { t } from '../copy'
@@ -89,6 +89,8 @@ export function BackupSettings({
   onRetry,
   onEnable,
   onReplace,
+  confirming,
+  onConfirming,
 }: {
   readonly reading: BackupReading
   readonly onBack: () => void
@@ -102,15 +104,23 @@ export function BackupSettings({
    * Called only after the confirmation below, never from the row itself.
    */
   readonly onReplace: () => void
-}) {
   /**
    * Whether the confirmation is standing between the row and the gesture.
    *
-   * Local, because nothing outside this screen has any business knowing that
-   * somebody is halfway through thinking about it -- and because leaving the
-   * screen must abandon the question rather than remember it.
+   * **Owned by the caller, and that is a correction a device run made.** It
+   * was local state here, and nothing put it back: the replacement
+   * succeeded, the key screen covered everything, and dismissing it revealed
+   * this screen still showing the confirmation panel -- two buttons offering
+   * to replace the key that had just been replaced. The E2E test caught it
+   * on the last line, waiting for a row that never came back.
+   *
+   * The caller is the one that learns the gesture finished, because it is
+   * the one that ran it. So it is the one that can close this, and it does
+   * so when the promise settles, long after the finger has gone.
    */
-  const [confirming, setConfirming] = useState(false)
+  readonly confirming: boolean
+  readonly onConfirming: (confirming: boolean) => void
+}) {
   const enabled = reading.reading === 'read' && reading.enabled
   const behind =
     reading.reading === 'read' &&
@@ -237,7 +247,7 @@ export function BackupSettings({
               <NotchedButton
                 testID="backup-replace-cancel"
                 label={t('backup_replace_cancel')}
-                onPress={() => setConfirming(false)}
+                onPress={() => onConfirming(false)}
                 tone="quiet"
                 wide
               />
@@ -252,7 +262,7 @@ export function BackupSettings({
               <NotchedButton
                 testID="backup-settings-replace"
                 label={t('backup_settings_replace')}
-                onPress={() => setConfirming(true)}
+                onPress={() => onConfirming(true)}
                 tone="quiet"
                 wide
               />
