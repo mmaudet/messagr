@@ -134,6 +134,19 @@ export const backupAskedSecrets = keychainStore('eu.messagr.backup-asked')
  */
 export const backupReceivedSecrets = keychainStore('eu.messagr.backup-received')
 
+/**
+ * Whether this device has already offered to bring a past back.
+ *
+ * Its own entry, and not the backup's: the two questions are asked of
+ * different devices in opposite situations. `backup-asked` is a device that
+ * has keys and is offered somewhere to put them; this is a device that has
+ * lost them and is offered a way to get them back. Somebody who refused the
+ * first has not answered the second, and a device that reinstalled has
+ * neither flag — sharing one entry would make a refusal on a telephone that
+ * no longer exists silence the offer that matters most.
+ */
+export const restoreAskedSecrets = keychainStore('eu.messagr.restore-asked')
+
 /** Where the crypto store's passphrase lives. See cryptoMachineConfig.ts. */
 export const cryptoStoreSecrets = keychainStore('eu.messagr.crypto-store')
 

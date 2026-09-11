@@ -762,6 +762,33 @@ export const fr = {
   backup_key_copy: 'Copier la clé',
   backup_key_copied: 'Clé copiée.',
   backup_key_done: 'J’ai rangé ma clé',
+  restore_offer_title: 'Vos anciens messages sont là',
+  restore_offer_lead:
+    "Cet appareil ne peut pas les ouvrir : les clés qui les ouvraient sont parties avec l'installation précédente.",
+  'restore_offer_scope %1$d': '%1$d conversations sont dans ce cas.',
+  restore_offer_have:
+    'Il y a une sauvegarde sur le serveur. Votre clé de récupération les rouvre, ici, sans rien réinstaller.',
+  restore_offer_accept: 'Entrer ma clé de récupération',
+  restore_offer_refuse: 'Plus tard',
+  restore_offer_later:
+    "Vous pourrez le faire depuis Réglages. Sans la clé, l'application fonctionne : c'est le passé qui reste fermé, pas le présent.",
+  restore_key_title: 'Votre clé de récupération',
+  restore_key_lead: 'Celle qui vous a été montrée une seule fois.',
+  restore_key_field: 'Coller ou saisir la clé',
+  restore_key_confirm: 'Rouvrir mes messages',
+  restore_key_cancel: 'Annuler',
+  restore_key_working: 'Ouverture…',
+  restore_key_not_a_key:
+    "Ce n'est pas une clé de récupération. Il manque peut-être une partie de la ligne collée.",
+  restore_key_wrong:
+    "Cette clé n'ouvre pas cette sauvegarde. C'est peut-être celle d'un autre compte.",
+  restore_key_failed: "La sauvegarde n'a pas pu être téléchargée. Réessayez.",
+  'restore_done %1$d':
+    '%1$d clés sont revenues. Vos anciens messages redeviennent lisibles.',
+  restore_done_none:
+    "La sauvegarde s'est ouverte, mais elle ne contenait aucune clé pour ce que cet appareil affiche.",
+  settings_restore: 'Retrouver mes anciens messages',
+  settings_restore_hint: 'Si vous avez votre clé de récupération.',
   back_to_newest: 'Revenir au dernier message',
 } as const
 

@@ -533,5 +533,32 @@ export const uz: Readonly<Record<CopyKey, string>> = {
   backup_key_copy: 'Kalitni nusxalash',
   backup_key_copied: 'Kalit nusxalandi.',
   backup_key_done: 'Kalitimni saqlab qoʻydim',
+  restore_offer_title: 'Eski xabarlaringiz shu yerda',
+  restore_offer_lead:
+    'Bu qurilma ularni ocha olmaydi: ochadigan kalitlar oldingi oʻrnatma bilan ketgan.',
+  'restore_offer_scope %1$d': '%1$d ta suhbat shu holatda.',
+  restore_offer_have:
+    'Serverda zaxira bor. Tiklash kalitingiz ularni shu yerda qaytadan ochadi, hech nimani qayta oʻrnatmasdan.',
+  restore_offer_accept: 'Tiklash kalitimni kiritish',
+  restore_offer_refuse: 'Keyinroq',
+  restore_offer_later:
+    'Buni Sozlamalardan qilishingiz mumkin. Kalitsiz ham ilova ishlaydi: yopiq qoladigani oʻtmish, hozirgi emas.',
+  restore_key_title: 'Tiklash kalitingiz',
+  restore_key_lead: 'Sizga bir marta koʻrsatilgani.',
+  restore_key_field: 'Kalitni qoʻying yoki yozing',
+  restore_key_confirm: 'Xabarlarimni qaytadan ochish',
+  restore_key_cancel: 'Bekor qilish',
+  restore_key_working: 'Ochilmoqda…',
+  restore_key_not_a_key:
+    'Bu tiklash kaliti emas. Qoʻyilgan qatorning bir qismi yetishmayotgan boʻlishi mumkin.',
+  restore_key_wrong:
+    'Bu kalit bu zaxirani ochmaydi. Ehtimol u boshqa hisobniki.',
+  restore_key_failed: 'Zaxirani yuklab boʻlmadi. Qayta urinib koʻring.',
+  'restore_done %1$d':
+    '%1$d ta kalit qaytdi. Eski xabarlaringiz yana oʻqiladigan boʻldi.',
+  restore_done_none:
+    'Zaxira ochildi, ammo unda bu qurilma koʻrsatayotgan narsa uchun birorta kalit yoʻq edi.',
+  settings_restore: 'Eski xabarlarimni qaytarish',
+  settings_restore_hint: 'Agar tiklash kalitingiz boʻlsa.',
   back_to_newest: 'Oxirgi xabarga qaytish',
 }

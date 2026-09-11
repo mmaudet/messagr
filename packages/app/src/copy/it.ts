@@ -517,5 +517,32 @@ export const it: Readonly<Record<CopyKey, string>> = {
   backup_key_copy: 'Copiare la chiave',
   backup_key_copied: 'Chiave copiata.',
   backup_key_done: 'Ho messo via la mia chiave',
+  restore_offer_title: 'I suoi vecchi messaggi sono qui',
+  restore_offer_lead:
+    "Questo dispositivo non può aprirli: le chiavi che lo facevano se ne sono andate con l'installazione precedente.",
+  'restore_offer_scope %1$d': '%1$d conversazioni sono in questo caso.',
+  restore_offer_have:
+    "C'è un backup sul server. La sua chiave di recupero li riapre, qui, senza reinstallare nulla.",
+  restore_offer_accept: 'Inserire la mia chiave di recupero',
+  restore_offer_refuse: 'Più tardi',
+  restore_offer_later:
+    "Potrà farlo dalle Impostazioni. Senza la chiave l'applicazione funziona: a restare chiuso è il passato, non il presente.",
+  restore_key_title: 'La sua chiave di recupero',
+  restore_key_lead: 'Quella che le è stata mostrata una sola volta.',
+  restore_key_field: 'Incolli o digiti la chiave',
+  restore_key_confirm: 'Riaprire i miei messaggi',
+  restore_key_cancel: 'Annullare',
+  restore_key_working: 'Apertura…',
+  restore_key_not_a_key:
+    'Questa non è una chiave di recupero. Forse manca una parte della riga incollata.',
+  restore_key_wrong:
+    'Questa chiave non apre questo backup. Forse è quella di un altro account.',
+  restore_key_failed: 'Il backup non è stato scaricato. Riprovare.',
+  'restore_done %1$d':
+    '%1$d chiavi sono tornate. I suoi vecchi messaggi tornano leggibili.',
+  restore_done_none:
+    'Il backup si è aperto, ma non conteneva nessuna chiave per ciò che questo dispositivo mostra.',
+  settings_restore: 'Ritrovare i miei vecchi messaggi',
+  settings_restore_hint: 'Se ha la sua chiave di recupero.',
   back_to_newest: 'Torna all’ultimo messaggio',
 }

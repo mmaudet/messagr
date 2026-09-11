@@ -91,6 +91,8 @@ export function BackupSettings({
   onReplace,
   confirming,
   onConfirming,
+  restorable,
+  onRestore,
 }: {
   readonly reading: BackupReading
   readonly onBack: () => void
@@ -120,6 +122,20 @@ export function BackupSettings({
    */
   readonly confirming: boolean
   readonly onConfirming: (confirming: boolean) => void
+  /**
+   * Whether the account has a backup this device is not reading.
+   *
+   * The door `restore_offer_later` promises: *« Vous pourrez le faire depuis
+   * Réglages. »* A refusal of the restore offer is honoured for good, like
+   * the backup's, and ADR-0013 is explicit that a product which will not ask
+   * again owes a way back somebody can find.
+   *
+   * False on a device that is already backing up -- it has its keys -- and
+   * on one whose account has no backup at all, where the button would open
+   * a door onto nothing.
+   */
+  readonly restorable: boolean
+  readonly onRestore: () => void
 }) {
   const enabled = reading.reading === 'read' && reading.enabled
   const behind =
@@ -280,6 +296,24 @@ export function BackupSettings({
               onPress={onEnable}
               wide
             />
+            {/* THE DOOR THE OFFER PROMISED. Only when there is something
+                behind it: a button that opened onto an account with no
+                backup would be the dead control this screen has already had
+                once. `quiet`, because backing up from here is the principal
+                action and this is the other thing somebody might have come
+                for. */}
+            {restorable && (
+              <>
+                <Text style={styles.note}>{t('settings_restore_hint')}</Text>
+                <NotchedButton
+                  testID="backup-settings-restore"
+                  label={t('settings_restore')}
+                  onPress={onRestore}
+                  tone="quiet"
+                  wide
+                />
+              </>
+            )}
           </View>
         ))}
     </View>

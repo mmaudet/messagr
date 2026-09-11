@@ -517,5 +517,32 @@ export const nl: Readonly<Record<CopyKey, string>> = {
   backup_key_copy: 'Sleutel kopiëren',
   backup_key_copied: 'Sleutel gekopieerd.',
   backup_key_done: 'Ik heb mijn sleutel opgeborgen',
+  restore_offer_title: 'Uw oudere berichten zijn er',
+  restore_offer_lead:
+    'Dit apparaat kan ze niet openen: de sleutels die dat deden gingen mee met de vorige installatie.',
+  'restore_offer_scope %1$d': '%1$d gesprekken zijn in dat geval.',
+  restore_offer_have:
+    'Er staat een back-up op de server. Uw herstelsleutel opent ze weer, hier, zonder iets opnieuw te installeren.',
+  restore_offer_accept: 'Mijn herstelsleutel invoeren',
+  restore_offer_refuse: 'Later',
+  restore_offer_later:
+    'U kunt het vanuit Instellingen doen. Zonder de sleutel werkt de toepassing: het verleden blijft dicht, het heden niet.',
+  restore_key_title: 'Uw herstelsleutel',
+  restore_key_lead: 'Die u één keer is getoond.',
+  restore_key_field: 'Plak of typ de sleutel',
+  restore_key_confirm: 'Mijn berichten weer openen',
+  restore_key_cancel: 'Annuleren',
+  restore_key_working: 'Bezig met openen…',
+  restore_key_not_a_key:
+    'Dat is geen herstelsleutel. Mogelijk ontbreekt een deel van de geplakte regel.',
+  restore_key_wrong:
+    'Deze sleutel opent deze back-up niet. Misschien is het die van een ander account.',
+  restore_key_failed: 'De back-up kon niet worden opgehaald. Probeer opnieuw.',
+  'restore_done %1$d':
+    '%1$d sleutels zijn terug. Uw oudere berichten zijn weer leesbaar.',
+  restore_done_none:
+    'De back-up ging open, maar bevatte geen sleutel voor wat dit apparaat toont.',
+  settings_restore: 'Mijn oudere berichten terughalen',
+  settings_restore_hint: 'Als u uw herstelsleutel hebt.',
   back_to_newest: 'Terug naar het nieuwste bericht',
 }
