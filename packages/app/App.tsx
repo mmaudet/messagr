@@ -3912,9 +3912,32 @@ export function App({
             front of it. A test can see what a person cannot.
             A call now paints under these rather than over. That is the right
             way round: an overlay something else can cover is not an overlay,
-            and of the two the key is the one that cannot be shown again. */}
+            and of the two the key is the one that cannot be shown again.
+
+            **AND A `SafeAreaView`, WHICH THE MOVE HAD COST THEM.** Placed
+            last they are outside the `SafeAreaView` above, which is the
+            whole point -- but a bare `absoluteFill` is laid against the
+            window and not against the safe area, so the title drew through
+            the clock and the battery. The account holder photographed it on
+            the demonstration telephone the day it shipped.
+            Every edge here, and not the `['left', 'right']` the screen above
+            takes: that view leaves top and bottom to a header and a dock
+            that paint to them deliberately. These two have neither. They are
+            a sheet with a title at the top and buttons at the bottom, and
+            both want to sit inside the insets rather than under them. The
+            ground is on the inset view rather than only inside, or the strip
+            it reserves would show the application through it. */}
         {backupPrompt === 'offering' && (
-          <View style={StyleSheet.absoluteFill}>
+          <SafeAreaView
+            // Named so a device run can measure the inset it reserves: this
+            // view stays the size of the window and pads, so the screen
+            // inside it is shorter by exactly the insets. `boot.test.ts`
+            // compares the two, which is the only way this is provable on
+            // Android -- Detox reports an element's size there and never its
+            // position.
+            testID="backup-overlay"
+            style={[StyleSheet.absoluteFill, styles.root]}
+            edges={['top', 'bottom', 'left', 'right']}>
             <BackupOffer
               onAccept={() => {
                 const session = sessionClientRef.current
@@ -3938,11 +3961,20 @@ export function App({
               }}
               onRefuse={() => setBackupPrompt(null)}
             />
-          </View>
+          </SafeAreaView>
         )}
 
         {backupPrompt !== null && backupPrompt !== 'offering' && (
-          <View style={StyleSheet.absoluteFill}>
+          <SafeAreaView
+            // Named so a device run can measure the inset it reserves: this
+            // view stays the size of the window and pads, so the screen
+            // inside it is shorter by exactly the insets. `boot.test.ts`
+            // compares the two, which is the only way this is provable on
+            // Android -- Detox reports an element's size there and never its
+            // position.
+            testID="backup-overlay"
+            style={[StyleSheet.absoluteFill, styles.root]}
+            edges={['top', 'bottom', 'left', 'right']}>
             <RecoveryKeyShown
               recoveryKey={backupPrompt.restoreKey}
               onCopy={() => Clipboard.setString(backupPrompt.restoreKey)}
@@ -3956,7 +3988,7 @@ export function App({
               // moment it came back into view.
               onDone={() => setBackupPrompt(null)}
             />
-          </View>
+          </SafeAreaView>
         )}
 
         {/* ABOVE EVERYTHING, AND NOT INSIDE THE CONVERSATION.

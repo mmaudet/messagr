@@ -404,6 +404,35 @@ describe('boot', () => {
       .toBeVisible()
       .withTimeout(60000)
 
+    // AND IT IS INSIDE THE SAFE AREA, WHICH A PHOTOGRAPH FOUND FIRST.
+    //
+    // Moving these two overlays to be the last children of the root fixed
+    // the paint order and cost them their insets: `absoluteFill` is laid
+    // against the window, not against the safe area, so the title drew
+    // through the clock and the battery on the demonstration telephone.
+    //
+    // Measured rather than looked at, and measured this way because Detox on
+    // Android reports an element's SIZE and never its position. The wrapper
+    // keeps the window's height and pads; the screen inside is shorter by
+    // exactly the insets. So the wrapper being taller than its child is the
+    // inset existing, and the two being equal is this defect returning.
+    const overlay = await element(by.id('backup-overlay')).getAttributes()
+    const inside = await element(by.id('recovery-key')).getAttributes()
+    const outerHeight = 'height' in overlay ? overlay.height : undefined
+    const innerHeight = 'height' in inside ? inside.height : undefined
+    if (
+      typeof outerHeight !== 'number' ||
+      typeof innerHeight !== 'number' ||
+      outerHeight <= innerHeight
+    ) {
+      throw new Error(
+        `the key screen reserved no safe-area inset: wrapper ${String(
+          outerHeight,
+        )} vs screen ${String(innerHeight)}. A bare absoluteFill draws under ` +
+          `the status bar, which is what this catches.`,
+      )
+    }
+
     // AND IT SAYS IT WILL NOT BE SHOWN AGAIN, BEFORE THE BUTTON THAT LEAVES.
     // A person who reads that after tapping has been told something they can
     // no longer act on.
