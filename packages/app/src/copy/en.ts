@@ -462,6 +462,20 @@ export const en: Readonly<Record<CopyKey, string>> = {
   list_nobody_else: 'Nobody else here',
   list_nobody_joined: 'Nobody joined this conversation',
   invite_open: 'Invite someone',
+  settings_backup: 'Message backup',
+  backup_settings_on:
+    'Your messages are kept on the server, closed by your recovery key.',
+  backup_settings_off:
+    'Your messages are not backed up. Reinstalling Messagr would lose everything that was said.',
+  'backup_settings_progress %1$d %2$d': '%1$d keys backed up out of %2$d',
+  backup_settings_catching_up:
+    'The rest goes as the conversations sync. Nothing is lost in the meantime.',
+  backup_settings_enable: 'Back up my messages',
+  backup_settings_never_shown:
+    'Your current key cannot be shown again, here or anywhere else.',
+  backup_settings_replace: 'Replace my recovery key',
+  backup_settings_replace_why:
+    'Do this if you have lost your key or wrote it down badly. A new key will be shown once, and the old one will stop opening anything.',
   backup_offer_title: 'Get your messages back if you lose this telephone',
   backup_offer_lead:
     'The keys that open your conversations exist on this device and nowhere else. Messagr can keep a copy on the server, closed by a key only you hold.',

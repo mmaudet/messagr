@@ -469,6 +469,20 @@ export const de: Readonly<Record<CopyKey, string>> = {
   list_nobody_else: 'Sonst niemand hier',
   list_nobody_joined: 'Niemand ist diesem Gespräch beigetreten',
   invite_open: 'Jemanden einladen',
+  settings_backup: 'Nachrichtensicherung',
+  backup_settings_on:
+    'Ihre Nachrichten liegen auf dem Server, verschlossen mit Ihrem Wiederherstellungsschlüssel.',
+  backup_settings_off:
+    'Ihre Nachrichten sind nicht gesichert. Eine Neuinstallation von Messagr würde alles Gesagte verlieren.',
+  'backup_settings_progress %1$d %2$d': '%1$d von %2$d Schlüsseln gesichert',
+  backup_settings_catching_up:
+    'Der Rest geht mit den nächsten Abgleichen. Bis dahin geht nichts verloren.',
+  backup_settings_enable: 'Meine Nachrichten sichern',
+  backup_settings_never_shown:
+    'Ihr aktueller Schlüssel kann nicht erneut angezeigt werden, hier so wenig wie anderswo.',
+  backup_settings_replace: 'Wiederherstellungsschlüssel ersetzen',
+  backup_settings_replace_why:
+    'Tun Sie das, wenn Sie Ihren Schlüssel verloren oder falsch notiert haben. Ein neuer Schlüssel wird einmal angezeigt, und der alte öffnet dann nichts mehr.',
   backup_offer_title:
     'Ihre Nachrichten zurückbekommen, wenn Sie dieses Telefon verlieren',
   backup_offer_lead:

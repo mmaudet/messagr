@@ -460,6 +460,20 @@ export const nl: Readonly<Record<CopyKey, string>> = {
   list_nobody_else: 'Verder niemand hier',
   list_nobody_joined: 'Niemand heeft aan dit gesprek deelgenomen',
   invite_open: 'Iemand uitnodigen',
+  settings_backup: 'Reservekopie van berichten',
+  backup_settings_on:
+    'Uw berichten staan op de server, gesloten met uw herstelsleutel.',
+  backup_settings_off:
+    'Van uw berichten is geen reservekopie. Messagr opnieuw installeren zou alles wat er is gezegd verliezen.',
+  'backup_settings_progress %1$d %2$d': '%1$d van %2$d sleutels bewaard',
+  backup_settings_catching_up:
+    'De rest gaat mee met de volgende synchronisaties. Ondertussen gaat er niets verloren.',
+  backup_settings_enable: 'Mijn berichten bewaren',
+  backup_settings_never_shown:
+    'Uw huidige sleutel kan niet opnieuw worden getoond, hier niet en elders niet.',
+  backup_settings_replace: 'Mijn herstelsleutel vervangen',
+  backup_settings_replace_why:
+    'Doe dit als u uw sleutel kwijt bent of verkeerd hebt genoteerd. Er wordt eenmalig een nieuwe sleutel getoond, en de oude opent daarna niets meer.',
   backup_offer_title: 'Uw berichten terugkrijgen als u deze telefoon verliest',
   backup_offer_lead:
     'De sleutels die uw gesprekken openen, bestaan alleen op dit toestel. Messagr kan er een kopie van op de server bewaren, gesloten met een sleutel die alleen u heeft.',

@@ -700,6 +700,25 @@ export const fr = {
   // chiffrement, qui reste automatique ; ce qui devient un choix ici, c'est
   // la durabilité. Un écran qui expliquerait le chiffrement à l'endroit où
   // l'on accepte ou refuse quelque chose ferait croire qu'on peut le régler.
+  // --- Réglages : l'état de la sauvegarde (#220, ADR-0013) ------------------
+  //
+  // Une ligne, et rien d'autre. ADR-0013 : « un produit qui harcèle sur la
+  // sécurité apprend surtout à ignorer ses propres avertissements ». Aucun
+  // bandeau ne réapparaît ailleurs dans l'application.
+  settings_backup: 'Sauvegarde des messages',
+  backup_settings_on:
+    'Vos messages sont sauvegardés sur le serveur, fermés par votre clé de récupération.',
+  backup_settings_off:
+    'Vos messages ne sont pas sauvegardés. Réinstaller Messagr perdrait tout ce qui a été dit.',
+  'backup_settings_progress %1$d %2$d': '%1$d clés sauvegardées sur %2$d',
+  backup_settings_catching_up:
+    'Le reste part au fil des synchronisations. Rien n’est perdu en attendant.',
+  backup_settings_enable: 'Sauvegarder mes messages',
+  backup_settings_never_shown:
+    'Votre clé actuelle ne peut pas être réaffichée, ici ni ailleurs.',
+  backup_settings_replace: 'Remplacer ma clé de récupération',
+  backup_settings_replace_why:
+    'À faire si vous avez perdu votre clé ou l’avez mal notée. Une nouvelle clé sera affichée une seule fois, et l’ancienne cessera d’ouvrir quoi que ce soit.',
   backup_offer_title: 'Retrouver vos messages si vous perdez ce téléphone',
   backup_offer_lead:
     'Les clés qui ouvrent vos conversations n’existent que sur cet appareil. Messagr peut en garder une copie sur le serveur, fermée par une clé que vous seul détenez.',
