@@ -458,6 +458,16 @@ export function App({
     let stale = false
     readKeyBackupState()
       .then(state => {
+        // SAID EVERY TIME, for the reason the offer's own line exists: a
+        // screen showing the wrong branch and a screen showing the right one
+        // are indistinguishable from outside, and this is the line that says
+        // which the bridge actually answered.
+        logEvent('info', 'MESSAGR_BACKUP_STATE', {
+          enabled: state.enabled,
+          total: state.total,
+          backedUp: state.backedUp,
+          stale,
+        })
         if (!stale) setBackupState(state)
       })
       .catch(() => {
