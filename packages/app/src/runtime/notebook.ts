@@ -22,6 +22,11 @@ import {
   type ListCache,
 } from './listCacheStore'
 import {
+  forgetfulEventCache,
+  openEventCache,
+  type EventCache,
+} from './eventCacheStore'
+import {
   forgetfulFavourites,
   openFavourites,
   type Favourites,
@@ -41,6 +46,12 @@ export interface NotebookOpening {
   readonly calls: CallLog
   /** The conversation list as it was last drawn, so the next launch is instant. */
   readonly list: ListCache
+  /**
+   * The ciphertext each conversation was last built from, so one can be read
+   * with no network. Sixth page; `eventCacheStore.ts` argues why ciphertext
+   * at rest is a smaller bargain than the list's plaintext previews.
+   */
+  readonly events: EventCache
   /** Events this device has been told not to draw. §13.7's "pour moi". */
   readonly hidden: Hidden
   /** The eighth page: the messages somebody kept. See favouriteStore.ts. */
@@ -115,6 +126,7 @@ export async function openNotebook(storeDir: string): Promise<NotebookOpening> {
       outstanding: forgetfulOutstanding(),
       calls: forgetfulCallLog(),
       list: forgetfulListCache(),
+      events: forgetfulEventCache(),
       hidden: forgetfulHidden(),
       favourites: forgetfulFavourites(),
       readBy: forgetfulReadBy(),
@@ -133,6 +145,7 @@ export async function openNotebook(storeDir: string): Promise<NotebookOpening> {
       outstanding: forgetfulOutstanding(),
       calls: forgetfulCallLog(),
       list: forgetfulListCache(),
+      events: forgetfulEventCache(),
       hidden: forgetfulHidden(),
       favourites: forgetfulFavourites(),
       readBy: forgetfulReadBy(),
@@ -160,6 +173,7 @@ export async function openNotebook(storeDir: string): Promise<NotebookOpening> {
       outstanding: await openOutstanding(page),
       calls: await openCallLog(page),
       list: await openListCache(page),
+      events: await openEventCache(page),
       hidden: await openHidden(page),
       favourites: await openFavourites(page),
       readBy: await openReadBy(page),
@@ -176,6 +190,7 @@ export async function openNotebook(storeDir: string): Promise<NotebookOpening> {
       outstanding: forgetfulOutstanding(),
       calls: forgetfulCallLog(),
       list: forgetfulListCache(),
+      events: forgetfulEventCache(),
       hidden: forgetfulHidden(),
       favourites: forgetfulFavourites(),
       readBy: forgetfulReadBy(),

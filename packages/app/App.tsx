@@ -145,6 +145,10 @@ import {
   toggle,
 } from './src/timeline/selection'
 import {
+  forgetfulEventCache,
+  type EventCache,
+} from './src/runtime/eventCacheStore'
+import {
   forgetfulListCache,
   type ListCache,
 } from './src/runtime/listCacheStore'
@@ -388,6 +392,14 @@ export function App({
   // The list as it was last drawn. Read once at the top of the launch and
   // written by every derivation after it. `listCacheStore.ts` says why.
   const listCacheRef = useRef<ListCache>(forgetfulListCache())
+  /**
+   * The ciphertext each conversation was last built from.
+   *
+   * Read when a fetch fails, so a conversation opens with no network; kept
+   * on every fetch that succeeds. `eventCacheStore.ts` argues why ciphertext
+   * at rest sits inside ADR-0006 rather than against it.
+   */
+  const eventsRef = useRef<EventCache>(forgetfulEventCache())
   // Which conversation is open, held in a ref as well as in state: the live
   // sync loop's callbacks are created once and would otherwise keep deriving
   // whichever conversation was open when the loop started.
@@ -1156,6 +1168,7 @@ export function App({
       lastReadRef.current = opening.lastRead
       outstandingRef.current = opening.outstanding
       listCacheRef.current = opening.list
+      eventsRef.current = opening.events
       hiddenRef.current = opening.hidden
       readByRef.current = opening.readBy
       // SEEDED BEFORE ANYTHING IS DRAWN, so a conversation opened on the
@@ -1574,6 +1587,8 @@ export function App({
                     sessionClient,
                     scope,
                     credentials.userId,
+                    undefined,
+                    eventsRef.current,
                   )
                   if (!stillOpen()) return
                   setConversation(held =>
@@ -1592,6 +1607,8 @@ export function App({
                   sessionClient,
                   scope,
                   credentials.userId,
+                  undefined,
+                  eventsRef.current,
                 )
                 if (!stillOpen()) return
                 setConversation(held =>
@@ -1661,6 +1678,8 @@ export function App({
                         sessionClient,
                         scope,
                         credentials.userId,
+                        undefined,
+                        eventsRef.current,
                       )
                     ).entries,
                 },
@@ -1798,6 +1817,8 @@ export function App({
                   sessionClient,
                   scope,
                   credentials.userId,
+                  undefined,
+                  eventsRef.current,
                 )
                 if (openScopeRef.current !== scope) return
                 // MERGED, like every other derivation. Replacing was the
@@ -1859,6 +1880,8 @@ export function App({
                     sessionClient,
                     scope,
                     credentials.userId,
+                    undefined,
+                    eventsRef.current,
                   )
                   setConversation(held =>
                     mergeTimeline(held ?? [], fresh.entries),
@@ -1935,6 +1958,8 @@ export function App({
                   sessionClient,
                   scope,
                   credentials.userId,
+                  undefined,
+                  eventsRef.current,
                 )
                 if (!stillOpen()) return
                 setConversation(held =>
@@ -2499,7 +2524,13 @@ export function App({
                   if (open === null || !tick.changedScopes.includes(open)) {
                     return
                   }
-                  loadConversation(sessionClient, open, credentials.userId)
+                  loadConversation(
+                    sessionClient,
+                    open,
+                    credentials.userId,
+                    undefined,
+                    eventsRef.current,
+                  )
                     .then(async fresh => {
                       setConversation(held =>
                         mergeTimeline(held ?? [], fresh.entries),

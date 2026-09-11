@@ -43,6 +43,8 @@ import {
 } from 'react-native-matrix-crypto'
 
 import { acceptBackup, type BackupAccepted } from './acceptBackup'
+import type { EventCache } from './eventCacheStore'
+import { eventsToBuildFrom } from './eventsToBuildFrom'
 import { replaceBackup, type BackupReplaced } from './replaceBackup'
 import {
   downloadKeys,
@@ -448,9 +450,39 @@ export async function loadConversation(
   roomId: string,
   selfUserId: string,
   limit = 40,
+  /**
+   * Where the ciphertext of the last successful fetch is kept, and where it
+   * is read from when there is no network. Optional so every existing caller
+   * and every test keeps working without one; a conversation opened without
+   * it behaves exactly as it did before.
+   */
+  remembered?: EventCache,
 ): Promise<LoadedConversation> {
   const http = makePumpHttp(sessionClient)
-  const events = await fetchRoomMessages(http, roomId, limit)
+
+  // THE FETCH, AND WHAT STANDS IN FOR IT WHEN THERE IS NONE.
+  //
+  // `listCacheStore.ts` made the LIST survive a launch with no network.
+  // Opening one of those conversations still asked, so aeroplane mode drew a
+  // list of conversations none of which would open -- reported from the
+  // demonstration Pixel: « même en mode avion, je dois pouvoir consulter les
+  // conversations ».
+  //
+  // What is kept is the ciphertext, exactly as the homeserver sent it, and
+  // it is decrypted below with the same keys in the same process. Nothing
+  // decrypted is written anywhere, which is what lets this sit inside
+  // ADR-0006 rather than against it -- `eventCacheStore.ts` argues it.
+  //
+  // The choice itself is in `eventsToBuildFrom.ts`, with its three
+  // temptations and why each is refused. It is not here because this file
+  // imports the bridge, and a file that imports the bridge cannot be
+  // exercised.
+  const events = await eventsToBuildFrom(
+    roomId,
+    () => fetchRoomMessages(http, roomId, limit),
+    remembered,
+  )
+
   const { entries, reactions } = await toTimelineEntries(
     {
       decryptEvent: (scope, rawEvent) =>
