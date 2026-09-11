@@ -469,6 +469,12 @@ export const it: Readonly<Record<CopyKey, string>> = {
   'backup_settings_progress %1$d %2$d': '%1$d chiavi salvate su %2$d',
   backup_settings_catching_up:
     'Il resto parte con le prossime sincronizzazioni. Nel frattempo non si perde nulla.',
+  backup_settings_reading: 'Lettura dello stato del backup…',
+  backup_settings_unreadable:
+    'Lo stato del backup non è stato letto su questo dispositivo.',
+  backup_settings_unreadable_why:
+    'Questo non dice nulla sul backup stesso: se era attivo, lo è ancora, e qui non è stato cambiato nulla.',
+  backup_settings_retry: 'Riprovare',
   backup_settings_enable: 'Salvare i miei messaggi',
   backup_settings_never_shown:
     'La sua chiave attuale non può essere mostrata di nuovo, né qui né altrove.',

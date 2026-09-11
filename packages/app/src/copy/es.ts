@@ -470,6 +470,12 @@ export const es: Readonly<Record<CopyKey, string>> = {
   'backup_settings_progress %1$d %2$d': '%1$d claves guardadas de %2$d',
   backup_settings_catching_up:
     'El resto sale con las siguientes sincronizaciones. Mientras tanto no se pierde nada.',
+  backup_settings_reading: 'Leyendo el estado de la copia de seguridad…',
+  backup_settings_unreadable:
+    'No se ha podido leer el estado de la copia de seguridad en este dispositivo.',
+  backup_settings_unreadable_why:
+    'Esto no dice nada sobre la copia en sí: si estaba activada, lo sigue estando, y aquí no se ha cambiado nada.',
+  backup_settings_retry: 'Reintentar',
   backup_settings_enable: 'Guardar mis mensajes',
   backup_settings_never_shown:
     'Su clave actual no puede volver a mostrarse, ni aquí ni en ningún otro sitio.',

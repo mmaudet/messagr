@@ -713,6 +713,12 @@ export const fr = {
   'backup_settings_progress %1$d %2$d': '%1$d clés sauvegardées sur %2$d',
   backup_settings_catching_up:
     'Le reste part au fil des synchronisations. Rien n’est perdu en attendant.',
+  backup_settings_reading: "Lecture de l'état de la sauvegarde…",
+  backup_settings_unreadable:
+    "L'état de la sauvegarde n'a pas pu être lu sur cet appareil.",
+  backup_settings_unreadable_why:
+    "Cela ne dit rien de la sauvegarde elle-même : si elle était active, elle l'est toujours, et rien n'a été modifié ici.",
+  backup_settings_retry: 'Réessayer',
   backup_settings_enable: 'Sauvegarder mes messages',
   backup_settings_never_shown:
     'Votre clé actuelle ne peut pas être réaffichée, ici ni ailleurs.',

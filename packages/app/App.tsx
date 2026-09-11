@@ -171,7 +171,7 @@ import { Conversation } from './src/ui/Conversation'
 import { ConversationList } from './src/ui/ConversationList'
 import { Invite, type InviteStage } from './src/ui/Invite'
 import { BackupOffer } from './src/ui/BackupOffer'
-import { BackupSettings } from './src/ui/BackupSettings'
+import { BackupSettings, type BackupReading } from './src/ui/BackupSettings'
 import { Favourites } from './src/ui/Favourites'
 import { RecoveryKeyShown } from './src/ui/RecoveryKeyShown'
 import { FloatingAction } from './src/ui/FloatingAction'
@@ -424,6 +424,16 @@ export function App({
   const [favouritesOpen, setFavouritesOpen] = useState(false)
   const [backupOpen, setBackupOpen] = useState(false)
   /**
+   * Bumped by the retry on the backup screen, and read by nothing else.
+   *
+   * A counter rather than a function the screen calls: the reading is taken
+   * by an effect -- see below for why it had to become one -- and an effect
+   * is asked again by changing what it depends on. A callback would be a
+   * second way to take the same reading, which is exactly the shape that put
+   * a stale sentence on this screen once already.
+   */
+  const [attempt, setAttempt] = useState(0)
+  /**
    * The offer, and then the key it produced.
    *
    * `'offering'` draws the soft prompt; a string is the restore key, shown
@@ -456,6 +466,7 @@ export function App({
   useEffect(() => {
     if (!backupOpen || backupPrompt !== null) return
     let stale = false
+    setBackupState({ reading: 'waiting' })
     readKeyBackupState()
       .then(state => {
         // SAID EVERY TIME, for the reason the offer's own line exists: a
@@ -468,31 +479,50 @@ export function App({
           backedUp: state.backedUp,
           stale,
         })
-        if (!stale) setBackupState(state)
+        if (!stale) setBackupState({ reading: 'read', ...state })
       })
-      .catch(() => {
-        // A bridge that cannot answer leaves the screen undrawn rather than
-        // drawn wrong: every sentence on it turns on whether the backup is
-        // on.
-        if (!stale) setBackupState(null)
+      .catch((cause: unknown) => {
+        // THE CAUSE, WHICH THIS USED TO SWALLOW. An empty `catch` is how a
+        // blank page on somebody else's telephone became something nobody
+        // here could explain: the screen said nothing and so did the log.
+        logEvent('warn', 'MESSAGR_BACKUP_STATE_UNREADABLE', {
+          because: getErrorMessage(cause),
+          stale,
+        })
+        if (!stale) setBackupState({ reading: 'unreadable' })
       })
     return () => {
       stale = true
     }
-  }, [backupOpen, backupPrompt])
+    // `attempt` is here so the retry on the screen re-runs this effect. It
+    // is otherwise unused, which is the point: nothing else has to know how
+    // the reading is taken.
+  }, [backupOpen, backupPrompt, attempt])
   /**
    * What the bridge says about the backup, while that screen is open.
    *
-   * `null` means nobody has asked or the answer has not arrived. The screen
-   * is not drawn until it has one, because every sentence on it turns on
-   * whether the backup is on and a screen that guessed would say the wrong
-   * one for a second.
+   * # THREE STATES, AND THE THIRD IS WHY THIS IS NOT A NULLABLE OBJECT
+   *
+   * It was `{...} | null`, with `null` standing for both "not asked yet" and
+   * "could not be read", and the screen was drawn only when it held an
+   * object. The reasoning written here was that a screen guessing would say
+   * the wrong sentence for a second, which is true and is not what happened.
+   *
+   * What happened is a **blank white page with no way out**. The Réglages
+   * list draws only while `backupOpen` is false, so opening this screen
+   * hides it; if the reading then never arrives, nothing replaces it.
+   * Thibault found it on iOS, where the reading fails for a reason this code
+   * did not even log -- the `catch` swallowed the cause.
+   *
+   * So the screen is drawn from the moment it is opened, and it says which
+   * of the three it is. `waiting` is honest for the second the bridge takes.
+   * `unreadable` is honest for ever, and carries a way to ask again. Neither
+   * asserts anything about the backup, which was the whole point of the
+   * paragraph above.
    */
-  const [backupState, setBackupState] = useState<{
-    enabled: boolean
-    total: number
-    backedUp: number
-  } | null>(null)
+  const [backupState, setBackupState] = useState<BackupReading>({
+    reading: 'waiting',
+  })
   /**
    * The kept messages, with their words, while that screen is open.
    *
@@ -3357,70 +3387,73 @@ export function App({
               </View>
             )}
 
-            {openScope === null &&
-              tab === 'settings' &&
-              backupOpen &&
-              backupState !== null && (
-                <View style={styles.block}>
-                  <BackupSettings
-                    enabled={backupState.enabled}
-                    total={backupState.total}
-                    backedUp={backupState.backedUp}
-                    onBack={() => {
-                      setBackupOpen(false)
-                      // Dropped rather than kept: the next opening asks
-                      // again, and a value held between them would be the
-                      // screen describing a backup as it was.
-                      setBackupState(null)
-                    }}
-                    onEnable={() => {
-                      // THE DOOR A REFUSAL HONOURED FOR GOOD OWES SOMEBODY.
-                      // ADR-0013 records a refusal for ever and leaves this
-                      // row; without a way back in, that would be a decision
-                      // taken once and never revisitable.
-                      //
-                      // The same sequence the offer runs, and the same place
-                      // to show what it produced: this screen closes and the
-                      // key takes the whole surface, because it is shown
-                      // once and must not sit behind a settings row.
-                      const session = sessionClientRef.current
-                      if (session === null) return
-                      // NOTHING IS UNMOUNTED UNDER THE FINGER, and that is
-                      // not caution -- it is a defect this had.
-                      //
-                      // This closed the screen here, synchronously, inside
-                      // the press handler. React then drew the Réglages list
-                      // where the button had been, and the rest of the same
-                      // gesture landed on the row now under it: tapping
-                      // « Sauvegarder mes messages » also opened
-                      // « Informations légales », which a person would find
-                      // waiting behind the key screen. Reproduced twice on an
-                      // emulator before it was believed.
-                      //
-                      // The key screen covers everything anyway, so there is
-                      // nothing to close: `onDone` below does it, once the
-                      // finger is long gone.
-                      acceptKeyBackup(session)
-                        .then(outcome => {
-                          setBackupPrompt(
-                            outcome.accepted
-                              ? { restoreKey: outcome.restoreKey }
-                              : null,
-                          )
-                        })
-                        .catch(() => setBackupPrompt(null))
-                    }}
-                    onReplace={() => {
-                      // #220's third criterion, and it is not built yet.
-                      // Replacing makes a NEW version and retires the old
-                      // key, which is one more homeserver request than
-                      // accepting and a sentence this screen already carries
-                      // but has nothing to act on yet. Left rather than
-                      // wired to something that would half-do it.
-                    }}
-                  />
-                </View>
-              )}
+            {/* NO `backupState` IN THIS CONDITION, AND THAT IS THE FIX.
+              It read `backupState !== null`, so a reading that failed drew
+              nothing -- and the Réglages list behind it draws only while
+              `backupOpen` is false, so «nothing» was a blank white page with
+              no way back. Thibault found it on iOS. The screen now draws the
+              moment it is opened and says which of the three states it is
+              in. */}
+            {openScope === null && tab === 'settings' && backupOpen && (
+              <View style={styles.block}>
+                <BackupSettings
+                  reading={backupState}
+                  onRetry={() => setAttempt(attempt + 1)}
+                  onBack={() => {
+                    setBackupOpen(false)
+                    // Dropped rather than kept: the next opening asks
+                    // again, and a value held between them would be the
+                    // screen describing a backup as it was.
+                    setBackupState({ reading: 'waiting' })
+                  }}
+                  onEnable={() => {
+                    // THE DOOR A REFUSAL HONOURED FOR GOOD OWES SOMEBODY.
+                    // ADR-0013 records a refusal for ever and leaves this
+                    // row; without a way back in, that would be a decision
+                    // taken once and never revisitable.
+                    //
+                    // The same sequence the offer runs, and the same place
+                    // to show what it produced: this screen closes and the
+                    // key takes the whole surface, because it is shown
+                    // once and must not sit behind a settings row.
+                    const session = sessionClientRef.current
+                    if (session === null) return
+                    // NOTHING IS UNMOUNTED UNDER THE FINGER, and that is
+                    // not caution -- it is a defect this had.
+                    //
+                    // This closed the screen here, synchronously, inside
+                    // the press handler. React then drew the Réglages list
+                    // where the button had been, and the rest of the same
+                    // gesture landed on the row now under it: tapping
+                    // « Sauvegarder mes messages » also opened
+                    // « Informations légales », which a person would find
+                    // waiting behind the key screen. Reproduced twice on an
+                    // emulator before it was believed.
+                    //
+                    // The key screen covers everything anyway, so there is
+                    // nothing to close: `onDone` below does it, once the
+                    // finger is long gone.
+                    acceptKeyBackup(session)
+                      .then(outcome => {
+                        setBackupPrompt(
+                          outcome.accepted
+                            ? { restoreKey: outcome.restoreKey }
+                            : null,
+                        )
+                      })
+                      .catch(() => setBackupPrompt(null))
+                  }}
+                  onReplace={() => {
+                    // #220's third criterion, and it is not built yet.
+                    // Replacing makes a NEW version and retires the old
+                    // key, which is one more homeserver request than
+                    // accepting and a sentence this screen already carries
+                    // but has nothing to act on yet. Left rather than
+                    // wired to something that would half-do it.
+                  }}
+                />
+              </View>
+            )}
 
             {openScope === null && tab === 'settings' && favouritesOpen && (
               <View style={styles.block}>

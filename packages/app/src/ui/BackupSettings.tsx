@@ -43,6 +43,23 @@ import { NotchedButton } from './NotchedButton'
  *
  * The sentence therefore comes before the control, not after it.
  *
+ * # THREE READINGS, BECAUSE A SCREEN THAT DRAWS NOTHING IS A BLANK PAGE
+ *
+ * This took `enabled`, `total` and `backedUp` and was rendered only once its
+ * caller had them. The caller hides the Réglages list to show this, so a
+ * reading that never arrived left **a blank white page with no way back** --
+ * found by a tester on iOS, where the reading fails.
+ *
+ * It now takes the reading itself and draws all three. `waiting` asserts
+ * nothing, which was the true half of the old reasoning. `unreadable` says
+ * so and offers to ask again, because a reading that failed once is usually
+ * a reading that succeeds twice, and leaving and re-entering the screen to
+ * discover that is a thing nobody should have to guess.
+ *
+ * Neither claims the backup is on or off. That distinction -- between not
+ * knowing and knowing the answer is no -- is the whole reason this is three
+ * states and not a boolean with a spinner.
+ *
  * # THE CURRENT KEY IS NOT HERE, AND THAT IS THE POINT
  *
  * No screen in this product can show it again, including this one. Saying so
@@ -50,26 +67,42 @@ import { NotchedButton } from './NotchedButton'
  * product lost it — the key was theirs from the moment it was shown, and the
  * only thing this screen can offer is a different one.
  */
+/** What this device could learn about its backup, including nothing. */
+export type BackupReading =
+  /** Asked, and the bridge has not answered yet. */
+  | { readonly reading: 'waiting' }
+  /** Asked, and it could not be answered. Says nothing about the backup. */
+  | { readonly reading: 'unreadable' }
+  | {
+      readonly reading: 'read'
+      readonly enabled: boolean
+      /** How many message keys this device holds. */
+      readonly total: number
+      /** How many of them the homeserver has a copy of. */
+      readonly backedUp: number
+    }
+
 export function BackupSettings({
-  enabled,
-  total,
-  backedUp,
+  reading,
   onBack,
+  onRetry,
   onEnable,
   onReplace,
 }: {
-  readonly enabled: boolean
-  /** How many message keys this device holds. */
-  readonly total: number
-  /** How many of them the homeserver has a copy of. */
-  readonly backedUp: number
+  readonly reading: BackupReading
   readonly onBack: () => void
+  /** Takes the reading again. Offered only when it could not be taken. */
+  readonly onRetry: () => void
   /** Offered only when the backup is off: accepting after a refusal. */
   readonly onEnable: () => void
   /** Offered only when it is on: a new key, and the old one retired. */
   readonly onReplace: () => void
 }) {
-  const behind = enabled && backedUp < total
+  const enabled = reading.reading === 'read' && reading.enabled
+  const behind =
+    reading.reading === 'read' &&
+    reading.enabled &&
+    reading.backedUp < reading.total
 
   return (
     <View style={styles.screen} testID="backup-settings">
@@ -83,55 +116,98 @@ export function BackupSettings({
 
       <Text style={styles.title}>{t('settings_backup')}</Text>
 
-      <View
-        style={[styles.card, enabled ? styles.on : styles.off]}
-        testID="backup-settings-state">
-        <Text style={styles.body}>
-          {enabled ? t('backup_settings_on') : t('backup_settings_off')}
-        </Text>
-      </View>
+      {reading.reading === 'waiting' && (
+        <View
+          style={[styles.card, styles.unknown]}
+          testID="backup-settings-waiting">
+          <Text style={styles.body}>{t('backup_settings_reading')}</Text>
+        </View>
+      )}
+
+      {reading.reading === 'unreadable' && (
+        <View style={styles.section} testID="backup-settings-unreadable">
+          <View style={[styles.card, styles.unknown]}>
+            <Text style={styles.body}>{t('backup_settings_unreadable')}</Text>
+          </View>
+          {/* WHAT IT DOES NOT MEAN, which is the sentence that matters. A
+              reading that failed says nothing about the backup, and somebody
+              reading « impossible de lire l'état » will otherwise conclude
+              their messages stopped being kept. */}
+          <Text style={styles.note}>{t('backup_settings_unreadable_why')}</Text>
+          <NotchedButton
+            testID="backup-settings-retry"
+            label={t('backup_settings_retry')}
+            onPress={onRetry}
+            wide
+          />
+        </View>
+      )}
+
+      {reading.reading === 'read' && (
+        <View
+          style={[styles.card, enabled ? styles.on : styles.off]}
+          testID="backup-settings-state">
+          <Text style={styles.body}>
+            {enabled ? t('backup_settings_on') : t('backup_settings_off')}
+          </Text>
+          {/* WITH THE STATE AND NOT WITH THE CONTROL, which is a correction.
+              It sat in the replace section, at the same weight as the
+              sentence warning what replacing costs -- a fact about the key
+              that exists and an instruction about an action, indistinguishable
+              from each other. It belongs to the state: it is the rest of
+              « vos messages sont sauvegardés ». */}
+          {enabled && (
+            <Text style={styles.stateNote} testID="backup-settings-never-shown">
+              {t('backup_settings_never_shown')}
+            </Text>
+          )}
+        </View>
+      )}
 
       {/* Only while they differ. Two numbers that agree say nothing the
           sentence above has not already said, and a progress line that never
           goes away is a progress line nobody reads. */}
-      {behind && (
+      {behind && reading.reading === 'read' && (
         <View style={styles.section} testID="backup-settings-progress">
           <Text style={styles.count}>
-            {t('backup_settings_progress %1$d %2$d', backedUp, total)}
+            {t(
+              'backup_settings_progress %1$d %2$d',
+              reading.backedUp,
+              reading.total,
+            )}
           </Text>
           <Text style={styles.note}>{t('backup_settings_catching_up')}</Text>
         </View>
       )}
 
-      {enabled ? (
-        <View style={styles.section}>
-          {/* BEFORE THE CONTROL. Somebody who reads this after tapping has
-              been told what it costs when it has already cost it. */}
-          <Text style={styles.note} testID="backup-settings-never-shown">
-            {t('backup_settings_never_shown')}
-          </Text>
-          <Text style={styles.note}>{t('backup_settings_replace_why')}</Text>
-          <NotchedButton
-            testID="backup-settings-replace"
-            label={t('backup_settings_replace')}
-            onPress={onReplace}
-            tone="quiet"
-            wide
-          />
-        </View>
-      ) : (
-        <View style={styles.section}>
-          {/* The way back in after a refusal, which ADR-0013 requires to
-              exist precisely because the refusal is honoured for good: a
-              product that will not ask again owes a door somebody can find. */}
-          <NotchedButton
-            testID="backup-settings-enable"
-            label={t('backup_settings_enable')}
-            onPress={onEnable}
-            wide
-          />
-        </View>
-      )}
+      {reading.reading === 'read' &&
+        (enabled ? (
+          <View style={styles.section}>
+            {/* BEFORE THE CONTROL. Somebody who reads this after tapping has
+                been told what it costs when it has already cost it. */}
+            <Text style={styles.note}>{t('backup_settings_replace_why')}</Text>
+            <NotchedButton
+              testID="backup-settings-replace"
+              label={t('backup_settings_replace')}
+              onPress={onReplace}
+              tone="quiet"
+              wide
+            />
+          </View>
+        ) : (
+          <View style={styles.section}>
+            {/* The way back in after a refusal, which ADR-0013 requires to
+                exist precisely because the refusal is honoured for good: a
+                product that will not ask again owes a door somebody can
+                find. */}
+            <NotchedButton
+              testID="backup-settings-enable"
+              label={t('backup_settings_enable')}
+              onPress={onEnable}
+              wide
+            />
+          </View>
+        ))}
     </View>
   )
 }
@@ -173,9 +249,23 @@ const styles = StyleSheet.create({
     backgroundColor: color.wait['100'],
     borderLeftColor: color.wait['500'],
   },
+  // Neither green nor ochre: this is the colour of not knowing, and the two
+  // states it must not be mistaken for are the ones that do know.
+  unknown: {
+    backgroundColor: color.surface.sunk,
+    borderLeftColor: color.neutral['300'],
+  },
   body: {
     ...type.body,
     color: color.neutral['900'],
+  },
+  // Inside the state card, under the sentence it belongs to. Lighter than
+  // the sentence above it and on the same ground, so it reads as the rest of
+  // that fact rather than as a second one.
+  stateNote: {
+    ...type.caption,
+    color: color.neutral['600'],
+    marginTop: space.s,
   },
   section: {
     gap: space.s,
