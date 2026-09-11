@@ -410,16 +410,19 @@ describe('boot', () => {
     await detoxExpect(element(by.id('recovery-key-once'))).toBeVisible()
     await element(by.id('recovery-key-done')).tap()
 
-    // The state the person is left in, which is the only thing that proves
-    // the acceptance went all the way through rather than merely drawing.
+    // THE STATE THE PERSON IS LEFT IN, and the assertion that found a real
+    // defect twice before it passed.
     //
-    // WAITED FOR RATHER THAN TAPPED STRAIGHT AWAY. Dismissing the key screen
-    // unmounts an overlay and the list underneath has to lay out again; the
-    // first run of this test tapped into that gap and matched nothing.
-    await waitFor(element(by.id('settings-backup')))
-      .toBeVisible()
-      .withTimeout(30000)
-    await element(by.id('settings-backup')).tap()
+    // Dismissing the key returns to the screen that was underneath -- the
+    // backup screen itself, not the Réglages list -- and it must now say the
+    // backup is on. `backup-settings-replace` appears only in that branch,
+    // so its presence is the whole claim: the acceptance went through, the
+    // commitment was kept, and the screen behind was put right.
+    //
+    // Twice this landed on « Informations légales » instead, because closing
+    // the backup screen inside the press handler drew the Réglages list under
+    // the finger and the rest of the gesture hit the row beneath. That is
+    // fixed in `App.tsx`; this is what notices if it comes back.
     await waitFor(element(by.id('backup-settings-replace')))
       .toBeVisible()
       .withTimeout(30000)

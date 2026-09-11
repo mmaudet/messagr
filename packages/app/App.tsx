@@ -2818,7 +2818,18 @@ export function App({
               // DROPPED HERE AND NOWHERE ELSE. Leaving this screen is the
               // moment the only copy of the key stops existing in this
               // process, which is what « montrée une fois » means in code.
-              onDone={() => setBackupPrompt(null)}
+              //
+              // And whatever is behind is put right here rather than when it
+              // was left: a Réglages screen that said « vos messages ne sont
+              // pas sauvegardés » before this key existed would be lying the
+              // moment it came back into view.
+              onDone={() => {
+                setBackupPrompt(null)
+                if (!backupOpen) return
+                readKeyBackupState()
+                  .then(setBackupState)
+                  .catch(() => setBackupState(null))
+              }}
             />
           </View>
         )}
@@ -3417,8 +3428,21 @@ export function App({
                       // once and must not sit behind a settings row.
                       const session = sessionClientRef.current
                       if (session === null) return
-                      setBackupOpen(false)
-                      setBackupState(null)
+                      // NOTHING IS UNMOUNTED UNDER THE FINGER, and that is
+                      // not caution -- it is a defect this had.
+                      //
+                      // This closed the screen here, synchronously, inside
+                      // the press handler. React then drew the Réglages list
+                      // where the button had been, and the rest of the same
+                      // gesture landed on the row now under it: tapping
+                      // « Sauvegarder mes messages » also opened
+                      // « Informations légales », which a person would find
+                      // waiting behind the key screen. Reproduced twice on an
+                      // emulator before it was believed.
+                      //
+                      // The key screen covers everything anyway, so there is
+                      // nothing to close: `onDone` below does it, once the
+                      // finger is long gone.
                       acceptKeyBackup(session)
                         .then(outcome => {
                           setBackupPrompt(
