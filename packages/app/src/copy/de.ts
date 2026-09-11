@@ -554,6 +554,39 @@ export const de: Readonly<Record<CopyKey, string>> = {
     '%1$d Schlüssel sind zurück. Ihre älteren Nachrichten sind wieder lesbar.',
   restore_done_none:
     'Die Sicherung ging auf, enthielt aber keinen Schlüssel für das, was dieses Gerät zeigt.',
+  vault_title: 'Ein Schlüsseltresor, zum Aufbewahren wo Sie wollen',
+  vault_lead:
+    'Eine Datei mit den Schlüsseln zu Ihren Unterhaltungen, geschlossen durch eine eigene Passphrase.',
+  vault_standard:
+    'Es ist das Matrix-Standardformat: jeder Matrix-Client öffnet sie, Element eingeschlossen. Es ist keine Datei, die nur Messagr lesen kann.',
+  vault_worth:
+    'Diese Datei öffnet alles, was gesagt wurde. Sie ist so viel wert wie der Ort, an den Sie sie legen.',
+  vault_not_export:
+    'Es ist kein Export Ihrer Daten: ein Tresor enthält Schlüssel, ein Export enthält Nachrichten.',
+  vault_passphrase_field: 'Eine Passphrase für diese Datei',
+  vault_passphrase_hint:
+    'Anders als Ihr Wiederherstellungsschlüssel, und woanders notiert. Ohne sie geht die Datei nicht auf — auch nicht durch uns.',
+  vault_create: 'Tresor erstellen',
+  vault_working: 'Tresor wird vorbereitet…',
+  vault_failed: 'Der Tresor konnte nicht erstellt werden.',
+  vault_cancel: 'Abbrechen',
+  vault_open_title: 'Einen Schlüsseltresor öffnen',
+  vault_open_lead:
+    'Eine Datei von Messagr oder von einem anderen Matrix-Client. Sie macht die Unterhaltungen lesbar, deren Schlüssel sie enthält.',
+  vault_open_choose: 'Datei wählen',
+  vault_open_passphrase: 'Die Passphrase für diese Datei',
+  vault_open_working: 'Tresor wird geöffnet…',
+  vault_open_wrong: 'Diese Passphrase öffnet diese Datei nicht.',
+  vault_open_not_a_vault: 'Diese Datei ist kein Schlüsseltresor.',
+  vault_open_failed:
+    'Der Tresor konnte nicht geöffnet werden. Versuchen Sie es erneut.',
+  'vault_opened %1$d':
+    '%1$d Schlüssel sind zurück. Die Unterhaltungen, die sie öffnen, sind wieder lesbar.',
+  vault_opened_none:
+    'Der Tresor ging auf, enthielt aber keinen Schlüssel, den dieses Gerät nicht schon hatte.',
+  settings_vault: 'Schlüsseltresor',
+  settings_vault_hint:
+    'Eine Datei, für wen nichts auf einem Server lassen will.',
   restore_done_close: 'Schließen',
   settings_restore: 'Meine älteren Nachrichten zurückholen',
   settings_restore_hint: 'Wenn Sie Ihren Wiederherstellungsschlüssel haben.',

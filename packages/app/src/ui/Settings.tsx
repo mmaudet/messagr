@@ -41,6 +41,7 @@ export function Settings({
   onBack,
   onLegal,
   onBackup,
+  onVault,
   onFavourites,
   receipts,
   onReceipts,
@@ -65,6 +66,8 @@ export function Settings({
    * to leave a way in that can be found.
    */
   readonly onBackup: () => void
+  /** ADR-0013's second route. See the row below the backup's. */
+  readonly onVault: () => void
   /**
    * The way to the messages somebody kept.
    *
@@ -122,6 +125,20 @@ export function Settings({
         accessibilityLabel={t('settings_backup')}
         style={[styles.rowLayout, styles.divider]}>
         <Text style={styles.rowLabel}>{t('settings_backup')}</Text>
+      </Pressable>
+
+      {/* THE SECOND ROUTE OF ADR-0013, and it sits after the backup rather
+          than beside it on purpose: one is the ordinary path and the other
+          is the gesture of somebody with a reason. Presenting them as two
+          equal choices would make a recovery key look optional, which it is
+          not. */}
+      <Pressable
+        testID="settings-vault"
+        onPress={onVault}
+        accessibilityRole="button"
+        accessibilityLabel={t('settings_vault')}
+        style={[styles.rowLayout, styles.divider]}>
+        <Text style={styles.rowLabel}>{t('settings_vault')}</Text>
       </Pressable>
 
       <Pressable

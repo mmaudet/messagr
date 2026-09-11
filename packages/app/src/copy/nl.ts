@@ -542,6 +542,37 @@ export const nl: Readonly<Record<CopyKey, string>> = {
     '%1$d sleutels zijn terug. Uw oudere berichten zijn weer leesbaar.',
   restore_done_none:
     'De back-up ging open, maar bevatte geen sleutel voor wat dit apparaat toont.',
+  vault_title: 'Een sleutelkluis, te bewaren waar u wilt',
+  vault_lead:
+    'Een bestand met de sleutels van uw gesprekken, gesloten met een eigen wachtwoordzin.',
+  vault_standard:
+    'Het is het standaardformaat van Matrix: elke Matrix-client opent het, Element inbegrepen. Het is geen bestand dat alleen Messagr kan lezen.',
+  vault_worth:
+    'Dit bestand opent alles wat er gezegd is. Het is waard wat de plek waar u het bewaart waard is.',
+  vault_not_export:
+    'Het is geen export van uw gegevens: een kluis bevat sleutels, een export bevat berichten.',
+  vault_passphrase_field: 'Een wachtwoordzin voor dit bestand',
+  vault_passphrase_hint:
+    'Anders dan uw herstelsleutel, en ergens anders genoteerd. Zonder die gaat het bestand niet open — ook niet door ons.',
+  vault_create: 'Kluis aanmaken',
+  vault_working: 'Kluis wordt voorbereid…',
+  vault_failed: 'De kluis kon niet worden aangemaakt.',
+  vault_cancel: 'Annuleren',
+  vault_open_title: 'Een sleutelkluis openen',
+  vault_open_lead:
+    'Een bestand van Messagr of van een andere Matrix-client. Het maakt de gesprekken leesbaar waarvan het de sleutels bevat.',
+  vault_open_choose: 'Een bestand kiezen',
+  vault_open_passphrase: 'De wachtwoordzin van dit bestand',
+  vault_open_working: 'Kluis wordt geopend…',
+  vault_open_wrong: 'Deze wachtwoordzin opent dit bestand niet.',
+  vault_open_not_a_vault: 'Dit bestand is geen sleutelkluis.',
+  vault_open_failed: 'De kluis kon niet worden geopend. Probeer opnieuw.',
+  'vault_opened %1$d':
+    '%1$d sleutels zijn terug. De gesprekken die ze openen zijn weer leesbaar.',
+  vault_opened_none:
+    'De kluis ging open, maar bevatte geen sleutel die dit apparaat nog niet had.',
+  settings_vault: 'Sleutelkluis',
+  settings_vault_hint: 'Een bestand, voor wie niets op een server wil laten.',
   restore_done_close: 'Sluiten',
   settings_restore: 'Mijn oudere berichten terughalen',
   settings_restore_hint: 'Als u uw herstelsleutel hebt.',
