@@ -110,6 +110,22 @@ describe('every catalogue', () => {
     expect(blank).toEqual([])
   })
 
+  it('writes Uzbek in the Latin script, with no Cyrillic letter in it', () => {
+    // Uzbek is written in both alphabets and this catalogue is the Latin
+    // one, which is the official script and what a telephone sold in
+    // Uzbekistan is set to.
+    //
+    // The failure this catches is not a sentence in the wrong script --
+    // anybody would see that. It is ONE LETTER: Cyrillic а е о р с х are
+    // drawn identically to the Latin ones in every typeface. One did arrive,
+    // in `vouch_fact_invite`, while this catalogue was being written, and
+    // nothing on the screen said so. It survived every other test here.
+    const cyrillic = Object.entries(CATALOGUES.uz).filter(([, value]) =>
+      /[\u0400-\u04FF]/.test(value),
+    )
+    expect(cyrillic).toEqual([])
+  })
+
   it.each(catalogues)('%s keeps every placeholder French has', (_, book) => {
     // A placeholder dropped in translation renders a sentence with a hole in
     // it, and one invented renders a literal `%@` on somebody's screen.

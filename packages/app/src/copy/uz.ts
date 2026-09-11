@@ -203,7 +203,7 @@ export const uz: Readonly<Record<CopyKey, string>> = {
     'Bu yerda hali hech nima aytilmagan, demak uzatiladigan oʻtmish yoʻq.',
   vouch_explain_invite: 'Ular boshqa odamlarni taklif qila oladilar.',
   vouch_fact_history: 'Oʻtmish ular uchun oʻqiladigan boʻladi',
-  vouch_fact_invite: 'Ular kimnidir kiritа oladilar',
+  vouch_fact_invite: 'Ular kimnidir kirita oladilar',
   vouch_explain_final:
     'Buni qaytarib boʻlmaydi: olgan kalitlari ularda qoladi.',
   vouch_confirm: 'Ha, men bu odamga kafillik beraman',
