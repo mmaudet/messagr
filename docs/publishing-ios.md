@@ -188,6 +188,28 @@ nomme la conversation et ne nomme personne d'autre. S'il ne se passe rien, la
 première chose à regarder est le journal de sygnal — `BadDeviceToken` y
 désignerait la paire d'environnements, et non l'application.
 
+## Ce que la build écrit d'elle-même
+
+Depuis le 11 septembre 2026, une build qui part chez Apple laisse une trace. `build.sh ios` enchaîne deux choses après l'envoi, et **aucune des deux ne peut faire échouer la build** : à ce moment-là l'artefact est déjà parti, et un journal qui n'a pas été publié est une commande à relancer, pas une build à refaire.
+
+**Une release GitHub**, taguée `build-<n>`, dont les notes sont les pull requests fusionnées depuis la build précédente. Le dépôt fusionne en squash, donc `master` porte un commit par changement et son sujet est une phrase écrite pour être lue — le générateur sélectionne et met en forme, il n'invente aucune prose.
+
+Le tag nomme le produit et non un magasin : `<n>` compte les builds publiées de ce dépôt, et n'est ni le numéro de TestFlight ni le `versionCode` de Play, qui sont deux compteurs indépendants. Le magasin et son numéro sont inscrits dans le **message** du tag (`ios 25`), ce que la build suivante relit pour mesurer depuis la dernière build **du même magasin** : mesurer une release Android depuis la dernière release iOS effacerait de la liste tout ce qui est parti chez Apple entre les deux, c'est-à-dire exactement ce qu'un lecteur Android attend.
+
+**Le « What to Test » de TestFlight**, avec le même texte. Il faut qu'Apple ait fini de traiter la build, ce qui prend cinq à trente minutes ; l'attente est bornée à trente minutes et son expiration le dit plutôt que de ressembler à un problème d'identifiants. Si elle expire :
+
+```
+node scripts/testflight-notes.mjs <numéro> --notes-file .build/ios/notes-<numéro>.md
+```
+
+Le jeton est signé en ES256 par Node lui-même, sans dépendance. Le seul point à connaître est `dsaEncoding: 'ieee-p1363'` : sans lui, Node produit une signature DER qu'Apple rejette avec un message parlant d'authentification — c'est ainsi qu'on passe un après-midi à examiner une clé qui n'a rien.
+
+Pour la toute première build d'un magasin, aucun tag ne porte encore l'une des siennes, donc il n'y a rien d'où mesurer. Le script refuse plutôt que de deviner, et il faut lui donner un plancher :
+
+```
+node scripts/release-notes.mjs ios <numéro> --since <ref> --publish
+```
+
 ## Et la CI
 
 Le travail que ce document décrivait comme « à faire un jour » est fait : la

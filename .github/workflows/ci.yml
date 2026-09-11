@@ -61,6 +61,13 @@ jobs:
       - name: Assert the generated design tokens match their source
         run: yarn tokens:check
 
+      # A changelog generator that got it wrong would produce a public
+      # artefact nobody would think to doubt. It has no test file because
+      # `scripts/` has no test harness; it carries its own cases instead, and
+      # this is what makes them run.
+      - name: Assert the release notes are built the way they are meant to be
+        run: node scripts/release-notes.mjs --self-test
+
       - run: yarn lint
       - run: yarn format
       - run: yarn typecheck

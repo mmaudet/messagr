@@ -162,6 +162,25 @@ jobs:
           track: ${{ inputs.track }}
           status: completed
 
+      # WHAT WENT INTO IT, on the repository, for the same reason the iOS
+      # build does it: a track that moves without a record is a track nobody
+      # can audit. `release-notes.mjs` argues the shape.
+      #
+      # AFTER the upload, so a release never names a bundle Play refused. It
+      # is allowed to fail without failing the run: the bundle is on the
+      # track by then, and a changelog that did not publish is a command to
+      # run again.
+      - name: Publish what this build carries
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          MESSAGR_VERSION_CODE: ${{ env.MESSAGR_VERSION_CODE }}
+        run: |
+          # The tags are not fetched by `actions/checkout` at depth 1, and a
+          # generator with no tags measures from nothing.
+          git fetch --tags --quiet
+          node scripts/release-notes.mjs android "$MESSAGR_VERSION_CODE" --publish
+
       - name: Keep the key out of anything that outlives this run
         if: always()
         run: rm -f "$RUNNER_TEMP/upload.jks"
