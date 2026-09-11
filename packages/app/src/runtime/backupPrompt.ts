@@ -56,32 +56,81 @@ export interface BackupPromptStores {
 /** Any non-empty value means yes; this one says what it is. */
 const YES = 'yes'
 
-async function flag(store: SecretStore, whenUnreadable: boolean) {
+async function flag(
+  store: SecretStore,
+  whenUnreadable: boolean,
+  note: () => void,
+) {
   try {
     const held = await store.read()
     return held !== null && held !== ''
   } catch {
+    note()
     return whenUnreadable
   }
 }
 
 /**
- * Whether to offer the backup now, having read every fact it turns on.
+ * Whether to offer the backup now, having read every fact it turns on --
+ * **and the three facts themselves**.
  *
  * The screen calls this and nothing else. `offerBackup` stays the pure table
  * underneath, so the decision can be exercised without a store and the
  * gathering can be exercised without a screen.
+ *
+ * # WHY THE FACTS COME BACK AND NOT ONLY THE ANSWER
+ *
+ * Because a `false` here has four causes and they are indistinguishable from
+ * outside: already backed up, already asked, nothing received yet, or a
+ * keystore that answered none of those and fell back to its defaults. Three
+ * of those are the feature working and one is the feature absent.
+ *
+ * That is not a theoretical concern. The first device run of this prompt
+ * showed no offer, and there was no way to tell which of the four it was
+ * without rebuilding the application to add a log. Returning the facts is
+ * what lets the caller say so once, in a line a device proof can read.
  */
+export interface BackupOfferReading {
+  readonly decision: BackupOffer
+  /** Whether a commitment was found. */
+  readonly backedUp: boolean
+  readonly asked: boolean
+  readonly received: boolean
+  /**
+   * Which stores could not be read at all, if any.
+   *
+   * **This is the field that tells a working refusal from a broken one.**
+   * The defaults above are deliberately quiet, and quiet is exactly what a
+   * missing feature looks like.
+   */
+  readonly unreadable: readonly ('commitment' | 'asked' | 'received')[]
+}
+
 export async function shouldOfferBackup(
   stores: BackupPromptStores,
-): Promise<BackupOffer> {
-  const [commitment, asked, received] = await Promise.all([
-    readBackupCommitment(stores.commitment),
-    flag(stores.asked, true),
-    flag(stores.received, false),
-  ])
+): Promise<BackupOfferReading> {
+  const unreadable: ('commitment' | 'asked' | 'received')[] = []
 
-  return offerBackup({ backedUp: commitment !== null, asked, received })
+  const commitment = await readBackupCommitment(stores.commitment).catch(() => {
+    unreadable.push('commitment')
+    return null
+  })
+  const asked = await flag(stores.asked, true, () => unreadable.push('asked'))
+  const received = await flag(stores.received, false, () =>
+    unreadable.push('received'),
+  )
+
+  return {
+    decision: offerBackup({
+      backedUp: commitment !== null,
+      asked,
+      received,
+    }),
+    backedUp: commitment !== null,
+    asked,
+    received,
+    unreadable,
+  }
 }
 
 /**

@@ -776,7 +776,20 @@ export function App({
   // it would be two operations where there is one.
   useEffect(() => {
     if (conversation === null || selfUserId === '') return
-    if (!receivedFromSomebodyElse(conversation, selfUserId)) return
+    const received = receivedFromSomebodyElse(conversation, selfUserId)
+    // SAID WHETHER OR NOT IT IS TRUE, and that is the point: a prompt that
+    // never appears looks identical whether the trigger has not fired or the
+    // trigger is broken. This is the line that tells them apart, and it is
+    // what a device proof reads.
+    logEvent('info', 'MESSAGR_BACKUP_TRIGGER', {
+      received,
+      entries: conversation.length,
+      // Neither identifier is carried: §13.27 and the rule that this log
+      // never names a person. What matters is whether any sender differed
+      // from this account, and `received` is that fact.
+      readable: conversation.filter(entry => entry.body !== null).length,
+    })
+    if (!received) return
     // ONE EFFECT, NOT TWO, and that is not tidiness. Writing the flag and
     // asking whether to offer are the same moment, and two effects on the
     // same dependency would race: the one that asks could read the flag
@@ -784,12 +797,24 @@ export function App({
     // a conversation late for no reason anybody could find.
     const noteAndAsk = async () => {
       await rememberReceived(backupReceivedSecrets)
-      const asked = await shouldOfferBackup({
+      const reading = await shouldOfferBackup({
         commitment: backupSecrets,
         asked: backupAskedSecrets,
         received: backupReceivedSecrets,
       })
-      if (!asked.offer) return
+      // SAID ONCE, IN A LINE A DEVICE PROOF CAN READ. A refusal here has
+      // four causes and they look identical from outside -- three of them
+      // are the feature working and one is the feature absent. The first
+      // device run of this prompt showed nothing and there was no way to
+      // tell which, which is why this line exists.
+      logEvent('info', 'MESSAGR_BACKUP_OFFER', {
+        offer: reading.decision.offer,
+        backedUp: reading.backedUp,
+        asked: reading.asked,
+        received: reading.received,
+        unreadable: reading.unreadable.join(',') || 'none',
+      })
+      if (!reading.decision.offer) return
       // RECORDED BEFORE THE ANSWER, which `backupPrompt.ts` argues at
       // length: an offer interrupted -- the application killed, the screen
       // turned, a call arriving -- is an offer that was made, and asking
@@ -3371,16 +3396,36 @@ export function App({
                       setBackupState(null)
                     }}
                     onEnable={() => {
-                      // #220's second criterion, and it is not built yet:
-                      // accepting from here runs the same sequence the offer
-                      // does, and that sequence has nowhere to show the key
-                      // until the offer screens are wired. Left to the next
-                      // change rather than wired to something that would
-                      // make a key and drop it.
+                      // THE DOOR A REFUSAL HONOURED FOR GOOD OWES SOMEBODY.
+                      // ADR-0013 records a refusal for ever and leaves this
+                      // row; without a way back in, that would be a decision
+                      // taken once and never revisitable.
+                      //
+                      // The same sequence the offer runs, and the same place
+                      // to show what it produced: this screen closes and the
+                      // key takes the whole surface, because it is shown
+                      // once and must not sit behind a settings row.
+                      const session = sessionClientRef.current
+                      if (session === null) return
+                      setBackupOpen(false)
+                      setBackupState(null)
+                      acceptKeyBackup(session)
+                        .then(outcome => {
+                          setBackupPrompt(
+                            outcome.accepted
+                              ? { restoreKey: outcome.restoreKey }
+                              : null,
+                          )
+                        })
+                        .catch(() => setBackupPrompt(null))
                     }}
                     onReplace={() => {
-                      // Same, for the same reason: replacing shows a new key
-                      // once, and there is nowhere to show it yet.
+                      // #220's third criterion, and it is not built yet.
+                      // Replacing makes a NEW version and retires the old
+                      // key, which is one more homeserver request than
+                      // accepting and a sentence this screen already carries
+                      // but has nothing to act on yet. Left rather than
+                      // wired to something that would half-do it.
                     }}
                   />
                 </View>
