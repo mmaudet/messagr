@@ -86,8 +86,17 @@ export function Consequences({
    * means anything. Renamed on the way in, since `finally` is a keyword.
    */
   readonly finally: string
-  /** Who the gesture is about, as an identifier. */
-  readonly target: string
+  /**
+   * Who the gesture is about, as an identifier.
+   *
+   * Optional, and that is a widening rather than a convenience. Both first
+   * callers -- vouching and eviction -- are about a person, and this
+   * component was shaped as though every irreversible gesture were. Then
+   * came replacing a recovery key, which is about nobody: naming the account
+   * or the device would answer a question the screen is not asking, and a
+   * line that says the obvious is a line somebody learns to skip.
+   */
+  readonly target?: string
   readonly testID: string
   /** The actions. Passed in because only the caller knows what they say. */
   readonly children: React.ReactNode
@@ -121,7 +130,7 @@ export function Consequences({
         </Text>
       </View>
 
-      <Text style={styles.target}>{target}</Text>
+      {target !== undefined && <Text style={styles.target}>{target}</Text>}
 
       {/* THE REFUSAL IS A BUTTON OF THE SAME RANK, which is the caller's to
           honour and is written here because this is where both callers can

@@ -493,6 +493,23 @@ export const it: Readonly<Record<CopyKey, string>> = {
   backup_offer_accept: 'Salvare le mie chiavi',
   backup_offer_refuse: 'Non ora',
   backup_offer_later: 'Potrà attivarlo più tardi dalle Impostazioni.',
+  backup_replace_title: 'Sostituire la sua chiave di recupero',
+  backup_replace_lead: 'Prima di decidere, ciò che questo gesto porta via.',
+  backup_replace_fact_old: 'La vecchia chiave non aprirà più nulla',
+  backup_replace_old_body:
+    "Il backup che apriva viene tolto dal server. Se l'aveva annotata da qualche parte che non controlla più, quel foglio non vale più nulla: è proprio lo scopo.",
+  backup_replace_fact_new: 'La nuova è mostrata una sola volta',
+  backup_replace_new_body:
+    'Come la prima. Abbia a portata di mano di che annotarla prima di proseguire.',
+  backup_replace_final:
+    'I suoi messaggi restano salvati, sotto la nuova chiave. La vecchia non si ritrova.',
+  backup_replace_confirm: 'Sì, sostituire la mia chiave',
+  backup_replace_cancel: 'Annullare',
+  backup_replace_working: 'Sostituzione…',
+  backup_replace_failed:
+    'La sostituzione non è andata a buon fine e nulla è cambiato: la sua vecchia chiave apre ancora il suo backup.',
+  backup_key_old_still_opens:
+    'La vecchia chiave non è stata ritirata: apre ancora il vecchio backup. Può ricominciare dalle Impostazioni.',
   backup_key_title: 'La sua chiave di recupero',
   backup_key_lead: 'La copi adesso e la conservi in un gestore di password.',
   backup_key_once:

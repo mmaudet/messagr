@@ -503,6 +503,23 @@ export const de: Readonly<Record<CopyKey, string>> = {
   backup_offer_accept: 'Meine Schlüssel sichern',
   backup_offer_refuse: 'Jetzt nicht',
   backup_offer_later: 'Sie können es später in den Einstellungen einschalten.',
+  backup_replace_title: 'Ihren Wiederherstellungsschlüssel ersetzen',
+  backup_replace_lead: 'Bevor Sie entscheiden: was dieser Schritt mitnimmt.',
+  backup_replace_fact_old: 'Der alte Schlüssel öffnet nichts mehr',
+  backup_replace_old_body:
+    'Die Sicherung, die er öffnete, wird vom Server entfernt. Haben Sie ihn irgendwo notiert, worüber Sie keine Kontrolle mehr haben, ist dieses Blatt nun wertlos — genau darum geht es.',
+  backup_replace_fact_new: 'Der neue wird ein einziges Mal gezeigt',
+  backup_replace_new_body:
+    'Wie der erste. Halten Sie etwas zum Notieren bereit, bevor Sie fortfahren.',
+  backup_replace_final:
+    'Ihre Nachrichten bleiben gesichert, unter dem neuen Schlüssel. Der alte kommt nicht zurück.',
+  backup_replace_confirm: 'Ja, meinen Schlüssel ersetzen',
+  backup_replace_cancel: 'Abbrechen',
+  backup_replace_working: 'Wird ersetzt…',
+  backup_replace_failed:
+    'Das Ersetzen ist nicht durchgegangen, und nichts hat sich geändert: Ihr alter Schlüssel öffnet Ihre Sicherung weiterhin.',
+  backup_key_old_still_opens:
+    'Der alte Schlüssel konnte nicht zurückgezogen werden: er öffnet die alte Sicherung weiterhin. Sie können in den Einstellungen erneut beginnen.',
   backup_key_title: 'Ihr Wiederherstellungsschlüssel',
   backup_key_lead:
     'Kopieren Sie ihn jetzt und legen Sie ihn in einem Passwortmanager ab.',

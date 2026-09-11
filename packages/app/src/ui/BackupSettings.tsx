@@ -1,8 +1,9 @@
-import React from 'react'
+import React, { useState } from 'react'
 import { Pressable, StyleSheet, Text, View } from 'react-native'
 
 import { t } from '../copy'
 import { color, floors, layout, space, stroke, type } from '../design/tokens'
+import { Consequences } from './Consequences'
 import { NotchedButton } from './NotchedButton'
 
 /**
@@ -95,9 +96,21 @@ export function BackupSettings({
   readonly onRetry: () => void
   /** Offered only when the backup is off: accepting after a refusal. */
   readonly onEnable: () => void
-  /** Offered only when it is on: a new key, and the old one retired. */
+  /**
+   * Offered only when it is on: a new key, and the old one retired.
+   *
+   * Called only after the confirmation below, never from the row itself.
+   */
   readonly onReplace: () => void
 }) {
+  /**
+   * Whether the confirmation is standing between the row and the gesture.
+   *
+   * Local, because nothing outside this screen has any business knowing that
+   * somebody is halfway through thinking about it -- and because leaving the
+   * screen must abandon the question rather than remember it.
+   */
+  const [confirming, setConfirming] = useState(false)
   const enabled = reading.reading === 'read' && reading.enabled
   const behind =
     reading.reading === 'read' &&
@@ -182,18 +195,69 @@ export function BackupSettings({
 
       {reading.reading === 'read' &&
         (enabled ? (
-          <View style={styles.section}>
-            {/* BEFORE THE CONTROL. Somebody who reads this after tapping has
+          confirming ? (
+            /* THE GESTURE NOTHING TAKES BACK, IN THE FORM THIS PRODUCT
+               ALREADY HAS FOR ONE. Unlike accepting -- which `BackupOffer`
+               deliberately does NOT draw this way, because it is refusable
+               and about nobody -- replacing destroys a backup and ends a key
+               somebody may be holding on paper.
+               No `target`: it is about nobody, and `Consequences` was
+               widened for exactly this. */
+            <Consequences
+              testID="backup-replace-consequences"
+              title={t('backup_replace_title')}
+              lead={t('backup_replace_lead')}
+              facts={[
+                {
+                  testID: 'backup-replace-old',
+                  tone: 'weigh',
+                  said: t('backup_replace_fact_old'),
+                  body: t('backup_replace_old_body'),
+                },
+                {
+                  testID: 'backup-replace-new',
+                  tone: 'weigh',
+                  said: t('backup_replace_fact_new'),
+                  body: t('backup_replace_new_body'),
+                },
+              ]}
+              finally={t('backup_replace_final')}>
+              <NotchedButton
+                testID="backup-replace-confirm"
+                label={t('backup_replace_confirm')}
+                onPress={() => {
+                  // NOT CLOSED HERE. The key screen covers everything the
+                  // moment it arrives, and unmounting under the finger is
+                  // the defect `App.tsx` records at length: the rest of the
+                  // gesture lands on whatever React drew underneath.
+                  onReplace()
+                }}
+                wide
+              />
+              <NotchedButton
+                testID="backup-replace-cancel"
+                label={t('backup_replace_cancel')}
+                onPress={() => setConfirming(false)}
+                tone="quiet"
+                wide
+              />
+            </Consequences>
+          ) : (
+            <View style={styles.section}>
+              {/* BEFORE THE CONTROL. Somebody who reads this after tapping has
                 been told what it costs when it has already cost it. */}
-            <Text style={styles.note}>{t('backup_settings_replace_why')}</Text>
-            <NotchedButton
-              testID="backup-settings-replace"
-              label={t('backup_settings_replace')}
-              onPress={onReplace}
-              tone="quiet"
-              wide
-            />
-          </View>
+              <Text style={styles.note}>
+                {t('backup_settings_replace_why')}
+              </Text>
+              <NotchedButton
+                testID="backup-settings-replace"
+                label={t('backup_settings_replace')}
+                onPress={() => setConfirming(true)}
+                tone="quiet"
+                wide
+              />
+            </View>
+          )
         ) : (
           <View style={styles.section}>
             {/* The way back in after a refusal, which ADR-0013 requires to

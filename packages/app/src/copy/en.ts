@@ -494,6 +494,23 @@ export const en: Readonly<Record<CopyKey, string>> = {
   backup_offer_accept: 'Back up my keys',
   backup_offer_refuse: 'Not now',
   backup_offer_later: 'You can turn it on later from Settings.',
+  backup_replace_title: 'Replace your recovery key',
+  backup_replace_lead: 'Before you decide, what this carries away.',
+  backup_replace_fact_old: 'The old key will open nothing',
+  backup_replace_old_body:
+    'The backup it opened is taken off the server. If you wrote it down somewhere you no longer control, that piece of paper is now worth nothing — which is the point.',
+  backup_replace_fact_new: 'The new one is shown once',
+  backup_replace_new_body:
+    'As the first was. Have something to write it on before you go on.',
+  backup_replace_final:
+    'Your messages stay backed up, under the new key. The old one does not come back.',
+  backup_replace_confirm: 'Yes, replace my key',
+  backup_replace_cancel: 'Cancel',
+  backup_replace_working: 'Replacing…',
+  backup_replace_failed:
+    'The replacement did not go through, and nothing changed: your old key still opens your backup.',
+  backup_key_old_still_opens:
+    'The old key could not be retired: it still opens the old backup. You can start again from Settings.',
   backup_key_title: 'Your recovery key',
   backup_key_lead: 'Copy it now and keep it in a password manager.',
   backup_key_once:

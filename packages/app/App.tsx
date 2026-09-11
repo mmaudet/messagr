@@ -38,6 +38,7 @@ import {
   readTrust,
   removeReaction,
   acceptKeyBackup,
+  replaceKeyBackup,
   readKeyBackupState,
   resumeKeyBackup,
   startCryptoMachine,
@@ -445,7 +446,18 @@ export function App({
    * an empty field where somebody's only copy should be.
    */
   const [backupPrompt, setBackupPrompt] = useState<
-    'offering' | { readonly restoreKey: string } | null
+    | 'offering'
+    | {
+        readonly restoreKey: string
+        /**
+         * Only a replacement sets this, and only when the old version would
+         * not go. See `replaceBackup.ts`: the new key works and the old one
+         * still opens the old backup, which is the one fact somebody
+         * replacing a key they have lost track of has to be told.
+         */
+        readonly oldStillOpens?: boolean
+      }
+    | null
   >(null)
   /**
    * Reads the backup's state whenever that screen is showing and nothing is
@@ -3444,12 +3456,34 @@ export function App({
                       .catch(() => setBackupPrompt(null))
                   }}
                   onReplace={() => {
-                    // #220's third criterion, and it is not built yet.
-                    // Replacing makes a NEW version and retires the old
-                    // key, which is one more homeserver request than
-                    // accepting and a sentence this screen already carries
-                    // but has nothing to act on yet. Left rather than
-                    // wired to something that would half-do it.
+                    // #220's third criterion, built. The confirmation is
+                    // `BackupSettings`'s own -- this runs only once it has
+                    // been given.
+                    //
+                    // NOTHING IS CLOSED HERE, for the reason written above
+                    // `onEnable`: the key screen covers everything anyway,
+                    // and unmounting under the finger sends the rest of the
+                    // gesture to whatever React draws underneath.
+                    const session = sessionClientRef.current
+                    if (session === null) return
+                    replaceKeyBackup(session)
+                      .then(outcome => {
+                        setBackupPrompt(
+                          outcome.replaced
+                            ? {
+                                restoreKey: outcome.restoreKey,
+                                // CARRIED, NOT DROPPED. A replacement whose
+                                // retirement failed is a success with one
+                                // true sentence attached: the old key still
+                                // opens the old backup. Rounding that up to
+                                // « c'est fait » would tell somebody their
+                                // lost key is harmless when it is not.
+                                oldStillOpens: !outcome.oldRetired,
+                              }
+                            : null,
+                        )
+                      })
+                      .catch(() => setBackupPrompt(null))
                   }}
                 />
               </View>
@@ -4010,6 +4044,7 @@ export function App({
             edges={['top', 'bottom', 'left', 'right']}>
             <RecoveryKeyShown
               recoveryKey={backupPrompt.restoreKey}
+              oldStillOpens={backupPrompt.oldStillOpens ?? false}
               onCopy={() => Clipboard.setString(backupPrompt.restoreKey)}
               // DROPPED HERE AND NOWHERE ELSE. Leaving this screen is the
               // moment the only copy of the key stops existing in this
