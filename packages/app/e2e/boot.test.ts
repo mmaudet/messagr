@@ -378,8 +378,15 @@ describe('boot', () => {
     // run that provisions a fresh account is the only place the first
     // acceptance exists, which is here.
     //
-    // Deliberately reached WITHOUT opening a conversation, because that is
-    // the whole point of the assertion.
+    // Deliberately reached WITHOUT a conversation open, because that is the
+    // whole point of the assertion -- and the tests above leave one open, so
+    // getting out of it is the first step rather than an incidental one. The
+    // tab bar does not exist inside a conversation, which is how the first
+    // run of this test failed: `tab-settings` matched no view at all.
+    await element(by.id('conversation-back')).tap()
+    await waitFor(element(by.id('tab-settings')))
+      .toBeVisible()
+      .withTimeout(30000)
     await element(by.id('tab-settings')).tap()
     await waitFor(element(by.id('settings-backup')))
       .toBeVisible()
