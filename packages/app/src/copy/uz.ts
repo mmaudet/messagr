@@ -486,6 +486,11 @@ export const uz: Readonly<Record<CopyKey, string>> = {
   'backup_settings_progress %1$d %2$d': '%2$d tadan %1$d kalit zaxiralandi',
   backup_settings_catching_up:
     'Qolgani suhbatlar sinxronlangani sari ketadi. Bu orada hech nima yoʻqolmaydi.',
+  backup_settings_reading: 'Zaxira holati oʻqilmoqda…',
+  backup_settings_unreadable: 'Zaxira holatini bu qurilmada oʻqib boʻlmadi.',
+  backup_settings_unreadable_why:
+    'Bu zaxiraning oʻzi haqida hech nima demaydi: yoqilgan boʻlsa, hamon yoqilgan, va bu yerda hech nima oʻzgartirilmadi.',
+  backup_settings_retry: 'Qayta urinish',
   backup_settings_enable: 'Xabarlarimni zaxiralash',
   backup_settings_never_shown:
     'Joriy kalitingizni qayta koʻrsatib boʻlmaydi — na bu yerda, na boshqa joyda.',

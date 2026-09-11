@@ -470,6 +470,12 @@ export const en: Readonly<Record<CopyKey, string>> = {
   'backup_settings_progress %1$d %2$d': '%1$d keys backed up out of %2$d',
   backup_settings_catching_up:
     'The rest goes as the conversations sync. Nothing is lost in the meantime.',
+  backup_settings_reading: 'Reading the state of the backup…',
+  backup_settings_unreadable:
+    'The state of the backup could not be read on this device.',
+  backup_settings_unreadable_why:
+    'That says nothing about the backup itself: if it was on, it still is, and nothing here was changed.',
+  backup_settings_retry: 'Try again',
   backup_settings_enable: 'Back up my messages',
   backup_settings_never_shown:
     'Your current key cannot be shown again, here or anywhere else.',

@@ -478,6 +478,12 @@ export const de: Readonly<Record<CopyKey, string>> = {
   'backup_settings_progress %1$d %2$d': '%1$d von %2$d Schlüsseln gesichert',
   backup_settings_catching_up:
     'Der Rest geht mit den nächsten Abgleichen. Bis dahin geht nichts verloren.',
+  backup_settings_reading: 'Der Zustand der Sicherung wird gelesen…',
+  backup_settings_unreadable:
+    'Der Zustand der Sicherung konnte auf diesem Gerät nicht gelesen werden.',
+  backup_settings_unreadable_why:
+    'Das sagt nichts über die Sicherung selbst: war sie an, ist sie es weiterhin, und hier wurde nichts geändert.',
+  backup_settings_retry: 'Erneut versuchen',
   backup_settings_enable: 'Meine Nachrichten sichern',
   backup_settings_never_shown:
     'Ihr aktueller Schlüssel kann nicht erneut angezeigt werden, hier so wenig wie anderswo.',

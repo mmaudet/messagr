@@ -469,6 +469,12 @@ export const nl: Readonly<Record<CopyKey, string>> = {
   'backup_settings_progress %1$d %2$d': '%1$d van %2$d sleutels bewaard',
   backup_settings_catching_up:
     'De rest gaat mee met de volgende synchronisaties. Ondertussen gaat er niets verloren.',
+  backup_settings_reading: 'De staat van de back-up wordt gelezen…',
+  backup_settings_unreadable:
+    'De staat van de back-up kon op dit apparaat niet gelezen worden.',
+  backup_settings_unreadable_why:
+    'Dat zegt niets over de back-up zelf: stond die aan, dan staat die nog aan, en hier is niets veranderd.',
+  backup_settings_retry: 'Opnieuw proberen',
   backup_settings_enable: 'Mijn berichten bewaren',
   backup_settings_never_shown:
     'Uw huidige sleutel kan niet opnieuw worden getoond, hier niet en elders niet.',
