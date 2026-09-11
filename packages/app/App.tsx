@@ -2811,72 +2811,6 @@ export function App({
   return (
     <GestureHandlerRootView style={styles.root}>
       <SafeAreaProvider>
-        {/* THE ONE TIME THIS PRODUCT ASKS SOMEBODY TO KEEP A SECRET, AND
-            OFF THE ROOT FOR THE REASON THE CALL BELOW GIVES.
-            These two sat inside the conversation screen, beside the
-            full-screen photograph, and that was wrong in a way only a device
-            found: accepting from Réglages with no conversation open created
-            the backup and showed no key at all. A backup exists and nobody
-            has ever seen what opens it -- the one state this feature must
-            never reach.
-            The offer looked fine because a conversation is open by
-            construction when it fires. The acceptance from Réglages is not,
-            and it is the path a refusal honoured for good depends on.
-            A call paints over these, deliberately: it is transient and the
-            key screen is not dismissed by it, so what a person comes back to
-            after answering is the key they still have to keep. */}
-        {backupPrompt === 'offering' && (
-          <View style={StyleSheet.absoluteFill}>
-            <BackupOffer
-              onAccept={() => {
-                const session = sessionClientRef.current
-                if (session === null) {
-                  setBackupPrompt(null)
-                  return
-                }
-                acceptKeyBackup(session)
-                  .then(outcome => {
-                    // The key exists for exactly as long as this state
-                    // holds it: nothing else has a copy, here or on the
-                    // homeserver. `acceptBackup.ts` hands it back precisely
-                    // once and never on a failure.
-                    setBackupPrompt(
-                      outcome.accepted
-                        ? { restoreKey: outcome.restoreKey }
-                        : null,
-                    )
-                  })
-                  .catch(() => setBackupPrompt(null))
-              }}
-              onRefuse={() => setBackupPrompt(null)}
-            />
-          </View>
-        )}
-
-        {backupPrompt !== null && backupPrompt !== 'offering' && (
-          <View style={StyleSheet.absoluteFill}>
-            <RecoveryKeyShown
-              recoveryKey={backupPrompt.restoreKey}
-              onCopy={() => Clipboard.setString(backupPrompt.restoreKey)}
-              // DROPPED HERE AND NOWHERE ELSE. Leaving this screen is the
-              // moment the only copy of the key stops existing in this
-              // process, which is what « montrée une fois » means in code.
-              //
-              // And whatever is behind is put right here rather than when it
-              // was left: a Réglages screen that said « vos messages ne sont
-              // pas sauvegardés » before this key existed would be lying the
-              // moment it came back into view.
-              onDone={() => setBackupPrompt(null)}
-            />
-          </View>
-        )}
-
-        {/* ABOVE EVERYTHING, AND NOT INSIDE THE CONVERSATION.
-          A call outlives the screen it started on: somebody who places one
-          and then goes back to the list is still on that call, and a
-          telephone that rings only while the right conversation is open is
-          not a telephone. So it hangs off the root, drawn from the runtime's
-          own state rather than from wherever the person happens to be. */}
         {call !== null && (
           <CallScreen
             state={call.state}
@@ -3952,6 +3886,85 @@ export function App({
             )}
           </View>
         </SafeAreaView>
+
+        {/* THE ONE TIME THIS PRODUCT ASKS SOMEBODY TO KEEP A SECRET, AND
+            THE LAST CHILD OF THE ROOT SO THAT NOTHING CAN PAINT OVER IT.
+            These two sat inside the conversation screen, beside the
+            full-screen photograph, and that was wrong in a way only a device
+            found: accepting from Réglages with no conversation open created
+            the backup and showed no key at all. A backup exists and nobody
+            has ever seen what opens it -- the one state this feature must
+            never reach.
+            The offer looked fine because a conversation is open by
+            construction when it fires. The acceptance from Réglages is not,
+            and it is the path a refusal honoured for good depends on.
+            **LAST, AND THAT IS THE WHOLE OF IT.** They were moved off the
+            root and placed FIRST, which looked right and was worse than
+            where they started: `StyleSheet.absoluteFill` takes a view out of
+            the flow but not out of the paint order, so every later sibling
+            -- the entire application -- drew on top of them. The key screen
+            rendered underneath everything, a person saw the settings screen,
+            and the tap meant for « J'ai rangé ma clé » went to whatever was
+            above it. `backupPrompt` therefore never cleared.
+            Three device runs were spent on it, and what hid it is that Detox
+            matched the key anyway: Espresso's visibility asks whether a view
+            has a rectangle on screen, never whether something is standing in
+            front of it. A test can see what a person cannot.
+            A call now paints under these rather than over. That is the right
+            way round: an overlay something else can cover is not an overlay,
+            and of the two the key is the one that cannot be shown again. */}
+        {backupPrompt === 'offering' && (
+          <View style={StyleSheet.absoluteFill}>
+            <BackupOffer
+              onAccept={() => {
+                const session = sessionClientRef.current
+                if (session === null) {
+                  setBackupPrompt(null)
+                  return
+                }
+                acceptKeyBackup(session)
+                  .then(outcome => {
+                    // The key exists for exactly as long as this state
+                    // holds it: nothing else has a copy, here or on the
+                    // homeserver. `acceptBackup.ts` hands it back precisely
+                    // once and never on a failure.
+                    setBackupPrompt(
+                      outcome.accepted
+                        ? { restoreKey: outcome.restoreKey }
+                        : null,
+                    )
+                  })
+                  .catch(() => setBackupPrompt(null))
+              }}
+              onRefuse={() => setBackupPrompt(null)}
+            />
+          </View>
+        )}
+
+        {backupPrompt !== null && backupPrompt !== 'offering' && (
+          <View style={StyleSheet.absoluteFill}>
+            <RecoveryKeyShown
+              recoveryKey={backupPrompt.restoreKey}
+              onCopy={() => Clipboard.setString(backupPrompt.restoreKey)}
+              // DROPPED HERE AND NOWHERE ELSE. Leaving this screen is the
+              // moment the only copy of the key stops existing in this
+              // process, which is what « montrée une fois » means in code.
+              //
+              // And whatever is behind is put right here rather than when it
+              // was left: a Réglages screen that said « vos messages ne sont
+              // pas sauvegardés » before this key existed would be lying the
+              // moment it came back into view.
+              onDone={() => setBackupPrompt(null)}
+            />
+          </View>
+        )}
+
+        {/* ABOVE EVERYTHING, AND NOT INSIDE THE CONVERSATION.
+          A call outlives the screen it started on: somebody who places one
+          and then goes back to the list is still on that call, and a
+          telephone that rings only while the right conversation is open is
+          not a telephone. So it hangs off the root, drawn from the runtime's
+          own state rather than from wherever the person happens to be. */}
       </SafeAreaProvider>
     </GestureHandlerRootView>
   )
