@@ -4262,9 +4262,12 @@ export function App({
                 // store now; what is stale is every row derived before they
                 // arrived, and the conversation open behind this if there is
                 // one.
-                setRestorePrompt(null)
+                // THE SCREEN STAYS, and says what came back. Closing here
+                // would leave somebody who has just typed their only copy of
+                // a secret with nothing that said it worked -- and the list
+                // behind takes a moment to derive again.
                 await refreshListRef.current?.().catch(() => {})
-                return null
+                return { imported: outcome.imported }
               }}
             />
           </SafeAreaView>

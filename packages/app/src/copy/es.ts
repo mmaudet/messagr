@@ -542,6 +542,7 @@ export const es: Readonly<Record<CopyKey, string>> = {
     '%1$d claves han vuelto. Sus mensajes antiguos vuelven a ser legibles.',
   restore_done_none:
     'La copia se abrió, pero no contenía ninguna clave para lo que este dispositivo muestra.',
+  restore_done_close: 'Cerrar',
   settings_restore: 'Recuperar mis mensajes antiguos',
   settings_restore_hint: 'Si tiene su clave de recuperación.',
   back_to_newest: 'Volver al último mensaje',

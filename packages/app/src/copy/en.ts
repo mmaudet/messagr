@@ -543,6 +543,7 @@ export const en: Readonly<Record<CopyKey, string>> = {
     '%1$d keys came back. Your older messages are readable again.',
   restore_done_none:
     'The backup opened, but it held no key for anything this device is showing.',
+  restore_done_close: 'Close',
   settings_restore: 'Get my older messages back',
   settings_restore_hint: 'If you have your recovery key.',
   back_to_newest: 'Back to the latest message',

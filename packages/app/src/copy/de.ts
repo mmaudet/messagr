@@ -554,6 +554,7 @@ export const de: Readonly<Record<CopyKey, string>> = {
     '%1$d Schlüssel sind zurück. Ihre älteren Nachrichten sind wieder lesbar.',
   restore_done_none:
     'Die Sicherung ging auf, enthielt aber keinen Schlüssel für das, was dieses Gerät zeigt.',
+  restore_done_close: 'Schließen',
   settings_restore: 'Meine älteren Nachrichten zurückholen',
   settings_restore_hint: 'Wenn Sie Ihren Wiederherstellungsschlüssel haben.',
   back_to_newest: 'Zurück zur neuesten Nachricht',

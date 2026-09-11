@@ -542,6 +542,7 @@ export const it: Readonly<Record<CopyKey, string>> = {
     '%1$d chiavi sono tornate. I suoi vecchi messaggi tornano leggibili.',
   restore_done_none:
     'Il backup si è aperto, ma non conteneva nessuna chiave per ciò che questo dispositivo mostra.',
+  restore_done_close: 'Chiudere',
   settings_restore: 'Ritrovare i miei vecchi messaggi',
   settings_restore_hint: 'Se ha la sua chiave di recupero.',
   back_to_newest: 'Torna all’ultimo messaggio',

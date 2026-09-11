@@ -52,6 +52,11 @@ import { NotchedButton } from './NotchedButton'
  */
 type Refusal = 'not-a-key' | 'wrong-key' | 'failed'
 
+/** What a successful restore brought back. */
+export interface Restored {
+  readonly imported: number
+}
+
 const REFUSAL_COPY = {
   'not-a-key': 'restore_key_not_a_key',
   'wrong-key': 'restore_key_wrong',
@@ -62,13 +67,27 @@ export function RecoveryKeyEntry({
   onSubmit,
   onCancel,
 }: {
-  /** Answers the refusal, or nothing when the past came back. */
-  readonly onSubmit: (key: string) => Promise<Refusal | null>
+  /** Answers the refusal, or what came back. */
+  readonly onSubmit: (key: string) => Promise<Refusal | Restored>
   readonly onCancel: () => void
 }) {
   const [draft, setDraft] = useState('')
   const [working, setWorking] = useState(false)
   const [refused, setRefused] = useState<Refusal | null>(null)
+  /**
+   * What came back, once it has.
+   *
+   * A screen of its own rather than closing on success, because the list
+   * behind takes a moment to derive again and a screen that vanished would
+   * leave somebody who has just typed their only copy of a secret with
+   * nothing that said it worked.
+   *
+   * It also carries the one outcome that is a success and reads like a
+   * failure: a backup that opened and held no key for anything on this
+   * screen. Closing silently there would be the product claiming to have
+   * done something it did not.
+   */
+  const [restored, setRestored] = useState<Restored | null>(null)
 
   const confirm = () => {
     const key = draft.trim()
@@ -76,14 +95,42 @@ export function RecoveryKeyEntry({
     setWorking(true)
     setRefused(null)
     onSubmit(key)
-      .then(refusal => {
-        setRefused(refusal)
+      .then(answer => {
+        if (typeof answer === 'string') setRefused(answer)
+        else setRestored(answer)
         setWorking(false)
       })
       .catch(() => {
         setRefused('failed')
         setWorking(false)
       })
+  }
+
+  if (restored !== null) {
+    return (
+      <View style={styles.screen} testID="restore-done">
+        <Text style={styles.title}>{t('restore_key_title')}</Text>
+        <View
+          style={[
+            styles.refusal,
+            restored.imported > 0 ? styles.came : styles.stillWaiting,
+          ]}>
+          <Text style={styles.refusalText}>
+            {restored.imported > 0
+              ? t('restore_done %1$d', restored.imported)
+              : t('restore_done_none')}
+          </Text>
+        </View>
+        <View style={styles.actions}>
+          <NotchedButton
+            testID="restore-done-close"
+            label={t('restore_done_close')}
+            onPress={onCancel}
+            wide
+          />
+        </View>
+      </View>
+    )
   }
 
   return (
@@ -165,5 +212,15 @@ const styles = StyleSheet.create({
     borderLeftColor: color.wait['500'],
   },
   refusalText: { ...type.bodySm, color: color.neutral['900'] },
+  // Green once, on the one screen of this flow where something went right.
+  // Invariant 3 spends it on the strongest state and nowhere else.
+  came: {
+    backgroundColor: color.brand.green100,
+    borderLeftColor: color.brand.green500,
+  },
+  // The ochre `refusal` already carries: a backup that opened and held
+  // nothing for this screen is not a failure and not a success, and it is
+  // the state that must not be dressed as either.
+  stillWaiting: {},
   actions: { marginTop: space.m, gap: space.s },
 })

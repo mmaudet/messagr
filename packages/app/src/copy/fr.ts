@@ -787,6 +787,7 @@ export const fr = {
     '%1$d clés sont revenues. Vos anciens messages redeviennent lisibles.',
   restore_done_none:
     "La sauvegarde s'est ouverte, mais elle ne contenait aucune clé pour ce que cet appareil affiche.",
+  restore_done_close: 'Fermer',
   settings_restore: 'Retrouver mes anciens messages',
   settings_restore_hint: 'Si vous avez votre clé de récupération.',
   back_to_newest: 'Revenir au dernier message',

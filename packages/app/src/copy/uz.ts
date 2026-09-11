@@ -558,6 +558,7 @@ export const uz: Readonly<Record<CopyKey, string>> = {
     '%1$d ta kalit qaytdi. Eski xabarlaringiz yana oʻqiladigan boʻldi.',
   restore_done_none:
     'Zaxira ochildi, ammo unda bu qurilma koʻrsatayotgan narsa uchun birorta kalit yoʻq edi.',
+  restore_done_close: 'Yopish',
   settings_restore: 'Eski xabarlarimni qaytarish',
   settings_restore_hint: 'Agar tiklash kalitingiz boʻlsa.',
   back_to_newest: 'Oxirgi xabarga qaytish',

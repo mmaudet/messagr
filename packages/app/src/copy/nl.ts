@@ -542,6 +542,7 @@ export const nl: Readonly<Record<CopyKey, string>> = {
     '%1$d sleutels zijn terug. Uw oudere berichten zijn weer leesbaar.',
   restore_done_none:
     'De back-up ging open, maar bevatte geen sleutel voor wat dit apparaat toont.',
+  restore_done_close: 'Sluiten',
   settings_restore: 'Mijn oudere berichten terughalen',
   settings_restore_hint: 'Als u uw herstelsleutel hebt.',
   back_to_newest: 'Terug naar het nieuwste bericht',
