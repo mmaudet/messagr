@@ -412,6 +412,13 @@ describe('boot', () => {
 
     // The state the person is left in, which is the only thing that proves
     // the acceptance went all the way through rather than merely drawing.
+    //
+    // WAITED FOR RATHER THAN TAPPED STRAIGHT AWAY. Dismissing the key screen
+    // unmounts an overlay and the list underneath has to lay out again; the
+    // first run of this test tapped into that gap and matched nothing.
+    await waitFor(element(by.id('settings-backup')))
+      .toBeVisible()
+      .withTimeout(30000)
     await element(by.id('settings-backup')).tap()
     await waitFor(element(by.id('backup-settings-replace')))
       .toBeVisible()
