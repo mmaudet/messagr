@@ -41,7 +41,7 @@ import { TabIcon } from './TabIcon'
  *
  * The identity's set has no bin and no clipboard, and `TabIcon` is explicit
  * that an icon invented in a component is one the identity never agreed to.
- * Two words also survive translation into six languages without anybody
+ * Two words also survive translation into every language without anybody
  * guessing at a pictogram, and they read aloud correctly for free.
  */
 export function SelectionBar({

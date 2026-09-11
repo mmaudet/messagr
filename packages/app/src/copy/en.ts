@@ -85,7 +85,7 @@ export const en: Readonly<Record<CopyKey, string>> = {
   settings_section_account_note:
     'What identifies you, and what lets you come back.',
   settings_row_lang_label: 'App language',
-  settings_row_lang_hint: 'English · six languages, chosen at first launch',
+  settings_row_lang_hint: 'English · seven languages, chosen at first launch',
   settings_row_recovery_label: 'Account recovery',
   settings_row_recovery_hint:
     'Recovery key · confirmation by someone close, PIN vault (V1.1) · no escrow: nobody else holds a copy',

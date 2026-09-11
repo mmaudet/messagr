@@ -73,7 +73,8 @@ export const nl: Readonly<Record<CopyKey, string>> = {
   settings_section_account_note:
     'Wat u identificeert, en wat u laat terugkeren.',
   settings_row_lang_label: 'Taal van de app',
-  settings_row_lang_hint: 'Nederlands · zes talen, gekozen bij de eerste start',
+  settings_row_lang_hint:
+    'Nederlands · zeven talen, gekozen bij de eerste start',
   settings_row_recovery_label: 'Accountherstel',
   settings_row_recovery_hint:
     'Herstelsleutel · bevestiging door iemand die u na staat, pincodekluis (V1.1) · geen bewaargeving: niemand anders houdt de sleutel van uw berichten',

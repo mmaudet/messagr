@@ -7,6 +7,13 @@
  * languages of the flows this product is built for, and they are the six the
  * identity has always named.
  *
+ * Uzbek is the seventh and it does not belong to that list. It was asked for,
+ * and the reason it could be granted in an afternoon is the property below:
+ * a screen holds no text, so a language is a catalogue and not a rewrite.
+ * Recording that it arrived by request rather than by the same reasoning as
+ * the other six keeps the paragraph above honest — and keeps the next person
+ * from reading a strategy into it that was never there.
+ *
  * # A flag and an endonym, not a flag alone
  *
  * A flag names a country and not a language — Deutsch is not only Germany's,
@@ -26,6 +33,7 @@ export const LANGUAGES = [
   { code: 'es', flag: '🇪🇸', endonym: 'Español' },
   { code: 'it', flag: '🇮🇹', endonym: 'Italiano' },
   { code: 'nl', flag: '🇳🇱', endonym: 'Nederlands' },
+  { code: 'uz', flag: '🇺🇿', endonym: 'Oʻzbekcha' },
 ] as const
 
 export type Language = (typeof LANGUAGES)[number]['code']
