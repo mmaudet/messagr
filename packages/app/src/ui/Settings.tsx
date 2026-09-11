@@ -40,6 +40,7 @@ import { LanguagePicker } from './LanguagePicker'
 export function Settings({
   onBack,
   onLegal,
+  onBackup,
   onFavourites,
   receipts,
   onReceipts,
@@ -55,6 +56,15 @@ export function Settings({
 }: {
   readonly onBack: () => void
   readonly onLegal: () => void
+  /**
+   * The way to the state of the key backup.
+   *
+   * ADR-0013 puts it here and nowhere else: after the one soft prompt, *« une
+   * ligne dans Réglages et rien d'autre »*. It is also the door a refusal
+   * honoured for good owes somebody — a product that will not ask again has
+   * to leave a way in that can be found.
+   */
+  readonly onBackup: () => void
   /**
    * The way to the messages somebody kept.
    *
@@ -100,6 +110,18 @@ export function Settings({
         accessibilityLabel={t('settings_favourites')}
         style={styles.row}>
         <Text style={styles.rowLabel}>{t('settings_favourites')}</Text>
+      </Pressable>
+
+      {/* Above the legal row: this one is about whether somebody keeps
+          their messages, and the rows are in the order of what a person came
+          looking for. */}
+      <Pressable
+        testID="settings-backup"
+        onPress={onBackup}
+        accessibilityRole="button"
+        accessibilityLabel={t('settings_backup')}
+        style={styles.row}>
+        <Text style={styles.rowLabel}>{t('settings_backup')}</Text>
       </Pressable>
 
       <Pressable

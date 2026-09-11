@@ -30,7 +30,7 @@
     "react-native-image-picker": "^8.2.1",
     "react-native-incall-manager": "4.2.2",
     "react-native-keychain": "10",
-    "react-native-matrix-crypto": "^0.6.0",
+    "react-native-matrix-crypto": "^0.7.0",
     "react-native-safe-area-context": "^5.5.2",
     "react-native-svg": "15.15.5",
     "react-native-webrtc": "124.0.8",

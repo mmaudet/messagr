@@ -326,6 +326,108 @@ describe('boot', () => {
     await detoxExpect(element(by.text(written))).toBeVisible()
   })
 
+  it('grows the field while typing, and shrinks it when the message goes', async () => {
+    // THIBAULT'S REPORT, 10 SEPTEMBER 2026, FROM AN iOS BUILD: the field does
+    // not grow while typing, and grows after sending. Two halves of one
+    // mechanism, and the reason this assertion is written before the fix is
+    // that a composer's height is not something any unit test in this
+    // repository can see.
+    //
+    // It runs on Android because that is where this suite runs. It is
+    // therefore NOT a proof of the iOS report -- it is the guard on the other
+    // platform, which is where the code being changed came from: `grown`
+    // exists because a Pixel kept a three-line bar over an empty field. A fix
+    // for iOS that quietly broke that is the failure this test exists to
+    // catch, and without it the only way to find out would be a second
+    // report from a second person.
+    const field = element(by.id('conversation-input'))
+
+    const empty = (await field.getAttributes()) as { height: number }
+    await field.replaceText(
+      ['un', 'deux', 'trois', 'quatre'].join('\n') + ` ${Date.now()}`,
+    )
+    const filled = (await field.getAttributes()) as { height: number }
+
+    expect(filled.height).toBeGreaterThan(empty.height)
+
+    await element(by.id('composer-send')).tap()
+    // Back to where it started. Not "smaller than filled": a bar that went
+    // from four lines to three over an empty field would satisfy that and is
+    // exactly the defect. The tolerance is a point, for rounding between the
+    // measured content height and the frame it is given.
+    await waitFor(element(by.id('composer-record')))
+      .toBeVisible()
+      .withTimeout(30000)
+    const after = (await field.getAttributes()) as { height: number }
+
+    expect(Math.abs(after.height - empty.height)).toBeLessThanOrEqual(1)
+  })
+
+  it('shows the recovery key when a backup is accepted from Réglages', async () => {
+    // THE PATH THAT BROKE, AND THE ONE PLACE IT CAN BE TESTED.
+    //
+    // These two screens hung inside the conversation screen, beside the
+    // full-screen photograph. The offer never showed the fault, because a
+    // conversation is open by construction when it fires. Accepting from
+    // Réglages is not: on iOS, with no conversation open, the backup was
+    // created and **no key was ever shown** -- a backup existing that nobody
+    // can open, which is the one state this feature must never reach.
+    //
+    // It cannot be re-tested by hand afterwards, and that is the feature
+    // working rather than a gap: the key is shown once and never again. A
+    // run that provisions a fresh account is the only place the first
+    // acceptance exists, which is here.
+    //
+    // Deliberately reached WITHOUT a conversation open, because that is the
+    // whole point of the assertion -- and the tests above leave one open, so
+    // getting out of it is the first step rather than an incidental one. The
+    // tab bar does not exist inside a conversation, which is how the first
+    // run of this test failed: `tab-settings` matched no view at all.
+    await element(by.id('conversation-back')).tap()
+    await waitFor(element(by.id('tab-settings')))
+      .toBeVisible()
+      .withTimeout(30000)
+    await element(by.id('tab-settings')).tap()
+    await waitFor(element(by.id('settings-backup')))
+      .toBeVisible()
+      .withTimeout(30000)
+    await element(by.id('settings-backup')).tap()
+
+    await waitFor(element(by.id('backup-settings-enable')))
+      .toBeVisible()
+      .withTimeout(30000)
+    await element(by.id('backup-settings-enable')).tap()
+
+    // Generous: this makes a key, publishes a version to the homeserver,
+    // writes the commitment to the keystore and enables the bridge.
+    await waitFor(element(by.id('recovery-key-value')))
+      .toBeVisible()
+      .withTimeout(60000)
+
+    // AND IT SAYS IT WILL NOT BE SHOWN AGAIN, BEFORE THE BUTTON THAT LEAVES.
+    // A person who reads that after tapping has been told something they can
+    // no longer act on.
+    await detoxExpect(element(by.id('recovery-key-once'))).toBeVisible()
+    await element(by.id('recovery-key-done')).tap()
+
+    // THE STATE THE PERSON IS LEFT IN, and the assertion that found a real
+    // defect twice before it passed.
+    //
+    // Dismissing the key returns to the screen that was underneath -- the
+    // backup screen itself, not the Réglages list -- and it must now say the
+    // backup is on. `backup-settings-replace` appears only in that branch,
+    // so its presence is the whole claim: the acceptance went through, the
+    // commitment was kept, and the screen behind was put right.
+    //
+    // Twice this landed on « Informations légales » instead, because closing
+    // the backup screen inside the press handler drew the Réglages list under
+    // the finger and the rest of the gesture hit the row beneath. That is
+    // fixed in `App.tsx`; this is what notices if it comes back.
+    await waitFor(element(by.id('backup-settings-replace')))
+      .toBeVisible()
+      .withTimeout(30000)
+  })
+
   /** The pump, narrowed. A launch that never ran one is a failure to say so. */
   function ranPump() {
     const { pump } = report

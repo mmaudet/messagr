@@ -68,7 +68,9 @@ defeats the keystore now gets the _account_ rather than a session. ADR-0008
 is what stands behind it: the entry is `ThisDeviceOnly`, so it does not
 travel to another device and does not restore from a backup.
 
-**It is not a key backup and does not become one.** The past stays
+**It is not a key backup and does not become one.** ADR-0013 is the one that
+is, and the two are worth telling apart: this decision gets somebody back
+_in_, that one gets back what was _said_. The past stays
 unreadable: room keys went with the store, and nothing here brings them
 back. Both outcomes say so on the screen rather than leaving somebody to
 discover it — coming back as a new device is the good outcome and is still a

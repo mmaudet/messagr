@@ -693,6 +693,52 @@ export const fr = {
   // them already had a conversation.
   list_nobody_joined: 'Personne n’a rejoint cette conversation',
   invite_open: 'Inviter quelqu’un',
+  // --- La sauvegarde des clés (ADR-0013) ------------------------------------
+  //
+  // Aucune de ces phrases ne parle de chiffrement, et c'est délibéré. La
+  // promesse « Chiffrée de bout en bout, sans réglage » porte sur le
+  // chiffrement, qui reste automatique ; ce qui devient un choix ici, c'est
+  // la durabilité. Un écran qui expliquerait le chiffrement à l'endroit où
+  // l'on accepte ou refuse quelque chose ferait croire qu'on peut le régler.
+  // --- Réglages : l'état de la sauvegarde (#220, ADR-0013) ------------------
+  //
+  // Une ligne, et rien d'autre. ADR-0013 : « un produit qui harcèle sur la
+  // sécurité apprend surtout à ignorer ses propres avertissements ». Aucun
+  // bandeau ne réapparaît ailleurs dans l'application.
+  settings_backup: 'Sauvegarde des messages',
+  backup_settings_on:
+    'Vos messages sont sauvegardés sur le serveur, fermés par votre clé de récupération.',
+  backup_settings_off:
+    'Vos messages ne sont pas sauvegardés. Réinstaller Messagr perdrait tout ce qui a été dit.',
+  'backup_settings_progress %1$d %2$d': '%1$d clés sauvegardées sur %2$d',
+  backup_settings_catching_up:
+    'Le reste part au fil des synchronisations. Rien n’est perdu en attendant.',
+  backup_settings_enable: 'Sauvegarder mes messages',
+  backup_settings_never_shown:
+    'Votre clé actuelle ne peut pas être réaffichée, ici ni ailleurs.',
+  backup_settings_replace: 'Remplacer ma clé de récupération',
+  backup_settings_replace_why:
+    'À faire si vous avez perdu votre clé ou l’avez mal notée. Une nouvelle clé sera affichée une seule fois, et l’ancienne cessera d’ouvrir quoi que ce soit.',
+  backup_offer_title: 'Retrouver vos messages si vous perdez ce téléphone',
+  backup_offer_lead:
+    'Les clés qui ouvrent vos conversations n’existent que sur cet appareil. Messagr peut en garder une copie sur le serveur, fermée par une clé que vous seul détenez.',
+  backup_offer_loss:
+    'Sans elle, réinstaller Messagr perd tout ce qui a été dit. Le compte revient, les messages restent illisibles.',
+  backup_offer_scope:
+    'La sauvegarde garde les messages. Les noms que vous donnez, vos favoris et vos repères de lecture restent sur cet appareil et disparaissent avec lui.',
+  backup_offer_trust:
+    'Le serveur ne peut pas lire la sauvegarde. Il ne peut pas non plus prouver qu’on n’y a rien remplacé : qui obtiendrait votre compte ou le serveur pourrait y glisser d’autres clés sans que rien ne le signale.',
+  backup_offer_accept: 'Sauvegarder mes clés',
+  backup_offer_refuse: 'Pas maintenant',
+  backup_offer_later: 'Vous pourrez l’activer plus tard depuis Réglages.',
+  backup_key_title: 'Votre clé de récupération',
+  backup_key_lead:
+    'Copiez-la maintenant et rangez-la dans un gestionnaire de mots de passe.',
+  backup_key_once:
+    'Elle ne sera plus jamais affichée. Sans elle, la sauvegarde ne s’ouvre pas.',
+  backup_key_copy: 'Copier la clé',
+  backup_key_copied: 'Clé copiée.',
+  backup_key_done: 'J’ai rangé ma clé',
   back_to_newest: 'Revenir au dernier message',
 } as const
 

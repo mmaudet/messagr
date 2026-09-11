@@ -96,6 +96,44 @@ export const recoverySecrets = keychainStore('eu.messagr.recovery')
  */
 export const pushkeySecrets = keychainStore('eu.messagr.pushkey')
 
+/**
+ * What this device needs in order to keep writing to its key backup: the
+ * sealing key and the version, as one value. See backupCommitment.ts.
+ *
+ * Its own entry rather than a field of the session, for `recoverySecrets`'
+ * reason one level along: the session is what restores this account, and a
+ * value rewritten whenever a backup version changes has no business sharing
+ * an entry with the credential whose loss is the loss of the account.
+ *
+ * **The restore key is not here, and is nowhere.** ADR-0013 keeps only the
+ * public half on the device — it encrypts and cannot decrypt, so whoever
+ * defeats this keystore gets the ability to add to a backup they still
+ * cannot read. The secret is shown once and leaves.
+ */
+export const backupSecrets = keychainStore('eu.messagr.backup')
+
+/**
+ * Whether this device has ever put the backup question. See backupPrompt.ts:
+ * a refusal is recorded for good, so this is what stops the product asking
+ * twice.
+ *
+ * Its own entry rather than a field beside the commitment, because the two
+ * are written at unrelated moments by unrelated code and either can be true
+ * without the other: sharing one would let a message arriving rewrite the
+ * record of what somebody answered.
+ */
+export const backupAskedSecrets = keychainStore('eu.messagr.backup-asked')
+
+/**
+ * Whether a message from somebody else has ever arrived on this device.
+ *
+ * Received, not sent, and `offerBackup.ts` carries the reason: sending
+ * proves the account works, receiving is the first time this device holds a
+ * key nobody else has. Not a secret; here because `SecretStore` is the only
+ * durable per-device store this application has.
+ */
+export const backupReceivedSecrets = keychainStore('eu.messagr.backup-received')
+
 /** Where the crypto store's passphrase lives. See cryptoMachineConfig.ts. */
 export const cryptoStoreSecrets = keychainStore('eu.messagr.crypto-store')
 

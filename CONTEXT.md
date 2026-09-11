@@ -198,13 +198,39 @@ participant; the `:server` suffix is never imposed on screen.
 A secondary device attached to an account, desktop companions included. A
 device never appears quietly: verified contacts see it arrive.
 
-**Recovery bundle**:
-The product-facing artifact that restores encrypted account continuity.
-_Avoid_: Backup, export, vault
+**Recovery key**:
+The generated 256-bit secret that opens a key backup, shown once in Matrix's
+base58 form and never shown again. It can be replaced, which retires the old
+one.
+_Avoid_: Password, passphrase, code — a passphrase is chosen by a person and
+derived from; this is generated and is the key itself
+_In the bridge it is called_ `restoreKey`, and the difference is deliberate
+rather than drift: `react-native-matrix-crypto` already owns `recoveryKey`
+for the **secret storage** key that `createRecovery` produces, which opens an
+account's private signing keys and is a different secret with the same shape.
+A library serving many products has to keep them apart; this product holds
+only one of the two and calls it what its users will understand.
+
+**Key backup**:
+The account's room keys kept on the homeserver, encrypted by the recovery key
+the server never holds. Off until accepted. It restores readability, never a
+message store.
+_Avoid_: Recovery bundle, vault, sync
+
+**Key vault**:
+The exported file of room keys, in Matrix's own format and under a passphrase
+of its own, readable by any Matrix client. The second route for somebody who
+wants no key material on a server.
+_Avoid_: Backup, export, archive
 
 **Data export**:
 The GDPR archive, produced on the device and readable elsewhere. It restores
-nothing, and is not a recovery bundle.
+nothing and is not a key vault: **the vault holds keys, the export holds
+messages.** Somebody handed a file of keys has not received their data.
+
+**Recovery bundle**:
+Retired. It named one artifact when there was one; there are now three, and
+each is named above.
 
 ### Design
 

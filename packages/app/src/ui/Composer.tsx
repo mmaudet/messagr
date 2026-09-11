@@ -51,6 +51,52 @@ import { TabIcon } from './TabIcon'
  * conversation off the top of its own screen, which is the failure mode of
  * every composer that forgets to stop.
  *
+ * **The field measures itself and this component sets no height.** It used
+ * to: a `grown` state fed from `onContentSizeChange` and written back as an
+ * explicit `height`. That state caused a report from iOS on 10 September
+ * 2026 -- *« le composeur ne grandit pas pendant la frappe et grandit après
+ * l'envoi »* -- and both halves have one cause, which is in React Native's
+ * source rather than in a guess.
+ *
+ * On the new architecture iOS emits `onContentSizeChange` **only from
+ * `updateLayoutMetrics:`** (`RCTTextInputComponentView.mm`, the
+ * `CGSizeEqualToSize` guard). An explicit height freezes the layout, so the
+ * metrics stop changing, so the event that would have grown the field is
+ * killed by what it itself produced. Sending removed the height, the layout
+ * moved again, and the event fired at last -- carrying a measurement for
+ * text that had just gone.
+ *
+ * Nothing is needed in its place. `BaseTextInputShadowNode::measureContent`
+ * runs the attributed string through the text layout manager and clamps the
+ * result to the layout constraints, so an unpinned field sizes itself and
+ * `maxHeight` in `styles.input` is the only bound it needs.
+ *
+ * # WHY REMOVING IT DOES NOT BRING BACK THE PIXEL'S BUG
+ *
+ * The state was introduced because a Pixel *« gardait une barre de trois
+ * lignes au-dessus d'un champ vide »*, and removing something that was put
+ * there for a reason deserves more than an argument.
+ *
+ * Measured on an Android emulator on 11 September 2026, through
+ * `uiautomator dump` so the numbers are the view's own rather than an
+ * impression: with the height pinned the field reads 95 pixels empty and 210
+ * with eighty characters in it; **with the pinning removed it reads 98 and
+ * 210**. Android grows either way, so the pin was buying nothing there.
+ *
+ * The first attempt at that measurement said the opposite -- 98 and 98, no
+ * growth at all -- and it was wrong: `adb shell input text` silently
+ * truncates a long string, so the field being measured held nine characters
+ * rather than eighty. It was caught by running the *unchanged* code through
+ * the same apparatus and getting the same wrong answer. A control is what
+ * turned a plausible finding into a broken measurement, and it is worth
+ * recording that it was nearly believed.
+ *
+ * The half that hand-driving could not reach is what happens after the
+ * message goes, because the send button stops responding once the
+ * application is driven through a development bundle. `e2e/boot.test.ts`
+ * asserts it instead, on a real build: four lines typed, sent, and the
+ * height back within a point of where it started.
+ *
  * # No paperclip
  *
  * Attachments beyond photographs are #111 -- an `m.file` is not an `m.image`
@@ -108,21 +154,6 @@ export function Composer({
   readonly onAttach?: () => void
 }) {
   const [draft, setDraft] = useState('')
-  /**
-   * How tall the field has grown, in points, or `null` for its own minimum.
-   *
-   * # WHY THE HEIGHT IS HELD HERE AND NOT LEFT TO THE NATIVE VIEW
-   *
-   * A `multiline` field measures itself from its content and keeps what it
-   * measured. Emptying `value` does not make it measure again -- so after a
-   * message with a line break in it, or simply a long one, the bar stayed
-   * three lines tall over an empty field, and only shrank when somebody
-   * typed the next character. Reported from the Pixel in both forms.
-   *
-   * Holding the height makes sending able to reset it, which is the only
-   * moment that knows the field is empty on purpose.
-   */
-  const [grown, setGrown] = useState<number | null>(null)
   const [emojiOpen, setEmojiOpen] = useState(false)
   const [whyDisabled, setWhyDisabled] = useState(false)
   // THE LIGHT PALETTE, NOT THE SYSTEM'S THEME.
@@ -144,9 +175,6 @@ export function Composer({
     const body = draft.trim()
     if (body === '') return
     setDraft('')
-    // Back to one line, with the text that made it taller. Anything else
-    // leaves a bar sized for a message that has gone.
-    setGrown(null)
     setEmojiOpen(false)
     onSend(body)
   }
@@ -226,20 +254,12 @@ export function Composer({
             textAlignVertical="top"
             placeholder={t('message_placeholder')}
             placeholderTextColor={palette.neutral['400']}
-            // MEASURED BY THE FIELD, BOUNDED HERE. `TALLEST_FIELD` is the
-            // ceiling and the field's own minimum is the floor; between them
-            // it grows with what is typed. Reset by `send`, which is the one
-            // moment that knows the emptiness is deliberate.
-            onContentSizeChange={event =>
-              setGrown(event.nativeEvent.contentSize.height)
-            }
-            style={[
-              styles.input,
-              { color: palette.neutral['900'] },
-              grown === null
-                ? null
-                : { height: Math.min(grown, TALLEST_FIELD) },
-            ]}
+            // NO HEIGHT AND NO `onContentSizeChange`. The field measures
+            // itself; `maxHeight` in `styles.input` is the only bound it is
+            // given. See the note at the top of this file for what stood
+            // here, what it cost on iOS, and the measurement that says
+            // removing it is safe on Android.
+            style={[styles.input, { color: palette.neutral['900'] }]}
           />
 
           {onAttach !== undefined && (

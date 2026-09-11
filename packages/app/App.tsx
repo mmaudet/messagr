@@ -37,6 +37,9 @@ import {
   sendReadReceipt,
   readTrust,
   removeReaction,
+  acceptKeyBackup,
+  readKeyBackupState,
+  resumeKeyBackup,
   startCryptoMachine,
   enterAnyInvitations,
   startLiveSync,
@@ -71,6 +74,9 @@ import {
   storeDirectorySecrets,
   termsSecrets,
   pushkeySecrets,
+  backupAskedSecrets,
+  backupReceivedSecrets,
+  backupSecrets,
   wakeSecrets,
   promiseSecrets,
   receiptSecrets,
@@ -120,7 +126,13 @@ import {
   type Favourites as FavouritesPage,
 } from './src/runtime/favouriteStore'
 import { forgetfulReadBy, type ReadBy } from './src/runtime/readByStore'
+import {
+  rememberBackupAsked,
+  rememberReceived,
+  shouldOfferBackup,
+} from './src/runtime/backupPrompt'
 import { readFavourites, type KeptMessage } from './src/runtime/readFavourites'
+import { receivedFromSomebodyElse } from './src/runtime/receivedFromSomebodyElse'
 import {
   canCopy,
   canFavourite,
@@ -158,7 +170,10 @@ import type { HistoryClaim } from './src/runtime/claimHistory'
 import { Conversation } from './src/ui/Conversation'
 import { ConversationList } from './src/ui/ConversationList'
 import { Invite, type InviteStage } from './src/ui/Invite'
+import { BackupOffer } from './src/ui/BackupOffer'
+import { BackupSettings } from './src/ui/BackupSettings'
 import { Favourites } from './src/ui/Favourites'
+import { RecoveryKeyShown } from './src/ui/RecoveryKeyShown'
 import { FloatingAction } from './src/ui/FloatingAction'
 import { Header } from './src/ui/Header'
 import { Composer } from './src/ui/Composer'
@@ -407,6 +422,77 @@ export function App({
   )
   const [legalOpen, setLegalOpen] = useState(false)
   const [favouritesOpen, setFavouritesOpen] = useState(false)
+  const [backupOpen, setBackupOpen] = useState(false)
+  /**
+   * The offer, and then the key it produced.
+   *
+   * `'offering'` draws the soft prompt; a string is the restore key, shown
+   * once. `null` is every other moment, which is almost all of them.
+   *
+   * One value rather than two flags because the three states are exclusive
+   * and the middle one carries a secret: two booleans would make
+   * "showing the key with no key" representable, and that is a screen with
+   * an empty field where somebody's only copy should be.
+   */
+  const [backupPrompt, setBackupPrompt] = useState<
+    'offering' | { readonly restoreKey: string } | null
+  >(null)
+  /**
+   * Reads the backup's state whenever that screen is showing and nothing is
+   * covering it.
+   *
+   * **An effect rather than a read at each place that opens the screen**, and
+   * that is a correction rather than a preference. It was two reads -- one in
+   * the row that opens, one when the key screen was dismissed -- and the
+   * second depended on a value captured when its closure was created. A
+   * device run caught it: after accepting, the screen behind still said « vos
+   * messages ne sont pas sauvegardés » about a backup the homeserver had
+   * already acknowledged, because the reading was the one taken before the
+   * acceptance.
+   *
+   * Keyed on the prompt as well as the screen, so dismissing the key is
+   * itself what asks again. Nothing has to remember to.
+   */
+  useEffect(() => {
+    if (!backupOpen || backupPrompt !== null) return
+    let stale = false
+    readKeyBackupState()
+      .then(state => {
+        // SAID EVERY TIME, for the reason the offer's own line exists: a
+        // screen showing the wrong branch and a screen showing the right one
+        // are indistinguishable from outside, and this is the line that says
+        // which the bridge actually answered.
+        logEvent('info', 'MESSAGR_BACKUP_STATE', {
+          enabled: state.enabled,
+          total: state.total,
+          backedUp: state.backedUp,
+          stale,
+        })
+        if (!stale) setBackupState(state)
+      })
+      .catch(() => {
+        // A bridge that cannot answer leaves the screen undrawn rather than
+        // drawn wrong: every sentence on it turns on whether the backup is
+        // on.
+        if (!stale) setBackupState(null)
+      })
+    return () => {
+      stale = true
+    }
+  }, [backupOpen, backupPrompt])
+  /**
+   * What the bridge says about the backup, while that screen is open.
+   *
+   * `null` means nobody has asked or the answer has not arrived. The screen
+   * is not drawn until it has one, because every sentence on it turns on
+   * whether the backup is on and a screen that guessed would say the wrong
+   * one for a second.
+   */
+  const [backupState, setBackupState] = useState<{
+    enabled: boolean
+    total: number
+    backedUp: number
+  } | null>(null)
   /**
    * The kept messages, with their words, while that screen is open.
    *
@@ -718,6 +804,73 @@ export function App({
     'idle',
   )
   const [selfUserId, setSelfUserId] = useState('')
+  // A MESSAGE SOMEBODY ELSE SENT, READ HERE FOR THE FIRST TIME.
+  //
+  // The trigger ADR-0013 settles on, and `offerBackup.ts` says why it is
+  // received rather than sent: sending proves the account works, receiving
+  // is the first time this device holds a key nobody else has.
+  //
+  // An effect over the built timeline rather than a hook in the sync loop,
+  // because the loop hands back events still encrypted and cannot know what
+  // is readable -- `receivedFromSomebodyElse.ts` carries that reasoning.
+  //
+  // It runs on every conversation that draws, which writes the same flag
+  // again and costs a keystore write nobody notices. Reading first to avoid
+  // it would be two operations where there is one.
+  useEffect(() => {
+    if (conversation === null || selfUserId === '') return
+    const received = receivedFromSomebodyElse(conversation, selfUserId)
+    // SAID WHETHER OR NOT IT IS TRUE, and that is the point: a prompt that
+    // never appears looks identical whether the trigger has not fired or the
+    // trigger is broken. This is the line that tells them apart, and it is
+    // what a device proof reads.
+    logEvent('info', 'MESSAGR_BACKUP_TRIGGER', {
+      received,
+      entries: conversation.length,
+      // Neither identifier is carried: §13.27 and the rule that this log
+      // never names a person. What matters is whether any sender differed
+      // from this account, and `received` is that fact.
+      readable: conversation.filter(entry => entry.body !== null).length,
+    })
+    if (!received) return
+    // ONE EFFECT, NOT TWO, and that is not tidiness. Writing the flag and
+    // asking whether to offer are the same moment, and two effects on the
+    // same dependency would race: the one that asks could read the flag
+    // before the one that writes has written it, and the offer would arrive
+    // a conversation late for no reason anybody could find.
+    const noteAndAsk = async () => {
+      await rememberReceived(backupReceivedSecrets)
+      const reading = await shouldOfferBackup({
+        commitment: backupSecrets,
+        asked: backupAskedSecrets,
+        received: backupReceivedSecrets,
+      })
+      // SAID ONCE, IN A LINE A DEVICE PROOF CAN READ. A refusal here has
+      // four causes and they look identical from outside -- three of them
+      // are the feature working and one is the feature absent. The first
+      // device run of this prompt showed nothing and there was no way to
+      // tell which, which is why this line exists.
+      logEvent('info', 'MESSAGR_BACKUP_OFFER', {
+        offer: reading.decision.offer,
+        backedUp: reading.backedUp,
+        asked: reading.asked,
+        received: reading.received,
+        unreadable: reading.unreadable.join(',') || 'none',
+      })
+      if (!reading.decision.offer) return
+      // RECORDED BEFORE THE ANSWER, which `backupPrompt.ts` argues at
+      // length: an offer interrupted -- the application killed, the screen
+      // turned, a call arriving -- is an offer that was made, and asking
+      // again would be the nagging ADR-0013 refuses.
+      await rememberBackupAsked(backupAskedSecrets)
+      setBackupPrompt('offering')
+    }
+    noteAndAsk().catch(() => {
+      // Every call inside answers rather than throwing. This is the belt on
+      // the promise: a rejection nobody anticipated costs an offer made
+      // later, from a conversation that draws again, and never a launch.
+    })
+  }, [conversation, selfUserId])
   const [sending, setSending] = useState<'idle' | 'sending' | 'failed'>('idle')
   // Held rather than rebuilt: it closes over the session and the room, which
   // only the probe below knows. `useState` with a function needs the extra
@@ -1144,6 +1297,22 @@ export function App({
 
           if (start.started) {
             passphrase = start.passphraseMinted ? 'minted' : 'reused'
+            // TELL THE BRIDGE AGAIN WHICH VERSION THIS DEVICE WRITES TO.
+            //
+            // It persists neither the sealing key nor the version, so a
+            // launch that skips this backs nothing up and says nothing about
+            // it -- ADR-0013's own silent failure. `resumeKeyBackup` reads
+            // the commitment from the keystore and hands it over.
+            //
+            // Not awaited into the launch's outcome and never thrown from: a
+            // backup that could not be resumed is not a reason to stop an
+            // application starting, and Réglages says so at any time.
+            resumeKeyBackup().catch(() => {
+              // `resumeKeyBackup` already answers false rather than
+              // throwing; this is the belt on the promise itself, so a
+              // rejection nobody anticipated cannot become an unhandled one
+              // during a launch.
+            })
           }
 
           if (!start.started) {
@@ -2642,12 +2811,6 @@ export function App({
   return (
     <GestureHandlerRootView style={styles.root}>
       <SafeAreaProvider>
-        {/* ABOVE EVERYTHING, AND NOT INSIDE THE CONVERSATION.
-          A call outlives the screen it started on: somebody who places one
-          and then goes back to the list is still on that call, and a
-          telephone that rings only while the right conversation is open is
-          not a telephone. So it hangs off the root, drawn from the runtime's
-          own state rather than from wherever the person happens to be. */}
         {call !== null && (
           <CallScreen
             state={call.state}
@@ -3091,11 +3254,13 @@ export function App({
             {openScope === null &&
               tab === 'settings' &&
               !legalOpen &&
-              !favouritesOpen && (
+              !favouritesOpen &&
+              !backupOpen && (
                 <View style={styles.block}>
                   <Settings
                     onBack={() => setTab('chat')}
                     onLegal={() => setLegalOpen(true)}
+                    onBackup={() => setBackupOpen(true)}
                     onFavourites={() => {
                       setFavouritesOpen(true)
                       // FETCHED ON OPENING AND DROPPED ON CLOSING, exactly as a
@@ -3191,6 +3356,71 @@ export function App({
                 <Legal onBack={() => setLegalOpen(false)} />
               </View>
             )}
+
+            {openScope === null &&
+              tab === 'settings' &&
+              backupOpen &&
+              backupState !== null && (
+                <View style={styles.block}>
+                  <BackupSettings
+                    enabled={backupState.enabled}
+                    total={backupState.total}
+                    backedUp={backupState.backedUp}
+                    onBack={() => {
+                      setBackupOpen(false)
+                      // Dropped rather than kept: the next opening asks
+                      // again, and a value held between them would be the
+                      // screen describing a backup as it was.
+                      setBackupState(null)
+                    }}
+                    onEnable={() => {
+                      // THE DOOR A REFUSAL HONOURED FOR GOOD OWES SOMEBODY.
+                      // ADR-0013 records a refusal for ever and leaves this
+                      // row; without a way back in, that would be a decision
+                      // taken once and never revisitable.
+                      //
+                      // The same sequence the offer runs, and the same place
+                      // to show what it produced: this screen closes and the
+                      // key takes the whole surface, because it is shown
+                      // once and must not sit behind a settings row.
+                      const session = sessionClientRef.current
+                      if (session === null) return
+                      // NOTHING IS UNMOUNTED UNDER THE FINGER, and that is
+                      // not caution -- it is a defect this had.
+                      //
+                      // This closed the screen here, synchronously, inside
+                      // the press handler. React then drew the Réglages list
+                      // where the button had been, and the rest of the same
+                      // gesture landed on the row now under it: tapping
+                      // « Sauvegarder mes messages » also opened
+                      // « Informations légales », which a person would find
+                      // waiting behind the key screen. Reproduced twice on an
+                      // emulator before it was believed.
+                      //
+                      // The key screen covers everything anyway, so there is
+                      // nothing to close: `onDone` below does it, once the
+                      // finger is long gone.
+                      acceptKeyBackup(session)
+                        .then(outcome => {
+                          setBackupPrompt(
+                            outcome.accepted
+                              ? { restoreKey: outcome.restoreKey }
+                              : null,
+                          )
+                        })
+                        .catch(() => setBackupPrompt(null))
+                    }}
+                    onReplace={() => {
+                      // #220's third criterion, and it is not built yet.
+                      // Replacing makes a NEW version and retires the old
+                      // key, which is one more homeserver request than
+                      // accepting and a sentence this screen already carries
+                      // but has nothing to act on yet. Left rather than
+                      // wired to something that would half-do it.
+                    }}
+                  />
+                </View>
+              )}
 
             {openScope === null && tab === 'settings' && favouritesOpen && (
               <View style={styles.block}>
@@ -3656,6 +3886,85 @@ export function App({
             )}
           </View>
         </SafeAreaView>
+
+        {/* THE ONE TIME THIS PRODUCT ASKS SOMEBODY TO KEEP A SECRET, AND
+            THE LAST CHILD OF THE ROOT SO THAT NOTHING CAN PAINT OVER IT.
+            These two sat inside the conversation screen, beside the
+            full-screen photograph, and that was wrong in a way only a device
+            found: accepting from Réglages with no conversation open created
+            the backup and showed no key at all. A backup exists and nobody
+            has ever seen what opens it -- the one state this feature must
+            never reach.
+            The offer looked fine because a conversation is open by
+            construction when it fires. The acceptance from Réglages is not,
+            and it is the path a refusal honoured for good depends on.
+            **LAST, AND THAT IS THE WHOLE OF IT.** They were moved off the
+            root and placed FIRST, which looked right and was worse than
+            where they started: `StyleSheet.absoluteFill` takes a view out of
+            the flow but not out of the paint order, so every later sibling
+            -- the entire application -- drew on top of them. The key screen
+            rendered underneath everything, a person saw the settings screen,
+            and the tap meant for « J'ai rangé ma clé » went to whatever was
+            above it. `backupPrompt` therefore never cleared.
+            Three device runs were spent on it, and what hid it is that Detox
+            matched the key anyway: Espresso's visibility asks whether a view
+            has a rectangle on screen, never whether something is standing in
+            front of it. A test can see what a person cannot.
+            A call now paints under these rather than over. That is the right
+            way round: an overlay something else can cover is not an overlay,
+            and of the two the key is the one that cannot be shown again. */}
+        {backupPrompt === 'offering' && (
+          <View style={StyleSheet.absoluteFill}>
+            <BackupOffer
+              onAccept={() => {
+                const session = sessionClientRef.current
+                if (session === null) {
+                  setBackupPrompt(null)
+                  return
+                }
+                acceptKeyBackup(session)
+                  .then(outcome => {
+                    // The key exists for exactly as long as this state
+                    // holds it: nothing else has a copy, here or on the
+                    // homeserver. `acceptBackup.ts` hands it back precisely
+                    // once and never on a failure.
+                    setBackupPrompt(
+                      outcome.accepted
+                        ? { restoreKey: outcome.restoreKey }
+                        : null,
+                    )
+                  })
+                  .catch(() => setBackupPrompt(null))
+              }}
+              onRefuse={() => setBackupPrompt(null)}
+            />
+          </View>
+        )}
+
+        {backupPrompt !== null && backupPrompt !== 'offering' && (
+          <View style={StyleSheet.absoluteFill}>
+            <RecoveryKeyShown
+              recoveryKey={backupPrompt.restoreKey}
+              onCopy={() => Clipboard.setString(backupPrompt.restoreKey)}
+              // DROPPED HERE AND NOWHERE ELSE. Leaving this screen is the
+              // moment the only copy of the key stops existing in this
+              // process, which is what « montrée une fois » means in code.
+              //
+              // And whatever is behind is put right here rather than when it
+              // was left: a Réglages screen that said « vos messages ne sont
+              // pas sauvegardés » before this key existed would be lying the
+              // moment it came back into view.
+              onDone={() => setBackupPrompt(null)}
+            />
+          </View>
+        )}
+
+        {/* ABOVE EVERYTHING, AND NOT INSIDE THE CONVERSATION.
+          A call outlives the screen it started on: somebody who places one
+          and then goes back to the list is still on that call, and a
+          telephone that rings only while the right conversation is open is
+          not a telephone. So it hangs off the root, drawn from the runtime's
+          own state rather than from wherever the person happens to be. */}
       </SafeAreaProvider>
     </GestureHandlerRootView>
   )

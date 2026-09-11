@@ -462,5 +462,38 @@ export const en: Readonly<Record<CopyKey, string>> = {
   list_nobody_else: 'Nobody else here',
   list_nobody_joined: 'Nobody joined this conversation',
   invite_open: 'Invite someone',
+  settings_backup: 'Message backup',
+  backup_settings_on:
+    'Your messages are kept on the server, closed by your recovery key.',
+  backup_settings_off:
+    'Your messages are not backed up. Reinstalling Messagr would lose everything that was said.',
+  'backup_settings_progress %1$d %2$d': '%1$d keys backed up out of %2$d',
+  backup_settings_catching_up:
+    'The rest goes as the conversations sync. Nothing is lost in the meantime.',
+  backup_settings_enable: 'Back up my messages',
+  backup_settings_never_shown:
+    'Your current key cannot be shown again, here or anywhere else.',
+  backup_settings_replace: 'Replace my recovery key',
+  backup_settings_replace_why:
+    'Do this if you have lost your key or wrote it down badly. A new key will be shown once, and the old one will stop opening anything.',
+  backup_offer_title: 'Get your messages back if you lose this telephone',
+  backup_offer_lead:
+    'The keys that open your conversations exist on this device and nowhere else. Messagr can keep a copy on the server, closed by a key only you hold.',
+  backup_offer_loss:
+    'Without it, reinstalling Messagr loses everything that was said. The account comes back; the messages stay unreadable.',
+  backup_offer_scope:
+    'The backup keeps the messages. The names you give, your favourites and your read marks stay on this device and go with it.',
+  backup_offer_trust:
+    'The server cannot read the backup. It also cannot prove nothing in it was replaced: anyone who got your account or the server could slip other keys in, with nothing to say so.',
+  backup_offer_accept: 'Back up my keys',
+  backup_offer_refuse: 'Not now',
+  backup_offer_later: 'You can turn it on later from Settings.',
+  backup_key_title: 'Your recovery key',
+  backup_key_lead: 'Copy it now and keep it in a password manager.',
+  backup_key_once:
+    'It will never be shown again. Without it, the backup does not open.',
+  backup_key_copy: 'Copy the key',
+  backup_key_copied: 'Key copied.',
+  backup_key_done: 'I have put my key away',
   back_to_newest: 'Back to the latest message',
 }

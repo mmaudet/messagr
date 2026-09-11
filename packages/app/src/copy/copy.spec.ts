@@ -1,3 +1,6 @@
+import { readdirSync, readFileSync } from 'node:fs'
+import { basename, join } from 'node:path'
+
 import { describe, expect, it } from 'vitest'
 
 import { fr } from './fr'
@@ -42,6 +45,23 @@ describe('the copy catalogue', () => {
       /reconnu|reconnaissance/i.test(value),
     )
     expect(offending).toEqual([])
+  })
+
+  it('never explains encryption where a backup is accepted or refused', () => {
+    // ADR-0013, and it is a product rule rather than a wording preference:
+    // « Rien de la promesse ne change. "Chiffrée de bout en bout, sans
+    // réglage" parle du chiffrement, qui reste automatique et non
+    // configurable. La durabilité devient un choix ; le chiffrement, non. »
+    //
+    // The safest way to keep a screen from implying otherwise is for it not
+    // to talk about encryption at all in the place where somebody is
+    // deciding something. The offer says what the server can and cannot do
+    // -- read it, prove nothing was replaced -- which is the substance,
+    // without putting the word next to a pair of buttons.
+    const talking = Object.entries(fr).filter(
+      ([key, value]) => key.startsWith('backup_') && /chiffr/i.test(value),
+    )
+    expect(talking).toEqual([])
   })
 
   it('never says "vérifier" anywhere, in any string', () => {
@@ -104,6 +124,67 @@ describe('every catalogue', () => {
       )
     }
   })
+})
+
+describe('no screen writes a label of its own', () => {
+  // WHAT `every catalogue` CANNOT SEE.
+  //
+  // The tests above prove the six catalogues agree with each other. They
+  // cannot prove a screen *asks* them: a French sentence written straight
+  // into a component renders French in all six languages and every
+  // assertion here stays green. That is the realistic mistake -- nobody
+  // removes a translation, somebody adds a screen in a hurry.
+  //
+  // Found by an audit rather than by a failure, on 11 September 2026, and
+  // written down because an audit run once rots. The audit found nothing,
+  // which is what makes this a guard rather than a fix.
+  //
+  // # WHAT IT DOES NOT CHECK, AND WHY THAT IS NOT AN OVERSIGHT
+  //
+  // Bare text between JSX tags -- `<Text>Bonjour</Text>` -- is the other
+  // half of the same mistake and is deliberately not attempted here. A
+  // regular expression cannot tell it from a TypeScript generic: the source
+  // of `Conversation.tsx` contains `readonly read?: ReadonlySet<string>`,
+  // and the text between that `>` and the next `<` reads exactly like a
+  // sentence to any pattern simple enough to live in a test. A first
+  // version flagged it, and the honest options were a parser or a
+  // hand-maintained exclusion list -- the second being the kind of test
+  // that gets argued with rather than fixed.
+  //
+  // So this guards the half that can be guarded exactly. The audit that
+  // covered the other half is in the commit that added this.
+
+  const screens = readdirSync(join(__dirname, '..', 'ui'))
+    .filter(name => name.endsWith('.tsx'))
+    .map(name => join(__dirname, '..', 'ui', name))
+    .concat(join(__dirname, '..', '..', 'App.tsx'))
+
+  /**
+   * The product's own name, which is the same word in every language.
+   *
+   * The only allowance, and it stays one word: a list that grew would be
+   * this test being negotiated with.
+   */
+  const UNTRANSLATED = new Set(['Messagr'])
+
+  it.each(screens.map(path => [basename(path), path]))(
+    '%s puts every label through the catalogue',
+    (_name, path) => {
+      const source = readFileSync(path, 'utf8')
+        .replace(/\/\*[\s\S]*?\*\//g, '')
+        .replace(/^\s*\/\/.*$/gm, '')
+
+      const written = [
+        ...source.matchAll(
+          /(?:label|accessibilityLabel|accessibilityHint|placeholder|title)=\{?'([^']{4,})'/g,
+        ),
+      ]
+        .map(([, text]) => text)
+        .filter(text => !UNTRANSLATED.has(text))
+
+      expect(written).toEqual([])
+    },
+  )
 })
 
 describe('choosing a language', () => {

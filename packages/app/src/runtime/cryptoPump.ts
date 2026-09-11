@@ -17,28 +17,47 @@ import {
   createCryptoMachine,
   createCrossSigningIdentity,
   decryptAttachment,
+  createKeyBackup,
   decryptEvent,
+  disableKeyBackup,
   discardScopeKey,
   encryptAttachment,
+  enableKeyBackup,
   encryptEvent,
   encryptionSlice,
   buildHistoryBundle,
   getDeviceIdentityKeys,
   getDeviceStatuses,
   getIdentityStatus,
+  getKeyBackupState,
   markRequestFailed,
   markRequestSent,
   offeredHistoryBundle,
   receiveHistoryBundle,
   receiveSyncChanges,
+  restoreKeyBackup,
+  restoreKeyMatches,
   shareHistoryBundle,
   shareScopeKey,
   takeOutgoingRequests,
 } from 'react-native-matrix-crypto'
 
+import { acceptBackup, type BackupAccepted } from './acceptBackup'
+import {
+  downloadKeys,
+  publishVersion,
+  readVersion,
+  type BackupVersionInfo,
+} from './backupCalls'
+import {
+  forgetBackupCommitment,
+  readBackupCommitment,
+  rememberBackupCommitment,
+} from './backupCommitment'
 import type { IdentityEntitlement } from './crossSigningIdentity'
 import { computeCryptoMachineConfig } from './cryptoMachineConfig'
 import {
+  backupSecrets,
   cryptoStoreFormMarker,
   cryptoStoreSecrets,
   syncCursorSecrets,
@@ -79,7 +98,7 @@ import { fetchImage, type ShownImage } from './receiveImage'
 import { sendImage, sendingThrough, type ImageSent } from './sendImage'
 import type { ReadFile } from '../timeline/imageEvent'
 import { enterInvitations, type Entered } from './enterInvitations'
-import { drainOutgoingRequests, makePumpHttp } from './pump'
+import { drainOutgoingRequests, makePumpHttp, PumpHttpError } from './pump'
 import {
   admitDrawnEntrant,
   issueInvitation,
@@ -1068,5 +1087,145 @@ export async function sendReadReceipt(
     )
   } catch {
     // See above.
+  }
+}
+
+/**
+ * Accepting the backup, bound to the real homeserver and the real bridge.
+ *
+ * The sequence and its ordering live in `acceptBackup.ts`, which is where
+ * the reasoning is and where the tests are. This is the binding, kept as
+ * thin as `homeserverCalls.ts` is for the same reason: nothing worth
+ * unit-testing happens here.
+ *
+ * What comes back on success is the restore key, and it is the only copy
+ * that will ever exist. Show it once and drop it.
+ */
+export async function acceptKeyBackup(
+  sessionClient: ReturnType<typeof createClient>,
+): Promise<BackupAccepted> {
+  const http = makePumpHttp(sessionClient)
+  return acceptBackup({
+    createKeyBackup,
+    publishVersion: body => publishVersion(http, body),
+    remember: commitment => rememberBackupCommitment(backupSecrets, commitment),
+    enable: (sealingKey, version) => enableKeyBackup(sealingKey, version),
+  })
+}
+
+/**
+ * Tells the bridge, on every launch, which version this device writes to.
+ *
+ * **Without this a backup silently stops at the first restart.** The bridge
+ * persists neither the sealing key nor the version — its own doc comment
+ * says a process that does not make this call backs nothing up and says
+ * nothing about it — so the commitment is read back from the keystore here
+ * and handed over.
+ *
+ * Answers whether anything was resumed, so a caller can tell a device that
+ * never accepted from one whose keystore has stopped answering. It does not
+ * throw: a backup that could not be resumed must not stop an application
+ * from starting, and the state is readable at any time from Réglages.
+ */
+export async function resumeKeyBackup(): Promise<boolean> {
+  const commitment = await readBackupCommitment(backupSecrets)
+  if (commitment === null) return false
+  try {
+    await enableKeyBackup(commitment.sealingKey, commitment.version)
+    return true
+  } catch {
+    return false
+  }
+}
+
+/** What the bridge says about this device's backup. See `BackupSettings`. */
+export async function readKeyBackupState(): Promise<{
+  enabled: boolean
+  total: number
+  backedUp: number
+}> {
+  const state = await getKeyBackupState()
+  return {
+    enabled: state.enabled,
+    total: state.total,
+    backedUp: state.backedUp,
+  }
+}
+
+/**
+ * Stops this device writing to its backup, and forgets the commitment.
+ *
+ * Both, and in that order. Forgetting alone would leave the bridge writing
+ * until the process ended; disabling alone would leave the next launch
+ * resuming what somebody just turned off.
+ *
+ * **It deletes nothing on the homeserver.** The backup and everything in it
+ * stay where they are and still open with the same restore key.
+ */
+export async function stopKeyBackup(): Promise<void> {
+  await disableKeyBackup()
+  await forgetBackupCommitment(backupSecrets)
+}
+
+/**
+ * The backup this account has on its homeserver, or `null` for none.
+ *
+ * A 404 is an absence rather than a failure — most accounts have no backup —
+ * and `backupCalls.ts` says why telling the two apart matters. The predicate
+ * is passed in from here because `PumpHttpError` is this layer's type and
+ * that module names no transport.
+ */
+export async function findBackupOnAccount(
+  sessionClient: ReturnType<typeof createClient>,
+): Promise<BackupVersionInfo | null> {
+  return readVersion(
+    makePumpHttp(sessionClient),
+    cause => cause instanceof PumpHttpError && cause.status === 404,
+  )
+}
+
+/** What a restore did, or why it could not run. */
+export type RestoreOutcome =
+  | { readonly restored: true; readonly imported: number }
+  /** The key is well formed and opens a different backup. */
+  | { readonly restored: false; readonly because: 'wrong-key' }
+  /** It is not a restore key at all — a typo, or something else pasted. */
+  | { readonly restored: false; readonly because: 'not-a-key' }
+  /** The download or the import failed. */
+  | { readonly restored: false; readonly because: 'failed' }
+
+/**
+ * Opens a backup with a restore key and imports what it holds.
+ *
+ * **The key is checked against the version description before anything is
+ * downloaded**, which is the difference between a wrong key costing a few
+ * hundred bytes and costing every key the account ever held. The bridge
+ * makes the same comparison inside `restoreKeyBackup`, so skipping this
+ * would be wrong about speed and never about safety.
+ *
+ * The two refusals are kept apart because they send a person to opposite
+ * remedies: `wrong-key` is a different secret to find, `not-a-key` is the
+ * same secret typed properly.
+ */
+export async function restoreFromKey(
+  sessionClient: ReturnType<typeof createClient>,
+  found: BackupVersionInfo,
+  restoreKey: string,
+): Promise<RestoreOutcome> {
+  let opens: boolean
+  try {
+    opens = restoreKeyMatches(restoreKey, found.info)
+  } catch {
+    // `malformed_identifier` from the bridge: not a key at all.
+    return { restored: false, because: 'not-a-key' }
+  }
+  if (!opens) return { restored: false, because: 'wrong-key' }
+
+  try {
+    const keys = await downloadKeys(makePumpHttp(sessionClient), found.version)
+    const imported = await restoreKeyBackup(restoreKey, found.version, keys)
+    return { restored: true, imported: imported.imported }
+  } catch {
+    return { restored: false, because: 'failed' }
   }
 }

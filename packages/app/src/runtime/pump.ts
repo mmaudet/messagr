@@ -74,16 +74,23 @@ interface ParsedRoomMessageBody {
   txn_id?: unknown
 }
 
+interface ParsedBackupBody {
+  version?: unknown
+  rooms?: unknown
+}
+
 /**
  * Sends one request the pump handed out to the endpoint its `kind` names,
  * and returns the homeserver's own response body verbatim, for
  * `markRequestSent`. Throws (a `PumpHttpError`, if the request reached the
  * server and was refused) on anything else.
  *
- * `to_device` and `room_message` carry their own path segments inside `body`
- * itself, alongside the wire content this library never interprets — see
- * `OutgoingRequest`'s own documentation in react-native-matrix-crypto for
- * the two disclosed exceptions this reflects.
+ * `to_device`, `room_message` and `room_key_backup` carry their own URL
+ * values inside `body` itself, alongside the wire content this library never
+ * interprets — see `OutgoingRequest`'s own documentation in
+ * react-native-matrix-crypto for the three disclosed exceptions this
+ * reflects. The third is the only one where the value belongs in the query
+ * string rather than the path.
  */
 export async function sendOutgoingRequest(
   http: HttpRequester,
@@ -164,6 +171,33 @@ export async function sendOutgoingRequest(
         `/_matrix/client/v3/rooms/${encodeURIComponent(parsed.room_id)}/send/` +
         `${encodeURIComponent(parsed.event_type)}/${encodeURIComponent(parsed.txn_id)}`
       return http.authedRequest('PUT', path, {}, request.body)
+    }
+    case 'room_key_backup': {
+      // ADR-0013: `/room_keys` goes through the pump, as an eighth request
+      // kind. It is Matrix protocol and belongs on the protocol's path; a
+      // second place that talks to the homeserver with rules of its own is
+      // how two places come to disagree.
+      const parsed = JSON.parse(request.body) as ParsedBackupBody
+      if (typeof parsed.version !== 'string' || parsed.version === '') {
+        throw new Error('a room_key_backup request must name its version')
+      }
+      // The version is an OPAQUE STRING and nothing here turns it into a
+      // number. Synapse answers with a counter from "1" and Continuwuity
+      // with a six-digit integer; the specification makes the field opaque,
+      // and a client that parsed it would work against one homeserver and
+      // fail against the other. It is passed through as it arrived.
+      //
+      // Reserialised rather than sent verbatim, the way `to_device` is: the
+      // real wire body is `rooms` alone, and `version` travels beside it
+      // only because the query string needs a value the body does not
+      // carry. Sending the extra field would be harmless to a server that
+      // ignores unknown keys, which is not the same as it being right.
+      return http.authedRequest(
+        'PUT',
+        '/_matrix/client/v3/room_keys/keys',
+        { version: parsed.version },
+        JSON.stringify({ rooms: parsed.rooms }),
+      )
     }
     default:
       // Not skipped. kind is an open tag, so a value this app cannot route

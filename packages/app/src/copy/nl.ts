@@ -460,5 +460,38 @@ export const nl: Readonly<Record<CopyKey, string>> = {
   list_nobody_else: 'Verder niemand hier',
   list_nobody_joined: 'Niemand heeft aan dit gesprek deelgenomen',
   invite_open: 'Iemand uitnodigen',
+  settings_backup: 'Reservekopie van berichten',
+  backup_settings_on:
+    'Uw berichten staan op de server, gesloten met uw herstelsleutel.',
+  backup_settings_off:
+    'Van uw berichten is geen reservekopie. Messagr opnieuw installeren zou alles wat er is gezegd verliezen.',
+  'backup_settings_progress %1$d %2$d': '%1$d van %2$d sleutels bewaard',
+  backup_settings_catching_up:
+    'De rest gaat mee met de volgende synchronisaties. Ondertussen gaat er niets verloren.',
+  backup_settings_enable: 'Mijn berichten bewaren',
+  backup_settings_never_shown:
+    'Uw huidige sleutel kan niet opnieuw worden getoond, hier niet en elders niet.',
+  backup_settings_replace: 'Mijn herstelsleutel vervangen',
+  backup_settings_replace_why:
+    'Doe dit als u uw sleutel kwijt bent of verkeerd hebt genoteerd. Er wordt eenmalig een nieuwe sleutel getoond, en de oude opent daarna niets meer.',
+  backup_offer_title: 'Uw berichten terugkrijgen als u deze telefoon verliest',
+  backup_offer_lead:
+    'De sleutels die uw gesprekken openen, bestaan alleen op dit toestel. Messagr kan er een kopie van op de server bewaren, gesloten met een sleutel die alleen u heeft.',
+  backup_offer_loss:
+    'Zonder die sleutel verliest u bij het opnieuw installeren van Messagr alles wat er is gezegd. Het account komt terug; de berichten blijven onleesbaar.',
+  backup_offer_scope:
+    'De reservekopie bewaart de berichten. De namen die u geeft, uw favorieten en uw leesmarkeringen blijven op dit toestel en verdwijnen ermee.',
+  backup_offer_trust:
+    'De server kan de reservekopie niet lezen. Hij kan ook niet aantonen dat er niets in is vervangen: wie uw account of de server in handen kreeg, zou er andere sleutels in kunnen schuiven zonder dat iets dat meldt.',
+  backup_offer_accept: 'Mijn sleutels bewaren',
+  backup_offer_refuse: 'Nu niet',
+  backup_offer_later: 'U kunt het later inschakelen bij Instellingen.',
+  backup_key_title: 'Uw herstelsleutel',
+  backup_key_lead: 'Kopieer hem nu en bewaar hem in een wachtwoordmanager.',
+  backup_key_once:
+    'Hij wordt nooit meer getoond. Zonder hem gaat de reservekopie niet open.',
+  backup_key_copy: 'Sleutel kopiëren',
+  backup_key_copied: 'Sleutel gekopieerd.',
+  backup_key_done: 'Ik heb mijn sleutel opgeborgen',
   back_to_newest: 'Terug naar het nieuwste bericht',
 }
