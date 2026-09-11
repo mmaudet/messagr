@@ -144,6 +144,38 @@ until the store listing, the content rating, the data safety form and the
 target audience declarations are filled in, and the API fills in none of
 them. Every upload after that is this workflow's.
 
+## A declaration the console owes before any upload commits
+
+Run 24, on 8 September 2026, uploaded an eighty-megabyte bundle successfully
+and then failed on one line:
+
+    ##[error]You must let us know whether your app uses any full-screen
+    intent permissions
+
+The failure is at `Committing the Edit`, which is after `Successfully
+uploaded 1 artifacts`. So the build was fine, the signature was fine, the
+service account was fine, and the track was fine. What was missing was a
+form.
+
+`AndroidManifest.xml` asks for `USE_FULL_SCREEN_INTENT`, and it asks
+honestly: an incoming call has to take a locked screen rather than add one
+more notification line, which is what `settings_full_screen_hint` describes
+to the person granting it. Android reserves that permission for telephone
+applications and Play makes every application holding it say so.
+
+**Where**: Play Console → _Policy and programmes_ → _App content_ →
+_Full-screen intent permission_. Answered once, it stays answered.
+
+**Why it is written here**: nothing in this repository can detect it and
+nothing in the workflow can fill it in. The next person to dispatch
+`Publish` without knowing this spends eighteen minutes to be told by an
+error message that names a form rather than a place.
+
+The same is true of the other declarations this document already names —
+content rating, data safety, target audience. This one is different only in
+that it arrived after the first release, so an application that had
+published once could still be refused.
+
 ## Why the release build is unsigned everywhere else
 
 `device.yml` builds a release APK on every push and does not sign it. The
