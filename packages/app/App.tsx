@@ -64,6 +64,7 @@ import {
 } from './src/runtime/callLogStore'
 import { CallsList } from './src/ui/CallsList'
 import { getErrorMessage } from './src/runtime/errors'
+import { mergeSummaries } from './src/runtime/mergeSummaries'
 import { computeHermesReport } from './src/runtime/hermes'
 import { logEvent } from './src/runtime/log'
 import { polyfillReport } from './src/runtime/bootstrap'
@@ -2166,13 +2167,30 @@ export function App({
                 // one place they look first.
                 await hiddenRef.current.all(),
               )
-              setSummaries(derived)
+              // MERGED RATHER THAN REPLACED, and the notebook keeps the
+              // merge rather than the derivation. `mergeSummaries.ts`
+              // argues it: on a partial network -- a train, a lift --
+              // `/joined_rooms` gets through and the one `/messages` per
+              // conversation does not, so every row came back empty, took
+              // the place of a good one on screen, AND was written over it.
+              // A moment of bad signal cost a list that had been right for
+              // days.
+              //
+              // The functional form because the merge needs what is on
+              // screen NOW: a closure would hold whatever was there when
+              // this refresh started, and a refresh is exactly the thing
+              // that changes it.
+              let merged: readonly ConversationSummary[] = derived
+              setSummaries(shown => {
+                merged = mergeSummaries(shown, derived)
+                return merged
+              })
               // AND KEPT, so the next launch draws this instantly. Not
               // awaited by the screen: the list is already on it, and a
               // notebook write is not something a person should wait behind.
               // The page swallows its own failures, so there is nothing here
               // that could reject.
-              listCacheRef.current.keep(derived).catch(() => {})
+              listCacheRef.current.keep(merged).catch(() => {})
             }
             await refreshList().catch((cause: unknown) =>
               logEvent('warn', 'MESSAGR_LIST_FAILED', {
