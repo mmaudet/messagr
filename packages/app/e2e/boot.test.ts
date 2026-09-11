@@ -326,6 +326,43 @@ describe('boot', () => {
     await detoxExpect(element(by.text(written))).toBeVisible()
   })
 
+  it('grows the field while typing, and shrinks it when the message goes', async () => {
+    // THIBAULT'S REPORT, 10 SEPTEMBER 2026, FROM AN iOS BUILD: the field does
+    // not grow while typing, and grows after sending. Two halves of one
+    // mechanism, and the reason this assertion is written before the fix is
+    // that a composer's height is not something any unit test in this
+    // repository can see.
+    //
+    // It runs on Android because that is where this suite runs. It is
+    // therefore NOT a proof of the iOS report -- it is the guard on the other
+    // platform, which is where the code being changed came from: `grown`
+    // exists because a Pixel kept a three-line bar over an empty field. A fix
+    // for iOS that quietly broke that is the failure this test exists to
+    // catch, and without it the only way to find out would be a second
+    // report from a second person.
+    const field = element(by.id('conversation-input'))
+
+    const empty = (await field.getAttributes()) as { height: number }
+    await field.replaceText(
+      ['un', 'deux', 'trois', 'quatre'].join('\n') + ` ${Date.now()}`,
+    )
+    const filled = (await field.getAttributes()) as { height: number }
+
+    expect(filled.height).toBeGreaterThan(empty.height)
+
+    await element(by.id('composer-send')).tap()
+    // Back to where it started. Not "smaller than filled": a bar that went
+    // from four lines to three over an empty field would satisfy that and is
+    // exactly the defect. The tolerance is a point, for rounding between the
+    // measured content height and the frame it is given.
+    await waitFor(element(by.id('composer-record')))
+      .toBeVisible()
+      .withTimeout(30000)
+    const after = (await field.getAttributes()) as { height: number }
+
+    expect(Math.abs(after.height - empty.height)).toBeLessThanOrEqual(1)
+  })
+
   /** The pump, narrowed. A launch that never ran one is a failure to say so. */
   function ranPump() {
     const { pump } = report
