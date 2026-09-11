@@ -363,6 +363,54 @@ describe('boot', () => {
     expect(Math.abs(after.height - empty.height)).toBeLessThanOrEqual(1)
   })
 
+  it('shows the recovery key when a backup is accepted from Réglages', async () => {
+    // THE PATH THAT BROKE, AND THE ONE PLACE IT CAN BE TESTED.
+    //
+    // These two screens hung inside the conversation screen, beside the
+    // full-screen photograph. The offer never showed the fault, because a
+    // conversation is open by construction when it fires. Accepting from
+    // Réglages is not: on iOS, with no conversation open, the backup was
+    // created and **no key was ever shown** -- a backup existing that nobody
+    // can open, which is the one state this feature must never reach.
+    //
+    // It cannot be re-tested by hand afterwards, and that is the feature
+    // working rather than a gap: the key is shown once and never again. A
+    // run that provisions a fresh account is the only place the first
+    // acceptance exists, which is here.
+    //
+    // Deliberately reached WITHOUT opening a conversation, because that is
+    // the whole point of the assertion.
+    await element(by.id('tab-settings')).tap()
+    await waitFor(element(by.id('settings-backup')))
+      .toBeVisible()
+      .withTimeout(30000)
+    await element(by.id('settings-backup')).tap()
+
+    await waitFor(element(by.id('backup-settings-enable')))
+      .toBeVisible()
+      .withTimeout(30000)
+    await element(by.id('backup-settings-enable')).tap()
+
+    // Generous: this makes a key, publishes a version to the homeserver,
+    // writes the commitment to the keystore and enables the bridge.
+    await waitFor(element(by.id('recovery-key-value')))
+      .toBeVisible()
+      .withTimeout(60000)
+
+    // AND IT SAYS IT WILL NOT BE SHOWN AGAIN, BEFORE THE BUTTON THAT LEAVES.
+    // A person who reads that after tapping has been told something they can
+    // no longer act on.
+    await detoxExpect(element(by.id('recovery-key-once'))).toBeVisible()
+    await element(by.id('recovery-key-done')).tap()
+
+    // The state the person is left in, which is the only thing that proves
+    // the acceptance went all the way through rather than merely drawing.
+    await element(by.id('settings-backup')).tap()
+    await waitFor(element(by.id('backup-settings-replace')))
+      .toBeVisible()
+      .withTimeout(30000)
+  })
+
   /** The pump, narrowed. A launch that never ran one is a failure to say so. */
   function ranPump() {
     const { pump } = report

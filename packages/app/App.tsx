@@ -2768,6 +2768,61 @@ export function App({
   return (
     <GestureHandlerRootView style={styles.root}>
       <SafeAreaProvider>
+        {/* THE ONE TIME THIS PRODUCT ASKS SOMEBODY TO KEEP A SECRET, AND
+            OFF THE ROOT FOR THE REASON THE CALL BELOW GIVES.
+            These two sat inside the conversation screen, beside the
+            full-screen photograph, and that was wrong in a way only a device
+            found: accepting from Réglages with no conversation open created
+            the backup and showed no key at all. A backup exists and nobody
+            has ever seen what opens it -- the one state this feature must
+            never reach.
+            The offer looked fine because a conversation is open by
+            construction when it fires. The acceptance from Réglages is not,
+            and it is the path a refusal honoured for good depends on.
+            A call paints over these, deliberately: it is transient and the
+            key screen is not dismissed by it, so what a person comes back to
+            after answering is the key they still have to keep. */}
+        {backupPrompt === 'offering' && (
+          <View style={StyleSheet.absoluteFill}>
+            <BackupOffer
+              onAccept={() => {
+                const session = sessionClientRef.current
+                if (session === null) {
+                  setBackupPrompt(null)
+                  return
+                }
+                acceptKeyBackup(session)
+                  .then(outcome => {
+                    // The key exists for exactly as long as this state
+                    // holds it: nothing else has a copy, here or on the
+                    // homeserver. `acceptBackup.ts` hands it back precisely
+                    // once and never on a failure.
+                    setBackupPrompt(
+                      outcome.accepted
+                        ? { restoreKey: outcome.restoreKey }
+                        : null,
+                    )
+                  })
+                  .catch(() => setBackupPrompt(null))
+              }}
+              onRefuse={() => setBackupPrompt(null)}
+            />
+          </View>
+        )}
+
+        {backupPrompt !== null && backupPrompt !== 'offering' && (
+          <View style={StyleSheet.absoluteFill}>
+            <RecoveryKeyShown
+              recoveryKey={backupPrompt.restoreKey}
+              onCopy={() => Clipboard.setString(backupPrompt.restoreKey)}
+              // DROPPED HERE AND NOWHERE ELSE. Leaving this screen is the
+              // moment the only copy of the key stops existing in this
+              // process, which is what « montrée une fois » means in code.
+              onDone={() => setBackupPrompt(null)}
+            />
+          </View>
+        )}
+
         {/* ABOVE EVERYTHING, AND NOT INSIDE THE CONVERSATION.
           A call outlives the screen it started on: somebody who places one
           and then goes back to the list is still on that call, and a
@@ -2881,51 +2936,6 @@ export function App({
               removeRef.current?.(chosen)
             }}
           />
-        )}
-
-        {/* THE ONE TIME THIS PRODUCT ASKS SOMEBODY TO KEEP A SECRET.
-            Above everything, because it is not a screen somebody navigated
-            to: it arrives, once, after the first message they could read.
-            ADR-0013 is emphatic that it is refusable and never repeated. */}
-        {backupPrompt === 'offering' && (
-          <View style={StyleSheet.absoluteFill}>
-            <BackupOffer
-              onAccept={() => {
-                const session = sessionClientRef.current
-                if (session === null) {
-                  setBackupPrompt(null)
-                  return
-                }
-                acceptKeyBackup(session)
-                  .then(outcome => {
-                    // The key exists for exactly as long as this state
-                    // holds it: nothing else has a copy, here or on the
-                    // homeserver. `acceptBackup.ts` hands it back precisely
-                    // once and never on a failure.
-                    setBackupPrompt(
-                      outcome.accepted
-                        ? { restoreKey: outcome.restoreKey }
-                        : null,
-                    )
-                  })
-                  .catch(() => setBackupPrompt(null))
-              }}
-              onRefuse={() => setBackupPrompt(null)}
-            />
-          </View>
-        )}
-
-        {backupPrompt !== null && backupPrompt !== 'offering' && (
-          <View style={StyleSheet.absoluteFill}>
-            <RecoveryKeyShown
-              recoveryKey={backupPrompt.restoreKey}
-              onCopy={() => Clipboard.setString(backupPrompt.restoreKey)}
-              // DROPPED HERE AND NOWHERE ELSE. Leaving this screen is the
-              // moment the only copy of the key stops existing in this
-              // process, which is what « montrée une fois » means in code.
-              onDone={() => setBackupPrompt(null)}
-            />
-          </View>
         )}
 
         {openPlate !== null && (
