@@ -517,5 +517,33 @@ export const es: Readonly<Record<CopyKey, string>> = {
   backup_key_copy: 'Copiar la clave',
   backup_key_copied: 'Clave copiada.',
   backup_key_done: 'He guardado mi clave',
+  restore_offer_title: 'Sus mensajes antiguos están aquí',
+  restore_offer_lead:
+    'Este dispositivo no puede abrirlos: las claves que lo hacían se fueron con la instalación anterior.',
+  'restore_offer_scope %1$d': '%1$d conversaciones están en ese caso.',
+  restore_offer_have:
+    'Hay una copia de seguridad en el servidor. Su clave de recuperación las vuelve a abrir, aquí, sin reinstalar nada.',
+  restore_offer_accept: 'Introducir mi clave de recuperación',
+  restore_offer_refuse: 'Más tarde',
+  restore_offer_later:
+    'Podrá hacerlo desde Ajustes. Sin la clave la aplicación funciona: lo que queda cerrado es el pasado, no el presente.',
+  restore_key_title: 'Su clave de recuperación',
+  restore_key_lead: 'La que se le mostró una sola vez.',
+  restore_key_field: 'Pegue o escriba la clave',
+  restore_key_confirm: 'Volver a abrir mis mensajes',
+  restore_key_cancel: 'Cancelar',
+  restore_key_working: 'Abriendo…',
+  restore_key_not_a_key:
+    'Esto no es una clave de recuperación. Puede que falte parte de la línea pegada.',
+  restore_key_wrong:
+    'Esta clave no abre esta copia. Puede ser la de otra cuenta.',
+  restore_key_failed: 'No se ha podido descargar la copia. Inténtelo de nuevo.',
+  'restore_done %1$d':
+    '%1$d claves han vuelto. Sus mensajes antiguos vuelven a ser legibles.',
+  restore_done_none:
+    'La copia se abrió, pero no contenía ninguna clave para lo que este dispositivo muestra.',
+  restore_done_close: 'Cerrar',
+  settings_restore: 'Recuperar mis mensajes antiguos',
+  settings_restore_hint: 'Si tiene su clave de recuperación.',
   back_to_newest: 'Volver al último mensaje',
 }

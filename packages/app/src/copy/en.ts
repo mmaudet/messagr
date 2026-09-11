@@ -518,5 +518,33 @@ export const en: Readonly<Record<CopyKey, string>> = {
   backup_key_copy: 'Copy the key',
   backup_key_copied: 'Key copied.',
   backup_key_done: 'I have put my key away',
+  restore_offer_title: 'Your older messages are here',
+  restore_offer_lead:
+    'This device cannot open them: the keys that did went with the previous installation.',
+  'restore_offer_scope %1$d': '%1$d conversations are in that state.',
+  restore_offer_have:
+    'There is a backup on the server. Your recovery key opens them again, here, with nothing to reinstall.',
+  restore_offer_accept: 'Enter my recovery key',
+  restore_offer_refuse: 'Later',
+  restore_offer_later:
+    'You can do it from Settings. Without the key the application works: it is the past that stays shut, not the present.',
+  restore_key_title: 'Your recovery key',
+  restore_key_lead: 'The one you were shown once.',
+  restore_key_field: 'Paste or type the key',
+  restore_key_confirm: 'Open my messages again',
+  restore_key_cancel: 'Cancel',
+  restore_key_working: 'Opening…',
+  restore_key_not_a_key:
+    'That is not a recovery key. Part of the pasted line may be missing.',
+  restore_key_wrong:
+    'This key does not open this backup. It may be one from another account.',
+  restore_key_failed: 'The backup could not be downloaded. Try again.',
+  'restore_done %1$d':
+    '%1$d keys came back. Your older messages are readable again.',
+  restore_done_none:
+    'The backup opened, but it held no key for anything this device is showing.',
+  restore_done_close: 'Close',
+  settings_restore: 'Get my older messages back',
+  settings_restore_hint: 'If you have your recovery key.',
   back_to_newest: 'Back to the latest message',
 }

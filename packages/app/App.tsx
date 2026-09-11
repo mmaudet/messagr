@@ -38,7 +38,9 @@ import {
   readTrust,
   removeReaction,
   acceptKeyBackup,
+  findBackupOnAccount,
   replaceKeyBackup,
+  restoreFromKey,
   readKeyBackupState,
   resumeKeyBackup,
   startCryptoMachine,
@@ -64,7 +66,14 @@ import {
   type CallRecord,
 } from './src/runtime/callLogStore'
 import { CallsList } from './src/ui/CallsList'
+import type { BackupVersionInfo } from './src/runtime/backupCalls'
 import { getErrorMessage } from './src/runtime/errors'
+import {
+  askedToRestore,
+  offerRestore,
+  rememberRestoreAsked,
+} from './src/runtime/offerRestore'
+import { unreadableConversations } from './src/runtime/unreadableConversations'
 import { mergeSummaries } from './src/runtime/mergeSummaries'
 import { computeHermesReport } from './src/runtime/hermes'
 import { logEvent } from './src/runtime/log'
@@ -78,6 +87,7 @@ import {
   pushkeySecrets,
   backupAskedSecrets,
   backupReceivedSecrets,
+  restoreAskedSecrets,
   backupSecrets,
   wakeSecrets,
   promiseSecrets,
@@ -179,7 +189,9 @@ import { Invite, type InviteStage } from './src/ui/Invite'
 import { BackupOffer } from './src/ui/BackupOffer'
 import { BackupSettings, type BackupReading } from './src/ui/BackupSettings'
 import { Favourites } from './src/ui/Favourites'
+import { RecoveryKeyEntry } from './src/ui/RecoveryKeyEntry'
 import { RecoveryKeyShown } from './src/ui/RecoveryKeyShown'
+import { RestoreOffer } from './src/ui/RestoreOffer'
 import { FloatingAction } from './src/ui/FloatingAction'
 import { Header } from './src/ui/Header'
 import { Composer } from './src/ui/Composer'
@@ -448,6 +460,33 @@ export function App({
    */
   const [attempt, setAttempt] = useState(0)
   /**
+   * The offer to bring a past back, and then the key being typed into it.
+   *
+   * One value rather than two flags, like `backupPrompt` above and for the
+   * same reason: the states are exclusive, and two booleans would make
+   * "typing a key with no backup to open" representable.
+   *
+   * `found` is carried rather than looked up again: it is what
+   * `GET /room_keys/version` answered, and `restoreFromKey` reads the
+   * algorithm and the public key out of it to refuse a wrong key before
+   * downloading anything.
+   */
+  const [restorePrompt, setRestorePrompt] = useState<
+    | { readonly stage: 'offering'; readonly unreadable: number }
+    | { readonly stage: 'entering' }
+    | null
+  >(null)
+  const restoreTargetRef = useRef<BackupVersionInfo | null>(null)
+  /**
+   * Whether the backup screen may offer to bring a past back.
+   *
+   * Read only while that screen is open and only when it says the backup is
+   * off: a device already backing up has its keys, and one whose account has
+   * no backup would be shown a door onto nothing. One request, on a screen
+   * somebody opened on purpose.
+   */
+  const [restorableFromSettings, setRestorableFromSettings] = useState(false)
+  /**
    * Whether the replacement's confirmation is standing.
    *
    * Here rather than inside `BackupSettings`, because closing it is
@@ -505,7 +544,7 @@ export function App({
     let stale = false
     setBackupState({ reading: 'waiting' })
     readKeyBackupState()
-      .then(state => {
+      .then(async state => {
         // SAID EVERY TIME, for the reason the offer's own line exists: a
         // screen showing the wrong branch and a screen showing the right one
         // are indistinguishable from outside, and this is the line that says
@@ -517,6 +556,21 @@ export function App({
           stale,
         })
         if (!stale) setBackupState({ reading: 'read', ...state })
+        // ASKED ONLY WHEN THERE IS A REASON TO. A device that is backing up
+        // has its keys; a device with nothing it cannot read has nothing to
+        // bring back. Both skip the request entirely.
+        if (state.enabled) {
+          if (!stale) setRestorableFromSettings(false)
+          return
+        }
+        const session = sessionClientRef.current
+        if (session === null || unreadableConversations(summaries) === 0) {
+          if (!stale) setRestorableFromSettings(false)
+          return
+        }
+        const found = await findBackupOnAccount(session)
+        restoreTargetRef.current = found
+        if (!stale) setRestorableFromSettings(found !== null)
       })
       .catch((cause: unknown) => {
         // THE CAUSE, WHICH THIS USED TO SWALLOW. An empty `catch` is how a
@@ -534,7 +588,10 @@ export function App({
     // `attempt` is here so the retry on the screen re-runs this effect. It
     // is otherwise unused, which is the point: nothing else has to know how
     // the reading is taken.
-  }, [backupOpen, backupPrompt, attempt])
+    // `summaries` is here because the reading asks whether anything is
+    // unreadable. It costs nothing while the screen is closed -- the first
+    // line returns -- and while it is open the list rarely redraws.
+  }, [backupOpen, backupPrompt, attempt, summaries])
   /**
    * What the bridge says about the backup, while that screen is open.
    *
@@ -815,6 +872,18 @@ export function App({
   // everything a loop needs. Read by the foreground handler below, which
   // runs long after that effect has finished.
   const resumeSyncRef = useRef<(() => void) | null>(null)
+  /**
+   * Derives the conversation list again, from outside the launch path that
+   * builds it.
+   *
+   * A ref for the same reason `attachRef` and `resumeSyncRef` are: the
+   * closure that can do this is made once, deep inside the effect that has
+   * the session and the credentials, and the thing that needs it -- a
+   * restore that has just brought keys back -- happens somewhere else
+   * entirely. #219's second criterion is « sans relancer l'application », and
+   * a list that only re-derives at launch could not meet it.
+   */
+  const refreshListRef = useRef<(() => Promise<void>) | null>(null)
   // Which loop the screen is currently listening to. See `beginLiveSync`.
   const liveGenerationRef = useRef(0)
   // The other person in this conversation, and the two halves of #34's
@@ -938,6 +1007,70 @@ export function App({
       // later, from a conversation that draws again, and never a launch.
     })
   }, [conversation, selfUserId])
+  /**
+   * The other half of the same lot: offering to bring a past back.
+   *
+   * # KEYED ON THE LIST, NOT ON A LAUNCH
+   *
+   * ADR-0013 fixes the order — *« L'appareil montre ses conversations
+   * d'abord, illisibles, et propose la clé ensuite. Demander un secret à la
+   * porte est ce que fait une banque, pas un messager. »* So this runs when
+   * the list has drawn and has something it cannot read, which is the moment
+   * the person is looking at the problem.
+   *
+   * It never gates anything. Somebody who has lost their key, or never made
+   * one, dismisses it and goes on writing.
+   *
+   * # THE FLAG IS READ BEFORE THE REQUEST
+   *
+   * `GET /room_keys/version` is one round trip and it is skipped entirely
+   * for a device that has already asked. Asking the homeserver first and the
+   * keystore second would spend a request on every launch to learn something
+   * local.
+   */
+  useEffect(() => {
+    if (restorePrompt !== null || backupPrompt !== null) return
+    const stranded = unreadableConversations(summaries)
+    if (stranded === 0) return
+    const session = sessionClientRef.current
+    if (session === null) return
+
+    let stale = false
+    const look = async () => {
+      if (await askedToRestore(restoreAskedSecrets)) return
+      const found = await findBackupOnAccount(session)
+      const decision = offerRestore({
+        backupExists: found !== null,
+        unreadable: stranded,
+        asked: false,
+      })
+      // SAID EVERY TIME, for the reason the backup offer's own line exists:
+      // a refusal here has several causes and they look identical from
+      // outside. This is what tells a device proof which one it hit.
+      logEvent('info', 'MESSAGR_RESTORE_OFFER', {
+        offer: decision.offer,
+        backupExists: found !== null,
+        unreadable: stranded,
+      })
+      if (!decision.offer || stale) return
+      // RECORDED BEFORE THE ANSWER. Same discipline as the backup's, same
+      // reason: an offer interrupted is an offer that was made.
+      await rememberRestoreAsked(restoreAskedSecrets)
+      restoreTargetRef.current = found
+      setRestorePrompt({ stage: 'offering', unreadable: decision.unreadable })
+    }
+    look().catch((cause: unknown) => {
+      // A homeserver that will not answer is a device that is offered
+      // nothing this time and asked again when the list next draws. Nothing
+      // here may take a launch down with it.
+      logEvent('warn', 'MESSAGR_RESTORE_OFFER_FAILED', {
+        reason: getErrorMessage(cause),
+      })
+    })
+    return () => {
+      stale = true
+    }
+  }, [summaries, restorePrompt, backupPrompt])
   const [sending, setSending] = useState<'idle' | 'sending' | 'failed'>('idle')
   // Held rather than rebuilt: it closes over the session and the room, which
   // only the probe below knows. `useState` with a function needs the extra
@@ -2241,6 +2374,12 @@ export function App({
               // that could reject.
               listCacheRef.current.keep(merged).catch(() => {})
             }
+            // Published for whatever needs the list derived again from
+            // outside this path. See `refreshListRef`.
+            refreshListRef.current = async () => {
+              await refreshList()
+            }
+
             await refreshList().catch((cause: unknown) =>
               logEvent('warn', 'MESSAGR_LIST_FAILED', {
                 reason: getErrorMessage(cause),
@@ -3472,6 +3611,14 @@ export function App({
                 <BackupSettings
                   reading={backupState}
                   onRetry={() => setAttempt(attempt + 1)}
+                  restorable={restorableFromSettings}
+                  onRestore={() => {
+                    // The same surface the offer leads to, reached from the
+                    // door instead. Nothing is closed here: the entry covers
+                    // everything, and this file has paid twice for
+                    // unmounting under a finger.
+                    setRestorePrompt({ stage: 'entering' })
+                  }}
                   confirming={replaceConfirming}
                   onConfirming={setReplaceConfirming}
                   onBack={() => {
@@ -4104,6 +4251,55 @@ export function App({
                   .catch(() => setBackupPrompt(null))
               }}
               onRefuse={() => setBackupPrompt(null)}
+            />
+          </SafeAreaView>
+        )}
+
+        {/* BRINGING A PAST BACK, BESIDE A LIST THAT HAS ALREADY DRAWN.
+            Last children of the root like the two above, and inside their
+            own `SafeAreaView` for the reason written there: `absoluteFill`
+            is laid against the window and not against the safe area. */}
+        {restorePrompt?.stage === 'offering' && (
+          <SafeAreaView
+            testID="restore-overlay"
+            style={[StyleSheet.absoluteFill, styles.root]}
+            edges={['top', 'bottom', 'left', 'right']}>
+            <RestoreOffer
+              unreadable={restorePrompt.unreadable}
+              onEnterKey={() => setRestorePrompt({ stage: 'entering' })}
+              onRefuse={() => setRestorePrompt(null)}
+            />
+          </SafeAreaView>
+        )}
+
+        {restorePrompt?.stage === 'entering' && (
+          <SafeAreaView
+            testID="restore-overlay"
+            style={[StyleSheet.absoluteFill, styles.root]}
+            edges={['top', 'bottom', 'left', 'right']}>
+            <RecoveryKeyEntry
+              onCancel={() => setRestorePrompt(null)}
+              onSubmit={async key => {
+                const session = sessionClientRef.current
+                const found = restoreTargetRef.current
+                if (session === null || found === null) return 'failed'
+                const outcome = await restoreFromKey(session, found, key)
+                if (!outcome.restored) return outcome.because
+                logEvent('info', 'MESSAGR_RESTORE_DONE', {
+                  imported: outcome.imported,
+                })
+                // WITHOUT RELAUNCHING, which is #219's second criterion and
+                // the reason `refreshListRef` exists. The keys are in the
+                // store now; what is stale is every row derived before they
+                // arrived, and the conversation open behind this if there is
+                // one.
+                // THE SCREEN STAYS, and says what came back. Closing here
+                // would leave somebody who has just typed their only copy of
+                // a secret with nothing that said it worked -- and the list
+                // behind takes a moment to derive again.
+                await refreshListRef.current?.().catch(() => {})
+                return { imported: outcome.imported }
+              }}
             />
           </SafeAreaView>
         )}

@@ -528,5 +528,34 @@ export const de: Readonly<Record<CopyKey, string>> = {
   backup_key_copy: 'Schlüssel kopieren',
   backup_key_copied: 'Schlüssel kopiert.',
   backup_key_done: 'Ich habe meinen Schlüssel abgelegt',
+  restore_offer_title: 'Ihre älteren Nachrichten sind da',
+  restore_offer_lead:
+    'Dieses Gerät kann sie nicht öffnen: die Schlüssel dafür gingen mit der vorigen Installation.',
+  'restore_offer_scope %1$d': '%1$d Unterhaltungen sind in diesem Zustand.',
+  restore_offer_have:
+    'Auf dem Server liegt eine Sicherung. Ihr Wiederherstellungsschlüssel öffnet sie wieder, hier, ohne etwas neu zu installieren.',
+  restore_offer_accept: 'Meinen Wiederherstellungsschlüssel eingeben',
+  restore_offer_refuse: 'Später',
+  restore_offer_later:
+    'Sie können es später in den Einstellungen tun. Ohne den Schlüssel funktioniert die Anwendung: verschlossen bleibt die Vergangenheit, nicht die Gegenwart.',
+  restore_key_title: 'Ihr Wiederherstellungsschlüssel',
+  restore_key_lead: 'Der, der Ihnen ein einziges Mal gezeigt wurde.',
+  restore_key_field: 'Schlüssel einfügen oder eintippen',
+  restore_key_confirm: 'Meine Nachrichten wieder öffnen',
+  restore_key_cancel: 'Abbrechen',
+  restore_key_working: 'Wird geöffnet…',
+  restore_key_not_a_key:
+    'Das ist kein Wiederherstellungsschlüssel. Vielleicht fehlt ein Teil der eingefügten Zeile.',
+  restore_key_wrong:
+    'Dieser Schlüssel öffnet diese Sicherung nicht. Vielleicht gehört er zu einem anderen Konto.',
+  restore_key_failed:
+    'Die Sicherung konnte nicht geladen werden. Versuchen Sie es erneut.',
+  'restore_done %1$d':
+    '%1$d Schlüssel sind zurück. Ihre älteren Nachrichten sind wieder lesbar.',
+  restore_done_none:
+    'Die Sicherung ging auf, enthielt aber keinen Schlüssel für das, was dieses Gerät zeigt.',
+  restore_done_close: 'Schließen',
+  settings_restore: 'Meine älteren Nachrichten zurückholen',
+  settings_restore_hint: 'Wenn Sie Ihren Wiederherstellungsschlüssel haben.',
   back_to_newest: 'Zurück zur neuesten Nachricht',
 }

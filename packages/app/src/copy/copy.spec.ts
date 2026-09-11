@@ -58,8 +58,16 @@ describe('the copy catalogue', () => {
     // deciding something. The offer says what the server can and cannot do
     // -- read it, prove nothing was replaced -- which is the substance,
     // without putting the word next to a pair of buttons.
+    //
+    // EXTENDED TO `restore_*` WITH THE KEYS THEMSELVES. The rule is about
+    // the moment, not about a prefix: somebody entering a recovery key on a
+    // reinstalled telephone is deciding something too, and an explanation of
+    // encryption there would make durability look like a setting in exactly
+    // the same way.
     const talking = Object.entries(fr).filter(
-      ([key, value]) => key.startsWith('backup_') && /chiffr/i.test(value),
+      ([key, value]) =>
+        (key.startsWith('backup_') || key.startsWith('restore_')) &&
+        /chiffr/i.test(value),
     )
     expect(talking).toEqual([])
   })

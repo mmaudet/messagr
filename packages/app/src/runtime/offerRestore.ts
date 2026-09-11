@@ -1,3 +1,5 @@
+import type { SecretStore } from './sessionStore'
+
 /**
  * What a device with an unreadable past should do about it, and in what
  * order.
@@ -69,4 +71,42 @@ export function offerRestore(state: {
   if (!state.backupExists || state.asked) return { offer: false }
   if (state.unreadable <= 0) return { offer: false }
   return { offer: true, unreadable: state.unreadable }
+}
+
+/**
+ * Whether this device has already put the question.
+ *
+ * **Defaults to TRUE when the store will not answer**, which is the same
+ * direction `backupPrompt.ts` chose and for the same reason: of the two ways
+ * to be wrong, asking again somebody who already said no is the one this
+ * product refuses. A device whose keystore is having a bad day says nothing
+ * and offers the door in Réglages instead.
+ */
+export async function askedToRestore(store: SecretStore): Promise<boolean> {
+  try {
+    return (await store.read()) !== null
+  } catch {
+    return true
+  }
+}
+
+/**
+ * Records that the question was put.
+ *
+ * Called BEFORE the answer, like the backup's: an offer interrupted -- the
+ * application killed, the screen turned -- is an offer that was made, and
+ * asking again is the nagging ADR-0013 refuses.
+ *
+ * `false` when it could not be kept, rather than a throw. Failing to
+ * remember a question is not a reason to stop somebody answering it.
+ */
+export async function rememberRestoreAsked(
+  store: SecretStore,
+): Promise<boolean> {
+  try {
+    await store.write('yes')
+    return true
+  } catch {
+    return false
+  }
 }
