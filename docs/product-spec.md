@@ -910,25 +910,47 @@ would be the worst kind of lie this product can tell.
 
 Two gates, in that order, before anything else happens.
 
-**The language is chosen by dragging a thumb across flags.** Not a dropdown: a
-horizontally snapping strip, and whichever language is centred is the one the
-screen is speaking **while the drag is happening**. Trying a language costs a
-thumb movement rather than a decision, and somebody who cannot read the screen
-does not have to guess which menu holds the languages — the flags are visible
-at rest and the screen answers as they pass.
+**The language is chosen from a list that opens when tapped.** This section
+described a horizontally snapping strip, retranslating the screen as the thumb
+dragged, and that is what shipped first. It was the account holder’s own idea
+and it read well: trying a language cost a thumb movement rather than a
+decision. **Nobody scrolled it.** A tester installed the application on
+8 September 2026, wanted another language, and could not find where to change
+it — on the first screen, where the control is the screen’s own business, and
+again in Réglages. Two chevrons were not enough of an affordance, and the
+people arguing they would be already knew the control was there.
+
+So: what every operating system does. A row showing the current language with
+a chevron, and a list on top when it is tapped — *« une liste déroulante
+classique y compris dans la page des paramètres »*, in his words. What is lost
+is the retranslate-as-you-drag trick. What is gained is that somebody who
+cannot read the screen can see there is a choice at all, which was the whole
+reason the control had to be legible in the first place.
 
 **A flag and the language’s own name for itself**, never the flag alone. A flag
 names a country and not a language; the endonym settles that without giving up
 the recognisability that made the flag worth having, which matters when the
-strip has to be readable by somebody who cannot read the screen behind it.
+control has to be readable by somebody who cannot read the screen behind it.
 
-**Six languages: FR, EN, DE, ES, IT, NL**, each a complete catalogue. Complete
-is enforced by the compiler — a catalogue is `Record<CopyKey, string>`, which
-has no optional keys — and **there is no fallback to French**, because a
+**Six languages: FR, EN, DE, ES, IT, NL**, each a complete catalogue — and
+**Uzbek, which is a seventh and does not belong to that list**. The six are the
+languages of the flows this product is built for. Uzbek was asked for, and the
+reason it could be granted in an afternoon is the property below rather than
+any reasoning about flows. Saying so keeps the six honest and keeps the next
+reader from finding a strategy here that was never there.
+
+Complete is enforced by the compiler — a catalogue is `Record<CopyKey, string>`,
+which has no optional keys — and **there is no fallback to French**, because a
 fallback is how a half-translated language ships and nobody notices: the screen
 reads fine to whoever wrote it. Tests assert that every catalogue carries
 exactly French’s keys, has no empty string, and keeps every placeholder French
-has.
+has. Uzbek adds one more: it is written in both the Latin and the Cyrillic
+alphabet, this catalogue is the Latin one, and a Cyrillic а among the Latin ones
+is invisible in every typeface — so a test refuses any Cyrillic letter in it.
+
+**The list stops on a half row.** Seven languages behind a clean cut at six is
+a list that looks like a list of six, which is the same mistake as the strip
+above: an affordance obvious to whoever already knows what is below it.
 
 **What an unset choice falls back to is the device’s own language**, when this
 application speaks it, and French otherwise. Not French unconditionally: a
