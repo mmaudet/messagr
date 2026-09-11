@@ -76,7 +76,8 @@ export const es: Readonly<Record<CopyKey, string>> = {
   settings_section_account_note:
     'Lo que le identifica, y lo que le permite volver.',
   settings_row_lang_label: 'Idioma de la aplicación',
-  settings_row_lang_hint: 'Español · seis idiomas, elegidos al primer arranque',
+  settings_row_lang_hint:
+    'Español · siete idiomas, elegidos al primer arranque',
   settings_row_recovery_label: 'Recuperación de la cuenta',
   settings_row_recovery_hint:
     'Clave de recuperación · validación por alguien cercano, caja con PIN (V1.1) · sin depósito: nadie más guarda la clave de sus mensajes',

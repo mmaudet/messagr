@@ -60,7 +60,7 @@ export type TabGlyph =
   // FOUR MORE, FOR THE SELECTION BAR, and the same door as the speaker.
   //
   // The bar said its actions in words, deliberately: the identity has no bin
-  // and no clipboard, two words survive six catalogues without anybody
+  // and no clipboard, two words survive every catalogue without anybody
   // guessing at a pictogram, and they read aloud for free. That held while
   // there were three actions. There are five now -- copy, forward, keep,
   // save, remove -- and measured on a Pixel 10 Pro Fold the row broke: the

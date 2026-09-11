@@ -129,9 +129,9 @@ describe('every catalogue', () => {
 describe('no screen writes a label of its own', () => {
   // WHAT `every catalogue` CANNOT SEE.
   //
-  // The tests above prove the six catalogues agree with each other. They
+  // The tests above prove the catalogues agree with each other. They
   // cannot prove a screen *asks* them: a French sentence written straight
-  // into a component renders French in all six languages and every
+  // into a component renders French in every language and every
   // assertion here stays green. That is the realistic mistake -- nobody
   // removes a translation, somebody adds a screen in a hurry.
   //

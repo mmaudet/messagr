@@ -3,10 +3,11 @@
  *
  * # WHY THIS IS NOT A TRANSLATED SENTENCE
  *
- * « 3 min 42 s » would need six catalogues and four plural forms, and it
+ * « 3 min 42 s » would need a sentence in every catalogue and four plural
+ * forms, and it
  * would still be longer than the row has space for. A clock is what every
  * telephone in the world prints beside a call, it is read the same way in
- * the six languages this product speaks, and `CallScreen`'s own `Elapsed`
+ * every language this product speaks, and `CallScreen`'s own `Elapsed`
  * already prints the same shape while the call is happening -- so the number
  * a person watched during the call is the number they see afterwards.
  *

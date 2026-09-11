@@ -78,7 +78,8 @@ export const de: Readonly<Record<CopyKey, string>> = {
   settings_section_account_note:
     'Was Sie ausweist, und was Sie zurückkehren lässt.',
   settings_row_lang_label: 'Sprache der App',
-  settings_row_lang_hint: 'Deutsch · sechs Sprachen, beim ersten Start gewählt',
+  settings_row_lang_hint:
+    'Deutsch · sieben Sprachen, beim ersten Start gewählt',
   settings_row_recovery_label: 'Kontowiederherstellung',
   settings_row_recovery_hint:
     'Wiederherstellungsschlüssel · Bestätigung durch eine nahestehende Person, PIN-Tresor (V1.1) · keine Hinterlegung: niemand sonst hält den Schlüssel zu Ihren Nachrichten',

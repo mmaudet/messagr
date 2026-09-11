@@ -3,7 +3,11 @@ import { describe, expect, it } from 'vitest'
 import { LANGUAGES, languageOf } from './languages'
 
 describe('LANGUAGES', () => {
-  it('offers the six the identity names', () => {
+  it('offers the six the identity names, and Uzbek', () => {
+    // The list, spelled out, so adding a language is a deliberate edit here
+    // rather than a side effect somewhere else. Uzbek is named apart on
+    // purpose: the first six follow from the flows this product was built
+    // for, and the seventh was asked for. See `languages.ts`.
     expect(LANGUAGES.map(l => l.code)).toEqual([
       'fr',
       'en',
@@ -11,6 +15,7 @@ describe('LANGUAGES', () => {
       'es',
       'it',
       'nl',
+      'uz',
     ])
   })
 
@@ -24,6 +29,10 @@ describe('LANGUAGES', () => {
       'Español',
       'Italiano',
       'Nederlands',
+      // Latin script, and `oʻ` written with the modifier letter turned comma
+      // (U+02BB) rather than an apostrophe: that is the standard form, and
+      // `copy.spec.ts` checks this string against the one in `uz.ts`.
+      'Oʻzbekcha',
     ])
   })
 

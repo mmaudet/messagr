@@ -7,7 +7,7 @@ import type { Stamp } from '../timeline/whenShown'
  * `whenShown.ts` decides *which* of the four shapes a moment takes — a time,
  * yesterday, a weekday, a date — and this says it in words. The two are
  * apart because the first is arithmetic worth testing without a catalogue
- * and the second is six catalogues with no arithmetic in them.
+ * and the second is one line per catalogue with no arithmetic in it.
  *
  * Shared rather than copied: it was written twice the moment a second list
  * needed it, and two copies of a date format are two chances for two lists

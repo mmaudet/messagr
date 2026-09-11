@@ -5,13 +5,14 @@ import { de } from './de'
 import { es } from './es'
 import { it } from './it'
 import { nl } from './nl'
+import { uz } from './uz'
 import type { Language } from './languages'
 
 /**
  * Where every user-facing string in this application comes from.
  *
  * A screen holds no text. That is the whole property, and it is what made the
- * other five languages a catalogue each rather than a rewrite.
+ * other languages a catalogue each rather than a rewrite.
  *
  * # Every catalogue is complete, and the compiler is what says so
  *
@@ -30,7 +31,7 @@ import type { Language } from './languages'
  */
 const CATALOGUES: Readonly<
   Record<Language, Readonly<Record<CopyKey, string>>>
-> = { fr, en, de, es, it, nl }
+> = { fr, en, de, es, it, nl, uz }
 
 let chosen: Language = 'fr'
 let catalogue: Readonly<Record<CopyKey, string>> = fr

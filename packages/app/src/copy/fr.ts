@@ -99,7 +99,7 @@ export const fr = {
     'Ce qui vous identifie, ce qui vous permet de revenir.',
   settings_row_lang_label: "Langue de l'application",
   settings_row_lang_hint:
-    'Français · six langues, choisies au premier lancement',
+    'Français · sept langues, choisies au premier lancement',
   settings_row_recovery_label: 'Récupération de compte',
   settings_row_recovery_hint:
     "Clé de récupération · validation par un proche, coffre PIN (V1.1) · aucun séquestre : personne d'autre ne détient la clé de vos messages",

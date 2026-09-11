@@ -237,9 +237,13 @@ const styles = StyleSheet.create({
     color: color.neutral['600'],
     paddingHorizontal: space.m,
   },
-  // Six rows fit any phone; bounded anyway so a seventh language never pushes
-  // the sheet off the screen.
-  list: { maxHeight: ITEM * 6 },
+  // THE HALF ROW IS THE POINT. Bounded so the sheet never pushes off the
+  // screen -- but bounded on a half row rather than a whole one, because
+  // there are seven languages now and a list cut cleanly at six looks like a
+  // list of six. That is the same mistake as the strip above: an affordance
+  // obvious to whoever already knows what is below it. Whoever came here for
+  // the seventh language is exactly the person who must not have to guess.
+  list: { maxHeight: ITEM * 6.5 },
   option: {
     flexDirection: 'row',
     alignItems: 'center',
