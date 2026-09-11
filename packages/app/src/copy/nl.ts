@@ -493,6 +493,23 @@ export const nl: Readonly<Record<CopyKey, string>> = {
   backup_offer_accept: 'Mijn sleutels bewaren',
   backup_offer_refuse: 'Nu niet',
   backup_offer_later: 'U kunt het later inschakelen bij Instellingen.',
+  backup_replace_title: 'Uw herstelsleutel vervangen',
+  backup_replace_lead: 'Voordat u beslist: wat dit meeneemt.',
+  backup_replace_fact_old: 'De oude sleutel opent niets meer',
+  backup_replace_old_body:
+    'De back-up die hij opende wordt van de server gehaald. Hebt u hem ergens genoteerd waarover u geen zeggenschap meer hebt, dan is dat papier nu niets meer waard — dat is de bedoeling.',
+  backup_replace_fact_new: 'De nieuwe wordt één keer getoond',
+  backup_replace_new_body:
+    'Zoals de eerste. Houd iets bij de hand om hem op te schrijven voordat u doorgaat.',
+  backup_replace_final:
+    'Uw berichten blijven bewaard, onder de nieuwe sleutel. De oude komt niet terug.',
+  backup_replace_confirm: 'Ja, vervang mijn sleutel',
+  backup_replace_cancel: 'Annuleren',
+  backup_replace_working: 'Bezig met vervangen…',
+  backup_replace_failed:
+    'De vervanging is niet doorgegaan en er is niets veranderd: uw oude sleutel opent uw back-up nog steeds.',
+  backup_key_old_still_opens:
+    'De oude sleutel kon niet worden ingetrokken: hij opent de oude back-up nog. U kunt opnieuw beginnen vanuit Instellingen.',
   backup_key_title: 'Uw herstelsleutel',
   backup_key_lead: 'Kopieer hem nu en bewaar hem in een wachtwoordmanager.',
   backup_key_once:

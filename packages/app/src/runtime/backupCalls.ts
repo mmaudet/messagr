@@ -125,3 +125,45 @@ export async function downloadKeys(
   )
   return JSON.parse(answer)
 }
+
+/**
+ * Retires a backup version: `DELETE /room_keys/version/{version}`.
+ *
+ * # WHAT THIS DESTROYS, AND WHY IT IS CALLED ANYWAY
+ *
+ * Every key the homeserver held under that version, and with them the only
+ * thing the old restore key opened. There is no undo: the homeserver keeps
+ * no copy of what it deletes, and this application never held one.
+ *
+ * It is called because the alternative is a false sentence. Réglages says a
+ * replaced key « cessera d'ouvrir quoi que ce soit », and somebody replaces
+ * a key precisely when they think the old one is written down somewhere they
+ * cannot account for. A replacement that left the old backup standing would
+ * leave that paper opening everything, which is the one thing the person was
+ * trying to stop.
+ *
+ * # IT IS THE LAST STEP AND THAT IS NOT ARBITRARY
+ *
+ * See `replaceBackup.ts`: the new version is published, remembered and
+ * enabled first. Between enabling and this call both versions stand, which
+ * costs nothing — two keys open two backups and both are the person's. Doing
+ * it the other way round leaves a window where the old backup is gone and
+ * the new one is not yet running, and a device that stops there has no
+ * backup at all and a key that opens nothing.
+ *
+ * A failure here is therefore survivable and must be REPORTED rather than
+ * swallowed: the replacement worked, and the old key still opens the old
+ * backup. That is a true sentence somebody can act on, and « c'est fait »
+ * would not be.
+ */
+export async function retireVersion(
+  http: HttpRequester,
+  version: string,
+): Promise<void> {
+  await http.authedRequest(
+    'DELETE',
+    `/_matrix/client/v3/room_keys/version/${encodeURIComponent(version)}`,
+    {},
+    undefined,
+  )
+}

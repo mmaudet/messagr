@@ -494,6 +494,23 @@ export const es: Readonly<Record<CopyKey, string>> = {
   backup_offer_accept: 'Guardar mis claves',
   backup_offer_refuse: 'Ahora no',
   backup_offer_later: 'Podrá activarlo más tarde desde Ajustes.',
+  backup_replace_title: 'Sustituir su clave de recuperación',
+  backup_replace_lead: 'Antes de decidir, lo que este gesto se lleva.',
+  backup_replace_fact_old: 'La clave antigua no abrirá nada',
+  backup_replace_old_body:
+    'La copia que abría se retira del servidor. Si la anotó en algún sitio que ya no controla, ese papel ya no vale nada: ese es el objetivo.',
+  backup_replace_fact_new: 'La nueva se muestra una sola vez',
+  backup_replace_new_body:
+    'Como la primera. Tenga con qué anotarla a mano antes de continuar.',
+  backup_replace_final:
+    'Sus mensajes siguen respaldados, bajo la nueva clave. La antigua no se recupera.',
+  backup_replace_confirm: 'Sí, sustituir mi clave',
+  backup_replace_cancel: 'Cancelar',
+  backup_replace_working: 'Sustituyendo…',
+  backup_replace_failed:
+    'La sustitución no se ha completado y nada ha cambiado: su clave antigua sigue abriendo su copia.',
+  backup_key_old_still_opens:
+    'La clave antigua no se ha podido retirar: sigue abriendo la copia antigua. Puede volver a empezar desde Ajustes.',
   backup_key_title: 'Su clave de recuperación',
   backup_key_lead: 'Cópiela ahora y guárdela en un gestor de contraseñas.',
   backup_key_once: 'No volverá a mostrarse. Sin ella, la copia no se abre.',

@@ -59,6 +59,15 @@ import {
 describe('boot', () => {
   let report: RuntimeReport
   let shape: GeometryReport
+  /**
+   * The first recovery key, read off the screen that shows it once.
+   *
+   * Module-level rather than passed, because the two tests that need it are
+   * the acceptance and the replacement, and the only moment the value exists
+   * is between them. `undefined` if the screen would not give it up, which
+   * the replacement test treats as a failure rather than as "different".
+   */
+  let firstKey: string | undefined
 
   // Jest's per-test testTimeout (jest.config.js) does not cover beforeAll:
   // hooks fall back to Jest's own 5000ms default unless given one here. A
@@ -404,6 +413,12 @@ describe('boot', () => {
       .toBeVisible()
       .withTimeout(60000)
 
+    // KEPT FOR THE TEST BELOW, which has to prove the replacement is a
+    // DIFFERENT key. Read here because this is the only moment it is on a
+    // screen: nothing brings it back.
+    const first = await element(by.id('recovery-key-value')).getAttributes()
+    firstKey = 'text' in first ? first.text : undefined
+
     // AND IT IS INSIDE THE SAFE AREA, WHICH A PHOTOGRAPH FOUND FIRST.
     //
     // Moving these two overlays to be the last children of the root fixed
@@ -452,6 +467,63 @@ describe('boot', () => {
     // the backup screen inside the press handler drew the Réglages list under
     // the finger and the rest of the gesture hit the row beneath. That is
     // fixed in `App.tsx`; this is what notices if it comes back.
+    await waitFor(element(by.id('backup-settings-replace')))
+      .toBeVisible()
+      .withTimeout(30000)
+  })
+
+  it('replaces the recovery key, and shows a different one', async () => {
+    // THE ONE RUN WHERE THIS CAN BE TESTED, for the same reason as the test
+    // above: a key is shown once, and the only place a SECOND first-showing
+    // exists is immediately after the first, on the same fresh account.
+    //
+    // Deliberately continuing from where that test left off -- on the backup
+    // screen, backup on -- rather than navigating again. The state this
+    // needs is the state that one ends in.
+    await element(by.id('backup-settings-replace')).tap()
+
+    // THE CONFIRMATION STANDS BETWEEN THE ROW AND THE GESTURE. Tapping the
+    // row must not replace anything: this is the assertion that the
+    // irreversible half is gated, and it would pass vacuously if the panel
+    // never appeared, which is why the key screen is asserted absent here
+    // rather than only the panel present.
+    await waitFor(element(by.id('backup-replace-consequences')))
+      .toBeVisible()
+      .withTimeout(30000)
+    await detoxExpect(element(by.id('recovery-key-value'))).not.toBeVisible()
+
+    await element(by.id('backup-replace-confirm')).tap()
+
+    // Publishes a new version, remembers it, enables it, retires the old.
+    await waitFor(element(by.id('recovery-key-value')))
+      .toBeVisible()
+      .withTimeout(60000)
+
+    // AND IT IS A DIFFERENT KEY. Without this the test passes on a screen
+    // that re-showed the first one, which is the failure that would matter
+    // most: somebody told their key was replaced while holding the old one.
+    const shown = await element(by.id('recovery-key-value')).getAttributes()
+    const replacement = 'text' in shown ? shown.text : undefined
+    if (typeof replacement !== 'string' || replacement.trim() === '') {
+      throw new Error('the replacement key was not readable from the screen')
+    }
+    if (replacement === firstKey) {
+      throw new Error(
+        `the replacement is the first key again: ${replacement}. A new
+         version was published and the screen showed what it already had.`,
+      )
+    }
+
+    // The retirement worked, so the screen says nothing about the old key
+    // still opening anything. Asserted because the sentence is the whole
+    // point of carrying `oldRetired` through three layers: a run where it
+    // appears is a run where the DELETE failed, and that must not pass
+    // silently as success.
+    await detoxExpect(
+      element(by.id('recovery-key-old-still-opens')),
+    ).not.toBeVisible()
+
+    await element(by.id('recovery-key-done')).tap()
     await waitFor(element(by.id('backup-settings-replace')))
       .toBeVisible()
       .withTimeout(30000)

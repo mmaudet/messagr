@@ -43,10 +43,12 @@ import {
 } from 'react-native-matrix-crypto'
 
 import { acceptBackup, type BackupAccepted } from './acceptBackup'
+import { replaceBackup, type BackupReplaced } from './replaceBackup'
 import {
   downloadKeys,
   publishVersion,
   readVersion,
+  retireVersion,
   type BackupVersionInfo,
 } from './backupCalls'
 import {
@@ -1110,6 +1112,37 @@ export async function acceptKeyBackup(
     publishVersion: body => publishVersion(http, body),
     remember: commitment => rememberBackupCommitment(backupSecrets, commitment),
     enable: (sealingKey, version) => enableKeyBackup(sealingKey, version),
+  })
+}
+
+/**
+ * Replaces the recovery key: a new one, and the end of the old.
+ *
+ * The same four steps `acceptKeyBackup` runs, plus reading what the
+ * homeserver currently holds before any of them and retiring it after all of
+ * them. `replaceBackup.ts` argues both positions; neither is arbitrary.
+ *
+ * The 404 predicate is the same one `findBackupOnAccount` uses and for the
+ * same reason: an account with no backup is an ordinary answer, not a
+ * failure, and a device in that state is simply accepting one.
+ */
+export async function replaceKeyBackup(
+  sessionClient: ReturnType<typeof createClient>,
+): Promise<BackupReplaced> {
+  const http = makePumpHttp(sessionClient)
+  return replaceBackup({
+    createKeyBackup,
+    publishVersion: body => publishVersion(http, body),
+    remember: commitment => rememberBackupCommitment(backupSecrets, commitment),
+    enable: (sealingKey, version) => enableKeyBackup(sealingKey, version),
+    currentVersion: async () => {
+      const found = await readVersion(
+        http,
+        cause => cause instanceof PumpHttpError && cause.status === 404,
+      )
+      return found?.version ?? null
+    },
+    retire: version => retireVersion(http, version),
   })
 }
 

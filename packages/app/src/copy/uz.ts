@@ -509,6 +509,23 @@ export const uz: Readonly<Record<CopyKey, string>> = {
   backup_offer_accept: 'Kalitlarimni zaxiralash',
   backup_offer_refuse: 'Hozir emas',
   backup_offer_later: 'Buni keyinroq Sozlamalardan yoqishingiz mumkin.',
+  backup_replace_title: 'Tiklash kalitingizni almashtirish',
+  backup_replace_lead: 'Qaror qilishdan oldin, bu imo nimani olib ketadi.',
+  backup_replace_fact_old: 'Eski kalit endi hech nimani ochmaydi',
+  backup_replace_old_body:
+    'U ochgan zaxira serverdan olib tashlanadi. Agar uni oʻzingiz endi nazorat qilmaydigan joyga yozib qoʻygan boʻlsangiz, u qogʻoz endi hech narsaga arzimaydi — maqsad ham shu.',
+  backup_replace_fact_new: 'Yangisi bir marta koʻrsatiladi',
+  backup_replace_new_body:
+    'Birinchisi kabi. Davom etishdan oldin yozib olish uchun nimadir tayyor tursin.',
+  backup_replace_final:
+    'Xabarlaringiz yangi kalit ostida zaxirada qoladi. Eskisi qaytmaydi.',
+  backup_replace_confirm: 'Ha, kalitimni almashtiring',
+  backup_replace_cancel: 'Bekor qilish',
+  backup_replace_working: 'Almashtirilmoqda…',
+  backup_replace_failed:
+    'Almashtirish oʻtmadi va hech nima oʻzgarmadi: eski kalitingiz zaxirangizni hamon ochadi.',
+  backup_key_old_still_opens:
+    'Eski kalitni olib tashlab boʻlmadi: u eski zaxirani hamon ochadi. Sozlamalardan qaytadan boshlashingiz mumkin.',
   backup_key_title: 'Tiklash kalitingiz',
   backup_key_lead: 'Uni hozir nusxalang va parol menejerida saqlang.',
   backup_key_once:

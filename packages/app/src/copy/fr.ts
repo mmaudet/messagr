@@ -737,6 +737,23 @@ export const fr = {
   backup_offer_accept: 'Sauvegarder mes clés',
   backup_offer_refuse: 'Pas maintenant',
   backup_offer_later: 'Vous pourrez l’activer plus tard depuis Réglages.',
+  backup_replace_title: 'Remplacer votre clé de récupération',
+  backup_replace_lead: 'Avant de décider, ce que ce geste emporte.',
+  backup_replace_fact_old: "L'ancienne clé n'ouvrira plus rien",
+  backup_replace_old_body:
+    "La sauvegarde qu'elle ouvrait est retirée du serveur. Si vous l'aviez notée quelque part que vous ne maîtrisez plus, ce papier ne vaut plus rien — c'est le but.",
+  backup_replace_fact_new: 'La nouvelle est montrée une seule fois',
+  backup_replace_new_body:
+    'Comme la première. Ayez de quoi la noter sous la main avant de continuer.',
+  backup_replace_final:
+    "Vos messages restent sauvegardés, sous la nouvelle clé. L'ancienne ne se retrouve pas.",
+  backup_replace_confirm: 'Oui, remplacer ma clé',
+  backup_replace_cancel: 'Annuler',
+  backup_replace_working: 'Remplacement…',
+  backup_replace_failed:
+    "Le remplacement n'a pas abouti, et rien n'a changé : votre ancienne clé ouvre toujours votre sauvegarde.",
+  backup_key_old_still_opens:
+    "L'ancienne clé n'a pas pu être retirée : elle ouvre encore l'ancienne sauvegarde. Vous pouvez recommencer depuis Réglages.",
   backup_key_title: 'Votre clé de récupération',
   backup_key_lead:
     'Copiez-la maintenant et rangez-la dans un gestionnaire de mots de passe.',

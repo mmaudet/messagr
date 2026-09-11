@@ -58,6 +58,7 @@ import { NotchedButton } from './NotchedButton'
  */
 export function RecoveryKeyShown({
   recoveryKey,
+  oldStillOpens = false,
   onCopy,
   onDone,
 }: {
@@ -74,6 +75,15 @@ export function RecoveryKeyShown({
    * they pasted and take it by hand if it is not there.
    */
   readonly onCopy: () => void
+  /**
+   * Whether a replacement left the old key opening the old backup.
+   *
+   * Only a replacement can set it, and only when the retirement failed --
+   * see `replaceBackup.ts`. It is carried all the way to this screen rather
+   * than logged, because the person standing here is the only one who can
+   * act on it and the sentence they would otherwise read is « c'est fait ».
+   */
+  readonly oldStillOpens?: boolean
   readonly onDone: () => void
 }) {
   const [copied, setCopied] = useState(false)
@@ -96,6 +106,19 @@ export function RecoveryKeyShown({
       <View style={[styles.card, styles.weigh]} testID="recovery-key-once">
         <Text style={styles.body}>{t('backup_key_once')}</Text>
       </View>
+
+      {/* THE HALF THAT DID NOT WORK, SAID ON THE SCREEN THAT CELEBRATES THE
+          HALF THAT DID. A replacement whose retirement failed hands back a
+          working new key AND leaves the old one opening the old backup.
+          Somebody replaces a key precisely because they have lost track of
+          it, so this is the sentence the whole gesture was about. */}
+      {oldStillOpens && (
+        <View
+          style={[styles.card, styles.weigh]}
+          testID="recovery-key-old-still-opens">
+          <Text style={styles.body}>{t('backup_key_old_still_opens')}</Text>
+        </View>
+      )}
 
       <View style={styles.actions}>
         <NotchedButton
