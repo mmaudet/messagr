@@ -114,6 +114,12 @@ if [ "$WHICH" != "android" ]; then
     # Neither of the two steps below is allowed to fail the build. The
     # artefact is with Apple by now; a changelog that did not publish is a
     # command to run again, not a build to redo.
+    # LES ÉTIQUETTES D'ABORD, comme le fait la moitié Android. Sans elles
+    # le compteur du dépôt repart d'où il croit en être, et un `build-<n>`
+    # déjà poussé serait réattribué -- ce que seul le `git push` découvrirait,
+    # une fois l'artefact parti chez Apple.
+    git -C "$ROOT" fetch --tags --quiet || true
+
     NOTES="$WORK/notes-$NEXT.md"
     if node "$ROOT/scripts/release-notes.mjs" ios "$NEXT" > "$NOTES"; then
       node "$ROOT/scripts/release-notes.mjs" ios "$NEXT" --publish ||
