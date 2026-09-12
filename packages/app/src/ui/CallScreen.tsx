@@ -150,7 +150,7 @@ export function CallScreen({
   onCamera,
   onSwitchCamera,
   onDismiss,
-  pictures = { local: null, remote: null },
+  pictures = { local: null, remote: null, refused: false },
   sendingVideo = false,
 }: {
   readonly state: CallState
@@ -297,6 +297,20 @@ export function CallScreen({
               {t('call_their_camera_off')}
             </Text>
           )}
+          {/* MA CAMÉRA, REFUSÉE, ET C'EST UNE AUTRE PHRASE.
+              Celle du dessus parle de l'AUTRE côté ; celle-ci parle d'ici.
+              Sans elle, quelqu'un dont la permission caméra a été refusée
+              voit un appel sans sa propre image et n'a aucun moyen de
+              distinguer « je n'ai pas allumé » de « le téléphone a dit
+              non » -- les deux dessinent exactement le même écran.
+
+              L'appel continue, et la phrase le dit : sans microphone il n'y
+              a pas d'appel, sans caméra il en reste un. */}
+          {pictures.refused && !over && (
+            <Text style={styles.aside} testID="call-camera-refused">
+              {t('call_camera_refused')}
+            </Text>
+          )}
           <Text style={styles.sentence} testID="call-state">
             {t(
               failure === undefined ? sentenceFor(state) : refusalFor(failure),
@@ -348,16 +362,27 @@ export function CallScreen({
               <Round
                 testID="call-mute"
                 label={muted ? t('call_unmute') : t('call_mute')}
+                on={muted}
                 tint={muted ? color.brand.green500 : color.neutral['600']}
                 onPress={() => onMute(!muted)}
                 glyph="mic"
               />
               {/* GREEN WHEN IT IS ON, like the mute beside it: on a screen
                   with two toggles and no labels-as-state, the fill IS the
-                  state, and one convention for both is one thing to learn. */}
+                  state, and one convention for both is one thing to learn.
+
+                  POUR UN ŒIL, ET SEULEMENT. Cette phrase était vraie et
+                  incomplète : au lecteur d'écran, ce bouton disait « haut-
+                  parleur » qu'il soit allumé ou éteint, et le vert était la
+                  seule indication. `on` porte l'état par
+                  `accessibilityState`, où la plateforme sait le dire. Les
+                  deux autres bascules l'ont aussi : leur libellé alterne,
+                  mais il nomme l'ACTION -- « couper le son » -- et non
+                  l'état, donc il ne suffisait pas non plus. */}
               <Round
                 testID="call-speaker"
                 label={t('call_speaker')}
+                on={speaker}
                 tint={speaker ? color.brand.green500 : color.neutral['600']}
                 onPress={() => onSpeaker(!speaker)}
                 glyph="speaker"
@@ -375,6 +400,7 @@ export function CallScreen({
                 label={
                   sendingVideo ? t('call_camera_off') : t('call_camera_on')
                 }
+                on={sendingVideo}
                 tint={
                   sendingVideo ? color.brand.green500 : color.neutral['600']
                 }
@@ -452,6 +478,7 @@ function Round({
   tint,
   onPress,
   glyph,
+  on,
 }: {
   readonly testID: string
   readonly label: string
@@ -463,6 +490,24 @@ function Round({
    * for a tab icon that means something else entirely.
    */
   readonly glyph: 'calls' | 'mic' | 'speaker' | 'cam'
+  /**
+   * Si ce contrôle est une bascule, et si elle est enclenchée.
+   *
+   * LE REMPLISSAGE EST L'ÉTAT, ET SEULEMENT POUR UN ŒIL. Le commentaire des
+   * bascules dit « the fill IS the state, and one convention for both is one
+   * thing to learn » — juste pour qui voit le vert, et faux pour qui écoute.
+   * Au lecteur d'écran, allumé et éteint sonnaient pareil.
+   *
+   * `accessibilityState` est le mécanisme de la plateforme pour ça, et il ne
+   * demande aucune copie : le lecteur dit lui-même « sélectionné », dans la
+   * langue du téléphone. Une clé de plus par bascule aurait dit la même chose
+   * en moins bien, et en sept exemplaires.
+   *
+   * `undefined` pour ce qui n'est pas une bascule — raccrocher et changer de
+   * caméra agissent, ils ne s'enclenchent pas — parce qu'annoncer « non
+   * sélectionné » sur un bouton qui ne se sélectionne jamais est du bruit.
+   */
+  readonly on?: boolean
 }) {
   return (
     <View style={styles.control}>
@@ -471,6 +516,7 @@ function Round({
         onPress={onPress}
         accessibilityRole="button"
         accessibilityLabel={label}
+        accessibilityState={on === undefined ? undefined : { selected: on }}
         style={({ pressed }) => [
           styles.round,
           { backgroundColor: tint },
