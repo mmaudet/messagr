@@ -339,6 +339,26 @@ describeRoundTrip('encrypted round trip', () => {
           .toBeVisible()
           .withTimeout(45000)
         await element(by.id('first-conversation')).tap()
+
+        // LA CONVERSATION EST-ELLE SEULEMENT OUVERTE ? C'EST LA QUESTION QUE
+        // CE TEST NE POSAIT PAS.
+        //
+        // Sans cette ligne, un échec disait « le fichier n'est jamais
+        // apparu » et laissait croire que l'application ne savait pas lire
+        // un `m.file` d'une autre implémentation. La capture d'échec de
+        // Detox montre autre chose : l'application est sur la LISTE, pas
+        // dans la conversation. Le fichier était bien lu -- le journal le
+        // dit par `MESSAGR_DOCUMENT_READ` -- et le test regardait un écran
+        // où il ne pouvait pas être.
+        //
+        // `conversation-input` est la preuve d'ouverture la moins ambiguë :
+        // il n'existe que dans une conversation. S'il n'apparaît pas, le
+        // message ci-dessous nomme la navigation plutôt que l'interop, et
+        // c'est une panne entièrement différente.
+        await waitFor(element(by.id('conversation-input')))
+          .toBeVisible()
+          .withTimeout(20000)
+
         // SUR LE NOM, parce que le nom EST le corps d'un `m.file` et que
         // c'est ce qu'une personne lit. Accentué à dessein : un aller-retour
         // qui ne passerait que de l'ASCII ne dirait rien des encodages, et
@@ -355,10 +375,23 @@ describeRoundTrip('encrypted round trip', () => {
     if (!seen) {
       throw new Error(
         `the file written by matrix-nio never appeared: no row named
-         ${COUNTERPARTY_FILE_NAME} across four launches. Either the room key
-         did not arrive -- see #234 -- or this application does not read an
-         m.file another implementation wrote, which is the thing this test
-         exists to find out.`,
+         ${COUNTERPARTY_FILE_NAME} across three launches.
+
+         READ THE DEVICE LOG BEFORE BLAMING THE INTEROP. The application says
+         MESSAGR_DOCUMENT_READ with the name when it has read the m.file, and
+         that line separates two failures this message used to confuse:
+
+           the line is there  -> the file was read, and this test was looking
+                                 at a screen it could not be on. The
+                                 conversation not opening reads exactly like
+                                 an interop failure and is not one.
+           the line is absent -> either the room key never arrived (#234) or
+                                 the application cannot read an m.file
+                                 another implementation wrote, which is the
+                                 thing this test exists to find out.
+
+         Measured on 12 September 2026: the line was there twice, and the
+         failure screenshot showed the conversation list.`,
       )
     }
     // Le budget de Jest est à 180 000 ms par défaut ; trois relances avec
