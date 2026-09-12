@@ -74,6 +74,3 @@ export type DocumentChoice =
   /** The person backed out. Not a failure, and nothing to report. */
   | { readonly chose: false; readonly because: null }
   | { readonly chose: false; readonly because: DocumentRefusal }
-
-/** The seam a library sits behind. */
-export type DocumentPicker = () => Promise<DocumentChoice>

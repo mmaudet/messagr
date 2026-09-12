@@ -42,21 +42,23 @@ export function Document({
   readonly name: string
   /** `null` when the sender stated none, which Matrix allows. */
   readonly size: number | null
-  readonly onSave: () => void
+  /**
+   * Enregistrer, quand l'écran sait le faire.
+   *
+   * ABSENT NE VEUT PAS DIRE « PAS DE LIGNE ». Une version précédente ne
+   * dessinait la rangée que si ce geste existait, et retombait sinon sur le
+   * texte : le `body` d'un `m.file` ÉTANT le nom du fichier, un document
+   * arrivé sur un écran sans sélecteur s'affichait comme une phrase disant
+   * « facture-2026.pdf ». C'est exactement ce que le commentaire d'à côté
+   * disait éviter.
+   */
+  readonly onSave?: () => void
   readonly testID?: string
 }) {
   const stated = statedSize(size)
 
-  return (
-    <Pressable
-      testID={testID}
-      onPress={onSave}
-      accessibilityRole="button"
-      // The name first, because that is what somebody is deciding about, and
-      // the action after it. A label reading « Save » alone would be five
-      // identical buttons on a screen with five documents on it.
-      accessibilityLabel={`${name}, ${t('selection_keep')}`}
-      style={styles.row}>
+  const inside = (
+    <>
       <TabIcon
         glyph="document"
         tint={color.neutral['600']}
@@ -70,6 +72,28 @@ export function Document({
           <Text style={styles.size}>{t(stated.key, stated.amount)}</Text>
         )}
       </View>
+    </>
+  )
+
+  if (onSave === undefined) {
+    return (
+      <View testID={testID} style={styles.row}>
+        {inside}
+      </View>
+    )
+  }
+
+  return (
+    <Pressable
+      testID={testID}
+      onPress={onSave}
+      accessibilityRole="button"
+      // The name first, because that is what somebody is deciding about, and
+      // the action after it. A label reading « Save » alone would be five
+      // identical buttons on a screen with five documents on it.
+      accessibilityLabel={`${name}, ${t('selection_keep')}`}
+      style={styles.row}>
+      {inside}
     </Pressable>
   )
 }

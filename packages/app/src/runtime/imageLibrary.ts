@@ -16,6 +16,8 @@ import { isOurs, sweepPickedLitter } from './pickedLitter'
 import { THUMBNAIL_EDGE, type ImageBytes, type PickedImage } from './pickImage'
 import { MOST_AT_ONCE } from './sendImages'
 
+import { bytesOf } from './base64'
+
 /**
  * Choosing a photograph from the library.
  *
@@ -268,21 +270,4 @@ async function thumbnailOf(
     // fallback to the full file is a path old events already take.
     return undefined
   }
-}
-
-/**
- * base64 to bytes.
- *
- * `atob` exists in Hermes and returns a string of char codes, each one a
- * byte — which is safe in this direction, unlike the other, where a string
- * conversion is what corrupts a photograph. See `receiveImage.ts` for the
- * encoder and why it is written out.
- */
-function bytesOf(base64: string): Uint8Array {
-  const binary = atob(base64)
-  const bytes = new Uint8Array(binary.length)
-  for (let at = 0; at < binary.length; at += 1) {
-    bytes[at] = binary.charCodeAt(at)
-  }
-  return bytes
 }

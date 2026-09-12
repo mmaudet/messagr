@@ -9,6 +9,8 @@ import {
   errorCodes,
   isErrorWithCode,
 } from '@react-native-documents/picker'
+
+import { bytesOf } from './base64'
 import {
   readFile,
   writeFile,
@@ -105,18 +107,4 @@ export function documentPlatform(): KeepingDocument {
     // would take the second one's bytes.
     name: () => `${Date.now()}-${Math.floor(Math.random() * 1e6)}`,
   }
-}
-
-/**
- * Base64 to bytes, written out for the reason `imageLibrary.ts` writes it
- * out: React Native has `atob` and no `Buffer`, and a one-line dependency
- * for this would be a dependency for this.
- */
-function bytesOf(base64: string): Uint8Array {
-  const binary = atob(base64)
-  const bytes = new Uint8Array(binary.length)
-  for (let at = 0; at < binary.length; at += 1) {
-    bytes[at] = binary.charCodeAt(at)
-  }
-  return bytes
 }
