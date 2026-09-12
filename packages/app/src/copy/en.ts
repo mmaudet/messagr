@@ -445,6 +445,17 @@ export const en: Readonly<Record<CopyKey, string>> = {
   settings_wake_off: 'Off',
   settings_wake_not_kept:
     'This choice could not be kept: it will return to its previous state at the next launch.',
+
+  // #208: the automatic keeping, and what the screen owes whoever is offered
+  // it. See the French, and ADR-0006's amendment of 12 September 2026.
+
+  settings_keep_every: 'Save photographs you receive',
+  settings_keep_every_hint:
+    'Every photograph you receive goes into your gallery before you have seen it, including ones from people you have not met yet. There it is readable by every application you give photo access to, and whoever sent it can no longer take it back.',
+  settings_keep_every_future:
+    'Turning it off retrieves nothing: what was saved stays saved.',
+  settings_keep_every_not_kept:
+    'This choice could not be kept: it will return to its previous state at the next launch.',
   promise_language: 'Choose your language',
   promise_terms: 'I accept Messagr’s terms and conditions of use.',
   promise_terms_link: 'Read the terms',

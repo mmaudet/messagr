@@ -445,6 +445,17 @@ export const nl: Readonly<Record<CopyKey, string>> = {
   settings_wake_off: 'Uit',
   settings_wake_not_kept:
     'Deze keuze kon niet worden bewaard: bij de volgende start geldt weer de vorige toestand.',
+
+  // #208: the automatic keeping, and what the screen owes whoever is offered
+  // it. See the French, and ADR-0006's amendment of 12 September 2026.
+
+  settings_keep_every: 'Ontvangen foto’s bewaren',
+  settings_keep_every_hint:
+    'Elke ontvangen foto komt in uw galerij voordat u hem hebt gezien, ook van mensen die u nog niet kent. Daar kan elke app die u toegang tot uw foto’s geeft hem lezen, en wie hem gestuurd heeft kan hem niet meer terugnemen.',
+  settings_keep_every_future:
+    'Uitzetten haalt niets terug: wat bewaard is, blijft bewaard.',
+  settings_keep_every_not_kept:
+    'Deze keuze kon niet worden bewaard: bij de volgende start geldt weer de vorige toestand.',
   promise_language: 'Kies uw taal',
   promise_terms: 'Ik aanvaard de algemene gebruiksvoorwaarden van Messagr.',
   promise_terms_link: 'De voorwaarden lezen',

@@ -445,6 +445,17 @@ export const es: Readonly<Record<CopyKey, string>> = {
   settings_wake_off: 'Desactivadas',
   settings_wake_not_kept:
     'Esta elección no se ha podido conservar: volverá a su estado anterior en el próximo arranque.',
+
+  // #208: the automatic keeping, and what the screen owes whoever is offered
+  // it. See the French, and ADR-0006's amendment of 12 September 2026.
+
+  settings_keep_every: 'Guardar las fotos recibidas',
+  settings_keep_every_hint:
+    'Cada foto recibida va a su galería antes de que usted la haya visto, incluidas las de personas que aún no conoce. Allí puede leerla cualquier aplicación a la que dé acceso a sus fotos, y quien la envió ya no puede retirarla.',
+  settings_keep_every_future:
+    'Apagarlo no recupera nada: lo que se guardó sigue guardado.',
+  settings_keep_every_not_kept:
+    'Esta elección no se ha podido conservar: volverá a su estado anterior en el próximo arranque.',
   promise_language: 'Elija su idioma',
   promise_terms: 'Acepto las condiciones generales de uso de Messagr.',
   promise_terms_link: 'Leer las condiciones',
