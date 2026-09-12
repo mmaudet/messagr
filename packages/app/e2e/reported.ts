@@ -1,4 +1,6 @@
 import { execFileSync } from 'node:child_process'
+import { mkdirSync, writeFileSync } from 'node:fs'
+import { join } from 'node:path'
 
 import { device } from 'detox'
 
@@ -143,8 +145,64 @@ function driving(): string {
   return id
 }
 
-/** Empties the device's log, so a relaunch cannot read the run before it. */
+/**
+ * Où les rapports sont gardés avant que le tampon soit vidé.
+ *
+ * # POURQUOI CE FICHIER EXISTE : #234 PORTE SUR CE QUI CHANGE ENTRE QUATRE
+ * LANCEMENTS, ET L'INSTRUMENT EN EFFAÇAIT TROIS
+ *
+ * `forgetTheLog` vide le tampon avant chaque lecture, et c'est juste pour ce
+ * qu'il fait : lire le rapport du lancement en cours sans attraper celui
+ * d'avant. C'est exactement le mauvais instrument pour une question qui
+ * porte sur une évolution.
+ *
+ * `roundTrip.test.ts` relance jusqu'à quatre fois en attendant une clé de
+ * salon. Quand il échoue, la question est : qu'est-ce qui a changé entre le
+ * premier lancement et le dernier ? La clé d'identité Curve25519 est-elle la
+ * même sous le même `device_id` ? Le journal du job ne contenait qu'un seul
+ * `MESSAGR_RUNTIME`, donc personne ne pouvait répondre.
+ *
+ * Alors chaque vidage écrit d'abord ce qu'il allait jeter. Un fichier de
+ * plus dans les artéfacts, aucune dépendance nouvelle, et la comparaison des
+ * quatre rapports devient une lecture.
+ *
+ * # CE QUE ÇA NE FAIT PAS
+ *
+ * Rien n'est déchiffré ici : `MESSAGR_RUNTIME` porte des clés publiques, des
+ * comptes et des durées, ce que le journal de l'appareil dit déjà. Ce
+ * fichier ne fait que l'empêcher de disparaître.
+ */
+const KEPT_LOGS = process.env.MESSAGR_KEPT_LOGS_DIR ?? '.artifacts/journaux'
+
+let keptSoFar = 0
+
+/**
+ * Empties the device's log, so a relaunch cannot read the run before it.
+ *
+ * Écrit ce qu'il jette, pour la raison ci-dessus. L'échec de l'écriture est
+ * avalé : garder une trace est un confort de diagnostic, et une suite qui
+ * mourrait parce qu'un répertoire n'existe pas serait pire que le silence
+ * qu'elle remplace.
+ */
 export function forgetTheLog(): void {
+  try {
+    const dumped = execFileSync('adb', ['-s', driving(), 'logcat', '-d'], {
+      maxBuffer: 64 * 1024 * 1024,
+    }).toString()
+    if (dumped.trim() !== '') {
+      keptSoFar += 1
+      mkdirSync(KEPT_LOGS, { recursive: true })
+      writeFileSync(
+        join(
+          KEPT_LOGS,
+          `${String(keptSoFar).padStart(2, '0')}-avant-vidage.log`,
+        ),
+        dumped,
+      )
+    }
+  } catch {
+    // Voir le commentaire : le diagnostic ne doit pas pouvoir tuer la suite.
+  }
   execFileSync('adb', ['-s', driving(), 'logcat', '-c'])
 }
 
