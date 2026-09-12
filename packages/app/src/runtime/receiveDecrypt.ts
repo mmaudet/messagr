@@ -119,6 +119,16 @@ export type ReceiveReport =
   | { readonly received: false; readonly reason: string }
   | {
       readonly received: true
+      /**
+       * Which event was read.
+       *
+       * `null` only if the homeserver sent one without an identifier, which
+       * nothing else here would survive either. It is reported because a
+       * report naming no event cannot be checked against a screen: #123 spent
+       * seven runs on a question that a test could not ask, for want of
+       * knowing which `claimed-…` to look at.
+       */
+      readonly eventId: string | null
       readonly body: string
       /**
        * Who the event says sent it, and nothing more.
@@ -218,8 +228,11 @@ async function decryptOne(
     }
   }
 
+  const named = (event as { event_id?: unknown }).event_id
+
   return {
     received: true,
+    eventId: typeof named === 'string' ? named : null,
     body: content.body,
     claimedSender: envelope.sender,
   }

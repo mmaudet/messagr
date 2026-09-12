@@ -96,8 +96,12 @@ describe('receiveAndDecrypt', () => {
       ROOM,
       SELF,
     )
+    // `eventId` est là pour #123 : un rapport qui nomme un corps et un
+    // expéditeur mais pas l'événement ne peut pas être confronté à un écran,
+    // faute de savoir quel `claimed-…` regarder.
     expect(report).toEqual({
       received: true,
+      eventId: '$1',
       body: 'hello from the other side',
       claimedSender: OTHER,
     })
