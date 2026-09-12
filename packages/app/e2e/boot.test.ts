@@ -534,43 +534,30 @@ describe('boot', () => {
   it('opens and shuts both composer panels, and still answers after', async () => {
     // EN DERNIER, ET C'EST LA MOITIÉ DE LA RÉPONSE À #243.
     //
-    // Sur #241, un test qui ouvrait un panneau mourait sur
-    // `RootViewWithoutFocusException` -- et emportait **les quatre suivants**,
-    // onze secondes chacun, parce qu'il mourait avant de refermer et que la
-    // racine ne retrouvait jamais le focus. Placé ici, un gel ne peut
-    // poisonner personne : il n'y a plus personne après.
+    // Sur #241, un test qui ouvrait un panneau mourait et emportait **les
+    // quatre suivants**, onze secondes chacun, parce qu'il mourait avant de
+    // refermer. Placé ici, un gel ne peut poisonner personne : il n'y a plus
+    // personne après.
     //
-    // # CE QUI SE PASSE QUAND UN PANNEAU S'OUVRE, MESURÉ EN LISANT
+    // # CE QUE CES DEUX PANNEAUX SONT, ET CE QU'ILS NE SONT PAS
     //
-    // Trois cascades partent ensemble :
+    // Ce sont deux petits blocs de `Composer.tsx` : une rangée d'émojis en
+    // ligne, et deux lignes « photo / document ». Ni l'un ni l'autre n'est
+    // l'`EmojiPicker` des réactions, qui monte 434 emoji et se pose par
+    // dessus la conversation -- un composant différent, ouvert par un appui
+    // long sur un message.
     //
-    // - le quai rend sa hauteur par `onLayout` à `dockHeight`, dont dépend le
-    //   `paddingBottom` du `ScrollView` qui porte TOUTE la conversation : une
-    //   mesure du bas de l'écran relaie une mise en page de tout le haut ;
-    // - `EmojiPicker` monte **434 emoji** d'un coup -- huit groupes, un
-    //   `ScrollView` ordinaire, aucune virtualisation -- soit 434 `Pressable`
-    //   et autant de nœuds d'accessibilité qu'Espresso doit parcourir ;
-    // - les huit groupes écrivent chacun dans un état pendant qu'ils se
-    //   posent, ce qui converge en deux passes. Deux passes sur 434 vues.
+    // Le dire parce que je les avais confondus. L'analyse de cause que
+    // j'avais publiée sur #243 attribuait le gel d'Espresso à ces 434 vues ;
+    // elle parlait du mauvais fichier. `emoji-panel` est un `{open && …}`
+    // sur une poignée de `Pressable`, sans cascade de mise en page.
     //
-    // Espresso attend que la racine « ne demande pas de mise en page pendant
-    // dix secondes ». Sur un émulateur rendu en logiciel, cette accalmie
-    // n'arrive pas.
-    //
-    // # POURQUOI LA SYNCHRONISATION EST COUPÉE, ET PAS PAR COMMODITÉ
-    //
-    // `disableSynchronization` dit à Detox de ne plus attendre l'inactivité
-    // avant d'agir. Ce n'est pas masquer un défaut : l'application va bien,
-    // et c'est mesuré autrement. Le 12 septembre 2026, `adb shell input tap`
-    // a ouvert et refermé les deux panneaux sur un émulateur, deux fois de
-    // suite, sur une build de développement -- un tap injecté n'attend aucune
-    // inactivité, et il passe. Ce qui ne passe pas est l'attente, pas le
-    // geste.
-    //
-    // Le prix est réel et il est nommé : entre le `disable` et le `enable`,
-    // rien ne garantit qu'une image de plus a été rendue. C'est pourquoi
-    // chaque étape attend explicitement ce qu'elle veut voir, et pourquoi le
-    // dernier test remet la synchronisation avant de conclure.
+    // Conséquence directe : couper la synchronisation Detox n'a plus de
+    // justification. Elle avait été ajoutée pour laisser passer une attente
+    // d'inactivité qu'une grosse cascade rendait impossible ; sans cascade,
+    // elle ne fait que priver le test de la garantie qu'il agit sur une
+    // application au repos. Ce test s'en passe, et si le gel revient, il
+    // reviendra sur un chemin qu'on n'a pas déjà troublé soi-même.
     await element(by.id('backup-settings-back')).tap()
     await waitFor(element(by.id('tab-chat')))
       .toBeVisible()
@@ -584,90 +571,35 @@ describe('boot', () => {
       .toBeVisible()
       .withTimeout(60000)
 
-    // LE CLAVIER D'ABORD, et c'est la différence avec la mesure à la main.
-    //
-    // Les tests au-dessus ont écrit et envoyé, donc le champ a eu le focus et
-    // le clavier est levé. Ma mesure locale en `adb` partait d'une
-    // conversation fraîchement ouverte, sans clavier — et c'est le seul écart
-    // entre un panneau qui s'ouvre et un panneau qui n'existe pas.
-    //
-    // `pressBack` referme le clavier sans quitter la conversation : la pile
-    // de navigation n'est pas celle du système ici, l'écran est un état de
-    // React, et `App.tsx` ne traite ce retour que lorsqu'il y a une couche à
-    // fermer.
-    try {
-      await device.pressBack()
-    } catch {
-      // Pas de clavier à refermer. Rien à faire.
-    }
+    await element(by.id('composer-emoji')).tap()
+    await waitFor(element(by.id('emoji-panel')))
+      .toExist()
+      .withTimeout(30000)
 
-    await device.disableSynchronization()
-    try {
-      await element(by.id('composer-emoji')).tap()
-      // CE QUE LE RUN A SOUS LES YEUX, quand il échoue. Deux allers-retours de
-      // CI ont été dépensés à deviner ce que cet écran montrait ; une image
-      // coûte une seconde et répond à la place d'une troisième hypothèse.
-      // Elle est prise à chaque fois : une capture qu'on ne prend qu'en cas
-      // d'échec est une capture qu'on n'a jamais quand on en a besoin.
-      await device.takeScreenshot('apres-le-tap-emoji')
-      // `toExist` SUR LE PANNEAU, ET LA VISIBILITÉ SUR UN CONTRÔLE.
-      //
-      // La première version assertait `toBeVisible` sur le panneau, et la CI
-      // a répondu en trente secondes : « covers at least 75 percent of the
-      // view's area ». Le panneau tient 434 emoji ; il est plus haut que le
-      // téléphone, donc il ne couvrira jamais 75 % de sa propre surface.
-      //
-      // Ce piège est déjà écrit dans ce fichier, au-dessus de `conversation` :
-      // « Asserting visibility on a container is asserting that the
-      // conversation is short. » Il valait pour la conversation, il vaut ici,
-      // et je l'ai retrouvé de l'autre côté.
-      //
-      // La suite de ce fichier dit aussi quoi faire à la place : assurer la
-      // visibilité « on one line of text, where the word means something ».
-      // `emoji-close` est un bouton de taille finie ; s'il se voit, le
-      // panneau est bien à l'écran et utilisable.
-      await waitFor(element(by.id('emoji-panel')))
-        .toExist()
-        .withTimeout(30000)
-      await waitFor(element(by.id('emoji-close')))
-        .toBeVisible()
-        .withTimeout(15000)
+    // REFERMÉ DANS LE TEST, et pas seulement ouvert. Un panneau laissé
+    // ouvert est l'état dans lequel #241 a laissé quatre tests mourir.
+    await element(by.id('composer-emoji')).tap()
+    await waitFor(element(by.id('emoji-panel')))
+      .not.toExist()
+      .withTimeout(30000)
 
-      // REFERMÉ DANS LE TEST, et pas seulement ouvert. Un panneau laissé
-      // ouvert est l'état dans lequel #241 a laissé quatre tests mourir.
-      await element(by.id('composer-emoji')).tap()
-      await waitFor(element(by.id('emoji-panel')))
-        .not.toExist()
-        .withTimeout(30000)
+    // L'AUTRE PANNEAU, arrivé avec #241 et jamais piloté non plus. Ses deux
+    // lignes sont nommées : un panneau qui s'ouvrirait vide serait vert ici.
+    await element(by.id('conversation-attach')).tap()
+    await waitFor(element(by.id('attach-panel')))
+      .toExist()
+      .withTimeout(30000)
+    await detoxExpect(element(by.id('attach-photo'))).toBeVisible()
+    await detoxExpect(element(by.id('attach-document'))).toBeVisible()
 
-      // L'AUTRE PANNEAU, arrivé avec #241 et jamais piloté non plus. Ses deux
-      // lignes sont nommées : un panneau qui s'ouvre vide serait vert ici.
-      await element(by.id('conversation-attach')).tap()
-      // Même discipline qu'au-dessus, bien que ce panneau-ci ne tienne que
-      // deux lignes : parier sur la hauteur d'un conteneur est ce qui vient
-      // de coûter un aller-retour de CI. Les deux lignes portent la
-      // visibilité, et c'est sur elles que le mot veut dire quelque chose.
-      await waitFor(element(by.id('attach-panel')))
-        .toExist()
-        .withTimeout(30000)
-      await detoxExpect(element(by.id('attach-photo'))).toBeVisible()
-      await detoxExpect(element(by.id('attach-document'))).toBeVisible()
+    await element(by.id('conversation-attach')).tap()
+    await waitFor(element(by.id('attach-panel')))
+      .not.toExist()
+      .withTimeout(30000)
 
-      await element(by.id('conversation-attach')).tap()
-      await waitFor(element(by.id('attach-panel')))
-        .not.toExist()
-        .withTimeout(30000)
-    } finally {
-      // DANS UN `finally`, parce que l'intérêt de ce test est ce qui vient
-      // après lui. Laisser la synchronisation coupée derrière un échec
-      // changerait la nature de tout ce qui suivrait, y compris dans un run
-      // futur où quelqu'un aurait ajouté un test en dessous.
-      await device.enableSynchronization()
-    }
-
-    // ET L'APPLICATION RÉPOND ENCORE, synchronisation rétablie. C'est la
-    // vraie question de #243 : sur #241, ce n'est pas le test du panneau qui
-    // a coûté cher, ce sont les quatre d'après.
+    // ET L'APPLICATION RÉPOND ENCORE. C'est la vraie question de #243 : sur
+    // #241, ce n'est pas le test du panneau qui a coûté cher, ce sont les
+    // quatre d'après.
     await detoxExpect(element(by.id('conversation-input'))).toBeVisible()
   })
 
