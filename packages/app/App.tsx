@@ -699,7 +699,20 @@ export function App({
    * in the gallery -- or that it is not, which is the only case they can act
    * on. `null` when nobody has asked, which is nearly always.
    */
-  const [photoKept, setPhotoKept] = useState<'kept' | 'failed' | null>(null)
+  /**
+   * Ce qui vient d'être enregistré, et de quel genre.
+   *
+   * LE GENRE EST LÀ PARCE QUE LA PHRASE MENTAIT. Un document enregistré
+   * affichait « Photographie enregistrée dans la photothèque de cet
+   * appareil », ce qui est faux deux fois : ce n'est pas une photographie, et
+   * la destination est celle que la personne a choisie dans la fenêtre
+   * système, pas la photothèque. Les textes justes existaient déjà dans les
+   * sept langues et n'étaient lus nulle part.
+   */
+  const [photoKept, setPhotoKept] = useState<{
+    readonly how: 'kept' | 'failed'
+    readonly what: 'photograph' | 'document'
+  } | null>(null)
   /**
    * Whether this launch found a session whose crypto store was gone.
    *
@@ -2200,7 +2213,7 @@ export function App({
               const gesture = async () => {
                 const got = await openDocument(credentials, document)
                 if (!got.ready) {
-                  setPhotoKept('failed')
+                  setPhotoKept({ how: 'failed', what: 'document' })
                   logEvent('warn', 'MESSAGR_KEEP_DOCUMENT', {
                     reason: got.reason,
                   })
@@ -2210,15 +2223,25 @@ export function App({
                   base64: got.base64,
                   name: got.name,
                 })
-                setPhotoKept(done.kept ? 'kept' : 'failed')
-                if (!done.kept) {
+                if (!done.kept && done.cancelled) {
+                  // La personne a refermé la fenêtre « Enregistrer sous ».
+                  // C'est un geste ordinaire, pas un échec, et le lui
+                  // annoncer comme tel serait lui reprocher d'avoir changé
+                  // d'avis.
+                  return
+                }
+                setPhotoKept({
+                  how: done.kept ? 'kept' : 'failed',
+                  what: 'document',
+                })
+                if (!done.kept && !done.cancelled) {
                   logEvent('warn', 'MESSAGR_KEEP_DOCUMENT', {
                     reason: done.reason,
                   })
                 }
               }
               gesture().catch((cause: unknown) => {
-                setPhotoKept('failed')
+                setPhotoKept({ how: 'failed', what: 'photograph' })
                 logEvent('warn', 'MESSAGR_KEEP_DOCUMENT', {
                   reason: getErrorMessage(cause),
                 })
@@ -3432,11 +3455,14 @@ export function App({
                     .current?.(alone.image)
                     .then(async shown => {
                       if (!shown.shown) {
-                        setPhotoKept('failed')
+                        setPhotoKept({ how: 'failed', what: 'photograph' })
                         return
                       }
                       const done = await keepPhotograph(photoLibrary, shown.uri)
-                      setPhotoKept(done.kept ? 'kept' : 'failed')
+                      setPhotoKept({
+                        how: done.kept ? 'kept' : 'failed',
+                        what: 'photograph',
+                      })
                       if (!done.kept) {
                         // §13.27: the reason is for whoever is diagnosing it,
                         // never for the person holding the telephone.
@@ -3446,7 +3472,7 @@ export function App({
                       }
                     })
                     .catch((cause: unknown) => {
-                      setPhotoKept('failed')
+                      setPhotoKept({ how: 'failed', what: 'photograph' })
                       logEvent('warn', 'MESSAGR_KEEP_PHOTOGRAPH', {
                         reason: getErrorMessage(cause),
                       })
