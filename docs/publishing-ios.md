@@ -210,6 +210,20 @@ Pour la toute première build d'un magasin, aucun tag ne porte encore l'une des 
 node scripts/release-notes.mjs ios <numéro> --since <ref> --publish
 ```
 
+### Le plancher de la première, et comment il a été trouvé
+
+Pour iOS, c'est **`1e93c9a`**, le commit de #230.
+
+Une build laisse sa propre empreinte dans l'historique : `build.sh` incrémente `CURRENT_PROJECT_VERSION` dans l'arbre de travail, et ce numéro est commité avec ce que la build transportait. Donc le commit qui pose un numéro **est** la build.
+
+```
+git log --oneline -S'CURRENT_PROJECT_VERSION = 24' -- packages/app/ios/Messagr.xcodeproj/project.pbxproj
+```
+
+La 24, partie chez Apple le 11 septembre 2026, a été numérotée dans #230 ; la 23 l'avait été dans #223. Mesurer depuis `1e93c9a` donne donc exactement ce que les testeurs de la 24 n'ont pas encore, et rien d'autre.
+
+La même commande retrouvera le plancher d'Android le jour où sa première release sera publiée, en cherchant le `versionCode` de la dernière montée sur la piste.
+
 ## Et la CI
 
 Le travail que ce document décrivait comme « à faire un jour » est fait : la
