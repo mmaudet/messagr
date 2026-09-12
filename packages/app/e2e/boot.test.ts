@@ -587,9 +587,28 @@ describe('boot', () => {
     await device.disableSynchronization()
     try {
       await element(by.id('composer-emoji')).tap()
+      // `toExist` SUR LE PANNEAU, ET LA VISIBILITÉ SUR UN CONTRÔLE.
+      //
+      // La première version assertait `toBeVisible` sur le panneau, et la CI
+      // a répondu en trente secondes : « covers at least 75 percent of the
+      // view's area ». Le panneau tient 434 emoji ; il est plus haut que le
+      // téléphone, donc il ne couvrira jamais 75 % de sa propre surface.
+      //
+      // Ce piège est déjà écrit dans ce fichier, au-dessus de `conversation` :
+      // « Asserting visibility on a container is asserting that the
+      // conversation is short. » Il valait pour la conversation, il vaut ici,
+      // et je l'ai retrouvé de l'autre côté.
+      //
+      // La suite de ce fichier dit aussi quoi faire à la place : assurer la
+      // visibilité « on one line of text, where the word means something ».
+      // `emoji-close` est un bouton de taille finie ; s'il se voit, le
+      // panneau est bien à l'écran et utilisable.
       await waitFor(element(by.id('emoji-panel')))
-        .toBeVisible()
+        .toExist()
         .withTimeout(30000)
+      await waitFor(element(by.id('emoji-close')))
+        .toBeVisible()
+        .withTimeout(15000)
 
       // REFERMÉ DANS LE TEST, et pas seulement ouvert. Un panneau laissé
       // ouvert est l'état dans lequel #241 a laissé quatre tests mourir.
@@ -601,8 +620,12 @@ describe('boot', () => {
       // L'AUTRE PANNEAU, arrivé avec #241 et jamais piloté non plus. Ses deux
       // lignes sont nommées : un panneau qui s'ouvre vide serait vert ici.
       await element(by.id('conversation-attach')).tap()
+      // Même discipline qu'au-dessus, bien que ce panneau-ci ne tienne que
+      // deux lignes : parier sur la hauteur d'un conteneur est ce qui vient
+      // de coûter un aller-retour de CI. Les deux lignes portent la
+      // visibilité, et c'est sur elles que le mot veut dire quelque chose.
       await waitFor(element(by.id('attach-panel')))
-        .toBeVisible()
+        .toExist()
         .withTimeout(30000)
       await detoxExpect(element(by.id('attach-photo'))).toBeVisible()
       await detoxExpect(element(by.id('attach-document'))).toBeVisible()
