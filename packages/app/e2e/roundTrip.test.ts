@@ -301,6 +301,17 @@ describeRoundTrip('encrypted round trip', () => {
       throw new Error('the report does not say which event it read')
     }
 
+    // ET IL FAUT OUVRIR LA CONVERSATION, ce que le titre de #123 dit et que
+    // ce fichier ne faisait pas : cette suite lit tout dans le rapport de la
+    // sonde et n'a jamais navigué nulle part. Une application relancée
+    // s'ouvre sur la LISTE, donc une assertion d'écran posée là ne trouve
+    // rien -- ce qu'un premier essai a confirmé en trente secondes de
+    // matcher qui ne correspond jamais.
+    await waitFor(element(by.id('first-conversation')))
+      .toBeVisible()
+      .withTimeout(30000)
+    await element(by.id('first-conversation')).tap()
+
     // §13.26 : la ligne paraît dès que le salon compte plus d'un autre
     // membre, ce qui est le cas de celui-ci -- le rapport dit `whoElse`
     // joined 3. Un salon à deux nomme personne, et c'est délibéré.
