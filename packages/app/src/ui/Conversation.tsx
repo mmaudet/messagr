@@ -514,7 +514,7 @@ function Message({
             // `Message` is: one plate, one place they attach.
             onLongPress={onOffer}
           />
-        ) : entry.document !== undefined && onSaveDocument !== undefined ? (
+        ) : entry.document !== undefined ? (
           // The row instead of the text, and here that is not the same
           // decision as the photograph's below. An `m.file`'s `body` is its
           // filename rather than a fallback, so drawing both would print the
@@ -523,9 +523,15 @@ function Message({
           <Document
             name={entry.document.name}
             size={entry.document.size}
-            onSave={() => {
-              if (entry.document !== undefined) onSaveDocument(entry.document)
-            }}
+            onSave={
+              onSaveDocument === undefined
+                ? undefined
+                : () => {
+                    if (entry.document !== undefined) {
+                      onSaveDocument(entry.document)
+                    }
+                  }
+            }
             testID={`document-${entry.eventId}`}
           />
         ) : entry.image !== undefined && onLoadImage !== undefined ? (
