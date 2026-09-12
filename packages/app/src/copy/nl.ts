@@ -421,6 +421,10 @@ export const nl: Readonly<Record<CopyKey, string>> = {
   composer_photo: 'Een foto toevoegen',
   composer_document: 'Een document toevoegen',
   composer_attach: 'Bijvoegen',
+  share_not_yet:
+    'Dit bestand is niet verstuurd, en Messagr heeft het niet bewaard.',
+  share_too_large: 'Dit bestand is te groot om te versturen.',
+  share_unreadable: 'Dit bestand kon niet gelezen worden.',
   composer_record: 'Spraakbericht',
   composer_send: 'Versturen',
   composer_record_soon:

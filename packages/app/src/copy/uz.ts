@@ -438,6 +438,9 @@ export const uz: Readonly<Record<CopyKey, string>> = {
   composer_photo: 'Surat qoʻshish',
   composer_document: 'Hujjat qoʻshish',
   composer_attach: 'Biriktirish',
+  share_not_yet: 'Bu fayl yuborilmadi va Messagr uni saqlab qolmadi.',
+  share_too_large: 'Bu fayl yuborish uchun juda katta.',
+  share_unreadable: 'Bu faylni oʻqib boʻlmadi.',
   composer_record: 'Ovozli xabar',
   composer_send: 'Yuborish',
   composer_record_soon:

@@ -420,6 +420,10 @@ export const it: Readonly<Record<CopyKey, string>> = {
   composer_photo: 'Aggiungere una foto',
   composer_document: 'Aggiungere un documento',
   composer_attach: 'Allegare',
+  share_not_yet:
+    'Questo file non è stato inviato, e Messagr non l’ha conservato.',
+  share_too_large: 'Questo file è troppo grande per essere inviato.',
+  share_unreadable: 'Questo file non è stato letto.',
   composer_record: 'Messaggio vocale',
   composer_send: 'Inviare',
   composer_record_soon:

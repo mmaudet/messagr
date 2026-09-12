@@ -422,6 +422,9 @@ export const en: Readonly<Record<CopyKey, string>> = {
   composer_photo: 'Add a photo',
   composer_document: 'Add a document',
   composer_attach: 'Attach',
+  share_not_yet: 'This file was not sent, and Messagr did not keep it.',
+  share_too_large: 'This file is too large to send.',
+  share_unreadable: 'This file could not be read.',
   composer_record: 'Voice message',
   composer_send: 'Send',
   composer_record_soon:

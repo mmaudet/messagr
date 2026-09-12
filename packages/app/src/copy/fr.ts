@@ -629,6 +629,13 @@ export const fr = {
   composer_photo: 'Ajouter une photo',
   composer_document: 'Ajouter un document',
   composer_attach: 'Joindre',
+  // CE QUE LA PHRASE DU DESSOUS NE DIT PAS. La liste explique déjà, et plus
+  // longuement, comment entrer ; la répéter ici ferait deux fois le même
+  // reproche. Ce qui manque à quelqu'un dont le partage n'a rien produit,
+  // c'est le sort de son fichier : pas parti, et pas gardé non plus.
+  share_not_yet: 'Ce fichier n’a pas été envoyé, et Messagr ne l’a pas gardé.',
+  share_too_large: 'Ce fichier est trop lourd pour être envoyé.',
+  share_unreadable: 'Ce fichier n’a pas pu être lu.',
   composer_record: 'Message vocal',
   composer_send: 'Envoyer',
   composer_record_soon:

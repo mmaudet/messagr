@@ -68,6 +68,28 @@ export function refuseDocument(stated: StatedDocument): DocumentRefusal | null {
   return null
 }
 
+/**
+ * Whether what was actually read can be sent, or why not.
+ *
+ * THE SECOND BOUND, AND UNTIL 12 SEPTEMBER 2026 THREE COMMENTS PROMISED IT
+ * AND NOTHING APPLIED IT. « An absence is not a refusal: the bytes are
+ * bounded again once read » is written on `StatedDocument.size` above, and
+ * it was true of nothing: neither the picker nor the incoming share compared
+ * anything after reading. So a file whose size the system did not state --
+ * which is what Android's `content://` produces most of the time -- went
+ * through unbounded, and the limit that exists to keep a phone from holding
+ * three copies of a large file protected only the files that had announced
+ * themselves.
+ *
+ * Taken as bytes rather than a length so a caller cannot pass the stated
+ * size here by mistake and believe it has checked the read.
+ */
+export function refuseWhatWasRead(bytes: Uint8Array): DocumentRefusal | null {
+  if (bytes.length === 0) return 'unreadable'
+  if (bytes.length > LARGEST_DOCUMENT_BYTES) return 'too-large'
+  return null
+}
+
 /** What choosing a document can come to. */
 export type DocumentChoice =
   | { readonly chose: true; readonly document: PickedDocument }

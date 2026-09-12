@@ -220,6 +220,9 @@ import { setCatalogue, t } from './src/copy'
 import type { Language } from './src/copy/languages'
 import { enterWithASession, type InvitationOutcome } from './src/runtime/entry'
 import { initialLink, watchLinks } from './src/runtime/incomingLink'
+import { shareFrom, type SharedFile } from './src/runtime/incomingShare'
+import { whatToDoWith, type ShareRefusal } from './src/runtime/sharedIn'
+import { readShared } from './src/runtime/documentPlatform'
 import { useKeyboardInset } from './src/ui/keyboardInset'
 import { sweepWhatThePickerLeft } from './src/runtime/imageLibrary'
 import { afterReinstall } from './src/runtime/afterReinstall'
@@ -880,6 +883,20 @@ export function App({
   /** The same, for a document. See `sendFile.ts` for why it is not the same
    * path with a flag. */
   const attachDocumentRef = useRef<(() => void) | null>(null)
+  /**
+   * Envoyer dans une conversation ce qu'une autre application a partagé.
+   *
+   * Lié avec la session, comme les autres gestes : il faut de quoi chiffrer
+   * et de quoi téléverser, et rien de tout ça n'existe avant l'entrée.
+   */
+  const shareIntoRef = useRef<
+    | ((
+        scope: string,
+        handed: SharedFile,
+        as: 'photograph' | 'document',
+      ) => void)
+    | null
+  >(null)
   /** Saving a document somebody sent, which is `keepDocument.ts`'s gesture. */
   const saveDocumentRef = useRef<((document: ReadDocument) => void) | null>(
     null,
@@ -965,6 +982,29 @@ export function App({
    * row are two different links, and a value alone would not re-trigger for
    * the second if it happened to be the same string.
    */
+  /**
+   * Un fichier qu'une autre application vient de remettre à Messagr.
+   *
+   * `null` la plupart du temps. Ce qui est tenu ici est une ADRESSE et ce que
+   * le système en a dit -- pas les octets : personne ne tient un fichier en
+   * mémoire pendant qu'il parcourt sa liste de conversations.
+   */
+  const [shared, setShared] = useState<SharedFile | null>(null)
+  /**
+   * Le même fichier, une fois décidé : ce qu'il deviendra en arrivant.
+   *
+   * Deux états plutôt qu'un parce que ce sont deux moments. Tant que `shared`
+   * est plein, personne n'a encore tranché ; quand celui-ci l'est, le msgtype
+   * est arrêté et le sélecteur peut s'ouvrir. Les garder confondus obligeait
+   * le rendu à redemander « est-ce une photographie ? », c'est-à-dire à
+   * reprendre la décision de `sharedIn.ts` à un deuxième endroit.
+   */
+  const [sharing, setSharing] = useState<{
+    readonly handed: SharedFile
+    readonly as: 'photograph' | 'document'
+  } | null>(null)
+  /** Pourquoi un partage n'a pas abouti, quand c'est arrivé. */
+  const [shareRefused, setShareRefused] = useState<ShareRefusal | null>(null)
   const [warmLink, setWarmLink] = useState<{
     readonly url: string
     readonly count: number
@@ -1196,10 +1236,98 @@ export function App({
   useEffect(
     () =>
       watchLinks(url => {
+        // CE QUI SÉPARE UN PARTAGE D'UNE INVITATION, en un seul endroit.
+        // `MainActivity` fait voyager les deux par le même canal, pour que
+        // le cas chaud soit celui que ce chemin a déjà appris.
+        const handed = shareFrom(url)
+        if (handed !== null) {
+          setShared(handed)
+          return
+        }
         setWarmLink(held => ({ url, count: (held?.count ?? 0) + 1 }))
       }),
     [],
   )
+
+  /**
+   * Dire qu'un partage n'a pas abouti, là où la phrase se lit.
+   *
+   * LA PHRASE VIT SUR LA LISTE, DONC IL FAUT Y ÊTRE. Mesuré sur l'émulateur
+   * le 12 septembre 2026 : un fichier de treize mégaoctets partagé pendant
+   * qu'une conversation était ouverte disparaissait sans un mot, parce que
+   * l'écran qui porte la réponse n'était pas celui qu'on regardait.
+   *
+   * Ce n'est pas arracher quelqu'un à son écran. Le geste de partage vient
+   * de mettre l'application au premier plan ; il n'y a pas de contexte à
+   * préserver, il y a une question à laquelle répondre. C'est la même chose
+   * que le sélecteur fait quand le partage aboutit, sauf qu'ici il n'y a
+   * rien à choisir.
+   */
+  const sayTheShareFailed = useCallback((why: ShareRefusal) => {
+    setOpenScope(null)
+    openScopeRef.current = null
+    setSelected(new Set())
+    setPersonOpen(false)
+    // `tab` suffit à replier les favoris, qui ne vivent que sous Réglages.
+    setTab('chat')
+    setInvite({ stage: 'shut' })
+    setAdmission(null)
+    setShareRefused(why)
+  }, [])
+
+  // CE QU'UN PARTAGE DEVIENT, décidé une fois qu'il est là.
+  //
+  // Quatre réponses et une seule est un envoi : attendre de savoir, entrer
+  // d'abord, refuser en nommant la raison, ou choisir une conversation. Les
+  // confondre produit l'écran qui reproche à quelqu'un un geste qu'il n'a
+  // pas fait -- et les deux premières se sont confondues pour de bon, ce que
+  // le paragraphe ci-dessous raconte.
+  useEffect(() => {
+    if (shared === null) return
+    const decided = whatToDoWith(shared, { entered: inYet })
+    // PAS ENCORE SU N'EST PAS NON. Un partage froid arrive AVANT que le
+    // lancement ait ouvert la session ; lu comme un refus, « entrez d'abord »
+    // s'affichait à quelqu'un entré depuis des jours, sa conversation visible
+    // juste en dessous -- mesuré sur l'émulateur le 12 septembre 2026. L'effet
+    // repart quand `inYet` se décide, parce qu'il en dépend, et le partage
+    // reste ici en attendant : une adresse, pas des octets.
+    if (decided.do === 'wait') return
+    setShared(null)
+    if (decided.do === 'pick-a-conversation') {
+      // Un refus d'avant ne survit pas au partage suivant : la phrase parle
+      // du geste qu'on vient de faire, pas de la séance.
+      setShareRefused(null)
+      setSharing({ handed: shared, as: decided.as })
+      return
+    }
+    sayTheShareFailed(
+      decided.do === 'say-not-yet'
+        ? 'not-yet'
+        : decided.because === 'too-large'
+          ? 'too-large'
+          : 'unreadable',
+    )
+  }, [shared, inYet, sayTheShareFailed])
+
+  // LE CAS FROID DU PARTAGE, lu une fois au démarrage.
+  //
+  // `getInitialURL` répond quand le système a démarré l'application pour
+  // l'occasion, ce qui est la moitié que `incomingLink.ts` avait d'abord
+  // traitée seule. L'autre moitié est l'écouteur ci-dessus. Les deux, dès le
+  // premier jour, parce que n'en traiter qu'une est le défaut de septembre.
+  useEffect(() => {
+    let stillHere = true
+    initialLink()
+      .then(url => {
+        if (!stillHere || url === null) return
+        const handed = shareFrom(url)
+        if (handed !== null) setShared(handed)
+      })
+      .catch(() => undefined)
+    return () => {
+      stillHere = false
+    }
+  }, [])
 
   // WHAT EARLIER VERSIONS LEFT IN THE CACHE, cleared once per launch.
   //
@@ -1371,7 +1499,13 @@ export function App({
         // answer to the same question, and `getInitialURL` keeps handing
         // back the address this process was started with for as long as it
         // lives.
-        link: warmLink === null ? initialLink : async () => warmLink.url,
+        // ET JAMAIS UN PARTAGE : les deux voyagent par le même canal, et
+        // une invitation est ce que ce chemin sait dépenser. Un partage lu
+        // ici serait un lien que rien ne peut réclamer.
+        link: async () => {
+          const url = warmLink === null ? await initialLink() : warmLink.url
+          return url === null || shareFrom(url) !== null ? null : url
+        },
         signUp: signUpSecrets,
         // A claim is two calls with the issuer's application in between. See
         // claimInvitation.ts: without a wait this tries once, is told 409,
@@ -2200,6 +2334,72 @@ export function App({
               gesture().catch((cause: unknown) => {
                 setSending('failed')
                 logEvent('warn', 'MESSAGR_DOCUMENT_SEND_FAILED', {
+                  reason: getErrorMessage(cause),
+                })
+              })
+            }
+
+            // ET CE QU'UNE AUTRE APPLICATION NOUS REMET.
+            //
+            // Les octets sont lus ICI, c'est-à-dire une fois la conversation
+            // choisie : personne ne tient un fichier en mémoire pendant qu'il
+            // parcourt sa liste, et rien n'a été recopié dans le stockage de
+            // cette application.
+            shareIntoRef.current = (scope, handed, as) => {
+              const gesture = async () => {
+                const read = await readShared(
+                  handed.uri,
+                  handed.name,
+                  handed.mimeType,
+                )
+                if (!read.chose) {
+                  sayTheShareFailed('unreadable')
+                  logEvent('warn', 'MESSAGR_SHARE_UNREADABLE', {
+                    because: read.because,
+                  })
+                  return
+                }
+
+                setSending('sending')
+                const done =
+                  as === 'photograph'
+                    ? await sendPhotograph(sessionClient, credentials, scope, {
+                        bytes: read.document.bytes,
+                        mimeType: read.document.mimeType,
+                        // ZÉRO, ET C'EST HONNÊTE. Une application tierce ne
+                        // donne pas les dimensions, et `forwardImage.ts` a
+                        // déjà tranché ce cas ici même : « A zero is honest
+                        // when they did not ». Le destinataire voit une
+                        // photographie, ce qu'on attend en partageant une
+                        // photographie.
+                        width: 0,
+                        height: 0,
+                      })
+                    : await sendDocument(
+                        sessionClient,
+                        credentials,
+                        scope,
+                        read.document,
+                      )
+                if (!done.sent) {
+                  setSending('failed')
+                  logEvent('warn', 'MESSAGR_SHARE_SEND_FAILED', {
+                    reason: done.reason,
+                  })
+                  return
+                }
+                setSending('idle')
+                logEvent('info', 'MESSAGR_SHARE_SENT', {
+                  eventId: done.eventId,
+                  as,
+                })
+                // Et on y atterrit, plutôt que de laisser quelqu'un deviner
+                // si son partage est parti.
+                showConversation(scope)
+              }
+              gesture().catch((cause: unknown) => {
+                setSending('failed')
+                logEvent('warn', 'MESSAGR_SHARE_SEND_FAILED', {
                   reason: getErrorMessage(cause),
                 })
               })
@@ -3260,6 +3460,22 @@ export function App({
           />
         )}
 
+        {/* LE SÉLECTEUR, quand le partage a de quoi aboutir. Ce qui décide
+            est l'effet plus haut : décider pendant un rendu voudrait dire y
+            changer l'état, ce que React refuse à raison. */}
+        {sharing !== null && (
+          <PickConversation
+            summaries={summaries}
+            names={names}
+            onPick={scope => {
+              const chosen = sharing
+              setSharing(null)
+              if (scope === null) return
+              shareIntoRef.current?.(scope, chosen.handed, chosen.as)
+            }}
+          />
+        )}
+
         {forwarding !== null && (
           <PickConversation
             summaries={summaries}
@@ -3914,6 +4130,7 @@ export function App({
                     invitation={linkOutcome}
                     reinstalled={reinstalled}
                     notInYet={inYet === false}
+                    shareRefused={shareRefused}
                     onOpen={scope => openConversationRef.current?.(scope)}
                   />
                 </View>
