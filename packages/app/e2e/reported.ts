@@ -96,6 +96,8 @@ export interface RuntimeReport {
          * event proves which key wrote it and nothing about who holds that
          * key. The screen says « Se présente comme » for the same reason.
          */
+        /** Which event was read, so a screen can be checked against it. */
+        readonly eventId?: string
         readonly claimedSender?: string
         readonly body?: string
       }

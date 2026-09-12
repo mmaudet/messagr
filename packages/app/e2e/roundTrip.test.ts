@@ -2,7 +2,7 @@ import { execFileSync } from 'node:child_process'
 import { resolve } from 'node:path'
 
 import { expect } from '@jest/globals'
-import { device } from 'detox'
+import { by, device, element, waitFor } from 'detox'
 
 import { IGNORING_THE_LIVE_POLL } from './longPoll'
 import { acceptThePromise } from './promise'
@@ -276,27 +276,38 @@ describeRoundTrip('encrypted round trip', () => {
     }
   })
 
-  // THE SCREEN ASSERTION IS PARKED, AND #123 CARRIES WHY.
-  //
-  // « Se présente comme … » is not rendered in this room, and it should be:
-  // the launch report says `history` is null on every run, which can only
-  // happen when `theOtherMember` answers null, which makes `otherParty`
-  // undefined, which makes every incoming message named (§13.26). Seven runs
-  // went into that contradiction and none resolved it.
-  //
-  // Ruled out, so nobody pays for them twice: scroll position (`toExist`
-  // fails, not `toBeVisible`); the frame racing the photograph queue; the
-  // language, which the suite now pins; and a nullable history claim, which
-  // `claimOfferedHistory` is not.
-  //
-  // What remains wants a device rather than a run: whether the timeline
-  // entry carries `claimedSender` at all. The launch report reads it from
-  // `receiveOneEncryptedMessage`, a probe with its own fetch; the screen
-  // reads it from `loadConversation`. Two paths, and only one is known to
-  // have it.
-  //
-  // The trust model is not unguarded meanwhile: the test below asserts it
-  // off the report, and has passed every one of those seven runs.
+  it('names the sender on the screen, and not only in the report', async () => {
+    // #123, RÉTABLI, ET CE QUI L'AVAIT GARÉ N'ÉTAIT PAS CE QU'ON CROYAIT.
+    //
+    // L'assertion échouait avec `toExist`, et sept runs ont cherché si
+    // l'entrée du fil portait seulement un `claimedSender`. Elle le porte :
+    // `loadConversation` passe par `toTimelineEntries`, qui ÉCARTE tout
+    // événement sans `sender` au lieu d'en rendre un sans nom, et
+    // `buildTimeline.spec.ts` l'épingle déjà.
+    //
+    // Ce qui manquait était mécanique. La ligne rend « Se présente comme »
+    // suivi de l'identifiant complet, et `by.text` est une correspondance
+    // EXACTE sur Android : une assertion portant sur le gabarit ou sur un
+    // préfixe ne trouve rien, la ligne étant pourtant à l'écran.
+    //
+    // Donc on vise le `testID` que la ligne porte déjà, et le rapport dit
+    // désormais quel événement il a lu pour qu'on sache lequel regarder.
+    const read = await whatItReported(60000)
+    if (read.received === 'not-run' || !read.received.received) {
+      throw new Error('nothing was received, so there is no line to look for')
+    }
+    const named = read.received.eventId
+    if (named === undefined) {
+      throw new Error('the report does not say which event it read')
+    }
+
+    // §13.26 : la ligne paraît dès que le salon compte plus d'un autre
+    // membre, ce qui est le cas de celui-ci -- le rapport dit `whoElse`
+    // joined 3. Un salon à deux nomme personne, et c'est délibéré.
+    await waitFor(element(by.id(`claimed-${named}`)))
+      .toBeVisible()
+      .withTimeout(30000)
+  })
 
   it('does not present the sender as established', async () => {
     // Decrypting an event proves which key wrote it and nothing about who
