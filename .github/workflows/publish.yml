@@ -180,6 +180,49 @@ jobs:
           track: ${{ inputs.track }}
           status: completed
 
+      # NOMMER L'ENDROIT, PAS SEULEMENT LE FORMULAIRE.
+      #
+      # Le message que Play rend quand une déclaration manque est « You must
+      # let us know whether your app uses any full-screen intent
+      # permissions ». Il nomme un formulaire et pas un endroit, et il arrive
+      # au `Committing the Edit`, c'est-à-dire APRÈS que le bundle a été
+      # téléversé avec succès. Build, signature, compte de service et piste
+      # sont donc tous bons, et l'échec ressemble pourtant à une panne de
+      # publication.
+      #
+      # `docs/publishing-android.md` porte le remède depuis le 8 septembre
+      # 2026, et il a été rencontré deux fois : run 24 ce jour-là, et le
+      # 12 septembre par quelqu'un qui n'avait pas lu le document avant de
+      # lancer. Un document que personne ne lit au bon moment ne vaut pas
+      # un message au moment où l'on regarde.
+      #
+      # `if: failure()` et rien d'autre : ceci ne rattrape pas l'échec et ne
+      # le masque pas. Il ajoute l'endroit à côté du formulaire.
+      - name: Say where the missing declaration lives
+        if: failure()
+        run: |
+          cat >&2 <<'DIT'
+          ──────────────────────────────────────────────────────────────
+          Si l'erreur ci-dessus parle d'une déclaration manquante, elle se
+          remplit ici, une fois pour toutes :
+
+            Play Console
+              → Règles et programmes  (Policy and programmes)
+              → Contenu de l'application  (App content)
+
+          Les déclarations que ce projet doit à la console :
+            • Autorisation d'intent plein écran  (full-screen intent)
+              L'application la demande honnêtement : un appel entrant doit
+              prendre un écran verrouillé. Voir showNotification.ts.
+            • Classification du contenu, sécurité des données, public cible
+
+          Un échec ici n'est pas un échec de build. Le bundle est téléversé
+          avant, et le refus porte sur le « Committing the Edit ».
+
+          Le détail est dans docs/publishing-android.md.
+          ──────────────────────────────────────────────────────────────
+          DIT
+
       # WHAT WENT INTO IT, on the repository, for the same reason the iOS
       # build does it: a track that moves without a record is a track nobody
       # can audit. `release-notes.mjs` argues the shape.
