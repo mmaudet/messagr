@@ -190,3 +190,82 @@ which is what the telephones in use are carrying now.
 hold plaintext. What changes is that the sentence at the top of this
 document is now understood to reach a library's cache, which it always
 meant.
+
+## Revisited, 12 September 2026 — a file another application hands over, on iOS
+
+#242: somebody looking at a photograph or a document in another application
+chooses Messagr from the system's share sheet, then a conversation, and the
+file is sent sealed. The gesture people already have.
+
+**Android needed no exception and took none.** What crosses is an address —
+a `content://`, a name, a type, a size — and the bytes are read only once a
+conversation has been chosen. Nothing is copied anywhere. That half shipped
+without touching this document, and it is the standard the iOS half is
+measured against rather than an accident of the platform.
+
+**iOS cannot do that, and the reason is a process boundary.** A share
+extension is a separate process with its own sandbox. The file it is handed
+is readable inside that process and nowhere else: the containing application
+cannot open it, and the address is worth nothing on the other side. The only
+route the system provides is a shared container both processes can reach —
+which the clarification of 10 September says plainly is this application's
+disk, because this application caused the file to exist.
+
+So the iOS half needs an exception, and the shape of it is the whole of it.
+
+**One file, for one crossing, and nothing else.** The shared container holds
+exactly one thing: the file being handed over, written by the extension and
+read by the application. It never holds the store, the notebook, a cache, a
+log, or a second copy of anything. A container that accumulates is a cache
+with a different name.
+
+**Removed as soon as its bytes are in memory, in a `finally`.** The same
+shape as the photograph somebody asks to keep, and for the same reason: the
+path that fails is the path a happy-path implementation leaves plaintext on.
+And swept at launch as well, because an extension can be killed between
+writing and handing over — nobody would ever remove that one, and it is the
+orphan this rule exists for.
+
+**Excluded from device backup.** `NSURLIsExcludedFromBackupKey` on the
+directory. Without it a file that exists for seconds can be copied to iCloud
+and outlive the gesture by years, somewhere nobody thinks of as holding
+someone's documents.
+
+**The extension holds no keys, and this is refused rather than deferred.**
+Three shapes were considered and all three are refused:
+
+- _The extension sends the message itself._ It would need the crypto store,
+  which means two processes on one Megolm store. A lost or forked Megolm
+  session makes a room unreadable **forever**, for everyone in it. That is
+  not a risk to be managed, it is a defect with no repair.
+- _The extension shows the conversation list, so the person picks before
+  anything is written._ The list is a page of the encrypted notebook
+  (ADR-0010), under a keystore-held passphrase. Reading it means handing the
+  extension that secret, which is ADR-0008's ground and a real widening of
+  what an attacker reaches. The saving is one copy that lives for seconds;
+  the price is a key in a second process, permanently.
+- _A security-scoped bookmark instead of a copy._ It does not survive the
+  crossing: what the extension is handed is temporary and scoped to the
+  extension's own life, so the application resolves nothing.
+
+The extension therefore does one thing: write the file and wake the
+application. The person picks a conversation in the application, exactly as
+on Android, and the sealing happens where the keys already are.
+
+**What it costs, said plainly.** Between the share gesture and the moment the
+application reads the file, a decrypted document sits in a directory this
+application owns. That window is short but it is not zero, and on a device
+whose keystore is defeated it is one more place to look. The Android half has
+no such window, and saying the two halves are equivalent would be false.
+
+**What did not change.** Nothing is written for the application to read back
+later: the file is handed over once and removed, and there is no path from
+the container into anything the product keeps. The three exceptions this
+document now carries — the conversation list's openings, a photograph
+somebody asks to keep, and this crossing — are alike in the way that matters:
+each is bounded, each is named, and none of them is a message store.
+
+**When to revisit.** If iOS ever offers the containing application a readable
+handle to an extension's item, this exception should go rather than be kept
+for symmetry: the Android shape is the better one and it is only the platform
+that prevents it here.
