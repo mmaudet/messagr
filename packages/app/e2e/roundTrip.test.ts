@@ -327,6 +327,7 @@ describeRoundTrip('encrypted round trip', () => {
     // salon, donc le fichier arrive en général au premier lancement. La
     // boucle reste pour la même raison que la sienne, #234.
     let seen = false
+    let lastFailure = 'nothing was attempted'
     for (let attempt = 0; attempt < 3 && !seen; attempt += 1) {
       forgetTheLog()
       await device.launchApp({
@@ -367,8 +368,13 @@ describeRoundTrip('encrypted round trip', () => {
           .toBeVisible()
           .withTimeout(45000)
         seen = true
-      } catch {
-        // La clé n'était pas arrivée dans ce lancement-ci. Un autre redemande.
+      } catch (cause: unknown) {
+        // GARDÉE, ET PAS AVALÉE. La boucle jetait la raison, donc l'échec
+        // final ne pouvait pas dire laquelle des deux attentes avait expiré
+        // -- celle qui prouve que la conversation est ouverte, ou celle qui
+        // cherche le fichier dedans. C'est le même défaut que le message
+        // d'origine, que ce commit reproche plus bas.
+        lastFailure = cause instanceof Error ? cause.message : String(cause)
       }
     }
 
@@ -391,7 +397,9 @@ describeRoundTrip('encrypted round trip', () => {
                                  thing this test exists to find out.
 
          Measured on 12 September 2026: the line was there twice, and the
-         failure screenshot showed the conversation list.`,
+         failure screenshot showed the conversation list.
+
+         The last attempt failed with: ${lastFailure}`,
       )
     }
     // Le budget de Jest est à 180 000 ms par défaut ; trois relances avec
