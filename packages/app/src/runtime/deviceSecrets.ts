@@ -205,6 +205,13 @@ export const receiptSecrets = keychainStore('eu.messagr.read-receipts')
 export const wakeSecrets = keychainStore('eu.messagr.wake')
 
 /**
+ * Whether every photograph drawn goes into the photothèque. #208, and off
+ * unless somebody turned it on: see `keepEverySetting.ts`, and ADR-0006's
+ * amendment of 12 September 2026 for why the default is the decision.
+ */
+export const keepEverySecrets = keychainStore('eu.messagr.keep-every')
+
+/**
  * Which published conditions were accepted, by the date they carry. A version
  * rather than a flag, so a revision can re-ask -- see `termsAccepted.ts`.
  */
