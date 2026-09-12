@@ -461,6 +461,17 @@ export const uz: Readonly<Record<CopyKey, string>> = {
   settings_wake_off: 'Oʻchirilgan',
   settings_wake_not_kept:
     'Bu tanlovni saqlab boʻlmadi: keyingi ishga tushirishda u avvalgi holatiga qaytadi.',
+
+  // #208: the automatic keeping, and what the screen owes whoever is offered
+  // it. See the French, and ADR-0006's amendment of 12 September 2026.
+
+  settings_keep_every: 'Qabul qilingan suratlarni saqlash',
+  settings_keep_every_hint:
+    'Qabul qilingan har bir surat siz uni koʻrishingizdan oldin galereyangizga tushadi, hali tanishmagan odamlaringiznikisi ham. U yerda suratlaringizga ruxsat bergan har bir ilova uni oʻqiy oladi, yuboruvchi esa uni endi qaytarib ololmaydi.',
+  settings_keep_every_future:
+    'Oʻchirish hech narsani qaytarmaydi: saqlangani saqlangan boʻlib qoladi.',
+  settings_keep_every_not_kept:
+    'Bu tanlovni saqlab boʻlmadi: keyingi ishga tushirishda u avvalgi holatiga qaytadi.',
   promise_language: 'Tilingizni tanlang',
   promise_terms: 'Men Messagr foydalanish shartlarini qabul qilaman.',
   promise_terms_link: 'Shartlarni oʻqish',

@@ -52,6 +52,9 @@ export function Settings({
   wake,
   onWake,
   wakeNotKept,
+  keepEvery,
+  onKeepEvery,
+  keepEveryNotKept,
   onRingFullScreen,
   onRingWhileQuiet,
 }: {
@@ -93,6 +96,13 @@ export function Settings({
   readonly wake: boolean
   readonly onWake: (on: boolean) => void
   readonly wakeNotKept: boolean
+  /**
+   * Whether every photograph drawn is put into the gallery. #208, and off by
+   * default — `keepEverySetting.ts` says why that is load-bearing.
+   */
+  readonly keepEvery: boolean
+  readonly onKeepEvery: (on: boolean) => void
+  readonly keepEveryNotKept: boolean
 }) {
   return (
     <View style={styles.screen} testID="settings">
@@ -210,6 +220,39 @@ export function Settings({
         <Text style={styles.hint}>{t('settings_wake_hint')}</Text>
         {wakeNotKept && (
           <Text style={styles.notKept}>{t('settings_wake_not_kept')}</Text>
+        )}
+      </View>
+
+      {/* #208, AND THE ONLY ROW HERE THAT CARRIES TWO HINT LINES.
+          ADR-0006's amendment of 12 September 2026 allows this switch on the
+          condition that the screen says what it costs, "and not merely say
+          'automatically save received media'". The two lines are the two
+          things it names: the person is not looking at the picture when it
+          happens, so they are choosing this for images they have not seen
+          from people they have not met; and turning it off retrieves
+          nothing, because the switch governs the future only.
+          Off by default, which `keepEverySetting.ts` argues is load-bearing
+          rather than polite. */}
+      <View
+        style={[styles.setting, styles.divider]}
+        testID="setting-keep-every">
+        <View style={styles.rowLayout}>
+          <Text style={styles.rowLabel}>{t('settings_keep_every')}</Text>
+          <Switch
+            testID="toggle-keep-every"
+            value={keepEvery}
+            onValueChange={onKeepEvery}
+            accessibilityLabel={t('settings_keep_every')}
+            trackColor={SWITCH_TRACK}
+            thumbColor={color.surface.paper}
+          />
+        </View>
+        <Text style={styles.hint}>{t('settings_keep_every_hint')}</Text>
+        <Text style={styles.hint}>{t('settings_keep_every_future')}</Text>
+        {keepEveryNotKept && (
+          <Text style={styles.notKept}>
+            {t('settings_keep_every_not_kept')}
+          </Text>
         )}
       </View>
 
