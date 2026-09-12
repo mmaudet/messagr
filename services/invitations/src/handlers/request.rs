@@ -1,3 +1,64 @@
+//! Demander une invitation quand on n'en a pas, et ce que cela ne collecte pas.
+//!
+//! # LA DEMANDE NE PORTE RIEN QUI DÉSIGNE QUELQU'UN
+//!
+//! Pas d'adresse, pas de nom, pas de texte libre. La page de confidentialité
+//! publiée promet « pas d'adresse électronique », et une file d'attente
+//! pleine de courriels de gens qui n'ont pas encore de compte aurait démenti
+//! cette phrase sur le service même qui la sert.
+//!
+//! Ce que la personne emporte est un CODE. Elle le garde, elle revient avec.
+//! C'est la même forme que « Copier le lien » sur la page d'invitation, qui
+//! fait déjà porter un secret à travers une installation — et la même forme
+//! que le produit entier, où l'identifiant d'un compte est tiré au hasard et
+//! n'est rattaché à rien.
+//!
+//! La contrepartie est assumée et elle est écrite sur la page : **celui qui
+//! décide ne sait pas qui demande**. Il arbitre un rythme, pas une personne.
+//! C'est moins que ce qu'un parrainage porte, et c'est ce que ce produit peut
+//! tenir sans se contredire.
+//!
+//! # LE JETON ACCORDÉ EST SCELLÉ PAR UNE CLÉ QUE LE SERVICE N'A PAS
+//!
+//! `create` rend le jeton d'invitation une fois et n'en garde que
+//! l'empreinte. Ici il faut le rendre plus tard, à quelqu'un qui revient :
+//! il doit donc être gardé. Le garder en clair ferait de cette table un
+//! trousseau d'invitations utilisables.
+//!
+//! Il est donc scellé avec une clé **dérivée du code**, que seule la personne
+//! détient. La base contient `SHA-256(code)` pour retrouver la ligne et
+//! `seal(SHA-256(code ‖ domaine), jeton)` pour le rendre : deux dérivations à
+//! sens unique du même secret, et aucune des deux ne donne l'autre. Un vol de
+//! la base ne rend aucune invitation.
+//!
+//! C'est plus que ce que `reserved_accounts` fait de ses secrets — ceux-là
+//! sont scellés par la clé du service, parce que le service doit s'en servir
+//! seul. Ici il n'a pas à s'en servir, donc il n'a pas à pouvoir.
+//!
+//! # TROIS DÉFENSES, ET AUCUNE NE DEMANDE DE TIERS
+//!
+//! Pas de captcha : il mettrait un tiers sur un site dont l'argument est de
+//! n'en avoir aucun. Ce qui reste, le ticket le nomme — un plafond, une
+//! cadence, un délai — et les trois tiennent sans rien savoir du demandeur.
+//!
+//! Elles sont **globales**, faute d'identifiant, et c'est le prix de ne rien
+//! collecter : quelqu'un d'obstiné peut saturer la file et faire attendre les
+//! autres. Le mal est borné — la file est une commodité, et le chemin par
+//! cooptation, qui est la vraie porte, n'en dépend pas.
+//!
+//! # CE QUI EST IDENTIQUE, ET CE QUI NE L'EST PAS
+//!
+//! Le critère du ticket dit « la réponse de la page est identique quoi qu'on
+//! ait soumis ». Ici **rien n'est soumis** : il n'y a donc rien par quoi la
+//! réponse pourrait varier, et la propriété est tenue par construction plutôt
+//! que par vigilance.
+//!
+//! Le code rendu change à chaque demande, ce qui n'est pas une variation
+//! « selon ce qui a été soumis » mais la réponse elle-même. Et un refus pour
+//! file pleine dit l'état du SERVICE, jamais quelque chose sur une personne :
+//! c'est une information que le demandeur doit avoir, sans quoi il repartirait
+//! avec un code qui ne se résoudra jamais.
+
 use std::sync::Arc;
 
 use axum::{
@@ -10,67 +71,6 @@ use sha2::{Digest, Sha256};
 use sqlx::Row;
 
 use crate::{auth, crypto, error::AppError, util::now, AppState};
-
-/// Demander une invitation quand on n'en a pas, et ce que cela ne collecte pas.
-///
-/// # LA DEMANDE NE PORTE RIEN QUI DÉSIGNE QUELQU'UN
-///
-/// Pas d'adresse, pas de nom, pas de texte libre. La page de confidentialité
-/// publiée promet « pas d'adresse électronique », et une file d'attente
-/// pleine de courriels de gens qui n'ont pas encore de compte aurait démenti
-/// cette phrase sur le service même qui la sert.
-///
-/// Ce que la personne emporte est un CODE. Elle le garde, elle revient avec.
-/// C'est la même forme que « Copier le lien » sur la page d'invitation, qui
-/// fait déjà porter un secret à travers une installation — et la même forme
-/// que le produit entier, où l'identifiant d'un compte est tiré au hasard et
-/// n'est rattaché à rien.
-///
-/// La contrepartie est assumée et elle est écrite sur la page : **celui qui
-/// décide ne sait pas qui demande**. Il arbitre un rythme, pas une personne.
-/// C'est moins que ce qu'un parrainage porte, et c'est ce que ce produit peut
-/// tenir sans se contredire.
-///
-/// # LE JETON ACCORDÉ EST SCELLÉ PAR UNE CLÉ QUE LE SERVICE N'A PAS
-///
-/// `create` rend le jeton d'invitation une fois et n'en garde que
-/// l'empreinte. Ici il faut le rendre plus tard, à quelqu'un qui revient :
-/// il doit donc être gardé. Le garder en clair ferait de cette table un
-/// trousseau d'invitations utilisables.
-///
-/// Il est donc scellé avec une clé **dérivée du code**, que seule la personne
-/// détient. La base contient `SHA-256(code)` pour retrouver la ligne et
-/// `seal(SHA-256(code ‖ domaine), jeton)` pour le rendre : deux dérivations à
-/// sens unique du même secret, et aucune des deux ne donne l'autre. Un vol de
-/// la base ne rend aucune invitation.
-///
-/// C'est plus que ce que `reserved_accounts` fait de ses secrets — ceux-là
-/// sont scellés par la clé du service, parce que le service doit s'en servir
-/// seul. Ici il n'a pas à s'en servir, donc il n'a pas à pouvoir.
-///
-/// # TROIS DÉFENSES, ET AUCUNE NE DEMANDE DE TIERS
-///
-/// Pas de captcha : il mettrait un tiers sur un site dont l'argument est de
-/// n'en avoir aucun. Ce qui reste, le ticket le nomme — un plafond, une
-/// cadence, un délai — et les trois tiennent sans rien savoir du demandeur.
-///
-/// Elles sont **globales**, faute d'identifiant, et c'est le prix de ne rien
-/// collecter : quelqu'un d'obstiné peut saturer la file et faire attendre les
-/// autres. Le mal est borné — la file est une commodité, et le chemin par
-/// cooptation, qui est la vraie porte, n'en dépend pas.
-///
-/// # CE QUI EST IDENTIQUE, ET CE QUI NE L'EST PAS
-///
-/// Le critère du ticket dit « la réponse de la page est identique quoi qu'on
-/// ait soumis ». Ici **rien n'est soumis** : il n'y a donc rien par quoi la
-/// réponse pourrait varier, et la propriété est tenue par construction plutôt
-/// que par vigilance.
-///
-/// Le code rendu change à chaque demande, ce qui n'est pas une variation
-/// « selon ce qui a été soumis » mais la réponse elle-même. Et un refus pour
-/// file pleine dit l'état du SERVICE, jamais quelque chose sur une personne :
-/// c'est une information que le demandeur doit avoir, sans quoi il repartirait
-/// avec un code qui ne se résoudra jamais.
 
 /// Le plafond de la file : ce qu'un humain peut dépouiller.
 ///
@@ -208,9 +208,9 @@ pub async fn look(
     // donc pas être une panne de configuration ; c'est un code qui ne
     // correspond pas, ce qui répond comme un code inconnu.
     let token = match (status.as_str(), sealed) {
-        ("granted", Some(sealed)) => Some(
-            crypto::open(&seal_key(&code), &sealed).map_err(|_| AppError::InvitationInvalid)?,
-        ),
+        ("granted", Some(sealed)) => {
+            Some(crypto::open(&seal_key(&code), &sealed).map_err(|_| AppError::InvitationInvalid)?)
+        }
         _ => None,
     };
 
@@ -274,8 +274,7 @@ mod tests {
                 encryption_key: [0u8; 32],
                 edge_retention_days: 30,
                 bind_addr: String::new(),
-                max_reserved_accounts_per_inviter:
-                    crate::config::DEFAULT_RESERVED_ACCOUNTS_CEILING,
+                max_reserved_accounts_per_inviter: crate::config::DEFAULT_RESERVED_ACCOUNTS_CEILING,
                 push_gateway_url: None,
             },
         })
@@ -308,11 +307,10 @@ mod tests {
 
         // LE CODE N'EST NULLE PART, et c'est la propriété qui compte. Ce que
         // la base tient est une empreinte ; un vol ne rend aucun code.
-        let stored: Vec<u8> =
-            sqlx::query_scalar("SELECT code_sha256 FROM invitation_requests")
-                .fetch_one(&pool)
-                .await
-                .unwrap();
+        let stored: Vec<u8> = sqlx::query_scalar("SELECT code_sha256 FROM invitation_requests")
+            .fetch_one(&pool)
+            .await
+            .unwrap();
         assert_eq!(stored, crypto::token_hash(&asked.code));
         assert_ne!(stored, asked.code.as_bytes());
     }

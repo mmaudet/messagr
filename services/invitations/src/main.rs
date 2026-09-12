@@ -127,10 +127,7 @@ fn router(state: Arc<AppState>) -> Router {
             "/invitation-requests",
             post(handlers::request::ask).get(handlers::request::queue),
         )
-        .route(
-            "/invitation-requests/:code",
-            get(handlers::request::look),
-        )
+        .route("/invitation-requests/:code", get(handlers::request::look))
         .route("/invitations", post(handlers::create::create))
         .route("/invitations/claim", post(handlers::claim::claim))
         .route(
