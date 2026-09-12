@@ -150,7 +150,19 @@ export interface ArrivedThisRun {
    * enregistre, ou personne ne le fera.
    */
   readonly mayKeep: (drawn: string) => ReadFile | null
-  /** Pour un appareil qui vient d'être déconnecté. */
+  /**
+   * Pour un appareil qui vient d'être déconnecté.
+   *
+   * RIEN NE L'APPELLE, ET C'EST DIT PLUTÔT QUE TU. Il n'y a pas de geste de
+   * déconnexion dans cette application : `forgetShownImages` et
+   * `forgetWhatIsWaiting` de `receiveImage.ts` sont dans le même cas, et
+   * celui-là garde des photographies déchiffrées. Les trois se câbleront
+   * ensemble le jour où la déconnexion existera.
+   *
+   * Une pièce finie que rien n'appelle est le défaut qui revient dans ce
+   * dépôt ; ce qui le rend coûteux est qu'il est invisible, pas qu'il
+   * existe. Écrit ici, il ne l'est plus.
+   */
   readonly forgetAll: () => void
 }
 
