@@ -79,6 +79,9 @@ const COUNTERPARTY = resolve(
   '../../../scripts/interop/nio_counterparty.py',
 )
 const COUNTERPARTY_BODY = 'encrypted by matrix-nio, for the application to read'
+// Le nom EST le corps d'un `m.file`, et c'est ce que l'écran affiche. Il doit
+// s'accorder au caractère près avec `nio_counterparty.py`, qui l'écrit.
+const COUNTERPARTY_FILE_NAME = 'relevé-de-nio.txt'
 
 const INVITATION = process.env.MESSAGR_ROUNDTRIP_INVITATION_LINK
 
@@ -88,7 +91,7 @@ const hasCounterparty =
   process.env.MESSAGR_INTEROP_WORKDIR !== undefined &&
   INVITATION !== undefined
 
-function runCounterparty(phase: 'send'): void {
+function runCounterparty(phase: 'send' | 'send-file'): void {
   execFileSync('python3', [COUNTERPARTY, phase], {
     stdio: 'inherit',
     // Long, because this phase queries keys and shares a group session
@@ -285,6 +288,69 @@ describeRoundTrip('encrypted round trip', () => {
     if (!seen) {
       throw new Error(
         "the counterparty's message never decrypted across four launches",
+      )
+    }
+  })
+
+  it('reads an m.file an independent client wrote for it', async () => {
+    // LE CRITÈRE DE #111, ENFIN MESURÉ — dans le sens qui peut l'être.
+    //
+    // Ce dépôt affirmait qu'un document « arrive en `m.file` qu'un autre
+    // client Matrix reconnaîtrait », et rien ne l'établissait : le seul test
+    // sur la question s'intitule « builds an m.file the specification would
+    // recognise » et n'assert que le msgtype et la forme d'`info`. C'est
+    // Messagr qui se relit lui-même.
+    //
+    // Ici une implémentation indépendante écrit l'événement — sa clé, son IV
+    // et ses empreintes sont celles de nio — et l'application le lit. Si
+    // `encryptedFile.ts` diverge d'un nom de champ, d'une variante de base64
+    // ou d'une empreinte, c'est ici que ça se voit, et nulle part ailleurs.
+    //
+    // L'AUTRE SENS N'EST PAS PROUVÉ, ET C'EST ÉCRIT POUR QU'ON NE LE CHERCHE
+    // PAS. Que le `m.file` de Messagr soit lu par nio demanderait que
+    // l'application joigne un document, donc qu'elle ouvre un sélecteur de
+    // fichiers — et l'émulateur n'en ouvre aucun. `nio_counterparty.py` sait
+    // désormais reconnaître un fichier reçu, de sorte que le jour où un banc
+    // peut en envoyer un, la preuve est une ligne d'assertion et non un
+    // chantier.
+    runCounterparty('send-file')
+
+    // La même boucle que le message, et pour la même raison : la clé de salon
+    // voyage dans un message Olm, qui n'arrive pas toujours dans le premier
+    // lancement. Voir le paragraphe de #234 plus haut.
+    let seen = false
+    for (let attempt = 0; attempt < 4 && !seen; attempt += 1) {
+      forgetTheLog()
+      await device.launchApp({
+        newInstance: true,
+        permissions: NOTIFICATIONS_GRANTED,
+        launchArgs: IGNORING_THE_LIVE_POLL,
+      })
+      try {
+        await waitFor(element(by.id('first-conversation')))
+          .toBeVisible()
+          .withTimeout(60000)
+        await element(by.id('first-conversation')).tap()
+        // SUR LE NOM, parce que le nom EST le corps d'un `m.file` et que
+        // c'est ce qu'une personne lit. Accentué à dessein : un aller-retour
+        // qui ne passerait que de l'ASCII ne dirait rien des encodages, et
+        // c'est exactement là que deux implémentations divergent.
+        await waitFor(element(by.text(COUNTERPARTY_FILE_NAME)))
+          .toBeVisible()
+          .withTimeout(60000)
+        seen = true
+      } catch {
+        // La clé n'était pas arrivée dans ce lancement-ci. Un autre redemande.
+      }
+    }
+
+    if (!seen) {
+      throw new Error(
+        `the file written by matrix-nio never appeared: no row named
+         ${COUNTERPARTY_FILE_NAME} across four launches. Either the room key
+         did not arrive -- see #234 -- or this application does not read an
+         m.file another implementation wrote, which is the thing this test
+         exists to find out.`,
       )
     }
   })
