@@ -420,6 +420,7 @@ export const nl: Readonly<Record<CopyKey, string>> = {
   composer_emoji: 'Emoji',
   composer_photo: 'Een foto toevoegen',
   composer_document: 'Een document toevoegen',
+  composer_attach: 'Bijvoegen',
   composer_record: 'Spraakbericht',
   composer_send: 'Versturen',
   composer_record_soon:

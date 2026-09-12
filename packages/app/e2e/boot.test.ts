@@ -335,6 +335,32 @@ describe('boot', () => {
     await detoxExpect(element(by.text(written))).toBeVisible()
   })
 
+  it('offers a photograph or a document behind one control', async () => {
+    // ONE CONTROL, AND THE MEASUREMENT THAT DECIDED IT. #111 first put a
+    // second button in the field, one per kind. Each takes the minimum touch
+    // target, so the input went from 603 pixels to 488, and at that width an
+    // ordinary twenty-five-character sentence wraps onto two lines while
+    // somebody types it. The test below found it sideways: its « empty »
+    // baseline had been reading a one-line field and started reading a
+    // two-line one.
+    //
+    // So the panel exists, and this is what says it still does. Nothing else
+    // can: this repository has no component tests, and a synthetic `adb`
+    // tap reaches none of the controls inside the field -- the send button
+    // included, as `Composer.tsx` has recorded since 10 September.
+    //
+    // It opens and closes without choosing, deliberately. Choosing would
+    // hand the screen to the system's own picker, which this suite has no
+    // way to dismiss.
+    await element(by.id('conversation-attach')).tap()
+    await detoxExpect(element(by.id('attach-panel'))).toBeVisible()
+    await detoxExpect(element(by.id('attach-photo'))).toBeVisible()
+    await detoxExpect(element(by.id('attach-document'))).toBeVisible()
+
+    await element(by.id('conversation-attach')).tap()
+    await detoxExpect(element(by.id('attach-panel'))).not.toBeVisible()
+  })
+
   it('grows the field while typing, and shrinks it when the message goes', async () => {
     // THIBAULT'S REPORT, 10 SEPTEMBER 2026, FROM AN iOS BUILD: the field does
     // not grow while typing, and grows after sending. Two halves of one

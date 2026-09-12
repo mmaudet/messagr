@@ -421,6 +421,7 @@ export const en: Readonly<Record<CopyKey, string>> = {
   composer_emoji: 'Emoji',
   composer_photo: 'Add a photo',
   composer_document: 'Add a document',
+  composer_attach: 'Attach',
   composer_record: 'Voice message',
   composer_send: 'Send',
   composer_record_soon:

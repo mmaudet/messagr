@@ -628,6 +628,7 @@ export const fr = {
   composer_emoji: 'Émojis',
   composer_photo: 'Ajouter une photo',
   composer_document: 'Ajouter un document',
+  composer_attach: 'Joindre',
   composer_record: 'Message vocal',
   composer_send: 'Envoyer',
   composer_record_soon:

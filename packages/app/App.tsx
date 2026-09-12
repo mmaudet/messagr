@@ -3083,6 +3083,20 @@ export function App({
   // `Photograph` fetches inside an effect that depends on this function. An
   // arrow built in the JSX would be a new value every render, so every render
   // would download and decrypt the picture again.
+  /**
+   * Saving a document, as a reference that does not change between renders.
+   *
+   * `useMemo` for the same reason `loadImage` below has one, and here it is
+   * not a micro-optimisation: a fresh function on every render re-renders
+   * the conversation subtree, and the moment that costs the most is the one
+   * right after a send, when the field has to reflow from several lines back
+   * to one. `boot.test.ts` measures that reflow nine milliseconds after the
+   * draft clears, which is less than a frame.
+   */
+  const saveDocument = useMemo(
+    () => (document: ReadDocument) => saveDocumentRef.current?.(document),
+    [],
+  )
   const loadImage = useMemo(
     () => (file: ReadFile) =>
       openImageRef.current === null
@@ -3956,9 +3970,7 @@ export function App({
                     sending={sending}
                     kept={photoKept}
                     onLoadImage={loadImage}
-                    onSaveDocument={document =>
-                      saveDocumentRef.current?.(document)
-                    }
+                    onSaveDocument={saveDocument}
                     otherParty={party?.other}
                     onOpenPlate={(plate, at) => setOpenPlate({ plate, at })}
                   />

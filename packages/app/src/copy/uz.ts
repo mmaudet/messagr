@@ -437,6 +437,7 @@ export const uz: Readonly<Record<CopyKey, string>> = {
   composer_emoji: 'Emoji',
   composer_photo: 'Surat qoʻshish',
   composer_document: 'Hujjat qoʻshish',
+  composer_attach: 'Biriktirish',
   composer_record: 'Ovozli xabar',
   composer_send: 'Yuborish',
   composer_record_soon:
