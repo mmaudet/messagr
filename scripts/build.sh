@@ -99,6 +99,44 @@ if [ "$WHICH" != "android" ]; then
     echo
     echo "iOS build $NEXT is with Apple. The bump is in the working tree and"
     echo "is not committed: commit it with whatever else this build carries."
+
+    # WHAT WENT INTO IT, WRITTEN DOWN WHERE SOMEBODY CAN FIND IT.
+    #
+    # Two builds went out on 11 September 2026 carrying no record of what was
+    # in them, and the account holder asked for one. `release-notes.mjs`
+    # argues the shape; the short version is that every pull request is
+    # squash-merged, so the commit log already IS the list.
+    #
+    # AFTER the upload and never before: a release for a build Apple refused
+    # would be a tag pointing at something that does not exist, and this
+    # repository would then have to learn to delete tags.
+    #
+    # Neither of the two steps below is allowed to fail the build. The
+    # artefact is with Apple by now; a changelog that did not publish is a
+    # command to run again, not a build to redo.
+    NOTES="$WORK/notes-$NEXT.md"
+    if node "$ROOT/scripts/release-notes.mjs" ios "$NEXT" > "$NOTES"; then
+      node "$ROOT/scripts/release-notes.mjs" ios "$NEXT" --publish ||
+        echo "The release was not published. Run it again when convenient."
+
+      # AND INTO « What to Test », which needs Apple to have finished
+      # processing -- five to thirty minutes. The wait is bounded and its
+      # timeout says so rather than reading as a credential problem.
+      node "$ROOT/scripts/testflight-notes.mjs" "$NEXT" \
+        --notes-file "$NOTES" --wait 1800 ||
+        echo "
+« What to Test » was not filled in. Nothing is wrong with the build; run:
+
+    node scripts/testflight-notes.mjs $NEXT --notes-file $NOTES
+"
+    else
+      echo "
+No changelog: no build-* tag carries an iOS build yet, so there is nothing to
+measure from. For the first one, give it a floor and publish by hand:
+
+    node scripts/release-notes.mjs ios $NEXT --since <ref> --publish
+"
+    fi
   else
     echo
     echo "The iOS step failed. The archive is kept at $WORK, so if it got as"
