@@ -220,6 +220,20 @@
         entrez. Il n'est rattaché à rien d'autre que lui-même.
       </p>
 
+      <!-- #152 : demander une invitation ne demande rien non plus, et le dire
+           ici est le pendant de la liste ci-dessus. La file d'attente tient
+           une empreinte de code, deux horodatages et un sceau que le service
+           ne peut pas ouvrir ; elle est purgée à trente jours comme le
+           graphe, ce que `deploy/messagr-eu/retention.json` déclare et que
+           `scripts/assert-retention.sh` vérifie contre cette page. -->
+      <p>
+        Demander une invitation depuis ce site ne demande rien non plus&nbsp;:
+        ni adresse, ni nom, ni message. La page vous rend un code, vous le
+        gardez, et c'est avec lui que vous revenez chercher la réponse. Rien
+        d'autre ne vous y identifie, et la personne qui répond ne sait pas qui
+        a demandé. Ces demandes sont effacées au bout de trente jours.
+      </p>
+
       <h2>Ce que le service ne peut pas lire</h2>
       <p>
         Le contenu de vos conversations est chiffré de bout en bout&nbsp;: il

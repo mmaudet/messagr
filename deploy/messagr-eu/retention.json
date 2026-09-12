@@ -17,6 +17,15 @@
       "purge_after IS NULL = gelé par un signalement, jamais purgé"
     ]
   },
+  "demandes_dinvitation": {
+    "$note": "Une demande ne porte ni adresse, ni nom, ni texte libre, ni adresse IP : une empreinte de code, deux horodatages, et un sceau que le service ne peut pas ouvrir. Elle est purgée quand même — une file qui ne se vide jamais finit par dire combien de gens ont demandé et quand, ce qui est une mesure d'audience, et la page n'en promet aucune.",
+    "duree": "trente jours",
+    "jours": 30,
+    "applique_par": [
+      "services/invitations : cleanup::purge_invitation_requests, colonne purge_after",
+      "services/invitations/src/handlers/request.rs : PURGE_AFTER_SECONDS"
+    ]
+  },
   "compte_supprime": {
     "duree": "trente jours",
     "jours": 30,
