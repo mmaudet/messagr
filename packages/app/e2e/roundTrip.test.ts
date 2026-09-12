@@ -185,6 +185,49 @@ describeRoundTrip('encrypted round trip', () => {
   })
 
   it('reads a message an independent client encrypted for it', async () => {
+    // ONE-TIME KEYS ON THE SERVER, ASSERTED BEFORE THE COUNTERPARTY RUNS.
+    //
+    // #234: this test fails intermittently, at the far end, after four
+    // launches and a hundred seconds, with « the counterparty's message
+    // never decrypted ». The logs say `m.no_olm` in substance every time:
+    // « Missing session for device », « no session found with session id ».
+    //
+    // A room key travels INSIDE an Olm message, and an Olm session cannot
+    // exist until the sender has claimed one of this device's one-time keys.
+    // So a device with none on the server is a device nothing can be shared
+    // with -- `go-counterparty/main.go` measured exactly that and wrote it
+    // down: « A run without this call fails in a way that reads as a
+    // protocol disagreement and is a missing upload. »
+    //
+    // The test above asserts the IDENTITY is published. It never asserted
+    // the one-time keys were, and the comment below it says « before this
+    // device published its keys » about a fact nothing checked.
+    //
+    // Zero here is a claim about the server; `null` is a question that could
+    // not be answered. Both are refused, and both name the cause where it
+    // happens rather than a hundred seconds later.
+    const before = await whatItReported(60000)
+    const ready = before.pump
+    if (ready === 'not-configured' || ready.outcome !== 'ran') {
+      throw new Error(
+        `no pump before the counterparty: ${JSON.stringify(ready)}`,
+      )
+    }
+    if (ready.report.oneTimeKeysOnServer === null) {
+      throw new Error(
+        'the server would not say how many one-time keys it holds for this ' +
+          'device, so there is no way to know whether the counterparty can ' +
+          'open an Olm session to it.',
+      )
+    }
+    if (ready.report.oneTimeKeysOnServer === 0) {
+      throw new Error(
+        'this device has no one-time key on the server, so the counterparty ' +
+          'cannot open an Olm session to it and the room key it shares will ' +
+          'never arrive. See #234.',
+      )
+    }
+
     // Sent only now: before this device published its keys, there was
     // nothing for the counterparty to encrypt to.
     runCounterparty('send')
