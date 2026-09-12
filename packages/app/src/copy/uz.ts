@@ -420,6 +420,8 @@ export const uz: Readonly<Record<CopyKey, string>> = {
   call_camera_off: 'Kamerani oʻchirish',
   call_switch_camera: 'Almashtirish',
   call_their_camera_off: 'Ularning kamerasi oʻchirilgan',
+  call_camera_refused:
+    'Kameringizni ochib boʻlmadi. Qoʻngʻiroq sizning tasviringizsiz davom etadi.',
   call_failed_no_relay:
     'Bu serverda qoʻngʻiroq relesi yoʻq: qoʻngʻiroq amalga oshmadi.',
   call_failed_no_microphone: 'Mikrofon mavjud emas.',

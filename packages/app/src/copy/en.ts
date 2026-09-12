@@ -404,6 +404,8 @@ export const en: Readonly<Record<CopyKey, string>> = {
   call_camera_off: 'Turn camera off',
   call_switch_camera: 'Flip',
   call_their_camera_off: 'Their camera is off',
+  call_camera_refused:
+    'Your camera could not be opened. The call continues without your picture.',
   call_failed_no_relay:
     'This server has no call relay: the call could not be placed.',
   call_failed_no_microphone: 'The microphone is not available.',

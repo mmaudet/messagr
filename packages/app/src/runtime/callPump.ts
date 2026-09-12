@@ -240,7 +240,7 @@ export function startCallRuntime(
   // Held beside the call rather than inside it: the pictures arrive on the
   // library's own callbacks, at moments that have nothing to do with the
   // state machine's transitions.
-  let pictures: Pictures = { local: null, remote: null }
+  let pictures: Pictures = { local: null, remote: null, refused: false }
   /** Whether this call has been marked as having carried a picture. */
   let sawVideo = false
   /**
@@ -498,7 +498,7 @@ export function startCallRuntime(
       // Does nothing when the state callback already wrote it.
       if (running !== null) writeDuration(running.scope)
       held = null
-      pictures = { local: null, remote: null }
+      pictures = { local: null, remote: null, refused: false }
       onChanged(null)
       // Before the session stops, and unconditionally: giving the audio
       // session back is what returns the device to its ringer volume and

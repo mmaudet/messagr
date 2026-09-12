@@ -7,6 +7,7 @@ import {
   RTCSessionDescription,
 } from 'react-native-webrtc'
 
+import { capTheFirstEncoding } from '../calls/ceiling'
 import { offersVideo } from '../calls/sdp'
 import { logEvent } from './log'
 import type { IceConfig, IceTransportPolicy } from '../calls/ice'
@@ -41,21 +42,6 @@ import type { Candidate, SessionDescription } from '../calls/wire'
  * switch, so the day `'relay-only'` gains a sibling this file fails to
  * compile rather than quietly sending host candidates.
  */
-
-/**
- * What this device promises never to exceed, per direction.
- *
- * The instance's coturn allows `max-bps=400000` -- 3.2 Mbit/s -- and its
- * configuration says why: *"the product's ceiling is a relayed 1:1 video call
- * at ~3 Mbit/s per direction"*. Half of that leaves room for the audio, the
- * retransmissions and the relay's own framing, and 1.2 Mbit/s is a decent
- * 720p.
- *
- * A NUMBER TO MEASURE, NOT TO BELIEVE. #199 asks for this compared against
- * 2.5 Mbit/s on a real call between two telephones, because nobody can pick
- * it from a desk -- only check it from a Pixel.
- */
-const VIDEO_CEILING_BPS = 1_200_000
 
 /** WebRTC's word for what `ice.ts` calls `relay-only`. */
 function relayPolicy(policy: IceTransportPolicy): 'relay' {
@@ -140,9 +126,23 @@ export interface Pictures {
   readonly local: string | null
   /** The far end's, or `null` until a track arrives. */
   readonly remote: string | null
+  /**
+   * Si CE côté a demandé sa caméra et ne l'a pas eue.
+   *
+   * POURQUOI UN CHAMP ICI PLUTÔT QU'UNE TRACE. Le refus ne laissait qu'une
+   * ligne de journal : la personne voyait un appel sans sa propre image et
+   * rien ne lui disait pourquoi. Un appel sans caméra et un appel dont la
+   * caméra a été refusée se ressemblent exactement à l'écran, et c'est la
+   * différence que #199 demandait de dire.
+   *
+   * Il voyage par ce canal parce que c'est celui qui porte déjà « y a-t-il
+   * une image, et de qui » : un second chemin pour un troisième fait de la
+   * même nature aurait été un état de plus à garder d'accord.
+   */
+  readonly refused: boolean
 }
 
-let pictures: Pictures = { local: null, remote: null }
+let pictures: Pictures = { local: null, remote: null, refused: false }
 let watcher: ((pictures: Pictures) => void) | null = null
 
 function publish(next: Pictures): void {
@@ -209,7 +209,8 @@ function connectionFor(config: IceConfig): PeerConnectionLike {
         throw new Error(`${kind} track was not captured by this media adapter`)
       }
       const sender = pc.addTrack(native, stream)
-      if (kind === 'video') publish({ ...pictures, local: stream.toURL() })
+      if (kind === 'video')
+        publish({ ...pictures, local: stream.toURL(), refused: false })
       // THE CEILING, APPLIED HERE BECAUSE NOWHERE ELSE CAN.
       //
       // The relay allows `max-bps=400000` -- 3.2 Mbit/s a direction -- and
@@ -222,9 +223,18 @@ function connectionFor(config: IceConfig): PeerConnectionLike {
       // `VIDEO_CEILING_BPS` is the one place the number lives.
       if (kind === 'video' && sender !== undefined) {
         const parameters = sender.getParameters()
-        const first = parameters.encodings?.[0]
-        if (first !== undefined) {
-          first.maxBitrate = VIDEO_CEILING_BPS
+        const posed = capTheFirstEncoding(parameters)
+        // JOURNALISÉ, ET C'EST CE QUI REND LA MESURE DE #199 POSSIBLE.
+        //
+        // Le ticket demande deux relevés de débit sur un appel réel. Sans
+        // cette ligne, personne ne sait depuis l'extérieur si le plafond a
+        // été posé — et une mesure prise sur un appel dont le plafond a
+        // échoué mesurerait autre chose que ce qu'on croit lire.
+        //
+        // `null` est dit aussi : « il n'y avait aucun encodage à plafonner »
+        // est une information, pas un silence.
+        logEvent('info', 'MESSAGR_VIDEO_CEILING', { bps: posed })
+        if (posed !== null) {
           // Never awaited by the caller: a ceiling that could not be set is
           // a call that still works, at a bitrate coturn will police less
           // kindly. Saying so beats failing the call over it.
@@ -248,7 +258,7 @@ function connectionFor(config: IceConfig): PeerConnectionLike {
       // handle whose stream has been released renders whatever the native
       // side last held, which on a call that just ended is the other
       // person's face, frozen.
-      publish({ local: null, remote: null })
+      publish({ local: null, remote: null, refused: false })
       pc.close()
     },
   }
@@ -378,8 +388,14 @@ export const deviceMedia: MediaPorts = {
     if (native === undefined) return
     native._switchCamera()
   },
-  onCameraRefused: cause =>
+  onCameraRefused: cause => {
     logEvent('warn', 'MESSAGR_CAMERA_REFUSED', {
       reason: cause instanceof Error ? cause.message : String(cause),
-    }),
+    })
+    // ET À L'ÉCRAN, pas seulement au journal. Le journal sert à celui qui
+    // débogue ; la personne dont la caméra vient d'être refusée regarde un
+    // appel sans sa propre image et mérite de savoir que ce n'est pas une
+    // panne mais une permission.
+    publish({ ...pictures, refused: true })
+  },
 }
