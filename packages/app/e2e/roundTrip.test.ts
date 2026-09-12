@@ -79,6 +79,9 @@ const COUNTERPARTY = resolve(
   '../../../scripts/interop/nio_counterparty.py',
 )
 const COUNTERPARTY_BODY = 'encrypted by matrix-nio, for the application to read'
+// Le nom EST le corps d'un `m.file`, et c'est ce que l'écran affiche. Il doit
+// s'accorder au caractère près avec `nio_counterparty.py`, qui l'écrit.
+const COUNTERPARTY_FILE_NAME = 'relevé-de-nio.txt'
 
 const INVITATION = process.env.MESSAGR_ROUNDTRIP_INVITATION_LINK
 
@@ -88,7 +91,7 @@ const hasCounterparty =
   process.env.MESSAGR_INTEROP_WORKDIR !== undefined &&
   INVITATION !== undefined
 
-function runCounterparty(phase: 'send'): void {
+function runCounterparty(phase: 'send' | 'send-file'): void {
   execFileSync('python3', [COUNTERPARTY, phase], {
     stdio: 'inherit',
     // Long, because this phase queries keys and shares a group session
@@ -288,6 +291,122 @@ describeRoundTrip('encrypted round trip', () => {
       )
     }
   })
+
+  it('reads an m.file an independent client wrote for it', async () => {
+    // LE CRITÈRE DE #111, ENFIN MESURÉ — dans le sens qui peut l'être.
+    //
+    // Ce dépôt affirmait qu'un document « arrive en `m.file` qu'un autre
+    // client Matrix reconnaîtrait », et rien ne l'établissait : le seul test
+    // sur la question s'intitule « builds an m.file the specification would
+    // recognise » et n'assert que le msgtype et la forme d'`info`. C'est
+    // Messagr qui se relit lui-même.
+    //
+    // Ici une implémentation indépendante écrit l'événement — sa clé, son IV
+    // et ses empreintes sont celles de nio — et l'application le lit. Si
+    // `encryptedFile.ts` diverge d'un nom de champ, d'une variante de base64
+    // ou d'une empreinte, c'est ici que ça se voit, et nulle part ailleurs.
+    //
+    // L'AUTRE SENS N'EST PAS PROUVÉ, ET C'EST ÉCRIT POUR QU'ON NE LE CHERCHE
+    // PAS. Que le `m.file` de Messagr soit lu par nio demanderait que
+    // l'application joigne un document, donc qu'elle ouvre un sélecteur de
+    // fichiers — et l'émulateur n'en ouvre aucun. `nio_counterparty.py` sait
+    // désormais reconnaître un fichier reçu, de sorte que le jour où un banc
+    // peut en envoyer un, la preuve est une ligne d'assertion et non un
+    // chantier.
+    runCounterparty('send-file')
+
+    // La même boucle que le message, et pour la même raison : la clé de salon
+    // voyage dans un message Olm, qui n'arrive pas toujours dans le premier
+    // lancement. Voir le paragraphe de #234 plus haut.
+    // TROIS TENTATIVES ET DES ATTENTES PLUS COURTES, parce que le budget
+    // est réel : quatre relances à deux attentes de soixante secondes
+    // dépassaient les 180 000 ms de Jest, et le test mourait sur le temps
+    // plutôt que sur ce qu'il mesure -- ce qui ne dit rien de l'interop.
+    //
+    // Trois suffisent ici : le test précédent a déjà fait arriver la clé de
+    // salon, donc le fichier arrive en général au premier lancement. La
+    // boucle reste pour la même raison que la sienne, #234.
+    let seen = false
+    let lastFailure = 'nothing was attempted'
+    for (let attempt = 0; attempt < 3 && !seen; attempt += 1) {
+      forgetTheLog()
+      await device.launchApp({
+        newInstance: true,
+        permissions: NOTIFICATIONS_GRANTED,
+        launchArgs: IGNORING_THE_LIVE_POLL,
+      })
+      try {
+        await waitFor(element(by.id('first-conversation')))
+          .toBeVisible()
+          .withTimeout(45000)
+        await element(by.id('first-conversation')).tap()
+
+        // LA CONVERSATION EST-ELLE SEULEMENT OUVERTE ? C'EST LA QUESTION QUE
+        // CE TEST NE POSAIT PAS.
+        //
+        // Sans cette ligne, un échec disait « le fichier n'est jamais
+        // apparu » et laissait croire que l'application ne savait pas lire
+        // un `m.file` d'une autre implémentation. La capture d'échec de
+        // Detox montre autre chose : l'application est sur la LISTE, pas
+        // dans la conversation. Le fichier était bien lu -- le journal le
+        // dit par `MESSAGR_DOCUMENT_READ` -- et le test regardait un écran
+        // où il ne pouvait pas être.
+        //
+        // `conversation-input` est la preuve d'ouverture la moins ambiguë :
+        // il n'existe que dans une conversation. S'il n'apparaît pas, le
+        // message ci-dessous nomme la navigation plutôt que l'interop, et
+        // c'est une panne entièrement différente.
+        await waitFor(element(by.id('conversation-input')))
+          .toBeVisible()
+          .withTimeout(20000)
+
+        // SUR LE NOM, parce que le nom EST le corps d'un `m.file` et que
+        // c'est ce qu'une personne lit. Accentué à dessein : un aller-retour
+        // qui ne passerait que de l'ASCII ne dirait rien des encodages, et
+        // c'est exactement là que deux implémentations divergent.
+        await waitFor(element(by.text(COUNTERPARTY_FILE_NAME)))
+          .toBeVisible()
+          .withTimeout(45000)
+        seen = true
+      } catch (cause: unknown) {
+        // GARDÉE, ET PAS AVALÉE. La boucle jetait la raison, donc l'échec
+        // final ne pouvait pas dire laquelle des deux attentes avait expiré
+        // -- celle qui prouve que la conversation est ouverte, ou celle qui
+        // cherche le fichier dedans. C'est le même défaut que le message
+        // d'origine, que ce commit reproche plus bas.
+        lastFailure = cause instanceof Error ? cause.message : String(cause)
+      }
+    }
+
+    if (!seen) {
+      throw new Error(
+        `the file written by matrix-nio never appeared: no row named
+         ${COUNTERPARTY_FILE_NAME} across three launches.
+
+         READ THE DEVICE LOG BEFORE BLAMING THE INTEROP. The application says
+         MESSAGR_DOCUMENT_READ with the name when it has read the m.file, and
+         that line separates two failures this message used to confuse:
+
+           the line is there  -> the file was read, and this test was looking
+                                 at a screen it could not be on. The
+                                 conversation not opening reads exactly like
+                                 an interop failure and is not one.
+           the line is absent -> either the room key never arrived (#234) or
+                                 the application cannot read an m.file
+                                 another implementation wrote, which is the
+                                 thing this test exists to find out.
+
+         Measured on 12 September 2026: the line was there twice, and the
+         failure screenshot showed the conversation list.
+
+         The last attempt failed with: ${lastFailure}`,
+      )
+    }
+    // Le budget de Jest est à 180 000 ms par défaut ; trois relances avec
+    // leurs deux attentes le dépassent. Élargi ici plutôt que pour toute la
+    // suite : les autres tests n'en ont pas besoin, et un budget global plus
+    // large ferait disparaître les blocages au lieu de les montrer.
+  }, 300000)
 
   it('names the sender on the screen, and not only in the report', async () => {
     // #123, RÉTABLI, ET CE QUI L'AVAIT GARÉ N'ÉTAIT PAS CE QU'ON CROYAIT.

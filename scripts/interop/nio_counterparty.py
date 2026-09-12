@@ -48,6 +48,7 @@ from nio import (
     AsyncClientConfig,
     LoginResponse,
     MegolmEvent,
+    RoomEncryptedFile,
     RoomMessageText,
 )
 
@@ -60,6 +61,11 @@ EXPECTED_BODY = "encrypted by the bridge, sent by the application"
 # direction of the same proof: the application reading what an independent
 # implementation encrypted.
 COUNTERPARTY_BODY = "encrypted by matrix-nio, for the application to read"
+# Le nom EST le corps d'un `m.file`, et c'est ce que l'écran affiche. Accentué
+# à dessein : un aller-retour qui ne passerait que de l'ASCII ne dirait rien
+# des encodages, et c'est exactement là que deux implémentations divergent.
+COUNTERPARTY_FILE_NAME = "relevé-de-nio.txt"
+COUNTERPARTY_FILE_BODY = "écrit par matrix-nio, pour que l'application le lise"
 
 SYNC_TIMEOUT_MS = 10_000
 COLLECT_DEADLINE_SECONDS = 120
@@ -210,6 +216,7 @@ async def collect(session_file: Path, store: Path) -> int:
         pending = {}
         reasons = {}
         decrypted_bodies = []
+        files_seen = []
         # Every sender seen in the room, whether or not it is the one being
         # waited for. A filter that drops what it rejects can only ever report
         # an absence, and "nothing arrived" reads identically whether nothing
@@ -233,6 +240,8 @@ async def collect(session_file: Path, store: Path) -> int:
                         pending[event.event_id] = event
                     elif isinstance(event, RoomMessageText):
                         decrypted_bodies.append(event.body)
+                    elif isinstance(event, RoomEncryptedFile):
+                        files_seen.append(event.body)
 
             for event_id, event in list(pending.items()):
                 try:
@@ -243,6 +252,27 @@ async def collect(session_file: Path, store: Path) -> int:
                 pending.pop(event_id)
                 if isinstance(plain, RoomMessageText):
                     decrypted_bodies.append(plain.body)
+                # UN `m.file` NE TOMBE PLUS PAR TERRE EN SILENCE.
+                #
+                # Cette branche n'existait pas : un fichier arrivant ici était
+                # déchiffré, n'était pas un `RoomMessageText`, et disparaissait
+                # sans que rien ne le signale. Le relevé d'audit de #111 l'a
+                # nommé — « un `m.file` arrivant chez elle tomberait par terre
+                # sans que rien ne le signale » — et c'est la forme de silence
+                # que ce dépôt collectionne.
+                #
+                # Il est retenu même quand personne ne l'attend : le compter
+                # est ce qui rend visible un envoi que la suite n'avait pas
+                # prévu, plutôt que de le confondre avec une absence.
+                elif isinstance(plain, RoomEncryptedFile):
+                    files_seen.append(plain.body)
+
+            # CE QU'UN FICHIER A DONNÉ, DIT PLUTÔT QUE TU. Rien n'en
+            # dépend aujourd'hui : la suite envoie du texte. Mais un `m.file`
+            # qui arrive ici et qu'on ne nomme pas est une mesure perdue, et
+            # c'est le silence que l'audit de #111 a reproché à ce banc.
+            if files_seen:
+                print(f"files: {len(files_seen)} — {', '.join(files_seen)}")
 
             # Decryption first, body second, and reported apart. A body that
             # drifted from the application's own constant is a different
@@ -313,8 +343,15 @@ async def collect(session_file: Path, store: Path) -> int:
         await client.close()
 
 
-async def send(session_file: Path, store: Path) -> int:
-    """Encrypt a message for the application to read.
+async def _send_with(session_file: Path, store: Path, make_content) -> int:
+    """Encrypt something for the application to read.
+
+    PARAMETERISED RATHER THAN DUPLICATED. Everything before the send is the
+    same for a message and for a file -- the full-state sync, the key query,
+    the group session shared on purpose so that "the key could not be shared"
+    stays distinct from "the send was refused". Copying a hundred lines to
+    change one dictionary is how the two halves drift apart, and the one
+    nobody runs is the one that rots.
 
     Runs after the application has published its keys, not before: Megolm
     shares with the devices that exist and have keys at share time, and the
@@ -426,7 +463,7 @@ async def send(session_file: Path, store: Path) -> int:
         response = await client.room_send(
             room_id=room_id,
             message_type="m.room.message",
-            content={"msgtype": "m.text", "body": COUNTERPARTY_BODY},
+            content=await make_content(client),
             ignore_unverified_devices=True,
         )
         event_id = getattr(response, "event_id", None)
@@ -440,8 +477,85 @@ async def send(session_file: Path, store: Path) -> int:
         await client.close()
 
 
+async def send(session_file: Path, store: Path) -> int:
+    """A text message, which is what this proof has always carried."""
+
+    async def text(_client):
+        return {"msgtype": "m.text", "body": COUNTERPARTY_BODY}
+
+    return await _send_with(session_file, store, text)
+
+
+async def send_file(session_file: Path, store: Path) -> int:
+    """An `m.file` from an independent client, for the application to read.
+
+    # WHY THIS PHASE EXISTS
+
+    #111 asks that a document "arrive as an `m.file` another Matrix client
+    would recognise". Until now nothing in this repository established that:
+    the only test on the question asserts `msgtype == "m.file"` and the shape
+    of `info`, which is Messagr reading itself.
+
+    This is the mirror half, and the one a continuous-integration run can
+    actually prove: an independent implementation writes the event, and the
+    application reads it. The other direction -- Messagr's own `m.file` read
+    by nio -- needs the application to attach a document, and the emulator
+    opens no file picker at all. `collect` below is nevertheless taught to
+    recognise one, so the day a device suite can send a file, the proof is a
+    line of assertion rather than a piece of work.
+
+    # THE ENCRYPTION IS NIO'S, AND THAT IS THE POINT
+
+    `encrypt_attachment` builds the key, the IV and the hashes on its side,
+    and this event carries them exactly as the specification says. If
+    Messagr's `EncryptedFile` reader disagrees on one field name, one base64
+    variant or one hash, this is where it shows -- which is a claim no test
+    written inside Messagr can make about itself.
+    """
+    from nio.crypto import attachments
+
+    async def uploaded(client):
+        plaintext = COUNTERPARTY_FILE_BODY.encode("utf-8")
+        ciphertext, keys = attachments.encrypt_attachment(plaintext)
+
+        response, _ = await client.upload(
+            lambda *_: ciphertext,
+            content_type="application/octet-stream",
+            filename=None,
+            encrypt=False,
+            filesize=len(ciphertext),
+        )
+        url = getattr(response, "content_uri", None)
+        if url is None:
+            raise RuntimeError(f"the upload was refused: {response}")
+
+        # THE NAME IS THE BODY, which is the inversion `fileEvent.ts` argues
+        # on the other side: for a photograph the body is a description, for
+        # a file it is the filename itself.
+        return {
+            "msgtype": "m.file",
+            "body": COUNTERPARTY_FILE_NAME,
+            "info": {
+                "mimetype": "text/plain",
+                "size": len(plaintext),
+            },
+            "file": {
+                "url": url,
+                "mimetype": "text/plain",
+                **keys,
+            },
+        }
+
+    return await _send_with(session_file, store, uploaded)
+
+
 def main() -> int:
-    phases = {"login": login, "send": send, "collect": collect}
+    phases = {
+        "login": login,
+        "send": send,
+        "send-file": send_file,
+        "collect": collect,
+    }
     if len(sys.argv) != 2 or sys.argv[1] not in phases:
         print("usage: nio_counterparty.py login|send|collect", file=sys.stderr)
         return 2
