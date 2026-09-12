@@ -472,6 +472,17 @@ async def claim_place(session_file: Path, store: Path) -> int:
     produit et doit se lire comme tel, pas comme une phase qui pend.
     """
     homeserver = env("MESSAGR_INTEROP_HOMESERVER")
+    # LE SERVICE EST DONNÉ, PAS DEVINÉ.
+    #
+    # Cette ligne construisait `{homeserver}/_messagr`, ce qui est le défaut
+    # de `provision-bench-accounts.sh` et non sa valeur : un banc qui pose
+    # `MESSAGR_BENCH_SERVICE` met le service ailleurs. La requête atteignait
+    # alors le homeserver, qui répondait `401 M_UNAUTHORIZED` -- un code
+    # Matrix, donc un message qui nomme le mauvais coupable.
+    #
+    # Le repli garde la même règle que le script, pour un banc qui ne pose
+    # rien ; ce qui a changé est qu'on demande d'abord.
+    service = os.environ.get("MESSAGR_INTEROP_SERVICE") or f"{homeserver}/_messagr"
     token = env("MESSAGR_INTEROP_CLAIM_TOKEN")
 
     session = json.loads(session_file.read_text())
@@ -479,7 +490,7 @@ async def claim_place(session_file: Path, store: Path) -> int:
 
     async with aiohttp.ClientSession() as http:
         async with http.post(
-            f"{homeserver}/_messagr/invitations/claim",
+            f"{service}/invitations/claim",
             json={"token": token, "existing_user_id": user_id},
             timeout=aiohttp.ClientTimeout(total=60),
         ) as response:
