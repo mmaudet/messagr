@@ -726,6 +726,8 @@ export const fr = {
   'backup_settings_progress %1$d %2$d': '%1$d clés sauvegardées sur %2$d',
   backup_settings_catching_up:
     'Le reste part au fil des synchronisations. Rien n’est perdu en attendant.',
+  'backup_settings_count %1$d':
+    '%1$d clés sauvegardées : c’est ce que Messagr voit sur le serveur.',
   backup_settings_reading: "Lecture de l'état de la sauvegarde…",
   backup_settings_unreadable:
     "L'état de la sauvegarde n'a pas pu être lu sur cet appareil.",
@@ -737,7 +739,7 @@ export const fr = {
     'Votre clé actuelle ne peut pas être réaffichée, ici ni ailleurs.',
   backup_settings_replace: 'Remplacer ma clé de récupération',
   backup_settings_replace_why:
-    'À faire si vous avez perdu votre clé ou l’avez mal notée. Une nouvelle clé sera affichée une seule fois, et l’ancienne cessera d’ouvrir quoi que ce soit.',
+    'À faire si vous avez perdu votre clé ou l’avez mal notée.',
   backup_offer_title: 'Retrouver vos messages si vous perdez ce téléphone',
   backup_offer_lead:
     'Les clés qui ouvrent vos conversations n’existent que sur cet appareil. Messagr peut en garder une copie sur le serveur, fermée par une clé que vous seul détenez.',

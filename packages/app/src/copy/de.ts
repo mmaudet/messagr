@@ -488,6 +488,8 @@ export const de: Readonly<Record<CopyKey, string>> = {
   'backup_settings_progress %1$d %2$d': '%1$d von %2$d Schlüsseln gesichert',
   backup_settings_catching_up:
     'Der Rest geht mit den nächsten Abgleichen. Bis dahin geht nichts verloren.',
+  'backup_settings_count %1$d':
+    '%1$d Schlüssel gesichert: das ist, was Messagr auf dem Server sieht.',
   backup_settings_reading: 'Der Zustand der Sicherung wird gelesen…',
   backup_settings_unreadable:
     'Der Zustand der Sicherung konnte auf diesem Gerät nicht gelesen werden.',
@@ -499,7 +501,7 @@ export const de: Readonly<Record<CopyKey, string>> = {
     'Ihr aktueller Schlüssel kann nicht erneut angezeigt werden, hier so wenig wie anderswo.',
   backup_settings_replace: 'Wiederherstellungsschlüssel ersetzen',
   backup_settings_replace_why:
-    'Tun Sie das, wenn Sie Ihren Schlüssel verloren oder falsch notiert haben. Ein neuer Schlüssel wird einmal angezeigt, und der alte öffnet dann nichts mehr.',
+    'Tun Sie das, wenn Sie Ihren Schlüssel verloren oder falsch notiert haben.',
   backup_offer_title:
     'Ihre Nachrichten zurückbekommen, wenn Sie dieses Telefon verlieren',
   backup_offer_lead:
