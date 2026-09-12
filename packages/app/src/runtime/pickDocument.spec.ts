@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest'
 import {
   LARGEST_DOCUMENT_BYTES,
   refuseDocument,
+  refuseWhatWasRead,
   type StatedDocument,
 } from './pickDocument'
 
@@ -43,5 +44,29 @@ describe('refuseDocument', () => {
     // absence would refuse ordinary files; the bytes are bounded again after
     // reading, which is where an unstated size gets caught.
     expect(refuseDocument({ ...STATED, size: null })).toBeNull()
+  })
+})
+
+describe('refuseWhatWasRead', () => {
+  // LA SECONDE BORNE, QUE TROIS COMMENTAIRES PROMETTAIENT ET QUE RIEN
+  // N'APPLIQUAIT. « the bytes are bounded again once read » est écrit sur
+  // `StatedDocument.size`, dans le test ci-dessus et dans `sharedIn.spec.ts`.
+  // Relu le 12 septembre 2026 : ni `pickAnyDocument` ni `readShared` ne
+  // comparaient quoi que ce soit après lecture, donc un fichier dont le
+  // système ne déclare pas la taille passait sans limite -- et c'est
+  // précisément le cas qu'Android produit le plus souvent.
+  it('refuses bytes over the limit, which is what an unstated size becomes', () => {
+    expect(refuseWhatWasRead(new Uint8Array(LARGEST_DOCUMENT_BYTES + 1))).toBe(
+      'too-large',
+    )
+  })
+
+  it('refuses an empty read, which is an address that gave nothing', () => {
+    expect(refuseWhatWasRead(new Uint8Array(0))).toBe('unreadable')
+  })
+
+  it('accepts what fits, including exactly the limit', () => {
+    expect(refuseWhatWasRead(new Uint8Array(LARGEST_DOCUMENT_BYTES))).toBeNull()
+    expect(refuseWhatWasRead(new Uint8Array(1024))).toBeNull()
   })
 })

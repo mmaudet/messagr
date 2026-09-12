@@ -129,6 +129,41 @@
         </intent-filter>
 
         <!--
+          PARTAGER VERS MESSAGR, ce qui est le geste que les gens ont déjà.
+          Une messagerie absente de la feuille de partage est une messagerie
+          qu'on utilise moins, non parce qu'elle fait moins bien, mais parce
+          qu'elle demande de repartir de zéro à chaque envoi.
+
+          DÉCLARÉ PAR TYPE ET NON EN `*/*`. Une application qui se propose
+          pour tout se propose aussi pour ce qu'elle ne sait pas envoyer, et
+          c'est exactement le bruit que ce produit évite ailleurs : le
+          sélecteur de fichiers du coffre a été choisi pour cette raison.
+          Ces quatre familles sont ce que #111 sait sceller et téléverser.
+
+          ET PAS `text/*`, BIEN QU'UN .txt EN SOIT UN. Ce qui arrive par
+          cette famille est presque toujours du texte SÉLECTIONNÉ, que le
+          système remet en `EXTRA_TEXT` et sans aucun flux à lire. Messagr
+          apparaîtrait alors dans la feuille de partage d'un navigateur, se
+          lancerait, et ne ferait rien — la promesse non tenue que le
+          paragraphe ci-dessus refuse. Envoyer du texte partagé est un autre
+          geste (il va dans le composeur, pas dans un `m.file`) et il n'est
+          pas ici ; le sélecteur de documents, lui, prend déjà n'importe quel
+          fichier.
+
+          `MainActivity` traduit l'intention en `messagr://share?…` avant que
+          React ne lise quoi que ce soit : la raison est écrite là-bas, et
+          elle tient au cas chaud que le canal des liens a déjà appris.
+        -->
+        <intent-filter>
+            <action android:name="android.intent.action.SEND" />
+            <category android:name="android.intent.category.DEFAULT" />
+            <data android:mimeType="image/*" />
+            <data android:mimeType="video/*" />
+            <data android:mimeType="audio/*" />
+            <data android:mimeType="application/*" />
+        </intent-filter>
+
+        <!--
           THE https LINK, CLAIMED AT LAST, AND THE CONDITION ABOVE IS WHY IT
           WAITED.
 

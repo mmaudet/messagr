@@ -14,6 +14,7 @@ import {
 } from '../design/tokens'
 import type { ConversationSummary } from '../runtime/conversationList'
 import { displayNameFor } from '../runtime/givenName'
+import type { ShareRefusal } from '../runtime/sharedIn'
 import { stampFor, type Stamp } from '../timeline/whenShown'
 import { Avatar } from './Avatar'
 
@@ -73,6 +74,17 @@ export interface ConversationListProps {
    */
   readonly notInYet?: boolean
   /**
+   * Pourquoi un partage venu d'une autre application n'a pas abouti.
+   *
+   * `null` la plupart du temps, c'est-à-dire chaque fois que personne n'a
+   * rien partagé. Il y a une phrase parce qu'un geste sans réponse est un
+   * geste dont on croit qu'il a marché : quelqu'un qui a choisi Messagr dans
+   * la feuille de partage de son téléphone attend que quelque chose se soit
+   * passé, et si rien n'est parti il vaut mieux le lui dire ici que le lui
+   * laisser découvrir chez le destinataire. Voir `sharedIn.ts`.
+   */
+  readonly shareRefused?: ShareRefusal | null
+  /**
    * The clock, injectable. A list reading `Date.now()` inside itself is one
    * nothing can screenshot twice and get the same answer from.
    */
@@ -86,6 +98,7 @@ export function ConversationList({
   invitation = null,
   reinstalled = null,
   notInYet = false,
+  shareRefused = null,
   now = Date.now(),
 }: ConversationListProps) {
   return (
@@ -134,6 +147,20 @@ export function ConversationList({
                   displayNameFor(invitation.from, names.get(invitation.from)),
                 )
               : t('list_invitation_refused')}
+        </Text>
+      )}
+      {/* CE QU'UN PARTAGE EST DEVENU, quand il n'est devenu rien.
+          La phrase ne redit pas comment entrer : `list_not_in_yet`, juste en
+          dessous, le dit déjà et plus longuement. Elle dit le sort du
+          fichier -- pas envoyé, pas gardé non plus -- qui est ce que les
+          autres phrases de cet écran ne disent pas. */}
+      {shareRefused !== null && (
+        <Text style={styles.ignored} testID="list-share-refused">
+          {shareRefused === 'not-yet'
+            ? t('share_not_yet')
+            : shareRefused === 'too-large'
+              ? t('share_too_large')
+              : t('share_unreadable')}
         </Text>
       )}
       {/* Plain rows rather than a `FlatList`, because this sits inside the

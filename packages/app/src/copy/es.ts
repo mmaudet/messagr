@@ -422,6 +422,9 @@ export const es: Readonly<Record<CopyKey, string>> = {
   composer_photo: 'Añadir una foto',
   composer_document: 'Añadir un documento',
   composer_attach: 'Adjuntar',
+  share_not_yet: 'Este archivo no se ha enviado, y Messagr no lo ha guardado.',
+  share_too_large: 'Este archivo es demasiado grande para enviarlo.',
+  share_unreadable: 'Este archivo no se ha podido leer.',
   composer_record: 'Nota de voz',
   composer_send: 'Enviar',
   composer_record_soon:

@@ -19,7 +19,7 @@ import {
 } from '@dr.pogodin/react-native-fs'
 
 import type { DocumentChoice } from './pickDocument'
-import { refuseDocument } from './pickDocument'
+import { refuseDocument, refuseWhatWasRead } from './pickDocument'
 import type { KeepingDocument } from './keepDocument'
 
 /** What a file is when nothing says otherwise. */
@@ -57,10 +57,18 @@ export async function pickAnyDocument(): Promise<DocumentChoice> {
     if (refusal !== null) return { chose: false, because: refusal }
 
     const base64 = await readFile(chosen.uri, 'base64')
+    const bytes = bytesOf(base64)
+    // ET UNE SECONDE FOIS, sur ce qui a vraiment été lu. Un `content://` sans
+    // taille déclarée est le cas ordinaire sur Android, et sans cette ligne
+    // c'était un passe-droit : la borne ne protégeait que les fichiers qui
+    // s'étaient annoncés.
+    const read = refuseWhatWasRead(bytes)
+    if (read !== null) return { chose: false, because: read }
+
     return {
       chose: true,
       document: {
-        bytes: bytesOf(base64),
+        bytes,
         mimeType: stated.mimeType,
         name: stated.name,
       },
@@ -74,6 +82,48 @@ export async function pickAnyDocument(): Promise<DocumentChoice> {
     ) {
       return { chose: false, because: null }
     }
+    return { chose: false, because: 'unreadable' }
+  }
+}
+
+/**
+ * Lit les octets d'un partage entrant, au moment où on en a besoin.
+ *
+ * PAS AVANT. L'adresse voyage depuis l'intention jusqu'ici sans que rien ne
+ * soit lu : quelqu'un qui parcourt sa liste de conversations ne tient pas un
+ * fichier en mémoire pendant qu'il choisit, et rien n'a été recopié dans le
+ * stockage de cette application (ADR-0006).
+ *
+ * Le nom et le type viennent de ce que le système a annoncé, et non d'une
+ * lecture de l'adresse : un `content://` est un identifiant opaque, et lire
+ * un nom de fichier dedans est la façon d'afficher une ligne intitulée « 42 ».
+ */
+export async function readShared(
+  uri: string,
+  name: string,
+  mimeType: string,
+): Promise<DocumentChoice> {
+  try {
+    const base64 = await readFile(uri, 'base64')
+    const bytes = bytesOf(base64)
+    // LA SEULE BORNE QUI COMPTE ICI quand le système n'a pas dit la taille,
+    // ce qu'Android fait souvent : `whatToDoWith` ne peut refuser que sur ce
+    // qui a été annoncé, et une absence n'est pas un laissez-passer.
+    const read = refuseWhatWasRead(bytes)
+    if (read !== null) return { chose: false, because: read }
+
+    return {
+      chose: true,
+      document: {
+        bytes,
+        mimeType: mimeType === '' ? ASSUMED_TYPE : mimeType,
+        name,
+      },
+    }
+  } catch {
+    // Une adresse qui ne se lit plus est le cas ordinaire d'un partage
+    // rouvert plus tard : le système retire l'autorisation avec l'activité
+    // qui l'a reçue.
     return { chose: false, because: 'unreadable' }
   }
 }
