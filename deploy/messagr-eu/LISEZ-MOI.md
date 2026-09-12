@@ -160,3 +160,47 @@ Verify after:
     node deploy/messagr-eu/tests/conformite-site-deploye.js --live
 
 `deploy.sh` runs the last of those itself, at the end.
+
+## Pointing Android at Play, and the address that is NOT the right one
+
+`MESSAGR_DEST_ANDROID` is unset today, so the page offers the self-hosted
+APK and nothing else. #91 needs the opposite: a trial that installs from the
+internal testing track, because what is being tested includes the
+distribution.
+
+The mechanism is already here. The value is not, and **the obvious value is
+wrong**.
+
+**Not this.** `https://play.google.com/store/apps/details?id=eu.messagr` is
+the address of a published application. On an internal track, anybody who is
+not already an enrolled tester gets "item not found" from it. Wiring that
+would give most people a dead end, which is worse than the APK they have
+today.
+
+**This.** The tester opt-in link, of the form
+
+    https://play.google.com/apps/internaltest/<numeric id>
+
+It enrols the person and then offers the install, which is the whole path a
+participant needs. The id is per track and is shown **only in the Play
+Console**, under Testing, Internal testing, Testers. Nothing in this
+repository can derive it, which is why it is written here rather than
+defaulted somewhere.
+
+Then:
+
+    MESSAGR_DEST_ANDROID='https://play.google.com/apps/internaltest/<id>' \
+      deploy/messagr-eu/deploy.sh
+
+`build-site.sh` refuses a value that does not land in the built page, so a
+typo is a failed deployment rather than a page that serves the waiting
+sentence to somebody holding a working invitation. That guard is the reason
+this is one command and not a checklist.
+
+**The APK is not withdrawn by this.** Both slots coexist, and withdrawing
+the download is its own gesture (`MESSAGR_APK=none`). Leave it until the
+trial says the Play path works.
+
+**And iOS stays a dead end** until `MESSAGR_DEST_IOS` has a value. See #106:
+`ios: ''` is what production serves today, and an iPhone is told to ask the
+person who invited them.
