@@ -23,15 +23,44 @@
 # of them.
 name: Publish
 
+# # THE TRACK NAMES ARE NOT THE CONSOLE'S NAMES, AND THAT COSTS AN EVENING
+#
+# The API calls them `internal`, `alpha`, `beta`. The console calls the same
+# three *internal testing*, *closed testing* and *open testing*. Nothing maps
+# `alpha` to "closed" anywhere a person would look, and somebody dispatching
+# this workflow reads the console's words, not the API's.
+#
+#   internal  -> Test interne     (a list of testers, by e-mail, up to 100)
+#   alpha     -> Test fermé       (a list, or a Google group)
+#   beta      -> Test ouvert      (anybody with the link)
+#
+# # WHY ALL THREE ARE OFFERED RATHER THAN THE FIRST TWO
+#
+# On 12 September 2026 the three tracks carried three different things:
+# build 126 on internal, version 1.0 on open, and the closed track from
+# 5 September. Play serves whoever is opted into several of them the highest
+# version code they can reach, so which build somebody got depended on which
+# link they had followed weeks earlier.
+#
+# That is not a configuration mistake, it is what happens when a workflow can
+# only reach two tracks out of three: the third is updated by hand, or not at
+# all. #91's trial is the case that makes it expensive -- a volunteer on the
+# open track would have received a build with no calls and no vouching, and
+# four of its ten steps would have failed for a reason nothing on screen
+# explains.
+#
+# Each dispatch builds its own version code, so publishing the same commit to
+# two tracks gives them two codes and identical software. That is the intended
+# use: dispatch once per track, same commit.
 on:
   workflow_dispatch:
     inputs:
       track:
-        description: Which Play track to publish to
+        description: 'Play track: internal | alpha (closed) | beta (open)'
         required: true
         default: internal
         type: choice
-        options: [internal, alpha]
+        options: [internal, alpha, beta]
 
 jobs:
   internal-testing:

@@ -145,6 +145,32 @@ the first upload rather than after it.
 the internal testing track, which reaches testers listed in the Play Console
 within minutes and does not go through review.
 
+### Three tracks, and the names do not match the console
+
+The API's names and the console's names are different words for the same
+three things, and nothing anywhere maps them for you:
+
+| workflow input | Play Console | who can install                      |
+| -------------- | ------------ | ------------------------------------ |
+| `internal`     | Test interne | a list of testers by e-mail, max 100 |
+| `alpha`        | Test fermé   | a list, or a Google group            |
+| `beta`         | Test ouvert  | anybody with the link                |
+
+**Keep them carrying the same commit.** On 12 September 2026 they carried
+three different things: build 126 on internal, version 1.0 on open, and the
+closed track from 5 September. Play serves somebody opted into several tracks
+the highest version code they can reach, so which build a person got depended
+on which link they had followed weeks earlier.
+
+That is expensive in exactly one situation, and it is the one that matters:
+#91's unassisted trial. A volunteer who reached the open track would have
+installed a build with no calls and no vouching, and four of the trial's ten
+steps would have failed for a reason nothing on screen explains.
+
+Each dispatch computes its own version code, so publishing one commit to two
+tracks gives them two codes and identical software. Dispatch once per track
+and the tracks agree.
+
 The first release is made **by hand** through the Play Console. Not because
 the API is known to refuse it — Google's own documentation says nothing either
 way, and the claim is folklore — but because a first release cannot go out
