@@ -479,6 +479,8 @@ export const en: Readonly<Record<CopyKey, string>> = {
   'backup_settings_progress %1$d %2$d': '%1$d keys backed up out of %2$d',
   backup_settings_catching_up:
     'The rest goes as the conversations sync. Nothing is lost in the meantime.',
+  'backup_settings_count %1$d':
+    '%1$d keys backed up: that is what Messagr sees on the server.',
   backup_settings_reading: 'Reading the state of the backup…',
   backup_settings_unreadable:
     'The state of the backup could not be read on this device.',
@@ -490,7 +492,7 @@ export const en: Readonly<Record<CopyKey, string>> = {
     'Your current key cannot be shown again, here or anywhere else.',
   backup_settings_replace: 'Replace my recovery key',
   backup_settings_replace_why:
-    'Do this if you have lost your key or wrote it down badly. A new key will be shown once, and the old one will stop opening anything.',
+    'Do this if you have lost your key or wrote it down badly.',
   backup_offer_title: 'Get your messages back if you lose this telephone',
   backup_offer_lead:
     'The keys that open your conversations exist on this device and nowhere else. Messagr can keep a copy on the server, closed by a key only you hold.',

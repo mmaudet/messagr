@@ -479,6 +479,8 @@ export const it: Readonly<Record<CopyKey, string>> = {
   'backup_settings_progress %1$d %2$d': '%1$d chiavi salvate su %2$d',
   backup_settings_catching_up:
     'Il resto parte con le prossime sincronizzazioni. Nel frattempo non si perde nulla.',
+  'backup_settings_count %1$d':
+    '%1$d chiavi salvate: è quello che Messagr vede sul server.',
   backup_settings_reading: 'Lettura dello stato del backup…',
   backup_settings_unreadable:
     'Lo stato del backup non è stato letto su questo dispositivo.',
@@ -490,7 +492,7 @@ export const it: Readonly<Record<CopyKey, string>> = {
     'La sua chiave attuale non può essere mostrata di nuovo, né qui né altrove.',
   backup_settings_replace: 'Sostituire la mia chiave di recupero',
   backup_settings_replace_why:
-    'Lo faccia se ha perso la chiave o l’ha annotata male. Una nuova chiave verrà mostrata una sola volta, e la precedente smetterà di aprire qualsiasi cosa.',
+    'Lo faccia se ha perso la chiave o l’ha annotata male.',
   backup_offer_title: 'Ritrovare i suoi messaggi se perde questo telefono',
   backup_offer_lead:
     'Le chiavi che aprono le sue conversazioni esistono solo su questo dispositivo. Messagr può conservarne una copia sul server, chiusa da una chiave che ha soltanto lei.',

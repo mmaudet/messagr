@@ -479,6 +479,8 @@ export const nl: Readonly<Record<CopyKey, string>> = {
   'backup_settings_progress %1$d %2$d': '%1$d van %2$d sleutels bewaard',
   backup_settings_catching_up:
     'De rest gaat mee met de volgende synchronisaties. Ondertussen gaat er niets verloren.',
+  'backup_settings_count %1$d':
+    '%1$d sleutels bewaard: dat is wat Messagr op de server ziet.',
   backup_settings_reading: 'De staat van de back-up wordt gelezen…',
   backup_settings_unreadable:
     'De staat van de back-up kon op dit apparaat niet gelezen worden.',
@@ -490,7 +492,7 @@ export const nl: Readonly<Record<CopyKey, string>> = {
     'Uw huidige sleutel kan niet opnieuw worden getoond, hier niet en elders niet.',
   backup_settings_replace: 'Mijn herstelsleutel vervangen',
   backup_settings_replace_why:
-    'Doe dit als u uw sleutel kwijt bent of verkeerd hebt genoteerd. Er wordt eenmalig een nieuwe sleutel getoond, en de oude opent daarna niets meer.',
+    'Doe dit als u uw sleutel kwijt bent of verkeerd hebt genoteerd.',
   backup_offer_title: 'Uw berichten terugkrijgen als u deze telefoon verliest',
   backup_offer_lead:
     'De sleutels die uw gesprekken openen, bestaan alleen op dit toestel. Messagr kan er een kopie van op de server bewaren, gesloten met een sleutel die alleen u heeft.',

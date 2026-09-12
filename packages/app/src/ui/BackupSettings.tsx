@@ -142,6 +142,18 @@ export function BackupSettings({
     reading.reading === 'read' &&
     reading.enabled &&
     reading.backedUp < reading.total
+  /**
+   * Le rattrapage est fini, et il y a quelque chose à montrer.
+   *
+   * `total > 0` parce qu'un appareil neuf n'a encore ouvert aucune
+   * conversation : « vos 0 clés sont sauvegardées » serait une preuve de
+   * rien, sur un écran dont toute la valeur est d'être cru.
+   */
+  const allBackedUp =
+    reading.reading === 'read' &&
+    reading.enabled &&
+    reading.total > 0 &&
+    reading.backedUp >= reading.total
 
   return (
     <View style={styles.screen} testID="backup-settings">
@@ -189,6 +201,29 @@ export function BackupSettings({
           <Text style={styles.body}>
             {enabled ? t('backup_settings_on') : t('backup_settings_off')}
           </Text>
+          {/* WITH THE STATE AND NOT WITH THE CONTROL, which is a correction.
+              It sat in the replace section, at the same weight as the
+              sentence warning what replacing costs -- a fact about the key
+              that exists and an instruction about an action, indistinguishable
+              from each other. It belongs to the state: it is the rest of
+              « vos messages sont sauvegardés ». */}
+          {/* LA PREUVE, DANS LA CARTE, POUR LA MÊME RAISON QUE LA LIGNE
+              CI-DESSOUS. « Vos messages sont sauvegardés » est une
+              affirmation qu'il faut croire sur parole ; « 13 clés
+              sauvegardées » est un nombre que la personne peut rapprocher de
+              ce qu'elle a vécu. C'est le reste de la même phrase, donc c'est
+              ici et pas dans un bloc à soi -- un troisième bloc flottant
+              était précisément le défaut que #226 reproche à cet écran.
+
+              Un seul nombre et pas deux. « 13 sur 13 » est une barre de
+              progression finie, et le paragraphe plus bas a raison de dire
+              que deux nombres qui s'accordent n'ajoutent rien. Un seul,
+              avec sa provenance, est une vérification. */}
+          {allBackedUp && reading.reading === 'read' && (
+            <Text style={styles.stateNote} testID="backup-settings-count">
+              {t('backup_settings_count %1$d', reading.backedUp)}
+            </Text>
+          )}
           {/* WITH THE STATE AND NOT WITH THE CONTROL, which is a correction.
               It sat in the replace section, at the same weight as the
               sentence warning what replacing costs -- a fact about the key
@@ -270,11 +305,24 @@ export function BackupSettings({
             </Consequences>
           ) : (
             <View style={styles.section}>
-              {/* BEFORE THE CONTROL. Somebody who reads this after tapping has
-                been told what it costs when it has already cost it. */}
-              <Text style={styles.note}>
-                {t('backup_settings_replace_why')}
-              </Text>
+              {/* SOUS LE CONTRÔLE, ET C'EST UN RETOURNEMENT ASSUMÉ.
+                Ce qui était écrit ici disait : « BEFORE THE CONTROL. Somebody
+                who reads this after tapping has been told what it costs when
+                it has already cost it. » C'était juste quand ce bouton ÉTAIT
+                la porte.
+
+                Depuis #228 il ne l'est plus : taper ouvre un écran de
+                conséquences qui nomme les deux pertes, marque IRRÉVERSIBLE et
+                demande confirmation. **L'appui ne coûte plus rien**, donc
+                l'argument qui plaçait la phrase au-dessus est tombé avec le
+                défaut qu'il protégeait.
+
+                Et la phrase a maigri d'autant. Elle disait aussi « une
+                nouvelle clé sera affichée une seule fois, et l'ancienne
+                cessera d'ouvrir quoi que ce soit » -- exactement les deux
+                faits de l'écran de conséquences, en plus court et en moins
+                clair. Il reste le QUAND, qui est ce que cet écran-ci est seul
+                à pouvoir dire. #226. */}
               <NotchedButton
                 testID="backup-settings-replace"
                 label={t('backup_settings_replace')}
@@ -282,6 +330,9 @@ export function BackupSettings({
                 tone="quiet"
                 wide
               />
+              <Text style={styles.note} testID="backup-settings-replace-why">
+                {t('backup_settings_replace_why')}
+              </Text>
             </View>
           )
         ) : (

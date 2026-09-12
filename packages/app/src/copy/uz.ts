@@ -495,6 +495,8 @@ export const uz: Readonly<Record<CopyKey, string>> = {
   'backup_settings_progress %1$d %2$d': '%2$d tadan %1$d kalit zaxiralandi',
   backup_settings_catching_up:
     'Qolgani suhbatlar sinxronlangani sari ketadi. Bu orada hech nima yoʻqolmaydi.',
+  'backup_settings_count %1$d':
+    '%1$d kalit zaxiralandi: Messagr serverda shuni koʻradi.',
   backup_settings_reading: 'Zaxira holati oʻqilmoqda…',
   backup_settings_unreadable: 'Zaxira holatini bu qurilmada oʻqib boʻlmadi.',
   backup_settings_unreadable_why:
@@ -505,7 +507,7 @@ export const uz: Readonly<Record<CopyKey, string>> = {
     'Joriy kalitingizni qayta koʻrsatib boʻlmaydi — na bu yerda, na boshqa joyda.',
   backup_settings_replace: 'Tiklash kalitimni almashtirish',
   backup_settings_replace_why:
-    'Kalitingizni yoʻqotgan yoki notoʻgʻri yozib olgan boʻlsangiz shuni qiling. Yangi kalit bir marta koʻrsatiladi, eskisi esa boshqa hech nimani ochmaydi.',
+    'Kalitingizni yoʻqotgan yoki notoʻgʻri yozib olgan boʻlsangiz shuni qiling.',
   backup_offer_title: 'Bu telefonni yoʻqotsangiz, xabarlaringizni qaytaring',
   backup_offer_lead:
     'Suhbatlaringizni ochadigan kalitlar shu qurilmada bor va boshqa hech qayerda yoʻq. Messagr ularning nusxasini serverda saqlashi mumkin — faqat sizdagi kalit bilan yopilgan holda.',
