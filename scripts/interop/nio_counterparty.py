@@ -530,9 +530,29 @@ async def claim_place(session_file: Path, store: Path) -> int:
 
 
 def main() -> int:
-    phases = {"login": login, "send": send, "collect": collect}
+    # `claim-place` MANQUAIT ICI, ET C'EST LE DÉFAUT QUI REVIENT DANS CE DÉPÔT.
+    #
+    # `claim_place` était écrite, testée de l'extérieur par
+    # `roundTrip.test.ts`, et absente de cette table. Le script répondait donc
+    # « usage: login|send|collect » et sortait 2, ce que l'appelant voyait
+    # comme « Command failed », sans rien qui nomme la phase inconnue.
+    #
+    # Une pièce finie que rien n'appelle ne se signale à aucune unité : le
+    # script se lit bien, la fonction se lit bien, et seule leur absence de
+    # lien est fausse. C'est pour cela que la table est ici plutôt que dans
+    # trois endroits, et que la ligne d'usage est dérivée d'elle : les deux ne
+    # peuvent plus diverger.
+    phases = {
+        "login": login,
+        "send": send,
+        "claim-place": claim_place,
+        "collect": collect,
+    }
     if len(sys.argv) != 2 or sys.argv[1] not in phases:
-        print("usage: nio_counterparty.py login|send|collect", file=sys.stderr)
+        print(
+            f"usage: nio_counterparty.py {'|'.join(phases)}",
+            file=sys.stderr,
+        )
         return 2
 
     work = Path(env("MESSAGR_INTEROP_WORKDIR"))
