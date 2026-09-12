@@ -183,6 +183,40 @@ jobs:
     # The boot contract is a claim about a device, so it is asserted on one.
     # Android on an Ubuntu runner rather than iOS on macOS: same assertions,
     # a tenth of the billed minutes.
+    #
+    # UN SEUL BANC, DONC UNE SEULE SUITE À LA FOIS.
+    #
+    # La concurrence du workflow est par RÉFÉRENCE : deux branches ne
+    # s'attendent pas. Tant que les poussées étaient espacées, personne ne
+    # l'a vu. Le 12 septembre 2026, cinq branches poussées en onze minutes
+    # ont produit cinq suites vivantes en même temps :
+    #
+    #     13:00 → 13:21     13:00 → 13:23     13:04 → 13:26
+    #     13:07 → 13:28     13:11 → 13:32
+    #
+    # Les cinq ont échoué, master compris, sur #234 — « the counterparty's
+    # message never decrypted ». Les sept runs du matin, espacés de vingt à
+    # trente minutes et jamais recouvrants, étaient tous verts.
+    #
+    # ELLES PARTAGENT UN HOMESERVER. Chaque suite provisionne ses propres
+    # comptes, mais toutes les créent, les font entrer et échangent leurs
+    # clés sur la MÊME instance. Ce que cinq suites simultanées lui
+    # demandent est un régime qu'elle n'avait jamais connu, et le découvrir
+    # sous la forme d'un défaut de chiffrement coûte une journée de fausses
+    # pistes — j'en ai écrit trois.
+    #
+    # LE GROUPE EST GLOBAL ET LA FILE N'ANNULE PAS. Au niveau du job, donc
+    # `android-release` et `ios-simulator` continuent de tourner en
+    # parallèle : eux ne touchent pas le banc. `cancel-in-progress: false`
+    # parce qu'annuler une suite en cours pour en lancer une autre perdrait
+    # vingt minutes de mesure ; ici on attend son tour.
+    #
+    # La concurrence par référence du workflow reste au-dessus : repousser
+    # sur la même branche annule toujours la précédente, y compris quand
+    # elle patiente dans cette file.
+    concurrency:
+      group: ${{ github.workflow }}-banc-unique
+      cancel-in-progress: false
     runs-on: ubuntu-latest
     timeout-minutes: 45
     steps:
