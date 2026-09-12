@@ -79,6 +79,39 @@ jobs:
       - name: Assert the bundle carries no crypto WebAssembly module
         run: ./scripts/assert-no-crypto-wasm.sh
 
+      # CE QUI ATTRAPE UN WORKFLOW QUI REFUSE DE DÉMARRER (#248).
+      #
+      # `publish.yml` a été rejeté AU DÉCLENCHEMENT pour un `+` dans une
+      # expression : pas une étape en échec, un run qui ne commence jamais.
+      # Rien ne le voyait, parce que ces fichiers ne tournent pas tous à
+      # chaque poussée — `publish.yml` attend une main.
+      #
+      # LE TEST QUE CETTE GARDE A PASSÉ AVANT D'ÊTRE POSÉE : attrape-t-elle
+      # SON incident ? Reproduit le 12 septembre 2026 avec
+      # `${{ github.run_number + 1 }}`, et actionlint répond
+      # « got unexpected character '+' while lexing expression ». Oui.
+      #
+      # Une analyse YAML, elle, ne l'aurait pas vu — le fichier était du YAML
+      # parfaitement valide — et c'est pour ça qu'elle avait été écartée.
+      #
+      # LE BINAIRE EST ÉPINGLÉ ET VÉRIFIÉ, plutôt qu'une action tierce ou un
+      # `curl | sh`. Une version qui flotte ferait dépendre la garde de ce que
+      # GitHub sert le jour dit, et une action tierce est un tiers de plus
+      # dans une chaîne que ce projet garde courte.
+      - name: Assert every workflow would actually start
+        env:
+          ACTIONLINT_VERSION: 1.7.12
+          ACTIONLINT_SHA256: 8aca8db96f1b94770f1b0d72b6dddcb1ebb8123cb3712530b08cc387b349a3d8
+        run: |
+          set -euo pipefail
+          archive="actionlint_${ACTIONLINT_VERSION}_linux_amd64.tar.gz"
+          curl -sSLf --retry 3 -o "$archive" \
+            "https://github.com/rhysd/actionlint/releases/download/v${ACTIONLINT_VERSION}/${archive}"
+          echo "${ACTIONLINT_SHA256}  ${archive}" | sha256sum --check --status
+          tar -xzf "$archive" actionlint
+          ./actionlint
+          rm -f actionlint "$archive"
+
       # HERE, AND NOT IN THE macOS JOB. All three are files in this
       # repository, so a Linux runner reads them fine -- and the simulator
       # job cannot catch any of this: a simulator build proves compilation,
