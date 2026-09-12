@@ -613,3 +613,75 @@ describe('turning the camera on and off during a call', () => {
     ).toHaveLength(2)
   })
 })
+
+describe('switching the camera', () => {
+  // RIEN NE COUVRAIT CE CHEMIN, et #199 affirme pourtant qu'il « fonctionne
+  // des deux côtés ». `git grep switchCamera` sur tous les `.spec.ts` rendait
+  // zéro : le câblage allait de l'écran jusqu'à `native._switchCamera()` sans
+  // qu'une seule ligne ne le vérifie. Ces trois cas ne prouvent pas qu'une
+  // caméra bascule sur un téléphone — seul un appareil le dira — mais ils
+  // prouvent que le geste atteint le port, avec la bonne piste, et qu'il ne
+  // tombe pas quand il n'y a pas de caméra.
+
+  it('hands the camera it captured to the port', async () => {
+    const captured = fakeTrack().track
+    const switchCamera = vi.fn()
+    const media = startCallMedia(
+      {
+        createConnection: () => fakeConnection().pc,
+        captureAudio: async () => fakeTrack().track,
+        captureVideo: async () => captured,
+        switchCamera,
+      },
+      CONFIG,
+      fakeListener(),
+    )
+    await media.offer({ video: true })
+    media.switchCamera()
+
+    // LA PISTE, ET PAS N'IMPORTE LAQUELLE. L'adaptateur retrouve la piste
+    // native par celle-ci ; lui passer celle du micro ferait chercher une
+    // caméra derrière un microphone, et `_switchCamera` ne répondrait rien.
+    expect(switchCamera).toHaveBeenCalledTimes(1)
+    expect(switchCamera).toHaveBeenCalledWith(captured)
+  })
+
+  it('does nothing at all on a call with no camera', async () => {
+    // Un appel audio n'a pas de caméra à retourner. L'écran cache déjà le
+    // contrôle -- « a control that turns nothing is worse than an absent
+    // one » -- mais la couche média ne doit pas dépendre de ce que l'écran
+    // dessine : un geste qui arrive quand même ne doit rien casser.
+    const switchCamera = vi.fn()
+    const media = startCallMedia(
+      {
+        createConnection: () => fakeConnection().pc,
+        captureAudio: async () => fakeTrack().track,
+        captureVideo: async () => fakeTrack().track,
+        switchCamera,
+      },
+      CONFIG,
+      fakeListener(),
+    )
+    await media.offer()
+    media.switchCamera()
+    expect(switchCamera).not.toHaveBeenCalled()
+  })
+
+  it('survives a platform that offers no switching', async () => {
+    // Le port est facultatif : une plateforme sans caméra frontale, ou une
+    // bibliothèque qui ne sait pas basculer, laisse ce port vide. Le geste
+    // ne doit pas jeter -- il arrive depuis un appui, et une exception là
+    // remonterait jusqu'à l'écran d'appel.
+    const media = startCallMedia(
+      {
+        createConnection: () => fakeConnection().pc,
+        captureAudio: async () => fakeTrack().track,
+        captureVideo: async () => fakeTrack().track,
+      },
+      CONFIG,
+      fakeListener(),
+    )
+    await media.offer({ video: true })
+    expect(() => media.switchCamera()).not.toThrow()
+  })
+})

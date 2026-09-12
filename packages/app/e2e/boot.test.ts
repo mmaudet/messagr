@@ -529,6 +529,94 @@ describe('boot', () => {
       .withTimeout(30000)
   })
 
+  // ── Et les panneaux du composeur, que rien ne pilotait (#243) ──
+
+  it('opens and shuts both composer panels, and still answers after', async () => {
+    // EN DERNIER, ET C'EST LA MOITIÉ DE LA RÉPONSE À #243.
+    //
+    // Sur #241, un test qui ouvrait un panneau mourait et emportait **les
+    // quatre suivants**, onze secondes chacun, parce qu'il mourait avant de
+    // refermer. Placé ici, un gel ne peut poisonner personne : il n'y a plus
+    // personne après.
+    //
+    // # CE QUE CES DEUX PANNEAUX SONT, ET CE QU'ILS NE SONT PAS
+    //
+    // Ce sont deux petits blocs de `Composer.tsx` : une rangée d'émojis en
+    // ligne, et deux lignes « photo / document ». Ni l'un ni l'autre n'est
+    // l'`EmojiPicker` des réactions, qui monte 434 emoji et se pose par
+    // dessus la conversation -- un composant différent, ouvert par un appui
+    // long sur un message.
+    //
+    // Le dire parce que je les avais confondus. L'analyse de cause que
+    // j'avais publiée sur #243 attribuait le gel d'Espresso à ces 434 vues ;
+    // elle parlait du mauvais fichier. `emoji-panel` est un `{open && …}`
+    // sur une poignée de `Pressable`, sans cascade de mise en page.
+    //
+    // Conséquence directe : couper la synchronisation Detox n'a plus de
+    // justification. Elle avait été ajoutée pour laisser passer une attente
+    // d'inactivité qu'une grosse cascade rendait impossible ; sans cascade,
+    // elle ne fait que priver le test de la garantie qu'il agit sur une
+    // application au repos. Ce test s'en passe, et si le gel revient, il
+    // reviendra sur un chemin qu'on n'a pas déjà troublé soi-même.
+    await element(by.id('backup-settings-back')).tap()
+    await waitFor(element(by.id('tab-chat')))
+      .toBeVisible()
+      .withTimeout(30000)
+    await element(by.id('tab-chat')).tap()
+    await waitFor(element(by.id('first-conversation')))
+      .toBeVisible()
+      .withTimeout(60000)
+    await element(by.id('first-conversation')).tap()
+    await waitFor(element(by.id('composer-emoji')))
+      .toBeVisible()
+      .withTimeout(60000)
+
+    // TROIS IMAGES AUTOUR DU GESTE, ET CE N'EST PAS UNE HYPOTHÈSE DE PLUS.
+    //
+    // Quatre runs ont échoué. La capture d'échec de Detox est prise TRENTE
+    // SECONDES après le geste : elle montre la liste, ce qui ne dit pas si
+    // le panneau ne s'est jamais ouvert ou si l'écran a changé ensuite. Deux
+    // histoires très différentes, et la même image.
+    //
+    // Celles-ci encadrent le tap, donc elles répondent. La piste qu'elles
+    // départageront : sur la liste, `tab-chat` occupe exactement la zone où
+    // vit `composer-emoji` dans une conversation. Un tap au même endroit,
+    // sur le mauvais écran, presse « Discussions ».
+    await device.takeScreenshot('panneaux-a-avant-le-tap')
+    await element(by.id('composer-emoji')).tap()
+    await device.takeScreenshot('panneaux-b-juste-apres-le-tap')
+    await waitFor(element(by.id('emoji-panel')))
+      .toExist()
+      .withTimeout(30000)
+    await device.takeScreenshot('panneaux-c-panneau-ouvert')
+
+    // REFERMÉ DANS LE TEST, et pas seulement ouvert. Un panneau laissé
+    // ouvert est l'état dans lequel #241 a laissé quatre tests mourir.
+    await element(by.id('composer-emoji')).tap()
+    await waitFor(element(by.id('emoji-panel')))
+      .not.toExist()
+      .withTimeout(30000)
+
+    // L'AUTRE PANNEAU, arrivé avec #241 et jamais piloté non plus. Ses deux
+    // lignes sont nommées : un panneau qui s'ouvrirait vide serait vert ici.
+    await element(by.id('conversation-attach')).tap()
+    await waitFor(element(by.id('attach-panel')))
+      .toExist()
+      .withTimeout(30000)
+    await detoxExpect(element(by.id('attach-photo'))).toBeVisible()
+    await detoxExpect(element(by.id('attach-document'))).toBeVisible()
+
+    await element(by.id('conversation-attach')).tap()
+    await waitFor(element(by.id('attach-panel')))
+      .not.toExist()
+      .withTimeout(30000)
+
+    // ET L'APPLICATION RÉPOND ENCORE. C'est la vraie question de #243 : sur
+    // #241, ce n'est pas le test du panneau qui a coûté cher, ce sont les
+    // quatre d'après.
+    await detoxExpect(element(by.id('conversation-input'))).toBeVisible()
+  })
+
   /** The pump, narrowed. A launch that never ran one is a failure to say so. */
   function ranPump() {
     const { pump } = report

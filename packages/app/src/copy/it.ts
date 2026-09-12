@@ -402,6 +402,8 @@ export const it: Readonly<Record<CopyKey, string>> = {
   call_camera_off: 'Spegnere la fotocamera',
   call_switch_camera: 'Cambiare',
   call_their_camera_off: 'La sua fotocamera è spenta',
+  call_camera_refused:
+    'La sua fotocamera non è potuta essere aperta. La chiamata continua senza la sua immagine.',
   call_failed_no_relay:
     'Questo server non ha un relay per le chiamate: la chiamata non è partita.',
   call_failed_no_microphone: 'Il microfono non è disponibile.',
@@ -443,6 +445,17 @@ export const it: Readonly<Record<CopyKey, string>> = {
   settings_wake_on: 'Attive',
   settings_wake_off: 'Disattivate',
   settings_wake_not_kept:
+    'Questa scelta non è stata conservata: tornerà allo stato precedente al prossimo avvio.',
+
+  // #208: the automatic keeping, and what the screen owes whoever is offered
+  // it. See the French, and ADR-0006's amendment of 12 September 2026.
+
+  settings_keep_every: 'Salvare le foto ricevute',
+  settings_keep_every_hint:
+    'Ogni foto ricevuta finisce nella sua galleria prima che lei l’abbia vista, comprese quelle di persone che non conosce ancora. Lì può leggerla ogni applicazione a cui dà accesso alle sue foto, e chi l’ha inviata non può più ritirarla.',
+  settings_keep_every_future:
+    'Spegnerlo non recupera nulla: ciò che è stato salvato resta salvato.',
+  settings_keep_every_not_kept:
     'Questa scelta non è stata conservata: tornerà allo stato precedente al prossimo avvio.',
   promise_language: 'Scelga la sua lingua',
   promise_terms: 'Accetto le condizioni generali d’uso di Messagr.',
