@@ -99,12 +99,22 @@ import {
   recoverySecrets,
   sessionSecrets,
   signUpSecrets,
+  keepEverySecrets,
 } from './src/runtime/deviceSecrets'
 import {
   publishReceipts,
   RECEIPTS_DEFAULT,
   receiptsArePublished,
 } from './src/runtime/receiptSetting'
+import {
+  KEEP_EVERY_DEFAULT,
+  everyPhotographIsKept,
+  keepEveryPhotograph,
+} from './src/runtime/keepEverySetting'
+import {
+  arrivedThisRun,
+  photographsThatJustArrived,
+} from './src/runtime/arrivedThisRun'
 import { markUpTo, readAtMark, type Receipt } from './src/runtime/receipts'
 import { hasSeenPromise, rememberPromiseSeen } from './src/runtime/promiseSeen'
 import { clearSignUp, isSignUpUnfinished } from './src/runtime/signUpMarker'
@@ -690,6 +700,25 @@ export function App({
   const [wake, setWake] = useState(true)
   const [wakeNotKept, setWakeNotKept] = useState(false)
   const wakeRef = useRef(true)
+  // #208. Off unless somebody found the switch and turned it on, which
+  // `keepEverySetting.ts` argues is load-bearing rather than polite: a
+  // default that saved would decide for everybody who never opens Réglages.
+  //
+  // The ref is what the poll reads. The poll runs from a closure made once,
+  // and whether every photograph is kept can change while it runs -- the
+  // same reason `receiptsRef` exists a few lines down.
+  const [keepEvery, setKeepEvery] = useState(KEEP_EVERY_DEFAULT)
+  const [keepEveryNotKept, setKeepEveryNotKept] = useState(false)
+  const keepEveryRef = useRef(KEEP_EVERY_DEFAULT)
+  /**
+   * Which photographs the switch above has the right to keep.
+   *
+   * Held for the life of the process and never written anywhere:
+   * `arrivedThisRun.ts` sets out the two defects it exists to prevent -- the
+   * back catalogue dumped into the gallery on the first scroll, and a copy
+   * added every time a conversation is reopened.
+   */
+  const arrivalsRef = useRef(arrivedThisRun())
   const [readHere, setReadHere] = useState<ReadonlySet<string>>(new Set())
   /**
    * The messages the selection mode holds, and whether the removal sheet is
@@ -1406,6 +1435,12 @@ export function App({
         wakeRef.current = on
       })
       .catch(() => undefined)
+    everyPhotographIsKept(keepEverySecrets)
+      .then(on => {
+        setKeepEvery(on)
+        keepEveryRef.current = on
+      })
+      .catch(() => undefined)
   }, [])
 
   // Held in a ref as well as in state: the live loop's callbacks are made
@@ -1413,6 +1448,10 @@ export function App({
   useEffect(() => {
     receiptsRef.current = receipts
   }, [receipts])
+
+  useEffect(() => {
+    keepEveryRef.current = keepEvery
+  }, [keepEvery])
 
   useEffect(() => {
     conversationRef.current = conversation ?? []
@@ -2484,7 +2523,61 @@ export function App({
             // held in a ref because `Photograph` keeps it in an effect's
             // dependency list -- a function rebuilt on every render would
             // make it re-download the picture on every render.
-            openImageRef.current = image => openPhotograph(credentials, image)
+            openImageRef.current = async image => {
+              const shown = await openPhotograph(credentials, image)
+              // #208, ET C'EST ICI QUE L'INTERRUPTEUR AGIT.
+              //
+              // Au moment du dessin, pas à celui de l'arrivée : une note
+              // posée par la boucle vive est un droit d'enregistrer, et il
+              // s'exerce quand l'image est déchiffrée pour être montrée. Une
+              // conversation rattrapée après une semaine hors ligne
+              // enregistre ce qu'elle dessine, pas ce qu'elle télécharge.
+              //
+              // `mayKeep` consomme la note, donc revenir sur la conversation
+              // -- changer d'onglet suffit -- n'ajoute pas une copie. Une
+              // vignette n'est jamais notée, donc jamais gardée.
+              //
+              // RIEN N'EST DIT À L'ÉCRAN. Le geste de #169 répond parce que
+              // quelqu'un vient de le demander ; celui-ci n'a été demandé
+              // qu'une fois, dans Réglages, et une notification par
+              // photographie reçue serait le contraire d'un réglage.
+              const toKeep = shown.shown
+                ? arrivalsRef.current.mayKeep(image.url)
+                : null
+              if (toKeep !== null) {
+                // LA PHOTOGRAPHIE, PAS CE QUI VIENT D'ÊTRE DESSINÉ. Ce qui
+                // est dessiné dans une conversation est la vignette du
+                // correspondant, et une vignette dans la photothèque serait
+                // une copie dégradée que personne ne veut y trouver à la
+                // place. `openPhotograph` répond depuis son cache quand les
+                // deux sont la même chose, donc ceci ne coûte un
+                // téléchargement que lorsqu'il en faut vraiment un.
+                openPhotograph(credentials, toKeep)
+                  .then(async whole => {
+                    if (!whole.shown) {
+                      logEvent('warn', 'MESSAGR_KEEP_EVERY', {
+                        reason: whole.reason,
+                      })
+                      return
+                    }
+                    const done = await keepPhotograph(photoLibrary, whole.uri)
+                    logEvent(
+                      done.kept ? 'info' : 'warn',
+                      'MESSAGR_KEEP_EVERY',
+                      done.kept ? {} : { reason: done.reason },
+                    )
+                  })
+                  // L'ÉCHEC NE PERD PAS LA PHOTOGRAPHIE, qui est un critère
+                  // de #208 : `shown` est déjà rendu plus bas, et rien ici
+                  // ne peut le retenir.
+                  .catch((cause: unknown) => {
+                    logEvent('warn', 'MESSAGR_KEEP_EVERY', {
+                      reason: getErrorMessage(cause),
+                    })
+                  })
+              }
+              return shown
+            }
 
             // TELLING THE HOMESERVER WHERE TO WAKE THIS DEVICE.
             //
@@ -3043,6 +3136,30 @@ export function App({
                     eventsRef.current,
                   )
                     .then(async fresh => {
+                      // #208, ET C'EST LE SEUL ENDROIT OÙ UNE ARRIVÉE EST
+                      // NOTÉE.
+                      //
+                      // Avant la fusion, parce que c'est la différence avec
+                      // ce qui était déjà là qui dit ce qui vient d'arriver :
+                      // `loadConversation` rend la conversation entière et
+                      // non un delta. Après la fusion il n'y aurait plus de
+                      // différence à lire.
+                      //
+                      // Rien n'est enregistré ici : une note est un droit
+                      // d'enregistrer, exercé par `Photograph` au moment où
+                      // l'image est dessinée. C'est ce que l'amendement du
+                      // 12 septembre à l'ADR-0006 exige -- « la copie est
+                      // faite quand l'application déchiffre une image pour
+                      // l'afficher, sur un appareil que quelqu'un tient ».
+                      if (keepEveryRef.current) {
+                        for (const arrival of photographsThatJustArrived(
+                          conversationRef.current,
+                          fresh.entries,
+                          credentials.userId,
+                        )) {
+                          arrivalsRef.current.noted(arrival)
+                        }
+                      }
                       setConversation(held =>
                         mergeTimeline(held ?? [], fresh.entries),
                       )
@@ -4000,6 +4117,23 @@ export function App({
                       publishReceipts(receiptSecrets, on)
                         .then(kept => setReceiptsNotKept(!kept))
                         .catch(() => setReceiptsNotKept(true))
+                    }}
+                    keepEvery={keepEvery}
+                    keepEveryNotKept={keepEveryNotKept}
+                    onKeepEvery={on => {
+                      // Shown first, kept second, like the two above.
+                      setKeepEvery(on)
+                      keepEveryRef.current = on
+                      // NOTHING ALREADY NOTED IS DISCARDED WHEN IT GOES OFF,
+                      // and nothing already drawn is picked up when it goes
+                      // on. Turning it on mid-run does not reach backwards:
+                      // `arrivedThisRun.ts` only holds what arrived while it
+                      // was on, because that is the only moment `noted` is
+                      // called. The switch governs the future, which is the
+                      // sentence under it.
+                      keepEveryPhotograph(keepEverySecrets, on)
+                        .then(kept => setKeepEveryNotKept(!kept))
+                        .catch(() => setKeepEveryNotKept(true))
                     }}
                   />
                 </View>

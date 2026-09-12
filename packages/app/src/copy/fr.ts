@@ -606,6 +606,8 @@ export const fr = {
   call_camera_off: 'Couper la caméra',
   call_switch_camera: 'Changer',
   call_their_camera_off: 'Sa caméra est coupée',
+  call_camera_refused:
+    'Votre caméra n’a pas pu être ouverte. L’appel continue sans votre image.',
   call_failed_no_relay:
     'Ce serveur n’a pas de relais d’appel : l’appel n’a pas pu être passé.',
   call_failed_no_microphone: 'Le micro n’est pas accessible.',
@@ -657,6 +659,24 @@ export const fr = {
   settings_wake_on: 'Activées',
   settings_wake_off: 'Désactivées',
   settings_wake_not_kept:
+    'Ce choix n’a pas pu être conservé : il reviendra à son état précédent au prochain démarrage.',
+
+  // #208 : L'ENREGISTREMENT AUTOMATIQUE, ET CE QUE L'ÉCRAN DOIT DIRE EN
+  // L'OFFRANT.
+  //
+  // L'amendement du 12 septembre à l'ADR-0006 autorise l'interrupteur en
+  // imposant deux phrases, parce que « enregistrer automatiquement les médias
+  // reçus » ne dit ni l'une ni l'autre. La personne ne regarde pas l'image au
+  // moment où elle part, et elle choisit cela pour des images qu'elle n'a pas
+  // vues, venant de gens qu'elle n'a pas encore rencontrés. Et éteindre plus
+  // tard ne récupère rien : l'interrupteur ne gouverne que l'avenir.
+
+  settings_keep_every: 'Enregistrer les photos reçues',
+  settings_keep_every_hint:
+    'Chaque photo reçue part dans votre galerie avant que vous l’ayez vue, y compris celles de personnes que vous ne connaissez pas encore. Elle y est lisible par toutes les applications à qui vous donnez accès à vos photos, et son expéditeur ne peut plus la retirer.',
+  settings_keep_every_future:
+    'Éteindre ne récupère rien : ce qui a été enregistré reste enregistré.',
+  settings_keep_every_not_kept:
     'Ce choix n’a pas pu être conservé : il reviendra à son état précédent au prochain démarrage.',
 
   // Le premier lancement : la langue, puis l'acceptation.

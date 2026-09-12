@@ -1,5 +1,6 @@
 import React, { useState } from 'react'
 import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native'
+import { useSafeAreaInsets } from 'react-native-safe-area-context'
 
 import { t } from '../copy'
 import {
@@ -177,6 +178,42 @@ export function Composer({
   const [emojiOpen, setEmojiOpen] = useState(false)
   const [attachOpen, setAttachOpen] = useState(false)
   const [whyDisabled, setWhyDisabled] = useState(false)
+  /**
+   * LA BARRE DE NAVIGATION PASSAIT PAR-DESSUS CE COMPOSEUR, ET FERMAIT LA
+   * CONVERSATION.
+   *
+   * `App.tsx` prend `edges={['left', 'right']}` : le bord bas n'est pas
+   * réservé, **parce que la barre d'onglets est censée se poser contre le bas
+   * de l'écran**. C'est juste pour la liste. Ça ne l'est pas ici, où il n'y a
+   * pas de barre d'onglets et où c'est ce composeur qui occupe le bas.
+   *
+   * Et `MainActivity` ne compense rien : il décale la vue de
+   * `WindowInsetsCompat.Type.ime()`, qui vaut zéro clavier baissé. Son propre
+   * commentaire le dit — « tant que le clavier est levé la barre de navigation
+   * est derrière lui, donc il n'y a rien à réserver ». Exact, et c'est
+   * exactement pourquoi le défaut ne se voit que clavier **baissé**,
+   * c'est-à-dire au moment où l'on tend la main vers l'emoji.
+   *
+   * Le résultat sur un Android à trois boutons : le rond de l'emoji et le
+   * bouton appareil photo sont derrière les boutons du système. Viser l'emoji
+   * presse Retour et ferme la conversation.
+   *
+   * PROUVÉ PAR DEUX CAPTURES, pas par un raisonnement : #255 encadre le geste,
+   * et les images montrent la conversation avant et la liste après. Quatre
+   * hypothèses s'étaient succédé avant elles, dont une que j'avais publiée.
+   *
+   * RÉSERVÉ ICI ET PAS DANS `MainActivity` : y toucher remonterait aussi la
+   * barre d'onglets, ce que le commentaire cité plus haut dit être un choix.
+   * Le composeur n'est pas la barre d'onglets, et c'est la distinction que le
+   * trou a révélée.
+   *
+   * CE QUE ÇA COÛTE, DIT PLUTÔT QUE TU : clavier levé, la vue est déjà
+   * décalée de toute la hauteur du clavier, barre de navigation comprise. Ce
+   * rembourrage s'ajoute alors, et laisse une bande de la hauteur de la barre
+   * entre les commandes et le clavier. C'est laid et c'est réparable ; un
+   * bouton qu'on ne peut pas viser sans perdre sa conversation ne l'est pas.
+   */
+  const insets = useSafeAreaInsets()
   // THE LIGHT PALETTE, NOT THE SYSTEM'S THEME.
   //
   // This read `useColorScheme()` and switched to `color.dark`. Four
@@ -207,6 +244,10 @@ export function Composer({
         {
           backgroundColor: palette.surface.paper,
           borderTopColor: palette.neutral['200'],
+          // Ajouté au rembourrage de `dock` plutôt que de le remplacer : la
+          // barre de navigation dit de quoi s'écarter, pas à quoi ressembler.
+          // Un appareil sans barre rend zéro et la mise en page ne bouge pas.
+          paddingBottom: space.s + insets.bottom,
         },
       ]}
       testID="composer">

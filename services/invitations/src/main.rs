@@ -112,6 +112,30 @@ fn router(state: Arc<AppState>) -> Router {
             "/_matrix/push/v1/notify",
             post(handlers::wake::notify).layer(DefaultBodyLimit::max(256 * 1024)),
         )
+        // DEMANDER UNE INVITATION QUAND ON N'EN A PAS (#152).
+        //
+        // La seule route ici qu'une PERSONNE appelle sans rien présenter :
+        // pas de compte, pas de jeton, rien. `wake` est l'autre sans
+        // authentification, mais elle est appelée par un homeserver.
+        //
+        // Elle ne lit aucun corps — il n'y a rien à soumettre, et c'est le
+        // fond de la décision : la demande ne porte ni adresse, ni nom, ni
+        // texte libre. `handlers::request` dit pourquoi, et ce que cela
+        // coûte. Ce qui la borne est un plafond, une cadence et un délai,
+        // tous trois sans tiers et sans identifiant.
+        .route(
+            "/invitation-requests",
+            post(handlers::request::ask).get(handlers::request::queue),
+        )
+        .route("/invitation-requests/:code", get(handlers::request::look))
+        // LA DÉCISION, PRISE PAR UNE PERSONNE, et authentifiée comme tout ce
+        // qui n'est pas public ici. Elle n'invente pas d'invitation : elle
+        // attache celle que l'exploitant a créée par le chemin ordinaire,
+        // avec son porteur, son salon et son plafond.
+        .route(
+            "/invitation-requests/:id/grant",
+            post(handlers::request::grant),
+        )
         .route("/invitations", post(handlers::create::create))
         .route("/invitations/claim", post(handlers::claim::claim))
         .route(

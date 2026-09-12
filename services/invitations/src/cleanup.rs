@@ -21,6 +21,26 @@ pub async fn purge_edges(pool: &SqlitePool, now: i64) -> Result<u64> {
     Ok(r.rows_affected())
 }
 
+/// Les demandes d'invitation, oubliées au même rythme que le graphe (#152).
+///
+/// ELLES NE DÉSIGNENT PERSONNE, ET SONT PURGÉES QUAND MÊME. Une ligne porte
+/// une empreinte de code, deux horodatages et un sceau que ce service ne peut
+/// pas ouvrir : rien qui nomme quelqu'un. Mais une file qui ne se vide jamais
+/// finit par dire combien de gens ont demandé et quand, ce qui est une forme
+/// de mesure d'audience — et la page de confidentialité en promet aucune.
+///
+/// Trente jours, la durée du graphe, et `retention.json` en est la source :
+/// `scripts/assert-retention.sh` refuse que la politique publiée et le code
+/// divergent, parce que la politique a déjà affirmé une durée que le code ne
+/// pratiquait pas.
+pub async fn purge_invitation_requests(pool: &SqlitePool, now: i64) -> Result<u64> {
+    let r = sqlx::query("DELETE FROM invitation_requests WHERE purge_after <= ?")
+        .bind(now)
+        .execute(pool)
+        .await?;
+    Ok(r.rows_affected())
+}
+
 pub async fn expire_invitations(pool: &SqlitePool, now: i64) -> Result<u64> {
     let r = sqlx::query(
         "UPDATE invitations SET status='expired' \
@@ -320,10 +340,12 @@ pub async fn run_forever(st: Arc<AppState>) {
             deactivate_orphans(&st).await,
             repair_half_deactivated(&st).await,
             purge_claimed_secrets_of_expired(&st.pool).await,
+            purge_invitation_requests(&st.pool, now).await,
         ) {
-            (Ok(a), Ok(b), Ok(c), Ok(d), Ok(e)) => tracing::info!(
+            (Ok(a), Ok(b), Ok(c), Ok(d), Ok(e), Ok(f)) => tracing::info!(
                 "cleanup: {a} edges, {b} invitations, {c} accounts, \
-                                {d} rows repaired, {e} claimed rows purged"
+                                {d} rows repaired, {e} claimed rows purged, \
+                                {f} requests purged"
             ),
             _ => tracing::warn!("cleanup partially failed"),
         }
@@ -334,6 +356,34 @@ pub async fn run_forever(st: Arc<AppState>) {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[sqlx::test(migrations = "./migrations")]
+    async fn the_purge_forgets_a_request_and_spares_the_one_still_in_its_window(
+        pool: sqlx::SqlitePool,
+    ) {
+        for (id, purge_after) in [("vieille", 100_i64), ("fraiche", 4_000_000_000_i64)] {
+            sqlx::query(
+                "INSERT INTO invitation_requests \
+                 (id, code_sha256, created_at, ripe_at, status, purge_after) \
+                 VALUES (?,?,0,0,'waiting',?)",
+            )
+            .bind(id)
+            .bind(crypto::token_hash(id))
+            .bind(purge_after)
+            .execute(&pool)
+            .await
+            .unwrap();
+        }
+
+        let gone = purge_invitation_requests(&pool, 1_000).await.unwrap();
+        assert_eq!(gone, 1);
+
+        let left: String = sqlx::query_scalar("SELECT id FROM invitation_requests")
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+        assert_eq!(left, "fraiche");
+    }
 
     /// **THE PURGE FORGETS WHAT AN EXPIRED INVITATION LEFT BEHIND.**
     ///
