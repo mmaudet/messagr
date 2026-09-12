@@ -1,3 +1,5 @@
+import type { ReadFile, ReadImage } from '../timeline/imageEvent'
+
 /**
  * Quelles photographies l'interrupteur de #208 a le droit d'enregistrer.
  *
@@ -72,7 +74,32 @@ export const MOST_NOTED = 500
 export interface EntryLike {
   readonly eventId: string
   readonly claimedSender: string
-  readonly image?: { readonly url: string } | undefined
+  readonly image?: ReadImage | undefined
+}
+
+/**
+ * Une arrivée notée : quoi garder, et sous quelles adresses la reconnaître.
+ *
+ * # LES DEUX NE SONT PAS LA MÊME CHOSE, ET C'EST TOUT L'INTÉRÊT DE CE TYPE
+ *
+ * La conversation ne dessine pas la photographie. `Photograph` demande « la
+ * plus petite copie qui fera l'affaire » et c'est la vignette du correspondant
+ * ; la photographie pleine n'est déchiffrée que par la visionneuse plein
+ * écran. Un registre qui n'aurait connu que l'adresse pleine n'aurait donc
+ * rien gardé tant que la personne n'aurait pas ouvert chaque image une par
+ * une, ce qui n'est pas un enregistrement automatique.
+ *
+ * Alors la note porte les deux adresses et ne rend qu'une chose : **la
+ * photographie pleine, jamais la vignette**. Dessiner la vignette suffit à
+ * déclencher, et ce qui part dans la galerie est la vraie image. Le prix est
+ * un téléchargement que personne n'a demandé à l'écran, et il est assumé :
+ * une vignette dans la photothèque serait une copie dégradée que personne ne
+ * veut y trouver à la place de la photographie.
+ */
+export interface JustArrived {
+  readonly photograph: ReadFile
+  /** Toutes les adresses sous lesquelles l'écran peut la dessiner. */
+  readonly addresses: readonly string[]
 }
 
 /**
@@ -94,48 +121,64 @@ export function photographsThatJustArrived(
   held: readonly EntryLike[],
   fresh: readonly EntryLike[],
   mine: string,
-): readonly string[] {
+): readonly JustArrived[] {
   const already = new Set(held.map(entry => entry.eventId))
-  const addresses: string[] = []
+  const arrivals: JustArrived[] = []
   for (const entry of fresh) {
     if (already.has(entry.eventId)) continue
     if (entry.claimedSender === mine) continue
-    // L'image pleine et non la vignette. La vignette est ce que l'écran
-    // dessine d'abord, et c'est une copie dégradée que personne ne veut
-    // trouver dans sa galerie à la place de la photographie.
-    const address = entry.image?.url
-    if (address !== undefined) addresses.push(address)
+    const image = entry.image
+    if (image === undefined) continue
+    // Les deux adresses quand il y a une vignette, l'unique sinon : un
+    // événement envoyé avant #117 n'en porte pas, et l'écran dessine alors
+    // la photographie elle-même.
+    const drawnAs = image.thumbnail
+    arrivals.push({
+      photograph: image,
+      addresses: drawnAs === null ? [image.url] : [image.url, drawnAs.url],
+    })
   }
-  return addresses
+  return arrivals
 }
 
 export interface ArrivedThisRun {
   /** Un événement image a atteint cet appareil pendant qu'il tournait. */
-  readonly noted: (address: string) => void
+  readonly noted: (arrival: JustArrived) => void
   /**
-   * Vrai au plus une fois par adresse, et seulement pour une qui a été notée.
-   * Consomme la note : l'appelant enregistre, ou personne ne le fera.
+   * La photographie à garder quand l'adresse dessinée porte une note, et
+   * `null` sinon. Consomme la note, sous toutes ses adresses : l'appelant
+   * enregistre, ou personne ne le fera.
    */
-  readonly mayKeep: (address: string) => boolean
+  readonly mayKeep: (drawn: string) => ReadFile | null
   /** Pour un appareil qui vient d'être déconnecté. */
   readonly forgetAll: () => void
 }
 
 export function arrivedThisRun(): ArrivedThisRun {
-  // Un `Set` et non une liste : une même pièce jointe référencée deux fois
-  // est la même image, et un sondage qui repasse sur un événement déjà vu ne
-  // doit pas donner un second droit d'enregistrer. L'ordre d'insertion tenu
-  // par `Set` est ce qui rend « la plus ancienne » lisible.
-  const notes = new Set<string>()
+  // Une entrée par adresse dessinable, vers la même note. Une `Map` et non
+  // une liste : une même pièce jointe référencée deux fois est la même image,
+  // et un sondage qui repasse sur un événement déjà vu ne doit pas donner un
+  // second droit d'enregistrer. L'ordre d'insertion tenu par `Map` est ce qui
+  // rend « la plus ancienne » lisible.
+  const notes = new Map<string, JustArrived>()
   return {
-    noted: address => {
-      if (notes.size >= MOST_NOTED) {
-        const oldest = notes.values().next().value
-        if (oldest !== undefined) notes.delete(oldest)
+    noted: arrival => {
+      for (const address of arrival.addresses) {
+        if (!notes.has(address) && notes.size >= MOST_NOTED) {
+          const oldest = notes.keys().next().value
+          if (oldest !== undefined) notes.delete(oldest)
+        }
+        notes.set(address, arrival)
       }
-      notes.add(address)
     },
-    mayKeep: address => notes.delete(address),
+    mayKeep: drawn => {
+      const arrival = notes.get(drawn)
+      if (arrival === undefined) return null
+      // Toutes les adresses partent ensemble. Sans cela, dessiner la vignette
+      // puis ouvrir la photographie en plein écran enregistrerait deux fois.
+      for (const address of arrival.addresses) notes.delete(address)
+      return arrival.photograph
+    },
     forgetAll: () => {
       notes.clear()
     },

@@ -2541,9 +2541,26 @@ export function App({
               // quelqu'un vient de le demander ; celui-ci n'a été demandé
               // qu'une fois, dans Réglages, et une notification par
               // photographie reçue serait le contraire d'un réglage.
-              if (shown.shown && arrivalsRef.current.mayKeep(image.url)) {
-                keepPhotograph(photoLibrary, shown.uri)
-                  .then(done => {
+              const toKeep = shown.shown
+                ? arrivalsRef.current.mayKeep(image.url)
+                : null
+              if (toKeep !== null) {
+                // LA PHOTOGRAPHIE, PAS CE QUI VIENT D'ÊTRE DESSINÉ. Ce qui
+                // est dessiné dans une conversation est la vignette du
+                // correspondant, et une vignette dans la photothèque serait
+                // une copie dégradée que personne ne veut y trouver à la
+                // place. `openPhotograph` répond depuis son cache quand les
+                // deux sont la même chose, donc ceci ne coûte un
+                // téléchargement que lorsqu'il en faut vraiment un.
+                openPhotograph(credentials, toKeep)
+                  .then(async whole => {
+                    if (!whole.shown) {
+                      logEvent('warn', 'MESSAGR_KEEP_EVERY', {
+                        reason: whole.reason,
+                      })
+                      return
+                    }
+                    const done = await keepPhotograph(photoLibrary, whole.uri)
                     logEvent(
                       done.kept ? 'info' : 'warn',
                       'MESSAGR_KEEP_EVERY',
@@ -3135,12 +3152,12 @@ export function App({
                       // faite quand l'application déchiffre une image pour
                       // l'afficher, sur un appareil que quelqu'un tient ».
                       if (keepEveryRef.current) {
-                        for (const address of photographsThatJustArrived(
+                        for (const arrival of photographsThatJustArrived(
                           conversationRef.current,
                           fresh.entries,
                           credentials.userId,
                         )) {
-                          arrivalsRef.current.noted(address)
+                          arrivalsRef.current.noted(arrival)
                         }
                       }
                       setConversation(held =>
