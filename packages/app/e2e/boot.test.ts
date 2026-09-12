@@ -584,9 +584,32 @@ describe('boot', () => {
       .toBeVisible()
       .withTimeout(60000)
 
+    // LE CLAVIER D'ABORD, et c'est la différence avec la mesure à la main.
+    //
+    // Les tests au-dessus ont écrit et envoyé, donc le champ a eu le focus et
+    // le clavier est levé. Ma mesure locale en `adb` partait d'une
+    // conversation fraîchement ouverte, sans clavier — et c'est le seul écart
+    // entre un panneau qui s'ouvre et un panneau qui n'existe pas.
+    //
+    // `pressBack` referme le clavier sans quitter la conversation : la pile
+    // de navigation n'est pas celle du système ici, l'écran est un état de
+    // React, et `App.tsx` ne traite ce retour que lorsqu'il y a une couche à
+    // fermer.
+    try {
+      await device.pressBack()
+    } catch {
+      // Pas de clavier à refermer. Rien à faire.
+    }
+
     await device.disableSynchronization()
     try {
       await element(by.id('composer-emoji')).tap()
+      // CE QUE LE RUN A SOUS LES YEUX, quand il échoue. Deux allers-retours de
+      // CI ont été dépensés à deviner ce que cet écran montrait ; une image
+      // coûte une seconde et répond à la place d'une troisième hypothèse.
+      // Elle est prise à chaque fois : une capture qu'on ne prend qu'en cas
+      // d'échec est une capture qu'on n'a jamais quand on en a besoin.
+      await device.takeScreenshot('apres-le-tap-emoji')
       // `toExist` SUR LE PANNEAU, ET LA VISIBILITÉ SUR UN CONTRÔLE.
       //
       // La première version assertait `toBeVisible` sur le panneau, et la CI
