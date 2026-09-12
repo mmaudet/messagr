@@ -436,6 +436,7 @@ export const uz: Readonly<Record<CopyKey, string>> = {
   plate_too_many: 'Bir vaqtda juda koʻp surat. Koʻpi bilan ellikta.',
   composer_emoji: 'Emoji',
   composer_photo: 'Surat qoʻshish',
+  composer_document: 'Hujjat qoʻshish',
   composer_record: 'Ovozli xabar',
   composer_send: 'Yuborish',
   composer_record_soon:
@@ -472,6 +473,10 @@ export const uz: Readonly<Record<CopyKey, string>> = {
   notify_decline: 'Rad etish',
   image_alt: 'Surat',
   image_unreadable: 'Bu suratni shu qurilmada ochib boʻlmadi.',
+  file_kept: 'Hujjat siz tanlagan joyga saqlandi.',
+  file_keep_failed: 'Hujjatni saqlab boʻlmadi.',
+  'file_size_kb %@': '%@ KB',
+  'file_size_mb %@': '%@ MB',
   conversation_attach: 'Surat yuborish',
   conversation_attaching: 'Surat shifrlanib yuborilmoqda…',
   'list_unread %1$d': '%1$d ta oʻqilmagan xabar',

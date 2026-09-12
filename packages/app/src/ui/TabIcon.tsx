@@ -74,6 +74,19 @@ export type TabGlyph =
   // words do not disappear -- they become the accessibility labels, which is
   // where they were doing the work that mattered.
   | 'speaker'
+  // A SHEET WITH A FOLDED CORNER, for attaching a document (#111), and the
+  // same door as the speaker and the selection bar's five: the identity has
+  // no paperclip and no page, because until documents could be sent there
+  // was nothing to draw one for. Drawn here on the set's own rules -- 24
+  // grid, 1.5 stroke, `currentColor` -- and the account holder keeps the
+  // last word on 12 September 2026, an icon being one commit to change.
+  //
+  // A sheet rather than a paperclip. A paperclip means "attach something",
+  // which is what the camera beside it already does for photographs, and two
+  // controls whose icons both mean "attach" would be two controls nobody can
+  // tell apart. The fold is the identity's own gesture: the conversation's
+  // bubbles carry one.
+  | 'document'
 
 const STROKE = {
   fill: 'none' as const,
@@ -172,6 +185,24 @@ export function TabIcon({
       {/* An arrow coming down into a tray. Not a cloud and not a disk: the
           photograph is already here, and what the gesture does is put it
           somewhere else on this same telephone. */}
+      {/* A sheet, its corner folded back, and two lines of something written
+          on it. The fold is what makes it a document rather than a card, and
+          it is drawn as the page's own edge: the corner is cut away and the
+          fold laid over it, which is what a folded corner looks like from
+          the front. */}
+      {glyph === 'document' && (
+        <>
+          <Path
+            d="M14 3.5H7A1.5 1.5 0 0 0 5.5 5v14A1.5 1.5 0 0 0 7 20.5h10a1.5 1.5 0 0 0 1.5-1.5V8z"
+            stroke={tint}
+            {...STROKE}
+          />
+          <Path d="M14 3.5V8h4.5" stroke={tint} {...STROKE} />
+          <Path d="M9 13h6" stroke={tint} {...STROKE} />
+          <Path d="M9 16.2h4" stroke={tint} {...STROKE} />
+        </>
+      )}
+
       {glyph === 'save' && (
         <>
           <Path d="M12 3.5v10" stroke={tint} {...STROKE} />

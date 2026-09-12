@@ -627,6 +627,7 @@ export const fr = {
   plate_too_many: 'Trop de photos d’un coup. Cinquante au plus.',
   composer_emoji: 'Émojis',
   composer_photo: 'Ajouter une photo',
+  composer_document: 'Ajouter un document',
   composer_record: 'Message vocal',
   composer_send: 'Envoyer',
   composer_record_soon:
@@ -674,6 +675,10 @@ export const fr = {
   // of the picture, which nothing here can produce, but what the thing is.
   image_alt: 'Photo',
   image_unreadable: 'Cette photo n’a pas pu être ouverte sur cet appareil.',
+  file_kept: 'Document enregistré là où vous l’avez choisi.',
+  file_keep_failed: 'Le document n’a pas pu être enregistré.',
+  'file_size_kb %@': '%@ Ko',
+  'file_size_mb %@': '%@ Mo',
   conversation_attach: 'Envoyer une photo',
   conversation_attaching: 'Chiffrement et envoi de la photo…',
 

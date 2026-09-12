@@ -427,6 +427,7 @@ export const de: Readonly<Record<CopyKey, string>> = {
   plate_too_many: 'Zu viele Fotos auf einmal. Höchstens fünfzig.',
   composer_emoji: 'Emojis',
   composer_photo: 'Ein Foto hinzufügen',
+  composer_document: 'Ein Dokument hinzufügen',
   composer_record: 'Sprachnachricht',
   composer_send: 'Senden',
   composer_record_soon:
@@ -464,6 +465,10 @@ export const de: Readonly<Record<CopyKey, string>> = {
   image_alt: 'Foto',
   image_unreadable:
     'Dieses Foto konnte auf diesem Gerät nicht geöffnet werden.',
+  file_kept: 'Dokument dort gesichert, wo Sie es gewählt haben.',
+  file_keep_failed: 'Das Dokument konnte nicht gesichert werden.',
+  'file_size_kb %@': '%@ KB',
+  'file_size_mb %@': '%@ MB',
   conversation_attach: 'Ein Foto senden',
   conversation_attaching: 'Foto wird verschlüsselt und gesendet …',
   'list_unread %1$d': '%1$d ungelesene Nachrichten',

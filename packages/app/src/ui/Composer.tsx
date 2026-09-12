@@ -97,11 +97,17 @@ import { TabIcon } from './TabIcon'
  * asserts it instead, on a real build: four lines typed, sent, and the
  * height back within a point of where it started.
  *
- * # No paperclip
+ * # Two controls, and neither is a paperclip
  *
- * Attachments beyond photographs are #111 -- an `m.file` is not an `m.image`
- * -- and a paperclip that opened a photo picker would be a control lying
- * about what it does. It comes back with the ticket.
+ * This said « no paperclip » while photographs were all that could be sent:
+ * an `m.file` is not an `m.image`, and a paperclip opening a photo picker
+ * would have been a control lying about what it does.
+ *
+ * #111 built the other half, so there are two controls now -- a camera and a
+ * sheet -- and still no paperclip. A paperclip means « attach something »,
+ * which is what the camera beside it already does; two controls whose icons
+ * both mean that are two controls nobody can tell apart. Each says which
+ * kind it opens, and each opens exactly that.
  *
  * # The emoji panel is a panel, not a keyboard
  *
@@ -148,10 +154,13 @@ const OFFERED = [
 export function Composer({
   onSend,
   onAttach,
+  onAttachDocument,
 }: {
   readonly onSend: (body: string) => void
   /** Choosing a photograph. Absent on a build with no picker. */
   readonly onAttach?: () => void
+  /** Choosing a document. Absent on a build with no picker. */
+  readonly onAttachDocument?: () => void
 }) {
   const [draft, setDraft] = useState('')
   const [emojiOpen, setEmojiOpen] = useState(false)
@@ -282,6 +291,23 @@ export function Composer({
                   never agreed to. The account holder drew it on 6 September
                   2026 and it is in `design/icons/` now, like the rest. */}
               <TabIcon glyph="camera" tint={palette.neutral['600']} />
+            </Pressable>
+          )}
+
+          {onAttachDocument !== undefined && (
+            <Pressable
+              testID="conversation-attach-document"
+              onPress={onAttachDocument}
+              accessibilityRole="button"
+              accessibilityLabel={t('composer_document')}
+              style={styles.inField}>
+              {/* A SHEET WITH A FOLDED CORNER, and it is the second control
+                  in this field rather than a menu on the first. A menu would
+                  hide one of the two behind a gesture nobody guesses, and
+                  this bar has spent the product's whole life taking such
+                  things out. `TabIcon.tsx` says why the glyph is a sheet and
+                  not a paperclip. */}
+              <TabIcon glyph="document" tint={palette.neutral['600']} />
             </Pressable>
           )}
         </View>
