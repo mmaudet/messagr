@@ -1,3 +1,4 @@
+import type { ReadDocument } from './fileEvent'
 import type { ReadImage } from './imageEvent'
 
 /**
@@ -35,6 +36,15 @@ export interface TimelineEntry {
    * dropping it would leave nothing to say when the download fails.
    */
   readonly image?: ReadImage
+  /**
+   * The document this event carries, when it carries one.
+   *
+   * Present alongside `body` like `image` above, and for a reason that looks
+   * the same and is not: an `m.file`'s `body` is not a fallback name, it IS
+   * the filename, and the row draws it. Keeping both means nothing has to
+   * decide which of two identical strings is the real one.
+   */
+  readonly document?: ReadDocument
   /**
    * Whether this event was removed for everyone.
    *

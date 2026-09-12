@@ -107,6 +107,9 @@ import { openForForward } from './forwardImage'
 import { fetchImage, type ShownImage } from './receiveImage'
 import { sendImage, sendingThrough, type ImageSent } from './sendImage'
 import type { ReadFile } from '../timeline/imageEvent'
+import type { ReadDocument, PickedDocument } from '../timeline/fileEvent'
+import { sendFile, type FileSent } from './sendFile'
+import { fetchDocument, type DocumentFetched } from './receiveDocument'
 import { enterInvitations, type Entered } from './enterInvitations'
 import { drainOutgoingRequests, makePumpHttp, PumpHttpError } from './pump'
 import {
@@ -978,6 +981,84 @@ export async function sendPhotograph(
     },
     scope,
     image,
+  )
+}
+
+/**
+ * The same five steps for a document, bound to the same ports.
+ *
+ * `sendFile.ts` says why it is not `sendImage` with a branch, and the two
+ * bindings below are identical on purpose: a document's ciphertext is
+ * uploaded as `application/octet-stream` for exactly the reason a
+ * photograph's is, and the real type travels inside the event where only a
+ * participant sees it. A repository told « application/pdf » would learn
+ * what kind of thing somebody sent, which is the metadata the encryption is
+ * for.
+ */
+export async function sendDocument(
+  sessionClient: ReturnType<typeof createClient>,
+  credentials: { readonly baseUrl: string; readonly accessToken: string },
+  scope: string,
+  document: PickedDocument,
+): Promise<FileSent> {
+  const http = makePumpHttp(sessionClient)
+  const media = mediaRepository(
+    credentials.baseUrl,
+    credentials.accessToken,
+    fetch,
+  )
+  return sendFile(
+    {
+      seal: plaintext => encryptAttachment(plaintext),
+      upload: ciphertext =>
+        media.upload(ciphertext, 'application/octet-stream'),
+      shareTheKey: async shareScope => {
+        const members = await fetchJoinedMembers(http, shareScope)
+        if (members.length === 0) {
+          throw new Error(`nobody is joined to ${shareScope}`)
+        }
+        await shareScopeKey(asCryptoScopeId(shareScope), [...members])
+        const drained = await drainOutgoingRequests(http, {
+          takeOutgoingRequests,
+          markRequestSent,
+          markRequestFailed,
+        })
+        if (drained.failed > 0) {
+          throw new Error(
+            `${drained.failed} of the room key's own requests could not be sent`,
+          )
+        }
+      },
+      machine: {
+        encryptEvent: (encryptScope, eventType, payload) =>
+          encryptEvent(asCryptoScopeId(encryptScope), eventType, payload),
+      },
+      send: sendingThrough(
+        http,
+        () => `messagr-${Date.now()}-${Math.floor(Math.random() * 1e6)}`,
+      ),
+    },
+    scope,
+    document,
+  )
+}
+
+/** Downloading and decrypting a document, for the gesture that saves it. */
+export async function openDocument(
+  credentials: { readonly baseUrl: string; readonly accessToken: string },
+  document: ReadDocument,
+): Promise<DocumentFetched> {
+  const media = mediaRepository(
+    credentials.baseUrl,
+    credentials.accessToken,
+    fetch,
+  )
+  return fetchDocument(
+    {
+      download: url => media.download(url),
+      open: (ciphertext, secret) => decryptAttachment(ciphertext, secret),
+    },
+    document,
   )
 }
 

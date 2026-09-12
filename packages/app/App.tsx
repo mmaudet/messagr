@@ -47,6 +47,8 @@ import {
   resumeKeyBackup,
   startCryptoMachine,
   enterAnyInvitations,
+  sendDocument,
+  openDocument,
   startLiveSync,
   vouchForEntrant,
   type CryptoPumpReport,
@@ -226,6 +228,12 @@ import {
   homeserverCalls,
 } from './src/runtime/homeserverCalls'
 import { keepPhotograph } from './src/runtime/keepPhotograph'
+import { keepDocument } from './src/runtime/keepDocument'
+import {
+  documentPlatform,
+  pickAnyDocument,
+} from './src/runtime/documentPlatform'
+import type { ReadDocument } from './src/timeline/fileEvent'
 import {
   keepRecoverySecret,
   readRecoverySecret,
@@ -856,6 +864,13 @@ export function App({
   // Choosing and sending a photograph, and opening one that arrived. Held in
   // refs like every other gesture the launch effect binds.
   const attachRef = useRef<(() => void) | null>(null)
+  /** The same, for a document. See `sendFile.ts` for why it is not the same
+   * path with a flag. */
+  const attachDocumentRef = useRef<(() => void) | null>(null)
+  /** Saving a document somebody sent, which is `keepDocument.ts`'s gesture. */
+  const saveDocumentRef = useRef<((document: ReadDocument) => void) | null>(
+    null,
+  )
   /** Redacts messages for everyone. Bound with the session, like the rest. */
   const removeRef = useRef<((eventIds: readonly string[]) => void) | null>(null)
   /** Sends the chosen events on to another conversation. See `forwardImage.ts`. */
@@ -2113,6 +2128,103 @@ export function App({
               })
             }
 
+            // A DOCUMENT, ON THE SAME SHAPE AND NOT THE SAME PATH. One file
+            // at a time rather than `sendImages`' loop: a picker that
+            // returns one file has nothing to iterate, and a batch of
+            // documents is a different product decision nobody has asked
+            // for.
+            attachDocumentRef.current = () => {
+              const scope = openScopeRef.current
+              if (scope === null) return
+              const stillOpen = () => openScopeRef.current === scope
+              const gesture = async () => {
+                const chosen = await pickAnyDocument()
+                if (!chosen.chose) {
+                  // A refusal is worth a line in the log and nothing on the
+                  // screen: the person either cancelled, which is normal, or
+                  // chose a file too large, which §13.27 says is for whoever
+                  // is diagnosing it.
+                  if (chosen.because !== null) {
+                    setSending('failed')
+                    logEvent('warn', 'MESSAGR_DOCUMENT_REFUSED', {
+                      because: chosen.because,
+                    })
+                  }
+                  return
+                }
+
+                setSending('sending')
+                const done = await sendDocument(
+                  sessionClient,
+                  credentials,
+                  scope,
+                  chosen.document,
+                )
+                if (!done.sent) {
+                  setSending('failed')
+                  logEvent('warn', 'MESSAGR_DOCUMENT_SEND_FAILED', {
+                    reason: done.reason,
+                  })
+                  return
+                }
+                setSending('idle')
+                logEvent('info', 'MESSAGR_DOCUMENT_SENT', {
+                  eventId: done.eventId,
+                })
+                const fresh = await loadConversation(
+                  sessionClient,
+                  scope,
+                  credentials.userId,
+                  undefined,
+                  eventsRef.current,
+                )
+                if (!stillOpen()) return
+                setConversation(held =>
+                  mergeTimeline(held ?? [], fresh.entries),
+                )
+                setReactions(fresh.reactions)
+              }
+              gesture().catch((cause: unknown) => {
+                setSending('failed')
+                logEvent('warn', 'MESSAGR_DOCUMENT_SEND_FAILED', {
+                  reason: getErrorMessage(cause),
+                })
+              })
+            }
+
+            // AND SAVING ONE, which is the gesture ADR-0006 was amended for.
+            // Fetched here rather than held: `receiveDocument.ts` says why a
+            // document has no cache, and the bytes exist for the length of
+            // this call and the `finally` inside `keepDocument`.
+            saveDocumentRef.current = (document: ReadDocument) => {
+              const gesture = async () => {
+                const got = await openDocument(credentials, document)
+                if (!got.ready) {
+                  setPhotoKept('failed')
+                  logEvent('warn', 'MESSAGR_KEEP_DOCUMENT', {
+                    reason: got.reason,
+                  })
+                  return
+                }
+                const done = await keepDocument(documentPlatform(), {
+                  base64: got.base64,
+                  name: got.name,
+                })
+                setPhotoKept(done.kept ? 'kept' : 'failed')
+                if (!done.kept) {
+                  logEvent('warn', 'MESSAGR_KEEP_DOCUMENT', {
+                    reason: done.reason,
+                  })
+                }
+              }
+              gesture().catch((cause: unknown) => {
+                setPhotoKept('failed')
+                logEvent('warn', 'MESSAGR_KEEP_DOCUMENT', {
+                  reason: getErrorMessage(cause),
+                })
+              })
+            }
+
             // Drawing one that arrived. Bound here for the same reason, and
             // held in a ref because `Photograph` keeps it in an effect's
             // dependency list -- a function rebuilt on every render would
@@ -2971,6 +3083,20 @@ export function App({
   // `Photograph` fetches inside an effect that depends on this function. An
   // arrow built in the JSX would be a new value every render, so every render
   // would download and decrypt the picture again.
+  /**
+   * Saving a document, as a reference that does not change between renders.
+   *
+   * `useMemo` for the same reason `loadImage` below has one, and here it is
+   * not a micro-optimisation: a fresh function on every render re-renders
+   * the conversation subtree, and the moment that costs the most is the one
+   * right after a send, when the field has to reflow from several lines back
+   * to one. `boot.test.ts` measures that reflow nine milliseconds after the
+   * draft clears, which is less than a frame.
+   */
+  const saveDocument = useMemo(
+    () => (document: ReadDocument) => saveDocumentRef.current?.(document),
+    [],
+  )
   const loadImage = useMemo(
     () => (file: ReadFile) =>
       openImageRef.current === null
@@ -3844,6 +3970,7 @@ export function App({
                     sending={sending}
                     kept={photoKept}
                     onLoadImage={loadImage}
+                    onSaveDocument={saveDocument}
                     otherParty={party?.other}
                     onOpenPlate={(plate, at) => setOpenPlate({ plate, at })}
                   />
@@ -4129,6 +4256,7 @@ export function App({
                 <Composer
                   onSend={sendMessage}
                   onAttach={() => attachRef.current?.()}
+                  onAttachDocument={() => attachDocumentRef.current?.()}
                 />
               )}
 

@@ -97,11 +97,28 @@ import { TabIcon } from './TabIcon'
  * asserts it instead, on a real build: four lines typed, sent, and the
  * height back within a point of where it started.
  *
- * # No paperclip
+ * # ONE CONTROL, AND THE MEASUREMENT THAT DECIDED IT
  *
- * Attachments beyond photographs are #111 -- an `m.file` is not an `m.image`
- * -- and a paperclip that opened a photo picker would be a control lying
- * about what it does. It comes back with the ticket.
+ * This said « no paperclip » while photographs were all that could be sent.
+ * #111 built the other half, and the first attempt put a second button in
+ * the field beside the camera -- one icon per kind, each saying what it
+ * opens.
+ *
+ * **It cost the field a line of text, and `boot.test.ts` caught it.** Each
+ * control takes exactly the minimum touch target, so a second one narrows
+ * the input from 603 to 488 pixels, and at that width « Je passe te prendre
+ * à 18h » -- twenty-five characters -- wraps onto two lines while somebody
+ * types it. Measured on an emulator through `uiautomator dump`: 98 pixels
+ * empty, 154 with that sentence in it. The suite found it sideways, through
+ * the baseline of the height test, which had been reading a one-line field
+ * and started reading a two-line one.
+ *
+ * So there is one control again, and it opens a choice. The glyph is `plus`
+ * rather than a camera, because a camera opening a document picker would be
+ * the control lying about what it does -- and `plus` is what stood here
+ * before the camera existed (#112). A paperclip would say « attach
+ * something », which is now exactly true, and the identity has none; the
+ * choice panel says which kind in words rather than in a second pictogram.
  *
  * # The emoji panel is a panel, not a keyboard
  *
@@ -148,13 +165,17 @@ const OFFERED = [
 export function Composer({
   onSend,
   onAttach,
+  onAttachDocument,
 }: {
   readonly onSend: (body: string) => void
   /** Choosing a photograph. Absent on a build with no picker. */
   readonly onAttach?: () => void
+  /** Choosing a document. Absent on a build with no picker. */
+  readonly onAttachDocument?: () => void
 }) {
   const [draft, setDraft] = useState('')
   const [emojiOpen, setEmojiOpen] = useState(false)
+  const [attachOpen, setAttachOpen] = useState(false)
   const [whyDisabled, setWhyDisabled] = useState(false)
   // THE LIGHT PALETTE, NOT THE SYSTEM'S THEME.
   //
@@ -202,6 +223,45 @@ export function Composer({
               <Text style={styles.emoji}>{emoji}</Text>
             </Pressable>
           ))}
+        </View>
+      )}
+
+      {attachOpen && (
+        <View style={styles.attachPanel} testID="attach-panel">
+          {onAttach !== undefined && (
+            <Pressable
+              testID="attach-photo"
+              onPress={() => {
+                setAttachOpen(false)
+                onAttach()
+              }}
+              accessibilityRole="button"
+              accessibilityLabel={t('composer_photo')}
+              style={styles.attachRow}>
+              <TabIcon glyph="camera" tint={palette.neutral['600']} />
+              <Text
+                style={[styles.attachWord, { color: palette.neutral['900'] }]}>
+                {t('composer_photo')}
+              </Text>
+            </Pressable>
+          )}
+          {onAttachDocument !== undefined && (
+            <Pressable
+              testID="attach-document"
+              onPress={() => {
+                setAttachOpen(false)
+                onAttachDocument()
+              }}
+              accessibilityRole="button"
+              accessibilityLabel={t('composer_document')}
+              style={styles.attachRow}>
+              <TabIcon glyph="document" tint={palette.neutral['600']} />
+              <Text
+                style={[styles.attachWord, { color: palette.neutral['900'] }]}>
+                {t('composer_document')}
+              </Text>
+            </Pressable>
+          )}
         </View>
       )}
 
@@ -262,26 +322,19 @@ export function Composer({
             style={[styles.input, { color: palette.neutral['900'] }]}
           />
 
-          {onAttach !== undefined && (
+          {(onAttach !== undefined || onAttachDocument !== undefined) && (
             <Pressable
               testID="conversation-attach"
-              onPress={onAttach}
+              onPress={() => setAttachOpen(open => !open)}
               accessibilityRole="button"
-              accessibilityLabel={t('composer_photo')}
+              accessibilityState={{ expanded: attachOpen }}
+              accessibilityLabel={t('composer_attach')}
               style={styles.inField}>
-              {/* A STILL CAMERA, WHICH THE SET DID NOT HAVE UNTIL TODAY.
-                  The identity's `cam` is a camcorder -- it belongs to the
-                  call screens -- and this control opens a photograph picker:
-                  `launchImageLibrary` with `mediaType: 'photo'`. An icon
-                  promising video for a control that cannot take one is a
-                  promise the product breaks on the next tap.
-
-                  It stood in as `plus` while the set had no still camera
-                  (#112) rather than being drawn here beside the four tab
-                  glyphs: an icon invented in a component is one the identity
-                  never agreed to. The account holder drew it on 6 September
-                  2026 and it is in `design/icons/` now, like the rest. */}
-              <TabIcon glyph="camera" tint={palette.neutral['600']} />
+              {/* `plus`, WHICH IS WHAT STOOD HERE BEFORE THE CAMERA.
+                  This control no longer opens one kind of thing, so an icon
+                  naming one kind would be a control lying about what it
+                  does. The panel above says the two kinds in words. */}
+              <TabIcon glyph="plus" tint={palette.neutral['600']} />
             </Pressable>
           )}
         </View>
@@ -351,6 +404,19 @@ const styles = StyleSheet.create({
     borderWidth: stroke.base,
     paddingHorizontal: space.xs,
     minHeight: floors.touchTargetMin,
+  },
+  attachPanel: {
+    paddingHorizontal: space.m,
+    paddingBottom: space.s,
+  },
+  attachRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: space.s,
+    minHeight: floors.touchTargetMin,
+  },
+  attachWord: {
+    ...typeScale.body,
   },
   inField: {
     minWidth: floors.touchTargetMin,

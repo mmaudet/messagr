@@ -13,12 +13,14 @@ import {
   type as typeScale,
 } from '../design/tokens'
 import type { ShownImage } from '../runtime/receiveImage'
+import type { ReadDocument } from '../timeline/fileEvent'
 import type { ReadFile } from '../timeline/imageEvent'
 import { separatorsFor, type DayMark } from '../timeline/daySeparators'
 import { platesIn, type Plate as Grouping } from '../timeline/plates'
 import type { TimelineEntry } from '../timeline/mergeTimeline'
 import type { ReactionTally } from '../timeline/reactions'
 import { EmojiPicker } from './EmojiPicker'
+import { Document } from './Document'
 import { Photograph } from './Photograph'
 import { Plate } from './Plate'
 
@@ -84,6 +86,8 @@ export interface ConversationProps {
   readonly onReact?: (target: string, key: string, own: string | null) => void
   /** Downloads and decrypts a photograph. Absent means none are drawn. */
   readonly onLoadImage?: (file: ReadFile) => Promise<ShownImage>
+  /** Saving a document somebody sent. Absent on a build with no picker. */
+  readonly onSaveDocument?: (document: ReadDocument) => void
   /**
    * The clock, injectable, for the same reason `ConversationList` takes one:
    * a screen reading `Date.now()` inside itself is one nothing can screenshot
@@ -111,6 +115,7 @@ export function Conversation({
   read = new Set(),
   onReact,
   onLoadImage,
+  onSaveDocument,
   now = Date.now(),
   otherParty,
   onOpenPlate,
@@ -243,6 +248,7 @@ export function Conversation({
                   onToggle(null)
                 }}
                 onLoadImage={onLoadImage}
+                onSaveDocument={onSaveDocument}
                 unexpected={
                   otherParty === undefined || entry.claimedSender !== otherParty
                 }
@@ -385,6 +391,7 @@ function Message({
   onToggle,
   onMore,
   onLoadImage,
+  onSaveDocument,
   unexpected,
   plate,
   onOpenPlate,
@@ -416,6 +423,8 @@ function Message({
   /** Opens the whole catalogue. See `EmojiPicker.tsx`. */
   onMore: () => void
   readonly onLoadImage?: (file: ReadFile) => Promise<ShownImage>
+  /** Saving a document somebody sent. Absent on a build with no picker. */
+  readonly onSaveDocument?: (document: ReadDocument) => void
 }) {
   return (
     <View style={mine ? styles.mine : styles.theirs}>
@@ -490,6 +499,20 @@ function Message({
             // reactions annotate its first event, which is the event this
             // `Message` is: one plate, one place they attach.
             onLongPress={onOffer}
+          />
+        ) : entry.document !== undefined && onSaveDocument !== undefined ? (
+          // The row instead of the text, and here that is not the same
+          // decision as the photograph's below. An `m.file`'s `body` is its
+          // filename rather than a fallback, so drawing both would print the
+          // name twice: once as the row's heading and once as a sentence
+          // underneath it.
+          <Document
+            name={entry.document.name}
+            size={entry.document.size}
+            onSave={() => {
+              if (entry.document !== undefined) onSaveDocument(entry.document)
+            }}
+            testID={`document-${entry.eventId}`}
           />
         ) : entry.image !== undefined && onLoadImage !== undefined ? (
           // The photograph instead of the text, not beside it. An `m.image`

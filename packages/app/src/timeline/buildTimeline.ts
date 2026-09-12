@@ -3,6 +3,7 @@ import { logEvent } from '../runtime/log'
 import type { HttpRequester } from '../runtime/pump'
 import type { TimelineEntry } from './mergeTimeline'
 import { leavesALine } from './redactionKind'
+import { readFileEvent } from './fileEvent'
 import { readImageEvent } from './imageEvent'
 import { readReaction, type LooseReaction } from './reactions'
 
@@ -211,13 +212,23 @@ export async function toTimelineEntries(
       // which is a filename drawn where a sentence goes.
       const image = readImageEvent(content as Record<string, unknown>)
 
+      // A document before a text, and the reason is the mirror image of the
+      // one above: an `m.file`'s `body` IS its filename, deliberately, so
+      // read as a message it would be an entry whose text is the name of a
+      // file -- true, and drawn where a sentence goes. The row says the name
+      // where a name belongs.
+      const document = readFileEvent(content as Record<string, unknown>)
+
       entries.push({
         eventId,
         claimedSender: sender,
         sentAt,
         body: typeof content.body === 'string' ? content.body : null,
         ...(image === null ? {} : { image }),
-        ...(typeof content.body === 'string' || image !== null
+        ...(document === null ? {} : { document }),
+        ...(typeof content.body === 'string' ||
+        image !== null ||
+        document !== null
           ? {}
           : { reason: 'this message carried no text' }),
       })
