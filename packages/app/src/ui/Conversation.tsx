@@ -62,7 +62,13 @@ export interface ConversationProps {
    * different field because the two can be true at once: a photograph can
    * be saved while another is still being sent.
    */
-  readonly kept: 'kept' | 'failed' | null
+  readonly kept: {
+    readonly how: 'kept' | 'failed'
+    /** Une photographie va dans la photothèque ; un document, là où la
+     * personne l'a choisi. Deux phrases, et elles ne sont pas
+     * interchangeables. */
+    readonly what: 'photograph' | 'document'
+  } | null
   /** Reactions, grouped by the message they point at. */
   readonly reactions?: ReadonlyMap<string, readonly ReactionTally[]>
   /** This account's own messages somebody else has read. */
@@ -266,7 +272,15 @@ export function Conversation({
         <Text
           testID="conversation-kept"
           style={[styles.note, { color: palette.neutral['600'] }]}>
-          {kept === 'kept' ? t('selection_kept') : t('selection_keep_failed')}
+          {t(
+            kept.what === 'document'
+              ? kept.how === 'kept'
+                ? 'file_kept'
+                : 'file_keep_failed'
+              : kept.how === 'kept'
+                ? 'selection_kept'
+                : 'selection_keep_failed',
+          )}
         </Text>
       )}
 

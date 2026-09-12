@@ -91,11 +91,25 @@ export function documentPlatform(): KeepingDocument {
       await writeFile(path, base64, 'base64')
     },
     save: async (path, name) => {
-      await saveDocuments({
-        sourceUris: [`file://${path}`],
-        copy: true,
-        fileName: name,
-      })
+      try {
+        await saveDocuments({
+          sourceUris: [`file://${path}`],
+          copy: true,
+          fileName: name,
+        })
+        return 'saved'
+      } catch (cause: unknown) {
+        // Refermer la fenêtre est un geste ordinaire, et la bibliothèque le
+        // signale par un code plutôt que par un message. Tout le reste
+        // remonte comme une vraie panne.
+        if (
+          isErrorWithCode(cause) &&
+          cause.code === errorCodes.OPERATION_CANCELED
+        ) {
+          return 'cancelled'
+        }
+        throw cause
+      }
     },
     forget: async path => {
       await unlink(path)

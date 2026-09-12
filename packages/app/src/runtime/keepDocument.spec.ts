@@ -8,7 +8,7 @@ function deps(over: Partial<KeepingDocument> = {}): KeepingDocument {
   return {
     temporary: '/tmp',
     write: async () => undefined,
-    save: async () => undefined,
+    save: async () => 'saved' as const,
     forget: async () => undefined,
     name: () => 'once',
     ...over,
@@ -25,6 +25,7 @@ describe('keepDocument', () => {
         },
         save: async () => {
           order.push('save')
+          return 'saved' as const
         },
         forget: async () => {
           order.push('forget')
@@ -56,12 +57,34 @@ describe('keepDocument', () => {
     expect(forgotten).toBe('/tmp/once-facture-2026.pdf')
   })
 
+  it('a closed dialogue is not a failure, and the plaintext goes anyway', async () => {
+    // Refermer « Enregistrer sous » est un geste ordinaire. Le rapporter
+    // comme un échec ferait dire à l'écran « le document n'a pas pu être
+    // enregistré » à quelqu'un qui a changé d'avis.
+    //
+    // Et le `finally` court pareil : une fenêtre refermée laisse le clair
+    // sur le disque exactement comme une remise qui échoue.
+    let forgotten: string | null = null
+    const kept = await keepDocument(
+      deps({
+        save: async () => 'cancelled' as const,
+        forget: async path => {
+          forgotten = path
+        },
+      }),
+      DOCUMENT,
+    )
+    expect(kept).toEqual({ kept: false, cancelled: true })
+    expect(forgotten).toBe('/tmp/once-facture-2026.pdf')
+  })
+
   it('hands the dialogue the name the sender gave', async () => {
     let suggested: string | null = null
     await keepDocument(
       deps({
         save: async (_path, name) => {
           suggested = name
+          return 'saved' as const
         },
       }),
       DOCUMENT,

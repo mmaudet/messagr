@@ -40,7 +40,15 @@ export interface KeepingDocument {
    * Opens the system's « save as » dialogue on the file at that path,
    * suggesting `name`.
    */
-  readonly save: (path: string, name: string) => Promise<void>
+  /**
+   * Ouvre la fenêtre système « Enregistrer sous » sur le fichier, en
+   * suggérant `name`, et dit ce qu'elle est devenue.
+   *
+   * `cancelled` PLUTÔT QU'UNE ERREUR : refermer cette fenêtre est un geste
+   * ordinaire. Le traiter comme un échec fait dire à l'écran « le document
+   * n'a pas pu être enregistré » à quelqu'un qui a simplement changé d'avis.
+   */
+  readonly save: (path: string, name: string) => Promise<'saved' | 'cancelled'>
   /** Removes the file. Its failure is not the caller's problem. */
   readonly forget: (path: string) => Promise<void>
   /** Something no two calls share. Injected so a test is not a clock. */
@@ -48,7 +56,14 @@ export interface KeepingDocument {
 }
 
 export type Kept =
-  { readonly kept: true } | { readonly kept: false; readonly reason: string }
+  | { readonly kept: true }
+  /** La fenêtre a été refermée. Rien n'a échoué et rien n'est à dire. */
+  | { readonly kept: false; readonly cancelled: true }
+  | {
+      readonly kept: false
+      readonly cancelled: false
+      readonly reason: string
+    }
 
 /**
  * The sender's filename, or `null` when it cannot be part of a path.
@@ -83,17 +98,27 @@ export async function keepDocument(
 ): Promise<Kept> {
   const named = safeName(document.name)
   if (named === null) {
-    return { kept: false, reason: 'this file arrived without a usable name' }
+    return {
+      kept: false,
+      cancelled: false,
+      reason: 'this file arrived without a usable name',
+    }
   }
 
   const path = `${deps.temporary}/${deps.name()}-${named}`
   try {
     await deps.write(path, document.base64)
-    await deps.save(path, named)
-    return { kept: true }
+    const became = await deps.save(path, named)
+    // LE `finally` COURT DANS LES DEUX CAS, et c'est le point : une fenêtre
+    // refermée laisse le clair sur le disque exactement comme une remise qui
+    // échoue.
+    return became === 'cancelled'
+      ? { kept: false, cancelled: true }
+      : { kept: true }
   } catch (cause: unknown) {
     return {
       kept: false,
+      cancelled: false,
       reason: cause instanceof Error ? cause.message : String(cause),
     }
   } finally {
