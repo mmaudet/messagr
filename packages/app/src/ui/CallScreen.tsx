@@ -38,10 +38,16 @@ import { TabIcon } from './TabIcon'
  * before hanging up. So `ended` shows its reason and stays until it is
  * dismissed, rather than closing itself the instant the call drops.
  *
- * # No video, and no control that pretends
+ * # No control that pretends, which is why there is a camera button now
  *
- * §4.5 names camera controls; this lot is audio, and #88 says a control that
- * does nothing is worse than an absent one. There is no camera button here.
+ * §4.5 names camera controls. While this lot was audio there was none here,
+ * because #88 says a control that does nothing is worse than an absent one --
+ * and this paragraph said "there is no camera button here" for the three days
+ * between the video lot building one on 9 September 2026 and somebody reading
+ * the two side by side, which is how a file stops being an account of itself.
+ *
+ * The rule it states is intact, and it is still enforced one level down:
+ * switching cameras appears only while there IS a camera to switch.
  *
  * There was no speaker button either, for the same reason, until the routing
  * existed to put behind it: `callAudio.ts` now holds the audio session, so
