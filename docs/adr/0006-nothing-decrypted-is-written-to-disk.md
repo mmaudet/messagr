@@ -260,10 +260,42 @@ no such window, and saying the two halves are equivalent would be false.
 
 **What did not change.** Nothing is written for the application to read back
 later: the file is handed over once and removed, and there is no path from
-the container into anything the product keeps. The three exceptions this
-document now carries — the conversation list's openings, a photograph
-somebody asks to keep, and this crossing — are alike in the way that matters:
-each is bounded, each is named, and none of them is a message store.
+the container into anything the product keeps. The exceptions this document
+carries — the conversation list's openings, a file somebody asks to keep, and
+this crossing — are alike in the way that matters: each is bounded, each is
+named, and none of them is a message store.
+
+## Clarified, 12 September 2026 — "a photograph" was always "a file"
+
+The paragraph above first counted "three exceptions" and named the second
+"a photograph somebody asks to keep". That was the amendment's own wording
+from 10 September, and by 12 September it had stopped being true of the
+code: #111 added documents, and `keepDocument.ts` saves one by the same
+mechanism — temporary file, handed over by path, unlinked in a `finally` —
+arguing in its own words that "the reasoning transfers whole".
+
+It does transfer whole, and that is why this is a clarification and not a
+fourth exception. What the 10 September amendment decided is not a policy
+about photographs; it is a policy about **a file the person asks to keep**,
+and every sentence of it holds word for word when the file is a PDF: the
+destination is one the person chose rather than one the product picked, it
+happens once per file and never in the background, the plaintext exists for
+the length of one call, and what leaves is outside everything this product
+provides.
+
+Two things differ, and neither changes the decision. A document goes through
+the system's own "save as" rather than to the photo library, so the person
+names the destination instead of accepting a known one — which is weaker
+disclosure, not stronger. And a document has no thumbnail, so nothing
+resizes it and there is no second copy to sweep: the trap #209 found on the
+photograph path cannot exist here.
+
+**Why this is written down rather than left as an analogy.** Because the
+analogy lived only in `keepDocument.ts`, and this document — the one anybody
+checks when they want to know what the product allows — enumerated its
+exceptions and left the document out. An ADR that contradicts the code
+teaches the wrong thing to whoever reads it first, and the reader who trusts
+it is the one who then removes an "undocumented" `write` in good faith.
 
 **When to revisit.** If iOS ever offers the containing application a readable
 handle to an extension's item, this exception should go rather than be kept
