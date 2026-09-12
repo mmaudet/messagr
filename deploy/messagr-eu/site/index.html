@@ -677,14 +677,52 @@
       <p data-t="pourquoi">Personne ne peut vous écrire sans que vous l'ayez laissé entrer.
       Il n'y a pas d'annuaire, pas de recherche par numéro, pas de carnet d'adresses
       aspiré : un inconnu n'a aucun moyen de vous trouver.</p>
-      <!-- UN `mailto:`, ET C'EST DÉLIBÉRÉ POUR L'INSTANT. Il fonctionne sans
-           script, ne contacte aucun tiers et ne mesure rien -- trois propriétés
-           que ce site tient et qu'un formulaire hébergé ailleurs romprait. Le
-           relier au service d'invitations est #152. -->
-      <a class="porte" href="mailto:conformite@messagr.eu?subject=Messagr%20invitation"
-         data-t="demander">Demander une invitation</a>
-      <p class="note" data-t="demander-note">Votre message arrive à une personne, pas à un
-      formulaire.</p>
+      <!-- LA DEMANDE NE PORTE RIEN. #152 remplace ici le `mailto:` par une
+           demande qui atteint le service d'invitations -- et la première
+           chose à dire est ce qu'elle n'emporte pas : ni adresse, ni nom, ni
+           texte libre. La page de confidentialité promet « pas d'adresse
+           électronique », et une file d'attente pleine de courriels aurait
+           démenti cette phrase sur le site qui la sert.
+
+           Ce que la personne emporte est un CODE, qu'elle garde et avec
+           lequel elle revient. C'est la forme de « Copier le lien » sur la
+           page d'invitation, qui fait déjà porter un secret à travers une
+           installation.
+
+           AUCUN TIERS, ET LA MÊME ORIGINE. Le service est relayé par nginx
+           sous `/_messagr/`, donc la requête ne sort pas de messagr.eu : pas
+           de captcha, pas de domaine étranger, rien à charger d'ailleurs. Le
+           CSP ne gagne que `connect-src 'self'`, qui est la plus petite
+           ouverture possible et ne permet que de se parler à soi-même. -->
+      <button class="porte" type="button" id="demander" data-t="demander">Demander une invitation</button>
+      <p class="note" data-t="demander-note">Une personne lit ces demandes et y répond, en général sous quelques jours. Aucune adresse ne vous est demandée.</p>
+
+      <p class="note" id="demande-etat" hidden></p>
+      <p class="code" id="demande-code" hidden></p>
+      <p class="note" id="demande-garde" data-t="demande-garde" hidden>Gardez ce code : c’est la seule façon de revenir chercher la réponse, puisque rien d’autre ne vous identifie.</p>
+
+      <label class="note" for="code-connu" data-t="demande-revenir">J’ai déjà un code</label>
+      <input id="code-connu" type="text" autocomplete="off" spellcheck="false">
+      <button type="button" id="demande-voir" data-t="demande-voir">Voir où en est ma demande</button>
+
+      <noscript>
+      <p class="note" data-t="demander-sans-script">Cette demande a besoin du script de la page. L’autre porte reste ouverte, et c’est la principale : une invitation vous vient de quelqu’un qui vous en envoie une.</p>
+      </noscript>
+
+      <!-- LES PHRASES D'ÉTAT VIVENT DANS LA PAGE, PAS DANS LE SCRIPT.
+           Chacune des six pages est entière dans sa langue sans qu'aucun
+           script tourne -- c'est ce que dit le bloc en bas de ce fichier, et
+           fabriquer du texte en JavaScript l'aurait défait pour ces
+           six-là. Elles sont donc écrites ici, traduites par la même
+           mécanique que le reste, et le script ne fait que les recopier. -->
+      <div hidden id="demande-phrases">
+      <p id="mot-attente" data-t="demande-attente">Pas encore de réponse. Revenez plus tard avec votre code.</p>
+      <p id="mot-accordee" data-t="demande-accordee">Votre invitation est prête. Ouvrez ce lien sur le téléphone où vous installerez Messagr.</p>
+      <p id="mot-refusee" data-t="demande-refusee">Cette demande n’a pas abouti.</p>
+      <p id="mot-inconnue" data-t="demande-inconnue">Ce code n’est pas reconnu.</p>
+      <p id="mot-occupee" data-t="demande-occupee">Trop de demandes attendent déjà. Revenez plus tard — et une invitation peut aussi vous venir de quelqu’un que vous connaissez.</p>
+      <p id="mot-panne" data-t="demande-panne">La demande n’a pas pu partir. Réessayez.</p>
+      </div>
     </section>
 
     <!-- CE QUE LE SERVEUR VOIT, ET CE QU'IL NE VOIT PAS.
@@ -1033,6 +1071,99 @@
       if (court !== RACINE) { location.replace(chemin(court)); }
       return;
     }
+  }
+})();
+</script>
+<script>
+// DEMANDER UNE INVITATION, ET REVENIR CHERCHER LA RÉPONSE. #152.
+//
+// Ce script ne fabrique aucun texte : les phrases vivent dans la page, dans
+// `#demande-phrases`, traduites par `build-landing.mjs` comme le reste. Chacune
+// des six pages reste donc entière dans sa langue, et quelqu'un qui coupe le
+// script lit la sienne sans trou — il perd le geste, pas le sens.
+//
+// LA MÊME ORIGINE, ET RIEN D'AUTRE. `/_messagr/` est le service d'invitations,
+// relayé par nginx sur messagr.eu. Aucun tiers n'est contacté, ici comme
+// partout ailleurs sur ce site.
+(function () {
+  var SERVICE = '/_messagr/invitation-requests';
+
+  // PAR IDENTIFIANT, ET PAS PAR `data-t`. Écrire ce sélecteur en toutes
+  // lettres mettait la chaîne dans la page, où `build-landing.mjs` balaie les
+  // clés de traduction : il en trouvait une nommée « ' + cle + ' » et
+  // refusait de construire. Le balayeur a raison — c'est bien un `data-t` sur
+  // la page — et c'est au script de ne pas en écrire.
+  function phrase(cle) {
+    var n = document.getElementById('mot-' + cle.replace('demande-', ''));
+    return n ? n.textContent : '';
+  }
+
+  var etat = document.getElementById('demande-etat');
+  var codeVu = document.getElementById('demande-code');
+  var garde = document.getElementById('demande-garde');
+  var bouton = document.getElementById('demander');
+  var champ = document.getElementById('code-connu');
+  var voir = document.getElementById('demande-voir');
+  if (!etat || !bouton) return;
+
+  function dire(cle) {
+    etat.textContent = phrase(cle);
+    etat.hidden = false;
+  }
+
+  function montrerLeCode(code) {
+    codeVu.textContent = code;
+    codeVu.hidden = false;
+    garde.hidden = false;
+    etat.hidden = true;
+  }
+
+  bouton.addEventListener('click', function () {
+    // DÉSARMÉ PENDANT L'ALLER-RETOUR. Deux appuis font deux demandes, donc
+    // deux codes, dont un que personne ne gardera — et la cadence du service
+    // compte les deux.
+    bouton.disabled = true;
+    fetch(SERVICE, { method: 'POST' })
+      .then(function (r) {
+        if (r.status === 429) return dire('demande-occupee');
+        if (!r.ok) return dire('demande-panne');
+        return r.json().then(function (d) { montrerLeCode(d.code); });
+      })
+      .catch(function () { dire('demande-panne'); })
+      .then(function () { bouton.disabled = false; });
+  });
+
+  if (voir && champ) {
+    voir.addEventListener('click', function () {
+      var code = (champ.value || '').trim();
+      if (!code) return;
+      codeVu.hidden = true;
+      garde.hidden = true;
+      // `encodeURIComponent` parce que ce que quelqu'un colle est ce que
+      // quelqu'un colle : un espace, un retour à la ligne, ou autre chose.
+      fetch(SERVICE + '/' + encodeURIComponent(code))
+        .then(function (r) {
+          if (r.status === 404) return dire('demande-inconnue');
+          if (!r.ok) return dire('demande-panne');
+          return r.json().then(function (d) {
+            if (d.status === 'granted' && d.token) {
+              dire('demande-accordee');
+              // LE LIEN EST CELUI DE LA PAGE D'INVITATION, et il est
+              // construit ici plutôt que rendu par le service : c'est une
+              // adresse de ce site, et le service n'a pas à savoir comment
+              // ce site s'adresse.
+              var a = document.createElement('a');
+              a.className = 'porte';
+              a.href = '/i/#' + encodeURIComponent(d.token);
+              a.textContent = a.href;
+              etat.after(a);
+              return;
+            }
+            dire(d.status === 'declined' ? 'demande-refusee' : 'demande-attente');
+          });
+        })
+        .catch(function () { dire('demande-panne'); });
+    });
   }
 })();
 </script>

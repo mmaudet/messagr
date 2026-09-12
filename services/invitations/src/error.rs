@@ -297,6 +297,28 @@ pub enum AppError {
          failed and a fresh key must be provided"
     )]
     CreationInFlight,
+    /// **THE REQUEST QUEUE IS FULL, OR ASKED TOO FAST** (#152).
+    ///
+    /// Said plainly rather than swallowed, and that is deliberate on a service
+    /// whose doctrine is to say nothing. The doctrine protects PEOPLE: it
+    /// refuses to reveal whether a token, an account or a claim exists. This
+    /// says something about the SERVICE — its queue is full, or it has taken
+    /// too many requests this hour — and about nobody.
+    ///
+    /// Answering silently would be worse than useless here: the person would
+    /// leave holding a code that can never resolve, and would come back to a
+    /// page that keeps saying "not yet" for ever. A refusal they can read is
+    /// what lets them come back later instead.
+    ///
+    /// The bounds are GLOBAL, because the request carries no identifier at all
+    /// — that is the price of collecting nothing, and `handlers::request` says
+    /// so at length.
+    #[error(
+        "too many invitation requests are waiting, or too many have been made this hour. \
+         Nothing is wrong with this request: come back later. Invitations also travel from \
+         person to person, and that path is unaffected"
+    )]
+    RequestsBusy,
     /// **THE ISSUANCE GATE'S REFUSAL** (porteur's decision, 14 August 2026):
     /// the account asking for an invitation holds, in the room that invitation
     /// names, less than the level that room requires to invite.
@@ -458,6 +480,11 @@ impl IntoResponse for AppError {
             // (429, which is about volume) and from `HomeserverUnavailable`
             // (503, which is about the upstream).
             AppError::CreationInFlight => (StatusCode::CONFLICT, "MESSAGR_CREATION_IN_FLIGHT"),
+            // 429, like the two other quotas here, and for the reason written
+            // above `CeilingReached`: the condition is not permanent and does
+            // not depend on the caller. It lifts as the queue is worked
+            // through, or as the hour passes.
+            AppError::RequestsBusy => (StatusCode::TOO_MANY_REQUESTS, "MESSAGR_REQUESTS_BUSY"),
             // 403, and the reasoning is this file's own, applied in the
             // direction it was written for: "a 403 would say 'never', and a
             // well-behaved client would stop" is why `CeilingReached` refrains

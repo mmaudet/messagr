@@ -260,12 +260,116 @@ no such window, and saying the two halves are equivalent would be false.
 
 **What did not change.** Nothing is written for the application to read back
 later: the file is handed over once and removed, and there is no path from
-the container into anything the product keeps. The three exceptions this
-document now carries — the conversation list's openings, a photograph
-somebody asks to keep, and this crossing — are alike in the way that matters:
-each is bounded, each is named, and none of them is a message store.
+the container into anything the product keeps. The exceptions this document
+carries — the conversation list's openings, a file somebody asks to keep, and
+this crossing — are alike in the way that matters: each is bounded, each is
+named, and none of them is a message store.
+
+## Clarified, 12 September 2026 — "a photograph" was always "a file"
+
+The paragraph above first counted "three exceptions" and named the second
+"a photograph somebody asks to keep". That was the amendment's own wording
+from 10 September, and by 12 September it had stopped being true of the
+code: #111 added documents, and `keepDocument.ts` saves one by the same
+mechanism — temporary file, handed over by path, unlinked in a `finally` —
+arguing in its own words that "the reasoning transfers whole".
+
+It does transfer whole, and that is why this is a clarification and not a
+fourth exception. What the 10 September amendment decided is not a policy
+about photographs; it is a policy about **a file the person asks to keep**,
+and every sentence of it holds word for word when the file is a PDF: the
+destination is one the person chose rather than one the product picked, it
+happens once per file and never in the background, the plaintext exists for
+the length of one call, and what leaves is outside everything this product
+provides.
+
+Two things differ, and neither changes the decision. A document goes through
+the system's own "save as" rather than to the photo library, so the person
+names the destination instead of accepting a known one — which is weaker
+disclosure, not stronger. And a document has no thumbnail, so nothing
+resizes it and there is no second copy to sweep: the trap #209 found on the
+photograph path cannot exist here.
+
+**Why this is written down rather than left as an analogy.** Because the
+analogy lived only in `keepDocument.ts`, and this document — the one anybody
+checks when they want to know what the product allows — enumerated its
+exceptions and left the document out. An ADR that contradicts the code
+teaches the wrong thing to whoever reads it first, and the reader who trusts
+it is the one who then removes an "undocumented" `write` in good faith.
 
 **When to revisit.** If iOS ever offers the containing application a readable
 handle to an extension's item, this exception should go rather than be kept
 for symmetry: the Android shape is the better one and it is only the platform
 that prevents it here.
+
+## Revisited, 12 September 2026 — keeping every photograph, if somebody asks for that
+
+#208, and the paragraph it overturns is this document's own, written on
+10 September:
+
+> **Once, per photograph, because somebody asked.** Never on arrival, never in
+> the background, never as a side effect of looking at something. The
+> automatic version — a toggle that keeps every image as it arrives, which the
+> account holder has asked for and which is what WhatsApp does — is a
+> different decision and is not taken here. It would turn the exception back
+> into a cache: everything received, on disk, in clear, without a gesture.
+
+**That paragraph was right to refuse it, and right to say why it was refusing
+rather than deciding.** It named the shape of the danger exactly — "the
+exception back into a cache" — and it declined to settle a question nobody
+had yet been asked to weigh. This is that weighing, and the answer is yes,
+under conditions the refusal itself dictates.
+
+**A toggle IS the gesture, made once for all of them.** The phrase that
+carried the 10 September decision is "because somebody asked", and the thing
+it was protecting against is a product deciding on somebody's behalf. A
+switch, off by default, that somebody has to find and turn on, is not the
+product deciding. It is the same consent, given once and revocable, which is
+how consent is given for everything else a telephone does with a camera roll.
+
+**Off by default, and that is load-bearing rather than polite.** A default
+that saved would make the decision for every person who never opened
+Réglages, which is most of them — and those are exactly the people the
+10 September paragraph was protecting. A product may offer this; it may not
+assume it.
+
+**It happens where the person is, not behind them.** The copy is made when
+the application decrypts an image to show it, on a device somebody is
+holding, and never by a background fetch or a push-woken pass. That keeps the
+rule the refusal really cared about: nothing arrives on disk because a
+message arrived, only because somebody was there to receive it. A
+conversation caught up after a week offline saves what it draws, not what it
+downloads.
+
+**The mechanism is unchanged**, and that is the strongest part of this
+amendment. `keepPhotograph.ts` already writes a temporary file, hands it to
+the gallery by path, and unlinks it in a `finally` — including when the
+hand-over fails. Turning that loop on automatically adds no new place where
+plaintext can rest, and no new code that could leave some behind: it calls
+the same function the button calls.
+
+**What it costs, said plainly, and it is more than the button costs.**
+Everything received becomes readable by every application that has photo
+access, backed up by whatever backs the gallery up, and beyond the reach of
+whoever sent it — and unlike the per-photograph gesture, **the person is not
+looking at the picture when it happens**. Somebody who turns this on is
+choosing that for images they have not seen yet, from people they have not
+met yet. The screen that offers it has to say that, and not merely say
+"automatically save received media".
+
+And turning it off later retrieves nothing. What was saved stays saved; the
+switch governs the future only. That, too, belongs on the screen.
+
+**What did not change.** Nothing is written for the application to read back.
+There is still no path from the gallery into this product, a saved
+photograph is still not a cache of anything, and the conversation is still
+derived from ciphertext on every launch. This widens _who asks and how often_
+— it does not widen _what the product keeps_, which is the sentence at the
+top of this document and is untouched.
+
+**When to revisit.** If this ever grows a second default — "save from
+favourites", "save from this person" — that is a directory of rules about
+people, and it is a different decision from this one. And if the day comes
+that somebody asks for the same switch on documents, the answer is not
+automatic: a document is a file with a name, and a gallery is not where it
+would go.
