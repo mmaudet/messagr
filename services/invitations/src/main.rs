@@ -128,6 +128,14 @@ fn router(state: Arc<AppState>) -> Router {
             post(handlers::request::ask).get(handlers::request::queue),
         )
         .route("/invitation-requests/:code", get(handlers::request::look))
+        // LA DÉCISION, PRISE PAR UNE PERSONNE, et authentifiée comme tout ce
+        // qui n'est pas public ici. Elle n'invente pas d'invitation : elle
+        // attache celle que l'exploitant a créée par le chemin ordinaire,
+        // avec son porteur, son salon et son plafond.
+        .route(
+            "/invitation-requests/:id/grant",
+            post(handlers::request::grant),
+        )
         .route("/invitations", post(handlers::create::create))
         .route("/invitations/claim", post(handlers::claim::claim))
         .route(

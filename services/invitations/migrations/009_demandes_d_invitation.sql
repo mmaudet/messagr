@@ -37,22 +37,18 @@ CREATE TABLE invitation_requests (
     -- L'invitation accordée, quand il y en a une. C'est ce que la personne
     -- reçoit en revenant avec son code.
     invitation_id TEXT    REFERENCES invitations(id),
-    -- LE JETON, SCELLÉ PAR UNE CLÉ QUE CE SERVICE N'A PAS.
+    -- AUCUNE COLONNE POUR LE JETON, ET C'EST UNE CORRECTION.
     --
-    -- `create` rend le jeton une fois et n'en garde que l'empreinte ; ici il
-    -- faut le rendre plus tard, donc le garder. En clair, cette colonne serait
-    -- un trousseau d'invitations utilisables.
+    -- La première version en portait une, scellée par une clé dérivée du
+    -- CODE. C'était élégant et impossible : le code n'existe que chez le
+    -- demandeur, l'accord se prononce en son absence, donc personne n'aurait
+    -- jamais pu remplir cette colonne.
     --
-    -- Il est scellé avec une clé dérivée du CODE, que seule la personne
-    -- détient : la base tient `SHA-256(code)` pour retrouver la ligne et
-    -- `seal(SHA-256(code ‖ domaine), jeton)` pour la rendre. Deux dérivations
-    -- à sens unique du même secret, et aucune ne donne l'autre. Un vol de la
-    -- base ne rend aucune invitation.
-    --
-    -- C'est plus que ce que `reserved_accounts` fait des siens, scellés par la
-    -- clé du service : ceux-là, le service doit s'en servir seul. Celui-ci,
-    -- non — donc il n'a pas à pouvoir.
-    invitation_token_enc BLOB,
+    -- Il n'y a rien à stocker. `invitations.token_enc` tient déjà le jeton,
+    -- scellé par la clé du service, pour que `create` puisse rejouer une
+    -- réponse idempotente. `invitation_id` suffit donc à le retrouver, et
+    -- cette table n'ajoute AUCUNE exposition : le jeton d'une invitation
+    -- accordée est exactement là où sont déjà ceux de toutes les autres.
     -- PURGÉE COMME LE GRAPHE, ET POUR LA MÊME RAISON. `retention.json` est la
     -- seule source de vérité des durées, et `scripts/assert-retention.sh`
     -- refuse que la politique publiée et le code divergent — parce que la

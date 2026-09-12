@@ -18,22 +18,28 @@
 //! C'est moins que ce qu'un parrainage porte, et c'est ce que ce produit peut
 //! tenir sans se contredire.
 //!
-//! # LE JETON ACCORDÉ EST SCELLÉ PAR UNE CLÉ QUE LE SERVICE N'A PAS
+//! # LE JETON ACCORDÉ N'EST PAS STOCKÉ ICI, ET UNE PREMIÈRE VERSION L'A CRU
 //!
-//! `create` rend le jeton d'invitation une fois et n'en garde que
-//! l'empreinte. Ici il faut le rendre plus tard, à quelqu'un qui revient :
-//! il doit donc être gardé. Le garder en clair ferait de cette table un
-//! trousseau d'invitations utilisables.
+//! Elle portait une colonne `invitation_token_enc`, scellée par une clé
+//! dérivée du CODE, et s'en félicitait : le service lui-même ne pouvait pas
+//! l'ouvrir. C'était vrai, et c'était impossible — **le code n'existe que
+//! chez le demandeur, et l'accord se prononce en son absence**. Personne
+//! n'aurait jamais pu remplir cette colonne.
 //!
-//! Il est donc scellé avec une clé **dérivée du code**, que seule la personne
-//! détient. La base contient `SHA-256(code)` pour retrouver la ligne et
-//! `seal(SHA-256(code ‖ domaine), jeton)` pour le rendre : deux dérivations à
-//! sens unique du même secret, et aucune des deux ne donne l'autre. Un vol de
-//! la base ne rend aucune invitation.
+//! Les tests ne l'ont pas vu parce qu'ils scellaient eux-mêmes avec le code :
+//! ils jouaient le demandeur ET l'exploitant, donc ils disposaient d'un
+//! secret que l'exploitant n'a jamais. Chaque pièce était juste et rien ne
+//! reliait les deux bouts.
 //!
-//! C'est plus que ce que `reserved_accounts` fait de ses secrets — ceux-là
-//! sont scellés par la clé du service, parce que le service doit s'en servir
-//! seul. Ici il n'a pas à s'en servir, donc il n'a pas à pouvoir.
+//! Il n'y a en fait rien à stocker. `invitations.token_enc` tient déjà le
+//! jeton, scellé par la clé du service, pour que `create` puisse rejouer une
+//! réponse idempotente. Une demande accordée retient donc un
+//! `invitation_id`, et rien de plus : le jeton d'une invitation accordée est
+//! exactement là où sont déjà ceux de toutes les autres, et cette table
+//! **n'ajoute aucune exposition**.
+//!
+//! Le code garde son rôle, qui est celui qui compte : il commande l'ACCÈS.
+//! Sans lui, personne ne sait quelle demande regarder.
 //!
 //! # TROIS DÉFENSES, ET AUCUNE NE DEMANDE DE TIERS
 //!
@@ -67,7 +73,6 @@ use axum::{
     Json,
 };
 use serde::Serialize;
-use sha2::{Digest, Sha256};
 use sqlx::Row;
 
 use crate::{auth, crypto, error::AppError, util::now, AppState};
@@ -102,14 +107,6 @@ pub const RIPENS_AFTER_SECONDS: i64 = 3_600;
 /// le code divergent. Cette constante doit s'y accorder.
 pub const PURGE_AFTER_SECONDS: i64 = 30 * 86_400;
 
-/// Le domaine de dérivation, pour que la clé ne soit jamais l'empreinte.
-///
-/// Sans ce suffixe, `SHA-256(code)` servirait à la fois d'index en base et de
-/// clé de scellement : qui lit la base lirait la clé. Un octet de séparation
-/// suffit à ce que l'un ne donne pas l'autre, et le nommer ici évite qu'on le
-/// « simplifie » un jour.
-const SEAL_DOMAIN: &str = "messagr/invitation-request/seal/v1";
-
 #[derive(Serialize)]
 pub struct AskedResponse {
     /// Rendu une fois. Le service n'en garde que des dérivations.
@@ -125,13 +122,6 @@ pub struct LookResponse {
     /// Le jeton d'invitation, uniquement quand la demande est accordée.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub token: Option<String>,
-}
-
-fn seal_key(code: &str) -> [u8; 32] {
-    let mut hasher = Sha256::new();
-    hasher.update(code.as_bytes());
-    hasher.update(SEAL_DOMAIN.as_bytes());
-    hasher.finalize().into()
 }
 
 /// `POST /invitation-requests` — public, et c'est le seul de ce service.
@@ -191,8 +181,15 @@ pub async fn look(
     State(st): State<Arc<AppState>>,
     Path(code): Path<String>,
 ) -> Result<Json<LookResponse>, AppError> {
+    // LE JETON VIENT DE `invitations`, où il est déjà. Une jointure plutôt
+    // qu'une copie : `create` y scelle le jeton pour pouvoir rejouer une
+    // réponse idempotente, et le recopier ici en ferait un second endroit à
+    // protéger, à purger et à garder d'accord avec le premier.
     let row = sqlx::query(
-        "SELECT status, invitation_token_enc FROM invitation_requests WHERE code_sha256 = ?",
+        "SELECT r.status AS status, i.token_enc AS token_enc \
+         FROM invitation_requests r \
+         LEFT JOIN invitations i ON i.id = r.invitation_id \
+         WHERE r.code_sha256 = ?",
     )
     .bind(crypto::token_hash(&code))
     .fetch_optional(&st.pool)
@@ -201,16 +198,17 @@ pub async fn look(
     .ok_or(AppError::InvitationInvalid)?;
 
     let status: String = row.get("status");
-    let sealed: Option<Vec<u8>> = row.get("invitation_token_enc");
+    let sealed: Option<Vec<u8>> = row.get("token_enc");
 
-    // OUVERT AVEC LA CLÉ DU CODE PRÉSENTÉ, et pas avec celle du service : ce
-    // sceau n'a jamais eu de clé que le service détienne. Un échec ici ne peut
-    // donc pas être une panne de configuration ; c'est un code qui ne
-    // correspond pas, ce qui répond comme un code inconnu.
+    // UN MARQUEUR ABSENT N'EST PAS UN CODE FAUX. `create` écrit `token_enc`
+    // en dernier et n'échoue PAS la création s'il n'y parvient pas — le
+    // demandeur d'alors tenait déjà sa réponse. Une invitation dans cet état
+    // est intacte et son jeton est irrécupérable : il n'y a rien à rendre
+    // ici, et le dire « en attente » serait mentir sur une décision qui a
+    // bien été prise.
     let token = match (status.as_str(), sealed) {
-        ("granted", Some(sealed)) => {
-            Some(crypto::open(&seal_key(&code), &sealed).map_err(|_| AppError::InvitationInvalid)?)
-        }
+        ("granted", Some(sealed)) => Some(crypto::open(&st.cfg.encryption_key, &sealed)?),
+        ("granted", None) => return Err(AppError::InvitationInvalid),
         _ => None,
     };
 
@@ -255,21 +253,168 @@ pub async fn queue(
     ))
 }
 
+#[derive(serde::Deserialize)]
+pub struct GrantRequest {
+    /// L'invitation à remettre, créée par le chemin ordinaire.
+    pub invitation_id: String,
+}
+
+/// `POST /invitation-requests/:id/grant` — la décision, prise par une personne.
+///
+/// # ELLE NE CRÉE PAS L'INVITATION, ELLE L'ATTACHE
+///
+/// L'exploitant crée l'invitation comme il l'a toujours fait, par
+/// `POST /invitations` : avec son propre porteur, dans un salon où il a le
+/// droit d'inviter, sous son propre plafond. Puis il l'attache ici.
+///
+/// Refaire ce travail dans cette route aurait dupliqué l'idempotence, le
+/// plafond, la réservation des comptes et le contrôle du niveau de pouvoir —
+/// quatre mécanismes que `create` porte déjà et dont aucun ne gagne à
+/// exister deux fois.
+///
+/// # LE DÉLAI EST VÉRIFIÉ ICI
+///
+/// `ripe_at` est la troisième défense, et c'est le seul endroit qui puisse
+/// la faire respecter. Avec un humain dans la boucle elle est déjà tenue de
+/// fait ; elle est écrite pour le jour où quelqu'un automatisera ce geste, et
+/// ce jour-là personne ne se souviendra qu'elle en dépendait.
+///
+/// # CE QUE LE DEMANDEUR N'APPREND PAS
+///
+/// Ni qui a accordé, ni depuis quel salon, ni sous quelle identité. Il
+/// reçoit un jeton, comme s'il l'avait reçu de la main d'un proche — ce qui
+/// est le geste que ce produit imite.
+pub async fn grant(
+    State(st): State<Arc<AppState>>,
+    Path(id): Path<String>,
+    headers: HeaderMap,
+    crate::extract::Body(req): crate::extract::Body<GrantRequest>,
+) -> Result<Json<WaitingRequest>, AppError> {
+    let caller = auth::authenticate(&st.mx, &headers).await?;
+
+    // L'INVITATION EST-ELLE CELLE DE QUI L'ATTACHE ? Sans ce contrôle,
+    // n'importe quel compte authentifié attacherait l'invitation d'un autre,
+    // et la dépenserait à sa place.
+    let owner: Option<String> =
+        sqlx::query_scalar("SELECT inviter_user_id FROM invitations WHERE id = ?")
+            .bind(&req.invitation_id)
+            .fetch_optional(&st.pool)
+            .await
+            .map_err(anyhow::Error::from)?;
+    match owner {
+        Some(who) if who == caller => {}
+        // Muet dans les deux cas : « pas la vôtre » et « n'existe pas » ne se
+        // distinguent pas, sinon la route dirait à qui interroge si une
+        // invitation existe. C'est la doctrine de `revoke`, mot pour mot.
+        _ => return Err(AppError::InvitationInvalid),
+    }
+
+    let at = now();
+    let row = sqlx::query("SELECT ripe_at, status FROM invitation_requests WHERE id = ?")
+        .bind(&id)
+        .fetch_optional(&st.pool)
+        .await
+        .map_err(anyhow::Error::from)?
+        .ok_or(AppError::InvitationInvalid)?;
+
+    let ripe_at: i64 = row.get("ripe_at");
+    let status: String = row.get("status");
+    if status != "waiting" {
+        // Déjà tranchée. Rejouer changerait la réponse sous les pieds de
+        // quelqu'un qui tient peut-être déjà son jeton.
+        return Err(AppError::InvitationInvalid);
+    }
+    if at < ripe_at {
+        return Err(AppError::RequestsBusy);
+    }
+
+    sqlx::query(
+        "UPDATE invitation_requests \
+         SET status = 'granted', decided_at = ?, invitation_id = ? \
+         WHERE id = ? AND status = 'waiting'",
+    )
+    .bind(at)
+    .bind(&req.invitation_id)
+    .bind(&id)
+    .execute(&st.pool)
+    .await
+    .map_err(anyhow::Error::from)?;
+
+    Ok(Json(WaitingRequest {
+        id,
+        created_at: at,
+        ripe_at,
+    }))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+    use axum::http::HeaderMap;
     use sqlx::SqlitePool;
 
+    /// Un homeserver réduit à `whoami`, qui croit le porteur sur parole :
+    /// « Bearer alice » devient « @alice:h ». Même forme que `status.rs`.
+    async fn whoami_hs() -> String {
+        async fn whoami(headers: HeaderMap) -> Json<serde_json::Value> {
+            let bearer = headers
+                .get("authorization")
+                .and_then(|v| v.to_str().ok())
+                .and_then(|v| v.strip_prefix("Bearer "))
+                .unwrap_or("unknown");
+            Json(serde_json::json!({"user_id": format!("@{bearer}:h")}))
+        }
+        let app = axum::Router::new().route(
+            "/_matrix/client/v3/account/whoami",
+            axum::routing::get(whoami),
+        );
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let base = format!("http://{}", listener.local_addr().unwrap());
+        tokio::spawn(async move { axum::serve(listener, app).await.unwrap() });
+        base
+    }
+
+    fn bearer(who: &str) -> HeaderMap {
+        let mut h = HeaderMap::new();
+        h.insert("authorization", format!("Bearer {who}").parse().unwrap());
+        h
+    }
+
+    /// Une invitation créée par le chemin ordinaire, jeton scellé compris —
+    /// c'est `create` qui écrit `token_enc`, et c'est de là que `look` le tire.
+    async fn seed_invitation(
+        pool: &SqlitePool,
+        id: &str,
+        inviter: &str,
+        token: &str,
+        key: &[u8; 32],
+    ) {
+        sqlx::query(
+            "INSERT INTO invitations \
+             (id, inviter_user_id, token_sha256, created_at, expires_at, max_uses, \
+              used_count, status, token_enc) \
+             VALUES (?,?,?,0,4000000000,1,0,'pending',?)",
+        )
+        .bind(id)
+        .bind(inviter)
+        .bind(crypto::token_hash(token))
+        .bind(crypto::seal(key, token).unwrap())
+        .execute(pool)
+        .await
+        .unwrap();
+    }
+
     fn state(pool: SqlitePool) -> Arc<AppState> {
+        state_with(pool, "http://127.0.0.1:1".into())
+    }
+
+    fn state_with(pool: SqlitePool, hs: String) -> Arc<AppState> {
         Arc::new(AppState {
             pool,
-            mx: Arc::new(crate::matrix::MatrixClient::new(
-                "http://127.0.0.1:1".into(),
-                "token".into(),
-            )),
+            mx: Arc::new(crate::matrix::MatrixClient::new(hs.clone(), "token".into())),
             cfg: crate::config::Config {
                 database_url: String::new(),
-                homeserver_url: "http://127.0.0.1:1".into(),
+                homeserver_url: hs,
                 registration_token: "token".into(),
                 encryption_key: [0u8; 32],
                 edge_retention_days: 30,
@@ -381,51 +526,140 @@ mod tests {
     }
 
     #[sqlx::test(migrations = "./migrations")]
-    async fn a_granted_request_hands_back_the_token_to_that_code_alone(pool: SqlitePool) {
-        let st = state(pool.clone());
+    async fn granting_attaches_an_invitation_and_the_code_collects_it(pool: SqlitePool) {
+        // LE CHEMIN ENTIER, QUE LA PREMIÈRE VERSION NE POUVAIT PAS PARCOURIR.
+        // Elle scellait le jeton avec une clé dérivée du code, que
+        // l'exploitant n'a jamais : ce test-ci n'aurait pas pu s'écrire.
+        let hs = whoami_hs().await;
+        let st = state_with(pool.clone(), hs);
         let Json(asked) = ask(State(st.clone())).await.unwrap();
 
-        let token = "THETOKEN";
-        sqlx::query(
-            "UPDATE invitation_requests SET status='granted', invitation_token_enc=? \
-             WHERE code_sha256 = ?",
+        // Mûre : le délai est une vraie garde, vérifiée par un test à part.
+        sqlx::query("UPDATE invitation_requests SET ripe_at = 0")
+            .execute(&pool)
+            .await
+            .unwrap();
+        seed_invitation(
+            &pool,
+            "inv-1",
+            "@alice:h",
+            "LEJETON",
+            &st.cfg.encryption_key,
         )
-        .bind(crypto::seal(&seal_key(&asked.code), token).unwrap())
-        .bind(crypto::token_hash(&asked.code))
-        .execute(&pool)
+        .await;
+
+        let id: String = sqlx::query_scalar("SELECT id FROM invitation_requests")
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+        let _ = grant(
+            State(st.clone()),
+            Path(id),
+            bearer("alice"),
+            crate::extract::Body(GrantRequest {
+                invitation_id: "inv-1".into(),
+            }),
+        )
         .await
         .unwrap();
 
         let Json(seen) = look(State(st), Path(asked.code)).await.unwrap();
         assert_eq!(seen.status, "granted");
-        assert_eq!(seen.token.as_deref(), Some(token));
+        assert_eq!(seen.token.as_deref(), Some("LEJETON"));
     }
 
     #[sqlx::test(migrations = "./migrations")]
-    async fn the_service_key_does_not_open_the_seal(pool: SqlitePool) {
-        // LA PROPRIÉTÉ QUI JUSTIFIE TOUT CE MÉCANISME. Le sceau est fermé par
-        // une clé dérivée du code ; la clé de chiffrement du service -- celle
-        // qui ouvre `reserved_accounts` -- ne l'ouvre pas. Un vol de la base
-        // ET de la configuration ne rend toujours aucune invitation.
-        let st = state(pool.clone());
-        let Json(asked) = ask(State(st)).await.unwrap();
-        let sealed = crypto::seal(&seal_key(&asked.code), "THETOKEN").unwrap();
+    async fn nobody_attaches_somebody_else_s_invitation(pool: SqlitePool) {
+        let hs = whoami_hs().await;
+        let st = state_with(pool.clone(), hs);
+        let _ = ask(State(st.clone())).await.unwrap();
+        sqlx::query("UPDATE invitation_requests SET ripe_at = 0")
+            .execute(&pool)
+            .await
+            .unwrap();
+        seed_invitation(
+            &pool,
+            "inv-1",
+            "@alice:h",
+            "LEJETON",
+            &st.cfg.encryption_key,
+        )
+        .await;
 
-        assert!(crypto::open(&[0u8; 32], &sealed).is_err());
-        assert!(crypto::open(&seal_key("ANOTHERCODE"), &sealed).is_err());
-        assert_eq!(
-            crypto::open(&seal_key(&asked.code), &sealed).unwrap(),
-            "THETOKEN"
-        );
+        let id: String = sqlx::query_scalar("SELECT id FROM invitation_requests")
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+        // MUET, comme `revoke` : « pas la vôtre » et « n'existe pas » ne se
+        // distinguent pas, sinon la route dirait à qui interroge si une
+        // invitation existe.
+        let refused = grant(
+            State(st),
+            Path(id),
+            bearer("mallory"),
+            crate::extract::Body(GrantRequest {
+                invitation_id: "inv-1".into(),
+            }),
+        )
+        .await;
+        assert!(matches!(refused, Err(AppError::InvitationInvalid)));
     }
 
     #[sqlx::test(migrations = "./migrations")]
-    async fn the_seal_key_is_not_the_index(pool: SqlitePool) {
-        // Qui lit la base lit `SHA-256(code)`. Si c'était aussi la clé, la
-        // base se déchiffrerait elle-même. Le domaine de dérivation est ce
-        // qui l'empêche, et rien d'autre ne le dirait.
-        let _ = pool;
-        let code = "SOMECODE";
-        assert_ne!(seal_key(code).to_vec(), crypto::token_hash(code));
+    async fn the_delay_is_a_real_guard(pool: SqlitePool) {
+        // `ripe_at` n'est pas décoratif : sans cette vérification, la
+        // troisième défense du ticket ne serait écrite nulle part.
+        let hs = whoami_hs().await;
+        let st = state_with(pool.clone(), hs);
+        let _ = ask(State(st.clone())).await.unwrap();
+        seed_invitation(
+            &pool,
+            "inv-1",
+            "@alice:h",
+            "LEJETON",
+            &st.cfg.encryption_key,
+        )
+        .await;
+
+        let id: String = sqlx::query_scalar("SELECT id FROM invitation_requests")
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+        let too_soon = grant(
+            State(st),
+            Path(id),
+            bearer("alice"),
+            crate::extract::Body(GrantRequest {
+                invitation_id: "inv-1".into(),
+            }),
+        )
+        .await;
+        assert!(matches!(too_soon, Err(AppError::RequestsBusy)));
+    }
+
+    #[sqlx::test(migrations = "./migrations")]
+    async fn a_granted_invitation_without_its_marker_says_nothing(pool: SqlitePool) {
+        // `create` écrit `token_enc` en dernier et n'échoue pas la création
+        // s'il n'y parvient pas. Une invitation dans cet état est intacte et
+        // son jeton irrécupérable : il n'y a rien à rendre, et dire
+        // « en attente » mentirait sur une décision qui a bien été prise.
+        let hs = whoami_hs().await;
+        let st = state_with(pool.clone(), hs);
+        let Json(asked) = ask(State(st.clone())).await.unwrap();
+        sqlx::query(
+            "INSERT INTO invitations \
+             (id, inviter_user_id, token_sha256, created_at, expires_at, max_uses, \
+              used_count, status) VALUES ('inv-nu','@alice:h',x'00',0,4000000000,1,0,'pending')",
+        )
+        .execute(&pool)
+        .await
+        .unwrap();
+        sqlx::query("UPDATE invitation_requests SET status='granted', invitation_id='inv-nu'")
+            .execute(&pool)
+            .await
+            .unwrap();
+
+        let answered = look(State(st), Path(asked.code)).await;
+        assert!(matches!(answered, Err(AppError::InvitationInvalid)));
     }
 }
