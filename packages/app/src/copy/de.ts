@@ -411,6 +411,8 @@ export const de: Readonly<Record<CopyKey, string>> = {
   call_camera_off: 'Kamera ausschalten',
   call_switch_camera: 'Wechseln',
   call_their_camera_off: 'Die Kamera der anderen Person ist aus',
+  call_camera_refused:
+    'Ihre Kamera konnte nicht geöffnet werden. Das Gespräch läuft ohne Ihr Bild weiter.',
   call_failed_no_relay:
     'Dieser Server hat kein Anrufrelais: Der Anruf war nicht möglich.',
   call_failed_no_microphone: 'Das Mikrofon ist nicht verfügbar.',
@@ -452,6 +454,17 @@ export const de: Readonly<Record<CopyKey, string>> = {
   settings_wake_on: 'An',
   settings_wake_off: 'Aus',
   settings_wake_not_kept:
+    'Diese Wahl konnte nicht behalten werden: beim nächsten Start gilt wieder der vorherige Zustand.',
+
+  // #208: the automatic keeping, and what the screen owes whoever is offered
+  // it. See the French, and ADR-0006's amendment of 12 September 2026.
+
+  settings_keep_every: 'Empfangene Fotos speichern',
+  settings_keep_every_hint:
+    'Jedes empfangene Foto landet in Ihrer Galerie, bevor Sie es gesehen haben, auch von Personen, die Sie noch nicht kennen. Dort kann jede App, der Sie Zugriff auf Ihre Fotos geben, es lesen, und wer es geschickt hat, kann es nicht mehr zurücknehmen.',
+  settings_keep_every_future:
+    'Ausschalten holt nichts zurück: was gespeichert wurde, bleibt gespeichert.',
+  settings_keep_every_not_kept:
     'Diese Wahl konnte nicht behalten werden: beim nächsten Start gilt wieder der vorherige Zustand.',
   promise_language: 'Wählen Sie Ihre Sprache',
   promise_terms: 'Ich akzeptiere die Nutzungsbedingungen von Messagr.',
