@@ -234,13 +234,26 @@ describeRoundTrip('encrypted round trip', () => {
 
     // Relaunched, repeatedly. The application now runs a live sync loop
     // (ADR-0007), so waiting inside one launch is no longer a lie about the
-    // product — but this block is skipped unless a counterparty is built,
-    // and the counterparty has not run since the mautrix-go one-time-key
-    // signature bug was found -- diagnosed on the docs/interop-otk-bug
-    // branch, which is not merged. Rewriting a test that
-    // cannot be watched failing is how a suite acquires assertions nobody
-    // has ever seen pass, so this keeps the retry it was proven with until
-    // somebody can run it.
+    // product.
+    //
+    // WHAT WAS WRITTEN HERE WAS FALSE, and it was the sentence protecting
+    // this loop from scrutiny: « the counterparty has not run since the
+    // mautrix-go one-time-key signature bug was found », therefore the block
+    // « cannot be watched failing », therefore the retry stays. Every link
+    // fails. #234 recovered the full logs of three occurrences -- runs
+    // 34590785553, 34615662123 and 34675023641 -- and the counterparty sent
+    // successfully in all three, event id and all. It runs. This block is
+    // reached. It HAS been watched failing.
+    //
+    // So the retry no longer rests on « nobody can run it ». What the three
+    // logs show is that it rescues nothing: all four launches failed every
+    // time, with fifty one-time keys on the server and the ciphertext
+    // arriving without its room key. It is kept for now because #239's two
+    // guards landed after those measurements and nothing has been seen
+    // since -- which is a reason with an expiry date, not a principle. If
+    // #234 closes without this loop ever turning red on attempt two or
+    // later, it should go: four launches and a hundred seconds are what this
+    // suite pays for it.
     let seen = false
     for (let attempt = 0; attempt < 4 && !seen; attempt += 1) {
       // Cleared first, and here it does more than remove a race: the loop
