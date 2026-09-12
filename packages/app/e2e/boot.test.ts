@@ -571,10 +571,24 @@ describe('boot', () => {
       .toBeVisible()
       .withTimeout(60000)
 
+    // TROIS IMAGES AUTOUR DU GESTE, ET CE N'EST PAS UNE HYPOTHÈSE DE PLUS.
+    //
+    // Quatre runs ont échoué. La capture d'échec de Detox est prise TRENTE
+    // SECONDES après le geste : elle montre la liste, ce qui ne dit pas si
+    // le panneau ne s'est jamais ouvert ou si l'écran a changé ensuite. Deux
+    // histoires très différentes, et la même image.
+    //
+    // Celles-ci encadrent le tap, donc elles répondent. La piste qu'elles
+    // départageront : sur la liste, `tab-chat` occupe exactement la zone où
+    // vit `composer-emoji` dans une conversation. Un tap au même endroit,
+    // sur le mauvais écran, presse « Discussions ».
+    await device.takeScreenshot('panneaux-a-avant-le-tap')
     await element(by.id('composer-emoji')).tap()
+    await device.takeScreenshot('panneaux-b-juste-apres-le-tap')
     await waitFor(element(by.id('emoji-panel')))
       .toExist()
       .withTimeout(30000)
+    await device.takeScreenshot('panneaux-c-panneau-ouvert')
 
     // REFERMÉ DANS LE TEST, et pas seulement ouvert. Un panneau laissé
     // ouvert est l'état dans lequel #241 a laissé quatre tests mourir.
