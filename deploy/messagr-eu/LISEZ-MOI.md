@@ -187,9 +187,36 @@ Console**, under Testing, Internal testing, Testers. Nothing in this
 repository can derive it, which is why it is written here rather than
 defaulted somewhere.
 
-Then:
+## The order, and it is not the obvious one either
+
+**Publish first, point the page second, withdraw the APK third.** Doing
+these in any other order sends somebody to a build that cannot do what they
+are being asked to do.
+
+**1. Put a current build on the track.** Run the `Publish` workflow on
+today's `master`, `track: internal`. This is not a formality. On
+12 September 2026 the only successful publish was from **5 September**, and
+every capability the trial needs landed after it:
+
+| what the trial needs                       | closed  | on the 5 September build |
+| ------------------------------------------ | ------- | ------------------------ |
+| inviting from the application, step 9      | 6 Sept  | no                       |
+| a notification with the app closed, step 6 | 6 Sept  | no                       |
+| an audio call, step 10                     | 9 Sept  | no                       |
+| ringing on a locked phone, step 10         | 9 Sept  | no                       |
+| vouching and eviction, step 7              | 10 Sept | no                       |
+
+Four of the ten steps were unplayable on it, including both of the two that
+#91 adds. Pointing the page at that track would have been worse than the
+APK, which at least carries a current build.
+
+Check what is on the track before trusting it. A track that has not moved
+is indistinguishable from one that has.
+
+**2. Point the page at the opt-in link.**
 
     MESSAGR_DEST_ANDROID='https://play.google.com/apps/internaltest/<id>' \
+      MESSAGR_APK=none \
       deploy/messagr-eu/deploy.sh
 
 `build-site.sh` refuses a value that does not land in the built page, so a
@@ -197,9 +224,15 @@ typo is a failed deployment rather than a page that serves the waiting
 sentence to somebody holding a working invitation. That guard is the reason
 this is one command and not a checklist.
 
-**The APK is not withdrawn by this.** Both slots coexist, and withdrawing
-the download is its own gesture (`MESSAGR_APK=none`). Leave it until the
-trial says the Play path works.
+**3. And `MESSAGR_APK=none` is not optional, it is the point.** `deploy.sh`
+refuses a run that leaves the file served while the page stops offering it,
+so you have to say which you want. For #91 the answer is to withdraw it: the
+criterion says "installed from the internal testing track, **not
+sideloaded**", and a page offering both lets the participant take the
+sideload path. The trial would then measure something other than what it
+claims to.
+
+Keep the APK only if this deployment is for something other than the trial.
 
 **And iOS stays a dead end** until `MESSAGR_DEST_IOS` has a value. See #106:
 `ios: ''` is what production serves today, and an iPhone is told to ask the
