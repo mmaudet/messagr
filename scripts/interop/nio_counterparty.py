@@ -38,6 +38,8 @@ in a directory the caller supplies and removes.
 """
 
 import asyncio
+
+import aiohttp
 import json
 import os
 import sys
@@ -62,6 +64,10 @@ EXPECTED_BODY = "encrypted by the bridge, sent by the application"
 COUNTERPARTY_BODY = "encrypted by matrix-nio, for the application to read"
 
 SYNC_TIMEOUT_MS = 10_000
+# Le temps laissé à l'application pour voir la demande et envoyer
+# l'invitation Matrix. Généreux : elle interroge l'état du service à son
+# propre rythme, et un banc chargé n'est pas un défaut de produit.
+PLACE_TIMEOUT_SECONDS = 120
 COLLECT_DEADLINE_SECONDS = 120
 
 # How long the send phase waits for the application's account to appear as a
@@ -436,6 +442,89 @@ async def send(session_file: Path, store: Path) -> int:
 
         print(f"OK: the counterparty sent an encrypted message ({event_id})")
         return 0
+    finally:
+        await client.close()
+
+
+
+async def claim_place(session_file: Path, store: Path) -> int:
+    """Réclamer une invitation émise par l'application, avec CETTE identité.
+
+    # POURQUOI UN COMPTE EXISTANT PLUTÔT QU'UN COMPTE NEUF
+
+    `ClaimRequest` porte `existing_user_id`, et c'est ce chemin-là qui sert
+    ici : la contrepartie a déjà une identité, des clés publiées et une
+    signature croisée. Lui faire tirer un compte réservé donnerait un
+    troisième inconnu, et la preuve que #35 demande — « prouvée avec un
+    client indépendant plutôt qu'avec le nôtre » — perdrait ce qui la rend
+    indépendante.
+
+    # CE QUE CETTE PHASE NE FAIT PAS
+
+    Elle ne rejoint pas le salon elle-même. Le service place la demande ;
+    c'est le client de l'INVITEUR — l'application — qui lit l'état et envoie
+    l'invitation Matrix, parce qu'un compte réservé ne peut pas inviter dans
+    un salon dont le niveau « invite » est à 50. La migration 008 raconte
+    cette contrainte au long.
+
+    Alors cette phase réclame, puis attend d'être invitée, puis rejoint.
+    L'attente est bornée : une invitation qui n'arrive pas est un défaut du
+    produit et doit se lire comme tel, pas comme une phase qui pend.
+    """
+    homeserver = env("MESSAGR_INTEROP_HOMESERVER")
+    token = env("MESSAGR_INTEROP_CLAIM_TOKEN")
+
+    session = json.loads(session_file.read_text())
+    user_id = session["user_id"]
+
+    async with aiohttp.ClientSession() as http:
+        async with http.post(
+            f"{homeserver}/_messagr/invitations/claim",
+            json={"token": token, "existing_user_id": user_id},
+            timeout=aiohttp.ClientTimeout(total=60),
+        ) as response:
+            body = await response.text()
+            if response.status != 200:
+                print(
+                    f"FAIL: the claim was refused ({response.status}): {body}",
+                    file=sys.stderr,
+                )
+                return 1
+    print(f"OK: {user_id} claimed the application's invitation")
+
+    client = client_for(
+        store, user_id, homeserver, device_id=session["device_id"]
+    )
+    try:
+        client.restore_login(
+            user_id=user_id,
+            device_id=session["device_id"],
+            access_token=session["access_token"],
+        )
+
+        # ATTENDRE L'INVITATION, PUIS REJOINDRE. Bornée : une invitation qui
+        # n'arrive jamais est un défaut, et une phase qui pendrait le
+        # dirait comme un dépassement de temps du harnais -- c'est-à-dire
+        # mal, et cent secondes plus tard.
+        deadline = asyncio.get_event_loop().time() + PLACE_TIMEOUT_SECONDS
+        while asyncio.get_event_loop().time() < deadline:
+            response = await client.sync(timeout=SYNC_TIMEOUT_MS, full_state=True)
+            invited = getattr(getattr(response, "rooms", None), "invite", {})
+            for room_id in invited:
+                joined = await client.join(room_id)
+                if getattr(joined, "room_id", None) is not None:
+                    print(f"OK: joined {room_id} on the application's invitation")
+                    return 0
+                print(f"the join was refused, retrying: {joined}", file=sys.stderr)
+
+        print(
+            "FAIL: no Matrix invitation arrived within "
+            f"{PLACE_TIMEOUT_SECONDS}s. The service placed the claim, so the "
+            "inviter's own client never sent it -- which is the application's "
+            "half of the path, not the service's.",
+            file=sys.stderr,
+        )
+        return 1
     finally:
         await client.close()
 

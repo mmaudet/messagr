@@ -88,8 +88,12 @@ const hasCounterparty =
   process.env.MESSAGR_INTEROP_WORKDIR !== undefined &&
   INVITATION !== undefined
 
-function runCounterparty(phase: 'send'): void {
+function runCounterparty(
+  phase: 'send' | 'send-file' | 'claim-place',
+  extra: Record<string, string> = {},
+): void {
   execFileSync('python3', [COUNTERPARTY, phase], {
+    env: { ...process.env, ...extra },
     stdio: 'inherit',
     // Long, because this phase queries keys and shares a group session
     // against a real homeserver before it sends anything.
@@ -349,4 +353,102 @@ describeRoundTrip('encrypted round trip', () => {
     }
     expect(read.received.claimedSender).toBe(process.env.MESSAGR_INTEROP_USER)
   })
+
+  it('removes somebody it invited, and rotates the key behind them', async () => {
+    // #35, LE GESTE PILOTÉ CONTRE UN VRAI HOMESERVER.
+    //
+    // Les `testID` d'éviction existent depuis `dd896dc` et **rien ne les
+    // pilotait** : `git grep evict packages/app/e2e` rendait zéro. Le code
+    // était écrit, la vérification demandée n'avait pas eu lieu.
+    //
+    // # POURQUOI CE TEST DOIT INVITER D'ABORD
+    //
+    // L'appareil du banc entre par invitation, donc au niveau zéro du salon
+    // du banc : il n'y a personne qu'il puisse en retirer, et `kick` y
+    // répondrait 403. Mais inviter CRÉE un salon dont il est l'auteur --
+    // `issueInvitation.ts` y pose `invite: 50` et `users_default: 0` — et
+    // c'est là, et seulement là, que le geste existe.
+    //
+    // # ET POURQUOI LA CONTREPARTIE RÉCLAME AVEC SON IDENTITÉ
+    //
+    // `ClaimRequest` porte `existing_user_id`. Lui faire tirer un compte
+    // réservé donnerait un troisième inconnu, et la preuve que #35 demande
+    // — « prouvée avec un client indépendant plutôt qu'avec le nôtre » —
+    // perdrait ce qui la rend indépendante.
+    //
+    // # DES CAPTURES À CHAQUE ÉTAPE, ET DÈS LE DÉPART
+    //
+    // Trois allers-retours de CI ont été dépensés ailleurs aujourd'hui à
+    // supposer ce qu'un écran montrait. Une image coûte une seconde et
+    // répond à la place d'une hypothèse. Prises systématiquement : une
+    // capture qu'on ne prend qu'en cas d'échec est une capture qu'on n'a
+    // jamais quand on en a besoin.
+    await device.launchApp({
+      newInstance: true,
+      permissions: NOTIFICATIONS_GRANTED,
+      launchArgs: IGNORING_THE_LIVE_POLL,
+    })
+    await waitFor(element(by.id('invite-open')))
+      .toBeVisible()
+      .withTimeout(60000)
+    await device.takeScreenshot('eviction-1-liste')
+
+    await element(by.id('invite-open')).tap()
+    await waitFor(element(by.id('invite-name')))
+      .toBeVisible()
+      .withTimeout(30000)
+    await element(by.id('invite-name')).replaceText('la contrepartie')
+    await element(by.id('invite')).tap()
+
+    await waitFor(element(by.id('invite-link')))
+      .toBeVisible()
+      .withTimeout(120000)
+    await device.takeScreenshot('eviction-2-le-lien')
+
+    const shown = await element(by.id('invite-link')).getAttributes()
+    const link = 'text' in shown ? shown.text : undefined
+    if (typeof link !== 'string' || link.trim() === '') {
+      throw new Error('the invitation link was not readable from the screen')
+    }
+    // LE JETON EST LE DERNIER SEGMENT. La page d'invitation le porte dans
+    // son chemin, et c'est ce que le service attend -- pas l'adresse.
+    const token = link.trim().split('/').pop() ?? ''
+    if (token === '') throw new Error(`no token in the link shown: ${link}`)
+
+    // Bloquant jusqu'à cent vingt secondes : la contrepartie réclame, puis
+    // attend que le client de l'inviteur -- cette application, qui tourne --
+    // lui envoie l'invitation Matrix.
+    runCounterparty('claim-place', { MESSAGR_INTEROP_CLAIM_TOKEN: token })
+
+    await element(by.id('invite-close')).tap()
+    await device.takeScreenshot('eviction-3-apres-le-claim')
+
+    // La conversation neuve est en tête : elle vient d'avoir lieu.
+    await waitFor(element(by.id('first-conversation')))
+      .toBeVisible()
+      .withTimeout(60000)
+    await element(by.id('first-conversation')).tap()
+    await waitFor(element(by.id('open-person')))
+      .toBeVisible()
+      .withTimeout(30000)
+    await element(by.id('open-person')).tap()
+
+    await waitFor(element(by.id('evict-open')))
+      .toBeVisible()
+      .withTimeout(30000)
+    await device.takeScreenshot('eviction-4-la-personne')
+    await element(by.id('evict-open')).tap()
+
+    // DEUX TEMPS, et le second est celui qui agit. La forme est celle de
+    // tout ce qui ne se reprend pas dans ce produit.
+    await waitFor(element(by.id('evict-confirm')))
+      .toBeVisible()
+      .withTimeout(30000)
+    await element(by.id('evict-confirm')).tap()
+
+    await waitFor(element(by.id('evict-outcome')))
+      .toBeVisible()
+      .withTimeout(120000)
+    await device.takeScreenshot('eviction-5-le-resultat')
+  }, 420000)
 })
