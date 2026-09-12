@@ -318,8 +318,16 @@ describeRoundTrip('encrypted round trip', () => {
     // La même boucle que le message, et pour la même raison : la clé de salon
     // voyage dans un message Olm, qui n'arrive pas toujours dans le premier
     // lancement. Voir le paragraphe de #234 plus haut.
+    // TROIS TENTATIVES ET DES ATTENTES PLUS COURTES, parce que le budget
+    // est réel : quatre relances à deux attentes de soixante secondes
+    // dépassaient les 180 000 ms de Jest, et le test mourait sur le temps
+    // plutôt que sur ce qu'il mesure -- ce qui ne dit rien de l'interop.
+    //
+    // Trois suffisent ici : le test précédent a déjà fait arriver la clé de
+    // salon, donc le fichier arrive en général au premier lancement. La
+    // boucle reste pour la même raison que la sienne, #234.
     let seen = false
-    for (let attempt = 0; attempt < 4 && !seen; attempt += 1) {
+    for (let attempt = 0; attempt < 3 && !seen; attempt += 1) {
       forgetTheLog()
       await device.launchApp({
         newInstance: true,
@@ -329,7 +337,7 @@ describeRoundTrip('encrypted round trip', () => {
       try {
         await waitFor(element(by.id('first-conversation')))
           .toBeVisible()
-          .withTimeout(60000)
+          .withTimeout(45000)
         await element(by.id('first-conversation')).tap()
         // SUR LE NOM, parce que le nom EST le corps d'un `m.file` et que
         // c'est ce qu'une personne lit. Accentué à dessein : un aller-retour
@@ -337,7 +345,7 @@ describeRoundTrip('encrypted round trip', () => {
         // c'est exactement là que deux implémentations divergent.
         await waitFor(element(by.text(COUNTERPARTY_FILE_NAME)))
           .toBeVisible()
-          .withTimeout(60000)
+          .withTimeout(45000)
         seen = true
       } catch {
         // La clé n'était pas arrivée dans ce lancement-ci. Un autre redemande.
@@ -353,7 +361,11 @@ describeRoundTrip('encrypted round trip', () => {
          exists to find out.`,
       )
     }
-  })
+    // Le budget de Jest est à 180 000 ms par défaut ; trois relances avec
+    // leurs deux attentes le dépassent. Élargi ici plutôt que pour toute la
+    // suite : les autres tests n'en ont pas besoin, et un budget global plus
+    // large ferait disparaître les blocages au lieu de les montrer.
+  }, 300000)
 
   it('names the sender on the screen, and not only in the report', async () => {
     // #123, RÉTABLI, ET CE QUI L'AVAIT GARÉ N'ÉTAIT PAS CE QU'ON CROYAIT.
