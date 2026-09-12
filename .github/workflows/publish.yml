@@ -37,8 +37,26 @@ jobs:
   internal-testing:
     runs-on: ubuntu-latest
     timeout-minutes: 45
+    # POSER UN TAG ET UNE RELEASE SONT DES ÉCRITURES. Sans ce bloc, le jeton
+    # du run n'a que ce que le dépôt accorde par défaut, et `git push origin
+    # <tag>` comme `gh release create` échouent -- silencieusement, puisque
+    # l'étape est `continue-on-error`.
+    permissions:
+      contents: write
     steps:
       - uses: actions/checkout@v4
+        with:
+          # TOUT L'HISTORIQUE, ET LE JOURNAL EN DÉPEND ENTIÈREMENT.
+          #
+          # Par défaut cette action clone à la profondeur 1. `git fetch
+          # --tags` ramène alors les étiquettes sans les commits entre elles,
+          # donc `git log <tag>..HEAD` ne voit que la tête : le journal
+          # publierait « 1 changement » sur une build qui en porte quinze.
+          #
+          # Et une liste dont on apprend qu'elle peut être fausse est pire
+          # que pas de liste -- c'est le premier des trois refus que
+          # `release-notes.mjs` écrit noir sur blanc.
+          fetch-depth: 0
 
       - uses: actions/setup-node@v4
         with:
@@ -176,8 +194,9 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           MESSAGR_VERSION_CODE: ${{ env.MESSAGR_VERSION_CODE }}
         run: |
-          # The tags are not fetched by `actions/checkout` at depth 1, and a
-          # generator with no tags measures from nothing.
+          # Les étiquettes viennent avec `fetch-depth: 0` ci-dessus ; ce
+          # rappel est gardé parce qu'il ne coûte rien et qu'il rattrape le
+          # jour où quelqu'un remettra la profondeur à 1.
           git fetch --tags --quiet
           node scripts/release-notes.mjs android "$MESSAGR_VERSION_CODE" --publish
 

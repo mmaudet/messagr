@@ -150,6 +150,28 @@ export function releasedAlready(platform, build, lines) {
   return match === undefined ? null : match.name
 }
 
+/**
+ * The identity a tag is signed with, when the machine has none of its own.
+ *
+ * AN ANNOTATED TAG NEEDS A TAGGER, and `git tag -a` refuses without one:
+ * « Please tell me who you are ». A continuous integration runner has no
+ * `user.email`, so the step that publishes the Android journal could never
+ * have worked -- and `continue-on-error` would have swallowed the refusal,
+ * which is how a build goes out with no record and nobody learns of it.
+ *
+ * A developer's own identity is left alone: this answers nothing when git
+ * already knows who they are.
+ */
+export function taggerFor(configured) {
+  if (configured !== '') return {}
+  return {
+    GIT_COMMITTER_NAME: 'messagr-ci',
+    GIT_COMMITTER_EMAIL: 'ci@messagr.eu',
+    GIT_AUTHOR_NAME: 'messagr-ci',
+    GIT_AUTHOR_EMAIL: 'ci@messagr.eu',
+  }
+}
+
 /** « iOS », « Android »: the store as somebody writes it, not as a flag. */
 function storeNamed(platform) {
   return platform === 'ios' ? 'iOS' : 'Android'
@@ -341,6 +363,17 @@ function selfTest() {
     'Android, build 148, construite depuis `abc1234`.',
   )
 
+  check(
+    'a machine that knows who it is keeps its own identity',
+    taggerFor('somebody@example.org'),
+    {},
+  )
+  check(
+    'a machine that does not is given one, because a tag needs a tagger',
+    taggerFor('').GIT_COMMITTER_EMAIL,
+    'ci@messagr.eu',
+  )
+
   let refused = false
   try {
     notesFrom({
@@ -443,8 +476,16 @@ function main(argv) {
   // THE STAMP IS THE MESSAGE, and it is what the next build reads to find its
   // baseline. A tag written without one still counts as a build, but it stops
   // being able to say which store it went to.
+  let configured = ''
+  try {
+    configured = git('config', '--get', 'user.email')
+  } catch {
+    // `git config --get` sort en erreur quand la clé n'existe pas, ce qui
+    // est précisément le cas qui nous intéresse.
+  }
   execFileSync('git', ['tag', '-a', tag, '-m', stampFor(platform, build)], {
     stdio: 'inherit',
+    env: { ...process.env, ...taggerFor(configured) },
   })
   execFileSync('git', ['push', 'origin', tag], { stdio: 'inherit' })
   execFileSync(
