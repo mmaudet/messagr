@@ -4,8 +4,8 @@ go 1.27.1
 
 require (
 	github.com/mattn/go-sqlite3 v1.14.49
-	go.mau.fi/util v0.10.0
-	maunium.net/go/mautrix v0.30.0
+	go.mau.fi/util v0.10.1-0.20260820140024-eb612d936fde
+	maunium.net/go/mautrix v0.30.1-0.20260825124633-300ee8dcde80
 )
 
 require (
