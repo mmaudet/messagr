@@ -32,6 +32,24 @@
 	     invitation est le homeserver du compte qui invite : messagr.eu en
 	     production, le banc pour une invitation emise depuis le banc. En
 	     declarer un seul rendrait la moitie des invitations inouvrables. -->
+	<!-- LE CONTENEUR QUE L'EXTENSION DE PARTAGE REMPLIT.
+
+	     Une extension de partage est un processus separe : le fichier qu'elle
+	     recoit se lit chez elle et nulle part ailleurs, et cette application
+	     ne peut pas l'ouvrir. Un conteneur d'App Group est la seule route que
+	     le systeme offre, et l'amendement d'ADR-0006 du 12 septembre 2026
+	     l'autorise pour une traversee : depose, lu, retire.
+
+	     LE MEME IDENTIFIANT DES DEUX COTES, a la lettre. Il est declare aussi
+	     dans MessagrShare/MessagrShare.entitlements, et une divergence d'un
+	     caractere donne un conteneur que chacun croit partager et que
+	     personne ne partage. Le symptome n'est pas une erreur : l'extension
+	     ecrit, l'application regarde ailleurs, et le partage disparait sans
+	     un mot. -->
+	<key>com.apple.security.application-groups</key>
+	<array>
+		<string>group.eu.messagr</string>
+	</array>
 	<key>com.apple.developer.associated-domains</key>
 	<array>
 		<string>applinks:messagr.eu</string>

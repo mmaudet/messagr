@@ -152,13 +152,32 @@ jobs:
           plutil -lint Messagr/Info.plist
           python3 -c "import plistlib, sys; plistlib.load(open('Messagr/Info.plist','rb'))"
 
+      # UN CYCLE NE FAIT PAS ROUGIR `xcodebuild`, ET C'EST LE PIÈGE.
+      #
+      # Mesuré le 12 septembre 2026 en ajoutant l'extension de partage
+      # (#242) : la phase d'embarquement était posée après le script Firebase,
+      # qui dépend de l'Info.plist, qui dépend de la copie. Xcode a écrit
+      # « error: Cycle inside Messagr; building could produce unreliable
+      # results », a laissé le PlugIns VIDE — donc une application livrée sans
+      # son extension — et a rendu **le code 0**. Un job vert pour un artefact
+      # amputé.
+      #
+      # Le journal est donc lu, puisque le code de sortie ne suffit pas. Les
+      # avertissements ordinaires ne sont pas cherchés ici : ce filet nomme un
+      # défaut précis, qui produit un binaire faux en silence.
       - name: Build for the simulator
         working-directory: packages/app/ios
         run: |
+          set -o pipefail
           xcodebuild -workspace Messagr.xcworkspace -scheme Messagr \
             -configuration Debug -sdk iphonesimulator \
             -destination 'generic/platform=iOS Simulator' \
-            -quiet build
+            -quiet build 2>&1 | tee /tmp/ios-build.log
+          if grep -q 'Cycle inside' /tmp/ios-build.log; then
+            echo '::error::le graphe de construction porte un cycle : ce que la build produit est incomplet, et xcodebuild rend quand même 0'
+            grep -A6 'Cycle inside' /tmp/ios-build.log
+            exit 1
+          fi
 
   end-to-end:
     # The boot contract is a claim about a device, so it is asserted on one.

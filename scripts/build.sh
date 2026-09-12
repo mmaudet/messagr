@@ -78,6 +78,27 @@ if [ "$WHICH" != "android" ]; then
   # something a `sed` knows. Both configurations move together: Debug and
   # Release carry the field separately and a build signed from one and
   # numbered from the other is a build nobody can find.
+  # DEUX CIBLES DEPUIS #242, ET LE `sed` NE LE SAIT PAS.
+  #
+  # L'extension de partage porte son propre CURRENT_PROJECT_VERSION, dans ses
+  # deux configurations : quatre champs au lieu de deux. Le `sed` ci-dessous
+  # les déplace tous ensemble — mais seulement ceux qui valent déjà $CURRENT,
+  # et $CURRENT est la PREMIÈRE valeur trouvée. Le jour où les deux cibles
+  # divergent, il en déplace une et laisse l'autre, et elles divergent un peu
+  # plus à chaque build.
+  #
+  # App Store Connect refuse alors la paire — après l'archive, après le
+  # transfert, vingt minutes pour apprendre ce que cette ligne dit tout de
+  # suite. Elle refuse de deviner laquelle est la bonne : ça se répare à la
+  # main, une fois, en connaissance de cause.
+  SEEN="$(grep -oE 'CURRENT_PROJECT_VERSION = [0-9]+' "$PROJECT" | sort -u | wc -l | tr -d ' ')"
+  if [ "$SEEN" != "1" ]; then
+    echo "les cibles ne portent pas le même numéro de build :" >&2
+    grep -oE 'CURRENT_PROJECT_VERSION = [0-9]+' "$PROJECT" | sort | uniq -c >&2
+    echo "App Store Connect refuserait la paire. À accorder à la main." >&2
+    exit 1
+  fi
+
   CURRENT="$(grep -m1 -oE 'CURRENT_PROJECT_VERSION = [0-9]+' "$PROJECT" | grep -oE '[0-9]+')"
   NEXT=$((CURRENT + 1))
   echo "==> build number $CURRENT -> $NEXT"

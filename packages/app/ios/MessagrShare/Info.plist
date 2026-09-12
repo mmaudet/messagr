@@ -1,0 +1,64 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>CFBundleDevelopmentRegion</key>
+	<string>$(DEVELOPMENT_LANGUAGE)</string>
+	<key>CFBundleDisplayName</key>
+	<string>Messagr</string>
+	<key>CFBundleExecutable</key>
+	<string>$(EXECUTABLE_NAME)</string>
+	<key>CFBundleIdentifier</key>
+	<string>$(PRODUCT_BUNDLE_IDENTIFIER)</string>
+	<key>CFBundleInfoDictionaryVersion</key>
+	<string>6.0</string>
+	<key>CFBundleName</key>
+	<string>$(PRODUCT_NAME)</string>
+	<key>CFBundlePackageType</key>
+	<string>XPC!</string>
+	<key>CFBundleShortVersionString</key>
+	<string>$(MARKETING_VERSION)</string>
+	<key>CFBundleVersion</key>
+	<string>$(CURRENT_PROJECT_VERSION)</string>
+	<key>NSExtension</key>
+	<dict>
+		<key>NSExtensionAttributes</key>
+		<dict>
+			<!-- CE QUE MESSAGR SE PROPOSE DE PRENDRE, ET RIEN DE PLUS.
+
+			     Les memes quatre familles que le filtre Android, et pour la
+			     meme raison : une application qui se propose pour tout se
+			     propose aussi pour ce qu'elle ne sait pas envoyer.
+
+			     PAS DE TEXTE, volontairement. Un partage de texte selectionne
+			     ne porte aucun fichier ; Messagr apparaitrait dans la feuille
+			     de partage d'un navigateur, se lancerait, et ne ferait rien.
+			     Envoyer du texte partage est un autre geste — il va dans le
+			     composeur, pas dans un `m.file` — et il a son propre ticket.
+
+			     MaxCount 1 partout : un lot est une decision produit
+			     distincte, et personne ne l'a demandee. #242 le dit. -->
+			<key>NSExtensionActivationRule</key>
+			<dict>
+				<key>NSExtensionActivationSupportsImageWithMaxCount</key>
+				<integer>1</integer>
+				<key>NSExtensionActivationSupportsMovieWithMaxCount</key>
+				<integer>1</integer>
+				<key>NSExtensionActivationSupportsFileWithMaxCount</key>
+				<integer>1</integer>
+			</dict>
+		</dict>
+		<!-- UNE CLASSE ET PAS UN STORYBOARD.
+
+		     `NSExtensionMainStoryboard` est ce que le modele d'Xcode pose, et
+		     il oblige a livrer un storyboard, donc une interface. Celle-ci
+		     n'en dessine aucune : elle prend, elle pose, elle rend la main.
+		     Un storyboard vide serait un fichier a maintenir pour un ecran
+		     que personne ne voit. -->
+		<key>NSExtensionPrincipalClass</key>
+		<string>$(PRODUCT_MODULE_NAME).ShareViewController</string>
+		<key>NSExtensionPointIdentifier</key>
+		<string>com.apple.share-services</string>
+	</dict>
+</dict>
+</plist>

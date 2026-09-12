@@ -7,13 +7,40 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		03EAED17A6D7BAF8B0D5ADA0 /* ShareViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 52331735FA73119FA2409DFC /* ShareViewController.swift */; };
 		0C80B921A6F3F58F76C31292 /* libPods-Messagr.a in Frameworks */ = {isa = PBXBuildFile; fileRef = 5DCACB8F33CDC322A6C60F78 /* libPods-Messagr.a */; };
 		13B07FBF1A68108700A75B9A /* Images.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 13B07FB51A68108700A75B9A /* Images.xcassets */; };
+		1B2FB5DD8AB4880B45933B8D /* Foundation.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = DD68D2F849669B19E84A6F31 /* Foundation.framework */; };
 		659C0AC3D5240884C02D82AA /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = 13B07FB81A68108700A75B9A /* PrivacyInfo.xcprivacy */; };
+		723CBF48B859DD40ADB05CA9 /* MessagrShare.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = 8905B54FD298C63D4910B429 /* MessagrShare.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 		761780ED2CA45674006654EE /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 761780EC2CA45674006654EE /* AppDelegate.swift */; };
 		81AB9BB82411601600AC10FF /* LaunchScreen.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = 81AB9BB72411601600AC10FF /* LaunchScreen.storyboard */; };
 		A1F0C0DE000100000000BEEF /* GoogleService-Info.plist in Resources */ = {isa = PBXBuildFile; fileRef = A1F0C0DE000200000000BEEF /* GoogleService-Info.plist */; };
 /* End PBXBuildFile section */
+
+/* Begin PBXContainerItemProxy section */
+		ED62A0DE6A9AED7471127F78 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 83CBB9F71A601CBA00E9B192 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = CD5BC45BB3810820FECD62E4;
+			remoteInfo = MessagrShare;
+		};
+/* End PBXContainerItemProxy section */
+
+/* Begin PBXCopyFilesBuildPhase section */
+		4FCBD258D283730C59BBA2B1 /* Embed Foundation Extensions */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = "";
+			dstSubfolderSpec = 13;
+			files = (
+				723CBF48B859DD40ADB05CA9 /* MessagrShare.appex in Embed Foundation Extensions */,
+			);
+			name = "Embed Foundation Extensions";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
 		13B07F961A680F5B00A75B9A /* Messagr.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Messagr.app; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -21,15 +48,28 @@
 		13B07FB61A68108700A75B9A /* Info.plist */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.plist.xml; name = Info.plist; path = Messagr/Info.plist; sourceTree = "<group>"; };
 		13B07FB81A68108700A75B9A /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.plist.xml; name = PrivacyInfo.xcprivacy; path = Messagr/PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
 		3B4392A12AC88292D35C810B /* Pods-Messagr.debug.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-Messagr.debug.xcconfig"; path = "Target Support Files/Pods-Messagr/Pods-Messagr.debug.xcconfig"; sourceTree = "<group>"; };
+		52331735FA73119FA2409DFC /* ShareViewController.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ShareViewController.swift; sourceTree = "<group>"; };
 		5709B34CF0A7D63546082F79 /* Pods-Messagr.release.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-Messagr.release.xcconfig"; path = "Target Support Files/Pods-Messagr/Pods-Messagr.release.xcconfig"; sourceTree = "<group>"; };
 		5DCACB8F33CDC322A6C60F78 /* libPods-Messagr.a */ = {isa = PBXFileReference; explicitFileType = archive.ar; includeInIndex = 0; path = "libPods-Messagr.a"; sourceTree = BUILT_PRODUCTS_DIR; };
+		7514B1F3A0FB3493C867E099 /* MessagrShare.entitlements */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.plist.entitlements; path = MessagrShare.entitlements; sourceTree = "<group>"; };
 		761780EC2CA45674006654EE /* AppDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = AppDelegate.swift; path = Messagr/AppDelegate.swift; sourceTree = "<group>"; };
 		81AB9BB72411601600AC10FF /* LaunchScreen.storyboard */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = file.storyboard; name = LaunchScreen.storyboard; path = Messagr/LaunchScreen.storyboard; sourceTree = "<group>"; };
+		8905B54FD298C63D4910B429 /* MessagrShare.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = MessagrShare.appex; sourceTree = BUILT_PRODUCTS_DIR; };
 		A1F0C0DE000200000000BEEF /* GoogleService-Info.plist */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.plist.xml; name = "GoogleService-Info.plist"; path = "Messagr/GoogleService-Info.plist"; sourceTree = "<group>"; };
+		DD68D2F849669B19E84A6F31 /* Foundation.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Foundation.framework; path = Platforms/iPhoneOS.platform/Developer/SDKs/iPhoneOS26.0.sdk/System/Library/Frameworks/Foundation.framework; sourceTree = DEVELOPER_DIR; };
 		ED297162215061F000B7C4FE /* JavaScriptCore.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = JavaScriptCore.framework; path = System/Library/Frameworks/JavaScriptCore.framework; sourceTree = SDKROOT; };
+		F541820BD2DD06E2A4515018 /* Info.plist */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
+		02C9B447A861D2FEA4BCAE14 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				1B2FB5DD8AB4880B45933B8D /* Foundation.framework in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		13B07F8C1A680F5B00A75B9A /* Frameworks */ = {
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
@@ -41,6 +81,14 @@
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
+		013607AA8BD6924475B0E7DE /* iOS */ = {
+			isa = PBXGroup;
+			children = (
+				DD68D2F849669B19E84A6F31 /* Foundation.framework */,
+			);
+			name = iOS;
+			sourceTree = "<group>";
+		};
 		13B07FAE1A68108700A75B9A /* Messagr */ = {
 			isa = PBXGroup;
 			children = (
@@ -59,6 +107,7 @@
 			children = (
 				ED297162215061F000B7C4FE /* JavaScriptCore.framework */,
 				5DCACB8F33CDC322A6C60F78 /* libPods-Messagr.a */,
+				013607AA8BD6924475B0E7DE /* iOS */,
 			);
 			name = Frameworks;
 			sourceTree = "<group>";
@@ -78,6 +127,7 @@
 				83CBBA001A601CBA00E9B192 /* Products */,
 				2D16E6871FA4F8E400B85C8A /* Frameworks */,
 				BBD78D7AC51CEA395F1C20DB /* Pods */,
+				911CA1C3E56DA288052B4243 /* MessagrShare */,
 			);
 			indentWidth = 2;
 			sourceTree = "<group>";
@@ -88,8 +138,20 @@
 			isa = PBXGroup;
 			children = (
 				13B07F961A680F5B00A75B9A /* Messagr.app */,
+				8905B54FD298C63D4910B429 /* MessagrShare.appex */,
 			);
 			name = Products;
+			sourceTree = "<group>";
+		};
+		911CA1C3E56DA288052B4243 /* MessagrShare */ = {
+			isa = PBXGroup;
+			children = (
+				52331735FA73119FA2409DFC /* ShareViewController.swift */,
+				F541820BD2DD06E2A4515018 /* Info.plist */,
+				7514B1F3A0FB3493C867E099 /* MessagrShare.entitlements */,
+			);
+			name = MessagrShare;
+			path = MessagrShare;
 			sourceTree = "<group>";
 		};
 		BBD78D7AC51CEA395F1C20DB /* Pods */ = {
@@ -112,6 +174,7 @@
 				13B07F871A680F5B00A75B9A /* Sources */,
 				13B07F8C1A680F5B00A75B9A /* Frameworks */,
 				13B07F8E1A680F5B00A75B9A /* Resources */,
+				4FCBD258D283730C59BBA2B1 /* Embed Foundation Extensions */,
 				00DD1BFF1BD5951E006B06BC /* Bundle React Native code and images */,
 				00EEFC60759A1932668264C0 /* [CP] Embed Pods Frameworks */,
 				E235C05ADACE081382539298 /* [CP] Copy Pods Resources */,
@@ -120,11 +183,29 @@
 			buildRules = (
 			);
 			dependencies = (
+				282E07717F3388693DFDA899 /* PBXTargetDependency */,
 			);
 			name = Messagr;
 			productName = Messagr;
 			productReference = 13B07F961A680F5B00A75B9A /* Messagr.app */;
 			productType = "com.apple.product-type.application";
+		};
+		CD5BC45BB3810820FECD62E4 /* MessagrShare */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 727899DCE910762F395E6C05 /* Build configuration list for PBXNativeTarget "MessagrShare" */;
+			buildPhases = (
+				AF8F200A1E83E813E549C396 /* Sources */,
+				02C9B447A861D2FEA4BCAE14 /* Frameworks */,
+				F863D9888476CB2EFA80EF8C /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = MessagrShare;
+			productName = MessagrShare;
+			productReference = 8905B54FD298C63D4910B429 /* MessagrShare.appex */;
+			productType = "com.apple.product-type.app-extension";
 		};
 /* End PBXNativeTarget section */
 
@@ -153,6 +234,7 @@
 			projectRoot = "";
 			targets = (
 				13B07F861A680F5B00A75B9A /* Messagr */,
+				CD5BC45BB3810820FECD62E4 /* MessagrShare */,
 			);
 		};
 /* End PBXProject section */
@@ -166,6 +248,13 @@
 				13B07FBF1A68108700A75B9A /* Images.xcassets in Resources */,
 				659C0AC3D5240884C02D82AA /* PrivacyInfo.xcprivacy in Resources */,
 				A1F0C0DE000100000000BEEF /* GoogleService-Info.plist in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		F863D9888476CB2EFA80EF8C /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -268,7 +357,24 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		AF8F200A1E83E813E549C396 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				03EAED17A6D7BAF8B0D5ADA0 /* ShareViewController.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXSourcesBuildPhase section */
+
+/* Begin PBXTargetDependency section */
+		282E07717F3388693DFDA899 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			name = MessagrShare;
+			target = CD5BC45BB3810820FECD62E4 /* MessagrShare */;
+			targetProxy = ED62A0DE6A9AED7471127F78 /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
 
 /* Begin XCBuildConfiguration section */
 		13B07F941A680F5B00A75B9A /* Debug */ = {
@@ -334,6 +440,32 @@
 				VERSIONING_SYSTEM = "apple-generic";
 			};
 			name = Release;
+		};
+		1FB08156D98F93C88F68A6CF /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_EMBED_SWIFT_STANDARD_LIBRARIES = NO;
+				CLANG_ENABLE_OBJC_WEAK = NO;
+				CODE_SIGN_ENTITLEMENTS = MessagrShare/MessagrShare.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 24;
+				DEVELOPMENT_TEAM = KUT463DS29;
+				INFOPLIST_FILE = MessagrShare/Info.plist;
+				IPHONEOS_DEPLOYMENT_TARGET = 15.1;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = eu.messagr.share;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = iphoneos;
+				SKIP_INSTALL = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Debug;
 		};
 		83CBBA201A601CBA00E9B192 /* Debug */ = {
 			isa = XCBuildConfiguration;
@@ -491,6 +623,33 @@
 			};
 			name = Release;
 		};
+		D3F14C4A5392D964F492B79D /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_EMBED_SWIFT_STANDARD_LIBRARIES = NO;
+				CLANG_ENABLE_OBJC_WEAK = NO;
+				CODE_SIGN_ENTITLEMENTS = MessagrShare/MessagrShare.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 24;
+				DEVELOPMENT_TEAM = KUT463DS29;
+				INFOPLIST_FILE = MessagrShare/Info.plist;
+				IPHONEOS_DEPLOYMENT_TARGET = 15.1;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = eu.messagr.share;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = iphoneos;
+				SKIP_INSTALL = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				VALIDATE_PRODUCT = YES;
+			};
+			name = Release;
+		};
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
@@ -499,6 +658,15 @@
 			buildConfigurations = (
 				13B07F941A680F5B00A75B9A /* Debug */,
 				13B07F951A680F5B00A75B9A /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		727899DCE910762F395E6C05 /* Build configuration list for PBXNativeTarget "MessagrShare" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				D3F14C4A5392D964F492B79D /* Release */,
+				1FB08156D98F93C88F68A6CF /* Debug */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;

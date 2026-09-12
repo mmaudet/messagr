@@ -10,13 +10,18 @@ import {
   isErrorWithCode,
 } from '@react-native-documents/picker'
 
+import { Platform } from 'react-native'
+
 import { bytesOf } from './base64'
 import {
   readFile,
+  readDir,
   writeFile,
   unlink,
+  pathForGroup,
   TemporaryDirectoryPath,
 } from '@dr.pogodin/react-native-fs'
+import { INBOX_NAME, SHARE_GROUP, oursToRemove } from './sharedInbox'
 
 import type { DocumentChoice } from './pickDocument'
 import { refuseDocument, refuseWhatWasRead } from './pickDocument'
@@ -97,6 +102,18 @@ export async function pickAnyDocument(): Promise<DocumentChoice> {
  * Le nom et le type viennent de ce que le système a annoncé, et non d'une
  * lecture de l'adresse : un `content://` est un identifiant opaque, et lire
  * un nom de fichier dedans est la façon d'afficher une ligne intitulée « 42 ».
+ *
+ * # ET SUR iOS, LE FICHIER EST RETIRÉ ICI MÊME
+ *
+ * Là-bas l'adresse désigne une copie que l'extension de partage a déposée
+ * dans le conteneur du groupe, faute de pouvoir remettre autre chose à
+ * travers une frontière de processus. L'amendement d'ADR-0006 du 12 septembre
+ * 2026 l'autorise pour cette traversée et exige qu'elle se referme : le
+ * retrait est donc dans un `finally`, y compris sur le chemin qui échoue, qui
+ * est précisément celui qu'une implémentation heureuse laisse en clair.
+ *
+ * `oursToRemove` décide, et pas ce module : sur Android l'adresse désigne la
+ * photo de quelqu'un dans sa propre galerie, et il n'y a rien à retirer.
  */
 export async function readShared(
   uri: string,
@@ -125,6 +142,99 @@ export async function readShared(
     // rouvert plus tard : le système retire l'autorisation avec l'activité
     // qui l'a reçue.
     return { chose: false, because: 'unreadable' }
+  } finally {
+    await forgetTheCrossing(uri)
+  }
+}
+
+/**
+ * Retire la copie qu'une extension a déposée, si c'en est une.
+ *
+ * # TROIS SORTIES, ET LA TRAVERSÉE SE REFERME SUR LES TROIS
+ *
+ * Le `finally` d'au-dessus couvre la lecture, qu'elle aboutisse ou non. Mais
+ * un partage a deux autres fins, et elles ne passent jamais par là :
+ *
+ * - **refusé** — trop lourd, ou sans nom : `whatToDoWith` tranche sur ce que
+ *   le système a annoncé, donc avant toute lecture ;
+ * - **annulé** — la personne referme le sélecteur de conversation.
+ *
+ * Dans les deux cas le fichier est déjà dans la boîte et personne ne le lira
+ * jamais. Sans cet export il y resterait jusqu'au prochain lancement, ce qui
+ * est plus long qu'« une traversée » et ce que l'amendement d'ADR-0006 ne
+ * couvre pas. `App.tsx` l'appelle sur ces deux chemins.
+ *
+ * Ne jette jamais : un retrait qui échoue ne doit pas transformer un envoi
+ * réussi en panne, et le balayage au lancement ramassera ce qui est resté.
+ */
+export async function forgetTheCrossing(uri: string): Promise<void> {
+  try {
+    const inbox = await theInbox()
+    if (!oursToRemove(uri, inbox)) return
+    await unlink(uri.startsWith('file://') ? uri.slice('file://'.length) : uri)
+  } catch {
+    // Rien. Voir ci-dessus.
+  }
+}
+
+/**
+ * Le dossier du conteneur partagé, ou `null` là où il n'y en a pas.
+ *
+ * Résolu une fois : le chemin ne change pas pendant qu'une application
+ * tourne, et `pathForGroup` traverse le pont.
+ */
+let inboxOnce: Promise<string | null> | null = null
+
+export function theInbox(): Promise<string | null> {
+  inboxOnce ??= (async () => {
+    // ANDROID N'A PAS DE CONTENEUR, et n'en a pas besoin : là-bas rien n'est
+    // recopié. Demander quand même ferait rejeter le pont à chaque partage.
+    if (Platform.OS !== 'ios') return null
+    try {
+      const container = await pathForGroup(SHARE_GROUP)
+      return `${container.replace(/\/+$/, '')}/${INBOX_NAME}`
+    } catch {
+      // UN GROUPE ABSENT N'EST PAS UNE PANNE ICI. Une build dont les
+      // entitlements ne portent pas le groupe -- une build de simulateur non
+      // signée, par exemple -- répond une erreur. Le partage ne marchera pas
+      // sur cette build, et le reste de l'application doit marcher quand même.
+      return null
+    }
+  })()
+  return inboxOnce
+}
+
+/**
+ * Vide la boîte, et répond combien de fichiers y traînaient.
+ *
+ * APPELÉ AU LANCEMENT, ET C'EST L'AMENDEMENT QUI LE DEMANDE. Une extension
+ * peut être tuée entre l'écriture et la remise -- le système lui accorde peu
+ * de mémoire et peu de temps -- et le fichier qu'elle a écrit n'a alors
+ * personne pour le retirer. C'est l'orphelin pour lequel cette règle existe.
+ *
+ * Le compte est rendu pour être journalisé : un balayage qui trouve quelque
+ * chose à chaque lancement dirait que le `finally` de `readShared` ne ferme
+ * pas, ce qui est une information et non un détail.
+ */
+export async function sweepTheInbox(): Promise<number> {
+  const inbox = await theInbox()
+  if (inbox === null) return 0
+  try {
+    const left = await readDir(inbox)
+    let swept = 0
+    for (const entry of left) {
+      if (!oursToRemove(entry.path, inbox)) continue
+      try {
+        await unlink(entry.path)
+        swept += 1
+      } catch {
+        // Un fichier verrouillé se retrouvera au lancement suivant.
+      }
+    }
+    return swept
+  } catch {
+    // Le dossier n'existe pas encore : personne n'a jamais partagé.
+    return 0
   }
 }
 

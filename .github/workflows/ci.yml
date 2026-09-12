@@ -87,6 +87,17 @@ jobs:
       - name: Assert an iPhone built from this tree could be woken
         run: ./scripts/assert-ios-push.sh
 
+      # LE MÊME GENRE DE SILENCE, SUR LE PARTAGE ENTRANT (#242).
+      # L'extension et l'application se remettent un fichier par un conteneur
+      # d'App Group, nommé dans quatre fichiers. Une divergence d'un caractère
+      # compile, se signe, s'installe -- et le partage disparaît sans erreur
+      # ni journal : chacun ouvre un conteneur valide, et ce n'est pas le
+      # même. Le job `ios-simulator` ne peut pas le voir, une build de
+      # simulateur n'étant pas signée ; celui-ci lit quatre chaînes dans
+      # quatre fichiers, ce qu'un runner Linux sait faire.
+      - name: Assert the share extension and the app share one container
+        run: ./scripts/assert-share-group.sh
+
       # THE SAME SHAPE OF FAILURE, ONE STEP LATER IN THE PIPELINE.
       # An empty AppIcon.appiconset builds, installs and runs; App Store
       # Connect is the first thing that refuses it, which is one round trip
