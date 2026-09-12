@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<!-- LE CONTENEUR PARTAGE, ET C'EST LA SEULE ENTITLEMENT DE CETTE CIBLE.
+
+	     Une extension de partage est un processus separe avec son propre bac
+	     a sable. Le fichier qu'elle recoit se lit chez elle et nulle part
+	     ailleurs, et l'application ne peut pas l'ouvrir : la seule route que
+	     le systeme offre est un conteneur d'App Group. C'est ce que
+	     l'amendement d'ADR-0006 du 12 septembre 2026 autorise, pour une
+	     traversee et pas davantage.
+
+	     ET RIEN D'AUTRE ICI. Pas de push, pas de domaines associes : cette
+	     extension ne s'enregistre nulle part et n'ouvre aucun lien entrant.
+	     Une entitlement de plus serait une surface de plus sur un processus
+	     qui n'en a pas besoin.
+
+	     Le meme identifiant est declare cote application. Une divergence d'un
+	     caractere donne un conteneur que chacun croit partager et que
+	     personne ne partage : l'extension ecrit, l'application regarde
+	     ailleurs, et le partage disparait sans un mot. -->
+	<key>com.apple.security.application-groups</key>
+	<array>
+		<string>group.eu.messagr</string>
+	</array>
+</dict>
+</plist>

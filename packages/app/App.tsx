@@ -222,7 +222,11 @@ import { enterWithASession, type InvitationOutcome } from './src/runtime/entry'
 import { initialLink, watchLinks } from './src/runtime/incomingLink'
 import { shareFrom, type SharedFile } from './src/runtime/incomingShare'
 import { whatToDoWith, type ShareRefusal } from './src/runtime/sharedIn'
-import { readShared } from './src/runtime/documentPlatform'
+import {
+  forgetTheCrossing,
+  readShared,
+  sweepTheInbox,
+} from './src/runtime/documentPlatform'
 import { useKeyboardInset } from './src/ui/keyboardInset'
 import { sweepWhatThePickerLeft } from './src/runtime/imageLibrary'
 import { afterReinstall } from './src/runtime/afterReinstall'
@@ -1300,6 +1304,13 @@ export function App({
       setSharing({ handed: shared, as: decided.as })
       return
     }
+    // LA TRAVERSÉE SE REFERME AUSSI QUAND ON REFUSE. Sur iOS le fichier est
+    // déjà dans la boîte -- l'extension l'y a posé avant que personne ne
+    // décide quoi que ce soit -- et un refus se prononce sur la taille
+    // ANNONCÉE, donc sans jamais lire. Le `finally` de `readShared` ne passe
+    // pas par là. Sans cette ligne, un fichier refusé resterait en clair
+    // jusqu'au prochain lancement, ce qui est plus long qu'une traversée.
+    forgetTheCrossing(shared.uri).catch(() => undefined)
     sayTheShareFailed(
       decided.do === 'say-not-yet'
         ? 'not-yet'
@@ -1343,6 +1354,27 @@ export function App({
     sweepWhatThePickerLeft()
       .then(swept => {
         if (swept > 0) logEvent('info', 'MESSAGR_SWEPT_PICKER_CACHE', { swept })
+      })
+      .catch(() => undefined)
+  }, [])
+
+  // ET CE QU'UNE EXTENSION DE PARTAGE A PU LAISSER DERRIÈRE ELLE.
+  //
+  // L'amendement d'ADR-0006 du 12 septembre 2026 le demande nommément.
+  // `readShared` retire la copie dans un `finally`, ce qui couvre le partage
+  // qui aboutit ET celui qui échoue -- mais pas celui qui n'arrive jamais
+  // jusqu'ici : le système accorde à une extension peu de mémoire et peu de
+  // temps, et peut la tuer entre l'écriture du fichier et la remise. Ce
+  // fichier-là n'a personne pour le retirer, et c'est l'orphelin pour lequel
+  // cette règle existe.
+  //
+  // Rien sur Android, où il n'y a pas de conteneur parce qu'il n'y a pas de
+  // copie. Journalisé seulement quand il trouve quelque chose : un balayage
+  // qui ramasse à chaque lancement dirait que le `finally` ne ferme pas.
+  useEffect(() => {
+    sweepTheInbox()
+      .then(swept => {
+        if (swept > 0) logEvent('info', 'MESSAGR_SWEPT_SHARE_INBOX', { swept })
       })
       .catch(() => undefined)
   }, [])
@@ -3470,7 +3502,13 @@ export function App({
             onPick={scope => {
               const chosen = sharing
               setSharing(null)
-              if (scope === null) return
+              if (scope === null) {
+                // ET QUAND ON RENONCE. Troisième sortie de la traversée, et
+                // la seule que la personne choisit. Le fichier est dans la
+                // boîte depuis l'extension ; personne ne le lira jamais.
+                forgetTheCrossing(chosen.handed.uri).catch(() => undefined)
+                return
+              }
               shareIntoRef.current?.(scope, chosen.handed, chosen.as)
             }}
           />
