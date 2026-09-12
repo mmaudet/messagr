@@ -142,11 +142,12 @@ act. The number matters less than where the long ones are.
     it is locked? Do they know how to answer, and does the audio work in both
     directions?
 
-    **THIS STEP CANNOT BE RUN YET.** #88 and #89 are not built. It is written
-    here now so that the day they land, the trial's shape is already decided
-    rather than improvised — and so that a trial run before then is honest
-    about ending at step 9 rather than quietly redefining what "the whole
-    path" means.
+    **THIS STEP CAN BE RUN.** It could not when it was written, and the
+    paragraph saying so outlived its own truth: #88 and #89 both landed on
+    9 September 2026, and the sentence stayed here until 12 September. A
+    trial run in between would have stopped at step 9 because these
+    instructions told it to, which is the one failure a written protocol can
+    cause by itself.
 
 ## What to write down
 
