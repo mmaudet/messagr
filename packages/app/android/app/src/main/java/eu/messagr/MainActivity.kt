@@ -84,6 +84,32 @@ class MainActivity : ReactActivity() {
    * The name and the size come from the resolver rather than from the URI:
    * a `content://` path is an opaque identifier, and reading a filename out
    * of it is how a row ends up headed « 42 ».
+   *
+   * # HOW TO EXERCISE THIS BY HAND, AND THE TRAP IN IT
+   *
+   * A share can be sent from a shell, which is what makes this half testable
+   * without touching a telephone:
+   *
+   * ```
+   * adb shell am start -a android.intent.action.SEND -t application/pdf \
+   *   -d content://media/external/downloads/1000000098 \
+   *   --eu android.intent.extra.STREAM content://media/external/downloads/1000000098 \
+   *   -n eu.messagr/.MainActivity --grant-read-uri-permission
+   * ```
+   *
+   * **The `-d` is not a typo and it is not redundant.** When a real
+   * application shares, the framework calls `migrateExtraStreamToClipData`
+   * on its way out of that process, so `EXTRA_STREAM` becomes clip data and
+   * the read permission is granted on it. `am start` builds the intent and
+   * hands it to the activity manager directly, without that step: the extra
+   * arrives, the grant does not. The resolver query below then throws, the
+   * name comes back empty, and the share is refused as unnamed -- which
+   * reads exactly like a defect in this code and is a defect in the
+   * apparatus. Naming the same address as the intent's data makes the
+   * activity manager grant it for real.
+   *
+   * Measured on 12 September 2026: without `-d`, « Ce fichier n'a pas pu
+   * être lu » ; with it, the conversation picker opens.
    */
   private fun translateAShare(intent: Intent?) {
     if (intent == null || intent.action != Intent.ACTION_SEND) return
