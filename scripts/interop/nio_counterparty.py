@@ -64,6 +64,12 @@ COUNTERPARTY_BODY = "encrypted by matrix-nio, for the application to read"
 SYNC_TIMEOUT_MS = 10_000
 COLLECT_DEADLINE_SECONDS = 120
 
+# How long the send phase waits for the application's account to appear as a
+# joined member before it refuses to share a room key. Six syncs: the join has
+# already happened by then or something else is wrong, and waiting longer only
+# moves the failure further from its cause. See #234.
+JOIN_DEADLINE_SECONDS = 60
+
 # WHAT THIS COUNTERPARTY IS ENTITLED TO READ, AND WHY IT CHANGED.
 #
 # The application now holds a cross-signing identity, so its crypto machine
@@ -350,10 +356,64 @@ async def send(session_file: Path, store: Path) -> int:
             )
             return 1
 
-        # The keys of everyone in the room, then the group session for them.
-        # nio does not do either implicitly, and room_send would refuse.
-        if client.should_query_keys:
-            await client.keys_query()
+        # THE MEMBER THIS IS FOR, SEEN JOINED BEFORE ANY KEY IS SHARED.
+        #
+        # #234, measured on run 34615662123 attempt 1: the application had
+        # fifty one-time keys on the server and a published identity, this
+        # phase printed an event id, and the application reported
+        # `MESSAGR_UNREADABLE` for that very event on each of its four
+        # launches. So the ciphertext arrived and the room key did not, which
+        # no shortage of one-time keys explains. What explains it is sharing
+        # with a set the application was not in.
+        #
+        # Megolm shares with the devices of the members THIS client has
+        # synced. `room.users` is the joined set and `room.invited_users` is
+        # not part of it, so an account whose join has not reached this sync
+        # is an account this share cannot reach -- silently, because there is
+        # nothing wrong with sharing a key with everyone you can see.
+        reader = env("MESSAGR_INTEROP_SENDER")
+        # The clock and not a count of syncs: a sync that has something to say
+        # returns at once, so counting them would give up after a second.
+        deadline = asyncio.get_event_loop().time() + JOIN_DEADLINE_SECONDS
+        while (
+            reader not in room.users
+            and asyncio.get_event_loop().time() < deadline
+        ):
+            await client.sync(timeout=SYNC_TIMEOUT_MS, full_state=True)
+            room = client.rooms.get(room_id) or room
+        if reader not in room.users:
+            print(
+                f"FAIL: {reader} has not been seen joining {room_id} after "
+                f"{JOIN_DEADLINE_SECONDS:.0f}s. A room key shared now would "
+                "not reach it, and the message would arrive unreadable a "
+                "hundred seconds later, naming nothing. See #234.",
+                file=sys.stderr,
+            )
+            return 1
+
+        # AND ITS DEVICES, ASKED FOR RATHER THAN WAITED FOR.
+        #
+        # `should_query_keys` is true only once the server has told this
+        # client that something changed. A device-list notification that has
+        # not arrived yet is indistinguishable from nothing having changed --
+        # and the application creates its device AFTER this counterparty
+        # logged in, which is the order the workflow deliberately imposes.
+        # Asking costs one request. Not asking costs a hundred seconds, four
+        # launches, and a run that reads as a protocol disagreement.
+        client.olm.add_changed_users({reader})
+        await client.keys_query()
+
+        devices = [
+            device.id for device in client.device_store.active_user_devices(reader)
+        ]
+        if not devices:
+            print(
+                f"FAIL: the server names no device for {reader}, so there is "
+                "nothing to share a room key with. See #234.",
+                file=sys.stderr,
+            )
+            return 1
+        print(f"sharing with {reader}: {len(devices)} device(s), {', '.join(devices)}")
         # room_send shares the group session itself when it has to. Doing it
         # here as well is deliberate: it separates "the key could not be
         # shared" from "the send was refused", which the combined call
