@@ -145,6 +145,32 @@ the first upload rather than after it.
 the internal testing track, which reaches testers listed in the Play Console
 within minutes and does not go through review.
 
+### Three tracks, and the names do not match the console
+
+The API's names and the console's names are different words for the same
+three things, and nothing anywhere maps them for you:
+
+| workflow input | Play Console | who can install                      |
+| -------------- | ------------ | ------------------------------------ |
+| `internal`     | Test interne | a list of testers by e-mail, max 100 |
+| `alpha`        | Test fermé   | a list, or a Google group            |
+| `beta`         | Test ouvert  | anybody with the link                |
+
+**Keep them carrying the same commit.** On 12 September 2026 they carried
+three different things: build 126 on internal, version 1.0 on open, and the
+closed track from 5 September. Play serves somebody opted into several tracks
+the highest version code they can reach, so which build a person got depended
+on which link they had followed weeks earlier.
+
+That is expensive in exactly one situation, and it is the one that matters:
+#91's unassisted trial. A volunteer who reached the open track would have
+installed a build with no calls and no vouching, and four of the trial's ten
+steps would have failed for a reason nothing on screen explains.
+
+Each dispatch computes its own version code, so publishing one commit to two
+tracks gives them two codes and identical software. Dispatch once per track
+and the tracks agree.
+
 The first release is made **by hand** through the Play Console. Not because
 the API is known to refuse it — Google's own documentation says nothing either
 way, and the claim is folklore — but because a first release cannot go out
@@ -171,13 +197,53 @@ more notification line, which is what `settings_full_screen_hint` describes
 to the person granting it. Android reserves that permission for telephone
 applications and Play makes every application holding it say so.
 
-**Where**: Play Console → _Policy and programmes_ → _App content_ →
-_Full-screen intent permission_. Answered once, it stays answered.
+**Where**, and the parent matters more than the leaf:
+
+    Monitor and improve
+      → Policy and programmes
+        → App content
+          → Full-screen intent permission
+
+This entry said _Policy and programmes → App content_ without the parent,
+and that missing parent cost a quarter of an hour on 12 September 2026. It
+is not where anybody looks: "Policy" sits under "Monitor and improve",
+beside Android Vitals and reviews.
+
+Three routes that do not work, tried in that order and written down so
+nobody repeats them: it is not under _Test and release_; it is not under
+_Protect with Play_, which is Play Protect; and the URL
+`…/app/<id>/app-content` redirects to the app list, so building the address
+by hand does not help either.
+
+**What to answer.** The form asks for the application's core functionality,
+in order to decide whether the permission can be pre-granted at install. The
+choices are _Alarm clock_, _Make and receive calls_, and _Other_.
+
+_Make and receive calls_ is the answer, and it is the honest one: the
+manifest asks for this permission for one reason only, which
+`showNotification.ts` states — an incoming call has to take a locked screen
+rather than add a notification line. #88 and #89 shipped that call.
+
+The tension is worth naming rather than hiding: this product's core is
+encrypted messaging, and a call is one capability among several. _Other_ is
+the fallback and it breaks nothing — `Settings.tsx` already carries the row
+that takes somebody to Android's own screen to grant it, with the sentence
+explaining why. What _Other_ costs is one step per person, and a call that
+does not light a locked screen until they have taken it.
+
+**It is not answered when it is saved.** Saving puts it in _Publishing
+overview_ under "changes not yet sent for review", behind a button. Until
+that is pressed and the review is done, `Publish` keeps failing with the
+same message.
 
 **Why it is written here**: nothing in this repository can detect it and
 nothing in the workflow can fill it in. The next person to dispatch
 `Publish` without knowing this spends eighteen minutes to be told by an
-error message that names a form rather than a place.
+error message that names a form rather than a place. It happened twice: run
+24 on 8 September 2026, and again on 12 September by somebody who had not
+read this page before dispatching. `publish.yml` now prints the way here
+when the run fails, because a document nobody reads at the right moment is
+worth less than a message where the eye already is.
 
 The same is true of the other declarations this document already names —
 content rating, data safety, target audience. This one is different only in
