@@ -1,3 +1,5 @@
+import { fileOf, type Uploaded } from './encryptedFile'
+
 import type { ImageBytes, PickedImage } from '../runtime/pickImage'
 
 /**
@@ -55,12 +57,7 @@ import type { ImageBytes, PickedImage } from '../runtime/pickImage'
  * shows when it cannot render the picture, and "image.jpg" does that job.
  */
 
-/** Where one sealed file went, and the key that opens it. */
-export interface Uploaded {
-  readonly url: string
-  /** `SealedAttachment.secret`, verbatim. */
-  readonly secret: string
-}
+export type { Uploaded } from './encryptedFile'
 
 /** What a picture is, as `info` states it. Matrix's `ThumbnailInfo` shape. */
 interface StatedInfo {
@@ -152,22 +149,6 @@ export function describeImage(
     },
     file: fileOf(photograph),
   }
-}
-
-/** The `EncryptedFile` object: the bridge's key material, plus the address. */
-function fileOf(uploaded: Uploaded): Record<string, unknown> {
-  let material: unknown
-  try {
-    material = JSON.parse(uploaded.secret)
-  } catch {
-    throw new Error('the attachment secret is not readable')
-  }
-  if (material === null || typeof material !== 'object') {
-    throw new Error('the attachment secret is not an object')
-  }
-  // The address last, so a secret that somehow carried one cannot overwrite
-  // where the bytes actually went.
-  return { ...(material as Record<string, unknown>), url: uploaded.url }
 }
 
 function statedInfoOf(image: ImageBytes): StatedInfo {
