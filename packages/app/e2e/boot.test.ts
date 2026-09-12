@@ -529,6 +529,102 @@ describe('boot', () => {
       .withTimeout(30000)
   })
 
+  // ── Et les panneaux du composeur, que rien ne pilotait (#243) ──
+
+  it('opens and shuts both composer panels, and still answers after', async () => {
+    // EN DERNIER, ET C'EST LA MOITIÉ DE LA RÉPONSE À #243.
+    //
+    // Sur #241, un test qui ouvrait un panneau mourait sur
+    // `RootViewWithoutFocusException` -- et emportait **les quatre suivants**,
+    // onze secondes chacun, parce qu'il mourait avant de refermer et que la
+    // racine ne retrouvait jamais le focus. Placé ici, un gel ne peut
+    // poisonner personne : il n'y a plus personne après.
+    //
+    // # CE QUI SE PASSE QUAND UN PANNEAU S'OUVRE, MESURÉ EN LISANT
+    //
+    // Trois cascades partent ensemble :
+    //
+    // - le quai rend sa hauteur par `onLayout` à `dockHeight`, dont dépend le
+    //   `paddingBottom` du `ScrollView` qui porte TOUTE la conversation : une
+    //   mesure du bas de l'écran relaie une mise en page de tout le haut ;
+    // - `EmojiPicker` monte **434 emoji** d'un coup -- huit groupes, un
+    //   `ScrollView` ordinaire, aucune virtualisation -- soit 434 `Pressable`
+    //   et autant de nœuds d'accessibilité qu'Espresso doit parcourir ;
+    // - les huit groupes écrivent chacun dans un état pendant qu'ils se
+    //   posent, ce qui converge en deux passes. Deux passes sur 434 vues.
+    //
+    // Espresso attend que la racine « ne demande pas de mise en page pendant
+    // dix secondes ». Sur un émulateur rendu en logiciel, cette accalmie
+    // n'arrive pas.
+    //
+    // # POURQUOI LA SYNCHRONISATION EST COUPÉE, ET PAS PAR COMMODITÉ
+    //
+    // `disableSynchronization` dit à Detox de ne plus attendre l'inactivité
+    // avant d'agir. Ce n'est pas masquer un défaut : l'application va bien,
+    // et c'est mesuré autrement. Le 12 septembre 2026, `adb shell input tap`
+    // a ouvert et refermé les deux panneaux sur un émulateur, deux fois de
+    // suite, sur une build de développement -- un tap injecté n'attend aucune
+    // inactivité, et il passe. Ce qui ne passe pas est l'attente, pas le
+    // geste.
+    //
+    // Le prix est réel et il est nommé : entre le `disable` et le `enable`,
+    // rien ne garantit qu'une image de plus a été rendue. C'est pourquoi
+    // chaque étape attend explicitement ce qu'elle veut voir, et pourquoi le
+    // dernier test remet la synchronisation avant de conclure.
+    await element(by.id('backup-settings-back')).tap()
+    await waitFor(element(by.id('tab-chat')))
+      .toBeVisible()
+      .withTimeout(30000)
+    await element(by.id('tab-chat')).tap()
+    await waitFor(element(by.id('first-conversation')))
+      .toBeVisible()
+      .withTimeout(60000)
+    await element(by.id('first-conversation')).tap()
+    await waitFor(element(by.id('composer-emoji')))
+      .toBeVisible()
+      .withTimeout(60000)
+
+    await device.disableSynchronization()
+    try {
+      await element(by.id('composer-emoji')).tap()
+      await waitFor(element(by.id('emoji-panel')))
+        .toBeVisible()
+        .withTimeout(30000)
+
+      // REFERMÉ DANS LE TEST, et pas seulement ouvert. Un panneau laissé
+      // ouvert est l'état dans lequel #241 a laissé quatre tests mourir.
+      await element(by.id('composer-emoji')).tap()
+      await waitFor(element(by.id('emoji-panel')))
+        .not.toExist()
+        .withTimeout(30000)
+
+      // L'AUTRE PANNEAU, arrivé avec #241 et jamais piloté non plus. Ses deux
+      // lignes sont nommées : un panneau qui s'ouvre vide serait vert ici.
+      await element(by.id('conversation-attach')).tap()
+      await waitFor(element(by.id('attach-panel')))
+        .toBeVisible()
+        .withTimeout(30000)
+      await detoxExpect(element(by.id('attach-photo'))).toBeVisible()
+      await detoxExpect(element(by.id('attach-document'))).toBeVisible()
+
+      await element(by.id('conversation-attach')).tap()
+      await waitFor(element(by.id('attach-panel')))
+        .not.toExist()
+        .withTimeout(30000)
+    } finally {
+      // DANS UN `finally`, parce que l'intérêt de ce test est ce qui vient
+      // après lui. Laisser la synchronisation coupée derrière un échec
+      // changerait la nature de tout ce qui suivrait, y compris dans un run
+      // futur où quelqu'un aurait ajouté un test en dessous.
+      await device.enableSynchronization()
+    }
+
+    // ET L'APPLICATION RÉPOND ENCORE, synchronisation rétablie. C'est la
+    // vraie question de #243 : sur #241, ce n'est pas le test du panneau qui
+    // a coûté cher, ce sont les quatre d'après.
+    await detoxExpect(element(by.id('conversation-input'))).toBeVisible()
+  })
+
   /** The pump, narrowed. A launch that never ran one is a failure to say so. */
   function ranPump() {
     const { pump } = report
