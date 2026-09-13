@@ -458,9 +458,18 @@ describeRoundTrip('encrypted round trip', () => {
     // §13.26 : la ligne paraît dès que le salon compte plus d'un autre
     // membre, ce qui est le cas de celui-ci -- le rapport dit `whoElse`
     // joined 3. Un salon à deux nomme personne, et c'est délibéré.
+    // PLUS HAUT QUE L'ÉCRAN, ET UNE PERSONNE REMONTE POUR LE LIRE.
+    //
+    // La conversation s'ouvre sur son message le plus récent, et celui que
+    // le rapport nomme est plus ancien. Sur le run Device 34739896093, cinq
+    // entrées le suivaient -- le fichier et une sonde par relance -- et la
+    // capture montre sa bulle coupée sous l'en-tête, sa ligne « Se présente
+    // comme » hors de l'écran. Le test remonte donc par pas jusqu'à la voir,
+    // comme `promise.ts` le fait pour l'action d'un écran qui défile.
     await waitFor(element(by.id(`claimed-${named}`)))
       .toBeVisible()
-      .withTimeout(30000)
+      .whileElement(by.id('screen-scroll'))
+      .scroll(300, 'up')
   })
 
   it('does not present the sender as established', async () => {
