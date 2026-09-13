@@ -162,9 +162,10 @@ address; the slot is already there and `build-site.sh` refuses a value that is
 not a plain https address, or one that does not land in the built page.
 
 **The walk itself.** #106's last criterion is one invitation opened end to end
-on a phone that never had the application. Its fourth criterion has the person
-paste the link, and the application has no paste: the walk that exists is
-link, landing, install, the link opened again, first launch (language, terms),
+on a phone that never had the application. Its fourth criterion had the person
+paste the link until it was corrected on 13 September 2026 to say there is no
+paste step, since the application has no paste: the walk that exists is link,
+landing, install, the link opened again, first launch (language, terms),
 claim. Nothing here proves that.
 
 ## What was found on the way in
