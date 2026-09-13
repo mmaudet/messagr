@@ -42,12 +42,10 @@ lieu de laisser le relais trancher dans le flux.
 > Si la citation n'est plus juste, tout le raisonnement de la moitié tombe, et
 > c'est la mesure qui l'apprendra.
 
-> **Ne jamais afficher la ligne de commande du conteneur.** Le secret que le
-> relais partage avec les serveurs Matrix lui est passé en argument
-> (`--static-auth-secret`) : `docker inspect messagr-turn` l'écrit en clair, et
-> `ps` sur l'hôte aussi. La configuration se lit en filtrant des clés nommées,
-> jamais en affichant le fichier entier ; les comptes se lisent dans le journal
-> du conteneur.
+> **Ne jamais afficher la configuration ni la ligne de commande complètes du
+> conteneur : elles portent un secret.** La configuration se lit en filtrant
+> des clés nommées du fichier monté, comme ci-dessus ; les comptes se lisent
+> dans le journal du conteneur.
 
 ## Ce qu'il faut
 
@@ -80,33 +78,53 @@ identiques à la constante près, et rangées sur la machine du porteur avec un
 ```
 
 Toutes deux sont signées par le keystore de debug commité
-(`FA:C6:17:45:…:3B:9C`), celui que porte le Pixel de démonstration.
+(`FA:C6:17:45:…:3B:9C`), comme la build de debug que porte le Pixel de
+démonstration, et portent le même `versionCode`. Passer de sa build à l'une
+d'elles, ou de l'une à l'autre, est donc une mise à jour : le compte reste.
 
-**Sur le Pixel, une mise à jour et rien d'autre**, jamais de désinstallation :
-`scripts/pixel.sh` dit ce qu'elle coûterait.
+**Le Pixel ne reçoit que des mises à jour.** Depuis le 13 septembre 2026, il
+porte le compte de production qui invitera à l'essai. Jamais de
+désinstallation, ni d'effacement de ses données : l'une comme l'autre
+perdrait ce compte, ses clés et son historique, et `scripts/pixel.sh` dit ce
+que cela coûte.
 
 ```
 adb -s 59021FDCG003NW install -r ~/messagr-builds/199/messagr-plafond-1200000.apk
 ```
 
-**Sur un téléphone qui porte la build du magasin, la retirer d'abord.** Play
-la signe avec sa propre clé, et Android refuse une mise à jour signée par une
-autre (`INSTALL_FAILED_UPDATE_INCOMPATIBLE`). Retirer l'application efface le
-compte de ce téléphone, ses clés et son historique : il faudra y rentrer par
-une invitation.
+**Le second téléphone sert d'abord à la répétition de l'essai**, avec la build
+de la piste interne de Play, et à #199 seulement ensuite. Play signe avec sa
+propre clé, et Android refuse une mise à jour signée par une autre
+(`INSTALL_FAILED_UPDATE_INCOMPATIBLE`) : la build Play se retire avant de poser
+l'APK. Cela efface le compte de la répétition, ses clés et son historique.
 
 ```
 adb -s <série> uninstall eu.messagr
 adb -s <série> install ~/messagr-builds/199/messagr-plafond-1200000.apk
 ```
 
-Une installation de debug neuve ne vérifie pas les liens de `messagr.eu`
-(observé le 13 septembre, voir `deploy/messagr-eu/LISEZ-MOI.md`) : le lien
-d'invitation s'ouvre dans le navigateur, et c'est _Copier le lien_ qui le porte
-jusqu'à l'application, qui propose de le coller au premier lancement.
+**Il entre ensuite en production par une invitation du Pixel.** L'application
+n'a aucun champ où coller un lien : son écran d'accueil le dit, le lien
+d'invitation est « la seule porte ». Sur le Pixel, _Inviter quelqu'un_ (le
+« + »), puis _Partager le lien_ pour le faire arriver sur le Mac. Il vaut une
+heure et ne sert qu'une fois.
 
-Ensuite, passer d'une APK à l'autre est un `install -r` sur les deux
-téléphones : même signature, et le compte reste.
+Ouvrir ce lien sur le second téléphone ne suffit pas. Une build de debug neuve
+ne vérifie pas les liens de `messagr.eu` : le Pixel, réinstallé en debug le
+13 septembre, répond `messagr.eu: 1024` à `adb shell pm get-app-links
+eu.messagr`. Android garde donc le lien dans le navigateur, et le bouton
+_Ouvrir dans Messagr_ de la page n'y peut rien : c'est un lien vers la même
+adresse, qui n'entre dans l'application que si ses liens sont vérifiés
+(`deploy/messagr-eu/site/i/index.html` le dit en commentaire). La porte est la
+commande qui adresse le lien au paquet lui-même, depuis le Mac, et qui ne
+demande aucune vérification :
+
+```
+adb -s <série> shell am start -a android.intent.action.VIEW -d 'https://messagr.eu/i/<jeton>' eu.messagr
+```
+
+Garder Messagr ouvert sur le Pixel pendant ce temps : il admet la personne qui
+a réclamé à chaque tour de synchronisation, pendant l'heure que vaut le lien.
 
 > **Une build de debug préfère Metro à son propre bundle.** Au lancement, elle
 > demande à `localhost:8081` si Metro tourne et, s'il répond, exécute le
