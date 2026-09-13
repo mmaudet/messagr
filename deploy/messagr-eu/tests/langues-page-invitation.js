@@ -413,9 +413,12 @@ CODES.forEach(function (code) {
     // ne propose pas de fichier, donc c'est le bloc de l'OFFRE qui sort et la
     // phrase de retrait qui reste. Les deux blocs sont éprouvés plus bas, dans
     // leurs deux états.
+    //
+    // `bientot-play` depuis que l'accueil porte les deux blocs à son tour :
+    // Google Play est annoncé sous le badge du fichier, et sort avec lui.
     var FAITS = [
       'apk-faits', 'apk-empreinte', 'etat-verifie',
-      'dl-porte', 'dl-comparer', 'dl-play', 'apk-avertissement'
+      'dl-porte', 'dl-comparer', 'dl-play', 'apk-avertissement', 'bientot-play'
     ];
     modele.cles.filter(function (c) {
       return FAITS.indexOf(c) === -1;
@@ -673,6 +676,33 @@ CODES.forEach(function (code) {
     echouer('la construction accepte une clé que les catalogues ignorent');
   }
   fs.rmSync(enTrop.sortie, { recursive: true, force: true });
+
+  // ET UNE OFFRE SANS SON ABSENCE NE PASSE PAS. Un bloc d'absence renommé
+  // faisait rendre la page telle quelle quand aucun fichier n'est proposé :
+  // offre comprise, vers le fichier retiré, c'est-à-dire le 13 septembre par
+  // un autre chemin. Les deux pages, parce que chacune porte sa paire, et le
+  // refus doit être celui-là : une construction qui échouerait pour une autre
+  // raison ferait passer ce cas sans rien éprouver.
+  ENGENDREES.forEach(function (modele) {
+    var orpheline = construire(function (source) {
+      var fichier = path.join(source, modele.source.replace(/^site\//, ''));
+      var texte = fs.readFileSync(fichier, 'utf8');
+      var renomme = texte.replace('data-si="pas-de-telechargement"', 'data-si="absence"');
+      if (renomme === texte) {
+        echouer('cas fabriqué : la page ' + modele.nom + ' ne porte pas le bloc ' +
+          "« pas-de-telechargement », donc ce cas n'éprouve rien");
+      }
+      fs.writeFileSync(fichier, renomme);
+    });
+    if (orpheline.code === 0) {
+      echouer('la construction accepte une page ' + modele.nom + ' qui porte ' +
+        "l'offre sans le bloc de son absence : sans fichier, l'offre resterait");
+    } else if (orpheline.dit.indexOf('le bloc « pas-de-telechargement »') === -1) {
+      echouer('la page ' + modele.nom + " sans bloc d'absence est refusée pour " +
+        'une autre raison : ' + orpheline.dit.trim());
+    }
+    fs.rmSync(orpheline.sortie, { recursive: true, force: true });
+  });
 })();
 
 // ── 5. LE SÉLECTEUR, QUI NAVIGUE MAINTENANT AU LIEU DE TRADUIRE ─────────

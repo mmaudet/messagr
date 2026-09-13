@@ -820,7 +820,7 @@
       </div>
       <div class="stores">
 
-        <div class="store">
+        <div class="store" data-si="telechargement">
           <a class="badge" href="/messagr.apk">
             <svg viewBox="0 0 24 27" aria-hidden="true" width="24" height="27">
               <path d="M1.6 1.1 14 13.5 1.6 25.9A2.4 2.4 0 0 1 1 24.3V2.7c0-.6.2-1.2.6-1.6z" fill="currentColor"/>
@@ -848,6 +848,38 @@
           <p class="faits avert" data-t="apk-avertissement">Votre téléphone demandera
           l'autorisation d'installer une application de sources inconnues : c'est normal
           pour un fichier obtenu hors magasin.</p>
+        </div>
+        <div class="store" data-si="pas-de-telechargement">
+          <!-- L'OFFRE ET SON ABSENCE SONT DEUX COLONNES, ET LA CONSTRUCTION N'EN
+               GARDE QU'UNE, par le mécanisme de la page du téléchargement :
+               `build-landing.mjs` tranche sur la présence des mesures du
+               fichier. `deploy.sh` accepte `MESSAGR_APK=none`, le fichier quitte
+               le serveur, et le badge doit partir dans le même geste.
+
+               LE BADGE ÉTAIT ÉCRIT EN DUR, ET IL A SURVÉCU AU RETRAIT. Le
+               13 septembre 2026, le déploiement de 03:33 UTC a retiré le fichier,
+               qui répondait 404 ; la page du téléchargement disait qu'aucun
+               fichier n'était proposé, et les six pages d'accueil offraient
+               toujours le téléchargement direct.
+
+               CETTE COLONNE DIT CE QUE DIT LA PAGE DU TÉLÉCHARGEMENT, avec sa
+               phrase, et ne met aucun lien à la place. Pas l'adresse de la piste
+               de test interne : elle n'installe que les testeurs de sa liste
+               (`docs/publishing-android.md`), et c'est la page d'invitation, que
+               n'ouvre que qui tient une invitation, qui reçoit la destination
+               Android du déploiement. -->
+          <span class="badge off" aria-disabled="true">
+            <svg viewBox="0 0 24 27" aria-hidden="true" width="24" height="27">
+              <path d="M1.6 1.1 14 13.5 1.6 25.9A2.4 2.4 0 0 1 1 24.3V2.7c0-.6.2-1.2.6-1.6z" fill="currentColor"/>
+              <path d="M17.4 10 3.5.3l12.2 12.2z" fill="currentColor" opacity=".85"/>
+              <path d="M17.4 17 3.5 26.7l12.2-12.2z" fill="currentColor" opacity=".85"/>
+              <path d="M21.9 12.1c1.4.8 1.4 2.5 0 3.3l-3 1.7-3.2-3.3 3.2-3.3z" fill="currentColor" opacity=".7"/>
+            </svg>
+            <span><b>Android</b><em data-t="direct">Téléchargement direct</em></span>
+          </span>
+          <p class="faits" data-t="dl-retire">Aucun fichier n'est proposé en ce moment. Cette page en
+          portera un de nouveau, avec son poids, sa date et son empreinte, le jour où il y en aura
+          un.</p>
         </div>
 
         <div class="store">
