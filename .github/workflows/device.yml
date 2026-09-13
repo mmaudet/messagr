@@ -205,11 +205,20 @@ jobs:
     # sous la forme d'un défaut de chiffrement coûte une journée de fausses
     # pistes — j'en ai écrit trois.
     #
-    # LE GROUPE EST GLOBAL ET LA FILE N'ANNULE PAS. Au niveau du job, donc
-    # `android-release` et `ios-simulator` continuent de tourner en
-    # parallèle : eux ne touchent pas le banc. `cancel-in-progress: false`
-    # parce qu'annuler une suite en cours pour en lancer une autre perdrait
-    # vingt minutes de mesure ; ici on attend son tour.
+    # LE GROUPE EST GLOBAL, ET SANS `queue: max` CE N'ÉTAIT PAS UNE FILE. Au
+    # niveau du job, donc `android-release` et `ios-simulator` continuent de
+    # tourner en parallèle : eux ne touchent pas le banc.
+    # `cancel-in-progress: false` parce qu'annuler une suite en cours pour en
+    # lancer une autre perdrait vingt minutes de mesure.
+    #
+    # CE COMMENTAIRE DISAIT « ici on attend son tour » : vrai à deux suites,
+    # faux à trois. Par défaut (`queue: single`), GitHub ne garde qu'UNE suite
+    # en attente dans le groupe, et l'annule dès qu'une autre arrive
+    # (« Control the concurrency of workflows and jobs », lu le 13 septembre
+    # 2026). Ce jour-là, la fusion de #272 a annulé la suite de #260 qui
+    # patientait, puis l'ouverture de #279 celle de #278 ; un job annulé ne
+    # ressemble pas à un échec. `queue: max` garde jusqu'à cent suites en
+    # attente. GitHub refuse de le combiner avec `cancel-in-progress: true`.
     #
     # La concurrence par référence du workflow reste au-dessus : repousser
     # sur la même branche annule toujours la précédente, y compris quand
@@ -217,6 +226,7 @@ jobs:
     concurrency:
       group: ${{ github.workflow }}-banc-unique
       cancel-in-progress: false
+      queue: max
     runs-on: ubuntu-latest
     timeout-minutes: 45
     steps:
