@@ -416,8 +416,13 @@ CODES.forEach(function (code) {
     //
     // `bientot-play` depuis que l'accueil porte les deux blocs à son tour :
     // Google Play est annoncé sous le badge du fichier, et sort avec lui.
+    //
+    // `etat-amorce` pour la raison d'`etat-verifie` : elle dit que la liste
+    // « est vérifiée sur le fichier que cette page propose », et cette
+    // construction n'en propose aucun. Le balayage de toutes les pages
+    // construites, plus bas, exige son ABSENCE, dans chacune des six langues.
     var FAITS = [
-      'apk-faits', 'apk-empreinte', 'etat-verifie',
+      'apk-faits', 'apk-empreinte', 'etat-verifie', 'etat-amorce',
       'dl-porte', 'dl-comparer', 'dl-play', 'apk-avertissement', 'bientot-play'
     ];
     modele.cles.filter(function (c) {
@@ -505,15 +510,40 @@ CODES.forEach(function (code) {
     echouer("la construction n'a écrit que " + pages.length + ' page(s) : le ' +
       "balayage qui suit ne lirait pas ce qu'il prétend lire");
   }
+  // ET AUCUNE NE DIT EN PROPOSER UN. Le badge corrigé et le fichier retiré,
+  // l'accueil servi le 13 septembre 2026 disait encore, dans ses six langues,
+  // que sa liste « est vérifiée sur le fichier que cette page propose ». Le
+  // balayage de l'adresse n'y pouvait rien : c'est une phrase et non un lien,
+  // et elle ment tout autant.
+  //
+  // LES SIX LANGUES SUR CHAQUE PAGE, et pas la seule langue de la page : une
+  // traduction restée là par erreur mentirait pareil. Les blancs sont
+  // normalisés, parce que le balisage français coupe la phrase en deux lignes.
+  var annonce = 'etat-amorce';
+  function echapperTexte(texte) {
+    return texte.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  }
   pages.forEach(function (relatif) {
-    fs.readFileSync(path.join(bon.sortie, relatif), 'utf8').split('\n')
-      .forEach(function (ligne, rang) {
-        if (ligne.indexOf('/messagr.apk') !== -1) {
-          echouer('la page construite « ' + relatif + ' » nomme /messagr.apk, ' +
-            'que cette construction ne propose pas (ligne ' + (rang + 1) + ' : ' +
-            ligne.trim() + ')');
-        }
-      });
+    var texte = fs.readFileSync(path.join(bon.sortie, relatif), 'utf8');
+    texte.split('\n').forEach(function (ligne, rang) {
+      if (ligne.indexOf('/messagr.apk') !== -1) {
+        echouer('la page construite « ' + relatif + ' » nomme /messagr.apk, ' +
+          'que cette construction ne propose pas (ligne ' + (rang + 1) + ' : ' +
+          ligne.trim() + ')');
+      }
+    });
+    var aplatie = texte.replace(/\s+/g, ' ');
+    CODES.forEach(function (code) {
+      var phrase = copie[code] && copie[code][annonce];
+      // Absente du catalogue, elle est signalée plus bas, là où la construction
+      // avec le fichier doit la porter.
+      if (typeof phrase !== 'string') { return; }
+      if (aplatie.indexOf(echapperTexte(phrase)) !== -1) {
+        echouer('la page construite « ' + relatif + ' » annonce un fichier que ' +
+          'cette construction ne propose pas (« ' + annonce + ' » en ' + code +
+          ' : ' + phrase + ')');
+      }
+    });
   });
 
   // L'EMPREINTE FABRIQUÉE EST CELLE QUE LA PAGE DÉCLARE, ET NON UNE SUITE DE
@@ -619,6 +649,23 @@ CODES.forEach(function (code) {
       if (rendue.indexOf(dessous) === -1) {
         echouer(quoi + " n'annonce plus « " + copie[code]['bientot-play'] +
           ' » dessous');
+      }
+    });
+    // LA PHRASE QUE CHERCHE LE BALAYAGE EST BIEN CELLE DE L'ACCUEIL, AVEC LE
+    // FICHIER. Sans cette moitié, « aucune page construite ne la porte »
+    // passerait aussi sur une construction qui l'aurait perdue partout, ou
+    // dont l'écriture la rendrait introuvable à la recherche.
+    CODES.forEach(function (code) {
+      var phrase = copie[code] && copie[code][annonce];
+      if (typeof phrase !== 'string') {
+        echouer('le catalogue « ' + code + ' » ne porte plus « ' + annonce + ' »');
+        return;
+      }
+      var ou = code === 'fr' ? 'index.html' : path.join(code, 'index.html');
+      var avec = aplatir(fs.readFileSync(path.join(avecFaits.sortie, ou), 'utf8'));
+      if (avec.indexOf(echapperTexte(phrase)) === -1) {
+        echouer("l'accueil « " + code + ' » construit avec le fichier ne dit plus ' +
+          '« ' + phrase + ' »');
       }
     });
     if (/%[A-Z]+%/.test(pageDe)) {
@@ -901,6 +948,6 @@ if (status === 0) {
     'pages, la page d\'invitation se traduit pour le navigateur qui la lit, ' +
     'la construction écrit une page d\'accueil par langue et refuse un ' +
     'catalogue troué, sans fichier proposé aucune page construite ne le ' +
-    'nomme, et le sélecteur navigue vraiment');
+    'nomme ni ne l\'annonce, et le sélecteur navigue vraiment');
 }
 process.exit(status);
