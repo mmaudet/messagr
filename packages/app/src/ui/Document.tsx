@@ -110,8 +110,22 @@ const styles = StyleSheet.create({
     borderWidth: stroke.base,
     borderColor: color.neutral['200'],
   },
+  // `flexShrink`, ET PAS `flex: 1`, PARCE QUE LA BULLE SE MESURE SUR SON
+  // CONTENU.
+  //
+  // `flex: 1` donne à ce bloc une base de zéro. Dans un écran qui fixe la
+  // largeur, il prend le reste de la rangée ; dans une bulle alignée sur
+  // `flex-start` et bornée à 80 %, qui prend la largeur de ce qu'elle
+  // contient, il ne compte pour rien et ne reçoit rien. Vu sur la capture du
+  // run Device 34739896093 : un document reçu réduit à son icône, sans nom ni
+  // taille, pendant que `MESSAGR_DOCUMENT_READ` disait que l'application
+  // l'avait lu. Personne ne l'avait vu, parce qu'aucun test n'ouvrait encore
+  // une conversation qui en contienne un.
+  //
+  // `flexShrink` garde la largeur du texte comme base et ne la réduit que
+  // si la bulle déborde, où `numberOfLines` coupe le nom au milieu.
   said: {
-    flex: 1,
+    flexShrink: 1,
   },
   name: {
     ...type.body,
