@@ -1,52 +1,72 @@
+import type { LinkSource } from './incomingLink'
+
 /**
- * A link spent once per run of the application, however many times the
- * operating system hands the same one over.
+ * The links an entry is claiming right now, so the same link is never claimed
+ * by two entries at once.
  *
  * # The duplicate this closes
  *
- * A cold launch can deliver the same invitation to the JavaScript twice: once
- * as the address the process was started with (`getInitialURL`), and once as a
- * `url` event a moment later. Under React Native's own ordering the event is
- * usually dropped -- the notification that carries it is posted before the
- * JavaScript has begun listening -- but that ordering is the platform's to
- * change, and this does not depend on it holding.
+ * One opening of a link can reach the JavaScript twice: on a cold launch as
+ * the address the process was started with (`getInitialURL`) and then as a
+ * `url` event, or as two events close together. Under React Native's own
+ * ordering the launch event is usually dropped -- its notification is posted
+ * before the JavaScript listens -- but that ordering is the platform's to
+ * change, and this does not depend on it holding. Each delivery re-runs the
+ * launch, and without this each run would start its own claim for the same
+ * single-use token.
  *
- * An invitation is single-use, and the whole of it is one credential. Handed
- * to entry twice, the same launch could run the account-creating claim a
- * second time against a token already spent, or re-send an existing account's
- * request needlessly. So each link string is spent at most once here.
+ * # Only while the claim runs, and not for the whole run
  *
- * # Why the string, and why per run
+ * A link is turned away only while an entry that took it has not answered.
+ * The moment that entry settles -- entered, refused, or failed outright -- the
+ * mark is lifted, and the same link opened again is handed over again.
  *
- * Two different invitations differ in their token and so in their string, and
- * each is spent on its own -- this never collapses two real invitations into
- * one. The same string arriving again within one run is the duplicate, and it
- * is what is turned away.
+ * It was held for the whole run at first, and that was too broad. A claim
+ * gives up after about thirty seconds when the issuer's application has not
+ * yet let the drawn account in, and what a person does next is open the same
+ * link again without closing the application. That second opening has to
+ * claim again, as it always has on Android: turning it away would leave
+ * somebody with no way in and nobody beside them to say why.
  *
- * A fresh run starts empty on purpose. A relaunch spending the same link again
- * is correct: a claim that a previous run began but did not finish must be
- * retriable, and the keystore, not this, is what remembers a session that was
- * actually obtained.
+ * # Why the mark is taken inside the link source
  *
- * # Why the check and the record are one step
- *
- * `fresh` reads and writes in a single synchronous turn. The cold read and the
- * warm event can reach it in either order and even overlap, and because
- * nothing awaits between the test and the record, whichever reaches it first
- * is the one run that spends the link. The other is told it is not fresh.
+ * Entry reads its link only after reading the keystore, so two runs racing
+ * reach the link source in either order. The check and the mark are taken
+ * there in one synchronous step, so whichever run reaches it first is the one
+ * that claims, and the other is handed no link and claims nothing.
  */
 export interface SpentLinks {
-  /** True the first time this exact link is seen this run, false after. */
-  readonly fresh: (url: string) => boolean
+  /**
+   * Runs one entry with `source` as its link. A link is handed over only when
+   * no entry that took the same link is still running, and the mark is lifted
+   * once `run` settles, however it settles.
+   */
+  readonly enter: <T>(
+    source: LinkSource,
+    run: (link: LinkSource) => Promise<T>,
+  ) => Promise<T>
 }
 
 export function spentLinks(): SpentLinks {
-  const spent = new Set<string>()
+  const underway = new Set<string>()
   return {
-    fresh: (url: string) => {
-      if (spent.has(url)) return false
-      spent.add(url)
-      return true
+    enter: async <T>(
+      source: LinkSource,
+      run: (link: LinkSource) => Promise<T>,
+    ): Promise<T> => {
+      const taken: string[] = []
+      const link: LinkSource = async () => {
+        const url = await source()
+        if (url === null || underway.has(url)) return null
+        underway.add(url)
+        taken.push(url)
+        return url
+      }
+      try {
+        return await run(link)
+      } finally {
+        for (const url of taken) underway.delete(url)
+      }
     },
   }
 }

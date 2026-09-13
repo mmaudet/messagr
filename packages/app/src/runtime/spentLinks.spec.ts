@@ -4,45 +4,110 @@ import { spentLinks } from './spentLinks'
 
 const LINK = 'https://messagr.eu/i/abc123'
 
+/** A promise held open until the test lets it go. */
+function held() {
+  let release!: () => void
+  const promise = new Promise<void>(settle => {
+    release = settle
+  })
+  return { promise, release }
+}
+
+/** An entry that takes its link and answers at once. */
+const takeAndAnswer = async (link: () => Promise<string | null>) => link()
+
 describe('spentLinks', () => {
-  it('spends a link the first time it is seen and not again', () => {
-    // The duplicate a cold launch can produce: getInitialURL and then a url
-    // event, the same string twice. The second is turned away.
+  it('turns the same link away while the entry that took it is still claiming', async () => {
+    // The duplicate one opening can produce -- the launch address and then a
+    // url event, or two events close together -- arriving while the first
+    // claim is still waiting on the service. It is handed no link, so it
+    // starts no second claim.
     const links = spentLinks()
-    expect(links.fresh(LINK)).toBe(true)
-    expect(links.fresh(LINK)).toBe(false)
+    const took = held()
+    const claiming = held()
+    const first = links.enter(
+      async () => LINK,
+      async link => {
+        const handed = await link()
+        took.release()
+        await claiming.promise
+        return handed
+      },
+    )
+    await took.promise
+
+    expect(await links.enter(async () => LINK, takeAndAnswer)).toBeNull()
+
+    claiming.release()
+    expect(await first).toBe(LINK)
   })
 
-  it('turns the same link away however many times it arrives', () => {
-    const links = spentLinks()
-    expect(links.fresh(LINK)).toBe(true)
-    expect(links.fresh(LINK)).toBe(false)
-    expect(links.fresh(LINK)).toBe(false)
+  it('hands the same link over again once the entry that took it has answered', async () => {
+    // Entered, refused, or given up because nobody had let the account in
+    // yet: however the entry answered, the same link opened again without
+    // closing the application is claimed again. The last of the three is the
+    // one that would otherwise stop somebody with nobody beside them.
+    for (const answer of [
+      { entered: true },
+      { entered: false, reason: 'this invitation cannot be used' },
+      { entered: false, reason: 'nobody has let this account in yet' },
+    ]) {
+      const links = spentLinks()
+      const first = await links.enter(
+        async () => LINK,
+        async link => {
+          await link()
+          return answer
+        },
+      )
+      expect(first).toBe(answer)
+
+      expect(await links.enter(async () => LINK, takeAndAnswer)).toBe(LINK)
+    }
   })
 
-  it('spends two different invitations each on its own', () => {
-    // Two real invitations differ in their token and so in their string, and
+  it('lifts the mark even when the entry fails outright', async () => {
+    // A launch that threw must not leave its link turned away for the rest of
+    // the run: that would be the too-broad hold again, by another road.
+    const links = spentLinks()
+    await expect(
+      links.enter(
+        async () => LINK,
+        async link => {
+          await link()
+          throw new Error('the keystore did not answer')
+        },
+      ),
+    ).rejects.toThrow('the keystore did not answer')
+
+    expect(await links.enter(async () => LINK, takeAndAnswer)).toBe(LINK)
+  })
+
+  it('lets two different invitations be claimed side by side', async () => {
+    // Two real invitations differ in their token and so in their address, and
     // neither is the other's duplicate.
     const links = spentLinks()
-    expect(links.fresh('https://messagr.eu/i/abc123')).toBe(true)
-    expect(links.fresh('https://messagr.eu/i/def456')).toBe(true)
-  })
+    const took = held()
+    const claiming = held()
+    const first = links.enter(
+      async () => 'https://messagr.eu/i/abc123',
+      async link => {
+        const handed = await link()
+        took.release()
+        await claiming.promise
+        return handed
+      },
+    )
+    await took.promise
 
-  it('keeps the application-scheme form apart from the https form', () => {
-    // They are the same invitation, but they are not the string the system
-    // hands over twice in one launch: only one scheme is delivered per launch.
-    // Treating them as one would need parsing this deliberately does not do.
-    const links = spentLinks()
-    expect(links.fresh('https://messagr.eu/i/abc123')).toBe(true)
-    expect(links.fresh('messagr://messagr.eu/i/abc123')).toBe(true)
-  })
+    expect(
+      await links.enter(
+        async () => 'https://messagr.eu/i/def456',
+        takeAndAnswer,
+      ),
+    ).toBe('https://messagr.eu/i/def456')
 
-  it('starts empty for each run, so a relaunch can spend the same link again', () => {
-    // A claim a previous run did not finish must be retriable. The keystore is
-    // what remembers a session that was actually obtained, not this.
-    const first = spentLinks()
-    const second = spentLinks()
-    expect(first.fresh(LINK)).toBe(true)
-    expect(second.fresh(LINK)).toBe(true)
+    claiming.release()
+    expect(await first).toBe('https://messagr.eu/i/abc123')
   })
 })

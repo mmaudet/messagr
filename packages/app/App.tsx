@@ -1043,10 +1043,12 @@ export function App({
     readonly url: string
     readonly count: number
   } | null>(null)
-  // Each invitation spent at most once this run, so the same link handed over
-  // twice on a cold launch -- getInitialURL and then a url event -- claims
-  // once. Held here because the launch effect can run more than once for the
-  // one link, and the two runs must agree. See spentLinks.ts.
+  // The links a launch is claiming right now. The same link handed over twice
+  // for one opening -- getInitialURL and then a url event, or two events close
+  // together -- runs the launch twice, and the two runs must agree that only
+  // one of them claims. Once that claim has answered, the same link opened
+  // again is claimed again. Held here because the launch effect is what runs
+  // twice. See spentLinks.ts.
   const spentLinksRef = useRef(spentLinks())
   const [evicted, setEvicted] = useState<'idle' | 'working' | EvictOutcome>(
     'idle',
@@ -1569,9 +1571,11 @@ export function App({
       // previous launch, or one obtained by spending the invitation it was
       // opened with. Nothing arrives from the build any more.
       let historyClaim: HistoryClaim | null = null
-      const entered = await enterWithASession({
-        secrets: sessionSecrets,
-        poster: servicePoster,
+      // ONE CLAIM PER LINK AT A TIME. A link another run of this launch is
+      // still claiming is not handed over again, and the mark is lifted the
+      // moment this entry answers -- so the same link opened again after a
+      // claim that gave up is claimed again. See spentLinks.ts.
+      const entered = await spentLinksRef.current.enter(
         // The warm link wins when there is one: it is the more recent
         // answer to the same question, and `getInitialURL` keeps handing
         // back the address this process was started with for as long as it
@@ -1579,25 +1583,23 @@ export function App({
         // ET JAMAIS UN PARTAGE : les deux voyagent par le même canal, et
         // une invitation est ce que ce chemin sait dépenser. Un partage lu
         // ici serait un lien que rien ne peut réclamer.
-        link: async () => {
+        async () => {
           const url = warmLink === null ? await initialLink() : warmLink.url
-          if (url === null || shareFrom(url) !== null) return null
-          // SPENT ONCE PER RUN. The system can hand the same invitation over
-          // twice on a cold launch -- as the address this process started with
-          // and again as an event -- and a single-use link claimed twice would
-          // run the account-creating claim against a token already spent. The
-          // check and the record are one step, so a cold read and a warm event
-          // racing here still spend the link once. See spentLinks.ts.
-          if (!spentLinksRef.current.fresh(url)) return null
-          return url
+          return url === null || shareFrom(url) !== null ? null : url
         },
-        signUp: signUpSecrets,
-        // A claim is two calls with the issuer's application in between. See
-        // claimInvitation.ts: without a wait this tries once, is told 409,
-        // and reports a link that cannot be used -- which is what it does on
-        // a device with nothing else changed.
-        wait: ms => new Promise(resolve => setTimeout(resolve, ms)),
-      })
+        link =>
+          enterWithASession({
+            secrets: sessionSecrets,
+            poster: servicePoster,
+            link,
+            signUp: signUpSecrets,
+            // A claim is two calls with the issuer's application in between.
+            // See claimInvitation.ts: without a wait this tries once, is told
+            // 409, and reports a link that cannot be used -- which is what it
+            // does on a device with nothing else changed.
+            wait: ms => new Promise(resolve => setTimeout(resolve, ms)),
+          }),
+      )
       // THE PASSWORD, KEPT AT THE ONE MOMENT IT IS EVER OFFERED.
       //
       // The service hands it back with the claim and nowhere else. A device
