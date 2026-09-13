@@ -70,6 +70,34 @@ SYNC_TIMEOUT_MS = 10_000
 PLACE_TIMEOUT_SECONDS = 120
 COLLECT_DEADLINE_SECONDS = 120
 
+# RÉCLAMER À NOUVEAU TANT QUE LE SERVICE RÉPOND « PAS ENCORE INVITÉ », ET
+# PENDANT COMBIEN DE TEMPS.
+#
+# Sur le chemin `existing_user_id`, `409 MESSAGR_NOT_YET_INVITED` est une
+# étape du protocole et non un refus : voir `claim_place`. Les invitations
+# Matrix que le service attend viennent du client de l'inviteur, et
+# l'application ne les envoie que pendant sa fenêtre d'admission :
+# `admitDrawnEntrant` interroge l'état de l'invitation trente fois, à deux
+# secondes d'écart, soit une minute au moins.
+#
+# QUAND CETTE FENÊTRE S'OUVRE. `App.tsx` affiche le lien, rafraîchit la
+# liste, puis appelle `admitEntrant`. La première réclamation ne part
+# qu'après que Detox a lu le lien, et Detox attend pour le lire que le
+# réseau de l'application soit calme. Sur le run 34721727472 : requêtes de
+# la liste finies à 22:25:30.39, lien capturé à 22:25:31.19, premier 409
+# reçu à 22:25:32.55. Les interrogations du service ne sont pas
+# journalisées, donc le départ de la fenêtre est borné et non lu : elle
+# s'ouvre environ deux secondes avant la première réclamation.
+#
+# Quarante-cinq secondes de réclamations tiennent donc dans cette minute,
+# avec plus de dix secondes de marge. Le protocole en demande bien moins :
+# au moins trois réclamations, entre lesquelles l'application interroge
+# deux fois, soit une dizaine de secondes.
+CLAIM_DEADLINE_SECONDS = 45
+CLAIM_PAUSE_SECONDS = 2
+CLAIM_REQUEST_SECONDS = 20
+NOT_YET_INVITED = "MESSAGR_NOT_YET_INVITED"
+
 # How long the send phase waits for the application's account to appear as a
 # joined member before it refuses to share a room key. Six syncs: the join has
 # already happened by then or something else is wrong, and waiting longer only
@@ -446,6 +474,14 @@ async def send(session_file: Path, store: Path) -> int:
         await client.close()
 
 
+def errcode_of(body: str) -> str | None:
+    """Le `errcode` d'une réponse du service, ou None quand elle n'en porte pas."""
+    try:
+        parsed = json.loads(body)
+    except ValueError:
+        return None
+    return parsed.get("errcode") if isinstance(parsed, dict) else None
+
 
 async def claim_place(session_file: Path, store: Path) -> int:
     """Réclamer une invitation émise par l'application, avec CETTE identité.
@@ -461,15 +497,43 @@ async def claim_place(session_file: Path, store: Path) -> int:
 
     # CE QUE CETTE PHASE NE FAIT PAS
 
-    Elle ne rejoint pas le salon elle-même. Le service place la demande ;
-    c'est le client de l'INVITEUR — l'application — qui lit l'état et envoie
+    Elle n'envoie aucune invitation. Le service place la demande ; c'est le
+    client de l'INVITEUR -- l'application -- qui lit l'état et envoie
     l'invitation Matrix, parce qu'un compte réservé ne peut pas inviter dans
     un salon dont le niveau « invite » est à 50. La migration 008 raconte
     cette contrainte au long.
 
-    Alors cette phase réclame, puis attend d'être invitée, puis rejoint.
-    L'attente est bornée : une invitation qui n'arrive pas est un défaut du
-    produit et doit se lire comme tel, pas comme une phase qui pend.
+    # TROIS RÉCLAMATIONS AU MOINS, ET LES DEUX PREMIÈRES RÉPONDENT 409
+
+    Lu dans `claim.rs` et `status.rs`, pas supposé. Sur ce chemin, le service
+    attend DEUX invitations Matrix, et l'application envoie les deux :
+
+    1. La première réclamation tire un compte réservé pour ce lien. Personne
+       ne l'a invité : `409 MESSAGR_NOT_YET_INVITED`. L'état de l'invitation
+       le nomme, et l'application l'invite.
+    2. Une fois ce compte invité, la réclamation suivante le fait entrer
+       dans le salon et tenter d'y inviter la contrepartie. Il n'a pas le
+       niveau : 403. Le service note la contrepartie comme attendue et
+       répond encore 409. L'état la nomme alors avant le compte tiré, et
+       l'application l'invite.
+    3. La réclamation suivante trouve la contrepartie déjà invitée : le
+       compte tiré se retire et se neutralise, et le service répond 200.
+
+    Une réclamation unique ne pouvait donc qu'échouer, et c'est ce qu'elle
+    faisait. `provision-bench-accounts.sh` décrit la même attente pour un
+    nouveau venu, dont le chemin s'arrête à la deuxième réclamation.
+
+    Réclamer à nouveau ne coûte rien au service : `account_for_claim`
+    reprend le compte déjà tiré au lieu d'en créer un autre. Et seul
+    `MESSAGR_NOT_YET_INVITED` se réclame à nouveau. Tout autre refus sort
+    tout de suite : le reposer serait poser une question déjà répondue, et
+    l'attendre derrière une échéance le ferait lire quarante-cinq secondes
+    plus tard, sous le nom de l'échéance au lieu du sien.
+
+    Alors cette phase réclame jusqu'à ce que le service réponde 200, puis
+    attend d'être invitée, puis rejoint. Chaque attente est bornée : une
+    invitation qui n'arrive pas est un défaut du produit et doit se lire
+    comme tel, pas comme une phase qui pend.
     """
     homeserver = env("MESSAGR_INTEROP_HOMESERVER")
     # LE SERVICE EST DONNÉ, PAS DEVINÉ.
@@ -488,33 +552,89 @@ async def claim_place(session_file: Path, store: Path) -> int:
     session = json.loads(session_file.read_text())
     user_id = session["user_id"]
 
+    clock = asyncio.get_running_loop()
+    started = clock.time()
+    deadline = started + CLAIM_DEADLINE_SECONDS
+    attempts = 0
+    last = "none"
+
     async with aiohttp.ClientSession() as http:
-        async with http.post(
-            f"{service}/invitations/claim",
-            json={"token": token, "existing_user_id": user_id},
-            # AUTHENTIFIÉ, ET LE SERVICE DIT POURQUOI À CET ENDROIT PRÉCIS.
-            #
-            # `POST /invitations/claim` ne l'est pas : c'est le principe même
-            # d'accueillir un nouveau venu. Mais sur le chemin
-            # `existing_user_id`, l'appelant désigne un TIERS, et
-            # `claim.rs` refuse sans preuve qu'il est bien cette personne --
-            # sans quoi n'importe qui ferait inviter un identifiant Matrix
-            # arbitraire dans un vrai salon, ce qui est irréversible.
-            #
-            # La contrepartie prouve donc qu'elle est `existing_user_id` avec
-            # le jeton de sa propre session. Le service compare, et refuse si
-            # les deux diffèrent.
-            headers={"Authorization": f"Bearer {session['access_token']}"},
-            timeout=aiohttp.ClientTimeout(total=60),
-        ) as response:
-            body = await response.text()
-            if response.status != 200:
+        while True:
+            attempts += 1
+            try:
+                async with http.post(
+                    f"{service}/invitations/claim",
+                    json={"token": token, "existing_user_id": user_id},
+                    # AUTHENTIFIÉ, ET LE SERVICE DIT POURQUOI À CET ENDROIT PRÉCIS.
+                    #
+                    # `POST /invitations/claim` ne l'est pas : c'est le principe
+                    # même d'accueillir un nouveau venu. Mais sur le chemin
+                    # `existing_user_id`, l'appelant désigne un TIERS, et
+                    # `claim.rs` refuse sans preuve qu'il est bien cette
+                    # personne -- sans quoi n'importe qui ferait inviter un
+                    # identifiant Matrix arbitraire dans un vrai salon, ce qui
+                    # est irréversible.
+                    #
+                    # La contrepartie prouve donc qu'elle est `existing_user_id`
+                    # avec le jeton de sa propre session. Le service compare, et
+                    # refuse si les deux diffèrent.
+                    headers={"Authorization": f"Bearer {session['access_token']}"},
+                    timeout=aiohttp.ClientTimeout(total=CLAIM_REQUEST_SECONDS),
+                ) as response:
+                    status = response.status
+                    body = await response.text()
+            except (aiohttp.ClientError, asyncio.TimeoutError) as error:
                 print(
-                    f"FAIL: the claim was refused ({response.status}): {body}",
+                    f"FAIL: claim {attempts} got no answer, "
+                    f"{clock.time() - started:.1f}s in "
+                    f"({type(error).__name__}: {error}).\n"
+                    f"      last answer before it: {last}",
                     file=sys.stderr,
                 )
                 return 1
-    print(f"OK: {user_id} claimed the application's invitation")
+
+            elapsed = clock.time() - started
+            errcode = errcode_of(body)
+            last = f"{status} {errcode}" if errcode else f"{status} {body[:200]!r}"
+            if status == 200:
+                break
+
+            # LE SEUL REFUS QUI SE RÉCLAME À NOUVEAU. Le docstring dit
+            # pourquoi ; ici, tout le reste sort avec le corps tel quel.
+            if status != 409 or errcode != NOT_YET_INVITED:
+                print(
+                    f"FAIL: the claim was refused ({status}) on attempt "
+                    f"{attempts}, {elapsed:.1f}s in: {body}",
+                    file=sys.stderr,
+                )
+                return 1
+
+            if clock.time() + CLAIM_PAUSE_SECONDS > deadline:
+                print(
+                    f"FAIL: no place after {attempts} claims over "
+                    f"{elapsed:.1f}s; last answer: {last}.\n"
+                    f"      Every answer was {NOT_YET_INVITED}: the Matrix "
+                    "invitation the service waits for was not there when it "
+                    "looked.\n"
+                    "      On this path it waits for two, both sent by the "
+                    "inviter's client -- the application, in the minute it\n"
+                    "      spends admitting after showing the link "
+                    "(admitDrawnEntrant): one for the account the service\n"
+                    "      drew for this link, then one for this account.",
+                    file=sys.stderr,
+                )
+                return 1
+
+            print(
+                f"claim {attempts}: {last}, {elapsed:.1f}s in; "
+                f"claiming again in {CLAIM_PAUSE_SECONDS}s"
+            )
+            await asyncio.sleep(CLAIM_PAUSE_SECONDS)
+
+    print(
+        f"OK: {user_id} claimed the application's invitation "
+        f"on attempt {attempts}, {elapsed:.1f}s in"
+    )
 
     client = client_for(
         store, user_id, homeserver, device_id=session["device_id"]
