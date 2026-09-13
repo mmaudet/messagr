@@ -127,10 +127,31 @@ on 12 September, answered `messagr.eu: 1024`: not verified. The demonstration
 Pixel, installed on 5 September and updated on 12 September, still answered
 `messagr.eu: verified`, which is not what the registry expected; why it kept
 that state is not established, and the other of the two phones has not been
-asked. Neither says anything about the track, since verification is against
-the certificate the installed copy was signed with. Where a link does open a
-browser, the landing page's _Copy the link_ is what carries an invitation
-across an install.
+asked. That install of the Pixel no longer exists: it was removed at 05:31 UTC
+the same morning and a debug build of `master` put in its place
+(`docs/production-entry-point.md`). Neither says anything about the track,
+since verification is against the certificate the installed copy was signed
+with.
+
+**Where a link does open a browser, the landing page does not carry the
+invitation into the application.** This paragraph used to say its _Copy the
+link_ did. What `site/i/index.html` does:
+
+- _Open in Messagr_ is `href=""`, the page's own https address and not
+  `messagr://`, so it reaches the application on the same condition as the
+  link itself (expected, not observed on a device).
+- _Copy the link_ is shown wherever the browser exposes `navigator.clipboard`,
+  puts `location.href` on the clipboard, and says the application will offer
+  to paste it.
+
+The application does not: it has no field for a link and never reads the
+clipboard, and its list, opened without a link, says `list_not_in_yet`,
+_"Open the invitation link somebody sent you: it is the only door"_. What
+carries an invitation across an install is the link opened again once the
+application is there, which is also all _Open in Messagr_ does, so when the
+system sends that link to a browser nothing on the page gets past it.
+`docs/unassisted-trial.md` treats a link that opens a browser on a build from
+the track as a hard stop for this reason.
 
 **The iPhone destination.** `DESTINATIONS.ios` is empty and the page says so
 honestly, because no iOS build is published anywhere. It wants a TestFlight
@@ -138,8 +159,10 @@ address; the slot is already there and `build-site.sh` refuses a value that is
 not a plain https address, or one that does not land in the built page.
 
 **The walk itself.** #106's last criterion is one invitation opened end to end
-on a phone that never had the application: link, landing, install, first
-launch (language, terms), paste, claim. Nothing here proves that.
+on a phone that never had the application. Its fourth criterion has the person
+paste the link, and the application has no paste: the walk that exists is
+link, landing, install, the link opened again, first launch (language, terms),
+claim. Nothing here proves that.
 
 ## What was found on the way in
 
@@ -187,19 +210,29 @@ deployment read said there was none.
 
 ## Pointing Android at Play, and the address that is NOT the right one
 
-`MESSAGR_DEST_ANDROID` is unset today, so the page offers the self-hosted
-APK and nothing else. #91 needs the opposite: a trial that installs from the
-internal testing track, because what is being tested includes the
-distribution.
+**Done on 13 September 2026.** `MESSAGR_DEST_ANDROID` has been set since the
+deployment of 03:33 UTC, and the site was deployed again the same morning
+with
 
-The mechanism is already here. The value is not, and **the obvious value is
-wrong**.
+    MESSAGR_DEST_ANDROID='https://play.google.com/apps/internaltest/4701142005580137400' \
+      MESSAGR_APK=none \
+      deploy/messagr-eu/deploy.sh
+
+Read off the served page afterwards (`last-modified: Sun, 13 Sep 2026
+05:45:05 GMT`): `DESTINATIONS.android` is that link, `androidApk` and `ios`
+are empty, and `https://messagr.eu/messagr.apk` answers `404`. An Android
+phone is offered the internal testing track and no download.
+
+Until then the page offered the self-hosted APK and nothing else, and #91
+needs the opposite: a trial that installs from the internal testing track,
+because what is being tested includes the distribution. What follows says why
+that value, because **the obvious value is wrong**.
 
 **Not this.** `https://play.google.com/store/apps/details?id=eu.messagr` is
 the address of a published application. On an internal track, anybody who is
 not already an enrolled tester gets "item not found" from it. Wiring that
-would give most people a dead end, which is worse than the APK they have
-today.
+would give most people a dead end, which would have been worse than the APK
+they had then.
 
 **This.** The tester opt-in link, of the form
 
@@ -236,6 +269,9 @@ APK, which at least carries a current build.
 
 Check what is on the track before trusting it. A track that has not moved
 is indistinguishable from one that has.
+
+Step 1 was run on 12 September 2026, before the page was pointed at the
+track: `Publish` on `864d580`, `track: internal`, run 34709655215, successful.
 
 **2. Point the page at the opt-in link.**
 
