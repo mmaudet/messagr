@@ -324,6 +324,26 @@ describe('an incoming call', () => {
       'ended',
     ])
   })
+
+  it('says the call is over when the answer comes after the invite ran out', async () => {
+    // An answer takes as long as the microphone and the camera take to be
+    // granted, and a first call asks for both. If the invite runs out
+    // meanwhile, the machine refuses the accept and ends itself on that
+    // throw, emitting nothing -- so the ending is announced here or nowhere,
+    // and nowhere is a screen left ringing that no gesture can move.
+    const one = probe()
+    one.transport.receive([rawInvite(BOB, 'call-theirs', 'bobparty')])
+    one.advance(DEFAULT_INVITE_LIFETIME_MS + 1)
+
+    expect(() => one.transport.accept(answerSdp())).toThrow(CallError)
+    await one.settle()
+
+    expect(one.kinds()).toEqual([])
+    expect(one.states().at(-1)).toEqual({
+      call: 'ended',
+      reason: { ended: 'inviteExpired' },
+    })
+  })
 })
 
 describe('the clock the transport keeps', () => {
@@ -346,6 +366,36 @@ describe('the clock the transport keeps', () => {
 
     expect(one.kinds()).toEqual(['m.call.invite', 'm.call.hangup'])
     expect(hangupReason(one.sent[1])).toBe('invite_timeout')
+  })
+
+  it('stops ringing its own invite by the time the far end stops accepting it', async () => {
+    // The far end counts the lifetime from when the invite reached its
+    // homeserver, which is after it was placed here, so the earliest it may
+    // refuse an answer is the lifetime counted from the placing. This side
+    // reads its own deadline only on a tick, up to a period late -- and a
+    // caller still hearing it ring past that instant is listening to a
+    // telephone that can no longer be picked up.
+    const one = probe()
+    one.transport.placeCall(offer())
+    await one.settle()
+    const invite = one.sent[0]
+    if (invite?.type !== 'm.call.invite') throw new Error('no invite')
+
+    // On the beat, up to the last instant the far end still accepts it.
+    for (
+      let elapsed = TICK_PERIOD_MS;
+      elapsed <= invite.content.lifetime;
+      elapsed += TICK_PERIOD_MS
+    ) {
+      one.advance(TICK_PERIOD_MS)
+      one.fireTimer()
+    }
+    await one.settle()
+
+    expect(one.transport.state()).toEqual({
+      call: 'ended',
+      reason: { ended: 'hangup', reason: 'invite_timeout' },
+    })
   })
 
   it('discards an unanswered incoming invite without sending anything', async () => {

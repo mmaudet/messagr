@@ -100,6 +100,7 @@
  */
 
 import {
+  CallError,
   CallMachine,
   callConfig,
   type CallAction,
@@ -231,6 +232,10 @@ export interface CallTransport {
    *
    * The glare path does not come through here: that one is discharged by the
    * transport itself, without ringing.
+   *
+   * Refused like any intent once the invite has run out, and that refusal
+   * also announces the ending it leaves: the machine ends the call on it
+   * without saying so.
    */
   readonly accept: (answer: SessionDescription) => void
   /** Refuse the ringing call. */
@@ -358,9 +363,15 @@ export function startCallTransport(
   config: CallTransportConfig,
   ports: CallTransportPorts,
 ): CallTransport {
-  const machine = new CallMachine(
-    callConfig(config.ownUserId, config.peerUserId),
-  )
+  const defaults = callConfig(config.ownUserId, config.peerUserId)
+  const machine = new CallMachine({
+    ...defaults,
+    // A period short of the lifetime, because this transport reads the clock
+    // once a period: waiting the whole of it could keep a caller hearing a
+    // telephone ring for up to that period after the far end stopped
+    // accepting an answer. See `CallConfig.inviteWaitMs`.
+    inviteWaitMs: defaults.inviteLifetimeMs - TICK_PERIOD_MS,
+  })
 
   /**
    * Events waiting for the wire, in the order the machine emitted them.
@@ -592,7 +603,21 @@ export function startCallTransport(
   }
 
   function accept(answer: SessionDescription): void {
-    drive((held, nowMs) => held.accept(config.ownPartyId, answer, nowMs))
+    try {
+      drive((held, nowMs) => held.accept(config.ownPartyId, answer, nowMs))
+    } catch (refusal: unknown) {
+      // The invite ran out while the answer was being built -- which, on a
+      // first call, lasts as long as somebody takes to grant the microphone
+      // and the camera. The machine ends itself on that refusal and emits no
+      // `stateChanged`, the silence `dischargeAutoAccept` already meets on
+      // the glare path, and it is announced for the same reason: a screen
+      // left on a ringing call that no gesture can move. Still thrown, since
+      // the refusal is owed to the person who pressed.
+      if (refusal instanceof CallError && refusal.kind === 'inviteExpired') {
+        announce({ act: 'stateChanged', state: machine.state() })
+      }
+      throw refusal
+    }
   }
 
   function reject(): void {

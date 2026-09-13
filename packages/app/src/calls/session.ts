@@ -302,6 +302,22 @@ export function startCallSession(
     }
   }
 
+  /**
+   * Runs a gesture that ends the call, unless the call has already ended.
+   *
+   * A CALL THAT IS OVER HAS NOTHING LEFT TO END. The machine refuses a reject
+   * or a hangup once it has ended, and rightly for a protocol: an intent in
+   * the wrong state. For a person it is a screen still a moment behind an
+   * ending that has already reached `onState`, and the refusal had nowhere
+   * to go but out of the press, as an exception. Found on an invitation that
+   * ran out while it was being answered (#292).
+   */
+  function unlessOver(end: (carrier: CallTransport) => void): void {
+    const carrier = transportOrStart()
+    if (carrier.state().call === 'ended') return
+    end(carrier)
+  }
+
   return {
     state: () => transportOrStart().state(),
 
@@ -330,12 +346,12 @@ export function startCallSession(
       carrier.accept(answer)
     },
 
-    reject: () => transportOrStart().reject(),
+    reject: () => unlessOver(carrier => carrier.reject()),
 
     // `user_hangup`, always, because this is the only path a person can take
     // to this function. Every other reason is the machine's or the media
     // layer's to give.
-    hangup: () => transportOrStart().hangup(USER_HANGUP),
+    hangup: () => unlessOver(carrier => carrier.hangup(USER_HANGUP)),
 
     setMuted: muted => media?.setMuted(muted) ?? muted,
 
