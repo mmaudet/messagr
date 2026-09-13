@@ -260,6 +260,9 @@ export function CallScreen({
             streamURL={pictures.remote}
             style={styles.far}
             objectFit="cover"
+            // Le rang du fond, écrit bien que ce soit celui par défaut : les
+            // deux rangs se lisent ensemble, et la vignette dit pourquoi.
+            zOrder={0}
             testID="call-far"
           />
         )}
@@ -272,6 +275,20 @@ export function CallScreen({
             style={styles.near}
             objectFit="cover"
             mirror
+            // AU-DESSUS DE L'IMAGE D'EN FACE, ET C'EST ÉCRIT. Chaque image
+            // est une surface vidéo, et entre deux surfaces de même rang
+            // Android ne promet aucun ordre : en pratique, la dernière créée
+            // recouvre l'autre. Chez l'appelant, la caméra s'ouvre avant
+            // l'invitation et l'image d'en face n'arrive qu'après la réponse ;
+            // elle recouvrait donc cette vignette, et l'appelant voyait
+            // l'autre sans jamais se voir. Chez l'appelé l'ordre est inverse,
+            // et c'est pourquoi le défaut ne touchait que l'appelant. #288,
+            // répétition du 13 septembre 2026.
+            //
+            // 1 est le rang que react-native-webrtc conseille pour la vidéo
+            // locale, 0 celui de la distante. Pas 2 : Android le place
+            // au-dessus de la fenêtre elle-même, donc par-dessus les commandes.
+            zOrder={1}
             testID="call-near"
           />
         )}
@@ -394,7 +411,21 @@ export function CallScreen({
 
                   Switching only appears while there IS a camera to switch.
                   A control that turns nothing is worse than an absent one,
-                  and this screen has said so since #88. */}
+                  and this screen has said so since #88.
+
+                  TROIS DESSINS POUR DEUX BOUTONS. Les deux dessinaient `cam`,
+                  côte à côte : deux ronds portant la même image, que rien ne
+                  distinguait. La maquette réserve `flip` au changement de
+                  caméra. #290, répétition du 13 septembre 2026.
+
+                  ET `cam.off` PENDANT UN APPEL VIDÉO SEULEMENT, comme le
+                  prototype V3 : son écran d'appel audio dessine `cam` que la
+                  bascule soit enclenchée ou non, et seul son écran vidéo
+                  passe à `cam.off` quand la caméra est coupée. Ici, un appel
+                  vidéo est un appel où une image est dessinée, `showing`.
+                  Sans image, c'est l'écran d'un appel audio : l'état de la
+                  caméra n'y tient qu'au vert et à `accessibilityState`, de
+                  même que la maquette n'y change que le fond du bouton. */}
               <Round
                 testID="call-camera"
                 label={
@@ -405,7 +436,7 @@ export function CallScreen({
                   sendingVideo ? color.brand.green500 : color.neutral['600']
                 }
                 onPress={() => onCamera(!sendingVideo)}
-                glyph="cam"
+                glyph={showing && !sendingVideo ? 'cam.off' : 'cam'}
               />
               {sendingVideo && (
                 <Round
@@ -413,7 +444,7 @@ export function CallScreen({
                   label={t('call_switch_camera')}
                   tint={color.neutral['600']}
                   onPress={onSwitchCamera}
-                  glyph="cam"
+                  glyph="flip"
                 />
               )}
               {/* HANGING UP CLOSES THE SCREEN AT ONCE, and does not wait
@@ -485,11 +516,11 @@ function Round({
   readonly tint: string
   readonly onPress: () => void
   /**
-   * Narrower than `TabGlyph` on purpose: these are the five this screen has
+   * Narrower than `TabGlyph` on purpose: these are the six this screen has
    * any business drawing, and a wider type would let a future control reach
    * for a tab icon that means something else entirely.
    */
-  readonly glyph: 'calls' | 'mic' | 'speaker' | 'cam'
+  readonly glyph: 'calls' | 'mic' | 'speaker' | 'cam' | 'cam.off' | 'flip'
   /**
    * Si ce contrôle est une bascule, et si elle est enclenchée.
    *
