@@ -23,10 +23,10 @@
 // # Ce qu'il cherche
 //
 // Le chemin du fichier, `/` suivi du nom que `deploy.sh` publie, n'importe où
-// dans la page. Le nom est LU dans `deploy.sh`, comme le font déjà
-// `destinations-page-invitation.js` et `landing/rendre-ecrans.mjs`. N'importe
-// où, et pas seulement dans un `href` : l'adresse absolue que la page
-// d'invitation porterait dans ses destinations mène au même 404.
+// dans la page. Le nom est LU dans `deploy.sh`, comme le fait déjà
+// `destinations-page-invitation.js`. N'importe où, et pas seulement dans un
+// `href` : l'adresse absolue que la page d'invitation porterait dans ses
+// destinations mène au même 404.
 //
 // # Pourquoi la moitié hors ligne existe
 //
