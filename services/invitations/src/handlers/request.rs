@@ -8,10 +8,8 @@
 //! cette phrase sur le service même qui la sert.
 //!
 //! Ce que la personne emporte est un CODE. Elle le garde, elle revient avec.
-//! C'est la même forme que « Copier le lien » sur la page d'invitation, qui
-//! fait déjà porter un secret à travers une installation — et la même forme
-//! que le produit entier, où l'identifiant d'un compte est tiré au hasard et
-//! n'est rattaché à rien.
+//! C'est la même forme que le produit entier, où l'identifiant d'un compte
+//! est tiré au hasard et n'est rattaché à rien.
 //!
 //! La contrepartie est assumée et elle est écrite sur la page : **celui qui
 //! décide ne sait pas qui demande**. Il arbitre un rythme, pas une personne.
