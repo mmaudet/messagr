@@ -38,10 +38,13 @@ in a directory the caller supplies and removes.
 """
 
 import asyncio
+
+import aiohttp
 import json
 import os
 import sys
 from pathlib import Path
+from urllib.parse import quote
 
 from nio import (
     AsyncClient,
@@ -69,6 +72,50 @@ COUNTERPARTY_FILE_BODY = "écrit par matrix-nio, pour que l'application le lise"
 
 SYNC_TIMEOUT_MS = 10_000
 COLLECT_DEADLINE_SECONDS = 120
+
+# RÉCLAMER À NOUVEAU TANT QUE LE SERVICE RÉPOND « PAS ENCORE INVITÉ », ET
+# PENDANT COMBIEN DE TEMPS.
+#
+# Sur le chemin `existing_user_id`, `409 MESSAGR_NOT_YET_INVITED` est une
+# étape du protocole et non un refus : voir `claim_place`. Les invitations
+# Matrix que le service attend viennent du client de l'inviteur, et
+# l'application ne les envoie que pendant sa fenêtre d'admission :
+# `admitDrawnEntrant` interroge l'état de l'invitation trente fois, à deux
+# secondes d'écart, soit une minute au moins.
+#
+# QUAND CETTE FENÊTRE S'OUVRE. `App.tsx` affiche le lien, rafraîchit la
+# liste, puis appelle `admitEntrant`. La première réclamation ne part
+# qu'après que Detox a lu le lien, et Detox attend pour le lire que le
+# réseau de l'application soit calme. Sur le run 34721727472 : requêtes de
+# la liste finies à 22:25:30.39, lien capturé à 22:25:31.19, premier 409
+# reçu à 22:25:32.55. Les interrogations du service ne sont pas
+# journalisées, donc le départ de la fenêtre est borné et non lu : elle
+# s'ouvre environ deux secondes avant la première réclamation.
+#
+# Quarante-cinq secondes de réclamations tiennent donc dans cette minute,
+# avec plus de dix secondes de marge. Le protocole en demande bien moins :
+# au moins trois réclamations, entre lesquelles l'application interroge
+# deux fois, soit une dizaine de secondes.
+CLAIM_DEADLINE_SECONDS = 45
+CLAIM_PAUSE_SECONDS = 2
+CLAIM_REQUEST_SECONDS = 20
+NOT_YET_INVITED = "MESSAGR_NOT_YET_INVITED"
+
+# TOUTE LA PHASE FINIT AVANT QUE LE HARNAIS NE LA TUE.
+#
+# `runCounterparty` (roundTrip.test.ts) accorde 120 secondes au processus
+# entier. Un processus tué n'imprime rien de ce qu'il savait, et l'appelant
+# ne lit que « Command failed » : l'échec sans cause que ce fichier refuse
+# partout ailleurs. L'attente de l'invitation durait jusqu'ici 120 secondes
+# à elle seule, après la réclamation.
+#
+# Réclamer finit au plus tard à 45 + 20 = 65 secondes. Attendre
+# l'invitation ne lance une synchronisation que s'il reste, avant 100
+# secondes comptées depuis le début de la phase, de quoi la finir et
+# rejoindre. Les 20 secondes restantes couvrent le démarrage de
+# l'interpréteur.
+PLACE_DEADLINE_SECONDS = 100
+HOMESERVER_REQUEST_SECONDS = 10
 
 # How long the send phase waits for the application's account to appear as a
 # joined member before it refuses to share a room key. Six syncs: the join has
@@ -549,15 +596,296 @@ async def send_file(session_file: Path, store: Path) -> int:
     return await _send_with(session_file, store, uploaded)
 
 
+def errcode_of(body: str) -> str | None:
+    """Le `errcode` d'une réponse du service, ou None quand elle n'en porte pas."""
+    try:
+        parsed = json.loads(body)
+    except ValueError:
+        return None
+    return parsed.get("errcode") if isinstance(parsed, dict) else None
+
+
+async def claim_place(session_file: Path, store: Path) -> int:
+    """Réclamer une invitation émise par l'application, avec CETTE identité.
+
+    # POURQUOI UN COMPTE EXISTANT PLUTÔT QU'UN COMPTE NEUF
+
+    `ClaimRequest` porte `existing_user_id`, et c'est ce chemin-là qui sert
+    ici : la contrepartie a déjà une identité, des clés publiées et une
+    signature croisée. Lui faire tirer un compte réservé donnerait un
+    troisième inconnu, et la preuve que #35 demande — « prouvée avec un
+    client indépendant plutôt qu'avec le nôtre » — perdrait ce qui la rend
+    indépendante.
+
+    # CE QUE CETTE PHASE NE FAIT PAS
+
+    Elle n'envoie aucune invitation. Le service place la demande ; c'est le
+    client de l'INVITEUR -- l'application -- qui lit l'état et envoie
+    l'invitation Matrix, parce qu'un compte réservé ne peut pas inviter dans
+    un salon dont le niveau « invite » est à 50. La migration 008 raconte
+    cette contrainte au long.
+
+    Elle n'ouvre pas non plus le magasin de nio, et ne se sert pas de son
+    `join` : l'attente de l'invitation, plus bas, dit pourquoi.
+
+    # TROIS RÉCLAMATIONS AU MOINS, ET LES DEUX PREMIÈRES RÉPONDENT 409
+
+    Lu dans `claim.rs` et `status.rs`, pas supposé. Sur ce chemin, le service
+    attend DEUX invitations Matrix, et l'application envoie les deux :
+
+    1. La première réclamation tire un compte réservé pour ce lien. Personne
+       ne l'a invité : `409 MESSAGR_NOT_YET_INVITED`. L'état de l'invitation
+       le nomme, et l'application l'invite.
+    2. Une fois ce compte invité, la réclamation suivante le fait entrer
+       dans le salon et tenter d'y inviter la contrepartie. Il n'a pas le
+       niveau : 403. Le service note la contrepartie comme attendue et
+       répond encore 409. L'état la nomme alors avant le compte tiré, et
+       l'application l'invite.
+    3. La réclamation suivante trouve la contrepartie déjà invitée : le
+       compte tiré se retire et se neutralise, et le service répond 200.
+
+    Une réclamation unique ne pouvait donc qu'échouer, et c'est ce qu'elle
+    faisait. `provision-bench-accounts.sh` décrit la même attente pour un
+    nouveau venu, dont le chemin s'arrête à la deuxième réclamation.
+
+    Réclamer à nouveau ne coûte rien au service : `account_for_claim`
+    reprend le compte déjà tiré au lieu d'en créer un autre. Et seul
+    `MESSAGR_NOT_YET_INVITED` se réclame à nouveau. Tout autre refus sort
+    tout de suite : le reposer serait poser une question déjà répondue, et
+    l'attendre derrière une échéance le ferait lire quarante-cinq secondes
+    plus tard, sous le nom de l'échéance au lieu du sien.
+
+    Alors cette phase réclame jusqu'à ce que le service réponde 200, puis
+    attend d'être invitée, puis rejoint. Chaque attente est bornée : une
+    invitation qui n'arrive pas est un défaut du produit et doit se lire
+    comme tel, pas comme une phase qui pend.
+    """
+    homeserver = env("MESSAGR_INTEROP_HOMESERVER")
+    # LE SERVICE EST DONNÉ, PAS DEVINÉ.
+    #
+    # Cette ligne construisait `{homeserver}/_messagr`, ce qui est le défaut
+    # de `provision-bench-accounts.sh` et non sa valeur : un banc qui pose
+    # `MESSAGR_BENCH_SERVICE` met le service ailleurs, et les deux
+    # dérivations d'une même chose finissent par diverger.
+    #
+    # Ce n'était PAS la cause du 401 -- voir l'en-tête plus bas. La valeur
+    # voyage quand même, parce qu'une duplication qui n'a pas encore mordu
+    # reste une duplication.
+    service = os.environ.get("MESSAGR_INTEROP_SERVICE") or f"{homeserver}/_messagr"
+    token = env("MESSAGR_INTEROP_CLAIM_TOKEN")
+
+    session = json.loads(session_file.read_text())
+    user_id = session["user_id"]
+
+    clock = asyncio.get_running_loop()
+    started = clock.time()
+    deadline = started + CLAIM_DEADLINE_SECONDS
+    attempts = 0
+    last = "none"
+
+    async with aiohttp.ClientSession() as http:
+        while True:
+            attempts += 1
+            try:
+                async with http.post(
+                    f"{service}/invitations/claim",
+                    json={"token": token, "existing_user_id": user_id},
+                    # AUTHENTIFIÉ, ET LE SERVICE DIT POURQUOI À CET ENDROIT PRÉCIS.
+                    #
+                    # `POST /invitations/claim` ne l'est pas : c'est le principe
+                    # même d'accueillir un nouveau venu. Mais sur le chemin
+                    # `existing_user_id`, l'appelant désigne un TIERS, et
+                    # `claim.rs` refuse sans preuve qu'il est bien cette
+                    # personne -- sans quoi n'importe qui ferait inviter un
+                    # identifiant Matrix arbitraire dans un vrai salon, ce qui
+                    # est irréversible.
+                    #
+                    # La contrepartie prouve donc qu'elle est `existing_user_id`
+                    # avec le jeton de sa propre session. Le service compare, et
+                    # refuse si les deux diffèrent.
+                    headers={"Authorization": f"Bearer {session['access_token']}"},
+                    timeout=aiohttp.ClientTimeout(total=CLAIM_REQUEST_SECONDS),
+                ) as response:
+                    status = response.status
+                    body = await response.text()
+            except (aiohttp.ClientError, asyncio.TimeoutError) as error:
+                print(
+                    f"FAIL: claim {attempts} got no answer, "
+                    f"{clock.time() - started:.1f}s in "
+                    f"({type(error).__name__}: {error}).\n"
+                    f"      last answer before it: {last}",
+                    file=sys.stderr,
+                )
+                return 1
+
+            elapsed = clock.time() - started
+            errcode = errcode_of(body)
+            last = f"{status} {errcode}" if errcode else f"{status} {body[:200]!r}"
+            if status == 200:
+                break
+
+            # LE SEUL REFUS QUI SE RÉCLAME À NOUVEAU. Le docstring dit
+            # pourquoi ; ici, tout le reste sort avec le corps tel quel.
+            if status != 409 or errcode != NOT_YET_INVITED:
+                print(
+                    f"FAIL: the claim was refused ({status}) on attempt "
+                    f"{attempts}, {elapsed:.1f}s in: {body}",
+                    file=sys.stderr,
+                )
+                return 1
+
+            if clock.time() + CLAIM_PAUSE_SECONDS > deadline:
+                print(
+                    f"FAIL: no place after {attempts} claims over "
+                    f"{elapsed:.1f}s; last answer: {last}.\n"
+                    f"      Every answer was {NOT_YET_INVITED}: the Matrix "
+                    "invitation the service waits for was not there when it "
+                    "looked.\n"
+                    "      On this path it waits for two, both sent by the "
+                    "inviter's client -- the application, in the minute it\n"
+                    "      spends admitting after showing the link "
+                    "(admitDrawnEntrant): one for the account the service\n"
+                    "      drew for this link, then one for this account.",
+                    file=sys.stderr,
+                )
+                return 1
+
+            print(
+                f"claim {attempts}: {last}, {elapsed:.1f}s in; "
+                f"claiming again in {CLAIM_PAUSE_SECONDS}s"
+            )
+            await asyncio.sleep(CLAIM_PAUSE_SECONDS)
+
+        print(
+            f"OK: {user_id} claimed the application's invitation "
+            f"on attempt {attempts}, {elapsed:.1f}s in"
+        )
+
+        # ATTENDRE L'INVITATION, PUIS REJOINDRE, SANS nio. Deux raisons, et
+        # toutes deux sont déjà écrites dans ce dépôt.
+        #
+        # LE `join` DE nio N'ENVOIE AUCUN CORPS. Dans nio 0.26, `Api.join`
+        # rend une méthode et un chemin, rien d'autre, et ce homeserver le
+        # refuse : « M_BAD_JSON deserialization failed: EOF while parsing a
+        # value », mesuré au premier run de cette contrepartie (27a4c0e) et
+        # rappelé dans `login` plus haut. Le service rejoint avec `{}`
+        # (`join_room`, dans `matrix.rs`) ; cette phase fait de même.
+        #
+        # UNE SYNCHRONISATION nio AVANCERAIT LE JETON QUE `collect` REPREND.
+        # Le magasin est partagé entre les phases : `store_sync_tokens`
+        # enregistre le jeton à chaque réponse, et le `sync` suivant repart de
+        # lui. `collect` tourne après la suite et lit ce que l'application a
+        # envoyé dans le salon du banc. Aucune relance ne suit cette phase,
+        # donc le dernier message de l'application passerait derrière le
+        # jeton, et `collect` conclurait à un salon muet. Une synchronisation
+        # sans `since`, avec le jeton d'accès, n'avance rien : c'est ainsi que
+        # le service trouve le salon d'un compte tiré (`pending_invite_room`).
+        bearer = {"Authorization": f"Bearer {session['access_token']}"}
+        place_deadline = started + PLACE_DEADLINE_SECONDS
+        syncs = 0
+        invited: list[str] = []
+        while clock.time() + 2 * HOMESERVER_REQUEST_SECONDS <= place_deadline:
+            syncs += 1
+            try:
+                async with http.get(
+                    f"{homeserver}/_matrix/client/v3/sync",
+                    params={"timeout": "0"},
+                    headers=bearer,
+                    timeout=aiohttp.ClientTimeout(total=HOMESERVER_REQUEST_SECONDS),
+                ) as response:
+                    status = response.status
+                    body = await response.text()
+            except (aiohttp.ClientError, asyncio.TimeoutError) as error:
+                print(
+                    f"FAIL: sync {syncs} got no answer, "
+                    f"{clock.time() - started:.1f}s in "
+                    f"({type(error).__name__}: {error})",
+                    file=sys.stderr,
+                )
+                return 1
+            if status != 200:
+                print(f"FAIL: the sync was refused ({status}): {body}", file=sys.stderr)
+                return 1
+            rooms = json.loads(body).get("rooms") or {}
+            invited = sorted(rooms.get("invite") or {})
+            if invited:
+                break
+            await asyncio.sleep(CLAIM_PAUSE_SECONDS)
+
+        if not invited:
+            print(
+                "FAIL: the claim succeeded, and no Matrix invitation was "
+                f"visible to {user_id} after {syncs} sync(s), "
+                f"{clock.time() - started:.1f}s into this phase.\n"
+                "      On this path the service answers 200 only once this "
+                "account is invited or joined.",
+                file=sys.stderr,
+            )
+            return 1
+
+        room_id = invited[0]
+        try:
+            async with http.post(
+                f"{homeserver}/_matrix/client/v3/join/{quote(room_id, safe='!')}",
+                json={},
+                headers=bearer,
+                timeout=aiohttp.ClientTimeout(total=HOMESERVER_REQUEST_SECONDS),
+            ) as response:
+                status = response.status
+                body = await response.text()
+        except (aiohttp.ClientError, asyncio.TimeoutError) as error:
+            print(
+                f"FAIL: the join of {room_id} got no answer "
+                f"({type(error).__name__}: {error})",
+                file=sys.stderr,
+            )
+            return 1
+        if status != 200:
+            print(
+                f"FAIL: the join of {room_id} was refused ({status}): {body}",
+                file=sys.stderr,
+            )
+            return 1
+
+    # LE SALON REJOINT VOYAGE JUSQU'AU TEST, PARCE QUE LUI SEUL LE CONNAÎT.
+    #
+    # `roundTrip.test.ts` doit ouvrir CETTE conversation, et la liste de
+    # l'application ne la met pas en tête : elle trie par dernière activité, et
+    # rien n'y a encore été dit. Son identifiant naît avec l'invitation, donc
+    # ni le test ni l'écran ne le connaissent d'avance ; la contrepartie vient
+    # de le rejoindre. Il est écrit à côté du fichier de session, dans le
+    # dossier que l'appelant fournit et supprime.
+    session_file.with_name("claimed-room").write_text(room_id)
+    also = f"; also invited to {', '.join(invited[1:])}" if invited[1:] else ""
+    print(f"OK: joined {room_id} on the application's invitation{also}")
+    return 0
+
+
 def main() -> int:
+    # `claim-place` MANQUAIT ICI, ET C'EST LE DÉFAUT QUI REVIENT DANS CE DÉPÔT.
+    #
+    # `claim_place` était écrite, testée de l'extérieur par
+    # `roundTrip.test.ts`, et absente de cette table. Le script répondait donc
+    # « usage: login|send|collect » et sortait 2, ce que l'appelant voyait
+    # comme « Command failed », sans rien qui nomme la phase inconnue.
+    #
+    # Une pièce finie que rien n'appelle ne se signale à aucune unité : le
+    # script se lit bien, la fonction se lit bien, et seule leur absence de
+    # lien est fausse. C'est pour cela que la table est ici plutôt que dans
+    # trois endroits, et que la ligne d'usage est dérivée d'elle : les deux ne
+    # peuvent plus diverger.
     phases = {
         "login": login,
         "send": send,
         "send-file": send_file,
+        "claim-place": claim_place,
         "collect": collect,
     }
     if len(sys.argv) != 2 or sys.argv[1] not in phases:
-        print("usage: nio_counterparty.py login|send|collect", file=sys.stderr)
+        print(
+            f"usage: nio_counterparty.py {'|'.join(phases)}",
+            file=sys.stderr,
+        )
         return 2
 
     work = Path(env("MESSAGR_INTEROP_WORKDIR"))

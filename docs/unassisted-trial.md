@@ -33,18 +33,22 @@ ten and #91 is.
 - [ ] **The invitation link opens the application _on a build from the
       track_.** The item most likely to be ticked wrongly. Android App Links
       verify against `/.well-known/assetlinks.json`, which declared a dead
-      package name until 6 September 2026 — and which today names the
-      fingerprint of a build installed **by hand**. Play App Signing re-signs
-      the upload with a certificate Google holds, and that is what reaches a
-      device from the internal testing track, so a link that opens the
-      application on the observer's own phone may still open a browser on the
-      participant's (**#114**, which needs Play Console access). Tap a real
-      link on a device that installed from the track, not on one that was
-      sideloaded. If it opens a browser the trial is still runnable — the
-      landing page offers **Copy the link**, which is what carries an
-      invitation across an install — but write down that step 1 measured
-      that path rather than the other one. It is a different finding, not
-      the same step gone badly.
+      package name until 6 September 2026 and has named the two certificates
+      Play App Signing signs with since 7 September (**#114**). Those are
+      what reach a device from the internal testing track, so a build from
+      the track is expected to verify. Expected, not yet observed: on a
+      device that installed from the track,
+      `adb shell pm get-app-links eu.messagr` should answer
+      `messagr.eu: verified`, and a real link tapped there should open the
+      application. Check it there, not on a phone that was sideloaded: a
+      sideloaded build is signed by a key that is not served, so what it
+      answers says nothing about the track. On 13 September 2026 a fresh
+      debug install did not verify, and the demonstration Pixel still did,
+      for a reason nobody has established; that install of the Pixel was
+      removed at 05:31 UTC the same morning (see
+      `production-entry-point.md`). If the link opens a browser on a build
+      from the track, **the path is blocked, not merely different**: see
+      _If the link opens a browser_ below.
 
 - [ ] **The language the person reads is one of the six.** French, English,
       German, Spanish, Italian, Dutch. The first screen offers the choice
@@ -53,9 +57,25 @@ ten and #91 is.
 - [ ] The person's Google account is enrolled as an internal tester, and they
       have opted in through the tester link, on their own device, before the
       session.
-- [ ] The inviter is `@mmaudet:messagr.eu` — the production entry point (see
+- [ ] **The inviter is an account of messagr.eu carried by the observer's
+      own phone.** On 13 September 2026 that is the demonstration Pixel:
+      its account, `@2qcl4umxsia3:messagr.eu`, was invited directly by the
+      production entry point, `@mmaudet:messagr.eu` (see
       `production-entry-point.md`). Not a bench account: the trial goes
-      through the real service or it proves nothing about the real service.
+      through the real service or it proves nothing about the real service,
+      and until that morning the Pixel was on the bench, its _Invite
+      someone_ making links on `messagr-fork.maudet.cloud`. The link issued
+      for the participant should begin `https://messagr.eu/i/`, since a link
+      takes the host of the issuing account's homeserver (`inviteSomebody`
+      in `packages/app/src/runtime/cryptoPump.ts`): expected, not yet
+      observed from the Pixel. **The entry point itself cannot be the
+      inviter.** No application carries it: on 13 September 2026 the server
+      knew it one device, the script's, last seen on 5 September; the
+      application has no sign-in screen, by design (_"No number, no account,
+      no password"_, `promise_subtitle`); and `reenter.ts` only brings an
+      account back after a reinstall. And the trial needs the inviter in an application, which
+      admits the entrant (`admitDrawnEntrant`), answers at step 6, vouches
+      at step 7 and calls at step 10.
 - [ ] The observer has this document open and somewhere to write.
 
 ## The rule that makes it a trial
@@ -70,6 +90,36 @@ impossible rather than unclear. Then help, and record that the path was
 blocked rather than confusing. Those two are different findings and lead to
 different work.
 
+## If the link opens a browser
+
+On a phone without Messagr it is meant to: the landing page is how step 1
+reaches step 2. **On a build from the track that is already installed, it is
+a hard stop**, and nothing on the landing page gets past it. This document
+used to call the trial still runnable there, through the page's **Copy the
+link**. What the page does, read in `deploy/messagr-eu/site/i/index.html`:
+
+- **Open in Messagr** is `<a class="ouvrir" href="">`, the page's own https
+  address. It is not `messagr://`, and it reaches the application on the same
+  condition as the link that has just opened a browser (expected, not observed
+  on a device).
+- **Copy the link** is shown wherever the browser exposes
+  `navigator.clipboard`. It puts `location.href`, that same address, on the
+  clipboard, and then says _"Link copied. Open Messagr after installing: it
+  will offer to paste it."_
+
+The application offers no such thing. It has no field a link can be pasted
+into, and it only ever writes to the clipboard (`Clipboard.setString` and
+`Clipboard.setImage` in `packages/app/App.tsx`, never a read). Opened without a
+link, it says _"You are not in yet. Open the invitation link somebody sent you:
+it is the only door, and the application can do nothing before it."_
+(`list_not_in_yet`). An invitation crosses an install one way: the link opened
+again and handed to the application by the system, which is the step that has
+just failed.
+
+So help, write down exactly what the help was, record step 1 as blocked, and
+give it its own ticket. With the fingerprints served, it is not a known limit
+but something to find the cause of.
+
 ## The path, and what to watch at each step
 
 Time each step from the person's first look at the screen to the moment they
@@ -79,7 +129,13 @@ act. The number matters less than where the long ones are.
    is? Do they open it, or do they ask what it is first?
 2. **Installing.** From the tester link, through the store. Watch for the
    step where the store says the app is unavailable — a known confusion when
-   the opt-in has not propagated.
+   the opt-in has not propagated. Then watch how they come back to the
+   invitation. Opened from the store or from the home screen, the application
+   has no link to spend, and once past the screens of step 3 its list says
+   `list_not_in_yet`; the invitation comes in when the link is opened again.
+   If they tapped **Copy the link** on the landing page, the page told them
+   the application would offer to paste it. It will not, so a search for a
+   paste field is a wrong turn the page caused, and goes down as one.
 3. **The promise, the language and the terms.** Before anything is claimed,
    the first screen states what the product promises, offers the six
    languages on a strip under the thumb, and will not continue until the
@@ -89,7 +145,12 @@ act. The number matters less than where the long ones are.
    and learn about the box from its refusal? A gate somebody walks into is a
    gate that was not visible.
 4. **Entry.** The link is claimed. Do they know they are now _in_ something,
-   and in something _with somebody_?
+   and in something _with somebody_? That somebody shows as an identifier,
+   `@2qcl4umxsia3` for the Pixel, until the person names them: an unnamed
+   participant is shown by the localpart of their account
+   (`packages/app/src/runtime/givenName.ts`). It is what every real invitee
+   sees of an inviter who entered by invitation, so do not name it for them
+   and do not explain it. Write down what they make of it.
 5. **Sending a message.** Do they find the composer? There is no send button
    — the return key sends — so watch for a hand hunting for one. Does the
    message appear?

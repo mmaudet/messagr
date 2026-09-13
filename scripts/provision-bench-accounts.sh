@@ -258,6 +258,18 @@ import json, sys
 inviter, room, entrant, link, trip_entrant, trip_link = sys.argv[1:7]
 out = {
     'homeserver': '$MESSAGR_BENCH_HOMESERVER',
+    # TRANSMIS PLUTÔT QUE REDÉRIVÉ, ET C'EST UN DÉFAUT MESURÉ.
+    #
+    # `SERVICE` vaut `MESSAGR_BENCH_SERVICE` quand il est posé, et
+    # `$MESSAGR_BENCH_HOMESERVER/_messagr` sinon. La contrepartie
+    # d'interopérabilité refaisait le second calcul de son côté, donc sur un
+    # banc où le premier s'applique elle visait le homeserver au lieu du
+    # service -- et recevait un 401 `M_UNAUTHORIZED`, qui est un code Matrix
+    # et nomme donc le mauvais coupable.
+    #
+    # Deux dérivations d'une même chose finissent toujours par diverger. Il
+    # n'y en a plus qu'une, et la valeur voyage.
+    'service': '$SERVICE',
     'room_id': room,
     'inviter': json.loads(inviter),
     'entrant_user_id': entrant,

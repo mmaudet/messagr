@@ -342,19 +342,41 @@ const faitsDuTelechargement = () => {
 // Les deux blocs sont écrits dans le balisage, donc tous deux relisibles ; la
 // construction en retire un. Exigés avant d'être retirés, comme le reste : un
 // bloc renommé doit arrêter la construction plutôt que de laisser les deux.
+//
+// L'ACCUEIL LES PORTE AUSSI, DEPUIS LE 13 SEPTEMBRE 2026. Son badge « Android,
+// Téléchargement direct » était écrit en dur, hors de ces blocs : le
+// déploiement de 03:33 UTC a retiré le fichier, la page du téléchargement l'a
+// dit, et les six pages d'accueil ont gardé un lien vers un 404. Deux choses
+// ont changé pour qu'un seul mécanisme serve les deux pages :
+//
+//   - LE BLOC SE RECONNAÎT À SON ATTRIBUT, quelle que soit la balise qui le
+//     porte, et c'est l'attribut seul qui quitte le bloc gardé. Sur l'accueil,
+//     chaque bloc est une colonne `store` : un `<div>` de plus autour du badge
+//     déferait la colonne. Avec le fichier, l'accueil construit reste celui
+//     d'avant, à l'octet.
+//   - IL SE FERME À SA PROPRE INDENTATION. La fermeture était cherchée à deux
+//     espaces, l'indentation des blocs de la page du téléchargement ; ceux de
+//     l'accueil sont à huit.
+//
+// ET UNE PAGE QUI PORTE L'UN DES DEUX PORTE L'AUTRE. Sans fichier, un bloc
+// d'absence introuvable faisait rendre la page telle quelle, offre comprise :
+// le contraire de la phrase au-dessus, en silence. Une page qui ne porte ni
+// l'un ni l'autre ne propose rien, et reste intacte.
 const trancherLOffre = (html, langue, offert) => {
   const garder = offert ? 'telechargement' : 'pas-de-telechargement'
   const retirer = offert ? 'pas-de-telechargement' : 'telechargement'
-  const present = new RegExp(`<div data-si="${garder}">`)
-  if (!present.test(html)) {
+  if (!/<div[^>]*\sdata-si="(?:pas-de-)?telechargement"/.test(html)) {
     return html
   }
+  const ouverture = new RegExp(`(<div[^>]*) data-si="${garder}"`, 'g')
+  exigerUneFois(html, ouverture, `le bloc « ${garder} »`, langue)
   const motif = new RegExp(
-    `\\n\\s*<div data-si="${retirer}">[\\s\\S]*?\\n  </div>`,
+    `\\n(?:[ \\t]*\\n)*([ \\t]*)<div[^>]*\\sdata-si="${retirer}"[^>]*>` +
+      `[\\s\\S]*?\\n\\1</div>`,
     'g',
   )
   exigerUneFois(html, motif, `le bloc « ${retirer} »`, langue)
-  return html.replace(motif, '').replace(`<div data-si="${garder}">`, '<div>')
+  return html.replace(motif, '').replace(ouverture, '$1')
 }
 
 const ecrireLesFaits = (html, langue, faits) => {

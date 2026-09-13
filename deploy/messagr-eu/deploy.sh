@@ -257,7 +257,19 @@ if [ "$offered" = "yes" ]; then
   fi
   echo "the offered download answers 200"
 else
-  echo "no download offered, and the page says so"
+  # AND EVERY OTHER PAGE, AS THE SERVER ANSWERS IT. This branch read the one
+  # page above and concluded for the whole site. On 13 September 2026 the
+  # 03:33 UTC deployment ran with MESSAGR_APK=none: the file answered 404, the
+  # invitation page named no download, this branch printed "no download
+  # offered, and the page says so" -- and the six landing pages were serving
+  # a "Direct download" badge that pointed at the 404. The page that lied was
+  # not the page that was read.
+  #
+  # A file of its own rather than a loop here, so it runs without deploying:
+  # CI exercises it against built pages, and `--live` asks any server from any
+  # checkout without writing anything.
+  node tests/telechargement-retire.js --live "https://messagr.eu"
+  echo "no download offered, and no served page names it"
 fi
 
 # ── AND THE WHOLE SITE, FILE BY FILE, AS THE SERVER ANSWERS IT ───────────

@@ -26,6 +26,46 @@ Its credentials live outside this repository, in
 `~/.messagr-exploitation/racine-mmaudet.json` on the operator's machine.
 Nothing in this repository should ever contain them.
 
+## The owner's phone, and the edge from him to himself
+
+**`@2qcl4umxsia3:messagr.eu`** is the account on the demonstration Pixel, the
+owner's own phone, and it arrived by invitation like any other. On
+13 September 2026 `@mmaudet:messagr.eu` invited it. The invitation was issued
+with the entry point's credentials, outside any application, into a
+conversation shaped exactly as `packages/app/src/runtime/issueInvitation.ts`
+shapes one, and the server lists both accounts as its members.
+
+**Why then.** Until that morning the Pixel carried an account of the bench:
+its _Invite someone_ made links on `messagr-fork.maudet.cloud`, while the
+unassisted trial goes through production. On the owner's decision its
+application was uninstalled at 05:31 UTC, and a debug build of `master` was
+installed and entered production through this invitation. It is the phone
+that invites on the day of the trial (`docs/unassisted-trial.md`).
+
+**Why not the entry point itself.** No application can carry it. The same
+morning the server knew it one device, « racine », the one its script uses,
+last seen on 5 September 2026. The application has no sign-in screen, by
+design (_"No number, no account, no password"_, `promise_subtitle`), and
+`reenter.ts` brings an account back onto a phone after a reinstall, not onto a
+phone that never held it.
+
+**The same person holds both accounts, so the invitation graph carries an
+edge from its owner to himself.** It is structural, not a shortcut: in a
+network entered only by invitation, the first phone is necessarily invited by
+an account its owner controls, because the graph cannot start from nothing.
+It is written here so that it is read rather than discovered.
+
+Two things follow. **The entry point must not vouch for this account**:
+vouching is the inviter saying that the person who entered is the one they
+meant to invite (`CONTEXT.md`), and here it would be the owner vouching for
+himself. **And the conversation created for this entry is read by nobody on
+the entry point's side**, since nothing carries the entry point.
+
+The people the Pixel invites see it as `@2qcl4umxsia3`, not `@mmaudet`, until
+they name it: an unnamed participant is shown by their localpart
+(`packages/app/src/runtime/givenName.ts`). That is what every real user sees
+of an inviter who entered by invitation.
+
 ## The root that came before, and no longer issues
 
 **`@maria:messagr.eu`** was the entry point until 5 September 2026 and is the
@@ -93,5 +133,6 @@ and the bench is where anything that provisions accounts belongs.
 
 It is not an operations runbook, and it does not say how to restart anything.
 It says which accounts exist on production that did not arrive by invitation,
-and why each one is allowed to. If a fifth appears, either this file gains a
-paragraph or the account should not be there.
+why each one is allowed to, and the one invitation that goes from the owner to
+himself. If a fifth such account appears, either this file gains a paragraph
+or the account should not be there.
