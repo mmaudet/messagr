@@ -103,25 +103,22 @@ adb -s <série> uninstall eu.messagr
 adb -s <série> install ~/messagr-builds/199/messagr-plafond-1200000.apk
 ```
 
-**Il entre ensuite en production par une invitation du Pixel.** L'application
-n'a aucun champ où coller un lien : son écran d'accueil le dit, le lien
-d'invitation est « la seule porte ». Sur le Pixel, _Inviter quelqu'un_ (le
-« + »), puis _Partager le lien_ pour le faire arriver sur le Mac. Il vaut une
-heure et ne sert qu'une fois.
-
-Ouvrir ce lien sur le second téléphone ne suffit pas. Une build de debug neuve
-ne vérifie pas les liens de `messagr.eu` : le Pixel, réinstallé en debug le
-13 septembre, répond `messagr.eu: 1024` à `adb shell pm get-app-links
-eu.messagr`. Android garde donc le lien dans le navigateur, et le bouton
-_Ouvrir dans Messagr_ de la page n'y peut rien : c'est un lien vers la même
-adresse, qui n'entre dans l'application que si ses liens sont vérifiés
-(`deploy/messagr-eu/site/i/index.html` le dit en commentaire). La porte est la
-commande qui adresse le lien au paquet lui-même, depuis le Mac, et qui ne
-demande aucune vérification :
+**Il entre ensuite en production par une invitation du Pixel, et le lien lui
+est remis depuis le Mac.** Une build de debug neuve ne vérifie pas les liens de
+`messagr.eu` : le Pixel, réinstallé en debug le 13 septembre, répond
+`messagr.eu: 1024` à `adb shell pm get-app-links eu.messagr`. La commande qui
+adresse le lien au paquet lui-même ne demande aucune vérification, et c'est
+ainsi que le Pixel est entré ce jour-là :
 
 ```
 adb -s <série> shell am start -a android.intent.action.VIEW -d 'https://messagr.eu/i/<jeton>' eu.messagr
 ```
+
+Le lien vient de _Inviter quelqu'un_ (le « + ») sur le Pixel, qui l'affiche en
+toutes lettres sous le code QR. Il vaut une heure et ne sert qu'une fois, et
+qui le lit peut entrer à la place de l'invité : le recopier depuis l'écran du
+Pixel, ou le transmettre au Mac par un moyen qui ne l'expose pas. Le jeton est
+en base32, sans caractère que le shell du téléphone interpréterait.
 
 Garder Messagr ouvert sur le Pixel pendant ce temps : il admet la personne qui
 a réclamé à chaque tour de synchronisation, pendant l'heure que vaut le lien.
