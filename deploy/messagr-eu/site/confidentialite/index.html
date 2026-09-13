@@ -185,7 +185,7 @@
         Ce que Messagr ne vous demande pas, ce que le service ne peut pas lire,
         et ce que le serveur voit malgré tout.
       </p>
-      <p class="stamp">Version du 5 septembre 2026</p>
+      <p class="stamp">Version du 13 septembre 2026</p>
 
       <h2>Qui traite vos données</h2>
       <p>
@@ -284,6 +284,17 @@
           système d'exploitation&nbsp;;
         </li>
         <li>votre session, dans ce même trousseau&nbsp;;</li>
+        <!-- #285 : ces lignes sont la trace qu'une build de store écrit, et
+             rien de plus : les évènements et les champs que
+             `packages/app/src/runtime/log.ts` nomme dans TRACE. Ajouter un
+             évènement à cette liste, c'est changer cette phrase et l'entrée
+             `journal_de_lappareil` de `deploy/messagr-eu/retention.json`. -->
+        <li>
+          quelques lignes dans le journal du système de l'appareil, limitées
+          aux appels, aux réveils par notification, à l'enregistrement des
+          notifications et à l'offre de sauvegarde. Elles ne portent ni contenu
+          ni identifiant, et l'application ne les envoie nulle part&nbsp;;
+        </li>
         <li>
           rien d'autre.
           <b>Les messages déchiffrés ne sont pas écrits sur le disque</b>&nbsp;:
