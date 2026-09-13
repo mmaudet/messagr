@@ -49,9 +49,14 @@ fi
 DEVICE=(-s "$SERIAL")
 echo "==> telephone: $SERIAL"
 
+# THE WHOLE LOG, UNLESS ASKED FOR THE TRACE. A bundle built with `--dev false`
+# writes only the trace a store build writes (`src/runtime/log.ts`), and this
+# telephone is read on a cable, so the bundle asks for everything.
+# `MESSAGR_WHOLE_LOG=0 scripts/pixel.sh` builds what a store build would
+# write instead, to read the trace before it leaves.
 echo "==> bundling the JavaScript (the step assembleDebug does not do)"
 cd "$APP"
-npx react-native bundle \
+MESSAGR_WHOLE_LOG="${MESSAGR_WHOLE_LOG-1}" npx react-native bundle \
   --platform android \
   --dev false \
   --entry-file index.js \

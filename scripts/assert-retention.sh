@@ -10,6 +10,12 @@
 # deploy/messagr-eu/retention.json holds the durations once. This checks that
 # the live page states them, and, when a server is reachable, that the server
 # applies them.
+#
+# An entry can also carry, under `dit`, what the page says about it, checked
+# the same way. The device's own log (#285) has no duration anybody here
+# decides -- the device's system keeps and clears it -- so its sentence is the
+# claim there is to hold, and a sentence nothing checks is how a policy starts
+# saying something the code does not do.
 set -uo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
@@ -36,8 +42,12 @@ else
 import json
 d = json.load(open('$SOURCE'))
 for k, v in d.items():
-    if isinstance(v, dict) and 'duree' in v:
+    if not isinstance(v, dict):
+        continue
+    if 'duree' in v:
         print(v['duree'])
+    for phrase in v.get('dit', []):
+        print(phrase)
 ")
 fi
 

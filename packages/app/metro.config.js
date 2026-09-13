@@ -27,7 +27,24 @@ const workspaceRoot = path.resolve(projectRoot, '../..')
 // rather than only of the intent.
 const CRYPTO_WASM = '@matrix-org/matrix-sdk-crypto-wasm'
 
+// THE FLAGS BABEL INLINES ARE PART OF THE CACHE KEY.
+//
+// `babel.config.js` bakes two environment variables into the bundle, and a
+// transform is cached on its source and its options, not on the environment
+// it ran in. So a bundle built after a bench build on the same machine was
+// served the bench's transforms: the send probe, measured once, and now the
+// whole log, in a release bundle that should carry the trace alone.
+// `cacheVersion` is hashed into every transform's key (Metro's
+// `Transformer.js`), which makes a flag that changed a transform redone
+// rather than a stale one shipped. No `--reset-cache` to remember.
+const defaults = getDefaultConfig(projectRoot)
+const INLINED = ['MESSAGR_SEND_PROBE', 'MESSAGR_WHOLE_LOG']
+
 const config = {
+  cacheVersion: [
+    defaults.cacheVersion,
+    ...INLINED.map(name => `${name}=${process.env[name] ?? ''}`),
+  ].join(' '),
   watchFolders: [workspaceRoot],
   resolver: {
     nodeModulesPaths: [
@@ -46,4 +63,4 @@ const config = {
   },
 }
 
-module.exports = mergeConfig(getDefaultConfig(projectRoot), config)
+module.exports = mergeConfig(defaults, config)

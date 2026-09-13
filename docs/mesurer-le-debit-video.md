@@ -133,11 +133,12 @@ a réclamé à chaque tour de synchronisation, pendant l'heure que vaut le lien.
 Pour les refaire : ce que fait `scripts/pixel.sh` sans l'installation, une fois
 par valeur, depuis `packages/app`. Une build de debug n'embarque pas le
 JavaScript d'elle-même, et une APK sans bundle frais transporterait un vieux
-code sans rien dire. Sur une machine où la suite de bout en bout a construit,
-ajouter `--reset-cache` au bundle : `babel.config.js` dit pourquoi.
+code sans rien dire. `MESSAGR_WHOLE_LOG=1` n'est pas facultatif : un bundle
+construit sans lui n'écrit que la trace d'une build de store, et
+`MESSAGR_VIDEO_CEILING` n'en fait pas partie.
 
 ```
-npx react-native bundle --platform android --dev false --entry-file index.js \
+MESSAGR_WHOLE_LOG=1 npx react-native bundle --platform android --dev false --entry-file index.js \
   --bundle-output android/app/src/main/assets/index.android.bundle \
   --assets-dest android/app/src/main/res
 (cd android && ./gradlew assembleDebug)
@@ -164,8 +165,9 @@ adb -s <série> logcat -s ReactNativeJS | grep --line-buffered MESSAGR_VIDEO_CEI
 MESSAGR_VIDEO_CEILING {"bps":1200000}
 ```
 
-`logEvent` écrit par `console.log`, sans condition de build : la ligne sort
-aussi d'une build de debug.
+La ligne sort parce que le bundle a été construit avec `MESSAGR_WHOLE_LOG=1`.
+Une installation depuis la piste n'écrit que la trace
+(`packages/app/src/runtime/log.ts`) : ce plafond ne s'y lit pas.
 
 `{"bps":null}` veut dire qu'il n'y avait aucun encodage à plafonner au moment
 où l'on a demandé — la négociation n'avait pas encore produit de couche. Une

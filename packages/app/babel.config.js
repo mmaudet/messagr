@@ -20,16 +20,24 @@ module.exports = {
     // baked the whole environment into a bundle would put whatever the
     // machine happened to be exporting into a file that ships.
     //
-    // METRO'S TRANSFORM CACHE DOES NOT KNOW ABOUT THE ENVIRONMENT. A bundle
-    // built after an end-to-end build, on the same machine, is served the
-    // cached transform and ships the probe -- measured here: the same two
+    // `MESSAGR_WHOLE_LOG` is the second name, and the same kind of switch.
+    // A release bundle writes the trace and nothing else (`log.ts` says
+    // which events), because that is the bundle that leaves for a store. A
+    // bundle somebody is going to read on a cable says so here: the probe
+    // build the device bench runs, or `MESSAGR_WHOLE_LOG=1`, which
+    // `scripts/pixel.sh` sets.
+    //
+    // METRO'S TRANSFORM CACHE DID NOT KNOW ABOUT THE ENVIRONMENT. A bundle
+    // built after an end-to-end build, on the same machine, was served the
+    // cached transform and shipped the probe -- measured here: the same two
     // commands produced byte-identical bundles until `--reset-cache` was
-    // passed, after which one compiled to `!0` and the other to `!1`. CI is
-    // safe because its cache is cold every run; a laptop is not. Pass
-    // `--reset-cache` when the flag changes.
+    // passed, after which one compiled to `!0` and the other to `!1`. With
+    // the whole log behind a flag, the same accident would ship every
+    // identifier the trace leaves out, so `metro.config.js` now puts both
+    // names in the cache key.
     [
       'transform-inline-environment-variables',
-      { include: ['MESSAGR_SEND_PROBE'] },
+      { include: ['MESSAGR_SEND_PROBE', 'MESSAGR_WHOLE_LOG'] },
     ],
   ],
 }
