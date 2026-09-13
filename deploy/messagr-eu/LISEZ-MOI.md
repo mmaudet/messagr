@@ -90,24 +90,38 @@ test failing.
 ## What still needs a person
 
 **A device that installed from the track, asked whether its links verify.**
-`assetlinks.json` names the two Play App Signing certificates, and has since
-#135 put them there on 7 September 2026 and closed #114; messagr.eu was
-serving exactly those two on 13 September 2026. Both were read off the console
-on 6 September 2026: Play generates a _classic_ certificate and a
-_post-quantum_ one, and both are served because which of the two a device
-presents to Digital Asset Links verification is not something this project
-decides. They are the certificates Google signs with before an install reaches
-a phone, so an install from the internal testing track is expected to verify,
-and `https://messagr.eu/i/<token>` is expected to open the application.
+It was asked on 13 September 2026, and the answer was no. `assetlinks.json`
+then named the two certificates read off the Play console on 6 September 2026,
+a _classic_ one and a _post-quantum_ one, served since #135 on 7 September. A
+Galaxy S22 Ultra on Android 16, holding version 130 from the closed testing
+track, answered `messagr.eu: 1024` and `messagr-fork.maudet.cloud: 1024`, and
+named a third certificate as its signature, `46:AC:3F:6A:…:FE:EC:55`.
+GoogleAssociationService had fetched `assetlinks.json` two seconds after that
+install and got a 200: the file was reachable, and it did not name the key.
 
-Expected, not yet observed. The check is one command on a device that
-installed from the track, and `messagr.eu: verified` is the answer that
-settles it:
+`apksigner verify --print-certs -v` on the `base.apk` pulled from that phone
+says why. Play signs an install three times. A **v3.2 hybrid** signature
+carries the classic and post-quantum certificates the console shows, and
+Android honours it from API level 37 (Android 17) only. A **v3.0** signature
+carries a third certificate, and every earlier device presents that one. So
+from 7 to 13 September 2026 no phone below Android 17 could verify messagr.eu
+links, and a person had to tick messagr.eu by hand under _Open by default_.
+`android-fingerprints.json` now records all three with the command that
+reproduces each, as `play-app-signing`, `play-app-signing-pq` and
+`play-app-signing-v3`, and `assetlinks.json` declares all three.
 
+Declared, not yet observed verified. The check is on a device that installed
+from the track, once the deployed file carries the third certificate: ask
+Android to verify again, then read the answer. `messagr.eu: verified` is the
+one that settles it.
+
+    adb shell pm verify-app-links --re-verify eu.messagr
     adb shell pm get-app-links eu.messagr
 
-Worth running before anybody is invited, rather than finding out at step 1 of
-`docs/unassisted-trial.md`.
+Worth running again before anybody is invited, rather than finding out at step
+1 of `docs/unassisted-trial.md`. And a store fingerprint is measured on an
+install, not only on the console: the console showed two certificates, and
+the install carries three.
 
 **The debug keys went out of `assetlinks.json` the same day, and that was a
 decision.** `tests/doctrine-app-links.js` refuses to serve a debug key
