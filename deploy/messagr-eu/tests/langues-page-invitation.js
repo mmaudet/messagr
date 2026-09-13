@@ -667,6 +667,13 @@ CODES.forEach(function (code) {
         echouer("l'accueil « " + code + ' » construit avec le fichier ne dit plus ' +
           '« ' + phrase + ' »');
       }
+      // ET PAS SA VARIANTE SANS FICHIER. Deux amorces qui se contredisent sur
+      // la même page, c'est la page qui se trompe une fois sur deux.
+      var absence = copie[code]['etat-amorce-sans'];
+      if (typeof absence === 'string' && avec.indexOf(echapperTexte(absence)) !== -1) {
+        echouer("l'accueil « " + code + ' » construit avec le fichier dit aussi ' +
+          '« ' + absence + ' »');
+      }
     });
     if (/%[A-Z]+%/.test(pageDe)) {
       echouer('une marque a survécu sur la page allemande');

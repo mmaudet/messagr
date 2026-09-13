@@ -358,25 +358,53 @@ const faitsDuTelechargement = () => {
 //     espaces, l'indentation des blocs de la page du téléchargement ; ceux de
 //     l'accueil sont à huit.
 //
-// ET UNE PAGE QUI PORTE L'UN DES DEUX PORTE L'AUTRE. Sans fichier, un bloc
-// d'absence introuvable faisait rendre la page telle quelle, offre comprise :
-// le contraire de la phrase au-dessus, en silence. Une page qui ne porte ni
+// PLUSIEURS PAIRES PAR PAGE, SUR N'IMPORTE QUELLE BALISE, DEPUIS LE MÊME JOUR.
+// Le badge parti, l'accueil redéployé à 05:45 UTC disait encore que la liste
+// des états « est vérifiée sur le fichier que cette page propose ». Cette
+// phrase est un `<p>`, et sa variante sans fichier en est un autre. « Quelle
+// que soit la balise » était écrit ci-dessus, et le code ne cherchait que des
+// `<div>`, une paire par page. Un bloc dont le contenu ne porte aucune balise
+// se ferme sur la sienne ; les autres se ferment à leur indentation, comme
+// avant.
+//
+// ET CHAQUE OFFRE A SON ABSENCE. Sans fichier, un bloc d'absence introuvable
+// faisait rendre la page telle quelle, offre comprise : le contraire de la
+// phrase au-dessus, en silence. Il faut donc autant de blocs de l'un que de
+// l'autre, et chaque bloc à retirer doit se fermer. Une page qui ne porte ni
 // l'un ni l'autre ne propose rien, et reste intacte.
 const trancherLOffre = (html, langue, offert) => {
   const garder = offert ? 'telechargement' : 'pas-de-telechargement'
   const retirer = offert ? 'pas-de-telechargement' : 'telechargement'
-  if (!/<div[^>]*\sdata-si="(?:pas-de-)?telechargement"/.test(html)) {
+  const ouverture = nom =>
+    new RegExp(`(<[a-z][a-z0-9]*(?=[\\s>])[^>]*?)\\s+data-si="${nom}"`, 'g')
+  const compter = nom => (html.match(ouverture(nom)) || []).length
+  const offres = compter('telechargement')
+  const absences = compter('pas-de-telechargement')
+  if (offres + absences === 0) {
     return html
   }
-  const ouverture = new RegExp(`(<div[^>]*) data-si="${garder}"`, 'g')
-  exigerUneFois(html, ouverture, `le bloc « ${garder} »`, langue)
+  if (offres !== absences) {
+    echouer(
+      `le bloc « pas-de-telechargement » apparaît ${absences} fois dans la ` +
+        `page ${langue}, et le bloc « telechargement » ${offres} fois : chaque ` +
+        `offre a son absence, et l'inverse`,
+    )
+  }
   const motif = new RegExp(
-    `\\n(?:[ \\t]*\\n)*([ \\t]*)<div[^>]*\\sdata-si="${retirer}"[^>]*>` +
-      `[\\s\\S]*?\\n\\1</div>`,
+    `\\n(?:[ \\t]*\\n)*([ \\t]*)<([a-z][a-z0-9]*)(?=[\\s>])[^>]*\\sdata-si="${retirer}"[^>]*>` +
+      `(?:[^<]*</\\2>|[\\s\\S]*?\\n\\1</\\2>)`,
     'g',
   )
-  exigerUneFois(html, motif, `le bloc « ${retirer} »`, langue)
-  return html.replace(motif, '').replace(ouverture, '$1')
+  const retirables = compter(retirer)
+  const fermes = (html.match(motif) || []).length
+  if (fermes !== retirables) {
+    echouer(
+      `le bloc « ${retirer} » apparaît ${retirables} fois dans la page ${langue}, ` +
+        `et ne se ferme que ${fermes} fois : un bloc qui ne se ferme ni sur sa ` +
+        `balise ni à son indentation ne peut pas être retiré`,
+    )
+  }
+  return html.replace(motif, '').replace(ouverture(garder), '$1')
 }
 
 const ecrireLesFaits = (html, langue, faits) => {
