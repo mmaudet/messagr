@@ -1,4 +1,5 @@
 import { execFileSync } from 'node:child_process'
+import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 
 import { expect } from '@jest/globals'
@@ -99,6 +100,25 @@ function runCounterparty(
     // against a real homeserver before it sends anything.
     timeout: 120_000,
   })
+}
+
+/**
+ * Le salon que `claim-place` a rejoint, tel qu'il l'a écrit.
+ *
+ * Personne d'autre ne le connaît : il naît avec l'invitation, l'écran montre
+ * une personne plutôt qu'un salon, et la contrepartie est celle qui vient d'y
+ * entrer. La moitié qui écrit est dans `claim_place`.
+ */
+function claimedRoom(): string {
+  const workdir = process.env.MESSAGR_INTEROP_WORKDIR
+  if (workdir === undefined) {
+    throw new Error('MESSAGR_INTEROP_WORKDIR is unset: no claimed room to read')
+  }
+  const room = readFileSync(resolve(workdir, 'claimed-room'), 'utf8').trim()
+  if (room === '') {
+    throw new Error('claim-place joined a room and wrote no identifier for it')
+  }
+  return room
 }
 
 const describeRoundTrip = hasCounterparty ? describe : describe.skip
@@ -415,19 +435,32 @@ describeRoundTrip('encrypted round trip', () => {
     const token = link.trim().split('/').pop() ?? ''
     if (token === '') throw new Error(`no token in the link shown: ${link}`)
 
-    // Bloquant jusqu'à cent vingt secondes : la contrepartie réclame, puis
-    // attend que le client de l'inviteur -- cette application, qui tourne --
-    // lui envoie l'invitation Matrix.
+    // Bloquant jusqu'à cent vingt secondes : la contrepartie réclame tant que
+    // le client de l'inviteur -- cette application, qui tourne -- ne l'a pas
+    // laissée entrer, puis rejoint le salon.
     runCounterparty('claim-place', { MESSAGR_INTEROP_CLAIM_TOKEN: token })
+    const scope = claimedRoom()
 
     await element(by.id('invite-close')).tap()
     await device.takeScreenshot('eviction-3-apres-le-claim')
 
-    // La conversation neuve est en tête : elle vient d'avoir lieu.
-    await waitFor(element(by.id('first-conversation')))
+    // LA CONVERSATION QUE LA CONTREPARTIE A REJOINTE, PAS LA PREMIÈRE LIGNE.
+    //
+    // Ce test ouvrait `first-conversation` en écrivant « la conversation neuve
+    // est en tête ». Elle ne peut pas l'être ici. La liste trie par dernière
+    // activité (`conversationList.ts`), une conversation où rien n'a été dit
+    // compte zéro, et le lancement de ce test vient d'écrire la sonde dans le
+    // salon du banc. Mesuré sur le run 34738990621 : le salon du banc en
+    // tête, la conversation neuve en dessous, et un écran de la personne où
+    // ne restait que « Retour » -- `theOtherMember` ne désigne personne dans
+    // un salon de plus de deux, donc rien à retirer.
+    //
+    // L'avatar porte le salon dans son `testID` sur chaque ligne, la première
+    // comprise : c'est lui qu'on touche, où que la ligne se trouve.
+    await waitFor(element(by.id(`avatar-${scope}`)))
       .toBeVisible()
       .withTimeout(60000)
-    await element(by.id('first-conversation')).tap()
+    await element(by.id(`avatar-${scope}`)).tap()
     await waitFor(element(by.id('open-person')))
       .toBeVisible()
       .withTimeout(30000)

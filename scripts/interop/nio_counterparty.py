@@ -738,6 +738,15 @@ async def claim_place(session_file: Path, store: Path) -> int:
             )
             return 1
 
+    # LE SALON REJOINT VOYAGE JUSQU'AU TEST, PARCE QUE LUI SEUL LE CONNAÎT.
+    #
+    # `roundTrip.test.ts` doit ouvrir CETTE conversation, et la liste de
+    # l'application ne la met pas en tête : elle trie par dernière activité, et
+    # rien n'y a encore été dit. Son identifiant naît avec l'invitation, donc
+    # ni le test ni l'écran ne le connaissent d'avance ; la contrepartie vient
+    # de le rejoindre. Il est écrit à côté du fichier de session, dans le
+    # dossier que l'appelant fournit et supprime.
+    session_file.with_name("claimed-room").write_text(room_id)
     also = f"; also invited to {', '.join(invited[1:])}" if invited[1:] else ""
     print(f"OK: joined {room_id} on the application's invitation{also}")
     return 0
