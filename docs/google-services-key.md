@@ -22,8 +22,10 @@ par App Check, pas par le secret de cette chaîne.
 clé partirait dans le prochain APK, exactement comme l'ancienne — et casserait
 chaque installation existante jusqu'à sa mise à jour. Sur ce projet, à ce jour,
 cela veut dire le Pixel de démonstration et le téléphone de la première
-personne invitée : deux appareils qu'AGENTS.md §7.2 gèle sur leur signature et
-interdit de désinstaller.
+personne invitée : deux appareils qu'on ne désinstalle pas, puisque leur compte
+et leurs clés vivent dans les données de l'application. Le Pixel porte depuis le
+13 septembre 2026 le compte de production qui invitera à l'essai (#91), et ne
+se met à jour qu'en `install -r`.
 
 Le geste coûteux, visible, et sans effet.
 
