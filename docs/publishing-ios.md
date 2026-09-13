@@ -188,6 +188,135 @@ nomme la conversation et ne nomme personne d'autre. S'il ne se passe rien, la
 première chose à regarder est le journal de sygnal — `BadDeviceToken` y
 désignerait la paire d'environnements, et non l'application.
 
+## Tests externes : faire entrer le relecteur d'Apple
+
+Un testeur externe ne reçoit une build qu'après la revue bêta d'Apple, et le relecteur doit pouvoir entrer dans l'application. Or on n'entre dans Messagr que par invitation (ADR-0004) : il n'y a ni formulaire, ni nom d'utilisateur, ni mot de passe à lui confier.
+
+### Pourquoi l'application ne suffit pas
+
+**Une invitation de l'application vit une heure** (`TTL_SECONDS = 3600`, `issueInvitation.ts`), et le téléphone qui l'a émise ne fait entrer que pendant cette heure (`STOP_ASKING_AFTER_MS`, `admitAnyoneWaiting.ts`). La revue prend en général une journée.
+
+**Et une invitation plus longue ne suffit pas non plus**, parce que la réclamation se fait en deux appels. Le premier tire un compte et reçoit `409 MESSAGR_NOT_YET_INVITED` ; tant que l'émetteur n'invite pas ce compte dans la conversation, les suivants reçoivent la même chose. C'est l'application de l'émetteur qui fait ce geste, sans que personne le demande. Une invitation créée hors de l'application n'est donc admise par personne, quelle que soit sa durée.
+
+`scripts/testflight-reviewer.mjs` tient les deux moitiés pendant toute la vie de l'invitation : il émet comme l'application émet, puis il admet comme elle admet.
+
+### Les commandes, dans l'ordre
+
+```
+node scripts/testflight-reviewer.mjs emettre --dry-run
+node scripts/testflight-reviewer.mjs emettre
+caffeinate -i node scripts/testflight-reviewer.mjs admettre 2>&1 | tee -a ~/.messagr-exploitation/relecteur-apple.log
+node scripts/testflight-reviewer.mjs etat
+node scripts/testflight-reviewer.mjs revoquer
+```
+
+Par défaut, le script agit en tant que `@exploitation:messagr.eu`, dont les identifiants sont dans `~/.messagr-exploitation/messagr-eu.json`. Il ne les écrit, ne les affiche et ne les journalise jamais, et ne les envoie qu'au serveur de ce fichier.
+
+**`emettre --dry-run`** décrit les cinq requêtes sans rien appeler, avec les constructeurs mêmes que le vrai lancement envoie.
+
+**`emettre`** crée une conversation de la forme exacte de celles de l'application (salon en version 11, `private_chat`, inviter coûte 50, membres à 0, caviardage à 101, chiffrement megolm), puis y émet **une** invitation : sept jours et deux usages par défaut, `--duree` et `--usages` pour autre chose. Il affiche le lien et l'échéance, et les écrit dans `~/.messagr-exploitation/exploitation-relecteur-apple.json`, en `chmod 600` : **le lien fait entrer, il se garde comme un secret.** Coupé en route, il reprend où il s'était arrêté, et redemande l'invitation avec la même clé d'idempotence, ce qui rend la même invitation au lieu d'en poser une seconde. `--self-test`, dans `checks`, relit `issueInvitation.ts` : une conversation du script qui cesserait de ressembler à celles de l'application y échoue.
+
+**`admettre`, avant de soumettre, et jusqu'à l'approbation.** Il interroge le service toutes les vingt à trente secondes et invite, une fois, chaque compte que le service nomme. Après une invitation, il suit de près (deux secondes, pendant quinze secondes) : l'application en face renonce après quinze essais à deux secondes d'écart, et un lien ouvert par quelqu'un qui a déjà un compte demande une seconde invitation quelques secondes après la première. Il écrit une ligne par événement, jamais le lien ni un jeton ; il survit aux coupures du réseau et aux redémarrages du service ; il s'arrête quand l'invitation est révoquée ou expirée, cinq minutes après l'échéance, ou quand l'unique usage d'une invitation à un usage est pris. Après un redémarrage du Mac, la même commande reprend sans réinviter personne.
+
+`caffeinate -i` empêche la mise en veille tant que la commande tourne. Il n'empêche pas celle d'un portable qu'on referme : laissez-le ouvert et branché, ou relancez `admettre` au réveil.
+
+**Soumettre** ensuite la build au groupe externe, avec les notes de revue plus bas. Il n'y a ni nom d'utilisateur ni mot de passe à fournir : tout passe par les notes, où l'on colle le lien et l'échéance que montre `etat`.
+
+**`etat`** montre, à tout moment, le lien, l'échéance, les comptes invités et ce que dit le service. Il n'écrit rien.
+
+**`revoquer`, après l'approbation.** Le lien cesse de fonctionner. **Et le service désactive les comptes que l'invitation a créés, celui du relecteur compris** (`handlers/revoke.rs`) : c'est irréversible, un homeserver ne rend jamais un nom. C'est pourquoi le script demande de taper `revoquer`, et qu'un tube ne lui fournit aucune confirmation. Ce pouvoir ne dure que la vie de l'invitation : dans l'heure qui suit l'échéance, le service détruit ce qui le permettait (`purge_claimed_secrets_of_expired`), et un compte entré reste alors en vie. Si Apple revoit une build plus tard, `emettre` recommence, et range l'état clos à côté du nouveau.
+
+### Ce que le service ne dit pas
+
+Combien d'usages il reste. `GET /invitations/{id}` ne rend ni `used_count` ni `max_uses`, et une invitation à deux usages dont un seul est pris lit `claimed` comme celle dont les deux le sont. `admettre` ne devine pas : avec deux usages, il continue d'interroger jusqu'à l'échéance, une requête toutes les vingt-cinq secondes environ, même quand plus personne ne peut entrer. La révocation fait partie de la procédure aussi pour cette raison.
+
+### Ce que devient le compte du relecteur
+
+Le compte n'existe pas avant que le relecteur ouvre le lien : le service le crée à la réclamation, sous un identifiant tiré au hasard, et le graphe d'invitations note `@exploitation` comme son invitant.
+
+C'est un **entrant** : niveau 0, dans une conversation créée pour lui seul par `@exploitation`, qui y est à 100. Il peut y écrire ; il ne peut y inviter personne, puisqu'inviter coûte 50 ; personne ne répond de lui. **Il n'entre jamais dans le salon de quelqu'un** : la conversation ne contient que `@exploitation` et lui. Le second usage, s'il sert (un second appareil, un second relecteur), y ajoute un second compte, et rien d'autre.
+
+Révoqué, le compte est désactivé. Laissé à l'échéance sans révocation, il reste, seul avec `@exploitation`.
+
+`production-entry-point.md` ne change pas : `@exploitation` émettait déjà, et le relecteur arrive par invitation, comme tout le monde.
+
+### Ce qu'il verra
+
+Lu dans le code, pas supposé ; les phrases sont celles de l'interface anglaise.
+
+**Le lien.** Sur un ordinateur, la page d'invitation montre un code QR (« Open this link on your phone: Messagr is a mobile application. Scan this code: ») : l'appareil photo de l'iPhone l'ouvre, et le domaine associé `/i*` le remet à Messagr. Touché sur l'iPhone lui-même, depuis Notes ou Mail, le lien fait de même. **Tapé dans Safari, il ne mène qu'à la page** : son bouton « Open in Messagr » recharge la même adresse, et Safari n'ouvre pas une application pour un lien de son propre domaine. Le bouton « Copy the link » promet que l'application proposera de le coller ; elle ne lit jamais le presse-papiers, et aucun écran ne permet de saisir un lien.
+
+**Non vérifié sur iPhone, et c'est le risque principal.** `AppDelegate.swift` ne transmet ni `continueUserActivity` ni `openURL` à React Native. Un lien ouvert pendant que Messagr tourne n'arrive donc probablement pas au JavaScript ; un lancement à froid le lit par `getInitialURL`, ce qui reste à constater sur un appareil. D'où la consigne des notes : fermer complètement Messagr avant d'ouvrir le lien.
+
+**Le premier écran**, un seul : « The messenger that asks you for nothing. », « Choose your language », la case « I accept Messagr’s terms and conditions of use. » et le bouton « Begin ». La réclamation ne part qu'après « Begin ».
+
+**Pendant la réclamation**, aucun indicateur : la liste dit « No conversations yet. Invite someone to start one. ». Si elle échoue, pour quelque raison que ce soit, y compris un compte qu'`admettre` n'a pas invité à temps : « You are not in yet. Open the invitation link somebody sent you: it is the only door, and the application can do nothing before it. », et rien ne réessaie. Rouvrir le lien suffit : le compte tiré attend, invité, et la seconde tentative aboutit.
+
+**Juste après l'entrée**, iOS demande l'autorisation d'envoyer des notifications, sans explication préalable.
+
+**La conversation** s'appelle « @exploitation » : l'identifiant sans le serveur. Elle dit « Nothing has been said here yet. », et elle n'est pas ouverte d'office. **Rien n'y arrivera** : le script ne chiffre pas et n'écrit pas.
+
+**Un message envoyé** porte une seule coche grise, « Handed to the server », et jamais la seconde. Le script ne publie aucune clé d'appareil pour `@exploitation`, et rien dans ce dépôt ne lui en donne : si ce compte n'a aucun appareil de chiffrement, la clé du message n'est remise à personne de son côté, et **rien à l'écran ne le dit**. Un appel sonne dans le vide, puis « Nobody answered » au bout de 90 secondes.
+
+**L'écran de ce qu'on sait d'une personne** dit de `@exploitation` que quelqu'un a répondu d'elle, parce qu'il lit son niveau de créateur comme une promotion. Répondre d'elle échoue avec une ligne restée en anglais dans l'interface française ; la retirer échoue aussi.
+
+### Le même script, pour un téléphone du porteur
+
+Faire entrer un téléphone sous la racine est le même geste, avec une invitation courte :
+
+```
+node scripts/testflight-reviewer.mjs emettre --compte ~/.messagr-exploitation/racine-mmaudet.json --objet pixel --duree 1h --usages 1
+node scripts/testflight-reviewer.mjs admettre --compte ~/.messagr-exploitation/racine-mmaudet.json --objet pixel
+```
+
+L'état est alors `~/.messagr-exploitation/mmaudet-pixel.json` : un par compte et par objet, pour que l'invitation du relecteur et celle du téléphone ne s'écrasent pas. Le `room_id` du fichier de la racine ne sert pas : chaque émission crée sa conversation, comme l'application.
+
+Lancer `admettre`, puis ouvrir le lien sur le téléphone. Un téléphone qui porte déjà un compte prend l'autre chemin du service : deux invitations, le compte tiré puis le sien, que le suivi de deux secondes enchaîne. Ce chemin n'écrit pas `claimed`, donc `admettre` s'arrête cinq minutes après l'échéance, ou à ctrl-c, qui ne défait rien.
+
+### Les notes de revue, à coller dans App Store Connect
+
+TestFlight, informations de test de la build, rubrique des notes pour la revue bêta. Remplacer `<LINK>` et `<DEADLINE>` par ce qu'affiche `etat`.
+
+```
+Messagr can only be joined by invitation, by design: there is no sign-up
+form, no user name and no password. An account is created on the device at
+the moment an invitation link is opened. We have created an invitation for
+you.
+
+1. Install Messagr from TestFlight. If you open it from TestFlight, close it
+   completely afterwards (swipe it away in the app switcher).
+
+2. Open this link on your computer:
+
+   <LINK>
+
+   The page shows a QR code. Scan it with the iPhone's Camera app and tap the
+   banner: Messagr opens. Tapping the link on the iPhone itself, for example
+   from Notes or Mail, works the same way. Typing it into Safari does not: it
+   only shows the page.
+
+   The link is valid until <DEADLINE> and can be used twice.
+
+3. The first screen states what Messagr promises. Choose a language, tick
+   "I accept Messagr's terms and conditions of use", and tap "Begin".
+
+4. Messagr creates your account from the invitation. This takes a few
+   seconds and shows no progress. iOS then asks whether Messagr may send
+   notifications.
+
+5. A conversation named "@exploitation" appears in the list. It is a
+   conversation with the Messagr operations account, which issued your
+   invitation, and nobody else is in it. You can write in it; messages are
+   end-to-end encrypted. The operations account does not reply.
+
+If Messagr says "You are not in yet", close it completely and open the link
+again as in step 2. The invitation is still valid and the second attempt
+completes.
+
+Accounts are pseudonymous: Messagr asks for no email address and no phone
+number, which is why we cannot provide demo credentials.
+```
+
 ## Ce que la build écrit d'elle-même
 
 Depuis le 11 septembre 2026, une build qui part chez Apple laisse une trace. `build.sh ios` enchaîne deux choses après l'envoi, et **aucune des deux ne peut faire échouer la build** : à ce moment-là l'artefact est déjà parti, et un journal qui n'a pas été publié est une commande à relancer, pas une build à refaire.
