@@ -44,6 +44,7 @@ import json
 import os
 import sys
 from pathlib import Path
+from urllib.parse import quote
 
 from nio import (
     AsyncClient,
@@ -64,10 +65,6 @@ EXPECTED_BODY = "encrypted by the bridge, sent by the application"
 COUNTERPARTY_BODY = "encrypted by matrix-nio, for the application to read"
 
 SYNC_TIMEOUT_MS = 10_000
-# Le temps laissé à l'application pour voir la demande et envoyer
-# l'invitation Matrix. Généreux : elle interroge l'état du service à son
-# propre rythme, et un banc chargé n'est pas un défaut de produit.
-PLACE_TIMEOUT_SECONDS = 120
 COLLECT_DEADLINE_SECONDS = 120
 
 # RÉCLAMER À NOUVEAU TANT QUE LE SERVICE RÉPOND « PAS ENCORE INVITÉ », ET
@@ -97,6 +94,22 @@ CLAIM_DEADLINE_SECONDS = 45
 CLAIM_PAUSE_SECONDS = 2
 CLAIM_REQUEST_SECONDS = 20
 NOT_YET_INVITED = "MESSAGR_NOT_YET_INVITED"
+
+# TOUTE LA PHASE FINIT AVANT QUE LE HARNAIS NE LA TUE.
+#
+# `runCounterparty` (roundTrip.test.ts) accorde 120 secondes au processus
+# entier. Un processus tué n'imprime rien de ce qu'il savait, et l'appelant
+# ne lit que « Command failed » : l'échec sans cause que ce fichier refuse
+# partout ailleurs. L'attente de l'invitation durait jusqu'ici 120 secondes
+# à elle seule, après la réclamation.
+#
+# Réclamer finit au plus tard à 45 + 20 = 65 secondes. Attendre
+# l'invitation ne lance une synchronisation que s'il reste, avant 100
+# secondes comptées depuis le début de la phase, de quoi la finir et
+# rejoindre. Les 20 secondes restantes couvrent le démarrage de
+# l'interpréteur.
+PLACE_DEADLINE_SECONDS = 100
+HOMESERVER_REQUEST_SECONDS = 10
 
 # How long the send phase waits for the application's account to appear as a
 # joined member before it refuses to share a room key. Six syncs: the join has
@@ -503,6 +516,9 @@ async def claim_place(session_file: Path, store: Path) -> int:
     un salon dont le niveau « invite » est à 50. La migration 008 raconte
     cette contrainte au long.
 
+    Elle n'ouvre pas non plus le magasin de nio, et ne se sert pas de son
+    `join` : l'attente de l'invitation, plus bas, dit pourquoi.
+
     # TROIS RÉCLAMATIONS AU MOINS, ET LES DEUX PREMIÈRES RÉPONDENT 409
 
     Lu dans `claim.rs` et `status.rs`, pas supposé. Sur ce chemin, le service
@@ -631,46 +647,100 @@ async def claim_place(session_file: Path, store: Path) -> int:
             )
             await asyncio.sleep(CLAIM_PAUSE_SECONDS)
 
-    print(
-        f"OK: {user_id} claimed the application's invitation "
-        f"on attempt {attempts}, {elapsed:.1f}s in"
-    )
-
-    client = client_for(
-        store, user_id, homeserver, device_id=session["device_id"]
-    )
-    try:
-        client.restore_login(
-            user_id=user_id,
-            device_id=session["device_id"],
-            access_token=session["access_token"],
-        )
-
-        # ATTENDRE L'INVITATION, PUIS REJOINDRE. Bornée : une invitation qui
-        # n'arrive jamais est un défaut, et une phase qui pendrait le
-        # dirait comme un dépassement de temps du harnais -- c'est-à-dire
-        # mal, et cent secondes plus tard.
-        deadline = asyncio.get_event_loop().time() + PLACE_TIMEOUT_SECONDS
-        while asyncio.get_event_loop().time() < deadline:
-            response = await client.sync(timeout=SYNC_TIMEOUT_MS, full_state=True)
-            invited = getattr(getattr(response, "rooms", None), "invite", {})
-            for room_id in invited:
-                joined = await client.join(room_id)
-                if getattr(joined, "room_id", None) is not None:
-                    print(f"OK: joined {room_id} on the application's invitation")
-                    return 0
-                print(f"the join was refused, retrying: {joined}", file=sys.stderr)
-
         print(
-            "FAIL: no Matrix invitation arrived within "
-            f"{PLACE_TIMEOUT_SECONDS}s. The service placed the claim, so the "
-            "inviter's own client never sent it -- which is the application's "
-            "half of the path, not the service's.",
-            file=sys.stderr,
+            f"OK: {user_id} claimed the application's invitation "
+            f"on attempt {attempts}, {elapsed:.1f}s in"
         )
-        return 1
-    finally:
-        await client.close()
+
+        # ATTENDRE L'INVITATION, PUIS REJOINDRE, SANS nio. Deux raisons, et
+        # toutes deux sont déjà écrites dans ce dépôt.
+        #
+        # LE `join` DE nio N'ENVOIE AUCUN CORPS. Dans nio 0.26, `Api.join`
+        # rend une méthode et un chemin, rien d'autre, et ce homeserver le
+        # refuse : « M_BAD_JSON deserialization failed: EOF while parsing a
+        # value », mesuré au premier run de cette contrepartie (27a4c0e) et
+        # rappelé dans `login` plus haut. Le service rejoint avec `{}`
+        # (`join_room`, dans `matrix.rs`) ; cette phase fait de même.
+        #
+        # UNE SYNCHRONISATION nio AVANCERAIT LE JETON QUE `collect` REPREND.
+        # Le magasin est partagé entre les phases : `store_sync_tokens`
+        # enregistre le jeton à chaque réponse, et le `sync` suivant repart de
+        # lui. `collect` tourne après la suite et lit ce que l'application a
+        # envoyé dans le salon du banc. Aucune relance ne suit cette phase,
+        # donc le dernier message de l'application passerait derrière le
+        # jeton, et `collect` conclurait à un salon muet. Une synchronisation
+        # sans `since`, avec le jeton d'accès, n'avance rien : c'est ainsi que
+        # le service trouve le salon d'un compte tiré (`pending_invite_room`).
+        bearer = {"Authorization": f"Bearer {session['access_token']}"}
+        place_deadline = started + PLACE_DEADLINE_SECONDS
+        syncs = 0
+        invited: list[str] = []
+        while clock.time() + 2 * HOMESERVER_REQUEST_SECONDS <= place_deadline:
+            syncs += 1
+            try:
+                async with http.get(
+                    f"{homeserver}/_matrix/client/v3/sync",
+                    params={"timeout": "0"},
+                    headers=bearer,
+                    timeout=aiohttp.ClientTimeout(total=HOMESERVER_REQUEST_SECONDS),
+                ) as response:
+                    status = response.status
+                    body = await response.text()
+            except (aiohttp.ClientError, asyncio.TimeoutError) as error:
+                print(
+                    f"FAIL: sync {syncs} got no answer, "
+                    f"{clock.time() - started:.1f}s in "
+                    f"({type(error).__name__}: {error})",
+                    file=sys.stderr,
+                )
+                return 1
+            if status != 200:
+                print(f"FAIL: the sync was refused ({status}): {body}", file=sys.stderr)
+                return 1
+            rooms = json.loads(body).get("rooms") or {}
+            invited = sorted(rooms.get("invite") or {})
+            if invited:
+                break
+            await asyncio.sleep(CLAIM_PAUSE_SECONDS)
+
+        if not invited:
+            print(
+                "FAIL: the claim succeeded, and no Matrix invitation was "
+                f"visible to {user_id} after {syncs} sync(s), "
+                f"{clock.time() - started:.1f}s into this phase.\n"
+                "      On this path the service answers 200 only once this "
+                "account is invited or joined.",
+                file=sys.stderr,
+            )
+            return 1
+
+        room_id = invited[0]
+        try:
+            async with http.post(
+                f"{homeserver}/_matrix/client/v3/join/{quote(room_id, safe='!')}",
+                json={},
+                headers=bearer,
+                timeout=aiohttp.ClientTimeout(total=HOMESERVER_REQUEST_SECONDS),
+            ) as response:
+                status = response.status
+                body = await response.text()
+        except (aiohttp.ClientError, asyncio.TimeoutError) as error:
+            print(
+                f"FAIL: the join of {room_id} got no answer "
+                f"({type(error).__name__}: {error})",
+                file=sys.stderr,
+            )
+            return 1
+        if status != 200:
+            print(
+                f"FAIL: the join of {room_id} was refused ({status}): {body}",
+                file=sys.stderr,
+            )
+            return 1
+
+    also = f"; also invited to {', '.join(invited[1:])}" if invited[1:] else ""
+    print(f"OK: joined {room_id} on the application's invitation{also}")
+    return 0
 
 
 def main() -> int:
