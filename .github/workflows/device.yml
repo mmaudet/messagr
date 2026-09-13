@@ -266,6 +266,10 @@ jobs:
               # The counterparty runs as the other account, the one that has a
               # password, and reads what the application's account sends.
               f.write(f'MESSAGR_INTEROP_HOMESERVER={d[\"homeserver\"]}\\n')
+              # LE SERVICE, TRANSMIS PLUTÔT QUE REDÉRIVÉ. Voir
+              # provision-bench-accounts.sh : la contrepartie le recalculait
+              # et visait le homeserver sur un banc où les deux diffèrent.
+              f.write(f'MESSAGR_INTEROP_SERVICE={d[\"service\"]}\\n')
               f.write(f'MESSAGR_INTEROP_USER={inviter[\"user_id\"]}\\n')
               f.write(f'MESSAGR_INTEROP_PASSWORD={inviter[\"password\"]}\\n')
               f.write(f'MESSAGR_INTEROP_ROOM={d[\"room_id\"]}\\n')
