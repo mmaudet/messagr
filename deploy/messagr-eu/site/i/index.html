@@ -13,8 +13,9 @@
      du service.
 
      La page porte du script depuis le 11 août 2026 — détection de
-     plateforme et copie du lien. La garantie a donc été DÉPLACÉE, pas
-     abandonnée : la politique de sécurité de contenu ci-dessous rend
+     plateforme, et copie du lien jusqu'au 13 septembre 2026. La garantie
+     a donc été DÉPLACÉE, pas abandonnée : la politique de sécurité de
+     contenu ci-dessous rend
      l'exfiltration impossible même si ce script était malveillant ou
      compromis, et c'est le NAVIGATEUR qui l'applique, plus la discipline
      du rédacteur.
@@ -91,22 +92,9 @@
     image-rendering: pixelated;
     background: #ffffff;
   }
-  button.copier {
-    display: block;
-    width: 100%;
-    background: #ffffff;
-    color: #06614A;
-    border: 1px solid #06614A;
-    border-radius: 18px;
-    font: inherit;
-    font-weight: 600;
-    padding: 13px;
-    /* Le haut est neuf : le canevas de 330 pixels séparait ce bouton du
-       paragraphe au-dessus tant qu'il occupait sa place. Une fois le canevas
-       vraiment caché, les deux se touchaient. */
-    margin: 16px 0;
-    cursor: pointer;
-  }
+  /* Le haut est là pour l'avertissement du fichier, qui n'a pas de marge et
+     toucherait la phrase sans lui. */
+  p#rouvrir { margin: 16px 0; }
 </style>
 </head>
 <body>
@@ -141,9 +129,14 @@
   <canvas id="qr" width="330" height="330" hidden data-t-label="qr-label"
           aria-label="Code QR du lien d'invitation, a scanner avec le telephone"></canvas>
 
-  <button class="copier" id="copier" hidden type="button" data-t="copier">Copier le lien</button>
-  <p class="note" id="copie-faite" hidden data-t="copie">Lien copié. Ouvrez
-     Messagr après l'installation : il vous proposera de le coller.</p>
+  <!-- LE LIEN EST LA SEULE PORTE, ET LA PAGE LE DIT. Elle offrait ici
+       « Copier le lien », puis promettait que l'application proposerait de le
+       coller après l'installation. L'application n'a aucun champ où coller un
+       lien et ne lit pas le presse-papiers : le bouton ne menait nulle part,
+       et il est parti le 13 septembre 2026. Ce qui reste est ce que fait le
+       produit : c'est le lien, rouvert depuis le message, qui ouvre Messagr. -->
+  <p id="rouvrir" data-t="rouvrir">Après l'installation, rouvrez le lien depuis le
+     message reçu : c'est lui qui ouvre Messagr.</p>
 
   <p class="note" data-t="rien-verifie">Cette page ne vérifie ni n'utilise
      votre invitation : seule l'application peut la réclamer.</p>
@@ -209,8 +202,7 @@
       recue: 'You have been invited to join Messagr.',
       ouvrir: 'Open in Messagr',
       rien: 'If nothing happens, Messagr is not installed on this device.',
-      copier: 'Copy the link',
-      copie: 'Link copied. Open Messagr after installing: it will offer to paste it.',
+      rouvrir: 'After installing, open the link again from the message you received: that is what opens Messagr.',
       apk: 'Your phone will ask permission to install an application from an unknown source: that is normal for a file obtained outside a store.',
       'rien-verifie': 'This page neither checks nor uses your invitation: only the application can claim it.',
       'qr-label': 'QR code of the invitation link, to scan with the phone',
@@ -228,8 +220,7 @@
       recue: 'Sie haben eine Einladung zu Messagr erhalten.',
       ouvrir: 'In Messagr öffnen',
       rien: 'Wenn nichts passiert, ist Messagr auf diesem Gerät nicht installiert.',
-      copier: 'Link kopieren',
-      copie: 'Link kopiert. Öffnen Sie Messagr nach der Installation: es bietet Ihnen an, ihn einzufügen.',
+      rouvrir: 'Öffnen Sie nach der Installation den Link erneut aus der erhaltenen Nachricht: er ist es, der Messagr öffnet.',
       apk: 'Ihr Telefon fragt nach der Erlaubnis, eine Anwendung aus unbekannter Quelle zu installieren: das ist bei einer Datei außerhalb eines Stores normal.',
       'rien-verifie': 'Diese Seite prüft und verwendet Ihre Einladung nicht: nur die Anwendung kann sie einlösen.',
       'qr-label': 'QR-Code des Einladungslinks, mit dem Telefon zu scannen',
@@ -247,8 +238,7 @@
       recue: 'Ha recibido una invitación para unirse a Messagr.',
       ouvrir: 'Abrir en Messagr',
       rien: 'Si no ocurre nada, Messagr no está instalado en este dispositivo.',
-      copier: 'Copiar el enlace',
-      copie: 'Enlace copiado. Abra Messagr después de instalarlo: le propondrá pegarlo.',
+      rouvrir: 'Después de instalar, vuelva a abrir el enlace desde el mensaje recibido: es él quien abre Messagr.',
       apk: 'Su teléfono pedirá permiso para instalar una aplicación de origen desconocido: es normal para un archivo obtenido fuera de una tienda.',
       'rien-verifie': 'Esta página no comprueba ni utiliza su invitación: solo la aplicación puede reclamarla.',
       'qr-label': 'Código QR del enlace de invitación, para escanear con el teléfono',
@@ -266,8 +256,7 @@
       recue: 'Hai ricevuto un invito a Messagr.',
       ouvrir: 'Apri in Messagr',
       rien: 'Se non succede nulla, Messagr non è installato su questo dispositivo.',
-      copier: 'Copia il link',
-      copie: 'Link copiato. Apri Messagr dopo l\'installazione: ti proporrà di incollarlo.',
+      rouvrir: 'Dopo l\'installazione, riapri il link dal messaggio ricevuto: è lui che apre Messagr.',
       apk: 'Il telefono chiederà il permesso di installare un\'applicazione di origine sconosciuta: è normale per un file ottenuto fuori da uno store.',
       'rien-verifie': 'Questa pagina non verifica né utilizza il tuo invito: solo l\'applicazione può riscattarlo.',
       'qr-label': 'Codice QR del link di invito, da scansionare con il telefono',
@@ -285,8 +274,7 @@
       recue: 'U hebt een uitnodiging voor Messagr ontvangen.',
       ouvrir: 'Openen in Messagr',
       rien: 'Als er niets gebeurt, is Messagr niet op dit apparaat geïnstalleerd.',
-      copier: 'Link kopiëren',
-      copie: 'Link gekopieerd. Open Messagr na de installatie: het biedt aan om hem te plakken.',
+      rouvrir: 'Open na de installatie de link opnieuw vanuit het ontvangen bericht: die opent Messagr.',
       apk: 'Uw telefoon vraagt toestemming om een applicatie uit een onbekende bron te installeren: dat is normaal voor een bestand van buiten een winkel.',
       'rien-verifie': 'Deze pagina controleert of gebruikt uw uitnodiging niet: alleen de applicatie kan hem opeisen.',
       'qr-label': 'QR-code van de uitnodigingslink, te scannen met de telefoon',
@@ -833,21 +821,6 @@
       }
     }
     toile.hidden = false;
-  }
-
-  // LA COPIE EST UN GESTE, JAMAIS UN EFFET DE BORD. Elle existe pour que
-  // l'installation ne fasse pas recommencer : l'application proposera de
-  // coller au premier lancement. Rien n'est déposé sans un clic, et sur iOS
-  // le système demande lui-même l'autorisation — le geste est visible et
-  // consenti plutôt que silencieux.
-  var bouton = document.getElementById('copier');
-  if (bouton && navigator.clipboard) {
-    bouton.hidden = false;
-    bouton.addEventListener('click', function () {
-      navigator.clipboard.writeText(location.href).then(function () {
-        document.getElementById('copie-faite').hidden = false;
-      });
-    });
   }
 })();
 </script>
