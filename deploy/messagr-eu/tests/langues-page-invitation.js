@@ -413,9 +413,12 @@ CODES.forEach(function (code) {
     // ne propose pas de fichier, donc c'est le bloc de l'OFFRE qui sort et la
     // phrase de retrait qui reste. Les deux blocs sont éprouvés plus bas, dans
     // leurs deux états.
+    //
+    // `bientot-play` depuis que l'accueil porte les deux blocs à son tour :
+    // Google Play est annoncé sous le badge du fichier, et sort avec lui.
     var FAITS = [
       'apk-faits', 'apk-empreinte', 'etat-verifie',
-      'dl-porte', 'dl-comparer', 'dl-play', 'apk-avertissement'
+      'dl-porte', 'dl-comparer', 'dl-play', 'apk-avertissement', 'bientot-play'
     ];
     modele.cles.filter(function (c) {
       return FAITS.indexOf(c) === -1;
@@ -471,6 +474,48 @@ CODES.forEach(function (code) {
     });
   });
 
+  // ── SANS FICHIER PROPOSÉ, AUCUNE PAGE CONSTRUITE NE LE NOMME ───────────
+  //
+  // TOUTES LES PAGES DE L'ARBRE, ET PAS UNE LISTE. Le 13 septembre 2026, la
+  // page qui gardait le lien vers le fichier retiré était celle que personne ne
+  // comptait parmi les pages qui le proposent : ce fichier ne lisait que la
+  // page du téléchargement, et le badge de l'accueil était écrit en dur. Une
+  // liste de pages à vérifier reproduirait cet angle mort ; on lit donc tout ce
+  // que la construction a écrit.
+  //
+  // `/messagr.apk` et non `href="/messagr.apk"` : l'adresse absolue, celle que
+  // la page d'invitation porterait dans ses destinations, mène au même 404.
+  function pagesConstruites(repertoire, prefixe) {
+    var trouvees = [];
+    fs.readdirSync(path.join(repertoire, prefixe), { withFileTypes: true })
+      .forEach(function (entree) {
+        var relatif = prefixe ? prefixe + '/' + entree.name : entree.name;
+        if (entree.isDirectory()) {
+          trouvees = trouvees.concat(pagesConstruites(repertoire, relatif));
+        } else if (/\.html$/.test(entree.name)) {
+          trouvees.push(relatif);
+        }
+      });
+    return trouvees.sort();
+  }
+  var pages = pagesConstruites(bon.sortie, '');
+  // UN BALAYAGE QUI NE LIT RIEN PASSE TOUJOURS. Moins de pages que celles que
+  // ce fichier sait engendrées, et le « aucune » qui suit ne voudrait rien dire.
+  if (pages.length < ENGENDREES.length * CODES.length) {
+    echouer("la construction n'a écrit que " + pages.length + ' page(s) : le ' +
+      "balayage qui suit ne lirait pas ce qu'il prétend lire");
+  }
+  pages.forEach(function (relatif) {
+    fs.readFileSync(path.join(bon.sortie, relatif), 'utf8').split('\n')
+      .forEach(function (ligne, rang) {
+        if (ligne.indexOf('/messagr.apk') !== -1) {
+          echouer('la page construite « ' + relatif + ' » nomme /messagr.apk, ' +
+            'que cette construction ne propose pas (ligne ' + (rang + 1) + ' : ' +
+            ligne.trim() + ')');
+        }
+      });
+  });
+
   // L'EMPREINTE FABRIQUÉE EST CELLE QUE LA PAGE DÉCLARE, ET NON UNE SUITE DE
   // « a ». Le tableau des états porte `data-verifie-sur` : l'empreinte contre
   // laquelle il a été vérifié, et `build-landing.mjs` refuse de publier un
@@ -507,38 +552,73 @@ CODES.forEach(function (code) {
       echouer("l'allemand devrait écrire « 132,6 MB », il ne l'écrit pas");
     }
 
-    // ── L'OFFRE ET SON ABSENCE, SUR LA PAGE DU TÉLÉCHARGEMENT ───────────
+    // ── L'OFFRE ET SON ABSENCE, SUR LES DEUX PAGES QUI LA PORTENT ───────
     //
     // `deploy.sh` accepte `MESSAGR_APK=none` : le fichier quitte le serveur.
     // La page doit cesser de le proposer DANS LE MÊME GESTE -- un bouton qui
     // reste avec le poids d'hier est pire qu'une page qui se tait -- et
     // reprendre l'offre quand le fichier revient. Les deux sens sont éprouvés,
     // parce qu'un seul laisserait passer une page qui ne propose jamais rien.
+    //
+    // L'ACCUEIL AUSSI, ET C'EST LUI QUI A MENTI. Ce bloc ne lisait que la page
+    // du téléchargement. Le 13 septembre 2026, le déploiement de 03:33 UTC a
+    // retiré le fichier : `/messagr.apk` répondait 404, les six pages du
+    // téléchargement disaient qu'aucun fichier n'était proposé, et les six
+    // pages d'accueil gardaient leur badge « Android, Téléchargement direct »
+    // vers ce 404, écrit en dur hors du mécanisme de retrait. Cette boucle
+    // porte donc sur chaque page engendrée, et le balayage de toutes les pages
+    // construites, plus haut, tient celles qu'aucune liste ne nomme.
+    var aplatir = function (t) { return t.replace(/\s+/g, ' '); };
+    ENGENDREES.forEach(function (modele) {
+      CODES.forEach(function (code) {
+        var quoi = 'la page ' + modele.nom + ' « ' + code + ' »';
+        var avec = aplatir(fs.readFileSync(path.join(avecFaits.sortie, modele.ou(code)), 'utf8'));
+        var sans = aplatir(fs.readFileSync(path.join(bon.sortie, modele.ou(code)), 'utf8'));
+        if (avec.indexOf('href="/messagr.apk"') === -1) {
+          echouer(quoi + ' ne propose pas le fichier alors que la construction ' +
+            'en mesure un');
+        }
+        if (avec.indexOf(copie[code]['dl-retire']) !== -1) {
+          echouer(quoi + " dit qu'aucun fichier n'est proposé alors qu'elle en " +
+            'propose un');
+        }
+        if (sans.indexOf(copie[code]['dl-retire']) === -1) {
+          echouer(quoi + " ne dit pas qu'aucun fichier n'est proposé, alors " +
+            "qu'elle n'en propose aucun");
+        }
+        if (/%[A-Z]+%/.test(sans) || /%[A-Z]+%/.test(avec)) {
+          echouer(quoi + ' montre une marque');
+        }
+      });
+    });
+
+    // AVEC LE FICHIER, LE BADGE DE L'ACCUEIL RESTE CELUI D'AUJOURD'HUI. Retirer
+    // l'offre quand il n'y a rien à offrir ne doit rien lui enlever quand il y
+    // a quelque chose : un seul lien vers le fichier, « Android » et le
+    // téléchargement direct dans la langue de la page, Google Play annoncé
+    // dessous.
+    var echapper = function (t) {
+      return t.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    };
     CODES.forEach(function (code) {
-      var relatif = code === 'fr'
-        ? 'telechargement/index.html'
-        : path.join(code, 'telechargement/index.html');
-      var aplatir = function (t) { return t.replace(/\s+/g, ' '); };
-      var avec = aplatir(fs.readFileSync(path.join(avecFaits.sortie, relatif), 'utf8'));
-      var sans = aplatir(fs.readFileSync(path.join(bon.sortie, relatif), 'utf8'));
-      if (avec.indexOf('href="/messagr.apk"') === -1) {
-        echouer('le téléchargement « ' + code + ' » ne propose pas le fichier ' +
-          "alors que la construction en mesure un");
+      var quoi = "le badge de l'accueil « " + code + ' »';
+      var ou = code === 'fr' ? 'index.html' : path.join(code, 'index.html');
+      var rendue = fs.readFileSync(path.join(avecFaits.sortie, ou), 'utf8');
+      var badges = rendue.match(/<a class="badge" href="\/messagr\.apk">[\s\S]*?<\/a>/g) || [];
+      if (badges.length !== 1) {
+        echouer(quoi + ' apparaît ' + badges.length + ' fois, une attendue');
+        return;
       }
-      if (avec.indexOf(copie[code]['dl-retire']) !== -1) {
-        echouer('le téléchargement « ' + code + ' » dit qu\'aucun fichier ' +
-          "n'est proposé alors qu'il en propose un");
+      var libelle = '<b>Android</b><em data-t="direct">' +
+        echapper(copie[code].direct) + '</em>';
+      if (badges[0].indexOf(libelle) === -1) {
+        echouer(quoi + ' ne dit plus « Android, ' + copie[code].direct + ' »');
       }
-      if (sans.indexOf('href="/messagr.apk"') !== -1) {
-        echouer('le téléchargement « ' + code + ' » propose un fichier que ' +
-          "cette construction ne mesure pas : le bouton resterait après un retrait");
-      }
-      if (sans.indexOf(copie[code]['dl-retire']) === -1) {
-        echouer('le téléchargement « ' + code + ' » ne dit pas qu\'aucun ' +
-          'fichier n\'est proposé, alors qu\'il n\'en propose aucun');
-      }
-      if (/%[A-Z]+%/.test(sans) || /%[A-Z]+%/.test(avec)) {
-        echouer('le téléchargement « ' + code + ' » montre une marque');
+      var dessous = '<div class="under" data-t="bientot-play">' +
+        echapper(copie[code]['bientot-play']) + '</div>';
+      if (rendue.indexOf(dessous) === -1) {
+        echouer(quoi + " n'annonce plus « " + copie[code]['bientot-play'] +
+          ' » dessous');
       }
     });
     if (/%[A-Z]+%/.test(pageDe)) {
@@ -596,6 +676,33 @@ CODES.forEach(function (code) {
     echouer('la construction accepte une clé que les catalogues ignorent');
   }
   fs.rmSync(enTrop.sortie, { recursive: true, force: true });
+
+  // ET UNE OFFRE SANS SON ABSENCE NE PASSE PAS. Un bloc d'absence renommé
+  // faisait rendre la page telle quelle quand aucun fichier n'est proposé :
+  // offre comprise, vers le fichier retiré, c'est-à-dire le 13 septembre par
+  // un autre chemin. Les deux pages, parce que chacune porte sa paire, et le
+  // refus doit être celui-là : une construction qui échouerait pour une autre
+  // raison ferait passer ce cas sans rien éprouver.
+  ENGENDREES.forEach(function (modele) {
+    var orpheline = construire(function (source) {
+      var fichier = path.join(source, modele.source.replace(/^site\//, ''));
+      var texte = fs.readFileSync(fichier, 'utf8');
+      var renomme = texte.replace('data-si="pas-de-telechargement"', 'data-si="absence"');
+      if (renomme === texte) {
+        echouer('cas fabriqué : la page ' + modele.nom + ' ne porte pas le bloc ' +
+          "« pas-de-telechargement », donc ce cas n'éprouve rien");
+      }
+      fs.writeFileSync(fichier, renomme);
+    });
+    if (orpheline.code === 0) {
+      echouer('la construction accepte une page ' + modele.nom + ' qui porte ' +
+        "l'offre sans le bloc de son absence : sans fichier, l'offre resterait");
+    } else if (orpheline.dit.indexOf('le bloc « pas-de-telechargement »') === -1) {
+      echouer('la page ' + modele.nom + " sans bloc d'absence est refusée pour " +
+        'une autre raison : ' + orpheline.dit.trim());
+    }
+    fs.rmSync(orpheline.sortie, { recursive: true, force: true });
+  });
 })();
 
 // ── 5. LE SÉLECTEUR, QUI NAVIGUE MAINTENANT AU LIEU DE TRADUIRE ─────────
@@ -793,6 +900,7 @@ if (status === 0) {
   console.log('langues: ' + CODES.length + ' catalogues complets sur les deux ' +
     'pages, la page d\'invitation se traduit pour le navigateur qui la lit, ' +
     'la construction écrit une page d\'accueil par langue et refuse un ' +
-    'catalogue troué, et le sélecteur navigue vraiment');
+    'catalogue troué, sans fichier proposé aucune page construite ne le ' +
+    'nomme, et le sélecteur navigue vraiment');
 }
 process.exit(status);

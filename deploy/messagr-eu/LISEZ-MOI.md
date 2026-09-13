@@ -177,7 +177,13 @@ Verify after:
       deploy/messagr-eu/nginx-messagr-eu.conf --live
     node deploy/messagr-eu/tests/conformite-site-deploye.js --live
 
-`deploy.sh` runs the last of those itself, at the end.
+`deploy.sh` runs the last of those itself, at the end. When the deployment
+offers no download it also runs
+`node deploy/messagr-eu/tests/telechargement-retire.js --live`, which reads
+every page this repository builds as the server answers it, and fails on any
+page that still names the file. On 13 September 2026 the six landing pages
+kept a badge pointing at a withdrawn download, while the one page the
+deployment read said there was none.
 
 ## Pointing Android at Play, and the address that is NOT the right one
 
