@@ -87,6 +87,20 @@ export type TabGlyph =
   // tell apart. The fold is the identity's own gesture: the conversation's
   // bubbles carry one.
   | 'document'
+  // THE CAMERA WHILE IT SENDS NOTHING, and the identity's own like the
+  // composer's three: `messagr-icon-cam.off.svg`, the catalogue's `cam.off`,
+  // transcribed rather than redrawn. The call screen's camera control drew
+  // `cam` on and off alike, and what an eye saw of the difference was the
+  // green fill: a state carried by colour alone -- what §13 refuses, and what
+  // the star below already answers with a shape. #290.
+  | 'cam.off'
+  // TWO ARROWS ROUND A LENS, for switching cameras, and transcribed like
+  // `cam.off`: `messagr-icon-flip.svg`, which the catalogue reserves for
+  // « Changer de caméra ». Switching drew `cam` right beside the camera
+  // control -- two round buttons with one picture in them, which is two
+  // controls nobody can tell apart. Reported from the rehearsal of 13
+  // September 2026 (#290).
+  | 'flip'
 
 const STROKE = {
   fill: 'none' as const,
@@ -291,6 +305,28 @@ export function TabIcon({
             {...STROKE}
           />
           <Path d="M15.5 11l6-3.4v8.8l-6-3.4z" stroke={tint} {...STROKE} />
+        </>
+      )}
+
+      {glyph === 'cam.off' && (
+        <>
+          <Path
+            d="M15.5 12.6V15a2.4 2.4 0 01-2.4 2.5H4.9A2.4 2.4 0 012.5 15V9a2.4 2.4 0 012.4-2.5h4.2"
+            stroke={tint}
+            {...STROKE}
+          />
+          <Path d="M15.5 10.2l6-2.6v8.8l-3.6-2" stroke={tint} {...STROKE} />
+          <Path d="M3.5 3.5l17 17" stroke={tint} {...STROKE} />
+        </>
+      )}
+
+      {glyph === 'flip' && (
+        <>
+          <Path d="M4 8.5A4.5 4.5 0 018.5 4H16" stroke={tint} {...STROKE} />
+          <Path d="M13.5 1.5L16 4l-2.5 2.5" stroke={tint} {...STROKE} />
+          <Path d="M20 15.5A4.5 4.5 0 0115.5 20H8" stroke={tint} {...STROKE} />
+          <Path d="M10.5 22.5L8 20l2.5-2.5" stroke={tint} {...STROKE} />
+          <Circle cx={12} cy={12} r={3} stroke={tint} {...STROKE} />
         </>
       )}
 
