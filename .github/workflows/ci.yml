@@ -68,6 +68,15 @@ jobs:
       - name: Assert the release notes are built the way they are meant to be
         run: node scripts/release-notes.mjs --self-test
 
+      # LE RELECTEUR D'APPLE N'ENTRE QUE SI CE SCRIPT DÉCIDE JUSTE, et il
+      # tourne des jours sans personne devant. Qui inviter, quand s'arrêter :
+      # des fonctions pures, exercées ici réseau coupé. Il relit aussi
+      # `issueInvitation.ts` et `create.rs` : une conversation émise par le
+      # script qui ne ressemblerait plus à celles de l'application échoue ici,
+      # plutôt que devant la revue d'Apple.
+      - name: Assert the reviewer's admission decides the way it is meant to
+        run: node scripts/testflight-reviewer.mjs --self-test
+
       - run: yarn lint
       - run: yarn format
       - run: yarn typecheck
