@@ -339,6 +339,52 @@ describe('what the media layer reports reaches the machine', () => {
   })
 })
 
+describe('an invitation that runs out while it is being answered', () => {
+  it('is said to be over, and refusing it or going back throws nothing', async () => {
+    // A first call: answering asks for the microphone, and the dialog stays
+    // up longer than the invitation had left. The machine refuses the late
+    // accept, and the screen must hear that the call ended -- or it stays on
+    // a ringing call whose refuse button and back button both reach a
+    // machine that has already ended.
+    let clock = 1_000
+    const { session, sent, states } = build({
+      now: () => clock,
+      media: {
+        createConnection: () => fakeConnection().pc,
+        captureAudio: async () => {
+          clock += 90_001
+          return fakeTrack()
+        },
+        captureVideo: async () => fakeTrack(),
+      },
+    })
+    session.receive([
+      {
+        type: 'm.call.invite',
+        sender: '@them:example.org',
+        content: {
+          call_id: 'call-theirs',
+          version: '1',
+          party_id: 'THEIRS',
+          lifetime: 90000,
+          offer: description('offer'),
+        },
+      },
+    ])
+    expect(states.at(-1)?.call).toBe('incomingInvite')
+
+    await expect(session.answer()).rejects.toThrow('the invite has expired')
+
+    expect(states.at(-1)).toEqual({
+      call: 'ended',
+      reason: { ended: 'inviteExpired' },
+    })
+    expect(() => session.reject()).not.toThrow()
+    expect(() => session.hangup()).not.toThrow()
+    expect(sent).toEqual([])
+  })
+})
+
 describe('mute', () => {
   it('answers what the microphone holds once there is one', async () => {
     const { session } = build()

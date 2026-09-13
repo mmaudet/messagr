@@ -3,9 +3,18 @@
     <uses-permission android:name="android.permission.INTERNET" />
 
     <!-- THE MICROPHONE, FOR A CALL AND FOR NOTHING ELSE.
-         Declared here and asked for at the moment somebody places or answers
-         a call, never at launch: a permission dialog with no call behind it
-         is a product asking to listen for reasons of its own.
+         Declared here and asked for when a call is about to exist: before a
+         placed call's invitation leaves, and as soon as an incoming call
+         rings with the application in front, or the moment it comes back in
+         front while the call still rings. Never at launch: a permission
+         dialog with no call behind it is a product asking to listen for
+         reasons of its own.
+
+         NO LONGER WHEN THE CALL IS ANSWERED, which is what this said until
+         #292. A dialog opened by the answer kept the application waiting
+         while the invitation went on counting, and a first call could be over
+         by the time both dialogs were granted. `src/calls/permissions.ts`
+         holds the rule, and says why iOS still asks at capture.
 
          `MODIFY_AUDIO_SETTINGS` is what lets the application route the call
          to the earpiece and switch it to the speaker. Without it the audio
@@ -15,9 +24,12 @@
     <uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS" />
 
     <!-- LA CAMÉRA, POUR UN APPEL VIDÉO ET POUR RIEN D'AUTRE.
-         Déclarée ici et demandée au moment où quelqu'un allume sa caméra
-         dans un appel, jamais au lancement — la même règle que le microphone
-         juste au-dessus, et pour la même raison.
+         Déclarée ici et demandée avec le microphone juste au-dessus, au même
+         moment et pour la même raison, mais pour un appel vidéo seulement :
+         avant que son invitation parte, dès qu'il sonne au premier plan, ou
+         quand quelqu'un allume sa caméra pendant un appel audio. Jamais au
+         lancement, et plus au décroché (#292). Refusée, elle laisse un appel
+         entier, sans image (#199).
 
          Arrivée avec #198, le spike qui demande si `RTCView` se dessine sous
          la nouvelle architecture. Elle reste après lui : c'est la permission

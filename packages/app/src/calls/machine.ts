@@ -199,6 +199,20 @@ export interface CallConfig {
   readonly peerUserId: string
   /** See `DEFAULT_INVITE_LIFETIME_MS`. */
   readonly inviteLifetimeMs: number
+  /**
+   * How long an invite of ours is waited on before it ends with
+   * `invite_timeout`: the lifetime it carries, or less.
+   *
+   * Less when the clock is read coarsely. The far end counts the lifetime
+   * from when the invite reached its homeserver, which is after `placeCall`,
+   * so the earliest it may refuse an answer is the lifetime counted from
+   * here. `tick` sees this deadline only when it is driven, and a driver that
+   * reads the clock once a period sees it up to a period late: a caller who
+   * waited the whole lifetime could go on hearing a telephone ring for up to
+   * that long after it could no longer be picked up. Such a driver shortens
+   * the wait by its period, which is what `startCallTransport` does.
+   */
+  readonly inviteWaitMs: number
   /** See `DEFAULT_NEGOTIATE_LIFETIME_MS`. */
   readonly negotiateLifetimeMs: number
   /** See `DEFAULT_CONNECT_TIMEOUT_MS`. */
@@ -211,12 +225,17 @@ export interface CallConfig {
   readonly reconnectWindowMs: number
 }
 
-/** A configuration with the four durations at their documented values. */
+/**
+ * A configuration with the four durations at their documented values, and an
+ * invite waited on for the whole of its lifetime -- right for a clock read at
+ * every instant, which is the clock the scenarios replay.
+ */
 export function callConfig(ownUserId: string, peerUserId: string): CallConfig {
   return {
     ownUserId,
     peerUserId,
     inviteLifetimeMs: DEFAULT_INVITE_LIFETIME_MS,
+    inviteWaitMs: DEFAULT_INVITE_LIFETIME_MS,
     negotiateLifetimeMs: DEFAULT_NEGOTIATE_LIFETIME_MS,
     connectTimeoutMs: DEFAULT_CONNECT_TIMEOUT_MS,
     reconnectWindowMs: DEFAULT_RECONNECT_WINDOW_MS,
@@ -668,7 +687,7 @@ export class CallMachine {
       ctx: {
         callId,
         partyId,
-        expiresAtMs: nowMs + this.config.inviteLifetimeMs,
+        expiresAtMs: nowMs + this.config.inviteWaitMs,
         pendingCandidates: [],
       },
     }

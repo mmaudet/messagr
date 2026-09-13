@@ -1,10 +1,12 @@
 // Type-only for the crypto package, as everywhere it is named outside
 // `cryptoPump.ts`; the functions themselves come through `encryptingDeps`.
 import type { createClient } from 'matrix-js-sdk'
+import { AppState } from 'react-native'
 
 import { openCallEvents } from '../calls/inbox'
 import type { CallState } from '../calls/machine'
 import { fetchTurnServer } from '../calls/ice'
+import { startCallPermissions } from '../calls/permissions'
 import {
   CallSessionError,
   startCallSession,
@@ -19,6 +21,7 @@ import { deviceCallAudio, type CallRole } from './callAudio'
 import { watchPictures, type Pictures } from './callMedia'
 import type { CallLog, CallOutcome } from './callLogStore'
 import { deviceMedia } from './callMedia'
+import { devicePermissions } from './callPermissions'
 import { encryptingDeps } from './cryptoPump'
 import { sendIntoScope } from './encryptAndSend'
 import { logEvent } from './log'
@@ -237,6 +240,37 @@ export function startCallRuntime(
 ): CallRuntime {
   const deps = encryptingDeps(sessionClient)
   let held: (DeviceCall & CallOnScreen) | null = null
+  /**
+   * When the microphone and the camera are asked for, on the telephone that
+   * can say without asking whether they are granted: Android. `null`
+   * elsewhere, where a call goes on asking at capture as it always did.
+   *
+   * THE DIALOGS OPEN BEFORE A CALL NEEDS THEM (#292): a callee's when the
+   * call rings in front, a caller's before the invitation leaves.
+   * `calls/permissions.ts` says why the answer asks for nothing now.
+   */
+  const permissions =
+    devicePermissions === null
+      ? null
+      : startCallPermissions(
+          devicePermissions,
+          AppState.currentState === 'active',
+        )
+  // FOR THE LIFE OF THE RUNTIME, like the pictures below and for the same
+  // reason: it is started once, at launch. A call that rang while the
+  // application was not in front is asked about the moment it comes back.
+  if (permissions !== null) {
+    AppState.addEventListener('change', state =>
+      permissions.foreground(state === 'active'),
+    )
+  }
+  /**
+   * Whether a call is waiting on its permissions before being placed.
+   *
+   * `held` is set only once the dialog has closed, so without this a second
+   * press in that wait would place a second call beside the first.
+   */
+  let placing = false
   // Held beside the call rather than inside it: the pictures arrive on the
   // library's own callbacks, at moments that have nothing to do with the
   // state machine's transitions.
@@ -356,6 +390,14 @@ export function startCallRuntime(
         ownPartyId: credentials.deviceId,
       },
       state => {
+        // THE RING ASKS FOR WHAT ANSWERING IT WILL NEED, and before the screen
+        // hears of it: an answer pressed on a notification is spent on this
+        // same transition, and it can only wait for a dialog already open.
+        permissions?.ringing(
+          state.call === 'incomingInvite'
+            ? { callId: state.callId, video: offersVideo(state.offer.sdp) }
+            : null,
+        )
         // THE RINGBACK STOPS WHEN THE FAR END PICKS UP, NOT WHEN THE CALL
         // ENDS. A tone still playing under somebody's voice is the loudest
         // possible way of saying the application has lost track of its own
@@ -461,8 +503,48 @@ export function startCallRuntime(
     },
 
     place: async (scope, peerUserId, wants) => {
-      if (held !== null) throw new Error('a call is already running')
-      await refusable(begin(scope, peerUserId, 'caller').session.place(wants))
+      if (held !== null || placing) {
+        throw new Error('a call is already running')
+      }
+      let placed = wants
+      let cameraRefused = false
+      if (permissions !== null) {
+        placing = true
+        const allowed = await permissions.beforePlacing(wants).finally(() => {
+          placing = false
+        })
+        // Somebody rang while the dialog was up, and that call is held now.
+        if (held !== null) throw new Error('a call is already running')
+        if (!allowed.allowed) {
+          // NOT PLACED: no invitation, no ringback, and no screen but the one
+          // saying why, in the sentence a microphone that would not open has
+          // always had. It closes itself, like every call that never began.
+          onChanged({
+            scope,
+            peerUserId,
+            state: { call: 'idle' },
+            failure: allowed.failure,
+            pictures,
+            sendingVideo: false,
+          })
+          throw new CallSessionError(
+            allowed.failure,
+            'the microphone was refused, so the call was not placed',
+          )
+        }
+        placed = allowed.wants
+        cameraRefused = allowed.cameraRefused
+      }
+      await refusable(begin(scope, peerUserId, 'caller').session.place(placed))
+      // A whole call without the picture, and the line that says so -- told
+      // once the call has its connection, whose closing takes the line away
+      // again. Told before that, a call that then failed would leave the line
+      // to the next one.
+      if (cameraRefused) {
+        deviceMedia.onCameraRefused?.(
+          new Error('the camera permission was refused'),
+        )
+      }
     },
     answer: async wants => {
       const running = held
@@ -474,7 +556,34 @@ export function startCallRuntime(
       const now = running.state
       const offered =
         now.call === 'incomingInvite' && offersVideo(now.offer.sdp)
-      await refusable(running.session.answer(wants ?? { video: offered }))
+      const asked = wants ?? { video: offered }
+      // NOTHING IS ASKED HERE ANY MORE, and that is #292: the ring asked, and
+      // an answer pressed while its dialog is up waits for it. A microphone
+      // refused there is a call that cannot be answered, said the way one
+      // that would not open always was; a camera refused answers without the
+      // picture.
+      const allowed = await permissions?.beforeAnswering(asked)
+      // The call that rang is not the one held any more. By its session:
+      // `held` is a new object at every transition of the same call.
+      if (held?.session !== running.session) return
+      if (allowed?.allowed === false) {
+        await refusable(
+          Promise.reject(
+            new CallSessionError(
+              allowed.failure,
+              'the microphone was refused, so the call was not answered',
+            ),
+          ),
+        )
+        return
+      }
+      await refusable(running.session.answer(allowed?.wants ?? asked))
+      // Once the call has its connection, as for a call placed.
+      if (allowed?.cameraRefused === true) {
+        deviceMedia.onCameraRefused?.(
+          new Error('the camera permission was refused'),
+        )
+      }
     },
     reject: () => held?.session.reject(),
     hangup: () => held?.session.hangup(),

@@ -246,8 +246,11 @@ export function CallScreen({
       animationType="slide"
       // The hardware back button. It hangs up rather than hiding the call:
       // a call still running behind a screen that is gone is a microphone
-      // nobody can see they left open.
-      onRequestClose={over ? onDismiss : onHangup}
+      // nobody can see they left open. While the call still rings, the same
+      // gesture refuses it, because refusing is how a call nobody answered
+      // ends: the machine has no hangup for one, and asking for it threw out
+      // of the press.
+      onRequestClose={over ? onDismiss : ringing ? onReject : onHangup}
       testID="call-screen">
       <View style={styles.ground}>
         {/* THE FAR END FILLS THE SCREEN, and this side sits in a corner --
