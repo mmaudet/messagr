@@ -64,6 +64,14 @@
 
 	     `scripts/assert-ios-purpose-strings.sh` refuse desormais ca dans
 	     `checks`, a partir des dependances declarees. -->
+	<!-- LE MOMENT DE LA DEMANDE NE CHANGE PAS SUR IOS.
+	     Android demande le micro, et la camera pour un appel video, avant que
+	     l'invitation parte ou des que l'appel sonne au premier plan, et plus
+	     au decroche : une demande au decroche pouvait laisser l'invitation
+	     expirer (#292). React Native ne sait pas verifier une autorisation
+	     sur iOS sans module natif, et le seul a portee est celui de
+	     react-native-webrtc. iOS demande donc toujours a la capture, comme
+	     avant. `src/calls/permissions.ts` porte la regle. -->
 	<key>NSMicrophoneUsageDescription</key>
 	<string>Pour que votre correspondant vous entende pendant un appel. Le son est chiffré de bout en bout : ni le serveur ni Messagr ne peuvent l’écouter, et rien n’est enregistré.</string>
 	<!-- UN TEXTE POUR UNE AUTORISATION QUI NE SERA JAMAIS DEMANDEE.
