@@ -135,21 +135,24 @@ with.
 
 **Where a link does open a browser, the landing page does not carry the
 invitation into the application.** This paragraph used to say its _Copy the
-link_ did. What `site/i/index.html` does:
+link_ did. That button put `location.href` on the clipboard and promised a
+paste the application never offered, and #278 removed it. What
+`site/i/index.html` does:
 
 - _Open in Messagr_ is `href=""`, the page's own https address and not
   `messagr://`, so it reaches the application on the same condition as the
   link itself (expected, not observed on a device).
-- _Copy the link_ is shown wherever the browser exposes `navigator.clipboard`,
-  puts `location.href` on the clipboard, and says the application will offer
-  to paste it.
+- Below it, shown on every platform, with or without script, one sentence:
+  _"After installing, open the link again from the message you received: that
+  is what opens Messagr."_ Nothing on the page touches the clipboard.
 
-The application does not: it has no field for a link and never reads the
-clipboard, and its list, opened without a link, says `list_not_in_yet`,
-_"Open the invitation link somebody sent you: it is the only door"_. What
-carries an invitation across an install is the link opened again once the
-application is there, which is also all _Open in Messagr_ does, so when the
-system sends that link to a browser nothing on the page gets past it.
+The application has no other way in: it has no field for a link and never
+reads the clipboard, and its list, opened without a link, says
+`list_not_in_yet`, _"Open the invitation link somebody sent you: it is the
+only door"_. What carries an invitation across an install is the link opened
+again once the application is there, which is what that sentence asks for
+and all _Open in Messagr_ does, so when the system sends that link to a
+browser nothing on the page gets past it.
 `docs/unassisted-trial.md` treats a link that opens a browser on a build from
 the track as a hard stop for this reason.
 
@@ -159,9 +162,10 @@ address; the slot is already there and `build-site.sh` refuses a value that is
 not a plain https address, or one that does not land in the built page.
 
 **The walk itself.** #106's last criterion is one invitation opened end to end
-on a phone that never had the application. Its fourth criterion has the person
-paste the link, and the application has no paste: the walk that exists is
-link, landing, install, the link opened again, first launch (language, terms),
+on a phone that never had the application. Its fourth criterion had the person
+paste the link until it was corrected on 13 September 2026 to say there is no
+paste step, since the application has no paste: the walk that exists is link,
+landing, install, the link opened again, first launch (language, terms),
 claim. Nothing here proves that.
 
 ## What was found on the way in

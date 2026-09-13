@@ -96,18 +96,19 @@ On a phone without Messagr it is meant to: the landing page is how step 1
 reaches step 2. **On a build from the track that is already installed, it is
 a hard stop**, and nothing on the landing page gets past it. This document
 used to call the trial still runnable there, through the page's **Copy the
-link**. What the page does, read in `deploy/messagr-eu/site/i/index.html`:
+link**, which promised a paste the application does not have; #278 removed
+the button. What the page does, read in `deploy/messagr-eu/site/i/index.html`:
 
 - **Open in Messagr** is `<a class="ouvrir" href="">`, the page's own https
   address. It is not `messagr://`, and it reaches the application on the same
   condition as the link that has just opened a browser (expected, not observed
   on a device).
-- **Copy the link** is shown wherever the browser exposes
-  `navigator.clipboard`. It puts `location.href`, that same address, on the
-  clipboard, and then says _"Link copied. Open Messagr after installing: it
-  will offer to paste it."_
+- Below it, on every platform, the page says _"After installing, open the
+  link again from the message you received: that is what opens Messagr."_
+  There is no button to copy the link, and nothing on the page touches the
+  clipboard.
 
-The application offers no such thing. It has no field a link can be pasted
+The application has no other way in. It has no field a link can be pasted
 into, and it only ever writes to the clipboard (`Clipboard.setString` and
 `Clipboard.setImage` in `packages/app/App.tsx`, never a read). Opened without a
 link, it says _"You are not in yet. Open the invitation link somebody sent you:
@@ -133,9 +134,11 @@ act. The number matters less than where the long ones are.
    invitation. Opened from the store or from the home screen, the application
    has no link to spend, and once past the screens of step 3 its list says
    `list_not_in_yet`; the invitation comes in when the link is opened again.
-   If they tapped **Copy the link** on the landing page, the page told them
-   the application would offer to paste it. It will not, so a search for a
-   paste field is a wrong turn the page caused, and goes down as one.
+   The landing page they left for the store tells them where to find it:
+   _"After installing, open the link again from the message you received:
+   that is what opens Messagr."_ Watch whether they find the link again in
+   that message, and how long it takes. If they look for it anywhere else
+   first, write down where.
 3. **The promise, the language and the terms.** Before anything is claimed,
    the first screen states what the product promises, offers the six
    languages on a strip under the thumb, and will not continue until the
