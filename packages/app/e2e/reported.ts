@@ -325,3 +325,87 @@ export function whatTheLoopReported(
     timeoutMs,
   )
 }
+
+let marksSoFar = 0
+
+/**
+ * Un repère posé dans le journal de l'appareil, pour lire ce qu'un geste a
+ * produit et rien de ce qui l'a précédé.
+ *
+ * # POURQUOI PAS `forgetTheLog`
+ *
+ * Vider le tampon efface aussi le `MESSAGR_RUNTIME` du lancement en cours, et
+ * des tests le relisent après un geste, sans relancer : « names the sender »
+ * lit celui du lancement que le test d'avant a laissé, « does not present the
+ * sender » le relit après lui. Un vidage au milieu les ferait attendre une
+ * ligne qui ne revient qu'au lancement suivant.
+ *
+ * # POURQUOI PAS LA DERNIÈRE LIGNE, COMME `whatItReported`
+ *
+ * Un lancement écrit son rapport une fois ; un geste peut se répéter dans le
+ * même processus. La seconde ouverture d'une conversation relirait la
+ * décision prise à la première, qui a la même forme et peut dire le
+ * contraire : une offre faite, puis refusée pour de bon.
+ *
+ * Écrit depuis l'hôte par `log`, sous une étiquette que l'application
+ * n'emploie pas, et unique dans la suite.
+ */
+export function markTheLog(): string {
+  marksSoFar += 1
+  const mark = `repere-${Date.now()}-${marksSoFar}`
+  execFileSync('adb', [
+    '-s',
+    driving(),
+    'shell',
+    'log',
+    '-t',
+    'MESSAGR_SUITE',
+    mark,
+  ])
+  return mark
+}
+
+/**
+ * La première ligne qui suit le repère et porte l'une de ces étiquettes, et
+ * laquelle c'était.
+ *
+ * Plusieurs étiquettes parce qu'un geste peut finir de plusieurs façons, et
+ * que celle qui échoue doit répondre aussi vite que celle qui réussit :
+ * attendre une réussite qui ne viendra plus, quand l'échec est déjà écrit,
+ * cacherait la cause derrière un délai.
+ */
+export async function whatCameAfter(
+  mark: string,
+  tags: readonly string[],
+  timeoutMs: number,
+): Promise<{ readonly tag: string; readonly value: unknown }> {
+  const until = Date.now() + timeoutMs
+  let lastError = `the mark ${mark} is not in the device's log`
+  while (Date.now() < until) {
+    const lines = execFileSync('adb', ['-s', driving(), 'logcat', '-d'], {
+      maxBuffer: 64 * 1024 * 1024,
+    })
+      .toString()
+      .split('\n')
+    const at = lines.findIndex(line => line.includes(mark))
+    if (at !== -1) {
+      lastError = `nothing tagged ${tags.join(' or ')} followed the mark`
+      for (const line of lines.slice(at + 1)) {
+        const tag = tags.find(wanted => line.includes(`${wanted} `))
+        if (tag === undefined) continue
+        try {
+          const json = line.slice(line.indexOf(tag) + tag.length).trim()
+          const value: unknown = JSON.parse(json)
+          return { tag, value }
+        } catch {
+          // Coupée entre deux enregistrements logcat. Le vidage suivant l'a
+          // entière.
+          lastError = `${tag} was not parseable`
+          break
+        }
+      }
+    }
+    await new Promise(resolve => setTimeout(resolve, 1000))
+  }
+  throw new Error(`${tags.join(' / ')}: ${lastError}`)
+}

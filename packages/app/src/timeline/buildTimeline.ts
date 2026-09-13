@@ -219,6 +219,24 @@ export async function toTimelineEntries(
       // where a name belongs.
       const document = readFileEvent(content as Record<string, unknown>)
 
+      // L'INSTRUMENT QUI SÉPARE DEUX PANNES INDISCERNABLES.
+      //
+      // Quand la suite ne trouve pas la ligne d'un fichier à l'écran, deux
+      // histoires très différentes donnent la même image : ou bien
+      // l'application n'a pas su lire l'`m.file`, ou bien elle l'a lu et la
+      // ligne n'était pas visible. Sans cette ligne, on ne peut que
+      // formuler des hypothèses, et elles se ressemblent toutes.
+      //
+      // Le nom et rien d'autre : c'est ce que le sondage compare, et c'est
+      // déjà ce que l'expéditeur a choisi de divulguer en envoyant le
+      // fichier. Ni l'adresse, ni le secret, ni la taille.
+      //
+      // Même raison que `MESSAGR_VIDEO_CEILING` pour #199 : une mesure
+      // prise sans instrument mesure autre chose que ce qu'on croit lire.
+      if (document !== null) {
+        logEvent('info', 'MESSAGR_DOCUMENT_READ', { name: document.name })
+      }
+
       entries.push({
         eventId,
         claimedSender: sender,

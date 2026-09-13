@@ -1,6 +1,7 @@
 import { expect } from '@jest/globals'
 import { by, device, element, expect as detoxExpect, waitFor } from 'detox'
 
+import { openTheFirstConversation } from './conversation'
 import { IGNORING_THE_LIVE_POLL } from './longPoll'
 import { NOTIFICATIONS_GRANTED } from './permissions'
 import { acceptThePromise } from './promise'
@@ -282,10 +283,7 @@ describe('boot', () => {
     // `first-conversation` rather than a row's own identifier: those are
     // minted per invitation, so nothing outside the device knows one in
     // advance. `ConversationList.tsx` says why the top row carries both.
-    await waitFor(element(by.id('first-conversation')))
-      .toBeVisible()
-      .withTimeout(60000)
-    await element(by.id('first-conversation')).tap()
+    await openTheFirstConversation()
 
     // `toExist` on the conversation and not `toBeVisible`: that node wraps
     // the whole message list, which is taller than the phone as soon as
@@ -563,10 +561,7 @@ describe('boot', () => {
       .toBeVisible()
       .withTimeout(30000)
     await element(by.id('tab-chat')).tap()
-    await waitFor(element(by.id('first-conversation')))
-      .toBeVisible()
-      .withTimeout(60000)
-    await element(by.id('first-conversation')).tap()
+    await openTheFirstConversation()
     await waitFor(element(by.id('composer-emoji')))
       .toBeVisible()
       .withTimeout(60000)
