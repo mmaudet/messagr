@@ -230,6 +230,7 @@ import { setCatalogue, t } from './src/copy'
 import type { Language } from './src/copy/languages'
 import { enterWithASession, type InvitationOutcome } from './src/runtime/entry'
 import { initialLink, watchLinks } from './src/runtime/incomingLink'
+import { spentLinks } from './src/runtime/spentLinks'
 import { shareFrom, type SharedFile } from './src/runtime/incomingShare'
 import { whatToDoWith, type ShareRefusal } from './src/runtime/sharedIn'
 import {
@@ -1042,6 +1043,11 @@ export function App({
     readonly url: string
     readonly count: number
   } | null>(null)
+  // Each invitation spent at most once this run, so the same link handed over
+  // twice on a cold launch -- getInitialURL and then a url event -- claims
+  // once. Held here because the launch effect can run more than once for the
+  // one link, and the two runs must agree. See spentLinks.ts.
+  const spentLinksRef = useRef(spentLinks())
   const [evicted, setEvicted] = useState<'idle' | 'working' | EvictOutcome>(
     'idle',
   )
@@ -1575,7 +1581,15 @@ export function App({
         // ici serait un lien que rien ne peut réclamer.
         link: async () => {
           const url = warmLink === null ? await initialLink() : warmLink.url
-          return url === null || shareFrom(url) !== null ? null : url
+          if (url === null || shareFrom(url) !== null) return null
+          // SPENT ONCE PER RUN. The system can hand the same invitation over
+          // twice on a cold launch -- as the address this process started with
+          // and again as an event -- and a single-use link claimed twice would
+          // run the account-creating claim against a token already spent. The
+          // check and the record are one step, so a cold read and a warm event
+          // racing here still spend the link once. See spentLinks.ts.
+          if (!spentLinksRef.current.fresh(url)) return null
+          return url
         },
         signUp: signUpSecrets,
         // A claim is two calls with the issuer's application in between. See
