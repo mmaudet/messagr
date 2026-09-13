@@ -33,18 +33,24 @@ ten and #91 is.
 - [ ] **The invitation link opens the application _on a build from the
       track_.** The item most likely to be ticked wrongly. Android App Links
       verify against `/.well-known/assetlinks.json`, which declared a dead
-      package name until 6 September 2026 — and which today names the
-      fingerprint of a build installed **by hand**. Play App Signing re-signs
-      the upload with a certificate Google holds, and that is what reaches a
-      device from the internal testing track, so a link that opens the
-      application on the observer's own phone may still open a browser on the
-      participant's (**#114**, which needs Play Console access). Tap a real
-      link on a device that installed from the track, not on one that was
-      sideloaded. If it opens a browser the trial is still runnable — the
-      landing page offers **Copy the link**, which is what carries an
-      invitation across an install — but write down that step 1 measured
-      that path rather than the other one. It is a different finding, not
-      the same step gone badly.
+      package name until 6 September 2026 and has named the two certificates
+      Play App Signing signs with since 7 September (**#114**). Those are
+      what reach a device from the internal testing track, so a build from
+      the track is expected to verify. Expected, not yet observed: on a
+      device that installed from the track,
+      `adb shell pm get-app-links eu.messagr` should answer
+      `messagr.eu: verified`, and a real link tapped there should open the
+      application. Check it there, not on a phone that was sideloaded: a
+      sideloaded build is signed by a key that is not served, so what it
+      answers says nothing about the track. On 13 September 2026 a fresh
+      debug install did not verify, and the demonstration Pixel still did,
+      for a reason nobody has established. If the link opens a browser on a
+      build from the track, the trial is still runnable — the landing page
+      offers **Copy the link**, which is what carries an invitation across an
+      install — but write down that step 1 measured that path rather than
+      the other one. It is a different finding, not the same step gone
+      badly, and with the fingerprints served it is no longer a known limit
+      but something to find the cause of.
 
 - [ ] **The language the person reads is one of the six.** French, English,
       German, Spanish, Italian, Dutch. The first screen offers the choice
