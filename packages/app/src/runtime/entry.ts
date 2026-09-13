@@ -5,6 +5,7 @@ import {
 } from './claimInvitation'
 import type { LinkSource } from './incomingLink'
 import { parseInvitationLink } from './invitationLink'
+import { sameOrigin } from './sameOrigin'
 import type { RestoreCredentials } from './sessionCredentials'
 import { loadSession, saveSession, type SecretStore } from './sessionStore'
 import { markSignUpStarted } from './signUpMarker'
@@ -129,6 +130,18 @@ export type EntryResult =
     }
   | { readonly entered: false; readonly reason: string }
 
+/**
+ * The reason a held account will not spend a link into another instance.
+ *
+ * A sentence for the log, not for a screen: §13.27 keeps diagnostic text off
+ * a screen a person reads, and the list draws its own fixed line for a refused
+ * invitation. It names no host and carries no token -- what it records is that
+ * the link was for a server other than the account's, which is the one fact
+ * somebody reading the log to understand a refusal needs.
+ */
+const OTHER_SERVER =
+  'this invitation is for a different server than this account'
+
 export async function enterWithASession(deps: EntryDeps): Promise<EntryResult> {
   const { secrets, poster, link, signUp, wait } = deps
 
@@ -138,6 +151,25 @@ export async function enterWithASession(deps: EntryDeps): Promise<EntryResult> {
     const usable = offered === null ? null : parseInvitationLink(offered)
     if (usable === null) {
       return { entered: true, session: held, claimed: false }
+    }
+    // THE ACCOUNT'S CREDENTIALS GO TO ITS OWN SERVER, AND TO NO OTHER.
+    //
+    // Spending the link for a held account authenticates the request with that
+    // account's access token (`claimForExistingAccount` -> `servicePoster`),
+    // and the link names the host the request is sent to. A link is written by
+    // whoever issued it, so the host it names is checked against the server
+    // this account actually lives on -- an invitation into a different instance
+    // is one this account can have no part in, and its token has no business
+    // travelling there. When the instances differ this refuses before any
+    // request is made. The reason is reported for the log, never for a screen,
+    // and the link's token is no part of it.
+    if (!sameOrigin(usable.homeserver, held.baseUrl)) {
+      return {
+        entered: true,
+        session: held,
+        claimed: false,
+        invitation: { kind: 'refused', reason: OTHER_SERVER },
+      }
     }
     // SPENT FOR THE ACCOUNT THIS DEVICE ALREADY HAS, never against it. The
     // service draws nobody on this path: it invites `held.userId` into the
