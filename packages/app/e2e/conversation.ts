@@ -1,6 +1,6 @@
 import { by, element, waitFor } from 'detox'
 
-import { markTheLog, whatCameAfter } from './reported'
+import { markTheLog, whatCameAfter, whatItReported } from './reported'
 
 /**
  * Ouvrir la première conversation de la liste, comme une personne le fait, et
@@ -51,6 +51,45 @@ import { markTheLog, whatCameAfter } from './reported'
  * suivantes lisent `offer: false` et passent.
  */
 export async function openTheFirstConversation(): Promise<void> {
+  // ET PAS AVANT QUE LA LIGNE SACHE OUVRIR QUOI QUE CE SOIT.
+  //
+  // La liste est dessinée depuis le carnet au tout début du lancement
+  // (`MESSAGR_LIST_REMEMBERED`), et chaque ligne appelle
+  // `openConversationRef.current?.(scope)`. `App.tsx` ne lie cette référence
+  // qu'à la fin de son chemin de lancement, après la pompe, la sonde d'envoi
+  // et `enterAnyInvitations` : avant, un toucher ne fait rien, et rien ne le
+  // dit.
+  //
+  // Mesuré sur le run 34717623056, où le test du `m.file` touchait 29 ms
+  // après le retour de `launchApp` : Espresso a effectué ses trois touchers
+  // 158, 201 et 837 ms au moins avant que la référence soit liée, et aucune
+  // conversation ne s'est ouverte. Detox n'avait aucune raison d'attendre :
+  // `/sync` est hors de sa synchronisation (longPoll.ts), et c'est un `/sync`
+  // que le lancement attendait à chaque fois. Une personne qui touche aussi
+  // tôt perd son toucher de la même façon ; ce n'est pas l'objet de ce
+  // fichier.
+  //
+  // Le signal est le rapport du lancement. `MESSAGR_RUNTIME` n'est écrit
+  // qu'au bout du chemin qui lie la référence, et `pump.outcome` à `ran` dit
+  // que c'est bien ce chemin-là qu'il a parcouru. Rien n'est attendu au
+  // jugé : c'est une ligne que le produit écrit après le moment qui compte.
+  //
+  // « Stable » ne veut pas dire que la liste ne bouge plus, la boucle la
+  // redessine à chaque tour. Ses lignes sont indexées par salon, donc un
+  // nouveau dessin garde le même `Pressable` : ce qui décidait du sort d'un
+  // toucher, c'était la référence.
+  //
+  // Cela suppose le journal vidé avant la relance, comme chaque lancement de
+  // cette suite le fait : sinon le rapport lu serait celui du lancement
+  // d'avant, et il répondrait tout de suite.
+  const launch = await whatItReported(60000)
+  if (launch.pump === 'not-configured' || launch.pump.outcome !== 'ran') {
+    throw new Error(
+      'this launch never bound what a row of the list calls, so a tap ' +
+        `could open nothing: ${JSON.stringify(launch.pump)}`,
+    )
+  }
+
   await waitFor(element(by.id('first-conversation')))
     .toBeVisible()
     .withTimeout(60000)

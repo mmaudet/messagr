@@ -336,31 +336,33 @@ describeRoundTrip('encrypted round trip', () => {
         permissions: NOTIFICATIONS_GRANTED,
         launchArgs: IGNORING_THE_LIVE_POLL,
       })
+      // LA CONVERSATION EST-ELLE SEULEMENT OUVERTE ? C'EST LA QUESTION QUE
+      // CE TEST NE POSAIT PAS, PUIS POSAIT TROP TÔT.
+      //
+      // Sans elle, un échec disait « le fichier n'est jamais apparu » et
+      // laissait croire que l'application ne savait pas lire un `m.file`
+      // d'une autre implémentation, alors que la capture montrait la LISTE.
+      //
+      // Et elle ne suffisait pas : ce test touchait `first-conversation` dès
+      // que la ligne était visible, c'est-à-dire dès que la liste mémorisée
+      // est dessinée, avant que le lancement ait lié ce que la ligne appelle.
+      // Trois touchers perdus sur le run 34717623056. `openTheFirstConversation`
+      // attend le rapport du lancement, prouve l'ouverture par la ligne que
+      // toute conversation qui se dessine écrit, répond à l'offre de
+      // sauvegarde, qui tombe ici, et finit sur `conversation-input`. S'il
+      // échoue, son message nomme la navigation plutôt que l'interop.
       try {
-        await waitFor(element(by.id('first-conversation')))
-          .toBeVisible()
-          .withTimeout(45000)
-        await element(by.id('first-conversation')).tap()
-
-        // LA CONVERSATION EST-ELLE SEULEMENT OUVERTE ? C'EST LA QUESTION QUE
-        // CE TEST NE POSAIT PAS.
-        //
-        // Sans cette ligne, un échec disait « le fichier n'est jamais
-        // apparu » et laissait croire que l'application ne savait pas lire
-        // un `m.file` d'une autre implémentation. La capture d'échec de
-        // Detox montre autre chose : l'application est sur la LISTE, pas
-        // dans la conversation. Le fichier était bien lu -- le journal le
-        // dit par `MESSAGR_DOCUMENT_READ` -- et le test regardait un écran
-        // où il ne pouvait pas être.
-        //
-        // `conversation-input` est la preuve d'ouverture la moins ambiguë :
-        // il n'existe que dans une conversation. S'il n'apparaît pas, le
-        // message ci-dessous nomme la navigation plutôt que l'interop, et
-        // c'est une panne entièrement différente.
-        await waitFor(element(by.id('conversation-input')))
-          .toBeVisible()
-          .withTimeout(20000)
-
+        await openTheFirstConversation()
+      } catch (cause: unknown) {
+        // GARDÉE, ET PAS AVALÉE. La boucle jetait la raison, donc l'échec
+        // final ne pouvait pas dire laquelle des attentes avait expiré --
+        // celle qui ouvre la conversation, ou celle qui cherche le fichier
+        // dedans. C'est le même défaut que le message d'origine, que ce test
+        // reproche plus bas.
+        lastFailure = cause instanceof Error ? cause.message : String(cause)
+        continue
+      }
+      try {
         // SUR LE NOM, parce que le nom EST le corps d'un `m.file` et que
         // c'est ce qu'une personne lit. Accentué à dessein : un aller-retour
         // qui ne passerait que de l'ASCII ne dirait rien des encodages, et
@@ -370,13 +372,18 @@ describeRoundTrip('encrypted round trip', () => {
           .withTimeout(45000)
         seen = true
       } catch (cause: unknown) {
-        // GARDÉE, ET PAS AVALÉE. La boucle jetait la raison, donc l'échec
-        // final ne pouvait pas dire laquelle des deux attentes avait expiré
-        // -- celle qui prouve que la conversation est ouverte, ou celle qui
-        // cherche le fichier dedans. C'est le même défaut que le message
-        // d'origine, que ce commit reproche plus bas.
+        // Gardée aussi, pour la même raison.
         lastFailure = cause instanceof Error ? cause.message : String(cause)
       }
+      // REFERMÉE DANS LE TEST, et pas seulement ouverte. « names the sender »
+      // part de la liste, comme une application relancée : c'était vrai par
+      // accident tant que ce test n'arrivait pas à ouvrir la conversation.
+      // Refermée à chaque tentative qui l'a ouverte, trouvée ou non, pour que
+      // l'état laissé ne dépende pas de laquelle a été la dernière.
+      await element(by.id('conversation-back')).tap()
+      await waitFor(element(by.id('first-conversation')))
+        .toBeVisible()
+        .withTimeout(30000)
     }
 
     if (!seen) {
@@ -398,7 +405,11 @@ describeRoundTrip('encrypted round trip', () => {
                                  thing this test exists to find out.
 
          Measured on 12 September 2026: the line was there twice, and the
-         failure screenshot showed the conversation list.
+         failure screenshot showed the conversation list. Read on 13
+         September in run 34717623056: all three taps had been made before
+         the launch bound what a row calls. openTheFirstConversation now
+         waits for the launch report first, and names the tap when it opens
+         nothing.
 
          The last attempt failed with: ${lastFailure}`,
       )
