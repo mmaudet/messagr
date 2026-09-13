@@ -173,20 +173,35 @@ describe('the two pictures of a video call', () => {
 describe('the camera controls', () => {
   // #290, from the same rehearsal: the camera control and the switch beside
   // it both drew `cam`, two round buttons with one picture in them. The
-  // prototype's video controls give switching a glyph of its own, and turn
-  // the camera's between `cam` and `cam.off` with what the camera is doing.
+  // prototype gives switching a glyph of its own, and draws the camera
+  // control differently on its two call screens: the audio one keeps `cam`
+  // whether its toggle is on or off, and only the video one turns it to
+  // `cam.off` once the camera is cut. A video call, to this screen, is one
+  // with a picture on it, whichever side's: without one it draws an audio
+  // call.
   const IN_CALL: CallState = { call: 'inCall', callId: 'call' }
 
-  it('draws the camera whole while it sends, and crossed out while it does not', () => {
+  it('keeps the camera whole on an audio call', () => {
+    const audio = screen({ state: IN_CALL, sendingVideo: false })
+
+    expect(glyphOn(audio, 'call-camera')).toBe('cam')
+  })
+
+  it('crosses the camera out on a video call while it sends nothing', () => {
     const sending = screen({
       state: IN_CALL,
       pictures: BOTH,
       sendingVideo: true,
     })
-    const silent = screen({ state: IN_CALL, sendingVideo: false })
+    // This side's camera cut, and the far end's picture still on the screen.
+    const cut = screen({
+      state: IN_CALL,
+      pictures: { local: null, remote: 'far', refused: false },
+      sendingVideo: false,
+    })
 
     expect(glyphOn(sending, 'call-camera')).toBe('cam')
-    expect(glyphOn(silent, 'call-camera')).toBe('cam.off')
+    expect(glyphOn(cut, 'call-camera')).toBe('cam.off')
   })
 
   it('draws switching as two arrows round a lens, not as a second camera', () => {

@@ -89,10 +89,10 @@ export type TabGlyph =
   | 'document'
   // THE CAMERA WHILE IT SENDS NOTHING, and the identity's own like the
   // composer's three: `messagr-icon-cam.off.svg`, the catalogue's `cam.off`,
-  // transcribed rather than redrawn. The call screen's camera control drew
-  // `cam` on and off alike, and what an eye saw of the difference was the
-  // green fill: a state carried by colour alone -- what §13 refuses, and what
-  // the star below already answers with a shape. #290.
+  // transcribed rather than redrawn. The call screen draws it where the
+  // prototype does and nowhere else: on a video call whose camera is cut. An
+  // audio call keeps `cam` whatever the camera is doing, as the prototype's
+  // audio screen does. #290.
   | 'cam.off'
   // TWO ARROWS ROUND A LENS, for switching cameras, and transcribed like
   // `cam.off`: `messagr-icon-flip.svg`, which the catalogue reserves for

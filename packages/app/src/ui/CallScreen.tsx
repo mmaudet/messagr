@@ -416,10 +416,16 @@ export function CallScreen({
                   TROIS DESSINS POUR DEUX BOUTONS. Les deux dessinaient `cam`,
                   côte à côte : deux ronds portant la même image, que rien ne
                   distinguait. La maquette réserve `flip` au changement de
-                  caméra, et son prototype fait alterner `cam` et `cam.off`
-                  selon que la caméra émet. Le dessin porte ainsi l'état comme
-                  le vert, et aussi pour qui ne distingue pas le vert. #290,
-                  répétition du 13 septembre 2026. */}
+                  caméra. #290, répétition du 13 septembre 2026.
+
+                  ET `cam.off` PENDANT UN APPEL VIDÉO SEULEMENT, comme le
+                  prototype V3 : son écran d'appel audio dessine `cam` que la
+                  bascule soit enclenchée ou non, et seul son écran vidéo
+                  passe à `cam.off` quand la caméra est coupée. Ici, un appel
+                  vidéo est un appel où une image est dessinée, `showing`.
+                  Sans image, c'est l'écran d'un appel audio : l'état de la
+                  caméra n'y tient qu'au vert et à `accessibilityState`, de
+                  même que la maquette n'y change que le fond du bouton. */}
               <Round
                 testID="call-camera"
                 label={
@@ -430,7 +436,7 @@ export function CallScreen({
                   sendingVideo ? color.brand.green500 : color.neutral['600']
                 }
                 onPress={() => onCamera(!sendingVideo)}
-                glyph={sendingVideo ? 'cam' : 'cam.off'}
+                glyph={showing && !sendingVideo ? 'cam.off' : 'cam'}
               />
               {sendingVideo && (
                 <Round
