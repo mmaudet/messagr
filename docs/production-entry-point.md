@@ -117,8 +117,11 @@ would be the wrong lesson drawn from the right rule.
 
 ## The invitation service
 
-`messagr-invitations-eu` serves `messagr.eu` and has been up continuously
-since late August 2026. `https://messagr.eu/_messagr/health` answers `200`.
+`messagr-invitations-eu` serves `messagr.eu`. Until 13 September 2026 it was
+built from the prototype's source and had no push gateway; since then it is
+built from `services/invitations`. How it is updated and rolled back is in
+`deploy/messagr-eu-invitations.md`. `https://messagr.eu/_messagr/health`
+answers `200`.
 Registration on the homeserver requires a token: an anonymous `POST` to
 `/_matrix/client/v3/register` comes back with a single flow,
 `m.login.registration_token`, which is the invariant the whole product rests
