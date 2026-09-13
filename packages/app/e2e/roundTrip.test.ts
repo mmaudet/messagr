@@ -4,6 +4,7 @@ import { resolve } from 'node:path'
 import { expect } from '@jest/globals'
 import { by, device, element, waitFor } from 'detox'
 
+import { openTheFirstConversation } from './conversation'
 import { IGNORING_THE_LIVE_POLL } from './longPoll'
 import { acceptThePromise } from './promise'
 import { NOTIFICATIONS_GRANTED } from './permissions'
@@ -439,10 +440,9 @@ describeRoundTrip('encrypted round trip', () => {
     // s'ouvre sur la LISTE, donc une assertion d'écran posée là ne trouve
     // rien -- ce qu'un premier essai a confirmé en trente secondes de
     // matcher qui ne correspond jamais.
-    await waitFor(element(by.id('first-conversation')))
-      .toBeVisible()
-      .withTimeout(30000)
-    await element(by.id('first-conversation')).tap()
+    // Par l'aide commune, qui répond aussi à l'offre de sauvegarde là où le
+    // produit la fait. Voir conversation.ts.
+    await openTheFirstConversation()
 
     // §13.26 : la ligne paraît dès que le salon compte plus d'un autre
     // membre, ce qui est le cas de celui-ci -- le rapport dit `whoElse`
