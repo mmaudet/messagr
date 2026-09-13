@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import type { LogFields } from './log'
 import { logEvent } from './log'
@@ -9,6 +9,18 @@ function captured(level: 'info' | 'warn' | 'error', fields: LogFields): string {
   logEvent(level, 'EVENT', fields)
   const line = String(spy.mock.calls.at(-1)?.[0])
   return line
+}
+
+/** Every line a gesture wrote, whatever the level it wrote it at. */
+function linesWrittenBy(gesture: () => void): string[] {
+  const lines: string[] = []
+  for (const method of ['log', 'warn', 'error'] as const) {
+    vi.spyOn(console, method).mockImplementation((...written: unknown[]) => {
+      lines.push(String(written[0]))
+    })
+  }
+  gesture()
+  return lines
 }
 
 afterEach(() => {
@@ -85,5 +97,230 @@ describe('a field that cannot be serialised', () => {
       line = captured('info', hostile)
     }).not.toThrow()
     expect(line).toContain('_unserialisable')
+  })
+})
+
+describe('a store build', () => {
+  // What the Play and TestFlight builds are to this module: a bundle built
+  // with `--dev false`, which Metro opens with `__DEV__=false`, and without
+  // either of the flags a bench sets on the bundle it is going to read.
+  beforeEach(() => {
+    vi.stubGlobal('__DEV__', false)
+    vi.stubEnv('MESSAGR_SEND_PROBE', '')
+    vi.stubEnv('MESSAGR_WHOLE_LOG', '')
+  })
+
+  afterEach(() => {
+    vi.unstubAllGlobals()
+    vi.unstubAllEnvs()
+  })
+
+  it('writes nothing for an event outside the trace, at any level', () => {
+    expect(
+      linesWrittenBy(() => {
+        logEvent('info', 'MESSAGR_ENTERED', { entered: true })
+        logEvent('warn', 'MESSAGR_LIVE_STATE', { state: 'reconnecting' })
+        logEvent('error', 'MESSAGR_RUNTIME_FAILED', { reason: 'boom' })
+      }),
+    ).toEqual([])
+  })
+
+  it('writes the decision on the backup offer', () => {
+    expect(
+      linesWrittenBy(() =>
+        logEvent('info', 'MESSAGR_BACKUP_OFFER', {
+          offer: true,
+          backedUp: false,
+          asked: false,
+          received: true,
+          unreadable: 'none',
+        }),
+      ),
+    ).toEqual([
+      'MESSAGR_BACKUP_OFFER {"offer":true,"backedUp":false,"asked":false,"received":true,"unreadable":"none"}',
+    ])
+  })
+
+  it("writes a call's state without the call's identifier or its offer", () => {
+    expect(
+      linesWrittenBy(() =>
+        logEvent('info', 'MESSAGR_CALL_STATE', {
+          call: 'incomingInvite',
+          callId: 'messagr-1726241234567-493021',
+          autoAccept: false,
+          offer: {
+            type: 'offer',
+            sdp: 'v=0\r\no=- 4611731400430051336 2 IN IP4 192.168.1.23\r\n',
+          },
+        }),
+      ),
+    ).toEqual([
+      'MESSAGR_CALL_STATE {"call":"incomingInvite","autoAccept":false}',
+    ])
+  })
+
+  it('withholds a reason that names an account, and says which field it withheld', () => {
+    expect(
+      linesWrittenBy(() =>
+        logEvent('warn', 'MESSAGR_PUSH_NOT_REGISTERED', {
+          reason: 'M_FORBIDDEN: @rabr642vve6v:messagr.eu may not add a pusher',
+        }),
+      ),
+    ).toEqual(['MESSAGR_PUSH_NOT_REGISTERED {"_withheld":["reason"]}'])
+  })
+
+  it('writes a reason that is words and nothing else', () => {
+    expect(
+      linesWrittenBy(() => {
+        logEvent('info', 'MESSAGR_PUSH_NOT_REGISTERED', {
+          reason: 'notifications were not permitted',
+        })
+        logEvent('info', 'MESSAGR_PUSH_NOT_REGISTERED', {
+          reason: 'Apple has not answered with a token yet',
+        })
+      }),
+    ).toEqual([
+      'MESSAGR_PUSH_NOT_REGISTERED {"reason":"notifications were not permitted"}',
+      'MESSAGR_PUSH_NOT_REGISTERED {"reason":"Apple has not answered with a token yet"}',
+    ])
+  })
+
+  it.each([
+    ['an account', '@rabr642vve6v:messagr.eu'],
+    ['a room', '!OGEhHVWSdvArJzumhm:messagr.eu'],
+    ['an event', '$VKSfJkXhoGbEQDHcA_5ptO9MUYdxBEqqr7DVy-sMEYY'],
+    ['a device', 'KMPLGEOJWD'],
+    ['a token', 'syt_cmFicjY0MnZ2ZTZ2_VEbKXHVgAlpRVVGSUjMC_0dH1cJ'],
+    ['an address', 'https://messagr.eu/_matrix/push/v1/notify'],
+  ])('withholds %s from every kind of field it can arrive in', (_, value) => {
+    expect(
+      linesWrittenBy(() => {
+        logEvent('info', 'MESSAGR_CALL_STATE', {
+          call: value,
+          autoAccept: value,
+        })
+        logEvent('info', 'MESSAGR_PUSH_NOT_REGISTERED', { reason: value })
+      }),
+    ).toEqual([
+      'MESSAGR_CALL_STATE {"_withheld":["call","autoAccept"]}',
+      'MESSAGR_PUSH_NOT_REGISTERED {"_withheld":["reason"]}',
+    ])
+  })
+
+  it('writes how a call ended, down to the reason its hangup carried', () => {
+    expect(
+      linesWrittenBy(() =>
+        logEvent('info', 'MESSAGR_CALL_STATE', {
+          call: 'ended',
+          reason: { ended: 'hangup', reason: 'user_hangup' },
+        }),
+      ),
+    ).toEqual([
+      'MESSAGR_CALL_STATE {"call":"ended","reason":{"ended":"hangup","reason":"user_hangup"}}',
+    ])
+  })
+
+  it('withholds a field of the trace that cannot even be read, and does not throw', () => {
+    // The rule the rest of this file is about holds here too: the report
+    // must not take down what it reports on. A getter that throws costs its
+    // own field.
+    const hostile = {
+      get reason(): never {
+        throw new Error('no')
+      },
+    }
+    expect(
+      linesWrittenBy(() =>
+        logEvent('warn', 'MESSAGR_PUSH_NOT_REGISTERED', hostile),
+      ),
+    ).toEqual(['MESSAGR_PUSH_NOT_REGISTERED {"_withheld":["reason"]}'])
+  })
+
+  it('writes what a notification woke, and why it could not look', () => {
+    expect(
+      linesWrittenBy(() => {
+        logEvent('info', 'MESSAGR_WOKE', { drew: 'read', count: 2 })
+        logEvent('info', 'MESSAGR_WOKE', {
+          drew: 'nothing',
+          reason: 'switched off',
+        })
+        logEvent('info', 'MESSAGR_WAKE_BLIND', {
+          reason: 'this device holds no session',
+        })
+        logEvent('error', 'MESSAGR_WAKE_UNAVAILABLE', {
+          reason:
+            "No Firebase App '[DEFAULT]' has been created - call firebase.initializeApp()",
+        })
+      }),
+    ).toEqual([
+      'MESSAGR_WOKE {"drew":"read","count":2}',
+      'MESSAGR_WOKE {"drew":"nothing","reason":"switched off"}',
+      'MESSAGR_WAKE_BLIND {"reason":"this device holds no session"}',
+      'MESSAGR_WAKE_UNAVAILABLE {"_withheld":["reason"]}',
+    ])
+  })
+
+  it('writes what became of the pusher', () => {
+    expect(
+      linesWrittenBy(() => {
+        logEvent('info', 'MESSAGR_PUSH_REGISTERED', {})
+        logEvent('info', 'MESSAGR_PUSH_REMOVED', {})
+      }),
+    ).toEqual(['MESSAGR_PUSH_REGISTERED {}', 'MESSAGR_PUSH_REMOVED {}'])
+  })
+
+  it('writes the countdown of a call that is reconnecting', () => {
+    expect(
+      linesWrittenBy(() =>
+        logEvent('warn', 'MESSAGR_CALL_STATE', {
+          call: 'reconnecting',
+          callId: 'messagr-1726241234567-493021',
+          secondsLeft: 12,
+        }),
+      ),
+    ).toEqual(['MESSAGR_CALL_STATE {"call":"reconnecting","secondsLeft":12}'])
+  })
+
+  it('writes which stores a backup reading could not open', () => {
+    expect(
+      linesWrittenBy(() =>
+        logEvent('info', 'MESSAGR_BACKUP_OFFER', {
+          offer: false,
+          backedUp: false,
+          asked: true,
+          received: false,
+          unreadable: 'commitment,asked',
+        }),
+      ),
+    ).toEqual([
+      'MESSAGR_BACKUP_OFFER {"offer":false,"backedUp":false,"asked":true,"received":false,"unreadable":"commitment,asked"}',
+    ])
+  })
+})
+
+describe('a build that is going to be read', () => {
+  afterEach(() => {
+    vi.unstubAllGlobals()
+    vi.unstubAllEnvs()
+  })
+
+  it.each([
+    ['a debug bundle', true, '', ''],
+    ['the probe build the device bench runs', false, '1', ''],
+    ['a release bundle built with MESSAGR_WHOLE_LOG=1', false, '', '1'],
+  ])('writes every event whole: %s', (_, dev, probe, whole) => {
+    vi.stubGlobal('__DEV__', dev)
+    vi.stubEnv('MESSAGR_SEND_PROBE', probe)
+    vi.stubEnv('MESSAGR_WHOLE_LOG', whole)
+    expect(
+      linesWrittenBy(() =>
+        logEvent('info', 'MESSAGR_CALL_POLL', {
+          scope: '!OGEhHVWSdvArJzumhm:messagr.eu',
+          carried: 2,
+        }),
+      ),
+    ).toEqual([
+      'MESSAGR_CALL_POLL {"scope":"!OGEhHVWSdvArJzumhm:messagr.eu","carried":2}',
+    ])
   })
 })
