@@ -48,8 +48,11 @@ rien -- écrit, éprouvé, pas embarqué.
 d'invitation**, celle que ce site sert, rendue avec l'agent d'un téléphone.
 C'est la première image du parcours en trois étapes de la page d'accueil, et la
 première chose qu'une personne invitée voit, avant d'avoir rien installé.
-`rendre-ecrans.mjs` la produit comme les autres, en lisant l'adresse du
-téléchargement dans `deploy.sh` plutôt qu'en la recopiant.
+`rendre-ecrans.mjs` la produit comme les autres, dans l'état qu'un téléphone
+Android lit depuis le 13 septembre 2026 : « Installer Messagr pour Android »,
+sans téléchargement direct. Sa destination y est une adresse en `.invalid`, qui
+ne mène nulle part : l'image n'en montre que le libellé, et le lien
+d'inscription de la piste interne n'a pas à entrer dans ce dépôt.
 
 ## Refaire les images
 

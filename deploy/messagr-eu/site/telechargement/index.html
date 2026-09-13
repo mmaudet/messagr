@@ -159,14 +159,19 @@
     compte est créé à cet instant.</li>
     <!-- LE CAS OÙ ÇA COINCE, ET IL N'EST PAS THÉORIQUE. Une installation hors
          magasin ne fait vérifier à personne que Messagr peut ouvrir les adresses
-         de messagr.eu : le lien part donc au navigateur. La page d'invitation
-         porte un bouton « Copier le lien » exactement pour ce chemin-là, et
-         c'est ici qu'on l'explique plutôt que de le laisser découvrir. -->
+         de messagr.eu : le lien part donc au navigateur. On l'écrit plutôt que
+         de le laisser découvrir.
+
+         IL N'Y A PLUS DE TROISIÈME ÉTAPE. Elle disait de toucher « Copier le
+         lien » sur la page qui s'affiche, puis d'ouvrir Messagr et d'y coller
+         le lien. L'application n'a jamais eu de champ où le coller et ne lit
+         pas le presse-papiers : sa seule porte est le lien lui-même. L'étape
+         et le bouton sont partis le 13 septembre 2026, et ce cas n'a pas de
+         repli dans la page. `tests/coller-le-lien.js` refuse une page
+         construite qui promettrait encore de coller. -->
     <li data-t="dl-etape-2">Si le lien ouvre un navigateur au lieu de l'application, c'est
     attendu pour une installation hors magasin : votre téléphone n'a pas vérifié que Messagr
     sait ouvrir ces adresses.</li>
-    <li data-t="dl-etape-3">Sur la page qui s'affiche, touchez « Copier le lien ». Ouvrez
-    Messagr, et collez-le.</li>
   </ol>
 
   <h2 data-t="dl-iphone">iPhone</h2>

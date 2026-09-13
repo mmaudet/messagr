@@ -98,39 +98,40 @@ for (const fichier of readdirSync(sources).sort()) {
 // lequel ce parcours existe -- et parce que la version bureau montre un code QR
 // qui ne veut rien dire dans une illustration.
 //
-// L'ADRESSE DU TÉLÉCHARGEMENT EST LUE DANS `deploy.sh`, JAMAIS RECOPIÉE. Elle
-// y est dérivée du nom du fichier et non configurable, exprès (voir son
-// en-tête). L'écrire une seconde fois ici, c'est deux vérités qui se
-// contrediront le jour où l'une bouge ; la lire, c'est zéro.
-const deploiement = readFileSync(join(ici, '..', 'deploy.sh'), 'utf8')
-const adresse = /^APK_URL="([^"]+)"$/m.exec(deploiement)
-if (!adresse) {
-  console.error(
-    "rendre-ecrans: FAIL: `APK_URL` est introuvable dans deploy.sh. L'adresse " +
-      'du téléchargement ne doit pas être recopiée ici : si elle a changé de ' +
-      'forme, ajustez la lecture.',
-  )
-  process.exit(1)
-}
-const apkUrl = adresse[1].replace('$APK_NAME', 'messagr.apk')
+// L'ÉTAT MONTRÉ EST CELUI DU MAGASIN, ET PLUS CELUI DU FICHIER. L'image
+// remplissait `androidApk` avec l'adresse de l'APK, et montrait « Télécharger
+// Messagr pour Android » suivi de l'avertissement des sources inconnues. Le
+// 13 septembre 2026, le déploiement a retiré le fichier et donné pour
+// destination Android le lien d'inscription de la piste interne : un
+// téléphone Android lit depuis « Installer Messagr pour Android », sans
+// avertissement, et l'accueil montrait encore l'ancien état.
+//
+// UNE ADRESSE QUI NE MÈNE NULLE PART, EXPRÈS. Le lien d'inscription ne se lit
+// que dans la Play Console (#268), et c'est la page d'invitation, qu'ouvre
+// seulement qui a reçu une invitation, qui le porte : il n'a rien à faire dans
+// ce dépôt ni sur une image publique. L'image ne montre d'ailleurs que le
+// libellé du lien, et ce libellé dépend de la fente remplie, pas de
+// l'adresse. Le domaine `.invalid` est réservé à cet usage (RFC 2606) : il ne
+// peut ni exister, ni passer pour une adresse vérifiée.
+const DESTINATION_FICTIVE = 'https://destination-android.invalid/'
 
 const atelier = mkdtempSync(join(tmpdir(), 'ecran-invitation-'))
 try {
   const pageSource = join(site, 'i', 'index.html')
   const page = readFileSync(pageSource, 'utf8')
-  const fente = "androidApk: ''"
+  const fente = "android: ''"
   if (!page.includes(fente)) {
     console.error(
       `rendre-ecrans: FAIL: la page d'invitation ne porte plus la fente ` +
         `\`${fente}\`. Sans destination, l'illustration montrerait la phrase ` +
-        `d'attente au lieu du téléchargement que le site propose vraiment.`,
+        `d'attente au lieu de l'installation que le site propose vraiment.`,
     )
     process.exit(1)
   }
   cpSync(join(site, 'i'), join(atelier, 'i'), { recursive: true })
   writeFileSync(
     join(atelier, 'i', 'index.html'),
-    page.replace(fente, `androidApk: '${apkUrl}'`),
+    page.replace(fente, `android: '${DESTINATION_FICTIVE}'`),
   )
 
   const sortie = join(site, 'messagr-ecran-invitation.png')

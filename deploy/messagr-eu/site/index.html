@@ -685,9 +685,7 @@
            démenti cette phrase sur le site qui la sert.
 
            Ce que la personne emporte est un CODE, qu'elle garde et avec
-           lequel elle revient. C'est la forme de « Copier le lien » sur la
-           page d'invitation, qui fait déjà porter un secret à travers une
-           installation.
+           lequel elle revient.
 
            AUCUN TIERS, ET LA MÊME ORIGINE. Le service est relayé par nginx
            sous `/_messagr/`, donc la requête ne sort pas de messagr.eu : pas
@@ -764,8 +762,11 @@
          data-verifie-sur="fd03d53e37b395a3ed3c08b99d1f150ff20da3b2d0cb53b29a2c951a3f19c12e">
   <div class="mesure">
     <h2 data-t="etat-titre">Ce que l'application fait aujourd'hui.</h2>
-    <p class="amorce" data-t="etat-amorce">Trois états, une date. Nous n'annonçons rien qui
+    <p class="amorce" data-si="telechargement" data-t="etat-amorce">Trois états, une date. Nous n'annonçons rien qui
     ne tourne pas : cette liste est vérifiée sur le fichier que cette page propose.</p>
+    <p class="amorce" data-si="pas-de-telechargement" data-t="etat-amorce-sans">Trois états. Nous
+    n'annonçons rien qui ne tourne pas : cette liste est vérifiée sur chaque fichier avant que
+    cette page le propose.</p>
 
     <div class="etats">
       <div class="groupe">
