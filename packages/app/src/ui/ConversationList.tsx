@@ -149,7 +149,10 @@ export function ConversationList({
           refused, which only a new one replaces; a claim that may go through
           next time, which opening the link again retries; and a link spent
           for an account this device could not keep. The old account stays in
-          all three. */}
+          all three. The second is said too of a link spent for the account
+          this device holds, when its claim may go through next time (#306):
+          the generic refusal sent somebody holding a perfectly good link to
+          ask for another. */}
       {invitation !== null && invitation !== undefined && (
         <Text style={styles.ignored} testID="list-invitation-ignored">
           {invitation.kind === 'used'

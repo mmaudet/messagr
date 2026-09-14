@@ -519,6 +519,53 @@ describe('enterWithASession', () => {
     })
   })
 
+  it('says to try again, and keeps the session, when the claim did not go through for a reason that may not hold next time', async () => {
+    // #306. The refusal was said for these too, after the pump, on the
+    // reasoning that a launch which could not reach the invitation service
+    // would not reach the pump either. A 502 from nginx, in front of a service
+    // that is restarting, reaches it -- and the list sent somebody holding a
+    // perfectly good link to ask for another. The same sentence as a yes that
+    // could not be carried out: opening the link again tries again.
+    const failures: Array<{ poster: ServicePoster; reason: string }> = [
+      {
+        poster: {
+          post: async () => ({ status: 502, body: '<h1>502 Bad Gateway</h1>' }),
+        },
+        reason: 'the invitation service could not be reached',
+      },
+      {
+        poster: {
+          post: async () => {
+            throw new Error('network is unreachable')
+          },
+        },
+        reason: 'the invitation service could not be reached',
+      },
+      {
+        poster: {
+          post: async () => NOT_YET_INVITED,
+        },
+        reason: 'nobody has let this account in yet',
+      },
+    ]
+    for (const failure of failures) {
+      const result = await enterWithASession({
+        secrets: store(JSON.stringify(SESSION)),
+        poster: failure.poster,
+        link: async () => 'https://messagr.eu/i/abc123',
+        ...nobodyAsked,
+        signUp: markerStore().secrets,
+        recovery: store(),
+      })
+      expect(result).toEqual({
+        entered: true,
+        session: SESSION,
+        claimed: false,
+        invitation: { kind: 'retry', reason: failure.reason },
+      })
+    }
+  })
+
   it('asks the service nothing when the link is not an invitation', async () => {
     // Opening the application from its icon is this, every time. A call per
     // launch to say "there was no link" would be a call per launch.
@@ -639,6 +686,27 @@ describe('enterWithASession', () => {
     if (!result.entered) {
       expect(result.reason).toBe('this invitation cannot be used')
     }
+  })
+
+  it('says the service could not be reached, and not that the link cannot be used, when it answers with a failure of its own', async () => {
+    // #306. A device with no account reads the same sentence either way --
+    // « ouvrez le lien d'invitation qu'on vous a envoyé » -- which stays true
+    // of a link that may go through next time. The reason is what the launch
+    // report carries, and it was the wrong one.
+    const result = await enterWithASession({
+      secrets: store(),
+      poster: {
+        post: async () => ({ status: 502, body: '<h1>502 Bad Gateway</h1>' }),
+      },
+      link: async () => 'https://messagr.eu/i/abc123',
+      ...nobodyAsked,
+      signUp: markerStore().secrets,
+      recovery: store(),
+    })
+    expect(result).toEqual({
+      entered: false,
+      reason: 'the invitation service could not be reached',
+    })
   })
 
   it('refuses a link it cannot read as an invitation', async () => {
@@ -901,6 +969,24 @@ describe('a link into another server (#304)', () => {
       }),
     )
     expect(here.held()).toEqual(UNTOUCHED)
+  })
+
+  it('says to try again, and not that the link is unusable, when the service answers with a failure of its own', async () => {
+    // #306. A 503 while the service's homeserver is away says nothing about
+    // the link, and a new link would meet the same service.
+    const here = device({
+      claim: { status: 503, body: '{"errcode":"MESSAGR_UPSTREAM"}' },
+    })
+    const { leaving } = answering('leave', here)
+    const result = await entering(here, leaving)
+    expect(result).toEqual(
+      stayingWith({
+        kind: 'retry',
+        reason: 'the invitation service could not be reached',
+      }),
+    )
+    expect(here.held()).toEqual(UNTOUCHED)
+    expect(here.forgotten).toEqual([])
   })
 
   it('gives up a request that goes unanswered, sends no other, and forgets nothing', async () => {
@@ -1196,6 +1282,14 @@ describe('a session this device can no longer use (#307)', () => {
       },
       {
         claim: 'unreachable',
+        outcome: {
+          kind: 'retry',
+          reason: 'the invitation service could not be reached',
+        },
+      },
+      {
+        // #306: a service failing on its own side is no answer about the link.
+        claim: { status: 502, body: '<h1>502 Bad Gateway</h1>' },
         outcome: {
           kind: 'retry',
           reason: 'the invitation service could not be reached',
