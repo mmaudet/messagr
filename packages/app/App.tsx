@@ -3,6 +3,7 @@ import {
   AppState,
   BackHandler,
   Linking,
+  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -224,6 +225,7 @@ import { Settings } from './src/ui/Settings'
 import { Trust } from './src/ui/Trust'
 import { GiveName } from './src/ui/GiveName'
 import { FirstLaunch } from './src/ui/FirstLaunch'
+import { LeaveAccount } from './src/ui/LeaveAccount'
 import { Evict } from './src/ui/Evict'
 import { Vouch } from './src/ui/Vouch'
 import { setCatalogue, t } from './src/copy'
@@ -241,6 +243,7 @@ import {
 import { useKeyboardInset } from './src/ui/keyboardInset'
 import { sweepWhatThePickerLeft } from './src/runtime/imageLibrary'
 import { afterReinstall } from './src/runtime/afterReinstall'
+import { forgetWhatThisDeviceKeeps } from './src/runtime/forgetAccount'
 import {
   cryptoStoreExists,
   homeserverCalls,
@@ -256,7 +259,11 @@ import {
   keepRecoverySecret,
   readRecoverySecret,
 } from './src/runtime/recoverySecret'
-import { saveSession } from './src/runtime/sessionStore'
+import {
+  loadSession,
+  sameSession,
+  saveSession,
+} from './src/runtime/sessionStore'
 import { reenterWithPassword, retireDevice } from './src/runtime/reenter'
 import { photoLibrary } from './src/runtime/photoLibrary'
 import { servicePoster } from './src/runtime/servicePoster'
@@ -993,6 +1000,28 @@ export function App({
   // What became of an invitation this launch was opened with. `null` when
   // there was none, which is almost every launch.
   const [linkOutcome, setLinkOutcome] = useState<InvitationOutcome | null>(null)
+  /**
+   * The question a link into another server puts, while it is being put.
+   * #304, and `entry.ts` says why it is a question.
+   *
+   * `null` on every other launch. While it is not, the screen is the question
+   * and nothing else, because the launch is waiting for the answer inside
+   * entry. The answer travels through `answerLeavingRef`: a function held in
+   * state would be called by React as an updater.
+   */
+  const [leaving, setLeaving] = useState<{
+    readonly account: string
+    readonly link: string
+  } | null>(null)
+  const answerLeavingRef = useRef<((answer: 'leave' | 'stay') => void) | null>(
+    null,
+  )
+  /**
+   * Whether a run of the launch is between putting that question and its
+   * entry answering -- the question, then the leaving and the claim a yes
+   * starts. No second question is put meanwhile. See the launch.
+   */
+  const leavingBusyRef = useRef(false)
   // `null` until the launch has answered. Distinguishing "not in" from "not
   // yet known" keeps the list from telling somebody they are locked out for
   // the second the keystore takes to answer.
@@ -1536,33 +1565,44 @@ export function App({
       // Everything here is superseded by the derivation a few seconds later;
       // nothing waits on it, and a notebook that will not open leaves the
       // screen exactly as empty as it was before.
-      const opening = await openNotebook(storeDir)
-      namesRef.current = opening.names
-      lastReadRef.current = opening.lastRead
-      outstandingRef.current = opening.outstanding
-      listCacheRef.current = opening.list
-      eventsRef.current = opening.events
-      hiddenRef.current = opening.hidden
-      readByRef.current = opening.readBy
-      // SEEDED BEFORE ANYTHING IS DRAWN, so a conversation opened on the
-      // first frame already knows how far it was read.
-      readMarksRef.current = new Map(await opening.readBy.all())
-      setHidden(await opening.hidden.all())
-      favouritesRef.current = opening.favourites
-      setFavourites(await opening.favourites.marks())
-      logEvent(opening.opened ? 'info' : 'warn', 'MESSAGR_GIVEN_NAMES', {
-        opened: opening.opened,
-        ...(opening.minted === undefined ? {} : { minted: opening.minted }),
-        ...(opening.reason === undefined ? {} : { reason: opening.reason }),
-      })
-      // The names before the rows, so the list draws people rather than
-      // identifiers on its first frame as well as its second.
-      setNames(await opening.names.all())
-      const lastDrawn = await opening.list.all()
-      if (lastDrawn.length > 0) {
-        setSummaries(lastDrawn)
-        logEvent('info', 'MESSAGR_LIST_REMEMBERED', { rows: lastDrawn.length })
+      //
+      // A FUNCTION, BECAUSE A LAUNCH CAN OPEN IT TWICE (#304). Leaving an
+      // account for an invitation into another server erases the notebook
+      // this opened, and the account entered next needs one of its own before
+      // anything is drawn from it.
+      const bindNotebook = async () => {
+        const book = await openNotebook(storeDir)
+        namesRef.current = book.names
+        lastReadRef.current = book.lastRead
+        outstandingRef.current = book.outstanding
+        listCacheRef.current = book.list
+        eventsRef.current = book.events
+        hiddenRef.current = book.hidden
+        readByRef.current = book.readBy
+        // SEEDED BEFORE ANYTHING IS DRAWN, so a conversation opened on the
+        // first frame already knows how far it was read.
+        readMarksRef.current = new Map(await book.readBy.all())
+        setHidden(await book.hidden.all())
+        favouritesRef.current = book.favourites
+        setFavourites(await book.favourites.marks())
+        logEvent(book.opened ? 'info' : 'warn', 'MESSAGR_GIVEN_NAMES', {
+          opened: book.opened,
+          ...(book.minted === undefined ? {} : { minted: book.minted }),
+          ...(book.reason === undefined ? {} : { reason: book.reason }),
+        })
+        // The names before the rows, so the list draws people rather than
+        // identifiers on its first frame as well as its second.
+        setNames(await book.names.all())
+        const lastDrawn = await book.list.all()
+        if (lastDrawn.length > 0) {
+          setSummaries(lastDrawn)
+          logEvent('info', 'MESSAGR_LIST_REMEMBERED', {
+            rows: lastDrawn.length,
+          })
+        }
+        return book
       }
+      let opening = await bindNotebook()
 
       // No provisioned account: report it rather than attempt a sync that has
       // nothing to restore. This keeps the screen runnable for a developer
@@ -1571,35 +1611,163 @@ export function App({
       // previous launch, or one obtained by spending the invitation it was
       // opened with. Nothing arrives from the build any more.
       let historyClaim: HistoryClaim | null = null
+      // Whether this run is the one that put the question, when one is put.
+      let askedHere = false
       // ONE CLAIM PER LINK AT A TIME. A link another run of this launch is
       // still claiming is not handed over again, and the mark is lifted the
       // moment this entry answers -- so the same link opened again after a
       // claim that gave up is claimed again. See spentLinks.ts.
-      const entered = await spentLinksRef.current.enter(
-        // The warm link wins when there is one: it is the more recent
-        // answer to the same question, and `getInitialURL` keeps handing
-        // back the address this process was started with for as long as it
-        // lives.
-        // ET JAMAIS UN PARTAGE : les deux voyagent par le même canal, et
-        // une invitation est ce que ce chemin sait dépenser. Un partage lu
-        // ici serait un lien que rien ne peut réclamer.
-        async () => {
-          const url = warmLink === null ? await initialLink() : warmLink.url
-          return url === null || shareFrom(url) !== null ? null : url
-        },
-        link =>
-          enterWithASession({
-            secrets: sessionSecrets,
-            poster: servicePoster,
-            link,
-            signUp: signUpSecrets,
-            // A claim is two calls with the issuer's application in between.
-            // See claimInvitation.ts: without a wait this tries once, is told
-            // 409, and reports a link that cannot be used -- which is what it
-            // does on a device with nothing else changed.
-            wait: ms => new Promise(resolve => setTimeout(resolve, ms)),
+      const entered = await spentLinksRef.current
+        .enter(
+          // The warm link wins when there is one: it is the more recent
+          // answer to the same question, and `getInitialURL` keeps handing
+          // back the address this process was started with for as long as it
+          // lives.
+          // ET JAMAIS UN PARTAGE : les deux voyagent par le même canal, et
+          // une invitation est ce que ce chemin sait dépenser. Un partage lu
+          // ici serait un lien que rien ne peut réclamer.
+          async () => {
+            const url = warmLink === null ? await initialLink() : warmLink.url
+            return url === null || shareFrom(url) !== null ? null : url
+          },
+          link =>
+            enterWithASession({
+              secrets: sessionSecrets,
+              poster: servicePoster,
+              link,
+              signUp: signUpSecrets,
+              // A claim is two calls with the issuer's application in between.
+              // See claimInvitation.ts: without a wait this tries once, is told
+              // 409, and reports a link that cannot be used -- which is what it
+              // does on a device with nothing else changed.
+              wait: ms => new Promise(resolve => setTimeout(resolve, ms)),
+              // THE QUESTION A LINK INTO ANOTHER SERVER PUTS, ON THE SCREEN AND
+              // AWAITED. #304: `entry.ts` says why it is a question. This
+              // launch waits inside entry until it is answered, and the
+              // re-entry after a reinstall and the pump both come after.
+              //
+              // One question at a time. A second link into another server,
+              // arriving while the first is answered or while a yes is carried
+              // out, is answered « stay » without being put: staying sends
+              // nothing, and that run then stops at the wait below.
+              ask: hosts => {
+                if (leavingBusyRef.current) return Promise.resolve('stay')
+                leavingBusyRef.current = true
+                askedHere = true
+                return new Promise<'leave' | 'stay'>(resolve => {
+                  answerLeavingRef.current = resolve
+                  setLeaving(hosts)
+                })
+              },
+              leaving: {
+                homeserver: homeserverCalls,
+                pusher: async () => {
+                  const token = await readLastPushkey(pushkeySecrets)
+                  return token === null
+                    ? null
+                    : { token, road: Platform.OS === 'ios' ? 'ios' : 'android' }
+                },
+                forget: async account => {
+                  // THE ACCOUNT STOPS IN THIS PROCESS AS WELL AS ON THE DISK.
+                  // A link opened while the application was running finds a
+                  // loop still polling for that account, and left running it
+                  // would feed the next account's machine what arrives for the
+                  // old one.
+                  runningSyncRef.current?.stop()
+                  runningSyncRef.current = null
+                  liveGenerationRef.current += 1
+                  const forgotten = await forgetWhatThisDeviceKeeps(
+                    storeDir,
+                    account.deviceId,
+                  )
+                  logEvent(
+                    forgotten.secrets.refused === 0 &&
+                      forgotten.notebook &&
+                      forgotten.cryptoStore
+                      ? 'info'
+                      : 'warn',
+                    'MESSAGR_ACCOUNT_FORGOTTEN',
+                    { ...forgotten },
+                  )
+                  // AND WHAT WAS DRAWN FROM IT: its conversations, the one
+                  // somebody had open, its calls. None of it may be on the
+                  // screen the next account opens.
+                  setSummaries([])
+                  setConversation(null)
+                  setOpenScope(null)
+                  openScopeRef.current = null
+                  setSelected(new Set())
+                  setPersonOpen(false)
+                  setParty(null)
+                  setTrust(null)
+                  setReactions(new Map())
+                  setReadHere(new Set())
+                  setCalls([])
+                  setKeptMessages(null)
+                  setFavouritesOpen(false)
+                  setClaimed(null)
+                  setRestorePrompt(null)
+                  setBackupPrompt(null)
+                  setInvite({ stage: 'shut' })
+                  setAdmission(null)
+                  setTab('chat')
+                  opening = await bindNotebook()
+                },
+              },
+            }),
+        )
+        .finally(() => {
+          if (askedHere) leavingBusyRef.current = false
+        })
+      // WHAT BECAME OF AN ACCOUNT THIS LAUNCH LEFT, ON ITS OWN SERVER. #304.
+      // Logged whenever that server answers, which may be after this launch
+      // has finished, or never: nothing waits for it, on purpose.
+      entered.left?.closing
+        .then(closed =>
+          logEvent(closed.loggedOut ? 'info' : 'warn', 'MESSAGR_ACCOUNT_LEFT', {
+            ...closed,
           }),
-      )
+        )
+        .catch(() => {})
+      // A RUN THAT RESTORED A SESSION WAITS FOR ANY ENTRY STILL SPENDING A
+      // LINK, THEN LOOKS AGAIN AT WHICH ACCOUNT THIS DEVICE HOLDS. #304.
+      //
+      // One opening of a link can start two runs of this launch, and the run
+      // handed no link restores the session it found while the other may be
+      // asking whether to leave that very account. Going on would re-enter
+      // it, or publish under it, before the person answered. So this run
+      // waits, and if the account was left meanwhile it has nothing left to
+      // launch: the run that asked carries the launch from here.
+      if (
+        entered.entered &&
+        !entered.claimed &&
+        (await spentLinksRef.current.settled()) &&
+        !sameSession(await loadSession(sessionSecrets), entered.session)
+      ) {
+        logEvent('info', 'MESSAGR_LAUNCH_SUPERSEDED', {})
+        return
+      }
+      // WHAT BECAME OF THE LINK, SAID AS SOON AS IT IS KNOWN. It was said
+      // only once the pump had run, and a device that kept its account rather
+      // than follow a link into another server (#304) has to be told why the
+      // link was not followed however the rest of the launch goes -- a
+      // stranded reinstall included.
+      if (entered.entered && entered.invitation !== undefined) {
+        setLinkOutcome(entered.invitation)
+        // THE REASON GOES HERE AND NOT ON THE SCREEN. §13.27: no diagnostic
+        // text on a screen a person reads, and the sentences the list draws
+        // are what it means for them. This is the line somebody diagnosing a
+        // link that will not open has to have -- the service distinguishes
+        // several refusals and the screen deliberately does not.
+        logEvent(
+          entered.invitation.kind === 'used' ||
+            entered.invitation.kind === 'elsewhere'
+            ? 'info'
+            : 'warn',
+          'MESSAGR_INVITATION',
+          { ...entered.invitation },
+        )
+      }
       // THE PASSWORD, KEPT AT THE ONE MOMENT IT IS EVER OFFERED.
       //
       // The service hands it back with the claim and nowhere else. A device
@@ -1794,20 +1962,6 @@ export function App({
             // Everything uncertain resolves to `restored-session`, which
             // creates nothing. See signUpMarker.ts.
             setInYet(entered.entered)
-            if (entered.entered && entered.invitation !== undefined) {
-              setLinkOutcome(entered.invitation)
-              // THE REASON GOES HERE AND NOT ON THE SCREEN. §13.27: no
-              // diagnostic text on a screen a person reads, and the two
-              // sentences the list draws are what it means for them. This
-              // is the line somebody diagnosing a link that will not open
-              // has to have -- the service distinguishes several refusals
-              // and the screen deliberately does not.
-              logEvent(
-                entered.invitation.kind === 'used' ? 'info' : 'warn',
-                'MESSAGR_INVITATION',
-                { ...entered.invitation },
-              )
-            }
 
             const entitlement =
               entered.entered && entered.claimed
@@ -3563,6 +3717,33 @@ export function App({
                 })
                 .catch(() => logEvent('warn', 'MESSAGR_TERMS_NOT_KEPT', {}))
             }}
+          />
+        </SafeAreaProvider>
+      </GestureHandlerRootView>
+    )
+  }
+
+  // THE QUESTION A LINK INTO ANOTHER SERVER PUTS, AND NOTHING BESIDE IT. #304.
+  //
+  // The whole screen, like the promise above, because the launch is waiting
+  // inside entry for the answer and nothing underneath may be used
+  // meanwhile: a list drawn from an account that may be about to go is a list
+  // of conversations the next tap could make disappear.
+  if (leaving !== null) {
+    const answer = (given: 'leave' | 'stay') => {
+      const resolve = answerLeavingRef.current
+      answerLeavingRef.current = null
+      setLeaving(null)
+      resolve?.(given)
+    }
+    return (
+      <GestureHandlerRootView style={styles.root}>
+        <SafeAreaProvider>
+          <LeaveAccount
+            account={leaving.account}
+            link={leaving.link}
+            onLeave={() => answer('leave')}
+            onStay={() => answer('stay')}
           />
         </SafeAreaProvider>
       </GestureHandlerRootView>

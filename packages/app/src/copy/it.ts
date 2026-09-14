@@ -223,6 +223,22 @@ export const it: Readonly<Record<CopyKey, string>> = {
     'Non è andata a buon fine, e nulla è cambiato. Può riprovare.',
   evict_failed_key_still_valid:
     'È uscita, ma la chiave non è stata sostituita: può ancora leggere ciò che si dirà. Riprovi.',
+  leave_title: 'Questo invito porta a un altro server',
+  leave_lead:
+    'Per seguirlo, questo dispositivo deve lasciare l’account che porta. Ecco cosa cambia, prima di decidere.',
+  leave_fact_gone: 'Questo account lascia il dispositivo',
+  'leave_gone_body %@':
+    'Questo dispositivo dimentica il suo account su %@. Le sue conversazioni e le chiavi che le aprono spariscono da qui.',
+  leave_fact_stays: 'Ciò che resta altrove',
+  leave_stays_body:
+    'L’account esiste ancora sul suo server. Le persone a cui scriveva conservano le loro conversazioni con lei.',
+  leave_fact_link: 'Un account nuovo, con questo link',
+  'leave_link_body %@':
+    'Poi questo dispositivo entra su %@ con un account nuovo, come un telefono che non ne aveva.',
+  leave_final:
+    'Questo dispositivo non potrà più tornare al vecchio account. I messaggi ricevuti prima non si potranno più leggere qui.',
+  leave_confirm: 'Sì, lasciare questo account',
+  leave_cancel: 'Tenere il mio account',
   promise_thesis: 'La messaggistica che non le chiede nulla.',
   promise_subtitle:
     'Nessun numero, nessun account, nessuna password. Qualcuno la invita, lei scrive.',
@@ -236,6 +252,8 @@ export const it: Readonly<Record<CopyKey, string>> = {
     'Avete aperto un invito. La conversazione che apre comparirà nel vostro elenco.',
   list_invitation_refused:
     'Questo invito non ha potuto essere usato. Chiedetene uno nuovo a chi ve l’ha mandato.',
+  list_invitation_elsewhere:
+    'Avete tenuto il vostro account, e questo invito portava a un altro server. Per questo non è stato seguito. Per seguirlo, riaprite il link.',
   'list_invitation_already %@':
     'Avete già una conversazione con %@. È quella che prosegue: l’invito non ne ha aperta una seconda.',
   list_not_in_yet:

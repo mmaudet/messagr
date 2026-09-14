@@ -212,6 +212,22 @@ export function cryptoMachineIsRunning(deviceId: string): boolean {
   return machineStartedFor === deviceId
 }
 
+/**
+ * Lets this context start a machine for another device, once the account the
+ * running one served has been forgotten. #304, and the one way the guard above
+ * is ever lifted.
+ *
+ * The refusal keeps two machines off one store, and a device id changing
+ * under a running process was refused loudly for that reason. After this
+ * device leaves its account there is no store left to protect: it has been
+ * erased, and the account it served is gone from this device. Only for the
+ * device named, so a late call cannot lift the guard over a machine that
+ * still matters.
+ */
+export function releaseMachineFor(deviceId: string): void {
+  if (machineStartedFor === deviceId) machineStartedFor = null
+}
+
 export async function startCryptoMachine(
   sessionClient: ReturnType<typeof createClient>,
   credentials: DeviceIdentity,

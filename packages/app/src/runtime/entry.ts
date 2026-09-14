@@ -4,8 +4,9 @@ import {
   type ServicePoster,
 } from './claimInvitation'
 import type { LinkSource } from './incomingLink'
-import { parseInvitationLink } from './invitationLink'
-import { sameOrigin } from './sameOrigin'
+import { parseInvitationLink, type InvitationLink } from './invitationLink'
+import { leaveAccount, type Closed, type Leaving } from './leaveAccount'
+import { hostShown, sameOrigin } from './sameOrigin'
 import type { RestoreCredentials } from './sessionCredentials'
 import { loadSession, saveSession, type SecretStore } from './sessionStore'
 import { markSignUpStarted } from './signUpMarker'
@@ -56,6 +57,37 @@ export interface EntryDeps {
    * which is right for a test and wrong on a device.
    */
   readonly wait?: (ms: number) => Promise<void>
+  /**
+   * Put to the person when an invitation leads to a server other than the one
+   * this device's account lives on: leave that account for it, or stay.
+   *
+   * # WHY A QUESTION, WHERE THERE WAS A REFUSAL
+   *
+   * #279 refused such a link outright, and it was right about what it
+   * protected: this account's token has no business on another server. It had
+   * nothing to say about the person holding the telephone. #304, from an
+   * iPhone on 14 September 2026: an account left over from the bench, every
+   * invitation to messagr.eu refused, a new link refused the same way, and an
+   * uninstall that changed nothing because iOS keeps the keychain. No gesture
+   * anywhere could leave that account.
+   *
+   * So the refusal became a question, and both answers keep the rule. Staying
+   * sends nothing anywhere. Leaving closes the account on its own server,
+   * forgets it here, and claims the link as a device with no account would.
+   * Nothing of the old account travels towards the link's host either way.
+   *
+   * NOTHING CONTINUES UNTIL IT IS ANSWERED, and not by courtesy: this is
+   * awaited inside entry, and the reinstall's re-entry and the pump that
+   * publishes keys both come after entry.
+   */
+  readonly ask: (hosts: {
+    /** The server this device's account lives on, as a person reads it. */
+    readonly account: string
+    /** The server the link leads to. */
+    readonly link: string
+  }) => Promise<'leave' | 'stay'>
+  /** What leaving the account needs, when that is the answer. See `leaveAccount.ts`. */
+  readonly leaving: Leaving
 }
 
 /**
@@ -82,6 +114,16 @@ export type InvitationOutcome =
    * across two vocabularies would put that question in two places.
    */
   | { readonly kind: 'already'; readonly from: string }
+  /**
+   * For a server other than this account's, and the person chose to keep the
+   * account. Nothing was sent anywhere.
+   *
+   * Its own kind rather than a `refused` with a reason, because the list has
+   * to say something else: not « demandez-en une nouvelle », since a new link
+   * into that server would lead to the same question, but why this one was not
+   * followed.
+   */
+  | { readonly kind: 'elsewhere' }
 
 export type EntryResult =
   | {
@@ -127,23 +169,27 @@ export type EntryResult =
        * see `recoverySecret.ts` and #190.
        */
       readonly password?: string
+      /**
+       * Present only when this launch left the account the device held, for a
+       * link into another server. `closing` is what became of that account on
+       * its own server, and it settles whenever that server answers -- the
+       * launch does not wait for it.
+       */
+      readonly left?: { readonly closing: Promise<Closed> }
     }
-  | { readonly entered: false; readonly reason: string }
-
-/**
- * The reason a held account will not spend a link into another instance.
- *
- * A sentence for the log, not for a screen: §13.27 keeps diagnostic text off
- * a screen a person reads, and the list draws its own fixed line for a refused
- * invitation. It names no host and carries no token -- what it records is that
- * the link was for a server other than the account's, which is the one fact
- * somebody reading the log to understand a refusal needs.
- */
-const OTHER_SERVER =
-  'this invitation is for a different server than this account'
+  | {
+      readonly entered: false
+      readonly reason: string
+      /**
+       * The same, when the claim after leaving did not succeed: the old
+       * account is gone from this device all the same, which is what the
+       * person agreed to, and a screen must not draw it as still there.
+       */
+      readonly left?: { readonly closing: Promise<Closed> }
+    }
 
 export async function enterWithASession(deps: EntryDeps): Promise<EntryResult> {
-  const { secrets, poster, link, signUp, wait } = deps
+  const { secrets, poster, link, wait, ask, leaving } = deps
 
   const held = await loadSession(secrets)
   if (held !== null) {
@@ -160,16 +206,30 @@ export async function enterWithASession(deps: EntryDeps): Promise<EntryResult> {
     // whoever issued it, so the host it names is checked against the server
     // this account actually lives on -- an invitation into a different instance
     // is one this account can have no part in, and its token has no business
-    // travelling there. When the instances differ this refuses before any
-    // request is made. The reason is reported for the log, never for a screen,
-    // and the link's token is no part of it.
+    // travelling there.
+    //
+    // THAT USED TO END IN A REFUSAL, AND NOW IT ENDS IN A QUESTION (#304).
+    // Nothing is sent before the answer, and staying sends nothing at all.
     if (!sameOrigin(usable.homeserver, held.baseUrl)) {
-      return {
-        entered: true,
-        session: held,
-        claimed: false,
-        invitation: { kind: 'refused', reason: OTHER_SERVER },
+      const answer = await ask({
+        account: hostShown(held.baseUrl),
+        link: hostShown(usable.homeserver),
+      })
+      if (answer === 'stay') {
+        return {
+          entered: true,
+          session: held,
+          claimed: false,
+          invitation: { kind: 'elsewhere' },
+        }
       }
+      // LEFT, THEN CLAIMED AS A DEVICE WITH NO ACCOUNT. The old account is
+      // closed on its own server and forgotten here before the link is
+      // spent, so the session the claim keeps is never the one forgetting
+      // takes. And the claim is the newcomer's: no bearer, because there is no
+      // longer anybody on this device to be.
+      const left = await leaveAccount(leaving, held)
+      return { ...(await claimAsANewcomer(deps, usable)), left }
     }
     // SPENT FOR THE ACCOUNT THIS DEVICE ALREADY HAS, never against it. The
     // service draws nobody on this path: it invites `held.userId` into the
@@ -200,6 +260,24 @@ export async function enterWithASession(deps: EntryDeps): Promise<EntryResult> {
   if (invitation === null) {
     return { entered: false, reason: 'this link is not an invitation' }
   }
+
+  return claimAsANewcomer(deps, invitation)
+}
+
+/**
+ * Spends an invitation for a device that holds no account, and keeps what it
+ * gets.
+ *
+ * Its own function because two roads reach it: a device that never had an
+ * account, and one that has just left its account for this link. The second
+ * must be exactly the first -- the ordinary first launch -- and one body is
+ * how that stays true.
+ */
+async function claimAsANewcomer(
+  deps: EntryDeps,
+  invitation: InvitationLink,
+): Promise<EntryResult> {
+  const { secrets, poster, signUp, wait } = deps
 
   const claim = await claimInvitation(poster, invitation, wait)
   if (!claim.claimed) {

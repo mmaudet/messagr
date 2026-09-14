@@ -79,3 +79,25 @@ export async function loadSession(
 
   return { baseUrl, userId, deviceId, accessToken }
 }
+
+/**
+ * Whether `held` is still the session `restored` was: the same server, the
+ * same account and the same device.
+ *
+ * #304. A launch that restored a session can overlap one that left that
+ * account for an invitation into another server, and before it re-enters or
+ * publishes anything it reads the keystore again and asks this. The token is
+ * not compared. It only ever changes with the device, and a comparison that
+ * carried it would be one more place a credential is handled for nothing.
+ */
+export function sameSession(
+  held: RestoreCredentials | null,
+  restored: RestoreCredentials,
+): boolean {
+  return (
+    held !== null &&
+    held.baseUrl === restored.baseUrl &&
+    held.userId === restored.userId &&
+    held.deviceId === restored.deviceId
+  )
+}

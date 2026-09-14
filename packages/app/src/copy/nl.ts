@@ -223,6 +223,22 @@ export const nl: Readonly<Record<CopyKey, string>> = {
     'Dat is niet gelukt, en er is niets veranderd. U kunt het opnieuw proberen.',
   evict_failed_key_still_valid:
     'Zij is eruit, maar de sleutel kon niet worden vervangen: zij kan nog lezen wat er wordt gezegd. Probeer opnieuw.',
+  leave_title: 'Deze uitnodiging leidt naar een andere server',
+  leave_lead:
+    'Om haar te volgen, moet dit apparaat zijn account verlaten. Dit is wat er verandert, voordat u beslist.',
+  leave_fact_gone: 'Dit account verlaat dit apparaat',
+  'leave_gone_body %@':
+    'Dit apparaat vergeet uw account op %@. De gesprekken en de sleutels die ze openen, verdwijnen van hier.',
+  leave_fact_stays: 'Wat elders blijft',
+  leave_stays_body:
+    'Het account bestaat nog op zijn server. De mensen met wie u schreef, houden hun gesprekken met u.',
+  leave_fact_link: 'Een nieuw account, via deze link',
+  'leave_link_body %@':
+    'Daarna komt dit apparaat binnen op %@ met een nieuw account, zoals een telefoon die er nooit een had.',
+  leave_final:
+    'Dit apparaat kan niet meer terug naar het oude account. Eerder ontvangen berichten kunnen hier niet meer worden gelezen.',
+  leave_confirm: 'Ja, dit account verlaten',
+  leave_cancel: 'Mijn account houden',
   promise_thesis: 'De berichtendienst die niets van u vraagt.',
   promise_subtitle:
     'Geen nummer, geen account, geen wachtwoord. Iemand nodigt u uit, u schrijft.',
@@ -237,6 +253,8 @@ export const nl: Readonly<Record<CopyKey, string>> = {
     'U hebt een uitnodiging geopend. Het gesprek dat ze opent, verschijnt zo in uw lijst.',
   list_invitation_refused:
     'Deze uitnodiging kon niet worden gebruikt. Vraag de afzender om een nieuwe.',
+  list_invitation_elsewhere:
+    'U hebt uw account behouden, en deze uitnodiging leidde naar een andere server. Daarom is ze niet gevolgd. Open de link opnieuw om haar alsnog te volgen.',
   'list_invitation_already %@':
     'U hebt al een gesprek met %@. Dat loopt door: de uitnodiging heeft geen tweede geopend.',
   list_not_in_yet:

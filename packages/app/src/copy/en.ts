@@ -228,6 +228,22 @@ export const en: Readonly<Record<CopyKey, string>> = {
     'That did not go through, and nothing changed. You can try again.',
   evict_failed_key_still_valid:
     'They are out, but the key could not be replaced: they can still read what is said. Try again.',
+  leave_title: 'This invitation leads to another server',
+  leave_lead:
+    'To follow it, this device has to leave the account it holds. Here is what changes, before you decide.',
+  leave_fact_gone: 'This account leaves this device',
+  'leave_gone_body %@':
+    'This device forgets your account on %@. Its conversations, and the keys that open them, are gone from here.',
+  leave_fact_stays: 'What stays elsewhere',
+  leave_stays_body:
+    'The account still exists on its server. The people you wrote to keep their conversations with you.',
+  leave_fact_link: 'A new account, through this link',
+  'leave_link_body %@':
+    'This device then enters %@ with a new account, like a phone that never had one.',
+  leave_final:
+    'This device will not be able to return to the old account. Messages received before can no longer be read here.',
+  leave_confirm: 'Yes, leave this account',
+  leave_cancel: 'Keep my account',
   promise_thesis: 'The messenger that asks you for nothing.',
   promise_subtitle:
     'No number, no account, no password. Someone invites you, you write.',
@@ -241,6 +257,8 @@ export const en: Readonly<Record<CopyKey, string>> = {
     'You opened an invitation. The conversation it opens will appear in your list.',
   list_invitation_refused:
     'This invitation could not be used. Ask the person who sent it for a new one.',
+  list_invitation_elsewhere:
+    'You kept your account, and this invitation led to another server. So it was not followed. To follow it, open the link again.',
   'list_invitation_already %@':
     'You already have a conversation with %@. That one carries on: the invitation did not open a second.',
   list_not_in_yet:

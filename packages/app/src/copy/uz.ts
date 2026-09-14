@@ -241,6 +241,22 @@ export const uz: Readonly<Record<CopyKey, string>> = {
     'Bu oʻtmadi va hech nima oʻzgarmadi. Qayta urinib koʻrishingiz mumkin.',
   evict_failed_key_still_valid:
     'Ular chiqarildi, ammo kalit almashtirilmadi: ular hamon aytilganlarni oʻqiy oladilar. Qayta urinib koʻring.',
+  leave_title: 'Bu taklif boshqa serverga olib boradi',
+  leave_lead:
+    'Unga amal qilish uchun bu qurilma oʻzidagi hisobdan chiqishi kerak. Qaror qilishdan oldin nima oʻzgarishini koʻring.',
+  leave_fact_gone: 'Bu hisob qurilmadan chiqadi',
+  'leave_gone_body %@':
+    'Bu qurilma %@ serveridagi hisobingizni unutadi. Uning suhbatlari va ularni ochadigan kalitlar bu yerdan yoʻqoladi.',
+  leave_fact_stays: 'Boshqa joyda qoladigan narsa',
+  leave_stays_body:
+    'Hisob oʻz serverida qoladi. Siz yozishgan odamlar siz bilan suhbatlarini saqlab qoladi.',
+  leave_fact_link: 'Bu havola orqali yangi hisob',
+  'leave_link_body %@':
+    'Keyin bu qurilma %@ serveriga yangi hisob bilan kiradi, xuddi hisobi boʻlmagan telefon kabi.',
+  leave_final:
+    'Bu qurilma eski hisobga qaytib kira olmaydi. Avval kelgan xabarlarni bu yerda endi oʻqib boʻlmaydi.',
+  leave_confirm: 'Ha, bu hisobdan chiqish',
+  leave_cancel: 'Hisobimni saqlash',
   promise_thesis: 'Sizdan hech narsa soʻramaydigan messenjer.',
   promise_subtitle:
     'Raqam yoʻq, hisob yoʻq, parol yoʻq. Kimdir sizni taklif qiladi — siz yozasiz.',
@@ -255,6 +271,8 @@ export const uz: Readonly<Record<CopyKey, string>> = {
     'Siz taklifni ochdingiz. U ochadigan suhbat roʻyxatingizda paydo boʻladi.',
   list_invitation_refused:
     'Bu taklifdan foydalanib boʻlmadi. Uni yuborgan odamdan yangisini soʻrang.',
+  list_invitation_elsewhere:
+    'Siz hisobingizni saqlab qoldingiz, bu taklif esa boshqa serverga olib borardi. Shuning uchun unga amal qilinmadi. Unga amal qilish uchun havolani qayta oching.',
   'list_invitation_already %@':
     'Sizda %@ bilan suhbat allaqachon bor. Oʻsha davom etadi: taklif ikkinchisini ochmadi.',
   list_not_in_yet:

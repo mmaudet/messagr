@@ -137,6 +137,10 @@ export function ConversationList({
         </Text>
       )}
 
+      {/* A LINK INTO ANOTHER SERVER, NOT FOLLOWED BECAUSE THE PERSON KEPT
+          THEIR ACCOUNT, has its own sentence (#304). The generic refusal
+          would send them to ask for a new link, and a new link into that
+          server would only put the same question again. */}
       {invitation !== null && invitation !== undefined && (
         <Text style={styles.ignored} testID="list-invitation-ignored">
           {invitation.kind === 'used'
@@ -146,7 +150,9 @@ export function ConversationList({
                   'list_invitation_already %@',
                   displayNameFor(invitation.from, names.get(invitation.from)),
                 )
-              : t('list_invitation_refused')}
+              : invitation.kind === 'elsewhere'
+                ? t('list_invitation_elsewhere')
+                : t('list_invitation_refused')}
         </Text>
       )}
       {/* CE QU'UN PARTAGE EST DEVENU, quand il n'est devenu rien.

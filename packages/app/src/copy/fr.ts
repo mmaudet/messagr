@@ -320,6 +320,29 @@ export const fr = {
   evict_failed_key_still_valid:
     'Elle est sortie, mais la clé n’a pas pu être remplacée : elle peut encore lire ce qui sera dit. Réessayez.',
 
+  // LEAVING THE ACCOUNT THIS DEVICE HOLDS, for an invitation into another
+  // server (#304). The shape of every gesture nothing takes back
+  // (`Consequences.tsx`): what leaves this device, what stays, then the word.
+  // Both servers are named, because which two they are is the whole of what
+  // somebody decides on. `leave_` and not `invitation_`, which the copy spec
+  // refuses.
+  leave_title: 'Cette invitation mène à un autre serveur',
+  leave_lead:
+    'Pour la suivre, cet appareil doit quitter le compte qu’il porte. Voici ce qui change, avant de décider.',
+  leave_fact_gone: 'Ce compte quitte cet appareil',
+  'leave_gone_body %@':
+    'Cet appareil oublie votre compte sur %@. Ses conversations et les clés qui les ouvrent disparaissent d’ici.',
+  leave_fact_stays: 'Ce qui reste ailleurs',
+  leave_stays_body:
+    'Le compte existe toujours sur son serveur. Vos correspondants gardent leurs conversations avec vous.',
+  leave_fact_link: 'Un compte neuf, par ce lien',
+  'leave_link_body %@':
+    'Cet appareil entre ensuite sur %@ avec un nouveau compte, comme un téléphone qui n’en avait pas.',
+  leave_final:
+    'Cet appareil ne pourra plus revenir à l’ancien compte. Les messages reçus avant ne pourront plus être lus ici.',
+  leave_confirm: 'Oui, quitter ce compte',
+  leave_cancel: 'Garder mon compte',
+
   // THE PROMISE, shown once and before anything is asked of anybody.
   //
   // Verbatim from the prototype's §1, which is the only brand screen of the
@@ -357,6 +380,12 @@ export const fr = {
   // The person is named because the row to open is already on this screen.
   'list_invitation_already %@':
     'Vous êtes déjà en conversation avec %@. C’est celle-ci qui continue : l’invitation n’en a pas ouvert une seconde.',
+  // THE FOURTH, when the link led to another server and the person kept their
+  // account (#304). Not the refusal: a new link into that server would put the
+  // same question again, so this says why the link was not followed, and how
+  // to follow it after all.
+  list_invitation_elsewhere:
+    'Vous avez gardé votre compte, et cette invitation menait à un autre serveur. Elle n’a donc pas été suivie. Pour la suivre, rouvrez le lien.',
   list_not_in_yet:
     'Vous n’êtes pas encore entré. Ouvrez le lien d’invitation qu’on vous a envoyé : c’est la seule porte, et l’application ne peut rien faire avant.',
   // #190. Deux issues, deux phrases : revenir sous une identité neuve est la

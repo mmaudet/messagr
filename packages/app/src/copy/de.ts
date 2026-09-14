@@ -231,6 +231,22 @@ export const de: Readonly<Record<CopyKey, string>> = {
     'Das hat nicht geklappt, und nichts hat sich geändert. Sie können es erneut versuchen.',
   evict_failed_key_still_valid:
     'Sie ist draußen, aber der Schlüssel konnte nicht ersetzt werden: sie kann weiterhin lesen, was gesagt wird. Versuchen Sie es erneut.',
+  leave_title: 'Diese Einladung führt zu einem anderen Server',
+  leave_lead:
+    'Um ihr zu folgen, muss dieses Gerät sein Konto verlassen. Hier steht, was sich ändert, bevor Sie entscheiden.',
+  leave_fact_gone: 'Dieses Konto verlässt das Gerät',
+  'leave_gone_body %@':
+    'Dieses Gerät vergisst Ihr Konto auf %@. Seine Unterhaltungen und die Schlüssel, die sie öffnen, verschwinden von hier.',
+  leave_fact_stays: 'Was anderswo bleibt',
+  leave_stays_body:
+    'Das Konto besteht auf seinem Server weiter. Ihre Gesprächspartner behalten ihre Unterhaltungen mit Ihnen.',
+  leave_fact_link: 'Ein neues Konto über diesen Link',
+  'leave_link_body %@':
+    'Danach meldet sich dieses Gerät mit einem neuen Konto bei %@ an, wie ein Telefon, das noch keines hatte.',
+  leave_final:
+    'Dieses Gerät kann nicht mehr zum alten Konto zurückkehren. Zuvor empfangene Nachrichten können hier nicht mehr gelesen werden.',
+  leave_confirm: 'Ja, dieses Konto verlassen',
+  leave_cancel: 'Mein Konto behalten',
   promise_thesis: 'Der Messenger, der nichts von Ihnen verlangt.',
   promise_subtitle:
     'Keine Nummer, kein Konto, kein Passwort. Jemand lädt Sie ein, Sie schreiben.',
@@ -245,6 +261,8 @@ export const de: Readonly<Record<CopyKey, string>> = {
     'Sie haben eine Einladung geöffnet. Das Gespräch, das sie eröffnet, erscheint gleich in Ihrer Liste.',
   list_invitation_refused:
     'Diese Einladung konnte nicht verwendet werden. Bitten Sie die absendende Person um eine neue.',
+  list_invitation_elsewhere:
+    'Sie haben Ihr Konto behalten, und diese Einladung führte zu einem anderen Server. Deshalb wurde ihr nicht gefolgt. Um ihr zu folgen, öffnen Sie den Link erneut.',
   'list_invitation_already %@':
     'Sie haben bereits ein Gespräch mit %@. Dieses läuft weiter: die Einladung hat kein zweites eröffnet.',
   list_not_in_yet:
