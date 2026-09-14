@@ -228,6 +228,23 @@ export const en: Readonly<Record<CopyKey, string>> = {
     'That did not go through, and nothing changed. You can try again.',
   evict_failed_key_still_valid:
     'They are out, but the key could not be replaced: they can still read what is said. Try again.',
+  leave_title: 'This invitation leads to another server',
+  leave_lead:
+    'To follow it, this device has to leave the account it holds. Here is what changes, before you decide.',
+  leave_fact_gone: 'Then this account leaves this device',
+  'leave_gone_body %@':
+    'Once the new account is in place, this device forgets your account on %@, its conversations and the keys that open them.',
+  leave_fact_stays: 'What stays elsewhere',
+  leave_stays_body:
+    'The account still exists on its server. The people you wrote to keep their conversations with you.',
+  leave_fact_link: 'First, a new account through this link',
+  'leave_link_body %@':
+    'This device first asks %@ for a new account. If it cannot put it in place, your account stays on this device.',
+  leave_final:
+    'Once the new account is in place, this device will not be able to return to the old one. Messages received before can no longer be read here.',
+  leave_confirm: 'Yes, leave this account',
+  leave_cancel: 'Keep my account',
+  leave_working: 'Working…',
   promise_thesis: 'The messenger that asks you for nothing.',
   promise_subtitle:
     'No number, no account, no password. Someone invites you, you write.',
@@ -241,6 +258,16 @@ export const en: Readonly<Record<CopyKey, string>> = {
     'You opened an invitation. The conversation it opens will appear in your list.',
   list_invitation_refused:
     'This invitation could not be used. Ask the person who sent it for a new one.',
+  list_invitation_elsewhere:
+    'You kept your account, and this invitation led to another server. So it was not followed. To follow it, close Messagr completely, then open the link again.',
+  list_invitation_reopen:
+    'This invitation leads to another server. To follow it, close Messagr completely, then open the link again.',
+  list_invitation_retry:
+    'This invitation could not be followed, and your account stays on this device. To try again, close Messagr completely, then open the link again.',
+  list_invitation_unusable:
+    'This invitation cannot be used. Your account stays on this device. Ask the person who sent it for a new one.',
+  list_invitation_spent:
+    'This invitation has been used, but this device could not keep the new account. Your account stays on this device. Ask the person who sent it for a new invitation.',
   'list_invitation_already %@':
     'You already have a conversation with %@. That one carries on: the invitation did not open a second.',
   list_not_in_yet:

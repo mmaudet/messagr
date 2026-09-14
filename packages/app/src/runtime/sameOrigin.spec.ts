@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import { sameOrigin } from './sameOrigin'
+import { hostShown, sameOrigin } from './sameOrigin'
 
 describe('sameOrigin', () => {
   it('holds for the same scheme, host and path-free base URL', () => {
@@ -86,5 +86,17 @@ describe('sameOrigin', () => {
   it('refuses rather than matches when a side is not a URL it can read', () => {
     expect(sameOrigin('not a url', 'https://messagr.eu')).toBe(false)
     expect(sameOrigin('https://messagr.eu', '')).toBe(false)
+  })
+})
+
+describe('hostShown', () => {
+  it('names the host a person reads, and its port only when it is not the default', () => {
+    // The question put before leaving an account names both servers, because
+    // which two they are is what somebody decides on. The scheme says nothing
+    // to that reader, and `:443` is the same server as no port at all -- while
+    // a bench on another port is another server, and has to read as one.
+    expect(hostShown('https://messagr.eu')).toBe('messagr.eu')
+    expect(hostShown('https://messagr.eu:443/')).toBe('messagr.eu')
+    expect(hostShown('https://Bench.Example:8448')).toBe('bench.example:8448')
   })
 })

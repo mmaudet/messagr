@@ -320,6 +320,33 @@ export const fr = {
   evict_failed_key_still_valid:
     'Elle est sortie, mais la clé n’a pas pu être remplacée : elle peut encore lire ce qui sera dit. Réessayez.',
 
+  // LEAVING THE ACCOUNT THIS DEVICE HOLDS, for an invitation into another
+  // server (#304). The shape of every gesture nothing takes back
+  // (`Consequences.tsx`): what leaves this device, what stays, then the word.
+  // Both servers are named, because which two they are is the whole of what
+  // somebody decides on. `leave_` and not `invitation_`, which the copy spec
+  // refuses.
+  leave_title: 'Cette invitation mène à un autre serveur',
+  leave_lead:
+    'Pour la suivre, cet appareil doit quitter le compte qu’il porte. Voici ce qui change, avant de décider.',
+  leave_fact_gone: 'Ensuite, ce compte quitte cet appareil',
+  'leave_gone_body %@':
+    'Une fois le nouveau compte en place, cet appareil oublie votre compte sur %@, ses conversations et les clés qui les ouvrent.',
+  leave_fact_stays: 'Ce qui reste ailleurs',
+  leave_stays_body:
+    'Le compte existe toujours sur son serveur. Vos correspondants gardent leurs conversations avec vous.',
+  // TRUE WHICHEVER WAY THE CLAIM GOES (14 September 2026): the new account is
+  // claimed first, and the old one is forgotten only once the new one is kept
+  // on this device.
+  leave_fact_link: 'D’abord, un compte neuf par ce lien',
+  'leave_link_body %@':
+    'Cet appareil demande d’abord un nouveau compte sur %@. S’il ne parvient pas à le mettre en place, votre compte reste sur cet appareil.',
+  leave_final:
+    'Une fois le nouveau compte en place, cet appareil ne pourra plus revenir à l’ancien. Les messages reçus avant ne pourront plus être lus ici.',
+  leave_confirm: 'Oui, quitter ce compte',
+  leave_cancel: 'Garder mon compte',
+  leave_working: 'En cours…',
+
   // THE PROMISE, shown once and before anything is asked of anybody.
   //
   // Verbatim from the prototype's §1, which is the only brand screen of the
@@ -357,6 +384,33 @@ export const fr = {
   // The person is named because the row to open is already on this screen.
   'list_invitation_already %@':
     'Vous êtes déjà en conversation avec %@. C’est celle-ci qui continue : l’invitation n’en a pas ouvert une seconde.',
+  // THE FOURTH, when the link led to another server and the person kept their
+  // account (#304). Not the refusal: a new link into that server would put the
+  // same question again, so this says why the link was not followed, and how
+  // to follow it after all.
+  list_invitation_elsewhere:
+    'Vous avez gardé votre compte, et cette invitation menait à un autre serveur. Elle n’a donc pas été suivie. Pour la suivre, fermez complètement Messagr, puis rouvrez le lien.',
+  // THE FIFTH, when the link into another server arrived while Messagr was
+  // open (#304, 14 September 2026). Only a cold launch changes the account, so
+  // the sentence says how to get one, and nothing was asked, sent or forgotten.
+  list_invitation_reopen:
+    'Cette invitation mène à un autre serveur. Pour la suivre, fermez complètement Messagr, puis rouvrez le lien.',
+  // THE SIXTH, when the person said yes and the claim did not go through for a
+  // reason that may not hold next time: a service out of reach, one that did
+  // not answer in time, or an issuer who has not let the account in yet.
+  // Opening the link again tries again, and the sentence says so at once.
+  list_invitation_retry:
+    'Cette invitation n’a pas pu être suivie, et votre compte reste sur cet appareil. Pour réessayer, fermez complètement Messagr, puis rouvrez le lien.',
+  // THE SEVENTH, when the person said yes and the service refused the link. A
+  // refusal is final, so the sentence sends them to ask for a new one rather
+  // than to open this one again.
+  list_invitation_unusable:
+    'Cette invitation ne peut pas être utilisée. Votre compte reste sur cet appareil. Demandez-en une nouvelle à la personne qui vous l’a envoyée.',
+  // THE EIGHTH, when the claim went through and this device could not keep
+  // the new account. The link is spent all the same, and the sentence says so:
+  // opening it again would only be refused.
+  list_invitation_spent:
+    'Cette invitation a été utilisée, mais cet appareil n’a pas pu garder le nouveau compte. Votre compte reste sur cet appareil. Demandez une nouvelle invitation à la personne qui vous l’a envoyée.',
   list_not_in_yet:
     'Vous n’êtes pas encore entré. Ouvrez le lien d’invitation qu’on vous a envoyé : c’est la seule porte, et l’application ne peut rien faire avant.',
   // #190. Deux issues, deux phrases : revenir sous une identité neuve est la

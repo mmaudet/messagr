@@ -29,6 +29,26 @@ export function sameOrigin(a: string, b: string): boolean {
   return left !== null && left === originOf(b)
 }
 
+/**
+ * The host a person reads: lowered, without its scheme, and with its port only
+ * when that port is not the scheme's own.
+ *
+ * For a screen, never for a comparison -- `sameOrigin` is the comparison. The
+ * question put before a device leaves its account for an invitation into
+ * another server names both servers, because which two they are is the one
+ * thing somebody decides on there. Parsed here rather than again, so the host a
+ * screen names is the host the guard compared.
+ *
+ * A URL this cannot read is shown as it was written rather than as nothing.
+ */
+export function hostShown(url: string): string {
+  const parts = partsOf(url)
+  if (parts === null) return url.trim()
+  return parts.port === DEFAULT_PORT[parts.scheme]
+    ? parts.host
+    : `${parts.host}:${parts.port}`
+}
+
 // Scheme, then the authority up to the first path, query or fragment. Any
 // userinfo before an `@` is dropped: it names who is asking, not which host
 // answers, and leaving it in would let `someone@host-a` read as a different
@@ -41,6 +61,16 @@ const DEFAULT_PORT: Readonly<Record<string, string>> = {
 }
 
 function originOf(url: string): string | null {
+  const parts = partsOf(url)
+  return parts === null ? null : `${parts.scheme}://${parts.host}:${parts.port}`
+}
+
+/** Scheme, host and port, read the one way both functions above rely on. */
+function partsOf(url: string): {
+  readonly scheme: string
+  readonly host: string
+  readonly port: string
+} | null {
   const match = ORIGIN.exec(url.trim())
   if (match === null) return null
   const scheme = match[1]!.toLowerCase()
@@ -65,5 +95,5 @@ function originOf(url: string): string | null {
       ? (DEFAULT_PORT[scheme] ?? '')
       : written
 
-  return `${scheme}://${host}:${port}`
+  return { scheme, host, port }
 }

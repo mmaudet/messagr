@@ -4,6 +4,7 @@
 // which the tests drive with two functions.
 import { exists } from '@dr.pogodin/react-native-fs'
 
+import { cryptoStorePath } from './cryptoMachineConfig'
 import type { Reentering } from './reenter'
 
 /**
@@ -53,12 +54,11 @@ export function homeserverCalls(baseUrl: string): Reentering {
 /**
  * Whether this session's crypto store is still on the disk.
  *
- * The path is `cryptoMachineConfig.ts`'s, spelled the same way and
- * deliberately not shared through a constant: that module builds it for the
- * library and this one asks about it before the library is given a chance to
- * create it. Two readers of one convention, which a comment can hold and an
- * import would quietly reverse -- asking `computeCryptoMachineConfig` would
- * mean handing this a passphrase it has no business seeing.
+ * The path is `cryptoStorePath`'s, the one function every reader of that
+ * directory now shares -- #304 made one of them a deletion. It is asked about
+ * before the library is given a chance to create the store, which is why
+ * this asks the path and not `computeCryptoMachineConfig`: that would mean
+ * handing this a passphrase it has no business seeing.
  *
  * `false` when the question cannot be asked. A launch that cannot read its
  * own directory should not conclude that a device was reinstalled and go
@@ -70,9 +70,10 @@ export async function cryptoStoreExists(
   storeDir: string,
   deviceId: string,
 ): Promise<boolean> {
-  if (storeDir === '' || deviceId === '') return true
+  const path = cryptoStorePath(storeDir, deviceId)
+  if (path === null) return true
   try {
-    return await exists(`${storeDir}/crypto/${deviceId}`)
+    return await exists(path)
   } catch {
     // Unknown reads as present: the cost of being wrong here is a launch
     // that behaves as it always has, against a launch that replaces a

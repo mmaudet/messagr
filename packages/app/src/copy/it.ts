@@ -223,6 +223,23 @@ export const it: Readonly<Record<CopyKey, string>> = {
     'Non è andata a buon fine, e nulla è cambiato. Può riprovare.',
   evict_failed_key_still_valid:
     'È uscita, ma la chiave non è stata sostituita: può ancora leggere ciò che si dirà. Riprovi.',
+  leave_title: 'Questo invito porta a un altro server',
+  leave_lead:
+    'Per seguirlo, questo dispositivo deve lasciare l’account che porta. Ecco cosa cambia, prima di decidere.',
+  leave_fact_gone: 'Poi, questo account lascia il dispositivo',
+  'leave_gone_body %@':
+    'Una volta attivato il nuovo account, questo dispositivo dimentica il suo account su %@, le sue conversazioni e le chiavi che le aprono.',
+  leave_fact_stays: 'Ciò che resta altrove',
+  leave_stays_body:
+    'L’account esiste ancora sul suo server. Le persone a cui scriveva conservano le loro conversazioni con lei.',
+  leave_fact_link: 'Prima, un account nuovo con questo link',
+  'leave_link_body %@':
+    'Questo dispositivo chiede prima un account nuovo a %@. Se non riesce ad attivarlo, il suo account resta su questo dispositivo.',
+  leave_final:
+    'Una volta attivato il nuovo account, questo dispositivo non potrà più tornare a quello vecchio. I messaggi ricevuti prima non si potranno più leggere qui.',
+  leave_confirm: 'Sì, lasciare questo account',
+  leave_cancel: 'Tenere il mio account',
+  leave_working: 'In corso…',
   promise_thesis: 'La messaggistica che non le chiede nulla.',
   promise_subtitle:
     'Nessun numero, nessun account, nessuna password. Qualcuno la invita, lei scrive.',
@@ -236,6 +253,16 @@ export const it: Readonly<Record<CopyKey, string>> = {
     'Avete aperto un invito. La conversazione che apre comparirà nel vostro elenco.',
   list_invitation_refused:
     'Questo invito non ha potuto essere usato. Chiedetene uno nuovo a chi ve l’ha mandato.',
+  list_invitation_elsewhere:
+    'Avete tenuto il vostro account, e questo invito portava a un altro server. Per questo non è stato seguito. Per seguirlo, chiudete completamente Messagr e riaprite il link.',
+  list_invitation_reopen:
+    'Questo invito porta a un altro server. Per seguirlo, chiudete completamente Messagr e riaprite il link.',
+  list_invitation_retry:
+    'Non è stato possibile seguire questo invito, e il vostro account resta su questo dispositivo. Per riprovare, chiudete completamente Messagr e riaprite il link.',
+  list_invitation_unusable:
+    'Questo invito non può essere usato. Il vostro account resta su questo dispositivo. Chiedetene uno nuovo a chi ve l’ha mandato.',
+  list_invitation_spent:
+    'Questo invito è stato usato, ma questo dispositivo non ha potuto tenere il nuovo account. Il vostro account resta su questo dispositivo. Chiedete un nuovo invito a chi ve l’ha mandato.',
   'list_invitation_already %@':
     'Avete già una conversazione con %@. È quella che prosegue: l’invito non ne ha aperta una seconda.',
   list_not_in_yet:

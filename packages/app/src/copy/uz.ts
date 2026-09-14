@@ -241,6 +241,23 @@ export const uz: Readonly<Record<CopyKey, string>> = {
     'Bu oʻtmadi va hech nima oʻzgarmadi. Qayta urinib koʻrishingiz mumkin.',
   evict_failed_key_still_valid:
     'Ular chiqarildi, ammo kalit almashtirilmadi: ular hamon aytilganlarni oʻqiy oladilar. Qayta urinib koʻring.',
+  leave_title: 'Bu taklif boshqa serverga olib boradi',
+  leave_lead:
+    'Unga amal qilish uchun bu qurilma oʻzidagi hisobdan chiqishi kerak. Qaror qilishdan oldin nima oʻzgarishini koʻring.',
+  leave_fact_gone: 'Keyin bu hisob qurilmadan chiqadi',
+  'leave_gone_body %@':
+    'Yangi hisob oʻrnatilgach, bu qurilma %@ serveridagi hisobingizni, uning suhbatlarini va ularni ochadigan kalitlarni unutadi.',
+  leave_fact_stays: 'Boshqa joyda qoladigan narsa',
+  leave_stays_body:
+    'Hisob oʻz serverida qoladi. Siz yozishgan odamlar siz bilan suhbatlarini saqlab qoladi.',
+  leave_fact_link: 'Avval, bu havola orqali yangi hisob',
+  'leave_link_body %@':
+    'Bu qurilma avval %@ serveridan yangi hisob soʻraydi. Uni oʻrnata olmasa, hisobingiz shu qurilmada qoladi.',
+  leave_final:
+    'Yangi hisob oʻrnatilgach, bu qurilma eski hisobga qaytib kira olmaydi. Avval kelgan xabarlarni bu yerda endi oʻqib boʻlmaydi.',
+  leave_confirm: 'Ha, bu hisobdan chiqish',
+  leave_cancel: 'Hisobimni saqlash',
+  leave_working: 'Bajarilmoqda…',
   promise_thesis: 'Sizdan hech narsa soʻramaydigan messenjer.',
   promise_subtitle:
     'Raqam yoʻq, hisob yoʻq, parol yoʻq. Kimdir sizni taklif qiladi — siz yozasiz.',
@@ -255,6 +272,16 @@ export const uz: Readonly<Record<CopyKey, string>> = {
     'Siz taklifni ochdingiz. U ochadigan suhbat roʻyxatingizda paydo boʻladi.',
   list_invitation_refused:
     'Bu taklifdan foydalanib boʻlmadi. Uni yuborgan odamdan yangisini soʻrang.',
+  list_invitation_elsewhere:
+    'Siz hisobingizni saqlab qoldingiz, bu taklif esa boshqa serverga olib borardi. Shuning uchun unga amal qilinmadi. Unga amal qilish uchun Messagr ilovasini butunlay yoping, soʻng havolani qayta oching.',
+  list_invitation_reopen:
+    'Bu taklif boshqa serverga olib boradi. Unga amal qilish uchun Messagr ilovasini butunlay yoping, soʻng havolani qayta oching.',
+  list_invitation_retry:
+    'Bu taklifga amal qilib boʻlmadi, hisobingiz esa shu qurilmada qoladi. Qayta urinish uchun Messagr ilovasini butunlay yoping, soʻng havolani qayta oching.',
+  list_invitation_unusable:
+    'Bu taklifdan foydalanib boʻlmaydi. Hisobingiz shu qurilmada qoladi. Uni yuborgan odamdan yangisini soʻrang.',
+  list_invitation_spent:
+    'Bu taklifdan foydalanildi, lekin bu qurilma yangi hisobni saqlab qola olmadi. Hisobingiz shu qurilmada qoladi. Uni yuborgan odamdan yangi taklif soʻrang.',
   'list_invitation_already %@':
     'Sizda %@ bilan suhbat allaqachon bor. Oʻsha davom etadi: taklif ikkinchisini ochmadi.',
   list_not_in_yet:

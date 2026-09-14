@@ -226,6 +226,23 @@ export const es: Readonly<Record<CopyKey, string>> = {
     'No ha salido bien, y no ha cambiado nada. Puede intentarlo de nuevo.',
   evict_failed_key_still_valid:
     'Ha salido, pero la clave no se ha podido reemplazar: todavía puede leer lo que se diga. Inténtelo de nuevo.',
+  leave_title: 'Esta invitación lleva a otro servidor',
+  leave_lead:
+    'Para seguirla, este dispositivo debe dejar la cuenta que tiene. Esto es lo que cambia, antes de decidir.',
+  leave_fact_gone: 'Después, esta cuenta deja este dispositivo',
+  'leave_gone_body %@':
+    'Una vez instalada la cuenta nueva, este dispositivo olvida su cuenta en %@, sus conversaciones y las claves que las abren.',
+  leave_fact_stays: 'Lo que queda en otra parte',
+  leave_stays_body:
+    'La cuenta sigue existiendo en su servidor. Las personas con las que escribía conservan sus conversaciones con usted.',
+  leave_fact_link: 'Primero, una cuenta nueva con este enlace',
+  'leave_link_body %@':
+    'Este dispositivo pide primero una cuenta nueva a %@. Si no consigue instalarla, su cuenta se queda en este dispositivo.',
+  leave_final:
+    'Una vez instalada la cuenta nueva, este dispositivo no podrá volver a la anterior. Los mensajes recibidos antes ya no podrán leerse aquí.',
+  leave_confirm: 'Sí, dejar esta cuenta',
+  leave_cancel: 'Conservar mi cuenta',
+  leave_working: 'En curso…',
   promise_thesis: 'La mensajería que no le pide nada.',
   promise_subtitle:
     'Sin número, sin cuenta, sin contraseña. Alguien le invita, usted escribe.',
@@ -239,6 +256,16 @@ export const es: Readonly<Record<CopyKey, string>> = {
     'Ha abierto una invitación. La conversación que abre aparecerá en su lista.',
   list_invitation_refused:
     'Esta invitación no ha podido usarse. Pida una nueva a quien se la envió.',
+  list_invitation_elsewhere:
+    'Ha conservado su cuenta, y esta invitación llevaba a otro servidor. Por eso no se ha seguido. Para seguirla, cierre Messagr por completo y vuelva a abrir el enlace.',
+  list_invitation_reopen:
+    'Esta invitación lleva a otro servidor. Para seguirla, cierre Messagr por completo y vuelva a abrir el enlace.',
+  list_invitation_retry:
+    'No se ha podido seguir esta invitación, y su cuenta se queda en este dispositivo. Para volver a intentarlo, cierre Messagr por completo y vuelva a abrir el enlace.',
+  list_invitation_unusable:
+    'Esta invitación no se puede usar. Su cuenta se queda en este dispositivo. Pida una nueva a quien se la envió.',
+  list_invitation_spent:
+    'Esta invitación ya se ha usado, pero este dispositivo no ha podido conservar la cuenta nueva. Su cuenta se queda en este dispositivo. Pida una nueva invitación a quien se la envió.',
   'list_invitation_already %@':
     'Ya tiene una conversación con %@. Es la que continúa: la invitación no ha abierto una segunda.',
   list_not_in_yet:

@@ -45,6 +45,8 @@ import {
 } from 'react-native-matrix-crypto'
 
 import { acceptBackup, type BackupAccepted } from './acceptBackup'
+import { theAccountsInQuestion } from './accountInQuestion'
+import { oneMachine } from './oneMachine'
 import type { EventCache } from './eventCacheStore'
 import { eventsToBuildFrom } from './eventsToBuildFrom'
 import { pickTextFile } from './documentFile'
@@ -80,7 +82,6 @@ import {
   sendIntoScope,
   type SendReport,
 } from './encryptAndSend'
-import { getErrorMessage } from './errors'
 import { logEvent } from './log'
 import {
   fetchInvitations,
@@ -187,8 +188,7 @@ export type MachineStartResult = {
  * is about to happen, not after it.
  */
 /**
- * Whether a crypto machine has already been created in this JavaScript
- * context, and for which device.
+ * Which crypto machine this JavaScript context holds, if any.
  *
  * # Why this is not paranoia
  *
@@ -204,12 +204,29 @@ export type MachineStartResult = {
  * id is kept rather than a boolean, because "already started" is only an
  * answer if it is the same device -- and a device id changing under a running
  * process is a thing to refuse loudly rather than to reuse.
+ *
+ * The rule lives in `oneMachine.ts`, where it is tested. Since #304 it takes
+ * the context from the moment a creation begins, and makes no machine for the
+ * device of an account in question, or of one that has left this telephone.
  */
-let machineStartedFor: string | null = null
+const machines = oneMachine(theAccountsInQuestion.mayCreateMachineFor)
 
 /** Whether this context already holds a machine for `deviceId`. */
 export function cryptoMachineIsRunning(deviceId: string): boolean {
-  return machineStartedFor === deviceId
+  return machines.holds(deviceId)
+}
+
+/**
+ * Whether this context holds a crypto machine, or is creating one, whichever
+ * device it is for.
+ *
+ * #304, and read for one question: can this entry change accounts? Not in a
+ * context that holds a machine -- a warm application, or a process a wake
+ * started before any screen opened -- because the next account would need a
+ * second machine beside the first, and `machines` allows one.
+ */
+export function aCryptoMachineIsRunning(): boolean {
+  return machines.running()
 }
 
 export async function startCryptoMachine(
@@ -273,26 +290,17 @@ export async function startCryptoMachine(
     }
   }
 
-  // ONE MACHINE PER CONTEXT. See `machineStartedFor`: the wake and the launch
-  // share a JavaScript context when the application is warm, and a second
-  // `createCryptoMachine` against the same file is how room keys are lost.
-  if (
-    machineStartedFor !== null &&
-    machineStartedFor !== credentials.deviceId
-  ) {
-    return {
-      started: false,
-      reason: `this context already holds a machine for ${machineStartedFor}`,
-      passphraseForm,
-    }
-  }
-  if (machineStartedFor === null) {
-    try {
-      await createCryptoMachine(config)
-    } catch (cause: unknown) {
-      return { started: false, reason: getErrorMessage(cause), passphraseForm }
-    }
-    machineStartedFor = credentials.deviceId
+  // ONE MACHINE PER CONTEXT, AND NONE FOR AN ACCOUNT IN QUESTION. See
+  // `machines`: the wake and the launch share a JavaScript context when the
+  // application is warm, and a second `createCryptoMachine` against the same
+  // file is how room keys are lost. Asked here, at the moment a machine would
+  // be created, and not once beforehand (#304). A creation this start waited
+  // for and saw fail, it makes once itself: see `oneMachine.ts`.
+  const opened = await machines.open(credentials, () =>
+    createCryptoMachine(config),
+  )
+  if (!opened.started) {
+    return { started: false, reason: opened.reason, passphraseForm }
   }
 
   const unsubscribeToDevice = subscribeToDeviceMessages(

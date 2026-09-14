@@ -3,7 +3,8 @@
 // nothing worth unit-testing lives here. What it adapts to is
 // `givenNameStore.ts`'s `EncryptedDatabase`, which the tests drive with an
 // ordinary object.
-import { open } from '@op-engineering/op-sqlite'
+import { exists, unlink } from '@dr.pogodin/react-native-fs'
+import { open, type DB } from '@op-engineering/op-sqlite'
 
 import { givenNamesSecrets } from './deviceSecrets'
 import { getErrorMessage } from './errors'
@@ -159,10 +160,11 @@ export async function openNotebook(storeDir: string): Promise<NotebookOpening> {
       // The file keeps its first page's name. Renaming it would leave every
       // device that has one holding a notebook nothing opens any more, which
       // is a data migration wearing a tidy-up's clothes.
-      name: 'given-names.sqlite',
+      name: NOTEBOOK_FILE,
       location: storeDir,
       encryptionKey: passphrase.passphrase,
     })
+    connections.push(database)
     const page = {
       execute: async (sql: string, params?: readonly (string | number)[]) =>
         database.execute(sql, params === undefined ? undefined : [...params]),
@@ -199,4 +201,53 @@ export async function openNotebook(storeDir: string): Promise<NotebookOpening> {
       minted: passphrase.minted,
     }
   }
+}
+
+/** The notebook's file, beside the crypto store in the host's directory. */
+const NOTEBOOK_FILE = 'given-names.sqlite'
+
+/**
+ * Every connection this context has opened on the notebook, so that forgetting
+ * it can close them first. See `forgetNotebook`.
+ */
+const connections: DB[] = []
+
+/**
+ * Erases the notebook, after closing every connection this context opened on
+ * it. #304: part of what leaving an account forgets.
+ *
+ * # CLOSED FIRST, AND THAT IS THE WHOLE DIFFICULTY
+ *
+ * A launch opened by a link while the application was already running has
+ * opened this file twice, and the next account's notebook is about to be
+ * created under the same name. SQLite lists deleting a file that a connection
+ * still writes to among the ways a database gets corrupted: that connection's
+ * journal can be taken for the next file's. So the connections go first, then
+ * the file, then any journal a crash left beside it -- a journal found next to
+ * a new database would be played back into it.
+ *
+ * Unlike a notebook that will not open, which must never be "fixed" by
+ * deleting it, this one is erased because the person asked for exactly that.
+ *
+ * `false` when something could not be removed. The caller reports it.
+ */
+export async function forgetNotebook(storeDir: string): Promise<boolean> {
+  for (const connection of connections.splice(0)) {
+    try {
+      connection.close()
+    } catch {
+      // Already closed: nothing is left open on it either way.
+    }
+  }
+  if (storeDir === '') return false
+  let removed = true
+  for (const suffix of ['', '-journal', '-wal', '-shm']) {
+    const path = `${storeDir}/${NOTEBOOK_FILE}${suffix}`
+    try {
+      if (await exists(path)) await unlink(path)
+    } catch {
+      removed = false
+    }
+  }
+  return removed
 }

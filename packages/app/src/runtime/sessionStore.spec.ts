@@ -1,6 +1,11 @@
 import { describe, expect, it, vi } from 'vitest'
 
-import { loadSession, saveSession, type SecretStore } from './sessionStore'
+import {
+  loadSession,
+  sameSession,
+  saveSession,
+  type SecretStore,
+} from './sessionStore'
 
 const SESSION = {
   baseUrl: 'https://messagr.eu',
@@ -94,5 +99,23 @@ describe('saveSession and loadSession', () => {
     await loadSession(store)
     expect(spy).not.toHaveBeenCalled()
     spy.mockRestore()
+  })
+})
+
+describe('sameSession', () => {
+  it('recognises the session a device still holds, and nothing else', () => {
+    // What a launch asks after another one may have left the account it
+    // restored: is this still the device's session? The same server, the same
+    // account and the same device say yes. A device re-entered since, an
+    // account on another server under the same name, or nothing held at all
+    // say no.
+    expect(sameSession(SESSION, { ...SESSION })).toBe(true)
+    expect(sameSession({ ...SESSION, deviceId: 'DEVICE2' }, SESSION)).toBe(
+      false,
+    )
+    expect(
+      sameSession({ ...SESSION, baseUrl: 'https://other.example' }, SESSION),
+    ).toBe(false)
+    expect(sameSession(null, SESSION)).toBe(false)
   })
 })
