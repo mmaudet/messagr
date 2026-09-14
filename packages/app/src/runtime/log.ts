@@ -236,3 +236,38 @@ export function logEvent(
     console.log(line)
   }
 }
+
+/**
+ * An event written when what it says changes, rather than each time it is
+ * said.
+ *
+ * #291. `MESSAGR_BACKUP_OFFER` is decided each time a conversation draws, and
+ * a conversation draws again on every sync cycle that touches it. On build
+ * 135, during a call, that was the same line ten times in seventeen seconds,
+ * and a telephone's log buffer holds 256 KiB: a line repeated pushes out the
+ * ones that would have explained something.
+ *
+ * Compared on what the caller hands over, serialised by `render`, which does
+ * not throw.
+ *
+ * `forget` has the next line written whatever it says. The caller says when,
+ * because only the caller knows what a new occasion to read the event is: for
+ * the backup offer, a conversation being opened.
+ */
+export function logWhenChanged(event: string): {
+  readonly log: (level: LogLevel, fields: LogFields) => void
+  readonly forget: () => void
+} {
+  let last: string | null = null
+  return {
+    log: (level, fields) => {
+      const said = render(fields)
+      if (said === last) return
+      last = said
+      logEvent(level, event, fields)
+    },
+    forget: () => {
+      last = null
+    },
+  }
+}
