@@ -293,9 +293,13 @@ track: `Publish` on `864d580`, `track: internal`, run 34709655215, successful.
 
 **2. Point the page at the opt-in link.**
 
-    MESSAGR_DEST_ANDROID='https://play.google.com/apps/internaltest/<id>' \
+    MESSAGR_DEST_IOS='https://testflight.apple.com/join/<code>' \
+      MESSAGR_DEST_ANDROID='https://play.google.com/apps/internaltest/<id>' \
       MESSAGR_APK=none \
       deploy/messagr-eu/deploy.sh
+
+`MESSAGR_DEST_IOS` is there because every deployment must carry every
+destination: see the end of this section.
 
 `build-site.sh` refuses a value that does not land in the built page, so a
 typo is a failed deployment rather than a page that serves the waiting
@@ -312,6 +316,22 @@ claims to.
 
 Keep the APK only if this deployment is for something other than the trial.
 
-**And iOS stays a dead end** until `MESSAGR_DEST_IOS` has a value. See #106:
-`ios: ''` is what production serves today, and an iPhone is told to ask the
-person who invited them.
+**iOS has had its destination since 14 September 2026.** Until then the page
+served `ios: ''`, and an iPhone was told to ask the person who invited them
+(#106). That morning, build 1.0 (25) was approved for external TestFlight
+testing, and the site was deployed with the public link of the external
+group:
+
+    MESSAGR_DEST_IOS='https://testflight.apple.com/join/WDqApzKx' \
+      MESSAGR_DEST_ANDROID='https://play.google.com/apps/internaltest/4701142005580137400' \
+      MESSAGR_APK=none \
+      deploy/messagr-eu/deploy.sh
+
+`conformite-site-deploye.js --live` then found the 44 files this repository
+builds, destinations included.
+
+**That is the command for every deployment of the site from now on**, even
+one that only corrects a sentence. `deploy.sh` does not remember the previous
+values: a destination left out is served empty, and that platform falls back
+to the waiting sentence. The live check cannot see it, because it builds its
+reference from the same incomplete environment.
