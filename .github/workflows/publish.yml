@@ -97,7 +97,15 @@ jobs:
           distribution: temurin
           java-version: '17'
 
+      # `packages` is set rather than left to the action's default, which asks
+      # for `tools`. On 14 September 2026, between 20:18 and 20:42 UTC, the
+      # runner's preinstalled sdkmanager stopped matching the one this action
+      # expects; the action installed cmdline-tools 16.0, whose
+      # `sdkmanager tools` answers « Failed to find package 'tools' », and every
+      # Android job stopped here, before building anything.
       - uses: android-actions/setup-android@v3
+        with:
+          packages: 'platform-tools'
 
       - run: yarn install --frozen-lockfile
 
