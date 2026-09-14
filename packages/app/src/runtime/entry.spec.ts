@@ -136,6 +136,36 @@ const never = () => new Promise<void>(() => {})
 const flush = () => new Promise(resolve => setImmediate(resolve))
 
 /**
+ * Time that passes only when a test makes it pass: a pause between two claim
+ * attempts, or a request that takes a while to answer. `after` resolves once
+ * enough of it has passed.
+ */
+function slowTime() {
+  let now = 0
+  let timers: Array<{ readonly at: number; readonly fire: () => void }> = []
+  const pass = (ms: number) => {
+    now += ms
+    const due = timers.filter(timer => timer.at <= now)
+    timers = timers.filter(timer => timer.at > now)
+    for (const timer of due) timer.fire()
+  }
+  return {
+    pass,
+    wait: async (ms: number) => pass(ms),
+    after: (ms: number) =>
+      new Promise<void>(resolve => {
+        timers.push({ at: now + ms, fire: resolve })
+      }),
+  }
+}
+
+/** The service's answer while the issuer has not let the drawn account in yet. */
+const NOT_YET_INVITED = {
+  status: 409,
+  body: '{"errcode":"MESSAGR_NOT_YET_INVITED"}',
+}
+
+/**
  * A device holding one account, and everything a launch can send from it.
  *
  * The keystore is modelled entry by entry -- the session, the sign-up marker,
@@ -150,7 +180,11 @@ const flush = () => new Promise(resolve => setImmediate(resolve))
  */
 function device(
   options: {
-    readonly claim?: { status: number; body: string } | 'unreachable' | 'silent'
+    readonly claim?:
+      | { status: number; body: string }
+      | 'unreachable'
+      | 'silent'
+      | ((attempt: number) => { status: number; body: string } | 'silent')
     readonly sessionWrite?: 'refused'
   } = {},
 ) {
@@ -192,8 +226,12 @@ function device(
       if (options.claim === 'unreachable') {
         throw new Error('network is unreachable')
       }
-      if (options.claim === 'silent') return new Promise<never>(() => {})
-      return options.claim ?? GRANTED_ELSEWHERE
+      const answer =
+        typeof options.claim === 'function'
+          ? options.claim(calls.length)
+          : options.claim
+      if (answer === 'silent') return new Promise<never>(() => {})
+      return answer ?? GRANTED_ELSEWHERE
     },
   }
   const departure: Departure = {
@@ -287,11 +325,12 @@ function onScreen(here: ReturnType<typeof device>) {
   return { questions, screen, otherServer }
 }
 
-/** An entry on `here`, opened with `link`. */
+/** An entry on `here`, opened with `link`, pausing between claim attempts with `wait`. */
 function entering(
   here: ReturnType<typeof device>,
   otherServer: OtherServer | null,
   link: string = ELSEWHERE,
+  wait?: (ms: number) => Promise<void>,
 ) {
   return enterWithASession({
     secrets: here.secrets,
@@ -299,6 +338,7 @@ function entering(
     link: async () => link,
     signUp: here.signUp,
     recovery: here.recovery,
+    ...(wait === undefined ? {} : { wait }),
     otherServer,
   })
 }
@@ -823,28 +863,69 @@ describe('a link into another server (#304)', () => {
     expect(here.held()).toEqual(UNTOUCHED)
   })
 
-  it('gives up a claim that does not answer in time, and forgets nothing', async () => {
+  it('gives up a request that goes unanswered, sends no other, and forgets nothing', async () => {
     // A request with no answer used to hold the account in question, and the
-    // launch with it, for as long as the network kept it open.
-    const here = device({ claim: 'silent' })
+    // launch with it, for as long as the network kept it open. Found in review
+    // on 14 September 2026: the minute then put over the whole claim fell in
+    // the middle of the handshake and left its loop running, so a later
+    // request could still spend the token while the list said to try again.
+    // Each request has its own limit now, and the claim ends with the first
+    // one that goes unanswered.
+    const time = slowTime()
+    const here = device({
+      claim: attempt => (attempt === 1 ? NOT_YET_INVITED : 'silent'),
+    })
     const questions = accountsInQuestion()
     const otherServer: OtherServer = {
       ask: async () => 'leave',
       aMachineIsRunning: () => false,
       holdInQuestion: questions.hold,
-      after: async () => undefined,
+      after: time.after,
       departure: here.departure,
     }
-    const result = await entering(here, otherServer)
-    expect(result).toEqual(
+    const outcomes: unknown[] = []
+    entering(here, otherServer, ELSEWHERE, time.wait).then(result => {
+      outcomes.push(result)
+    })
+    await flush()
+    time.pass(30_000)
+    await flush()
+    expect(outcomes).toEqual([
       stayingWith({
         kind: 'retry',
-        reason: 'the invitation service did not answer in time',
+        reason: 'the invitation service could not be reached',
       }),
-    )
+    ])
+    time.pass(60_000)
+    await flush()
+    expect(here.calls).toHaveLength(2)
     expect(here.held()).toEqual(UNTOUCHED)
     expect(here.forgotten).toEqual([])
     expect(questions.mayCreateMachineFor(SESSION)).toBe(true)
+  })
+
+  it('waits a slow admission out to its own end, and enters', async () => {
+    // Fifteen requests of three seconds each and the pauses between them: a
+    // minute and thirteen seconds in all, which the minute over the whole
+    // claim cut short. No single request comes near its own limit.
+    const time = slowTime()
+    const here = device({
+      claim: attempt => {
+        time.pass(3_000)
+        return attempt < 15 ? NOT_YET_INVITED : GRANTED_ELSEWHERE
+      },
+    })
+    const { otherServer } = answering('leave', here)
+    const result = await entering(
+      here,
+      { ...otherServer, after: time.after },
+      ELSEWHERE,
+      time.wait,
+    )
+    expect(result.entered && result.session).toEqual(ENTERED_ELSEWHERE)
+    expect(
+      here.calls.filter(call => call.url.endsWith('/invitations/claim')),
+    ).toHaveLength(15)
   })
 
   it('forgets the old account once the claim succeeds, and keeps the new one', async () => {

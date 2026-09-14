@@ -105,4 +105,37 @@ describe('oneMachine', () => {
     expect(machines.running()).toBe(false)
     expect(machines.start(NEW).kind).toBe('create')
   })
+
+  it('makes the machine once itself when the creation it waited for failed', async () => {
+    // Found in review on 14 September 2026. A wake on a locked screen began
+    // the machine and could not make it, the person opened the application
+    // meanwhile, and the launch that had waited for the wake gave up there.
+    const machines = oneMachine(anyDevice)
+    const wake = creation(machines.start(OLD))
+    const made: string[] = []
+    const launch = machines.open(OLD, async () => {
+      made.push('by the launch')
+    })
+    wake.settle(false)
+    expect(await launch).toEqual({ started: true })
+    expect(made).toEqual(['by the launch'])
+    expect(machines.start(OLD)).toEqual({ kind: 'reuse' })
+  })
+
+  it('makes it only once, and says why when that fails too', async () => {
+    const machines = oneMachine(anyDevice)
+    const wake = creation(machines.start(OLD))
+    let attempts = 0
+    const launch = machines.open(OLD, async () => {
+      attempts += 1
+      throw new Error('the store would not open')
+    })
+    wake.settle(false)
+    expect(await launch).toEqual({
+      started: false,
+      reason: 'the store would not open',
+    })
+    expect(attempts).toBe(1)
+    expect(machines.running()).toBe(false)
+  })
 })

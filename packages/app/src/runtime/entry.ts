@@ -130,7 +130,10 @@ export interface OtherServer {
    * of the process once its account has departed. See `accountInQuestion.ts`.
    */
   readonly holdInQuestion: (account: DeviceIdentity) => InQuestion
-  /** Resolves after `ms`. What bounds the claim: see `CLAIM_DEADLINE_MS`. */
+  /**
+   * Resolves after `ms`. What bounds each claim request: see
+   * `REQUEST_DEADLINE_MS`.
+   */
   readonly after: (ms: number) => Promise<void>
   /** What leaving the old account needs, once the new one is kept. */
   readonly departure: Departure
@@ -327,19 +330,41 @@ export async function enterWithASession(deps: EntryDeps): Promise<EntryResult> {
 }
 
 /**
- * How long a claim into another server may take. #304.
+ * How long one claim request into another server may go unanswered. #304.
  *
- * Entry waits on it with the old account in question, and the launch waits on
- * entry, so a request the network held open used to hold both for as long as
- * it did: the poster has no limit of its own. A minute is the half minute the
- * handshake may spend waiting on the issuer (`claimInvitation.ts`), with room
- * for its fifteen requests.
+ * Entry waits on the claim with the old account in question, and the launch
+ * waits on entry, while the poster has no limit of its own: a request the
+ * network held open would hold both for as long as it did. So a request is
+ * given up after this, and the claim ends with it -- no request goes out after
+ * one that was given up.
  *
- * This path only: a device with no account claims as it always has. And the
- * request is no longer awaited, not abandoned -- a claim the service grants
- * after the minute spends the token for an account this device never keeps.
+ * ON EACH REQUEST, NOT ON THE CLAIM. Found in review on 14 September 2026: a
+ * minute over the whole claim fell in the middle of the handshake, whose
+ * pauses alone make twenty-eight seconds, and left its loop running, so a 200
+ * that came later spent the token while the list said to try again. The
+ * handshake now runs to its own end (`claimInvitation.ts`).
+ *
+ * This path only: a device with no account claims as it always has. A request
+ * given up is no longer awaited, not cancelled, and one the service grants all
+ * the same spends the token for an account this device never keeps.
  */
-const CLAIM_DEADLINE_MS = 60_000
+const REQUEST_DEADLINE_MS = 30_000
+
+/** `poster`, giving up each request left unanswered for `REQUEST_DEADLINE_MS`. */
+function givingUpTheUnanswered(
+  poster: ServicePoster,
+  after: (ms: number) => Promise<void>,
+): ServicePoster {
+  return {
+    post: (url, body, bearer) =>
+      new Promise((resolve, reject) => {
+        after(REQUEST_DEADLINE_MS).then(() =>
+          reject(new Error('the invitation service did not answer in time')),
+        )
+        poster.post(url, body, bearer).then(resolve, reject)
+      }),
+  }
+}
 
 /**
  * A link into another server, offered to a device that holds an account. #304.
@@ -358,7 +383,7 @@ const CLAIM_DEADLINE_MS = 60_000
  * 1. Whether a crypto machine is running is read. If one is, nothing is begun.
  * 2. The old account is put in question, then the question is put. Whether a
  *    machine is running is read again once it is answered.
- * 3. The link is claimed, for `CLAIM_DEADLINE_MS` at most.
+ * 3. The link is claimed, each request given up after `REQUEST_DEADLINE_MS`.
  * 4. The new account is put in question too, and the old password is
  *    forgotten -- held in memory, for step 5.
  * 5. The new account is kept: the sign-up marker, its session, then its
@@ -437,13 +462,11 @@ async function followAnotherServer(
       return onTheHeldAccount({ kind: 'reopen' })
     }
 
-    const claim = await Promise.race([
-      claimInvitation(poster, link, wait),
-      otherServer.after(CLAIM_DEADLINE_MS).then((): ClaimResult => ({
-        claimed: false,
-        reason: 'the invitation service did not answer in time',
-      })),
-    ])
+    const claim = await claimInvitation(
+      givingUpTheUnanswered(poster, otherServer.after),
+      link,
+      wait,
+    )
     if (!claim.claimed) {
       // Two sentences, because a person acts on the difference: a refusal is
       // final and the link will be refused again, and anything else may go

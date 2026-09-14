@@ -82,7 +82,6 @@ import {
   sendIntoScope,
   type SendReport,
 } from './encryptAndSend'
-import { getErrorMessage } from './errors'
 import { logEvent } from './log'
 import {
   fetchInvitations,
@@ -295,26 +294,13 @@ export async function startCryptoMachine(
   // `machines`: the wake and the launch share a JavaScript context when the
   // application is warm, and a second `createCryptoMachine` against the same
   // file is how room keys are lost. Asked here, at the moment a machine would
-  // be created, and not once beforehand (#304).
-  const start = machines.start(credentials)
-  if (start.kind === 'refused') {
-    return { started: false, reason: start.reason, passphraseForm }
-  }
-  if (start.kind === 'wait' && !(await start.created)) {
-    return {
-      started: false,
-      reason: 'the machine this context was creating did not start',
-      passphraseForm,
-    }
-  }
-  if (start.kind === 'create') {
-    try {
-      await createCryptoMachine(config)
-    } catch (cause: unknown) {
-      start.settle(false)
-      return { started: false, reason: getErrorMessage(cause), passphraseForm }
-    }
-    start.settle(true)
+  // be created, and not once beforehand (#304). A creation this start waited
+  // for and saw fail, it makes once itself: see `oneMachine.ts`.
+  const opened = await machines.open(credentials, () =>
+    createCryptoMachine(config),
+  )
+  if (!opened.started) {
+    return { started: false, reason: opened.reason, passphraseForm }
   }
 
   const unsubscribeToDevice = subscribeToDeviceMessages(

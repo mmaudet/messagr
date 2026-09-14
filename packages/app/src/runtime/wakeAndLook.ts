@@ -26,9 +26,11 @@ import {
   syncCursorSecrets,
 } from './deviceSecrets'
 import { getErrorMessage } from './errors'
+import { cryptoStoreExists } from './homeserverCalls'
 import { logEvent } from './log'
 import { lookForWhatArrived } from './lookForWhatArrived'
 import { openNotebook } from './notebook'
+import { onlyAnExistingStore } from './onlyAnExistingStore'
 import { sendIntoScope } from './encryptAndSend'
 import { makePumpHttp } from './pump'
 import { loadSession } from './sessionStore'
@@ -74,14 +76,16 @@ export async function lookForWhatArrivedHere(): Promise<WhatWoke | null> {
 
   try {
     const sessionClient = createClient(session)
-    const started = await startCryptoMachine(
-      sessionClient,
-      session,
-      where.dir,
-      () => {
-        // A to-device failure during a wake is not worth a second
-        // notification, and there is nothing here to report it to.
-      },
+    const dir = where.dir
+    // ONLY A STORE THAT EXISTS (#304): the first creation, and the passphrase
+    // it mints, belong to the launch. See `onlyAnExistingStore.ts`.
+    const started = await onlyAnExistingStore(
+      () => cryptoStoreExists(dir, session.deviceId),
+      () =>
+        startCryptoMachine(sessionClient, session, dir, () => {
+          // A to-device failure during a wake is not worth a second
+          // notification, and there is nothing here to report it to.
+        }),
     )
     // Refused, among other reasons, for an account this device is asking
     // whether to leave, or has left since this wake read its session (#304).
@@ -175,13 +179,14 @@ export async function refuseTheCallHere(
 
   try {
     const sessionClient = createClient(session)
-    const started = await startCryptoMachine(
-      sessionClient,
-      session,
-      where.dir,
-      () => {
-        // As above: nothing here to report a to-device failure to.
-      },
+    const dir = where.dir
+    // As above: only a store that exists.
+    const started = await onlyAnExistingStore(
+      () => cryptoStoreExists(dir, session.deviceId),
+      () =>
+        startCryptoMachine(sessionClient, session, dir, () => {
+          // As above: nothing here to report a to-device failure to.
+        }),
     )
     if (!started.started) return no(started.reason)
 
