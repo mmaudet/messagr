@@ -3,7 +3,6 @@ import {
   AppState,
   BackHandler,
   Linking,
-  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -34,6 +33,7 @@ import {
   reactToMessage,
   registerThisDeviceForWaking,
   stopWakingThisDevice,
+  aCryptoMachineIsRunning,
   sendPhotograph,
   sendReadReceipt,
   readTrust,
@@ -243,7 +243,9 @@ import {
 import { useKeyboardInset } from './src/ui/keyboardInset'
 import { sweepWhatThePickerLeft } from './src/runtime/imageLibrary'
 import { afterReinstall } from './src/runtime/afterReinstall'
-import { forgetWhatThisDeviceKeeps } from './src/runtime/forgetAccount'
+import { departureFrom } from './src/runtime/leavingThisDevice'
+import { putTheAccountInQuestion } from './src/runtime/accountInQuestion'
+import { whenToSay } from './src/runtime/whenToSay'
 import {
   cryptoStoreExists,
   homeserverCalls,
@@ -1005,23 +1007,24 @@ export function App({
    * #304, and `entry.ts` says why it is a question.
    *
    * `null` on every other launch. While it is not, the screen is the question
-   * and nothing else, because the launch is waiting for the answer inside
-   * entry. The answer travels through `answerLeavingRef`: a function held in
+   * and nothing else, because the launch is waiting inside entry: for the
+   * answer, then after a yes for the claim, which is what `answered` draws.
+   * The answer travels through `answerTheQuestionRef`: a function held in
    * state would be called by React as an updater.
    */
-  const [leaving, setLeaving] = useState<{
+  const [otherServerQuestion, setOtherServerQuestion] = useState<{
     readonly account: string
     readonly link: string
+    readonly answered: boolean
   } | null>(null)
-  const answerLeavingRef = useRef<((answer: 'leave' | 'stay') => void) | null>(
-    null,
-  )
+  const answerTheQuestionRef = useRef<
+    ((answer: 'leave' | 'stay') => void) | null
+  >(null)
   /**
    * Whether a run of the launch is between putting that question and its
-   * entry answering -- the question, then the leaving and the claim a yes
-   * starts. No second question is put meanwhile. See the launch.
+   * entry answering. No second question is put meanwhile. See the launch.
    */
-  const leavingBusyRef = useRef(false)
+  const questionBusyRef = useRef(false)
   // `null` until the launch has answered. Distinguishing "not in" from "not
   // yet known" keeps the list from telling somebody they are locked out for
   // the second the keystore takes to answer.
@@ -1602,7 +1605,7 @@ export function App({
         }
         return book
       }
-      let opening = await bindNotebook()
+      const opened = await bindNotebook()
 
       // No provisioned account: report it rather than attempt a sync that has
       // nothing to restore. This keeps the screen runnable for a developer
@@ -1611,8 +1614,9 @@ export function App({
       // previous launch, or one obtained by spending the invitation it was
       // opened with. Nothing arrives from the build any more.
       let historyClaim: HistoryClaim | null = null
-      // Whether this run is the one that put the question, when one is put.
-      let askedHere = false
+      // What lifts the question this run put, when it put one. See
+      // `accountInQuestion.ts`.
+      let releaseTheQuestion: (() => void) | null = null
       // ONE CLAIM PER LINK AT A TIME. A link another run of this launch is
       // still claiming is not handed over again, and the mark is lifted the
       // moment this entry answers -- so the same link opened again after a
@@ -1641,94 +1645,68 @@ export function App({
               // 409, and reports a link that cannot be used -- which is what it
               // does on a device with nothing else changed.
               wait: ms => new Promise(resolve => setTimeout(resolve, ms)),
-              // THE QUESTION A LINK INTO ANOTHER SERVER PUTS, ON THE SCREEN AND
-              // AWAITED. #304: `entry.ts` says why it is a question. This
-              // launch waits inside entry until it is answered, and the
-              // re-entry after a reinstall and the pump both come after.
-              //
-              // One question at a time. A second link into another server,
-              // arriving while the first is answered or while a yes is carried
-              // out, is answered « stay » without being put: staying sends
-              // nothing, and that run then stops at the wait below.
-              ask: hosts => {
-                if (leavingBusyRef.current) return Promise.resolve('stay')
-                leavingBusyRef.current = true
-                askedHere = true
-                return new Promise<'leave' | 'stay'>(resolve => {
-                  answerLeavingRef.current = resolve
-                  setLeaving(hosts)
-                })
-              },
-              leaving: {
-                homeserver: homeserverCalls,
-                pusher: async () => {
-                  const token = await readLastPushkey(pushkeySecrets)
-                  return token === null
-                    ? null
-                    : { token, road: Platform.OS === 'ios' ? 'ios' : 'android' }
-                },
-                forget: async account => {
-                  // THE ACCOUNT STOPS IN THIS PROCESS AS WELL AS ON THE DISK.
-                  // A link opened while the application was running finds a
-                  // loop still polling for that account, and left running it
-                  // would feed the next account's machine what arrives for the
-                  // old one.
-                  runningSyncRef.current?.stop()
-                  runningSyncRef.current = null
-                  liveGenerationRef.current += 1
-                  const forgotten = await forgetWhatThisDeviceKeeps(
-                    storeDir,
-                    account.deviceId,
-                  )
-                  logEvent(
-                    forgotten.secrets.refused === 0 &&
-                      forgotten.notebook &&
-                      forgotten.cryptoStore
-                      ? 'info'
-                      : 'warn',
-                    'MESSAGR_ACCOUNT_FORGOTTEN',
-                    { ...forgotten },
-                  )
-                  // AND WHAT WAS DRAWN FROM IT: its conversations, the one
-                  // somebody had open, its calls. None of it may be on the
-                  // screen the next account opens.
-                  setSummaries([])
-                  setConversation(null)
-                  setOpenScope(null)
-                  openScopeRef.current = null
-                  setSelected(new Set())
-                  setPersonOpen(false)
-                  setParty(null)
-                  setTrust(null)
-                  setReactions(new Map())
-                  setReadHere(new Set())
-                  setCalls([])
-                  setKeptMessages(null)
-                  setFavouritesOpen(false)
-                  setClaimed(null)
-                  setRestorePrompt(null)
-                  setBackupPrompt(null)
-                  setInvite({ stage: 'shut' })
-                  setAdmission(null)
-                  setTab('chat')
-                  opening = await bindNotebook()
-                },
-              },
+              // A LINK INTO ANOTHER SERVER IS FOLLOWED FROM A COLD LAUNCH ONLY
+              // (#304, decided on 14 September 2026). `null` for a link handed
+              // over while Messagr was running, and for a process that already
+              // holds a crypto machine -- one a wake started before any screen
+              // opened -- because the next account would need a second machine
+              // beside it. `entry.ts` then says to reopen Messagr.
+              otherServer:
+                warmLink === null && !aCryptoMachineIsRunning()
+                  ? {
+                      // THE QUESTION, ON THE SCREEN AND AWAITED. This launch
+                      // waits inside entry until it is answered, and the
+                      // re-entry after a reinstall and the pump both come
+                      // after.
+                      //
+                      // One question at a time. A second one, arriving while
+                      // the first is answered or a yes is carried out, is
+                      // answered « stay » without being put: staying sends
+                      // nothing, and that run then stops at the wait below.
+                      ask: hosts => {
+                        if (questionBusyRef.current) {
+                          return Promise.resolve('stay')
+                        }
+                        questionBusyRef.current = true
+                        releaseTheQuestion = putTheAccountInQuestion()
+                        return new Promise<'leave' | 'stay'>(resolve => {
+                          answerTheQuestionRef.current = resolve
+                          setOtherServerQuestion({ ...hosts, answered: false })
+                        })
+                      },
+                      departure: departureFrom(storeDir),
+                    }
+                  : null,
             }),
         )
         .finally(() => {
-          if (askedHere) leavingBusyRef.current = false
+          if (releaseTheQuestion !== null) {
+            questionBusyRef.current = false
+            setOtherServerQuestion(null)
+            releaseTheQuestion()
+          }
         })
       // WHAT BECAME OF AN ACCOUNT THIS LAUNCH LEFT, ON ITS OWN SERVER. #304.
       // Logged whenever that server answers, which may be after this launch
       // has finished, or never: nothing waits for it, on purpose.
-      entered.left?.closing
-        .then(closed =>
-          logEvent(closed.loggedOut ? 'info' : 'warn', 'MESSAGR_ACCOUNT_LEFT', {
-            ...closed,
-          }),
-        )
-        .catch(() => {})
+      if (entered.entered && entered.left !== undefined) {
+        entered.left.closing
+          .then(closed =>
+            logEvent(
+              closed.loggedOut ? 'info' : 'warn',
+              'MESSAGR_ACCOUNT_LEFT',
+              { ...closed },
+            ),
+          )
+          .catch(() => {})
+      }
+      // THE NOTEBOOK THIS LAUNCH OPENED BELONGED TO THE ACCOUNT IT LEFT.
+      // Leaving closed and erased it, so the account just entered is given one
+      // of its own before anything is drawn from it, and the rows remembered
+      // for the old account go with it.
+      const leftAnAccount = entered.entered && entered.left !== undefined
+      if (leftAnAccount) setSummaries([])
+      const opening = leftAnAccount ? await bindNotebook() : opened
       // A RUN THAT RESTORED A SESSION WAITS FOR ANY ENTRY STILL SPENDING A
       // LINK, THEN LOOKS AGAIN AT WHICH ACCOUNT THIS DEVICE HOLDS. #304.
       //
@@ -1741,32 +1719,23 @@ export function App({
       if (
         entered.entered &&
         !entered.claimed &&
-        (await spentLinksRef.current.settled()) &&
+        (await spentLinksRef.current.waitedForAnotherEntry()) &&
         !sameSession(await loadSession(sessionSecrets), entered.session)
       ) {
         logEvent('info', 'MESSAGR_LAUNCH_SUPERSEDED', {})
         return
       }
-      // WHAT BECAME OF THE LINK, SAID AS SOON AS IT IS KNOWN. It was said
-      // only once the pump had run, and a device that kept its account rather
-      // than follow a link into another server (#304) has to be told why the
-      // link was not followed however the rest of the launch goes -- a
-      // stranded reinstall included.
-      if (entered.entered && entered.invitation !== undefined) {
+      // WHY A LINK INTO ANOTHER SERVER WAS NOT FOLLOWED, SAID AT ONCE (#304):
+      // that reason is owed however the rest of the launch goes. Everything
+      // else a link can become is said after the pump, as it always was, and
+      // `whenToSay.ts` says why.
+      if (
+        entered.entered &&
+        entered.invitation !== undefined &&
+        whenToSay(entered.invitation) === 'on-entry'
+      ) {
         setLinkOutcome(entered.invitation)
-        // THE REASON GOES HERE AND NOT ON THE SCREEN. §13.27: no diagnostic
-        // text on a screen a person reads, and the sentences the list draws
-        // are what it means for them. This is the line somebody diagnosing a
-        // link that will not open has to have -- the service distinguishes
-        // several refusals and the screen deliberately does not.
-        logEvent(
-          entered.invitation.kind === 'used' ||
-            entered.invitation.kind === 'elsewhere'
-            ? 'info'
-            : 'warn',
-          'MESSAGR_INVITATION',
-          { ...entered.invitation },
-        )
+        logEvent('info', 'MESSAGR_INVITATION', { ...entered.invitation })
       }
       // THE PASSWORD, KEPT AT THE ONE MOMENT IT IS EVER OFFERED.
       //
@@ -1962,6 +1931,24 @@ export function App({
             // Everything uncertain resolves to `restored-session`, which
             // creates nothing. See signUpMarker.ts.
             setInYet(entered.entered)
+            if (
+              entered.entered &&
+              entered.invitation !== undefined &&
+              whenToSay(entered.invitation) === 'after-the-pump'
+            ) {
+              setLinkOutcome(entered.invitation)
+              // THE REASON GOES HERE AND NOT ON THE SCREEN. §13.27: no
+              // diagnostic text on a screen a person reads, and the two
+              // sentences the list draws are what it means for them. This
+              // is the line somebody diagnosing a link that will not open
+              // has to have -- the service distinguishes several refusals
+              // and the screen deliberately does not.
+              logEvent(
+                entered.invitation.kind === 'used' ? 'info' : 'warn',
+                'MESSAGR_INVITATION',
+                { ...entered.invitation },
+              )
+            }
 
             const entitlement =
               entered.entered && entered.claimed
@@ -3729,19 +3716,24 @@ export function App({
   // inside entry for the answer and nothing underneath may be used
   // meanwhile: a list drawn from an account that may be about to go is a list
   // of conversations the next tap could make disappear.
-  if (leaving !== null) {
+  if (otherServerQuestion !== null) {
     const answer = (given: 'leave' | 'stay') => {
-      const resolve = answerLeavingRef.current
-      answerLeavingRef.current = null
-      setLeaving(null)
+      const resolve = answerTheQuestionRef.current
+      answerTheQuestionRef.current = null
+      // A yes keeps the question on the screen, drawn as under way, until
+      // entry answers: the claim comes first and can take half a minute.
+      setOtherServerQuestion(
+        given === 'leave' ? { ...otherServerQuestion, answered: true } : null,
+      )
       resolve?.(given)
     }
     return (
       <GestureHandlerRootView style={styles.root}>
         <SafeAreaProvider>
           <LeaveAccount
-            account={leaving.account}
-            link={leaving.link}
+            account={otherServerQuestion.account}
+            link={otherServerQuestion.link}
+            working={otherServerQuestion.answered}
             onLeave={() => answer('leave')}
             onStay={() => answer('stay')}
           />

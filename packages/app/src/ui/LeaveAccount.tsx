@@ -1,9 +1,9 @@
 import React from 'react'
-import { ScrollView, StyleSheet } from 'react-native'
+import { ScrollView, StyleSheet, Text } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 
 import { t } from '../copy'
-import { color, layout, space } from '../design/tokens'
+import { color, layout, space, type } from '../design/tokens'
 import { Consequences } from './Consequences'
 import { NotchedButton } from './NotchedButton'
 
@@ -17,6 +17,13 @@ import { NotchedButton } from './NotchedButton'
  * leaves this device, what stays, and the word « Irréversible ». Of the three
  * this is the one whose loss belongs to the person pressing the button --
  * their conversations here, and the keys that open them.
+ *
+ * # TRUE WHICHEVER WAY THE CLAIM GOES
+ *
+ * Decided on 14 September 2026: the new account is claimed first, and the old
+ * one is forgotten only once that has succeeded. The facts are read in that
+ * order -- first a new account, then this one leaves -- so nothing on this
+ * screen is untrue for somebody whose link turns out to be spent.
  *
  * # BOTH SERVERS ARE NAMED
  *
@@ -36,6 +43,7 @@ import { NotchedButton } from './NotchedButton'
 export function LeaveAccount({
   account,
   link,
+  working,
   onLeave,
   onStay,
 }: {
@@ -43,6 +51,13 @@ export function LeaveAccount({
   readonly account: string
   /** The server the invitation leads to. */
   readonly link: string
+  /**
+   * Whether the answer was yes and the link is still being claimed. That can
+   * take half a minute, while the issuer's application lets the new account
+   * in, and the screen stays the question meanwhile: what is underneath is
+   * the account that may be about to go.
+   */
+  readonly working: boolean
   readonly onLeave: () => void
   /**
    * The refusal, and a button of the same rank as the gesture:
@@ -60,6 +75,12 @@ export function LeaveAccount({
           lead={t('leave_lead')}
           facts={[
             {
+              tone: 'plain',
+              said: t('leave_fact_link'),
+              body: t('leave_link_body %@', link),
+              testID: 'leave-account-link',
+            },
+            {
               // OCHRE: the loss to weigh, and it is theirs. Not red, which is
               // a measure taken against somebody.
               tone: 'weigh',
@@ -73,28 +94,34 @@ export function LeaveAccount({
               body: t('leave_stays_body'),
               testID: 'leave-account-stays',
             },
-            {
-              tone: 'plain',
-              said: t('leave_fact_link'),
-              body: t('leave_link_body %@', link),
-              testID: 'leave-account-link',
-            },
           ]}
           finally={t('leave_final')}>
-          <NotchedButton
-            testID="leave-account-confirm"
-            label={t('leave_confirm')}
-            tone="measure"
-            onPress={onLeave}
-            wide
-          />
-          <NotchedButton
-            testID="leave-account-stay"
-            label={t('leave_cancel')}
-            tone="quiet"
-            onPress={onStay}
-            wide
-          />
+          {working ? (
+            <Text testID="leave-account-working" style={styles.working}>
+              {t('leave_working')}
+            </Text>
+          ) : (
+            <>
+              {/* THE DEFAULT TONE, NOT THE MEASURE. Red is `deny`, « action de
+                  mesure » in the token's own words, and leaving one's own
+                  account is not a measure taken against anybody.
+                  `BackupSettings.tsx` confirms replacing a recovery key the
+                  same way. */}
+              <NotchedButton
+                testID="leave-account-confirm"
+                label={t('leave_confirm')}
+                onPress={onLeave}
+                wide
+              />
+              <NotchedButton
+                testID="leave-account-stay"
+                label={t('leave_cancel')}
+                tone="quiet"
+                onPress={onStay}
+                wide
+              />
+            </>
+          )}
         </Consequences>
       </ScrollView>
     </SafeAreaView>
@@ -107,4 +134,5 @@ const styles = StyleSheet.create({
     paddingHorizontal: layout.screenGutter,
     paddingBottom: space.xxl,
   },
+  working: { ...type.bodySm, color: color.neutral['600'] },
 })

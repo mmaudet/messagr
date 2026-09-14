@@ -226,19 +226,20 @@ export const nl: Readonly<Record<CopyKey, string>> = {
   leave_title: 'Deze uitnodiging leidt naar een andere server',
   leave_lead:
     'Om haar te volgen, moet dit apparaat zijn account verlaten. Dit is wat er verandert, voordat u beslist.',
-  leave_fact_gone: 'Dit account verlaat dit apparaat',
+  leave_fact_gone: 'Daarna verlaat dit account dit apparaat',
   'leave_gone_body %@':
-    'Dit apparaat vergeet uw account op %@. De gesprekken en de sleutels die ze openen, verdwijnen van hier.',
+    'Zodra het nieuwe account er is, vergeet dit apparaat uw account op %@, de gesprekken en de sleutels die ze openen.',
   leave_fact_stays: 'Wat elders blijft',
   leave_stays_body:
     'Het account bestaat nog op zijn server. De mensen met wie u schreef, houden hun gesprekken met u.',
-  leave_fact_link: 'Een nieuw account, via deze link',
+  leave_fact_link: 'Eerst een nieuw account via deze link',
   'leave_link_body %@':
-    'Daarna komt dit apparaat binnen op %@ met een nieuw account, zoals een telefoon die er nooit een had.',
+    'Dit apparaat vraagt eerst een nieuw account aan bij %@. Krijgt het er geen, dan verandert er niets en blijft uw account hier.',
   leave_final:
-    'Dit apparaat kan niet meer terug naar het oude account. Eerder ontvangen berichten kunnen hier niet meer worden gelezen.',
+    'Zodra het nieuwe account er is, kan dit apparaat niet meer terug naar het oude. Eerder ontvangen berichten kunnen hier niet meer worden gelezen.',
   leave_confirm: 'Ja, dit account verlaten',
   leave_cancel: 'Mijn account houden',
+  leave_working: 'Bezig…',
   promise_thesis: 'De berichtendienst die niets van u vraagt.',
   promise_subtitle:
     'Geen nummer, geen account, geen wachtwoord. Iemand nodigt u uit, u schrijft.',
@@ -254,7 +255,9 @@ export const nl: Readonly<Record<CopyKey, string>> = {
   list_invitation_refused:
     'Deze uitnodiging kon niet worden gebruikt. Vraag de afzender om een nieuwe.',
   list_invitation_elsewhere:
-    'U hebt uw account behouden, en deze uitnodiging leidde naar een andere server. Daarom is ze niet gevolgd. Open de link opnieuw om haar alsnog te volgen.',
+    'U hebt uw account behouden, en deze uitnodiging leidde naar een andere server. Daarom is ze niet gevolgd. Sluit Messagr volledig en open de link opnieuw om haar alsnog te volgen.',
+  list_invitation_reopen:
+    'Deze uitnodiging leidt naar een andere server. Sluit Messagr volledig en open de link opnieuw om haar te volgen.',
   'list_invitation_already %@':
     'U hebt al een gesprek met %@. Dat loopt door: de uitnodiging heeft geen tweede geopend.',
   list_not_in_yet:

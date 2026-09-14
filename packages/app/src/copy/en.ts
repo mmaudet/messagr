@@ -231,19 +231,20 @@ export const en: Readonly<Record<CopyKey, string>> = {
   leave_title: 'This invitation leads to another server',
   leave_lead:
     'To follow it, this device has to leave the account it holds. Here is what changes, before you decide.',
-  leave_fact_gone: 'This account leaves this device',
+  leave_fact_gone: 'Then this account leaves this device',
   'leave_gone_body %@':
-    'This device forgets your account on %@. Its conversations, and the keys that open them, are gone from here.',
+    'Once the new account is obtained, this device forgets your account on %@, its conversations and the keys that open them.',
   leave_fact_stays: 'What stays elsewhere',
   leave_stays_body:
     'The account still exists on its server. The people you wrote to keep their conversations with you.',
-  leave_fact_link: 'A new account, through this link',
+  leave_fact_link: 'First, a new account through this link',
   'leave_link_body %@':
-    'This device then enters %@ with a new account, like a phone that never had one.',
+    'This device first asks %@ for a new account. If it does not get one, nothing changes and your account stays here.',
   leave_final:
-    'This device will not be able to return to the old account. Messages received before can no longer be read here.',
+    'Once the new account is obtained, this device will not be able to return to the old one. Messages received before can no longer be read here.',
   leave_confirm: 'Yes, leave this account',
   leave_cancel: 'Keep my account',
+  leave_working: 'Working…',
   promise_thesis: 'The messenger that asks you for nothing.',
   promise_subtitle:
     'No number, no account, no password. Someone invites you, you write.',
@@ -258,7 +259,9 @@ export const en: Readonly<Record<CopyKey, string>> = {
   list_invitation_refused:
     'This invitation could not be used. Ask the person who sent it for a new one.',
   list_invitation_elsewhere:
-    'You kept your account, and this invitation led to another server. So it was not followed. To follow it, open the link again.',
+    'You kept your account, and this invitation led to another server. So it was not followed. To follow it, close Messagr completely, then open the link again.',
+  list_invitation_reopen:
+    'This invitation leads to another server. To follow it, close Messagr completely, then open the link again.',
   'list_invitation_already %@':
     'You already have a conversation with %@. That one carries on: the invitation did not open a second.',
   list_not_in_yet:

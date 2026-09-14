@@ -86,7 +86,7 @@ describe('spentLinks', () => {
   it('answers at once when no entry holds a link, and says it did not wait', async () => {
     // Almost every launch: one run, whose own mark was lifted when its entry
     // answered. Nothing to wait for, and nothing for the caller to re-read.
-    expect(await spentLinks().settled()).toBe(false)
+    expect(await spentLinks().waitedForAnotherEntry()).toBe(false)
   })
 
   it('makes a run that was handed no link wait for the entry that took it', async () => {
@@ -109,7 +109,7 @@ describe('spentLinks', () => {
     await took.promise
 
     let waited: boolean | null = null
-    links.settled().then(answer => {
+    links.waitedForAnotherEntry().then(answer => {
       waited = answer
     })
     await new Promise(resolve => setImmediate(resolve))

@@ -25,6 +25,7 @@ import {
   storeDirectorySecrets,
   syncCursorSecrets,
 } from './deviceSecrets'
+import { accountInQuestion } from './accountInQuestion'
 import { getErrorMessage } from './errors'
 import { logEvent } from './log'
 import { lookForWhatArrived } from './lookForWhatArrived'
@@ -62,6 +63,14 @@ export async function lookForWhatArrivedHere(): Promise<WhatWoke | null> {
   const blind = (reason: string) => {
     logEvent('info', 'MESSAGR_WAKE_BLIND', { reason })
     return null
+  }
+
+  // NOT WHILE THIS DEVICE DECIDES WHETHER TO LEAVE ITS ACCOUNT (#304). A
+  // machine started here would be the account in question's, and the next
+  // account's would then be refused as a second one. See
+  // `accountInQuestion.ts`.
+  if (accountInQuestion()) {
+    return blind('this device is deciding whether to leave its account')
   }
 
   const where = await readStoreDirectory(storeDirectorySecrets)

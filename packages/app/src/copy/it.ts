@@ -226,19 +226,20 @@ export const it: Readonly<Record<CopyKey, string>> = {
   leave_title: 'Questo invito porta a un altro server',
   leave_lead:
     'Per seguirlo, questo dispositivo deve lasciare l’account che porta. Ecco cosa cambia, prima di decidere.',
-  leave_fact_gone: 'Questo account lascia il dispositivo',
+  leave_fact_gone: 'Poi, questo account lascia il dispositivo',
   'leave_gone_body %@':
-    'Questo dispositivo dimentica il suo account su %@. Le sue conversazioni e le chiavi che le aprono spariscono da qui.',
+    'Ottenuto il nuovo account, questo dispositivo dimentica il suo account su %@, le sue conversazioni e le chiavi che le aprono.',
   leave_fact_stays: 'Ciò che resta altrove',
   leave_stays_body:
     'L’account esiste ancora sul suo server. Le persone a cui scriveva conservano le loro conversazioni con lei.',
-  leave_fact_link: 'Un account nuovo, con questo link',
+  leave_fact_link: 'Prima, un account nuovo con questo link',
   'leave_link_body %@':
-    'Poi questo dispositivo entra su %@ con un account nuovo, come un telefono che non ne aveva.',
+    'Questo dispositivo chiede prima un account nuovo a %@. Se non lo ottiene, non cambia nulla e il suo account resta qui.',
   leave_final:
-    'Questo dispositivo non potrà più tornare al vecchio account. I messaggi ricevuti prima non si potranno più leggere qui.',
+    'Ottenuto il nuovo account, questo dispositivo non potrà più tornare a quello vecchio. I messaggi ricevuti prima non si potranno più leggere qui.',
   leave_confirm: 'Sì, lasciare questo account',
   leave_cancel: 'Tenere il mio account',
+  leave_working: 'In corso…',
   promise_thesis: 'La messaggistica che non le chiede nulla.',
   promise_subtitle:
     'Nessun numero, nessun account, nessuna password. Qualcuno la invita, lei scrive.',
@@ -253,7 +254,9 @@ export const it: Readonly<Record<CopyKey, string>> = {
   list_invitation_refused:
     'Questo invito non ha potuto essere usato. Chiedetene uno nuovo a chi ve l’ha mandato.',
   list_invitation_elsewhere:
-    'Avete tenuto il vostro account, e questo invito portava a un altro server. Per questo non è stato seguito. Per seguirlo, riaprite il link.',
+    'Avete tenuto il vostro account, e questo invito portava a un altro server. Per questo non è stato seguito. Per seguirlo, chiudete completamente Messagr e riaprite il link.',
+  list_invitation_reopen:
+    'Questo invito porta a un altro server. Per seguirlo, chiudete completamente Messagr e riaprite il link.',
   'list_invitation_already %@':
     'Avete già una conversazione con %@. È quella che prosegue: l’invito non ne ha aperta una seconda.',
   list_not_in_yet:

@@ -13,8 +13,15 @@ import type { SecretStore } from './sessionStore'
  */
 type Whose = 'account' | 'device'
 
-/** Every entry declared the account's, in the order declared: the session first. */
-const accountEntries: string[] = []
+/**
+ * Every entry, with its service and whose it is, in the order declared: the
+ * session first. Keyed by the store itself, so leaving can name the entries it
+ * spares with the very objects it was handed.
+ */
+const entries = new Map<
+  SecretStore,
+  { readonly service: string; readonly whose: Whose }
+>()
 
 /**
  * A named entry in the operating system's own keystore.
@@ -49,8 +56,7 @@ const accountEntries: string[] = []
  * own note says why it is the answer.
  */
 function keychainStore(service: string, whose: Whose): SecretStore {
-  if (whose === 'account') accountEntries.push(service)
-  return {
+  const store: SecretStore = {
     read: async () => {
       const held = await Keychain.getGenericPassword({ service })
       return held === false ? null : held.password
@@ -62,6 +68,8 @@ function keychainStore(service: string, whose: Whose): SecretStore {
       })
     },
   }
+  entries.set(store, { service, whose })
+  return store
 }
 
 /**
@@ -335,22 +343,40 @@ export const storeDirectorySecrets = keychainStore(
 )
 
 /**
- * Erases every entry declared the account's, and none of the device's. #304:
- * what leaving an account takes from the keystore.
+ * Erases every entry declared the account's except those in `keeping`, and
+ * none of the device's. #304: what leaving an account takes from the keystore.
+ *
+ * `keeping` is what the next account has already written -- its session and
+ * its sign-up marker -- which belong to it by then, and not to the account
+ * being left. `entry.ts` says why they are written before this runs.
+ */
+export async function forgetAccountSecrets(
+  keeping: readonly SecretStore[],
+): Promise<{ readonly forgotten: number; readonly refused: number }> {
+  const theAccounts = [...entries]
+    .filter(([, entry]) => entry.whose === 'account')
+    .map(([store]) => store)
+    .filter(store => !keeping.includes(store))
+  return forgetSecrets(theAccounts)
+}
+
+/**
+ * Erases the entries named, which must be entries this module declared.
  *
  * Every entry is attempted whatever the one before answered, and one the
- * keystore would not erase is counted rather than retried. The session goes
- * first, so a device interrupted halfway holds no account to return to.
+ * keystore would not erase -- or one this module never declared -- is counted
+ * rather than retried.
  */
-export async function forgetAccountSecrets(): Promise<{
-  readonly forgotten: number
-  readonly refused: number
-}> {
+export async function forgetSecrets(
+  stores: readonly SecretStore[],
+): Promise<{ readonly forgotten: number; readonly refused: number }> {
   let forgotten = 0
   let refused = 0
-  for (const service of accountEntries) {
+  for (const store of stores) {
+    const entry = entries.get(store)
     try {
-      await Keychain.resetGenericPassword({ service })
+      if (entry === undefined) throw new Error('not an entry of this keystore')
+      await Keychain.resetGenericPassword({ service: entry.service })
       forgotten += 1
     } catch {
       refused += 1

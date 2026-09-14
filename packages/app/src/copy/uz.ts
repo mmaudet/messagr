@@ -244,19 +244,20 @@ export const uz: Readonly<Record<CopyKey, string>> = {
   leave_title: 'Bu taklif boshqa serverga olib boradi',
   leave_lead:
     'Unga amal qilish uchun bu qurilma oʻzidagi hisobdan chiqishi kerak. Qaror qilishdan oldin nima oʻzgarishini koʻring.',
-  leave_fact_gone: 'Bu hisob qurilmadan chiqadi',
+  leave_fact_gone: 'Keyin bu hisob qurilmadan chiqadi',
   'leave_gone_body %@':
-    'Bu qurilma %@ serveridagi hisobingizni unutadi. Uning suhbatlari va ularni ochadigan kalitlar bu yerdan yoʻqoladi.',
+    'Yangi hisob olingach, bu qurilma %@ serveridagi hisobingizni, uning suhbatlarini va ularni ochadigan kalitlarni unutadi.',
   leave_fact_stays: 'Boshqa joyda qoladigan narsa',
   leave_stays_body:
     'Hisob oʻz serverida qoladi. Siz yozishgan odamlar siz bilan suhbatlarini saqlab qoladi.',
-  leave_fact_link: 'Bu havola orqali yangi hisob',
+  leave_fact_link: 'Avval, bu havola orqali yangi hisob',
   'leave_link_body %@':
-    'Keyin bu qurilma %@ serveriga yangi hisob bilan kiradi, xuddi hisobi boʻlmagan telefon kabi.',
+    'Bu qurilma avval %@ serveridan yangi hisob soʻraydi. Uni olmasa, hech narsa oʻzgarmaydi va hisobingiz shu yerda qoladi.',
   leave_final:
-    'Bu qurilma eski hisobga qaytib kira olmaydi. Avval kelgan xabarlarni bu yerda endi oʻqib boʻlmaydi.',
+    'Yangi hisob olingach, bu qurilma eski hisobga qaytib kira olmaydi. Avval kelgan xabarlarni bu yerda endi oʻqib boʻlmaydi.',
   leave_confirm: 'Ha, bu hisobdan chiqish',
   leave_cancel: 'Hisobimni saqlash',
+  leave_working: 'Bajarilmoqda…',
   promise_thesis: 'Sizdan hech narsa soʻramaydigan messenjer.',
   promise_subtitle:
     'Raqam yoʻq, hisob yoʻq, parol yoʻq. Kimdir sizni taklif qiladi — siz yozasiz.',
@@ -272,7 +273,9 @@ export const uz: Readonly<Record<CopyKey, string>> = {
   list_invitation_refused:
     'Bu taklifdan foydalanib boʻlmadi. Uni yuborgan odamdan yangisini soʻrang.',
   list_invitation_elsewhere:
-    'Siz hisobingizni saqlab qoldingiz, bu taklif esa boshqa serverga olib borardi. Shuning uchun unga amal qilinmadi. Unga amal qilish uchun havolani qayta oching.',
+    'Siz hisobingizni saqlab qoldingiz, bu taklif esa boshqa serverga olib borardi. Shuning uchun unga amal qilinmadi. Unga amal qilish uchun Messagr ilovasini butunlay yoping, soʻng havolani qayta oching.',
+  list_invitation_reopen:
+    'Bu taklif boshqa serverga olib boradi. Unga amal qilish uchun Messagr ilovasini butunlay yoping, soʻng havolani qayta oching.',
   'list_invitation_already %@':
     'Sizda %@ bilan suhbat allaqachon bor. Oʻsha davom etadi: taklif ikkinchisini ochmadi.',
   list_not_in_yet:

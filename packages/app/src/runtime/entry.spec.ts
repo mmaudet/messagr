@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest'
 
 import type { ServicePoster } from './claimInvitation'
-import { enterWithASession } from './entry'
-import type { RestoreCredentials } from './sessionCredentials'
+import { enterWithASession, type OtherServer } from './entry'
+import type { Departure } from './leaveAccount'
 import type { SecretStore } from './sessionStore'
 
 const SESSION = {
@@ -38,10 +38,7 @@ const refusing: ServicePoster = {
 
 /**
  * A poster that records every call it is asked to make, so a test can assert
- * not only what came back but whether anything was sent at all. The refusal
- * this module now makes for a link into another instance is a refusal to make
- * a request, and only a poster that would have noticed the request can prove
- * it was not made.
+ * not only what came back but whether anything was sent at all.
  */
 function recordingPoster(
   answer: { status: number; body: string } = { status: 200, body: '{}' },
@@ -56,39 +53,50 @@ function recordingPoster(
   }
 }
 
-/** An invitation into a server the held account does not live on. */
-const ELSEWHERE = 'https://other.example/i/abc123'
-
-/**
- * Everything a launch sends, whichever door it leaves by: the invitation
- * service's poster, and the calls leaving an account makes to a homeserver.
- *
- * One list rather than two, because the question a test about credentials
- * asks is where each request went and what it carried -- and a request that
- * went out of a door the test was not watching would answer it wrongly.
- */
-function wire(claim: { status: number; body: string } = GRANTED_ELSEWHERE) {
-  const calls: Array<{ url: string; body: string; bearer?: string }> = []
+/** The sign-up marker's own store, which every entry now writes through. */
+function markerStore() {
+  const written: string[] = []
   return {
-    calls,
-    poster: {
-      post: async (url: string, body: string, bearer?: string) => {
-        calls.push({ url, body, bearer })
-        return claim
+    written,
+    secrets: {
+      read: async () => written[written.length - 1] ?? null,
+      write: async (value: string) => {
+        written.push(value)
       },
     },
-    homeserver: (baseUrl: string) => ({
-      post: async (path: string, body: unknown, bearer?: string) => {
-        calls.push({
-          url: `${baseUrl}${path}`,
-          body: JSON.stringify(body),
-          bearer,
-        })
-        return { status: 200, body: {} }
-      },
-    }),
   }
 }
+
+/**
+ * For an entry that never reaches the question. Asking fails the test, and so
+ * does anything leaving would do: an entry that should not have asked, and
+ * did, is exactly what these tests are for noticing.
+ */
+const nobodyAsked: { readonly otherServer: OtherServer } = {
+  otherServer: {
+    ask: async () => {
+      throw new Error('this entry was not supposed to ask anybody anything')
+    },
+    departure: {
+      pusher: async () => null,
+      stopWaking: async () => {
+        throw new Error('this entry was not supposed to leave its account')
+      },
+      logOut: async () => {
+        throw new Error('this entry was not supposed to leave its account')
+      },
+      forgetPassword: async () => {
+        throw new Error('this entry was not supposed to forget a password')
+      },
+      forget: async () => {
+        throw new Error('this entry was not supposed to forget an account')
+      },
+    },
+  },
+}
+
+/** An invitation into a server the held account does not live on. */
+const ELSEWHERE = 'https://other.example/i/abc123'
 
 /** The account the other server hands a device that claims its link. */
 const ENTERED_ELSEWHERE = {
@@ -108,76 +116,125 @@ const GRANTED_ELSEWHERE = {
   }),
 }
 
+type Call = { url: string; body: string; bearer?: string }
+
 /**
- * A device holding one account, and what forgetting that account does to it.
+ * A device holding one account, and everything a launch can send from it.
  *
- * The pushkey lives here too, and goes with the account, so a test can tell
- * whether it was read before it was forgotten.
+ * The keystore is modelled entry by entry -- the session, the sign-up marker,
+ * the password, the pushkey, and one entry standing for everything else the
+ * account keeps -- because what these tests ask is which entries are still
+ * there afterwards, and whose they are.
+ *
+ * Every request leaves through `calls`, whichever door it takes: the
+ * invitation service's poster, or the pusher and session calls leaving makes
+ * on the server named by the account they carry. One list, so a request cannot
+ * escape an assertion by taking the other door.
  */
-function holding(session: RestoreCredentials) {
-  let kept: string | null = JSON.stringify(session)
-  let pushkey: string | null = 'pushkey-of-this-device'
+function device(
+  options: {
+    readonly claim?: { status: number; body: string }
+    readonly sessionWrite?: 'refused'
+  } = {},
+) {
+  const calls: Call[] = []
   const forgotten: string[] = []
+  // What the password entry held at the moment a session was written.
+  const passwordWhenSessionKept: Array<string | null> = []
+  let session: string | null = JSON.stringify(SESSION)
+  let marker: string | null = null
+  let password: string | null = 'old-password'
+  let pushkey: string | null = 'pushkey-of-this-device'
+  let rest: string | null = 'the-rest-of-the-old-account'
+
   const secrets: SecretStore = {
-    read: async () => kept,
+    read: async () => session,
     write: async value => {
-      kept = value
+      if (options.sessionWrite === 'refused') throw new Error('keystore full')
+      passwordWhenSessionKept.push(password)
+      session = value
     },
   }
-  return {
-    secrets,
-    forgotten,
-    kept: () => (kept === null ? null : (JSON.parse(kept) as unknown)),
+  const signUp: SecretStore = {
+    read: async () => marker,
+    write: async value => {
+      marker = value
+    },
+  }
+  const poster: ServicePoster = {
+    post: async (url, body, bearer) => {
+      calls.push({ url, body, bearer })
+      return options.claim ?? GRANTED_ELSEWHERE
+    },
+  }
+  const departure: Departure = {
     pusher: async () =>
-      pushkey === null ? null : { token: pushkey, road: 'ios' as const },
-    forget: async (account: RestoreCredentials) => {
+      pushkey === null ? null : { token: pushkey, road: 'ios' },
+    stopWaking: async (account, pusher) => {
+      calls.push({
+        url: `${account.baseUrl}/_matrix/client/v3/pushers/set`,
+        body: JSON.stringify({ pushkey: pusher.token, kind: null }),
+        bearer: account.accessToken,
+      })
+    },
+    logOut: async account => {
+      calls.push({
+        url: `${account.baseUrl}/_matrix/client/v3/logout`,
+        body: '{}',
+        bearer: account.accessToken,
+      })
+    },
+    forgetPassword: async () => {
+      password = null
+    },
+    forget: async (account, keeping) => {
       forgotten.push(account.userId)
-      kept = null
+      if (!keeping.includes(secrets)) session = null
+      if (!keeping.includes(signUp)) marker = null
+      password = null
       pushkey = null
+      rest = null
     },
   }
-}
 
-/** The answer that changes nothing. */
-const stays = async () => 'stay' as const
-
-/** The answer that leaves the account for the link. */
-const leaves = async () => 'leave' as const
-
-/**
- * For an entry that never reaches the question. Asking fails the test, and so
- * does anything leaving would do: an entry that should not have asked, and
- * did, is exactly what these tests are for noticing.
- */
-const nobodyAsked = {
-  ask: async (): Promise<'leave' | 'stay'> => {
-    throw new Error('this entry was not supposed to ask anybody anything')
-  },
-  leaving: {
-    homeserver: () => ({
-      post: async (): Promise<{ status: number; body: unknown }> => {
-        throw new Error('this entry was not supposed to leave its account')
-      },
-    }),
-    pusher: async () => null,
-    forget: async () => {
-      throw new Error('this entry was not supposed to forget an account')
-    },
-  },
-}
-
-/** The sign-up marker's own store, which every entry now writes through. */
-function markerStore() {
-  const written: string[] = []
   return {
-    written,
-    secrets: {
-      read: async () => written[written.length - 1] ?? null,
-      write: async (value: string) => {
-        written.push(value)
-      },
-    },
+    calls,
+    forgotten,
+    passwordWhenSessionKept,
+    secrets,
+    signUp,
+    poster,
+    departure,
+    held: () => ({
+      session: session === null ? null : (JSON.parse(session) as unknown),
+      marker,
+      password,
+      pushkey,
+      rest,
+    }),
   }
+}
+
+/** The question, answered once, remembering the two servers it named. */
+function answering(answer: 'leave' | 'stay', here: ReturnType<typeof device>) {
+  const asked: Array<{ account: string; link: string }> = []
+  const otherServer: OtherServer = {
+    ask: async hosts => {
+      asked.push(hosts)
+      return answer
+    },
+    departure: here.departure,
+  }
+  return { asked, otherServer }
+}
+
+/** Everything the old account left on the device, as it was before. */
+const UNTOUCHED = {
+  session: SESSION,
+  marker: null,
+  password: 'old-password',
+  pushkey: 'pushkey-of-this-device',
+  rest: 'the-rest-of-the-old-account',
 }
 
 describe('enterWithASession', () => {
@@ -218,118 +275,6 @@ describe('enterWithASession', () => {
     // Measured against the bench before it was sent: `401 M_UNAUTHORIZED`,
     // "unauthenticated caller".
     expect(bearer).toBe(SESSION.accessToken)
-  })
-
-  it('keeps the account when the person stays, and says why the link was not followed', async () => {
-    // #304. A link into another server used to be refused outright, and a
-    // device carrying an account from a server it had outlived could follow
-    // no invitation at all -- a new link was refused the same way. Now the
-    // person is asked, and staying is the answer that changes nothing: the
-    // account and its conversations stay. What is sent is the rule of #279,
-    // below.
-    const sent = wire()
-    const device = holding(SESSION)
-    const result = await enterWithASession({
-      secrets: device.secrets,
-      poster: sent.poster,
-      link: async () => ELSEWHERE,
-      signUp: markerStore().secrets,
-      ask: stays,
-      leaving: { ...device, homeserver: sent.homeserver },
-    })
-    expect(result).toEqual({
-      entered: true,
-      session: SESSION,
-      claimed: false,
-      invitation: { kind: 'elsewhere' },
-    })
-    expect(device.kept()).toEqual(SESSION)
-  })
-
-  it('leaves the account, then claims the link as a device with no account', async () => {
-    // The other answer. What this device keeps of the old account is
-    // forgotten first, and the link is then claimed the way a telephone that
-    // never had an account claims one: a new account, its password carried
-    // out for #190, the sign-up marker written -- the ordinary first launch.
-    const sent = wire()
-    const device = holding(SESSION)
-    const marker = markerStore()
-    const result = await enterWithASession({
-      secrets: device.secrets,
-      poster: sent.poster,
-      link: async () => ELSEWHERE,
-      signUp: marker.secrets,
-      ask: leaves,
-      leaving: { ...device, homeserver: sent.homeserver },
-    })
-    expect(result).toEqual({
-      entered: true,
-      session: ENTERED_ELSEWHERE,
-      claimed: true,
-      password: 'drawn-elsewhere',
-      left: { closing: expect.any(Promise) },
-    })
-    expect(device.forgotten).toEqual([SESSION.userId])
-    // Kept after the old account was forgotten, not before: forgetting it
-    // afterwards would have taken the new one too.
-    expect(device.kept()).toEqual(ENTERED_ELSEWHERE)
-    expect(marker.written).toEqual(['signing-up'])
-  })
-
-  it('names both servers when it asks', async () => {
-    // Which two servers is the whole of what somebody decides on, so the
-    // question carries them: the one this device's account lives on, and the
-    // one the link leads to. Hosts as a person reads them, not URLs.
-    const sent = wire()
-    const device = holding(SESSION)
-    const asked: Array<{ account: string; link: string }> = []
-    await enterWithASession({
-      secrets: device.secrets,
-      poster: sent.poster,
-      link: async () => ELSEWHERE,
-      signUp: markerStore().secrets,
-      ask: async hosts => {
-        asked.push(hosts)
-        return 'stay'
-      },
-      leaving: { ...device, homeserver: sent.homeserver },
-    })
-    expect(asked).toEqual([{ account: 'messagr.eu', link: 'other.example' }])
-  })
-
-  it('asks about another server reached through the application scheme too', async () => {
-    // The application's own scheme names a host exactly as https does, so it
-    // is held to the same rule: a link to another instance is a question
-    // whichever scheme carried it.
-    const sent = wire()
-    const device = holding(SESSION)
-    const result = await enterWithASession({
-      secrets: device.secrets,
-      poster: sent.poster,
-      link: async () => 'messagr://other.example/i/abc123',
-      signUp: markerStore().secrets,
-      ask: stays,
-      leaving: { ...device, homeserver: sent.homeserver },
-    })
-    expect(sent.calls).toEqual([])
-    expect(result.entered && result.invitation).toEqual({ kind: 'elsewhere' })
-  })
-
-  it('asks about the account server named on a different port', async () => {
-    // A bench on another port is another instance. The host matching is not
-    // enough on its own.
-    const sent = wire()
-    const device = holding(SESSION)
-    const result = await enterWithASession({
-      secrets: device.secrets,
-      poster: sent.poster,
-      link: async () => 'https://messagr.eu:8448/i/abc123',
-      signUp: markerStore().secrets,
-      ask: stays,
-      leaving: { ...device, homeserver: sent.homeserver },
-    })
-    expect(sent.calls).toEqual([])
-    expect(result.entered && result.invitation).toEqual({ kind: 'elsewhere' })
   })
 
   it('spends a link that names the account server through the application scheme', async () => {
@@ -585,49 +530,248 @@ describe('enterWithASession', () => {
   })
 })
 
+describe('a link into another server (#304)', () => {
+  it('keeps the account when the person stays, and says why the link was not followed', async () => {
+    // A link into another server used to be refused outright, and a device
+    // carrying an account from a server it had outlived could follow no
+    // invitation at all. Now the person is asked, and staying is the answer
+    // that changes nothing.
+    const here = device()
+    const { otherServer } = answering('stay', here)
+    const result = await enterWithASession({
+      secrets: here.secrets,
+      poster: here.poster,
+      link: async () => ELSEWHERE,
+      signUp: here.signUp,
+      otherServer,
+    })
+    expect(result).toEqual({
+      entered: true,
+      session: SESSION,
+      claimed: false,
+      invitation: { kind: 'elsewhere' },
+    })
+    expect(here.held()).toEqual(UNTOUCHED)
+  })
+
+  it('names both servers when it asks', async () => {
+    // Which two servers is the whole of what somebody decides on, so the
+    // question carries them: the one this device's account lives on, and the
+    // one the link leads to. Hosts as a person reads them, not URLs.
+    const here = device()
+    const { asked, otherServer } = answering('stay', here)
+    await enterWithASession({
+      secrets: here.secrets,
+      poster: here.poster,
+      link: async () => ELSEWHERE,
+      signUp: here.signUp,
+      otherServer,
+    })
+    expect(asked).toEqual([{ account: 'messagr.eu', link: 'other.example' }])
+  })
+
+  it('asks about another server reached through the application scheme too', async () => {
+    // The application's own scheme names a host exactly as https does, so it
+    // is held to the same rule.
+    const here = device()
+    const { otherServer } = answering('stay', here)
+    const result = await enterWithASession({
+      secrets: here.secrets,
+      poster: here.poster,
+      link: async () => 'messagr://other.example/i/abc123',
+      signUp: here.signUp,
+      otherServer,
+    })
+    expect(result.entered && result.invitation).toEqual({ kind: 'elsewhere' })
+  })
+
+  it('asks about the account server named on a different port', async () => {
+    // A bench on another port is another instance. The host matching is not
+    // enough on its own.
+    const here = device()
+    const { otherServer } = answering('stay', here)
+    const result = await enterWithASession({
+      secrets: here.secrets,
+      poster: here.poster,
+      link: async () => 'https://messagr.eu:8448/i/abc123',
+      signUp: here.signUp,
+      otherServer,
+    })
+    expect(result.entered && result.invitation).toEqual({ kind: 'elsewhere' })
+  })
+
+  it('asks nothing about a link that arrived while the application was running, and says to reopen it', async () => {
+    // Decided on 14 September 2026: the account changes only at a cold
+    // launch. A process already running holds that account's crypto machine,
+    // and a second machine in the same process is not something this
+    // application does. So nothing is asked, forgotten or claimed, and the
+    // list says to close Messagr completely and open the link again.
+    const here = device()
+    const result = await enterWithASession({
+      secrets: here.secrets,
+      poster: here.poster,
+      link: async () => ELSEWHERE,
+      signUp: here.signUp,
+      otherServer: null,
+    })
+    expect(result).toEqual({
+      entered: true,
+      session: SESSION,
+      claimed: false,
+      invitation: { kind: 'reopen' },
+    })
+    expect(here.calls).toEqual([])
+    expect(here.held()).toEqual(UNTOUCHED)
+  })
+
+  it('leaves the old account untouched when the claim is refused, and tells the old server nothing', async () => {
+    // CLAIMED BEFORE ANYTHING ELSE (14 September 2026). A link that turns out
+    // to be spent, revoked or unreachable must not cost somebody the account
+    // they had: nothing is forgotten until another account exists to replace
+    // it, and the list says the invitation could not be used.
+    const here = device({ claim: { status: 404, body: '{}' } })
+    const { otherServer } = answering('leave', here)
+    const result = await enterWithASession({
+      secrets: here.secrets,
+      poster: here.poster,
+      link: async () => ELSEWHERE,
+      signUp: here.signUp,
+      otherServer,
+    })
+    expect(result).toEqual({
+      entered: true,
+      session: SESSION,
+      claimed: false,
+      invitation: { kind: 'refused', reason: 'this invitation cannot be used' },
+    })
+    expect(here.held()).toEqual(UNTOUCHED)
+    expect(here.calls.map(call => call.url)).toEqual([
+      'https://other.example/_messagr/invitations/claim',
+    ])
+  })
+
+  it('forgets the old account once the claim succeeds, and keeps the new one', async () => {
+    // The new account is kept first -- its token is spent, and losing it
+    // would cost the invitation -- and what the old account left is forgotten
+    // afterwards, sparing the session and the marker the new account has just
+    // written. Its password is carried out, and kept by the caller as on
+    // every first launch. The old server is told last, with what was held in
+    // memory.
+    const here = device()
+    const { otherServer } = answering('leave', here)
+    const result = await enterWithASession({
+      secrets: here.secrets,
+      poster: here.poster,
+      link: async () => ELSEWHERE,
+      signUp: here.signUp,
+      otherServer,
+    })
+    expect(result).toEqual({
+      entered: true,
+      session: ENTERED_ELSEWHERE,
+      claimed: true,
+      password: 'drawn-elsewhere',
+      left: { closing: expect.any(Promise) },
+    })
+    expect(here.held()).toEqual({
+      session: ENTERED_ELSEWHERE,
+      marker: 'signing-up',
+      password: null,
+      pushkey: null,
+      rest: null,
+    })
+    await (result.entered ? result.left?.closing : undefined)
+    expect(here.calls.map(call => [call.url, call.bearer])).toEqual([
+      ['https://other.example/_messagr/invitations/claim', undefined],
+      ['https://messagr.eu/_matrix/client/v3/pushers/set', 'syt_secret'],
+      ['https://messagr.eu/_matrix/client/v3/logout', 'syt_secret'],
+    ])
+  })
+
+  it('has already forgotten the old password when it keeps the new session', async () => {
+    // A stop between the two would otherwise leave the old account's password
+    // beside the new account's session, and a launch that then finds no crypto
+    // store re-enters with the password it holds -- on the new account's
+    // server. That is #279 broken by a crash, so the password goes first.
+    const here = device()
+    const { otherServer } = answering('leave', here)
+    await enterWithASession({
+      secrets: here.secrets,
+      poster: here.poster,
+      link: async () => ELSEWHERE,
+      signUp: here.signUp,
+      otherServer,
+    })
+    expect(here.passwordWhenSessionKept).toEqual([null])
+  })
+
+  it('forgets nothing when the new session could not be kept', async () => {
+    // A keystore that refuses the new session keeps the old one, and the old
+    // account is then the only one the next launch can find. Forgetting what
+    // it left, or ending its session, would leave that launch nothing.
+    const here = device({ sessionWrite: 'refused' })
+    const { otherServer } = answering('leave', here)
+    const result = await enterWithASession({
+      secrets: here.secrets,
+      poster: here.poster,
+      link: async () => ELSEWHERE,
+      signUp: here.signUp,
+      otherServer,
+    })
+    expect(result).toEqual({
+      entered: true,
+      session: ENTERED_ELSEWHERE,
+      claimed: true,
+      kept: false,
+      password: 'drawn-elsewhere',
+    })
+    expect(here.forgotten).toEqual([])
+    expect(here.calls.map(call => call.url)).toEqual([
+      'https://other.example/_messagr/invitations/claim',
+    ])
+  })
+})
+
 describe('the rule of #279, whichever the answer', () => {
   // AN ACCOUNT'S CREDENTIALS GO TO ITS OWN SERVER AND TO NO OTHER. #304 turned
   // the refusal into a question, and this is the part that must not move with
   // it: neither answer may carry the held account's token, or any
   // authenticated request at all, towards the server the link names.
   //
-  // Read off one wire that sees every door a request can leave by -- the
-  // invitation service's poster and the homeserver calls leaving makes -- so a
+  // Read off one list that sees every door a request can leave by, so a
   // request cannot escape the assertion by taking the other door.
 
   it('lets no request leave when the person stays', async () => {
-    const sent = wire()
-    const device = holding(SESSION)
+    const here = device()
+    const { otherServer } = answering('stay', here)
     await enterWithASession({
-      secrets: device.secrets,
-      poster: sent.poster,
+      secrets: here.secrets,
+      poster: here.poster,
       link: async () => ELSEWHERE,
-      signUp: markerStore().secrets,
-      ask: stays,
-      leaving: { ...device, homeserver: sent.homeserver },
+      signUp: here.signUp,
+      otherServer,
     })
-    expect(sent.calls).toEqual([])
+    expect(here.calls).toEqual([])
   })
 
   it('sends nothing authenticated towards the link when the person leaves, and the old token only home', async () => {
-    const sent = wire()
-    const device = holding(SESSION)
+    const here = device()
+    const { otherServer } = answering('leave', here)
     const result = await enterWithASession({
-      secrets: device.secrets,
-      poster: sent.poster,
+      secrets: here.secrets,
+      poster: here.poster,
       link: async () => ELSEWHERE,
-      signUp: markerStore().secrets,
-      ask: leaves,
-      leaving: { ...device, homeserver: sent.homeserver },
+      signUp: here.signUp,
+      otherServer,
     })
     // Every request leaving started, answered, so none is still to come.
-    await result.left?.closing
+    await (result.entered ? result.left?.closing : undefined)
 
-    const carriesTheAccount = (call: { body: string; bearer?: string }) =>
+    const carriesTheAccount = (call: Call) =>
       call.bearer === SESSION.accessToken ||
       call.body.includes(SESSION.accessToken)
 
-    const towardsTheLink = sent.calls.filter(call =>
+    const towardsTheLink = here.calls.filter(call =>
       call.url.startsWith('https://other.example/'),
     )
     expect(
@@ -636,14 +780,14 @@ describe('the rule of #279, whichever the answer', () => {
       ),
     ).toEqual([])
     expect(
-      sent.calls
+      here.calls
         .filter(carriesTheAccount)
         .filter(call => !call.url.startsWith('https://messagr.eu/')),
     ).toEqual([])
 
-    // And the wire saw both sides, so the two assertions above are about
+    // And the list saw both sides, so the two assertions above are about
     // requests that were made rather than about a silence.
-    expect(sent.calls.map(call => call.url)).toEqual(
+    expect(here.calls.map(call => call.url)).toEqual(
       expect.arrayContaining([
         'https://messagr.eu/_matrix/client/v3/logout',
         'https://other.example/_messagr/invitations/claim',

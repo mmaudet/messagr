@@ -46,7 +46,7 @@ export interface SpentLinks {
     run: (link: LinkSource) => Promise<T>,
   ) => Promise<T>
   /**
-   * Waits until no entry holds a link, and answers whether it had to.
+   * Waits until no entry holds a link, and answers whether another one did.
    *
    * #304. Two runs of the launch overlap when one link is delivered twice, and
    * the run handed no link restores the session it found while the other may
@@ -58,7 +58,7 @@ export interface SpentLinks {
    * `false` on almost every launch: one run, whose own mark was lifted when
    * its entry answered, and nothing for the caller to read again.
    */
-  readonly settled: () => Promise<boolean>
+  readonly waitedForAnotherEntry: () => Promise<boolean>
 }
 
 export function spentLinks(): SpentLinks {
@@ -88,7 +88,7 @@ export function spentLinks(): SpentLinks {
         }
       }
     },
-    settled: async () => {
+    waitedForAnotherEntry: async () => {
       if (underway.size === 0) return false
       await new Promise<void>(release => waiting.push(release))
       return true

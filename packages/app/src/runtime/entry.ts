@@ -1,11 +1,12 @@
 import {
   claimForExistingAccount,
   claimInvitation,
+  type ClaimResult,
   type ServicePoster,
 } from './claimInvitation'
 import type { LinkSource } from './incomingLink'
 import { parseInvitationLink, type InvitationLink } from './invitationLink'
-import { leaveAccount, type Closed, type Leaving } from './leaveAccount'
+import { leaveAccount, type Closed, type Departure } from './leaveAccount'
 import { hostShown, sameOrigin } from './sameOrigin'
 import type { RestoreCredentials } from './sessionCredentials'
 import { loadSession, saveSession, type SecretStore } from './sessionStore'
@@ -58,8 +59,8 @@ export interface EntryDeps {
    */
   readonly wait?: (ms: number) => Promise<void>
   /**
-   * Put to the person when an invitation leads to a server other than the one
-   * this device's account lives on: leave that account for it, or stay.
+   * What following a link into another server needs, or `null` when this
+   * launch cannot follow one.
    *
    * # WHY A QUESTION, WHERE THERE WAS A REFUSAL
    *
@@ -72,9 +73,26 @@ export interface EntryDeps {
    * anywhere could leave that account.
    *
    * So the refusal became a question, and both answers keep the rule. Staying
-   * sends nothing anywhere. Leaving closes the account on its own server,
-   * forgets it here, and claims the link as a device with no account would.
-   * Nothing of the old account travels towards the link's host either way.
+   * sends nothing anywhere. Leaving claims the link as a device with no
+   * account would, and only then forgets the old account and tells its
+   * server. Nothing of the old account travels towards the link's host either
+   * way.
+   *
+   * # WHY IT CAN BE NULL
+   *
+   * Decided on 14 September 2026: the account changes only at a cold launch.
+   * A process that is already running holds the account's crypto machine, and
+   * the next account would need a second one beside it. A link that arrives
+   * while Messagr is open is therefore not asked about: the list says to close
+   * Messagr completely and open the link again, and that launch asks.
+   */
+  readonly otherServer: OtherServer | null
+}
+
+/** What following a link into another server needs. See `EntryDeps.otherServer`. */
+export interface OtherServer {
+  /**
+   * Put to the person: leave this device's account for the link, or stay.
    *
    * NOTHING CONTINUES UNTIL IT IS ANSWERED, and not by courtesy: this is
    * awaited inside entry, and the reinstall's re-entry and the pump that
@@ -86,8 +104,8 @@ export interface EntryDeps {
     /** The server the link leads to. */
     readonly link: string
   }) => Promise<'leave' | 'stay'>
-  /** What leaving the account needs, when that is the answer. See `leaveAccount.ts`. */
-  readonly leaving: Leaving
+  /** What leaving the old account needs, once the link has been claimed. */
+  readonly departure: Departure
 }
 
 /**
@@ -124,6 +142,13 @@ export type InvitationOutcome =
    * followed.
    */
   | { readonly kind: 'elsewhere' }
+  /**
+   * For a server other than this account's, and it arrived while Messagr was
+   * already running. Nothing was asked, sent or forgotten: the account changes
+   * only at a cold launch, so the list says to close Messagr completely and
+   * open the link again.
+   */
+  | { readonly kind: 'reopen' }
 
 export type EntryResult =
   | {
@@ -170,26 +195,17 @@ export type EntryResult =
        */
       readonly password?: string
       /**
-       * Present only when this launch left the account the device held, for a
-       * link into another server. `closing` is what became of that account on
-       * its own server, and it settles whenever that server answers -- the
-       * launch does not wait for it.
+       * Present only when this launch left the account the device held for a
+       * link into another server, after claiming that link. `closing` is what
+       * became of the old account on its own server, and it settles whenever
+       * that server answers -- the launch does not wait for it.
        */
       readonly left?: { readonly closing: Promise<Closed> }
     }
-  | {
-      readonly entered: false
-      readonly reason: string
-      /**
-       * The same, when the claim after leaving did not succeed: the old
-       * account is gone from this device all the same, which is what the
-       * person agreed to, and a screen must not draw it as still there.
-       */
-      readonly left?: { readonly closing: Promise<Closed> }
-    }
+  | { readonly entered: false; readonly reason: string }
 
 export async function enterWithASession(deps: EntryDeps): Promise<EntryResult> {
-  const { secrets, poster, link, wait, ask, leaving } = deps
+  const { secrets, poster, link, wait } = deps
 
   const held = await loadSession(secrets)
   if (held !== null) {
@@ -208,28 +224,11 @@ export async function enterWithASession(deps: EntryDeps): Promise<EntryResult> {
     // is one this account can have no part in, and its token has no business
     // travelling there.
     //
-    // THAT USED TO END IN A REFUSAL, AND NOW IT ENDS IN A QUESTION (#304).
-    // Nothing is sent before the answer, and staying sends nothing at all.
+    // THAT USED TO END IN A REFUSAL, AND NOW IT ENDS IN A QUESTION (#304), put
+    // at a cold launch only. Nothing is sent before the answer, and staying
+    // sends nothing at all.
     if (!sameOrigin(usable.homeserver, held.baseUrl)) {
-      const answer = await ask({
-        account: hostShown(held.baseUrl),
-        link: hostShown(usable.homeserver),
-      })
-      if (answer === 'stay') {
-        return {
-          entered: true,
-          session: held,
-          claimed: false,
-          invitation: { kind: 'elsewhere' },
-        }
-      }
-      // LEFT, THEN CLAIMED AS A DEVICE WITH NO ACCOUNT. The old account is
-      // closed on its own server and forgotten here before the link is
-      // spent, so the session the claim keeps is never the one forgetting
-      // takes. And the claim is the newcomer's: no bearer, because there is no
-      // longer anybody on this device to be.
-      const left = await leaveAccount(leaving, held)
-      return { ...(await claimAsANewcomer(deps, usable)), left }
+      return followAnotherServer(deps, held, usable)
     }
     // SPENT FOR THE ACCOUNT THIS DEVICE ALREADY HAS, never against it. The
     // service draws nobody on this path: it invites `held.userId` into the
@@ -261,28 +260,136 @@ export async function enterWithASession(deps: EntryDeps): Promise<EntryResult> {
     return { entered: false, reason: 'this link is not an invitation' }
   }
 
-  return claimAsANewcomer(deps, invitation)
+  return claimWithoutAccount(deps, invitation)
 }
 
 /**
- * Spends an invitation for a device that holds no account, and keeps what it
- * gets.
+ * A link into another server, offered to a device that holds an account. #304.
  *
- * Its own function because two roads reach it: a device that never had an
- * account, and one that has just left its account for this link. The second
- * must be exactly the first -- the ordinary first launch -- and one body is
- * how that stays true.
+ * # CLAIMED FIRST
+ *
+ * Decided on 14 September 2026. The link is claimed the way a device with no
+ * account claims one -- no bearer, since the account this device holds has no
+ * business on that server -- before anything of the old account is touched. A
+ * refused claim leaves the old account exactly as it was, and its server is
+ * told nothing.
+ *
+ * # THEN, IN THIS ORDER
+ *
+ * 1. The old password is forgotten.
+ * 2. The new account is kept: the sign-up marker, then its session. Its token
+ *    is spent, so the only writes between the claim and its session are the
+ *    password's erasure and the marker a first launch writes there too.
+ * 3. What the old account left is forgotten, sparing the session and the
+ *    marker the new account has just written, and the old server is told --
+ *    the pusher, then the session -- with the credentials held in memory,
+ *    without waiting. See `leaveAccount.ts`.
+ * 4. The caller keeps the new password once entry answers, as on every first
+ *    launch.
+ *
+ * # THE WINDOW A STOP LEAVES OPEN
+ *
+ * Between the claim and the new session, a stop loses the new account: its
+ * token is spent, and the next launch finds the old account, less its
+ * password. A first launch stopped there loses its account the same way.
+ *
+ * Between the new session and the end of step 3, a stop leaves the new account
+ * beside what the old one left: its crypto store under its own device id,
+ * which nothing opens again; its notebook, which the next launch opens for the
+ * new account and draws from until the list is derived again; its sync
+ * cursor, its backup commitment and its pushkey. Its server is never told, so
+ * it keeps the pusher and may still wake this telephone. None of that is a
+ * credential of the old account. Its token lived only in the session the new
+ * one replaced, and its password went first -- which is why it goes first: a
+ * launch that re-enters after a reinstall sends the password it holds to the
+ * server of the session it holds, and with the old password gone that pair can
+ * never be the old password and the new server.
+ *
+ * Between step 3 and the caller keeping the new password, a stop leaves the
+ * new account without one, as it would leave a first launch.
  */
-async function claimAsANewcomer(
+async function followAnotherServer(
+  deps: EntryDeps,
+  held: RestoreCredentials,
+  link: InvitationLink,
+): Promise<EntryResult> {
+  const { secrets, poster, signUp, wait, otherServer } = deps
+
+  if (otherServer === null) {
+    return {
+      entered: true,
+      session: held,
+      claimed: false,
+      invitation: { kind: 'reopen' },
+    }
+  }
+
+  const answer = await otherServer.ask({
+    account: hostShown(held.baseUrl),
+    link: hostShown(link.homeserver),
+  })
+  if (answer === 'stay') {
+    return {
+      entered: true,
+      session: held,
+      claimed: false,
+      invitation: { kind: 'elsewhere' },
+    }
+  }
+
+  const claim = await claimInvitation(poster, link, wait)
+  if (!claim.claimed) {
+    return {
+      entered: true,
+      session: held,
+      claimed: false,
+      invitation: { kind: 'refused', reason: claim.reason },
+    }
+  }
+
+  await otherServer.departure.forgetPassword()
+  const entered = await keepTheClaim(deps, claim)
+  if (entered.kept === false) {
+    // THE OLD ACCOUNT STAYS WHERE IT IS. The keystore refused the new session,
+    // so the old one is still the session the next launch will find, and the
+    // new account lives only as long as this launch. Forgetting what the old
+    // account left, or ending its session, would leave that next launch
+    // nothing to enter with.
+    return entered
+  }
+
+  const left = await leaveAccount(otherServer.departure, held, [
+    secrets,
+    signUp,
+  ])
+  return { ...entered, left }
+}
+
+/** Spends an invitation for a device that holds no account, and keeps what it gets. */
+async function claimWithoutAccount(
   deps: EntryDeps,
   invitation: InvitationLink,
 ): Promise<EntryResult> {
-  const { secrets, poster, signUp, wait } = deps
-
-  const claim = await claimInvitation(poster, invitation, wait)
+  const claim = await claimInvitation(deps.poster, invitation, deps.wait)
   if (!claim.claimed) {
     return { entered: false, reason: claim.reason }
   }
+  return keepTheClaim(deps, claim)
+}
+
+/**
+ * Keeps what a claim handed back: the sign-up marker, then the session.
+ *
+ * Its own function because two roads reach it: a device that never had an
+ * account, and one that has just claimed a link into another server. The
+ * second must keep its claim exactly as the first does -- the ordinary first
+ * launch -- and one body is how that stays true.
+ */
+async function keepTheClaim(
+  deps: EntryDeps,
+  claim: Extract<ClaimResult, { readonly claimed: true }>,
+): Promise<Extract<EntryResult, { readonly entered: true }>> {
+  const { secrets, signUp } = deps
 
   // Before the session is kept, because this is the moment the sign-up
   // began. A marker written after a crash that happened in between would be

@@ -329,19 +329,22 @@ export const fr = {
   leave_title: 'Cette invitation mène à un autre serveur',
   leave_lead:
     'Pour la suivre, cet appareil doit quitter le compte qu’il porte. Voici ce qui change, avant de décider.',
-  leave_fact_gone: 'Ce compte quitte cet appareil',
+  leave_fact_gone: 'Ensuite, ce compte quitte cet appareil',
   'leave_gone_body %@':
-    'Cet appareil oublie votre compte sur %@. Ses conversations et les clés qui les ouvrent disparaissent d’ici.',
+    'Une fois le nouveau compte obtenu, cet appareil oublie votre compte sur %@, ses conversations et les clés qui les ouvrent.',
   leave_fact_stays: 'Ce qui reste ailleurs',
   leave_stays_body:
     'Le compte existe toujours sur son serveur. Vos correspondants gardent leurs conversations avec vous.',
-  leave_fact_link: 'Un compte neuf, par ce lien',
+  // TRUE WHICHEVER WAY THE CLAIM GOES (14 September 2026): the new account is
+  // claimed first, and the old one is forgotten only once it exists.
+  leave_fact_link: 'D’abord, un compte neuf par ce lien',
   'leave_link_body %@':
-    'Cet appareil entre ensuite sur %@ avec un nouveau compte, comme un téléphone qui n’en avait pas.',
+    'Cet appareil demande d’abord un nouveau compte sur %@. S’il ne l’obtient pas, rien ne change et votre compte reste ici.',
   leave_final:
-    'Cet appareil ne pourra plus revenir à l’ancien compte. Les messages reçus avant ne pourront plus être lus ici.',
+    'Une fois le nouveau compte obtenu, cet appareil ne pourra plus revenir à l’ancien. Les messages reçus avant ne pourront plus être lus ici.',
   leave_confirm: 'Oui, quitter ce compte',
   leave_cancel: 'Garder mon compte',
+  leave_working: 'En cours…',
 
   // THE PROMISE, shown once and before anything is asked of anybody.
   //
@@ -385,7 +388,12 @@ export const fr = {
   // same question again, so this says why the link was not followed, and how
   // to follow it after all.
   list_invitation_elsewhere:
-    'Vous avez gardé votre compte, et cette invitation menait à un autre serveur. Elle n’a donc pas été suivie. Pour la suivre, rouvrez le lien.',
+    'Vous avez gardé votre compte, et cette invitation menait à un autre serveur. Elle n’a donc pas été suivie. Pour la suivre, fermez complètement Messagr, puis rouvrez le lien.',
+  // THE FIFTH, when the link into another server arrived while Messagr was
+  // open (#304, 14 September 2026). Only a cold launch changes the account, so
+  // the sentence says how to get one, and nothing was asked, sent or forgotten.
+  list_invitation_reopen:
+    'Cette invitation mène à un autre serveur. Pour la suivre, fermez complètement Messagr, puis rouvrez le lien.',
   list_not_in_yet:
     'Vous n’êtes pas encore entré. Ouvrez le lien d’invitation qu’on vous a envoyé : c’est la seule porte, et l’application ne peut rien faire avant.',
   // #190. Deux issues, deux phrases : revenir sous une identité neuve est la

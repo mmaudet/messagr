@@ -140,7 +140,9 @@ export function ConversationList({
       {/* A LINK INTO ANOTHER SERVER, NOT FOLLOWED BECAUSE THE PERSON KEPT
           THEIR ACCOUNT, has its own sentence (#304). The generic refusal
           would send them to ask for a new link, and a new link into that
-          server would only put the same question again. */}
+          server would only put the same question again. So does one that
+          arrived while Messagr was open: only a cold launch can follow it,
+          and the sentence says how to get one. */}
       {invitation !== null && invitation !== undefined && (
         <Text style={styles.ignored} testID="list-invitation-ignored">
           {invitation.kind === 'used'
@@ -152,7 +154,9 @@ export function ConversationList({
                 )
               : invitation.kind === 'elsewhere'
                 ? t('list_invitation_elsewhere')
-                : t('list_invitation_refused')}
+                : invitation.kind === 'reopen'
+                  ? t('list_invitation_reopen')
+                  : t('list_invitation_refused')}
         </Text>
       )}
       {/* CE QU'UN PARTAGE EST DEVENU, quand il n'est devenu rien.
