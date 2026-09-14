@@ -222,6 +222,10 @@ Par défaut, le script agit en tant que `@exploitation:messagr.eu`, dont les ide
 
 **Soumettre** ensuite la build au groupe externe, avec les notes de revue plus bas. Il n'y a ni nom d'utilisateur ni mot de passe à fournir : tout passe par les notes, où l'on colle le lien et l'échéance que montre `etat`.
 
+**Les builds suivantes d'une même version ne repassent pas en revue.** Une fois la 1.0 (24) approuvée, les builds 25 et 26 ont été ajoutées au groupe « Testeurs externes », puis soumises, le 14 septembre 2026. Leur état externe est passé à `IN_BETA_TESTING` dans la minute. Personne n'était entré par l'invitation du relecteur, et sa révocation n'a désactivé aucun compte.
+
+**La note « à tester » française arrive vide.** `build.sh ios` remplace le « What to Test », mais les builds 25 et 26 sont arrivées avec la note en-US remplie et la note fr-FR vide. Or le français est la langue principale de l'application, et celle des testeurs. Remplir la note fr-FR avant d'ajouter la build au groupe externe. La phrase acceptée par la revue de la 24, puis reprise pour la 25 et la 26, est « Version à destination de tests uniquement ».
+
 **`etat`** montre, à tout moment, le lien, l'échéance, les comptes invités et ce que dit le service. Il n'écrit rien.
 
 **`revoquer`, après l'approbation.** Le lien cesse de fonctionner. **Et le service désactive les comptes que l'invitation a créés, celui du relecteur compris** (`handlers/revoke.rs`) : c'est irréversible, un homeserver ne rend jamais un nom. C'est pourquoi le script demande de taper `revoquer`, et qu'un tube ne lui fournit aucune confirmation. Ce pouvoir ne dure que la vie de l'invitation : dans l'heure qui suit l'échéance, le service détruit ce qui le permettait (`purge_claimed_secrets_of_expired`), et un compte entré reste alors en vie. Si Apple revoit une build plus tard, `emettre` recommence, et range l'état clos à côté du nouveau.
