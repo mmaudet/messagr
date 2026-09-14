@@ -110,10 +110,14 @@ links, and a person had to tick messagr.eu by hand under _Open by default_.
 reproduces each, as `play-app-signing`, `play-app-signing-pq` and
 `play-app-signing-v3`, and `assetlinks.json` declares all three.
 
-Declared, not yet observed verified. The check is on a device that installed
-from the track, once the deployed file carries the third certificate: ask
-Android to verify again, then read the answer. `messagr.eu: verified` is the
-one that settles it.
+**Observed verified on 14 September 2026.** A Pixel 10 on Android 16, holding
+version 135 installed from the internal testing track that evening, presented
+`46:AC:3F:6A:…:FE:EC:55` as its signature and answered `messagr.eu: verified`
+and `messagr-fork.maudet.cloud: verified`, with nothing ticked by hand. Google's
+Digital Asset Links API answered `linked: true` for that certificate on both
+domains the same day. On any other device that installed from the track, the
+check stays the same: ask Android to verify again, then read the answer.
+`messagr.eu: verified` is the one that settles it.
 
     adb shell pm verify-app-links --re-verify eu.messagr
     adb shell pm get-app-links eu.messagr
