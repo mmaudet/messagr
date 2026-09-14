@@ -171,6 +171,17 @@ Each dispatch computes its own version code, so publishing one commit to two
 tracks gives them two codes and identical software. Dispatch once per track
 and the tracks agree.
 
+**One after another, never together.** Start the next dispatch only once the
+previous run has finished. The upload step opens an edit on the application in
+Play and commits it, and while that edit is open, a commit by another run makes
+it expire. On the evening of 13 September 2026 the three tracks were dispatched
+within seconds of each other from `4888962`. `alpha` (133) and `beta` (134)
+published, and `internal` (132) failed at _Upload to the internal testing
+track_ with `This edit has expired, please create a new Edit.` Two dispatches
+run in parallel that morning had both passed, by timing and not by design.
+Relaunched alone, `internal` took 135. The three tracks carry 135, 133 and 134:
+identical software, and somebody in several tracks still gets the highest code.
+
 The first release is made **by hand** through the Play Console. Not because
 the API is known to refuse it — Google's own documentation says nothing either
 way, and the claim is folklore — but because a first release cannot go out
