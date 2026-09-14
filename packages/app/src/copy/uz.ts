@@ -246,15 +246,15 @@ export const uz: Readonly<Record<CopyKey, string>> = {
     'Unga amal qilish uchun bu qurilma oʻzidagi hisobdan chiqishi kerak. Qaror qilishdan oldin nima oʻzgarishini koʻring.',
   leave_fact_gone: 'Keyin bu hisob qurilmadan chiqadi',
   'leave_gone_body %@':
-    'Yangi hisob olingach, bu qurilma %@ serveridagi hisobingizni, uning suhbatlarini va ularni ochadigan kalitlarni unutadi.',
+    'Yangi hisob oʻrnatilgach, bu qurilma %@ serveridagi hisobingizni, uning suhbatlarini va ularni ochadigan kalitlarni unutadi.',
   leave_fact_stays: 'Boshqa joyda qoladigan narsa',
   leave_stays_body:
     'Hisob oʻz serverida qoladi. Siz yozishgan odamlar siz bilan suhbatlarini saqlab qoladi.',
   leave_fact_link: 'Avval, bu havola orqali yangi hisob',
   'leave_link_body %@':
-    'Bu qurilma avval %@ serveridan yangi hisob soʻraydi. Uni olmasa, hech narsa oʻzgarmaydi va hisobingiz shu yerda qoladi.',
+    'Bu qurilma avval %@ serveridan yangi hisob soʻraydi. Uni oʻrnata olmasa, hisobingiz shu qurilmada qoladi.',
   leave_final:
-    'Yangi hisob olingach, bu qurilma eski hisobga qaytib kira olmaydi. Avval kelgan xabarlarni bu yerda endi oʻqib boʻlmaydi.',
+    'Yangi hisob oʻrnatilgach, bu qurilma eski hisobga qaytib kira olmaydi. Avval kelgan xabarlarni bu yerda endi oʻqib boʻlmaydi.',
   leave_confirm: 'Ha, bu hisobdan chiqish',
   leave_cancel: 'Hisobimni saqlash',
   leave_working: 'Bajarilmoqda…',
@@ -276,6 +276,8 @@ export const uz: Readonly<Record<CopyKey, string>> = {
     'Siz hisobingizni saqlab qoldingiz, bu taklif esa boshqa serverga olib borardi. Shuning uchun unga amal qilinmadi. Unga amal qilish uchun Messagr ilovasini butunlay yoping, soʻng havolani qayta oching.',
   list_invitation_reopen:
     'Bu taklif boshqa serverga olib boradi. Unga amal qilish uchun Messagr ilovasini butunlay yoping, soʻng havolani qayta oching.',
+  list_invitation_retry:
+    'Bu taklifga amal qilib boʻlmadi, hisobingiz esa shu qurilmada qoladi. Qayta urinish uchun Messagr ilovasini butunlay yoping, soʻng havolani qayta oching.',
   'list_invitation_already %@':
     'Sizda %@ bilan suhbat allaqachon bor. Oʻsha davom etadi: taklif ikkinchisini ochmadi.',
   list_not_in_yet:

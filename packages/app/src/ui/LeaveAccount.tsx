@@ -21,9 +21,10 @@ import { NotchedButton } from './NotchedButton'
  * # TRUE WHICHEVER WAY THE CLAIM GOES
  *
  * Decided on 14 September 2026: the new account is claimed first, and the old
- * one is forgotten only once that has succeeded. The facts are read in that
- * order -- first a new account, then this one leaves -- so nothing on this
- * screen is untrue for somebody whose link turns out to be spent.
+ * one is forgotten only once the new one is in place on this device. The facts
+ * are read in that order -- first a new account, then this one leaves -- so
+ * nothing on this screen is untrue for somebody whose link turns out to be
+ * spent, or whose device could not keep the new account.
  *
  * # BOTH SERVERS ARE NAMED
  *

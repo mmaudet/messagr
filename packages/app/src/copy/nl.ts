@@ -228,15 +228,15 @@ export const nl: Readonly<Record<CopyKey, string>> = {
     'Om haar te volgen, moet dit apparaat zijn account verlaten. Dit is wat er verandert, voordat u beslist.',
   leave_fact_gone: 'Daarna verlaat dit account dit apparaat',
   'leave_gone_body %@':
-    'Zodra het nieuwe account er is, vergeet dit apparaat uw account op %@, de gesprekken en de sleutels die ze openen.',
+    'Zodra het nieuwe account is ingesteld, vergeet dit apparaat uw account op %@, de gesprekken en de sleutels die ze openen.',
   leave_fact_stays: 'Wat elders blijft',
   leave_stays_body:
     'Het account bestaat nog op zijn server. De mensen met wie u schreef, houden hun gesprekken met u.',
   leave_fact_link: 'Eerst een nieuw account via deze link',
   'leave_link_body %@':
-    'Dit apparaat vraagt eerst een nieuw account aan bij %@. Krijgt het er geen, dan verandert er niets en blijft uw account hier.',
+    'Dit apparaat vraagt eerst een nieuw account aan bij %@. Lukt het niet om het in te stellen, dan blijft uw account op dit apparaat.',
   leave_final:
-    'Zodra het nieuwe account er is, kan dit apparaat niet meer terug naar het oude. Eerder ontvangen berichten kunnen hier niet meer worden gelezen.',
+    'Zodra het nieuwe account is ingesteld, kan dit apparaat niet meer terug naar het oude. Eerder ontvangen berichten kunnen hier niet meer worden gelezen.',
   leave_confirm: 'Ja, dit account verlaten',
   leave_cancel: 'Mijn account houden',
   leave_working: 'Bezig…',
@@ -258,6 +258,8 @@ export const nl: Readonly<Record<CopyKey, string>> = {
     'U hebt uw account behouden, en deze uitnodiging leidde naar een andere server. Daarom is ze niet gevolgd. Sluit Messagr volledig en open de link opnieuw om haar alsnog te volgen.',
   list_invitation_reopen:
     'Deze uitnodiging leidt naar een andere server. Sluit Messagr volledig en open de link opnieuw om haar te volgen.',
+  list_invitation_retry:
+    'Deze uitnodiging kon niet worden gevolgd, en uw account blijft op dit apparaat. Sluit Messagr volledig en open de link opnieuw om het nog eens te proberen.',
   'list_invitation_already %@':
     'U hebt al een gesprek met %@. Dat loopt door: de uitnodiging heeft geen tweede geopend.',
   list_not_in_yet:

@@ -68,7 +68,9 @@ export async function lookForWhatArrivedHere(): Promise<WhatWoke | null> {
   // NOT WHILE THIS DEVICE DECIDES WHETHER TO LEAVE ITS ACCOUNT (#304). A
   // machine started here would be the account in question's, and the next
   // account's would then be refused as a second one. See
-  // `accountInQuestion.ts`.
+  // `accountInQuestion.ts`. Asked here to spare the work, and asked again by
+  // `startCryptoMachine` at the moment a machine would be created, since a
+  // question can be put while this wake is still reading the keystore.
   if (accountInQuestion()) {
     return blind('this device is deciding whether to leave its account')
   }

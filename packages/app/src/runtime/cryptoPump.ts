@@ -45,6 +45,8 @@ import {
 } from 'react-native-matrix-crypto'
 
 import { acceptBackup, type BackupAccepted } from './acceptBackup'
+import { accountInQuestion } from './accountInQuestion'
+import { oneMachine } from './oneMachine'
 import type { EventCache } from './eventCacheStore'
 import { eventsToBuildFrom } from './eventsToBuildFrom'
 import { pickTextFile } from './documentFile'
@@ -187,8 +189,7 @@ export type MachineStartResult = {
  * is about to happen, not after it.
  */
 /**
- * Whether a crypto machine has already been created in this JavaScript
- * context, and for which device.
+ * Which crypto machine this JavaScript context holds, if any.
  *
  * # Why this is not paranoia
  *
@@ -204,26 +205,29 @@ export type MachineStartResult = {
  * id is kept rather than a boolean, because "already started" is only an
  * answer if it is the same device -- and a device id changing under a running
  * process is a thing to refuse loudly rather than to reuse.
+ *
+ * The rule lives in `oneMachine.ts`, where it is tested. Since #304 it takes
+ * the context from the moment a creation begins, and creates nothing while
+ * this device decides whether to leave its account.
  */
-let machineStartedFor: string | null = null
+const machines = oneMachine(accountInQuestion)
 
 /** Whether this context already holds a machine for `deviceId`. */
 export function cryptoMachineIsRunning(deviceId: string): boolean {
-  return machineStartedFor === deviceId
+  return machines.holds(deviceId)
 }
 
 /**
- * Whether this context holds a crypto machine at all, whichever device it is
- * for.
+ * Whether this context holds a crypto machine, or is creating one, whichever
+ * device it is for.
  *
- * #304, and read for one question: may this launch change accounts? Only a
- * cold launch may. A context that has already started a machine -- a warm
- * application, or a process a wake started before any screen opened -- is not
- * one, because the next account would need a second machine beside the first,
- * and the guard above allows one.
+ * #304, and read for one question: can this entry change accounts? Not in a
+ * context that holds a machine -- a warm application, or a process a wake
+ * started before any screen opened -- because the next account would need a
+ * second machine beside the first, and `machines` allows one.
  */
 export function aCryptoMachineIsRunning(): boolean {
-  return machineStartedFor !== null
+  return machines.running()
 }
 
 export async function startCryptoMachine(
@@ -287,26 +291,30 @@ export async function startCryptoMachine(
     }
   }
 
-  // ONE MACHINE PER CONTEXT. See `machineStartedFor`: the wake and the launch
-  // share a JavaScript context when the application is warm, and a second
-  // `createCryptoMachine` against the same file is how room keys are lost.
-  if (
-    machineStartedFor !== null &&
-    machineStartedFor !== credentials.deviceId
-  ) {
+  // ONE MACHINE PER CONTEXT, AND NONE WHILE THE ACCOUNT IS IN QUESTION. See
+  // `machines`: the wake and the launch share a JavaScript context when the
+  // application is warm, and a second `createCryptoMachine` against the same
+  // file is how room keys are lost. Asked here, at the moment a machine would
+  // be created, and not once beforehand (#304).
+  const start = machines.start(credentials.deviceId)
+  if (start.kind === 'refused') {
+    return { started: false, reason: start.reason, passphraseForm }
+  }
+  if (start.kind === 'wait' && !(await start.created)) {
     return {
       started: false,
-      reason: `this context already holds a machine for ${machineStartedFor}`,
+      reason: 'the machine this context was creating did not start',
       passphraseForm,
     }
   }
-  if (machineStartedFor === null) {
+  if (start.kind === 'create') {
     try {
       await createCryptoMachine(config)
     } catch (cause: unknown) {
+      start.settle(false)
       return { started: false, reason: getErrorMessage(cause), passphraseForm }
     }
-    machineStartedFor = credentials.deviceId
+    start.settle(true)
   }
 
   const unsubscribeToDevice = subscribeToDeviceMessages(

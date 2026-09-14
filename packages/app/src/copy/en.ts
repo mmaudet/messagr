@@ -233,15 +233,15 @@ export const en: Readonly<Record<CopyKey, string>> = {
     'To follow it, this device has to leave the account it holds. Here is what changes, before you decide.',
   leave_fact_gone: 'Then this account leaves this device',
   'leave_gone_body %@':
-    'Once the new account is obtained, this device forgets your account on %@, its conversations and the keys that open them.',
+    'Once the new account is in place, this device forgets your account on %@, its conversations and the keys that open them.',
   leave_fact_stays: 'What stays elsewhere',
   leave_stays_body:
     'The account still exists on its server. The people you wrote to keep their conversations with you.',
   leave_fact_link: 'First, a new account through this link',
   'leave_link_body %@':
-    'This device first asks %@ for a new account. If it does not get one, nothing changes and your account stays here.',
+    'This device first asks %@ for a new account. If it cannot put it in place, your account stays on this device.',
   leave_final:
-    'Once the new account is obtained, this device will not be able to return to the old one. Messages received before can no longer be read here.',
+    'Once the new account is in place, this device will not be able to return to the old one. Messages received before can no longer be read here.',
   leave_confirm: 'Yes, leave this account',
   leave_cancel: 'Keep my account',
   leave_working: 'Working…',
@@ -262,6 +262,8 @@ export const en: Readonly<Record<CopyKey, string>> = {
     'You kept your account, and this invitation led to another server. So it was not followed. To follow it, close Messagr completely, then open the link again.',
   list_invitation_reopen:
     'This invitation leads to another server. To follow it, close Messagr completely, then open the link again.',
+  list_invitation_retry:
+    'This invitation could not be followed, and your account stays on this device. To try again, close Messagr completely, then open the link again.',
   'list_invitation_already %@':
     'You already have a conversation with %@. That one carries on: the invitation did not open a second.',
   list_not_in_yet:

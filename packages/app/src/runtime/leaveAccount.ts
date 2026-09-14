@@ -16,10 +16,11 @@ import type { SecretStore } from './sessionStore'
  *
  * # AFTER THE CLAIM, NEVER BEFORE
  *
- * Decided on 14 September 2026. Only a claim that succeeded leads here, so a
- * link that turns out to be spent or unreachable costs nobody the account they
- * had. `entry.ts` holds that order, and the window a stop leaves open; this is
- * what follows it.
+ * Decided on 14 September 2026. Only a claim whose account this device has
+ * kept leads here, so a link that turns out to be spent or unreachable, or a
+ * keystore that refuses the new session, costs nobody the account they had.
+ * `entry.ts` holds that order, and the window a stop leaves open; this is what
+ * follows it.
  *
  * # IN THIS ORDER
  *

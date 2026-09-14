@@ -231,15 +231,15 @@ export const es: Readonly<Record<CopyKey, string>> = {
     'Para seguirla, este dispositivo debe dejar la cuenta que tiene. Esto es lo que cambia, antes de decidir.',
   leave_fact_gone: 'Después, esta cuenta deja este dispositivo',
   'leave_gone_body %@':
-    'Una vez obtenida la cuenta nueva, este dispositivo olvida su cuenta en %@, sus conversaciones y las claves que las abren.',
+    'Una vez instalada la cuenta nueva, este dispositivo olvida su cuenta en %@, sus conversaciones y las claves que las abren.',
   leave_fact_stays: 'Lo que queda en otra parte',
   leave_stays_body:
     'La cuenta sigue existiendo en su servidor. Las personas con las que escribía conservan sus conversaciones con usted.',
   leave_fact_link: 'Primero, una cuenta nueva con este enlace',
   'leave_link_body %@':
-    'Este dispositivo pide primero una cuenta nueva a %@. Si no la obtiene, no cambia nada y su cuenta se queda aquí.',
+    'Este dispositivo pide primero una cuenta nueva a %@. Si no consigue instalarla, su cuenta se queda en este dispositivo.',
   leave_final:
-    'Una vez obtenida la cuenta nueva, este dispositivo no podrá volver a la anterior. Los mensajes recibidos antes ya no podrán leerse aquí.',
+    'Una vez instalada la cuenta nueva, este dispositivo no podrá volver a la anterior. Los mensajes recibidos antes ya no podrán leerse aquí.',
   leave_confirm: 'Sí, dejar esta cuenta',
   leave_cancel: 'Conservar mi cuenta',
   leave_working: 'En curso…',
@@ -260,6 +260,8 @@ export const es: Readonly<Record<CopyKey, string>> = {
     'Ha conservado su cuenta, y esta invitación llevaba a otro servidor. Por eso no se ha seguido. Para seguirla, cierre Messagr por completo y vuelva a abrir el enlace.',
   list_invitation_reopen:
     'Esta invitación lleva a otro servidor. Para seguirla, cierre Messagr por completo y vuelva a abrir el enlace.',
+  list_invitation_retry:
+    'No se ha podido seguir esta invitación, y su cuenta se queda en este dispositivo. Para volver a intentarlo, cierre Messagr por completo y vuelva a abrir el enlace.',
   'list_invitation_already %@':
     'Ya tiene una conversación con %@. Es la que continúa: la invitación no ha abierto una segunda.',
   list_not_in_yet:

@@ -142,7 +142,9 @@ export function ConversationList({
           would send them to ask for a new link, and a new link into that
           server would only put the same question again. So does one that
           arrived while Messagr was open: only a cold launch can follow it,
-          and the sentence says how to get one. */}
+          and the sentence says how to get one. And so does a yes that could
+          not be carried out, whichever part of it failed: the old account
+          stays, and the sentence says how to try again. */}
       {invitation !== null && invitation !== undefined && (
         <Text style={styles.ignored} testID="list-invitation-ignored">
           {invitation.kind === 'used'
@@ -156,7 +158,9 @@ export function ConversationList({
                 ? t('list_invitation_elsewhere')
                 : invitation.kind === 'reopen'
                   ? t('list_invitation_reopen')
-                  : t('list_invitation_refused')}
+                  : invitation.kind === 'retry'
+                    ? t('list_invitation_retry')
+                    : t('list_invitation_refused')}
         </Text>
       )}
       {/* CE QU'UN PARTAGE EST DEVENU, quand il n'est devenu rien.

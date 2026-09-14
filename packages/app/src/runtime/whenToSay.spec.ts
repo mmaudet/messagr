@@ -22,6 +22,20 @@ describe('whenToSay', () => {
     ).toBe('after-the-pump')
   })
 
+  it('says at once that a yes could not be carried out, however it failed', () => {
+    // Said after the pump, this waited on the old account's server, which
+    // somebody leaving it may no longer reach -- and then nothing was said.
+    // The sentence holds for a spent link, for a service that could not be
+    // reached and for a device that could not keep the new account: the old
+    // account stays, and opening the link again tries again.
+    expect(
+      whenToSay({
+        kind: 'retry',
+        reason: 'the invitation service could not be reached',
+      }),
+    ).toBe('on-entry')
+  })
+
   it('says at once why a link into another server was not followed', () => {
     // #304 asks for the reason however the rest of the launch goes: a device
     // that kept its account, or one told to reopen Messagr, is told why even

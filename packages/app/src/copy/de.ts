@@ -236,15 +236,15 @@ export const de: Readonly<Record<CopyKey, string>> = {
     'Um ihr zu folgen, muss dieses Gerät sein Konto verlassen. Hier steht, was sich ändert, bevor Sie entscheiden.',
   leave_fact_gone: 'Dann verlässt dieses Konto das Gerät',
   'leave_gone_body %@':
-    'Sobald das neue Konto da ist, vergisst dieses Gerät Ihr Konto auf %@, seine Unterhaltungen und die Schlüssel, die sie öffnen.',
+    'Sobald das neue Konto eingerichtet ist, vergisst dieses Gerät Ihr Konto auf %@, seine Unterhaltungen und die Schlüssel, die sie öffnen.',
   leave_fact_stays: 'Was anderswo bleibt',
   leave_stays_body:
     'Das Konto besteht auf seinem Server weiter. Ihre Gesprächspartner behalten ihre Unterhaltungen mit Ihnen.',
   leave_fact_link: 'Zuerst ein neues Konto über diesen Link',
   'leave_link_body %@':
-    'Dieses Gerät fragt zuerst bei %@ ein neues Konto an. Bekommt es keines, ändert sich nichts und Ihr Konto bleibt hier.',
+    'Dieses Gerät fragt zuerst bei %@ ein neues Konto an. Kann es dieses nicht einrichten, bleibt Ihr Konto auf diesem Gerät.',
   leave_final:
-    'Sobald das neue Konto da ist, kann dieses Gerät nicht mehr zum alten zurückkehren. Zuvor empfangene Nachrichten können hier nicht mehr gelesen werden.',
+    'Sobald das neue Konto eingerichtet ist, kann dieses Gerät nicht mehr zum alten zurückkehren. Zuvor empfangene Nachrichten können hier nicht mehr gelesen werden.',
   leave_confirm: 'Ja, dieses Konto verlassen',
   leave_cancel: 'Mein Konto behalten',
   leave_working: 'Läuft …',
@@ -266,6 +266,8 @@ export const de: Readonly<Record<CopyKey, string>> = {
     'Sie haben Ihr Konto behalten, und diese Einladung führte zu einem anderen Server. Deshalb wurde ihr nicht gefolgt. Um ihr zu folgen, schließen Sie Messagr vollständig und öffnen Sie den Link erneut.',
   list_invitation_reopen:
     'Diese Einladung führt zu einem anderen Server. Um ihr zu folgen, schließen Sie Messagr vollständig und öffnen Sie den Link erneut.',
+  list_invitation_retry:
+    'Dieser Einladung konnte nicht gefolgt werden, und Ihr Konto bleibt auf diesem Gerät. Um es erneut zu versuchen, schließen Sie Messagr vollständig und öffnen Sie den Link erneut.',
   'list_invitation_already %@':
     'Sie haben bereits ein Gespräch mit %@. Dieses läuft weiter: die Einladung hat kein zweites eröffnet.',
   list_not_in_yet:

@@ -228,15 +228,15 @@ export const it: Readonly<Record<CopyKey, string>> = {
     'Per seguirlo, questo dispositivo deve lasciare l’account che porta. Ecco cosa cambia, prima di decidere.',
   leave_fact_gone: 'Poi, questo account lascia il dispositivo',
   'leave_gone_body %@':
-    'Ottenuto il nuovo account, questo dispositivo dimentica il suo account su %@, le sue conversazioni e le chiavi che le aprono.',
+    'Una volta attivato il nuovo account, questo dispositivo dimentica il suo account su %@, le sue conversazioni e le chiavi che le aprono.',
   leave_fact_stays: 'Ciò che resta altrove',
   leave_stays_body:
     'L’account esiste ancora sul suo server. Le persone a cui scriveva conservano le loro conversazioni con lei.',
   leave_fact_link: 'Prima, un account nuovo con questo link',
   'leave_link_body %@':
-    'Questo dispositivo chiede prima un account nuovo a %@. Se non lo ottiene, non cambia nulla e il suo account resta qui.',
+    'Questo dispositivo chiede prima un account nuovo a %@. Se non riesce ad attivarlo, il suo account resta su questo dispositivo.',
   leave_final:
-    'Ottenuto il nuovo account, questo dispositivo non potrà più tornare a quello vecchio. I messaggi ricevuti prima non si potranno più leggere qui.',
+    'Una volta attivato il nuovo account, questo dispositivo non potrà più tornare a quello vecchio. I messaggi ricevuti prima non si potranno più leggere qui.',
   leave_confirm: 'Sì, lasciare questo account',
   leave_cancel: 'Tenere il mio account',
   leave_working: 'In corso…',
@@ -257,6 +257,8 @@ export const it: Readonly<Record<CopyKey, string>> = {
     'Avete tenuto il vostro account, e questo invito portava a un altro server. Per questo non è stato seguito. Per seguirlo, chiudete completamente Messagr e riaprite il link.',
   list_invitation_reopen:
     'Questo invito porta a un altro server. Per seguirlo, chiudete completamente Messagr e riaprite il link.',
+  list_invitation_retry:
+    'Non è stato possibile seguire questo invito, e il vostro account resta su questo dispositivo. Per riprovare, chiudete completamente Messagr e riaprite il link.',
   'list_invitation_already %@':
     'Avete già una conversazione con %@. È quella che prosegue: l’invito non ne ha aperta una seconda.',
   list_not_in_yet:

@@ -7,6 +7,7 @@ import {
 import type { LinkSource } from './incomingLink'
 import { parseInvitationLink, type InvitationLink } from './invitationLink'
 import { leaveAccount, type Closed, type Departure } from './leaveAccount'
+import { keepRecoverySecret } from './recoverySecret'
 import { hostShown, sameOrigin } from './sameOrigin'
 import type { RestoreCredentials } from './sessionCredentials'
 import { loadSession, saveSession, type SecretStore } from './sessionStore'
@@ -51,6 +52,11 @@ export interface EntryDeps {
    */
   readonly signUp: SecretStore
   /**
+   * Where the account's password is kept: by this module, right after the
+   * session it belongs to, and by nobody after that. See `keepTheClaim`.
+   */
+  readonly recovery: SecretStore
+  /**
    * Awaited between claim attempts. Absent in tests, which should not sleep.
    *
    * A claim is two calls with somebody else's application in between: see
@@ -60,7 +66,7 @@ export interface EntryDeps {
   readonly wait?: (ms: number) => Promise<void>
   /**
    * What following a link into another server needs, or `null` when this
-   * launch cannot follow one.
+   * entry cannot follow one.
    *
    * # WHY A QUESTION, WHERE THERE WAS A REFUSAL
    *
@@ -81,10 +87,10 @@ export interface EntryDeps {
    * # WHY IT CAN BE NULL
    *
    * Decided on 14 September 2026: the account changes only at a cold launch.
-   * A process that is already running holds the account's crypto machine, and
-   * the next account would need a second one beside it. A link that arrives
-   * while Messagr is open is therefore not asked about: the list says to close
-   * Messagr completely and open the link again, and that launch asks.
+   * An entry that is not part of the launch reads a link handed to an
+   * application that was already running -- `launchEntries.ts` says what that
+   * means, which is not the order the link's events arrived in -- and the list
+   * says to close Messagr completely and open the link again.
    */
   readonly otherServer: OtherServer | null
 }
@@ -104,7 +110,17 @@ export interface OtherServer {
     /** The server the link leads to. */
     readonly link: string
   }) => Promise<'leave' | 'stay'>
-  /** What leaving the old account needs, once the link has been claimed. */
+  /**
+   * Whether this context holds a crypto machine, or is creating one.
+   *
+   * Read before the question is put, and again once it has been answered: a
+   * process a wake started holds the old account's machine before any screen
+   * opens, and a wake can start one while somebody is still reading. The next
+   * account would need a second machine beside it, and this application never
+   * makes one.
+   */
+  readonly aMachineIsRunning: () => boolean
+  /** What leaving the old account needs, once the new one is kept. */
   readonly departure: Departure
 }
 
@@ -143,12 +159,26 @@ export type InvitationOutcome =
    */
   | { readonly kind: 'elsewhere' }
   /**
-   * For a server other than this account's, and it arrived while Messagr was
-   * already running. Nothing was asked, sent or forgotten: the account changes
-   * only at a cold launch, so the list says to close Messagr completely and
-   * open the link again.
+   * For a server other than this account's, read by an entry that could not
+   * change accounts: a link handed to an application already running, or a
+   * context that already holds a crypto machine. Nothing was claimed or
+   * forgotten, and the list says to close Messagr completely and open the link
+   * again.
    */
   | { readonly kind: 'reopen' }
+  /**
+   * For a server other than this account's: the person chose to leave, and
+   * the new account could not be put in place -- a link that could not be
+   * used, a service that could not be reached, or a device that could not keep
+   * what the claim handed back. The old account stays, and opening the link
+   * again tries again.
+   *
+   * Its own kind rather than `refused`, because `refused` is said after the
+   * pump, and the pump talks to the old account's server: when that server
+   * did not answer, nothing was said at all. And « demandez-en une nouvelle »
+   * is wrong for a service that was merely out of reach.
+   */
+  | { readonly kind: 'retry'; readonly reason: string }
 
 export type EntryResult =
   | {
@@ -186,19 +216,24 @@ export type EntryResult =
        */
       readonly invitation?: InvitationOutcome
       /**
-       * The account's password, present only on the launch that claimed it.
+       * Whether the account's password was kept, present only when the claim
+       * handed one back and its session was kept.
        *
-       * Passed through rather than kept here: this module decides entry, and
-       * where a credential lives is `deviceSecrets.ts`'s answer. The caller
-       * keeps it, because it is the one moment the service ever offers it --
-       * see `recoverySecret.ts` and #190.
+       * KEPT HERE, AND IT USED TO BE PASSED THROUGH. The caller wrote it once
+       * entry had answered, which was harmless while nothing came between the
+       * two. #304 put the whole of leaving the old account there: a stop in the
+       * middle of it found the new account with a session, no crypto store and
+       * no password, and the next launch had nothing to come back with. So the
+       * password is kept right after its session and nowhere else -- a second
+       * writer would be a second moment it could land beside the wrong session.
+       * `recoverySecret.ts` and #190 say why it is kept at all.
        */
-      readonly password?: string
+      readonly passwordKept?: boolean
       /**
        * Present only when this launch left the account the device held for a
-       * link into another server, after claiming that link. `closing` is what
-       * became of the old account on its own server, and it settles whenever
-       * that server answers -- the launch does not wait for it.
+       * link into another server, after keeping the account that link made.
+       * `closing` is what became of the old account on its own server, and it
+       * settles whenever that server answers -- the launch does not wait.
        */
       readonly left?: { readonly closing: Promise<Closed> }
     }
@@ -271,57 +306,63 @@ export async function enterWithASession(deps: EntryDeps): Promise<EntryResult> {
  * Decided on 14 September 2026. The link is claimed the way a device with no
  * account claims one -- no bearer, since the account this device holds has no
  * business on that server -- before anything of the old account is touched. A
- * refused claim leaves the old account exactly as it was, and its server is
- * told nothing.
+ * refused claim, or a service that cannot be reached, leaves the old account
+ * exactly as it was, and its server is told nothing.
  *
- * # THEN, IN THIS ORDER
+ * # IN THIS ORDER
  *
- * 1. The old password is forgotten.
- * 2. The new account is kept: the sign-up marker, then its session. Its token
- *    is spent, so the only writes between the claim and its session are the
- *    password's erasure and the marker a first launch writes there too.
- * 3. What the old account left is forgotten, sparing the session and the
- *    marker the new account has just written, and the old server is told --
- *    the pusher, then the session -- with the credentials held in memory,
- *    without waiting. See `leaveAccount.ts`.
- * 4. The caller keeps the new password once entry answers, as on every first
- *    launch.
+ * 1. Whether a crypto machine is running is read before the question and
+ *    again after the answer. If one is, nothing is begun.
+ * 2. The link is claimed.
+ * 3. The old password is forgotten.
+ * 4. The new account is kept: the sign-up marker, its session, then its
+ *    password.
+ * 5. What the old account left is forgotten, sparing those three entries, and
+ *    the old server is told -- the pusher, then the session -- with the
+ *    credentials held in memory, without waiting. See `leaveAccount.ts`.
  *
  * # THE WINDOW A STOP LEAVES OPEN
  *
  * Between the claim and the new session, a stop loses the new account: its
  * token is spent, and the next launch finds the old account, less its
- * password. A first launch stopped there loses its account the same way.
+ * password. The sign-up marker, if it was written by then, lies beside the old
+ * session, and that is harmless: it only lets a launch finish publishing an
+ * identity this device created and no homeserver acknowledged
+ * (`crossSigningIdentity.ts`, its `finishing-sign-up` branch), and the old
+ * account's identity was acknowledged long ago.
  *
- * Between the new session and the end of step 3, a stop leaves the new account
- * beside what the old one left: its crypto store under its own device id,
- * which nothing opens again; its notebook, which the next launch opens for the
- * new account and draws from until the list is derived again; its sync
- * cursor, its backup commitment and its pushkey. Its server is never told, so
- * it keeps the pusher and may still wake this telephone. None of that is a
- * credential of the old account. Its token lived only in the session the new
- * one replaced, and its password went first -- which is why it goes first: a
- * launch that re-enters after a reinstall sends the password it holds to the
- * server of the session it holds, and with the old password gone that pair can
- * never be the old password and the new server.
+ * Between the new session and its password -- one keystore write -- a stop
+ * leaves the new account with neither a password nor a crypto store, and the
+ * next launch finds it stranded. That write is as close to the session as it
+ * can be put, and nothing else comes between them.
  *
- * Between step 3 and the caller keeping the new password, a stop leaves the
- * new account without one, as it would leave a first launch.
+ * Between the new password and the end of step 5, a stop leaves the new
+ * account whole, beside what the old one left: its crypto store under its own
+ * device id, which nothing opens again; its notebook, which the next launch
+ * opens for the new account and draws from until the list is derived again;
+ * its sync cursor, its backup commitment and its pushkey. The old server is
+ * never told, so it keeps the pusher and may still wake this telephone. None
+ * of that is a credential of the old account. Its token lived only in the
+ * session the new one replaced, and its password went at step 3 -- before the
+ * new session, because a launch that re-enters after a reinstall sends the
+ * password it holds to the server of the session it holds, and the old
+ * password must never lie beside the new session.
  */
 async function followAnotherServer(
   deps: EntryDeps,
   held: RestoreCredentials,
   link: InvitationLink,
 ): Promise<EntryResult> {
-  const { secrets, poster, signUp, wait, otherServer } = deps
+  const { secrets, poster, signUp, recovery, wait, otherServer } = deps
+  const onTheHeldAccount = (invitation: InvitationOutcome): EntryResult => ({
+    entered: true,
+    session: held,
+    claimed: false,
+    invitation,
+  })
 
-  if (otherServer === null) {
-    return {
-      entered: true,
-      session: held,
-      claimed: false,
-      invitation: { kind: 'reopen' },
-    }
+  if (otherServer === null || otherServer.aMachineIsRunning()) {
+    return onTheHeldAccount({ kind: 'reopen' })
   }
 
   const answer = await otherServer.ask({
@@ -329,38 +370,41 @@ async function followAnotherServer(
     link: hostShown(link.homeserver),
   })
   if (answer === 'stay') {
-    return {
-      entered: true,
-      session: held,
-      claimed: false,
-      invitation: { kind: 'elsewhere' },
-    }
+    return onTheHeldAccount({ kind: 'elsewhere' })
+  }
+  // READ AGAIN, NOW THAT IT IS ANSWERED. A wake can have started the old
+  // account's machine while the question waited, and a yes that finds one
+  // running cannot be carried out in this process.
+  if (otherServer.aMachineIsRunning()) {
+    return onTheHeldAccount({ kind: 'reopen' })
   }
 
   const claim = await claimInvitation(poster, link, wait)
   if (!claim.claimed) {
-    return {
-      entered: true,
-      session: held,
-      claimed: false,
-      invitation: { kind: 'refused', reason: claim.reason },
-    }
+    return onTheHeldAccount({ kind: 'retry', reason: claim.reason })
   }
 
   await otherServer.departure.forgetPassword()
   const entered = await keepTheClaim(deps, claim)
   if (entered.kept === false) {
-    // THE OLD ACCOUNT STAYS WHERE IT IS. The keystore refused the new session,
-    // so the old one is still the session the next launch will find, and the
-    // new account lives only as long as this launch. Forgetting what the old
-    // account left, or ending its session, would leave that next launch
-    // nothing to enter with.
-    return entered
+    // THE OLD ACCOUNT STAYS THE ONE THIS DEVICE HOLDS. The keystore refused
+    // the new session, so the old one is what the next launch will find, and
+    // this launch stays on it too: running the new account from memory would
+    // write its sync cursor and its notebook into what the old account left.
+    // `keepTheClaim` kept no password for the new account -- beside the old
+    // session, a re-entry would send it to the old server. The old password,
+    // gone at step 3, is not written back: a keystore that has just refused a
+    // write is not one to trust with that one.
+    return onTheHeldAccount({
+      kind: 'retry',
+      reason: 'this device could not keep the new account',
+    })
   }
 
   const left = await leaveAccount(otherServer.departure, held, [
     secrets,
     signUp,
+    recovery,
   ])
   return { ...entered, left }
 }
@@ -378,7 +422,8 @@ async function claimWithoutAccount(
 }
 
 /**
- * Keeps what a claim handed back: the sign-up marker, then the session.
+ * Keeps what a claim handed back: the sign-up marker, the session, then the
+ * password.
  *
  * Its own function because two roads reach it: a device that never had an
  * account, and one that has just claimed a link into another server. The
@@ -389,7 +434,7 @@ async function keepTheClaim(
   deps: EntryDeps,
   claim: Extract<ClaimResult, { readonly claimed: true }>,
 ): Promise<Extract<EntryResult, { readonly entered: true }>> {
-  const { secrets, signUp } = deps
+  const { secrets, signUp, recovery } = deps
 
   // Before the session is kept, because this is the moment the sign-up
   // began. A marker written after a crash that happened in between would be
@@ -403,24 +448,26 @@ async function keepTheClaim(
   // loss than the account.
   await markSignUpStarted(signUp)
 
-  // Carried out only on this launch. A restore has none to pass on, which is
-  // right: the password is offered once, when the account is made.
-  const password =
-    claim.password === undefined ? {} : { password: claim.password }
-
   const kept = await saveSession(secrets, claim.session)
-  if (kept) {
-    return { entered: true, session: claim.session, claimed: true, ...password }
+  if (!kept) {
+    // Entered anyway. The token is spent and the account exists; refusing
+    // here would throw away an invitation that has already been consumed and
+    // cannot be consumed again. Its password is not kept: there is no session
+    // for it to go with, and beside whatever session this device still holds
+    // it would be the wrong password.
+    return {
+      entered: true,
+      session: claim.session,
+      claimed: true,
+      kept: false,
+    }
   }
 
-  // Entered anyway. The token is spent and the account exists; refusing here
-  // would throw away an invitation that has already been consumed and cannot
-  // be consumed again.
-  return {
-    entered: true,
-    session: claim.session,
-    claimed: true,
-    kept: false,
-    ...password,
-  }
+  // THE PASSWORD, RIGHT AFTER ITS SESSION, and offered once: the service hands
+  // it back with the claim and nowhere else. See `EntryResult.passwordKept`.
+  const password =
+    claim.password === undefined
+      ? {}
+      : { passwordKept: await keepRecoverySecret(recovery, claim.password) }
+  return { entered: true, session: claim.session, claimed: true, ...password }
 }

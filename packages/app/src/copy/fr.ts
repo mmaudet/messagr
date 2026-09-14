@@ -331,17 +331,18 @@ export const fr = {
     'Pour la suivre, cet appareil doit quitter le compte qu’il porte. Voici ce qui change, avant de décider.',
   leave_fact_gone: 'Ensuite, ce compte quitte cet appareil',
   'leave_gone_body %@':
-    'Une fois le nouveau compte obtenu, cet appareil oublie votre compte sur %@, ses conversations et les clés qui les ouvrent.',
+    'Une fois le nouveau compte en place, cet appareil oublie votre compte sur %@, ses conversations et les clés qui les ouvrent.',
   leave_fact_stays: 'Ce qui reste ailleurs',
   leave_stays_body:
     'Le compte existe toujours sur son serveur. Vos correspondants gardent leurs conversations avec vous.',
   // TRUE WHICHEVER WAY THE CLAIM GOES (14 September 2026): the new account is
-  // claimed first, and the old one is forgotten only once it exists.
+  // claimed first, and the old one is forgotten only once the new one is kept
+  // on this device.
   leave_fact_link: 'D’abord, un compte neuf par ce lien',
   'leave_link_body %@':
-    'Cet appareil demande d’abord un nouveau compte sur %@. S’il ne l’obtient pas, rien ne change et votre compte reste ici.',
+    'Cet appareil demande d’abord un nouveau compte sur %@. S’il ne parvient pas à le mettre en place, votre compte reste sur cet appareil.',
   leave_final:
-    'Une fois le nouveau compte obtenu, cet appareil ne pourra plus revenir à l’ancien. Les messages reçus avant ne pourront plus être lus ici.',
+    'Une fois le nouveau compte en place, cet appareil ne pourra plus revenir à l’ancien. Les messages reçus avant ne pourront plus être lus ici.',
   leave_confirm: 'Oui, quitter ce compte',
   leave_cancel: 'Garder mon compte',
   leave_working: 'En cours…',
@@ -394,6 +395,11 @@ export const fr = {
   // the sentence says how to get one, and nothing was asked, sent or forgotten.
   list_invitation_reopen:
     'Cette invitation mène à un autre serveur. Pour la suivre, fermez complètement Messagr, puis rouvrez le lien.',
+  // THE SIXTH, when the person said yes and the new account could not be put
+  // in place: a link that could not be used, a service out of reach, or a
+  // device that could not keep it. True of all three, and said at once.
+  list_invitation_retry:
+    'Cette invitation n’a pas pu être suivie, et votre compte reste sur cet appareil. Pour réessayer, fermez complètement Messagr, puis rouvrez le lien.',
   list_not_in_yet:
     'Vous n’êtes pas encore entré. Ouvrez le lien d’invitation qu’on vous a envoyé : c’est la seule porte, et l’application ne peut rien faire avant.',
   // #190. Deux issues, deux phrases : revenir sous une identité neuve est la

@@ -246,6 +246,7 @@ import { afterReinstall } from './src/runtime/afterReinstall'
 import { departureFrom } from './src/runtime/leavingThisDevice'
 import { putTheAccountInQuestion } from './src/runtime/accountInQuestion'
 import { whenToSay } from './src/runtime/whenToSay'
+import { launchEntries } from './src/runtime/launchEntries'
 import {
   cryptoStoreExists,
   homeserverCalls,
@@ -257,10 +258,7 @@ import {
   pickAnyDocument,
 } from './src/runtime/documentPlatform'
 import type { ReadDocument } from './src/timeline/fileEvent'
-import {
-  keepRecoverySecret,
-  readRecoverySecret,
-} from './src/runtime/recoverySecret'
+import { readRecoverySecret } from './src/runtime/recoverySecret'
 import {
   loadSession,
   sameSession,
@@ -1025,6 +1023,13 @@ export function App({
    * entry answering. No second question is put meanwhile. See the launch.
    */
   const questionBusyRef = useRef(false)
+  /**
+   * Which entries belong to the launch of this screen. See `launchEntries.ts`:
+   * held per mount, since a screen mounted again reads its link the way a
+   * launch does, and whether a second crypto machine would be needed is
+   * `oneMachine.ts`'s question rather than this one's.
+   */
+  const launchRef = useRef(launchEntries())
   // `null` until the launch has answered. Distinguishing "not in" from "not
   // yet known" keeps the list from telling somebody they are locked out for
   // the second the keystore takes to answer.
@@ -1614,6 +1619,9 @@ export function App({
       // previous launch, or one obtained by spending the invitation it was
       // opened with. Nothing arrives from the build any more.
       let historyClaim: HistoryClaim | null = null
+      // WHETHER THIS ENTRY BELONGS TO THE LAUNCH, decided by when it begins
+      // rather than by how its link arrived. See `launchEntries.ts`.
+      const thisEntry = launchRef.current.begin()
       // What lifts the question this run put, when it put one. See
       // `accountInQuestion.ts`.
       let releaseTheQuestion: (() => void) | null = null
@@ -1640,46 +1648,48 @@ export function App({
               poster: servicePoster,
               link,
               signUp: signUpSecrets,
+              recovery: recoverySecrets,
               // A claim is two calls with the issuer's application in between.
               // See claimInvitation.ts: without a wait this tries once, is told
               // 409, and reports a link that cannot be used -- which is what it
               // does on a device with nothing else changed.
               wait: ms => new Promise(resolve => setTimeout(resolve, ms)),
               // A LINK INTO ANOTHER SERVER IS FOLLOWED FROM A COLD LAUNCH ONLY
-              // (#304, decided on 14 September 2026). `null` for a link handed
-              // over while Messagr was running, and for a process that already
-              // holds a crypto machine -- one a wake started before any screen
-              // opened -- because the next account would need a second machine
-              // beside it. `entry.ts` then says to reopen Messagr.
-              otherServer:
-                warmLink === null && !aCryptoMachineIsRunning()
-                  ? {
-                      // THE QUESTION, ON THE SCREEN AND AWAITED. This launch
-                      // waits inside entry until it is answered, and the
-                      // re-entry after a reinstall and the pump both come
-                      // after.
-                      //
-                      // One question at a time. A second one, arriving while
-                      // the first is answered or a yes is carried out, is
-                      // answered « stay » without being put: staying sends
-                      // nothing, and that run then stops at the wait below.
-                      ask: hosts => {
-                        if (questionBusyRef.current) {
-                          return Promise.resolve('stay')
-                        }
-                        questionBusyRef.current = true
-                        releaseTheQuestion = putTheAccountInQuestion()
-                        return new Promise<'leave' | 'stay'>(resolve => {
-                          answerTheQuestionRef.current = resolve
-                          setOtherServerQuestion({ ...hosts, answered: false })
-                        })
-                      },
-                      departure: departureFrom(storeDir),
-                    }
-                  : null,
+              // (#304, decided on 14 September 2026). `null` for an entry that
+              // is not part of the launch, and `entry.ts` then says to reopen
+              // Messagr. Whether a crypto machine already runs -- one a wake
+              // started, say -- entry asks itself, before the question and
+              // again after the answer.
+              otherServer: thisEntry.cold
+                ? {
+                    // THE QUESTION, ON THE SCREEN AND AWAITED. This launch
+                    // waits inside entry until it is answered, and the
+                    // re-entry after a reinstall and the pump both come
+                    // after.
+                    //
+                    // One question at a time. A second one, arriving while
+                    // the first is answered or a yes is carried out, is
+                    // answered « stay » without being put: staying sends
+                    // nothing, and that run then stops at the wait below.
+                    ask: hosts => {
+                      if (questionBusyRef.current) {
+                        return Promise.resolve('stay')
+                      }
+                      questionBusyRef.current = true
+                      releaseTheQuestion = putTheAccountInQuestion()
+                      return new Promise<'leave' | 'stay'>(resolve => {
+                        answerTheQuestionRef.current = resolve
+                        setOtherServerQuestion({ ...hosts, answered: false })
+                      })
+                    },
+                    aMachineIsRunning: aCryptoMachineIsRunning,
+                    departure: departureFrom(storeDir),
+                  }
+                : null,
             }),
         )
         .finally(() => {
+          thisEntry.end()
           if (releaseTheQuestion !== null) {
             questionBusyRef.current = false
             setOtherServerQuestion(null)
@@ -1737,19 +1747,13 @@ export function App({
         setLinkOutcome(entered.invitation)
         logEvent('info', 'MESSAGR_INVITATION', { ...entered.invitation })
       }
-      // THE PASSWORD, KEPT AT THE ONE MOMENT IT IS EVER OFFERED.
-      //
-      // The service hands it back with the claim and nowhere else. A device
-      // that misses it here has no way back from a reinstall, which is the
-      // behaviour there was before, so its failure is logged rather than
-      // fatal. See recoverySecret.ts for what it costs to keep.
-      if (
-        entered.entered &&
-        entered.claimed &&
-        entered.password !== undefined
-      ) {
-        const kept = await keepRecoverySecret(recoverySecrets, entered.password)
-        if (!kept) logEvent('warn', 'MESSAGR_RECOVERY_SECRET_NOT_KEPT', {})
+      // THE PASSWORD, KEPT AT THE ONE MOMENT IT IS EVER OFFERED -- by entry,
+      // right after the session it belongs to, and written nowhere else
+      // (#304). A device that misses it has no way back from a reinstall,
+      // which is the behaviour there was before, so its failure is logged
+      // rather than fatal. See recoverySecret.ts for what it costs to keep.
+      if (entered.entered && entered.passwordKept === false) {
+        logEvent('warn', 'MESSAGR_RECOVERY_SECRET_NOT_KEPT', {})
       }
 
       // A SESSION WHOSE CRYPTO STORE IS GONE, AND WHAT TO DO ABOUT IT.

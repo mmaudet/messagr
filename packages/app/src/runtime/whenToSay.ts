@@ -16,13 +16,17 @@ import type { InvitationOutcome } from './entry'
  * # ON ENTRY, FOR WHAT #304 ADDED AND NOTHING ELSE
  *
  * A link into another server that was not followed -- the person kept their
- * account, or Messagr has to be reopened first -- is told at once. The reason
- * is owed however the rest of the launch goes, a stranded device included.
+ * account, Messagr has to be reopened first, or a yes could not be carried
+ * out -- is told at once. The reason is owed however the rest of the launch
+ * goes, a stranded device included, and the last of the three would otherwise
+ * wait on a pump that talks to the very server somebody is leaving.
  */
 export function whenToSay(
   outcome: InvitationOutcome,
 ): 'on-entry' | 'after-the-pump' {
-  return outcome.kind === 'elsewhere' || outcome.kind === 'reopen'
+  return outcome.kind === 'elsewhere' ||
+    outcome.kind === 'reopen' ||
+    outcome.kind === 'retry'
     ? 'on-entry'
     : 'after-the-pump'
 }
