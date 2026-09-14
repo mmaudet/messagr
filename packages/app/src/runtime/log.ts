@@ -1,3 +1,5 @@
+import type { Logger } from 'matrix-js-sdk/lib/logger'
+
 /**
  * The one place this application writes to the console.
  *
@@ -42,6 +44,12 @@
  * lands in the unified log under `com.facebook.react.log`, where React Native
  * writes `info` and `warn` as info messages (`RCTLog.mm`): Console.app shows
  * them only once asked to include info messages.
+ *
+ * # Except matrix-js-sdk, which writes around it
+ *
+ * The library logs through a logger of its own, straight to the console. A
+ * store build keeps that one to warnings and errors: `keepTheSdkToWarnings`
+ * says what it wrote before, and why it is set before the library loads.
  */
 export type LogLevel = 'info' | 'warn' | 'error'
 
@@ -235,4 +243,54 @@ export function logEvent(
   } else {
     console.log(line)
   }
+}
+
+/** What a store build makes nothing of, in matrix-js-sdk's logger. */
+const BELOW_WARNINGS: ReadonlySet<string> = new Set(['trace', 'debug', 'info'])
+
+/**
+ * Keeps matrix-js-sdk's own logger to warnings and errors in a store build.
+ *
+ * # What it wrote
+ *
+ * The library does not log through this module. It has a logger of its own
+ * that writes straight to the console, and a client made without one is handed
+ * it, with every request that client makes (`client.js`). On the Play build
+ * 135, 14 September 2026, a line went out for each request and another for its
+ * answer, beside the trace and not through it:
+ * `FetchHttpApi: --> GET https://messagr.eu/_matrix/client/v3/sync?timeout=xxx`.
+ *
+ * # How, and why before the library loads
+ *
+ * That logger is a `loglevel` logger, which its type does not say: each of its
+ * methods is made by its `methodFactory` whenever it is rebuilt. So a store
+ * build hands it a factory that makes nothing below a warning, and rebuilds it.
+ * A child takes its parent's factory at the moment it is made and never
+ * afterwards (`getChild`, in the library's `logger.js`), and the library makes
+ * one while its modules load (`models/room-sticky-events.js`). That is why
+ * `bootstrap.ts` calls this, ahead of everything `index.js` loads after it.
+ *
+ * # Warnings and errors still go out
+ *
+ * They are the lines that say why the library failed. They are not the trace:
+ * the library names a room in some of them, and nothing here reads them first.
+ *
+ * A debug bundle and a bundle built to be read keep every line, as
+ * `writesTheWholeLog` says.
+ */
+export function keepTheSdkToWarnings(sdk: Logger): void {
+  if (writesTheWholeLog()) return
+  // A `loglevel` logger, whatever its declared type says. See above.
+  const made = sdk as unknown as {
+    methodFactory: (
+      method: string,
+      level: number,
+      name: string | symbol | undefined,
+    ) => (...message: unknown[]) => void
+    rebuild: () => void
+  }
+  const make = made.methodFactory
+  made.methodFactory = (method, level, name) =>
+    BELOW_WARNINGS.has(method) ? () => undefined : make(method, level, name)
+  made.rebuild()
 }

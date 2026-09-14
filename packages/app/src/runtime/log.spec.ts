@@ -1,7 +1,16 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import {
+  ClientPrefix,
+  MatrixHttpApi,
+  Method,
+  type HttpApiEvent,
+  type HttpApiEventHandlerMap,
+} from 'matrix-js-sdk/lib/http-api/index'
+import { logger as sdkLogger, type Logger } from 'matrix-js-sdk/lib/logger'
+import { TypedEventEmitter } from 'matrix-js-sdk/lib/models/typed-event-emitter'
 
 import type { LogFields } from './log'
-import { logEvent } from './log'
+import { keepTheSdkToWarnings, logEvent } from './log'
 
 function captured(level: 'info' | 'warn' | 'error', fields: LogFields): string {
   const method = level === 'error' ? 'error' : level === 'warn' ? 'warn' : 'log'
@@ -322,5 +331,99 @@ describe('a build that is going to be read', () => {
     ).toEqual([
       'MESSAGR_CALL_POLL {"scope":"!OGEhHVWSdvArJzumhm:messagr.eu","carried":2}',
     ])
+  })
+})
+
+describe("matrix-js-sdk's own logger", () => {
+  // Loggers the library makes itself, one for each test, through its own
+  // `getChild`. The one `bootstrap.ts` hands over is shared by the whole
+  // process: a test that changed it would change every test after it.
+
+  /** Every line the library wrote to the console, whatever its level. */
+  async function sdkLinesWrittenBy(
+    gesture: () => Promise<void>,
+  ): Promise<string[]> {
+    const lines: string[] = []
+    const methods = ['trace', 'debug', 'info', 'log', 'warn', 'error'] as const
+    for (const method of methods) {
+      vi.spyOn(console, method).mockImplementation((...written: unknown[]) => {
+        lines.push(written.map(String).join(' '))
+      })
+    }
+    await gesture()
+    return lines
+  }
+
+  /**
+   * The request the Play build 135 wrote a line about, made through the
+   * library's own HTTP layer, which is handed `sdk` the way a client hands it
+   * the logger it was made with (`client.js`).
+   */
+  async function aSync(sdk: Logger): Promise<void> {
+    const http = new MatrixHttpApi(
+      new TypedEventEmitter<HttpApiEvent, HttpApiEventHandlerMap>(),
+      {
+        baseUrl: 'https://messagr.eu',
+        prefix: ClientPrefix.V3,
+        onlyData: true,
+        logger: sdk,
+        fetchFn: async () => new Response('{}', { status: 200 }),
+      },
+    )
+    await http.request(Method.Get, '/sync', { timeout: '30000' })
+  }
+
+  afterEach(() => {
+    vi.unstubAllGlobals()
+    vi.unstubAllEnvs()
+  })
+
+  it('writes nothing below warnings in a store build, from its logger or a child it makes later', async () => {
+    // Read on the Play build 135, 14 September 2026, beside the trace and not
+    // through it: `FetchHttpApi: --> GET
+    // https://messagr.eu/_matrix/client/v3/sync?timeout=xxx`.
+    vi.stubGlobal('__DEV__', false)
+    vi.stubEnv('MESSAGR_SEND_PROBE', '')
+    vi.stubEnv('MESSAGR_WHOLE_LOG', '')
+    const sdk = sdkLogger.getChild('[a store build]')
+    keepTheSdkToWarnings(sdk)
+    expect(
+      await sdkLinesWrittenBy(async () => {
+        await aSync(sdk)
+        const sync = sdk.getChild('[sync]')
+        sync.trace('a trace')
+        sync.debug('a debug line')
+        sync.info('an info line')
+      }),
+    ).toEqual([])
+  })
+
+  it('still writes its warnings and errors in a store build', async () => {
+    vi.stubGlobal('__DEV__', false)
+    vi.stubEnv('MESSAGR_SEND_PROBE', '')
+    vi.stubEnv('MESSAGR_WHOLE_LOG', '')
+    const sdk = sdkLogger.getChild('[warnings]')
+    keepTheSdkToWarnings(sdk)
+    expect(
+      await sdkLinesWrittenBy(async () => {
+        sdk.warn('a warning')
+        sdk.getChild('[sync]').error('an error')
+      }),
+    ).toEqual(['[warnings] a warning', '[warnings][sync] an error'])
+  })
+
+  it.each([
+    ['a debug bundle', true, '', ''],
+    ['the probe build the device bench runs', false, '1', ''],
+    ['a release bundle built with MESSAGR_WHOLE_LOG=1', false, '', '1'],
+  ])('writes every line it logs: %s', async (build, dev, probe, whole) => {
+    vi.stubGlobal('__DEV__', dev)
+    vi.stubEnv('MESSAGR_SEND_PROBE', probe)
+    vi.stubEnv('MESSAGR_WHOLE_LOG', whole)
+    const sdk = sdkLogger.getChild(`[${build}]`)
+    keepTheSdkToWarnings(sdk)
+    expect(await sdkLinesWrittenBy(() => aSync(sdk))).toContain(
+      `[${build}] FetchHttpApi: --> GET https://messagr.eu/_matrix/client/v3/sync?timeout=xxx`,
+    )
   })
 })
