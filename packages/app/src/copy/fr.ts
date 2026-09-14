@@ -396,8 +396,10 @@ export const fr = {
   list_invitation_reopen:
     'Cette invitation mène à un autre serveur. Pour la suivre, fermez complètement Messagr, puis rouvrez le lien.',
   // THE SIXTH, when the person said yes and the claim did not go through for a
-  // reason that may not hold next time: a service out of reach, one that did
-  // not answer in time, or an issuer who has not let the account in yet.
+  // reason that may not hold next time: a service out of reach or failing on
+  // its own side, one that did not answer in time, or an issuer who has not let
+  // the account in yet. And since #306 for the same reasons when the link was
+  // spent for the account this device holds, where the refusal used to be said.
   // Opening the link again tries again, and the sentence says so at once.
   list_invitation_retry:
     'Cette invitation n’a pas pu être suivie, et votre compte reste sur cet appareil. Pour réessayer, fermez complètement Messagr, puis rouvrez le lien.',

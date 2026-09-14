@@ -93,6 +93,13 @@ interface ClaimResponse {
 export const REFUSED = 'this invitation cannot be used'
 
 /**
+ * What a claim says when nothing answered about the link: the service was out
+ * of reach, or answered with a failure of its own. Worth trying again, which
+ * is the whole difference from `REFUSED`.
+ */
+const UNREACHABLE = 'the invitation service could not be reached'
+
+/**
  * How long to keep asking while the issuer is still letting this account in,
  * and how long to wait between. Fifteen attempts two seconds apart: half a
  * minute, which is longer than the round trip takes and short enough that a
@@ -209,11 +216,15 @@ async function postWithPatience(
       // Deliberately different from a refusal, because a person can act on
       // the difference: this one is worth trying again, a refused link never
       // will be.
-      return {
-        answered: false,
-        reason: 'the invitation service could not be reached',
-      }
+      return { answered: false, reason: UNREACHABLE }
     }
+    // A 5XX IS NO ANSWER ABOUT THE LINK, so it is read as no answer at all
+    // (#306). nginx says 502 while the service restarts, and the service says
+    // 503 while its homeserver is away -- « the caller must RETRY, not give
+    // up », in `error.rs`. Read as `REFUSED`, it sent somebody holding a
+    // perfectly good link to ask for another. A 4xx other than the handshake's
+    // 409 stays `REFUSED`, whichever it is.
+    if (answer.status >= 500) return { answered: false, reason: UNREACHABLE }
     if (answer.status !== 409) break
     // No way to wait is a caller that cannot mean to keep asking: without a
     // pause this would hammer the service fifteen times in as many
