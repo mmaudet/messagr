@@ -262,6 +262,10 @@ export const es: Readonly<Record<CopyKey, string>> = {
     'Esta invitación lleva a otro servidor. Para seguirla, cierre Messagr por completo y vuelva a abrir el enlace.',
   list_invitation_retry:
     'No se ha podido seguir esta invitación, y su cuenta se queda en este dispositivo. Para volver a intentarlo, cierre Messagr por completo y vuelva a abrir el enlace.',
+  list_invitation_unusable:
+    'Esta invitación no se puede usar. Su cuenta se queda en este dispositivo. Pida una nueva a quien se la envió.',
+  list_invitation_spent:
+    'Esta invitación ya se ha usado, pero este dispositivo no ha podido conservar la cuenta nueva. Su cuenta se queda en este dispositivo. Pida una nueva invitación a quien se la envió.',
   'list_invitation_already %@':
     'Ya tiene una conversación con %@. Es la que continúa: la invitación no ha abierto una segunda.',
   list_not_in_yet:

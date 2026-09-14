@@ -143,8 +143,11 @@ export function ConversationList({
           server would only put the same question again. So does one that
           arrived while Messagr was open: only a cold launch can follow it,
           and the sentence says how to get one. And so does a yes that could
-          not be carried out, whichever part of it failed: the old account
-          stays, and the sentence says how to try again. */}
+          not be carried out, in one of three sentences, because a person acts
+          on the difference: a link refused, which only a new one replaces; a
+          claim that may go through next time, which opening the link again
+          retries; and a link spent for an account this device could not
+          keep. The old account stays in all three. */}
       {invitation !== null && invitation !== undefined && (
         <Text style={styles.ignored} testID="list-invitation-ignored">
           {invitation.kind === 'used'
@@ -158,9 +161,13 @@ export function ConversationList({
                 ? t('list_invitation_elsewhere')
                 : invitation.kind === 'reopen'
                   ? t('list_invitation_reopen')
-                  : invitation.kind === 'retry'
-                    ? t('list_invitation_retry')
-                    : t('list_invitation_refused')}
+                  : invitation.kind === 'unusable'
+                    ? t('list_invitation_unusable')
+                    : invitation.kind === 'retry'
+                      ? t('list_invitation_retry')
+                      : invitation.kind === 'spent'
+                        ? t('list_invitation_spent')
+                        : t('list_invitation_refused')}
         </Text>
       )}
       {/* CE QU'UN PARTAGE EST DEVENU, quand il n'est devenu rien.

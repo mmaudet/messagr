@@ -259,6 +259,10 @@ export const it: Readonly<Record<CopyKey, string>> = {
     'Questo invito porta a un altro server. Per seguirlo, chiudete completamente Messagr e riaprite il link.',
   list_invitation_retry:
     'Non è stato possibile seguire questo invito, e il vostro account resta su questo dispositivo. Per riprovare, chiudete completamente Messagr e riaprite il link.',
+  list_invitation_unusable:
+    'Questo invito non può essere usato. Il vostro account resta su questo dispositivo. Chiedetene uno nuovo a chi ve l’ha mandato.',
+  list_invitation_spent:
+    'Questo invito è stato usato, ma questo dispositivo non ha potuto tenere il nuovo account. Il vostro account resta su questo dispositivo. Chiedete un nuovo invito a chi ve l’ha mandato.',
   'list_invitation_already %@':
     'Avete già una conversazione con %@. È quella che prosegue: l’invito non ne ha aperta una seconda.',
   list_not_in_yet:

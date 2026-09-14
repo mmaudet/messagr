@@ -25,7 +25,6 @@ import {
   storeDirectorySecrets,
   syncCursorSecrets,
 } from './deviceSecrets'
-import { accountInQuestion } from './accountInQuestion'
 import { getErrorMessage } from './errors'
 import { logEvent } from './log'
 import { lookForWhatArrived } from './lookForWhatArrived'
@@ -65,16 +64,6 @@ export async function lookForWhatArrivedHere(): Promise<WhatWoke | null> {
     return null
   }
 
-  // NOT WHILE THIS DEVICE DECIDES WHETHER TO LEAVE ITS ACCOUNT (#304). A
-  // machine started here would be the account in question's, and the next
-  // account's would then be refused as a second one. See
-  // `accountInQuestion.ts`. Asked here to spare the work, and asked again by
-  // `startCryptoMachine` at the moment a machine would be created, since a
-  // question can be put while this wake is still reading the keystore.
-  if (accountInQuestion()) {
-    return blind('this device is deciding whether to leave its account')
-  }
-
   const where = await readStoreDirectory(storeDirectorySecrets)
   if (where.dir === null) return blind(where.reason)
 
@@ -94,6 +83,9 @@ export async function lookForWhatArrivedHere(): Promise<WhatWoke | null> {
         // notification, and there is nothing here to report it to.
       },
     )
+    // Refused, among other reasons, for an account this device is asking
+    // whether to leave, or has left since this wake read its session (#304).
+    // `accountInQuestion.ts` says why, and the wake draws blind for it too.
     if (!started.started) return blind(started.reason)
 
     const notebook = await openNotebook(where.dir)

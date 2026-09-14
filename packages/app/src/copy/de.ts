@@ -268,6 +268,10 @@ export const de: Readonly<Record<CopyKey, string>> = {
     'Diese Einladung führt zu einem anderen Server. Um ihr zu folgen, schließen Sie Messagr vollständig und öffnen Sie den Link erneut.',
   list_invitation_retry:
     'Dieser Einladung konnte nicht gefolgt werden, und Ihr Konto bleibt auf diesem Gerät. Um es erneut zu versuchen, schließen Sie Messagr vollständig und öffnen Sie den Link erneut.',
+  list_invitation_unusable:
+    'Diese Einladung kann nicht verwendet werden. Ihr Konto bleibt auf diesem Gerät. Bitten Sie die absendende Person um eine neue.',
+  list_invitation_spent:
+    'Diese Einladung wurde verwendet, aber dieses Gerät konnte das neue Konto nicht behalten. Ihr Konto bleibt auf diesem Gerät. Bitten Sie die absendende Person um eine neue Einladung.',
   'list_invitation_already %@':
     'Sie haben bereits ein Gespräch mit %@. Dieses läuft weiter: die Einladung hat kein zweites eröffnet.',
   list_not_in_yet:

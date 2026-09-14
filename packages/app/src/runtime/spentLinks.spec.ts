@@ -83,44 +83,6 @@ describe('spentLinks', () => {
     expect(await links.enter(async () => LINK, takeAndAnswer)).toBe(LINK)
   })
 
-  it('answers at once when no entry holds a link, and says it did not wait', async () => {
-    // Almost every launch: one run, whose own mark was lifted when its entry
-    // answered. Nothing to wait for, and nothing for the caller to re-read.
-    expect(await spentLinks().waitedForAnotherEntry()).toBe(false)
-  })
-
-  it('makes a run that was handed no link wait for the entry that took it', async () => {
-    // #304. The run that was handed nothing restored the session it found,
-    // while the run that took the link may be asking the person whether to
-    // leave that very account. Carrying on would re-enter it or publish under
-    // it before they answer. So it waits, and is told it waited, which is its
-    // cue to look again at which account this device now holds.
-    const links = spentLinks()
-    const took = held()
-    const asking = held()
-    const first = links.enter(
-      async () => LINK,
-      async link => {
-        await link()
-        took.release()
-        await asking.promise
-      },
-    )
-    await took.promise
-
-    let waited: boolean | null = null
-    links.waitedForAnotherEntry().then(answer => {
-      waited = answer
-    })
-    await new Promise(resolve => setImmediate(resolve))
-    expect(waited).toBeNull()
-
-    asking.release()
-    await first
-    await new Promise(resolve => setImmediate(resolve))
-    expect(waited).toBe(true)
-  })
-
   it('lets two different invitations be claimed side by side', async () => {
     // Two real invitations differ in their token and so in their address, and
     // neither is the other's duplicate.

@@ -45,25 +45,10 @@ export interface SpentLinks {
     source: LinkSource,
     run: (link: LinkSource) => Promise<T>,
   ) => Promise<T>
-  /**
-   * Waits until no entry holds a link, and answers whether another one did.
-   *
-   * #304. Two runs of the launch overlap when one link is delivered twice, and
-   * the run handed no link restores the session it found while the other may
-   * be asking the person whether to leave that very account. A run that
-   * restored a session waits here before it does anything with it. `true`
-   * tells it another entry was running meanwhile, so the account this device
-   * holds is worth reading again before it goes on.
-   *
-   * `false` on almost every launch: one run, whose own mark was lifted when
-   * its entry answered, and nothing for the caller to read again.
-   */
-  readonly waitedForAnotherEntry: () => Promise<boolean>
 }
 
 export function spentLinks(): SpentLinks {
   const underway = new Set<string>()
-  let waiting: Array<() => void> = []
   return {
     enter: async <T>(
       source: LinkSource,
@@ -81,17 +66,7 @@ export function spentLinks(): SpentLinks {
         return await run(link)
       } finally {
         for (const url of taken) underway.delete(url)
-        if (underway.size === 0) {
-          const released = waiting
-          waiting = []
-          for (const release of released) release()
-        }
       }
-    },
-    waitedForAnotherEntry: async () => {
-      if (underway.size === 0) return false
-      await new Promise<void>(release => waiting.push(release))
-      return true
     },
   }
 }

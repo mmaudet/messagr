@@ -17,16 +17,21 @@ import type { InvitationOutcome } from './entry'
  *
  * A link into another server that was not followed -- the person kept their
  * account, Messagr has to be reopened first, or a yes could not be carried
- * out -- is told at once. The reason is owed however the rest of the launch
- * goes, a stranded device included, and the last of the three would otherwise
- * wait on a pump that talks to the very server somebody is leaving.
+ * out, whichever of three ways it failed -- is told at once. The reason is
+ * owed however the rest of the launch goes, a stranded device included, and a
+ * failed yes would otherwise wait on a pump that talks to the very server
+ * somebody is leaving.
  */
+const SAID_ON_ENTRY: ReadonlySet<InvitationOutcome['kind']> = new Set([
+  'elsewhere',
+  'reopen',
+  'unusable',
+  'retry',
+  'spent',
+])
+
 export function whenToSay(
   outcome: InvitationOutcome,
 ): 'on-entry' | 'after-the-pump' {
-  return outcome.kind === 'elsewhere' ||
-    outcome.kind === 'reopen' ||
-    outcome.kind === 'retry'
-    ? 'on-entry'
-    : 'after-the-pump'
+  return SAID_ON_ENTRY.has(outcome.kind) ? 'on-entry' : 'after-the-pump'
 }

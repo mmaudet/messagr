@@ -90,7 +90,7 @@ interface ClaimResponse {
  * which tokens ever existed. Reporting the difference here would rebuild
  * exactly the oracle it refuses to be, on the other side of the wire.
  */
-const REFUSED = 'this invitation cannot be used'
+export const REFUSED = 'this invitation cannot be used'
 
 /**
  * How long to keep asking while the issuer is still letting this account in,

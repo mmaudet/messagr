@@ -1,8 +1,12 @@
 import { describe, expect, it } from 'vitest'
 
+import { accountsInQuestion } from './accountInQuestion'
 import { oneMachine, type MachineStart } from './oneMachine'
 
-const nothingInQuestion = () => false
+const OLD = { userId: '@old:bench.example', deviceId: 'OLDDEVICE' }
+const NEW = { userId: '@new:messagr.eu', deviceId: 'NEWDEVICE' }
+
+const anyDevice = () => true
 
 /** The creation a start was granted, and a failure if it was granted anything else. */
 function creation(start: MachineStart) {
@@ -24,27 +28,27 @@ function waiting(start: MachineStart) {
 
 describe('oneMachine', () => {
   it('creates one machine, and every later start for that device reuses it', () => {
-    const machines = oneMachine(nothingInQuestion)
-    creation(machines.start('DEVICE1')).settle(true)
-    expect(machines.start('DEVICE1')).toEqual({ kind: 'reuse' })
+    const machines = oneMachine(anyDevice)
+    creation(machines.start(OLD)).settle(true)
+    expect(machines.start(OLD)).toEqual({ kind: 'reuse' })
   })
 
   it('never creates a machine for another device beside one that exists or is being created', () => {
     // The rule this whole guard is for: a second machine in one process is not
     // something this application does, whichever device it would serve.
-    const machines = oneMachine(nothingInQuestion)
-    const creating = creation(machines.start('OLDDEVICE'))
-    expect(machines.start('NEWDEVICE').kind).toBe('refused')
+    const machines = oneMachine(anyDevice)
+    const creating = creation(machines.start(OLD))
+    expect(machines.start(NEW).kind).toBe('refused')
     creating.settle(true)
-    expect(machines.start('NEWDEVICE').kind).toBe('refused')
+    expect(machines.start(NEW).kind).toBe('refused')
   })
 
   it('makes a start that arrives during a creation wait for it, rather than create a second', async () => {
     // A wake and a launch reaching the same device at once. The second used to
     // create again, against the same store.
-    const machines = oneMachine(nothingInQuestion)
-    const creating = creation(machines.start('DEVICE1'))
-    const second = waiting(machines.start('DEVICE1'))
+    const machines = oneMachine(anyDevice)
+    const creating = creation(machines.start(OLD))
+    const second = waiting(machines.start(OLD))
     creating.settle(true)
     expect(await second.created).toBe(true)
   })
@@ -52,30 +56,53 @@ describe('oneMachine', () => {
   it('counts a machine as running from the moment its creation begins', () => {
     // So a launch that looks after somebody answers sees a wake's machine even
     // while the library is still creating it.
-    const machines = oneMachine(nothingInQuestion)
+    const machines = oneMachine(anyDevice)
     expect(machines.running()).toBe(false)
-    creation(machines.start('DEVICE1'))
+    creation(machines.start(OLD))
     expect(machines.running()).toBe(true)
   })
 
-  it('creates nothing while this device decides whether to leave its account', () => {
-    // Read at the moment a machine would start, not once beforehand: a wake
-    // that began before the question is put reaches this line after it.
-    let inQuestion = true
-    const machines = oneMachine(() => inQuestion)
-    expect(machines.start('OLDDEVICE').kind).toBe('refused')
+  it('creates no machine for a device it is told not to, asked at that moment', () => {
+    // Asked at the moment a machine would start, not once beforehand: a wake
+    // that began before a question was put reaches this line after it.
+    let mayCreate = false
+    const machines = oneMachine(() => mayCreate)
+    expect(machines.start(OLD).kind).toBe('refused')
     expect(machines.running()).toBe(false)
-    inQuestion = false
-    expect(machines.start('NEWDEVICE').kind).toBe('create')
+    mayCreate = true
+    expect(machines.start(OLD).kind).toBe('create')
+  })
+
+  it('grants another account its machine while one account is in question', () => {
+    // Found in review on 14 September 2026: the question used to refuse every
+    // creation, whichever account it was for.
+    const questions = accountsInQuestion()
+    const machines = oneMachine(questions.mayCreateMachineFor)
+    questions.hold(OLD)
+    expect(machines.start(OLD).kind).toBe('refused')
+    expect(machines.start(NEW).kind).toBe('create')
+  })
+
+  it('refuses a stale wake the departed account’s machine, and grants the next account its own', () => {
+    // A wake that read the old session before the departure reaches this line
+    // after it, and finds that device closed for the rest of the process.
+    const questions = accountsInQuestion()
+    const machines = oneMachine(questions.mayCreateMachineFor)
+    const question = questions.hold(OLD)
+    question.departed()
+    question.lift()
+    expect(machines.start(OLD).kind).toBe('refused')
+    expect(machines.running()).toBe(false)
+    expect(machines.start(NEW).kind).toBe('create')
   })
 
   it('frees the context when a creation fails', async () => {
-    const machines = oneMachine(nothingInQuestion)
-    const creating = creation(machines.start('DEVICE1'))
-    const second = waiting(machines.start('DEVICE1'))
+    const machines = oneMachine(anyDevice)
+    const creating = creation(machines.start(OLD))
+    const second = waiting(machines.start(OLD))
     creating.settle(false)
     expect(await second.created).toBe(false)
     expect(machines.running()).toBe(false)
-    expect(machines.start('DEVICE2').kind).toBe('create')
+    expect(machines.start(NEW).kind).toBe('create')
   })
 })

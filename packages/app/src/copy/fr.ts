@@ -395,11 +395,22 @@ export const fr = {
   // the sentence says how to get one, and nothing was asked, sent or forgotten.
   list_invitation_reopen:
     'Cette invitation mène à un autre serveur. Pour la suivre, fermez complètement Messagr, puis rouvrez le lien.',
-  // THE SIXTH, when the person said yes and the new account could not be put
-  // in place: a link that could not be used, a service out of reach, or a
-  // device that could not keep it. True of all three, and said at once.
+  // THE SIXTH, when the person said yes and the claim did not go through for a
+  // reason that may not hold next time: a service out of reach, one that did
+  // not answer in time, or an issuer who has not let the account in yet.
+  // Opening the link again tries again, and the sentence says so at once.
   list_invitation_retry:
     'Cette invitation n’a pas pu être suivie, et votre compte reste sur cet appareil. Pour réessayer, fermez complètement Messagr, puis rouvrez le lien.',
+  // THE SEVENTH, when the person said yes and the service refused the link. A
+  // refusal is final, so the sentence sends them to ask for a new one rather
+  // than to open this one again.
+  list_invitation_unusable:
+    'Cette invitation ne peut pas être utilisée. Votre compte reste sur cet appareil. Demandez-en une nouvelle à la personne qui vous l’a envoyée.',
+  // THE EIGHTH, when the claim went through and this device could not keep
+  // the new account. The link is spent all the same, and the sentence says so:
+  // opening it again would only be refused.
+  list_invitation_spent:
+    'Cette invitation a été utilisée, mais cet appareil n’a pas pu garder le nouveau compte. Votre compte reste sur cet appareil. Demandez une nouvelle invitation à la personne qui vous l’a envoyée.',
   list_not_in_yet:
     'Vous n’êtes pas encore entré. Ouvrez le lien d’invitation qu’on vous a envoyé : c’est la seule porte, et l’application ne peut rien faire avant.',
   // #190. Deux issues, deux phrases : revenir sous une identité neuve est la

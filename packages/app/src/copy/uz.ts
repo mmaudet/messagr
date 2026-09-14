@@ -278,6 +278,10 @@ export const uz: Readonly<Record<CopyKey, string>> = {
     'Bu taklif boshqa serverga olib boradi. Unga amal qilish uchun Messagr ilovasini butunlay yoping, soʻng havolani qayta oching.',
   list_invitation_retry:
     'Bu taklifga amal qilib boʻlmadi, hisobingiz esa shu qurilmada qoladi. Qayta urinish uchun Messagr ilovasini butunlay yoping, soʻng havolani qayta oching.',
+  list_invitation_unusable:
+    'Bu taklifdan foydalanib boʻlmaydi. Hisobingiz shu qurilmada qoladi. Uni yuborgan odamdan yangisini soʻrang.',
+  list_invitation_spent:
+    'Bu taklifdan foydalanildi, lekin bu qurilma yangi hisobni saqlab qola olmadi. Hisobingiz shu qurilmada qoladi. Uni yuborgan odamdan yangi taklif soʻrang.',
   'list_invitation_already %@':
     'Sizda %@ bilan suhbat allaqachon bor. Oʻsha davom etadi: taklif ikkinchisini ochmadi.',
   list_not_in_yet:

@@ -1,8 +1,10 @@
 import { describe, expect, it } from 'vitest'
 
+import { accountsInQuestion } from './accountInQuestion'
 import type { ServicePoster } from './claimInvitation'
 import { enterWithASession, type OtherServer } from './entry'
 import type { Departure } from './leaveAccount'
+import { questionOnScreen } from './questionOnScreen'
 import type { SecretStore } from './sessionStore'
 
 const SESSION = {
@@ -80,6 +82,12 @@ const nobodyAsked: { readonly otherServer: OtherServer } = {
     aMachineIsRunning: () => {
       throw new Error('this entry was not supposed to look for a machine')
     },
+    holdInQuestion: () => {
+      throw new Error('this entry was not supposed to hold an account')
+    },
+    after: async () => {
+      throw new Error('this entry was not supposed to time a claim')
+    },
     departure: {
       pusher: async () => null,
       stopWaking: async () => {
@@ -121,6 +129,12 @@ const GRANTED_ELSEWHERE = {
 
 type Call = { url: string; body: string; bearer?: string }
 
+/** A limit on the claim that never comes, for every test that is not about time. */
+const never = () => new Promise<void>(() => {})
+
+/** Lets every settled promise run on before a test looks. */
+const flush = () => new Promise(resolve => setImmediate(resolve))
+
 /**
  * A device holding one account, and everything a launch can send from it.
  *
@@ -136,7 +150,7 @@ type Call = { url: string; body: string; bearer?: string }
  */
 function device(
   options: {
-    readonly claim?: { status: number; body: string } | 'unreachable'
+    readonly claim?: { status: number; body: string } | 'unreachable' | 'silent'
     readonly sessionWrite?: 'refused'
   } = {},
 ) {
@@ -178,6 +192,7 @@ function device(
       if (options.claim === 'unreachable') {
         throw new Error('network is unreachable')
       }
+      if (options.claim === 'silent') return new Promise<never>(() => {})
       return options.claim ?? GRANTED_ELSEWHERE
     },
   }
@@ -233,22 +248,43 @@ function device(
   }
 }
 
-/** The question, answered once, remembering the two servers it named. */
+/**
+ * The question, answered at once, remembering the two servers it named -- with
+ * the registry of accounts in question beside it, so a test can ask what a
+ * crypto machine may be made for afterwards.
+ */
 function answering(
   answer: 'leave' | 'stay',
   here: ReturnType<typeof device>,
   aMachineIsRunning: () => boolean = () => false,
 ) {
   const asked: Array<{ account: string; link: string }> = []
+  const questions = accountsInQuestion()
   const otherServer: OtherServer = {
     ask: async hosts => {
       asked.push(hosts)
       return answer
     },
     aMachineIsRunning,
+    holdInQuestion: questions.hold,
+    after: never,
     departure: here.departure,
   }
-  return { asked, otherServer }
+  return { asked, questions, otherServer }
+}
+
+/** The question as the screen holds it: answered by a button, by back, or by nothing. */
+function onScreen(here: ReturnType<typeof device>) {
+  const questions = accountsInQuestion()
+  const screen = questionOnScreen(() => undefined)
+  const otherServer: OtherServer = {
+    ask: hosts => screen.put(hosts).answer,
+    aMachineIsRunning: () => false,
+    holdInQuestion: questions.hold,
+    after: never,
+    departure: here.departure,
+  }
+  return { questions, screen, otherServer }
 }
 
 /** An entry on `here`, opened with `link`. */
@@ -275,6 +311,14 @@ const UNTOUCHED = {
   pushkey: 'pushkey-of-this-device',
   rest: 'the-rest-of-the-old-account',
 }
+
+/** The old account, still the one this device holds, and what the list says. */
+const stayingWith = (invitation: unknown) => ({
+  entered: true,
+  session: SESSION,
+  claimed: false,
+  invitation,
+})
 
 describe('enterWithASession', () => {
   it('spends an invitation for the account it already has, not against it', async () => {
@@ -614,15 +658,11 @@ describe('a link into another server (#304)', () => {
     // invitation at all. Now the person is asked, and staying is the answer
     // that changes nothing.
     const here = device()
-    const { otherServer } = answering('stay', here)
+    const { questions, otherServer } = answering('stay', here)
     const result = await entering(here, otherServer)
-    expect(result).toEqual({
-      entered: true,
-      session: SESSION,
-      claimed: false,
-      invitation: { kind: 'elsewhere' },
-    })
+    expect(result).toEqual(stayingWith({ kind: 'elsewhere' }))
     expect(here.held()).toEqual(UNTOUCHED)
+    expect(questions.mayCreateMachineFor(SESSION)).toBe(true)
   })
 
   it('names both servers when it asks', async () => {
@@ -667,12 +707,7 @@ describe('a link into another server (#304)', () => {
     // close Messagr completely and open the link again.
     const here = device()
     const result = await entering(here, null)
-    expect(result).toEqual({
-      entered: true,
-      session: SESSION,
-      claimed: false,
-      invitation: { kind: 'reopen' },
-    })
+    expect(result).toEqual(stayingWith({ kind: 'reopen' }))
     expect(here.calls).toEqual([])
     expect(here.held()).toEqual(UNTOUCHED)
   })
@@ -681,18 +716,25 @@ describe('a link into another server (#304)', () => {
     // A process a wake started holds the old account's machine before any
     // screen opens, and the next account would need a second one beside it.
     const here = device()
-    const { asked, otherServer } = answering('leave', here, () => true)
+    const { asked, questions, otherServer } = answering(
+      'leave',
+      here,
+      () => true,
+    )
     const result = await entering(here, otherServer)
     expect(result.entered && result.invitation).toEqual({ kind: 'reopen' })
     expect(asked).toEqual([])
     expect(here.calls).toEqual([])
+    expect(questions.mayCreateMachineFor(SESSION)).toBe(true)
   })
 
-  it('claims nothing, and says to reopen, when a crypto machine started while the question waited', async () => {
-    // Read again after the answer: a wake can start the old account's machine
-    // while somebody is still reading. A yes that finds one running cannot be
-    // carried out, and nothing of it is begun.
+  it('claims nothing, and says to reopen, when a crypto machine runs once the question is answered', async () => {
+    // Read again after the answer. The question keeps a wake from making the
+    // old account's machine while somebody reads, so this should find none;
+    // a yes that did find one could not be carried out, and nothing of it is
+    // begun.
     const here = device()
+    const questions = accountsInQuestion()
     let machine = false
     const otherServer: OtherServer = {
       ask: async () => {
@@ -700,52 +742,109 @@ describe('a link into another server (#304)', () => {
         return 'leave'
       },
       aMachineIsRunning: () => machine,
+      holdInQuestion: questions.hold,
+      after: never,
       departure: here.departure,
     }
     const result = await entering(here, otherServer)
-    expect(result).toEqual({
-      entered: true,
-      session: SESSION,
-      claimed: false,
-      invitation: { kind: 'reopen' },
-    })
+    expect(result).toEqual(stayingWith({ kind: 'reopen' }))
     expect(here.calls).toEqual([])
     expect(here.held()).toEqual(UNTOUCHED)
+    expect(questions.mayCreateMachineFor(SESSION)).toBe(true)
   })
 
-  it('leaves the old account untouched when the claim is refused, and tells the old server nothing', async () => {
-    // CLAIMED BEFORE ANYTHING ELSE (14 September 2026). A link that turns out
-    // to be spent or revoked must not cost somebody the account they had, and
-    // the list says so at once.
+  it('holds only the old account’s device while the question waits', async () => {
+    // Found in review on 14 September 2026: the question held every creation,
+    // so a question nobody answered kept any machine from being made, the new
+    // account's included.
+    const here = device()
+    const { questions, screen, otherServer } = onScreen(here)
+    const entry = entering(here, otherServer)
+    await flush()
+    expect(questions.mayCreateMachineFor(SESSION)).toBe(false)
+    expect(questions.mayCreateMachineFor(ENTERED_ELSEWHERE)).toBe(true)
+    screen.answer('stay')
+    await entry
+    expect(questions.mayCreateMachineFor(SESSION)).toBe(true)
+  })
+
+  it('lifts the question, as « stay », when the back gesture dismisses it', async () => {
+    const here = device()
+    const { questions, screen, otherServer } = onScreen(here)
+    const entry = entering(here, otherServer)
+    await flush()
+    expect(screen.back()).toBe(true)
+    expect(await entry).toEqual(stayingWith({ kind: 'elsewhere' }))
+    expect(questions.mayCreateMachineFor(SESSION)).toBe(true)
+    expect(here.calls).toEqual([])
+  })
+
+  it('lifts the question, as « stay », when the screen goes away unanswered', async () => {
+    const here = device()
+    const { questions, screen, otherServer } = onScreen(here)
+    const entry = entering(here, otherServer)
+    await flush()
+    screen.unmounted()
+    expect(await entry).toEqual(stayingWith({ kind: 'elsewhere' }))
+    expect(questions.mayCreateMachineFor(SESSION)).toBe(true)
+    expect(here.calls).toEqual([])
+  })
+
+  it('leaves the old account untouched when the claim is refused, and says to ask for a new link', async () => {
+    // CLAIMED BEFORE ANYTHING ELSE (14 September 2026). A link that is spent
+    // or revoked must not cost somebody the account they had, and opening it
+    // again would only be refused again.
     const here = device({ claim: { status: 404, body: '{}' } })
-    const { otherServer } = answering('leave', here)
+    const { questions, otherServer } = answering('leave', here)
     const result = await entering(here, otherServer)
-    expect(result).toEqual({
-      entered: true,
-      session: SESSION,
-      claimed: false,
-      invitation: { kind: 'retry', reason: 'this invitation cannot be used' },
-    })
+    expect(result).toEqual(
+      stayingWith({
+        kind: 'unusable',
+        reason: 'this invitation cannot be used',
+      }),
+    )
     expect(here.held()).toEqual(UNTOUCHED)
     expect(here.calls.map(call => call.url)).toEqual([
       'https://other.example/_messagr/invitations/claim',
     ])
+    expect(questions.mayCreateMachineFor(SESSION)).toBe(true)
   })
 
-  it('leaves the old account untouched when the invitation service cannot be reached', async () => {
+  it('leaves the old account untouched when the invitation service cannot be reached, and says to try again', async () => {
     const here = device({ claim: 'unreachable' })
     const { otherServer } = answering('leave', here)
     const result = await entering(here, otherServer)
-    expect(result).toEqual({
-      entered: true,
-      session: SESSION,
-      claimed: false,
-      invitation: {
+    expect(result).toEqual(
+      stayingWith({
         kind: 'retry',
         reason: 'the invitation service could not be reached',
-      },
-    })
+      }),
+    )
     expect(here.held()).toEqual(UNTOUCHED)
+  })
+
+  it('gives up a claim that does not answer in time, and forgets nothing', async () => {
+    // A request with no answer used to hold the account in question, and the
+    // launch with it, for as long as the network kept it open.
+    const here = device({ claim: 'silent' })
+    const questions = accountsInQuestion()
+    const otherServer: OtherServer = {
+      ask: async () => 'leave',
+      aMachineIsRunning: () => false,
+      holdInQuestion: questions.hold,
+      after: async () => undefined,
+      departure: here.departure,
+    }
+    const result = await entering(here, otherServer)
+    expect(result).toEqual(
+      stayingWith({
+        kind: 'retry',
+        reason: 'the invitation service did not answer in time',
+      }),
+    )
+    expect(here.held()).toEqual(UNTOUCHED)
+    expect(here.forgotten).toEqual([])
+    expect(questions.mayCreateMachineFor(SESSION)).toBe(true)
   })
 
   it('forgets the old account once the claim succeeds, and keeps the new one', async () => {
@@ -779,6 +878,54 @@ describe('a link into another server (#304)', () => {
     ])
   })
 
+  it('keeps the left account’s device from any machine, and not the new account’s', async () => {
+    // A wake that read the old session before the question reaches the
+    // machine after the departure. It finds that device closed for the rest of
+    // the process, while the new account's machine is free to be made.
+    const here = device()
+    const { questions, otherServer } = answering('leave', here)
+    await entering(here, otherServer)
+    expect(questions.mayCreateMachineFor(SESSION)).toBe(false)
+    expect(questions.mayCreateMachineFor(ENTERED_ELSEWHERE)).toBe(true)
+  })
+
+  it('keeps the new account’s device from a machine until the old account is forgotten', async () => {
+    // The new session is kept before the old account is forgotten, and a push
+    // the old server sends meanwhile wakes this context. That wake would find
+    // the new session and make its machine with the store passphrase the old
+    // account left -- which forgetting erases next, so the next launch could
+    // not open that store.
+    const here = device()
+    const { questions, otherServer } = answering('leave', here)
+    const whileForgetting: boolean[] = []
+    const forgetting: OtherServer = {
+      ...otherServer,
+      departure: {
+        ...otherServer.departure,
+        forget: async (account, keeping) => {
+          whileForgetting.push(questions.mayCreateMachineFor(ENTERED_ELSEWHERE))
+          await here.departure.forget(account, keeping)
+        },
+      },
+    }
+    await entering(here, forgetting)
+    expect(whileForgetting).toEqual([false])
+    expect(questions.mayCreateMachineFor(ENTERED_ELSEWHERE)).toBe(true)
+  })
+
+  it('puts no account in question while a link into the same server is claimed', async () => {
+    // Found in review on 14 September 2026: the same link delivered twice made
+    // the run handed no link wait for the other run's claim, which can take
+    // half a minute, where before #304 it went on at once. Only a question
+    // makes a run wait now, and this path asks none.
+    const here = device({ claim: 'silent' })
+    const { questions, otherServer } = answering('leave', here)
+    entering(here, otherServer, 'https://messagr.eu/i/abc123')
+    await flush()
+    expect(here.calls).toHaveLength(1)
+    expect(await questions.waitFor(SESSION)).toBe(false)
+  })
+
   it('keeps the new password before it forgets anything of the old account', async () => {
     // Forgetting takes a while -- a dozen keystore entries, a notebook, a
     // crypto store -- and a stop in the middle of it must find the new account
@@ -801,40 +948,41 @@ describe('a link into another server (#304)', () => {
     expect(here.passwordWhenSessionKept).toEqual([null])
   })
 
-  it('goes back to the old account when the new session could not be kept', async () => {
+  it('goes back to the old account when the new session could not be kept, and says the link is spent', async () => {
     // A keystore that refuses the new session keeps the old one, and the old
-    // account is then the only one this device can hold. So this launch stays
-    // on it -- running the new account from memory would write its sync and
-    // its notebook into what the old account left -- and the list says the
-    // link could not be followed. Only the old password is gone: it went
-    // first, for the reason the test above gives.
+    // account is then the only one this device can hold. The claim spent the
+    // token all the same, so the list says to ask for a new invitation rather
+    // than to open this one again.
     const here = device({ sessionWrite: 'refused' })
-    const { otherServer } = answering('leave', here)
+    const { questions, otherServer } = answering('leave', here)
     const result = await entering(here, otherServer)
-    expect(result).toEqual({
-      entered: true,
-      session: SESSION,
-      claimed: false,
-      invitation: {
-        kind: 'retry',
+    expect(result).toEqual(
+      stayingWith({
+        kind: 'spent',
         reason: 'this device could not keep the new account',
-      },
-    })
+      }),
+    )
     expect(here.forgotten).toEqual(['the old password'])
     expect(here.calls.map(call => call.url)).toEqual([
       'https://other.example/_messagr/invitations/claim',
     ])
+    expect(questions.mayCreateMachineFor(SESSION)).toBe(true)
   })
 
-  it('never leaves a password of the new account beside the old session', async () => {
-    // A launch that re-enters after a reinstall sends the password it holds
-    // to the server of the session it holds. The new account's password beside
-    // the old session would go to the old server.
+  it('writes the old password back beside the old session, and never the new one', async () => {
+    // A reinstalled iPhone comes back through `reenter`, which sends the
+    // password it holds to the server of the session it holds. The old
+    // password beside the old session keeps that pair right and keeps the
+    // device from being stranded; the new account's password there would go to
+    // the old server.
     const here = device({ sessionWrite: 'refused' })
     const { otherServer } = answering('leave', here)
     await entering(here, otherServer)
     const { session, password } = here.held()
-    expect({ session, password }).toEqual({ session: SESSION, password: null })
+    expect({ session, password }).toEqual({
+      session: SESSION,
+      password: 'old-password',
+    })
   })
 })
 

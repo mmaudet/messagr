@@ -260,6 +260,10 @@ export const nl: Readonly<Record<CopyKey, string>> = {
     'Deze uitnodiging leidt naar een andere server. Sluit Messagr volledig en open de link opnieuw om haar te volgen.',
   list_invitation_retry:
     'Deze uitnodiging kon niet worden gevolgd, en uw account blijft op dit apparaat. Sluit Messagr volledig en open de link opnieuw om het nog eens te proberen.',
+  list_invitation_unusable:
+    'Deze uitnodiging kan niet worden gebruikt. Uw account blijft op dit apparaat. Vraag de afzender om een nieuwe.',
+  list_invitation_spent:
+    'Deze uitnodiging is gebruikt, maar dit apparaat kon het nieuwe account niet bewaren. Uw account blijft op dit apparaat. Vraag de afzender om een nieuwe uitnodiging.',
   'list_invitation_already %@':
     'U hebt al een gesprek met %@. Dat loopt door: de uitnodiging heeft geen tweede geopend.',
   list_not_in_yet:

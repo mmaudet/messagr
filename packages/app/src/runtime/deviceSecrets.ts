@@ -346,9 +346,10 @@ export const storeDirectorySecrets = keychainStore(
  * Erases every entry declared the account's except those in `keeping`, and
  * none of the device's. #304: what leaving an account takes from the keystore.
  *
- * `keeping` is what the next account has already written -- its session and
- * its sign-up marker -- which belong to it by then, and not to the account
- * being left. `entry.ts` says why they are written before this runs.
+ * `keeping` is what the next account has already written -- its session, its
+ * sign-up marker and its password -- which belong to it by then, and not to
+ * the account being left. `entry.ts` says why they are written before this
+ * runs.
  */
 export async function forgetAccountSecrets(
   keeping: readonly SecretStore[],

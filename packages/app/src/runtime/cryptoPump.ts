@@ -45,7 +45,7 @@ import {
 } from 'react-native-matrix-crypto'
 
 import { acceptBackup, type BackupAccepted } from './acceptBackup'
-import { accountInQuestion } from './accountInQuestion'
+import { theAccountsInQuestion } from './accountInQuestion'
 import { oneMachine } from './oneMachine'
 import type { EventCache } from './eventCacheStore'
 import { eventsToBuildFrom } from './eventsToBuildFrom'
@@ -207,10 +207,10 @@ export type MachineStartResult = {
  * process is a thing to refuse loudly rather than to reuse.
  *
  * The rule lives in `oneMachine.ts`, where it is tested. Since #304 it takes
- * the context from the moment a creation begins, and creates nothing while
- * this device decides whether to leave its account.
+ * the context from the moment a creation begins, and makes no machine for the
+ * device of an account in question, or of one that has left this telephone.
  */
-const machines = oneMachine(accountInQuestion)
+const machines = oneMachine(theAccountsInQuestion.mayCreateMachineFor)
 
 /** Whether this context already holds a machine for `deviceId`. */
 export function cryptoMachineIsRunning(deviceId: string): boolean {
@@ -291,12 +291,12 @@ export async function startCryptoMachine(
     }
   }
 
-  // ONE MACHINE PER CONTEXT, AND NONE WHILE THE ACCOUNT IS IN QUESTION. See
+  // ONE MACHINE PER CONTEXT, AND NONE FOR AN ACCOUNT IN QUESTION. See
   // `machines`: the wake and the launch share a JavaScript context when the
   // application is warm, and a second `createCryptoMachine` against the same
   // file is how room keys are lost. Asked here, at the moment a machine would
   // be created, and not once beforehand (#304).
-  const start = machines.start(credentials.deviceId)
+  const start = machines.start(credentials)
   if (start.kind === 'refused') {
     return { started: false, reason: start.reason, passphraseForm }
   }

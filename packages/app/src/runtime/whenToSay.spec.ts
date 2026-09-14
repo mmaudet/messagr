@@ -23,17 +23,21 @@ describe('whenToSay', () => {
   })
 
   it('says at once that a yes could not be carried out, however it failed', () => {
-    // Said after the pump, this waited on the old account's server, which
-    // somebody leaving it may no longer reach -- and then nothing was said.
-    // The sentence holds for a spent link, for a service that could not be
-    // reached and for a device that could not keep the new account: the old
-    // account stays, and opening the link again tries again.
-    expect(
-      whenToSay({
-        kind: 'retry',
-        reason: 'the invitation service could not be reached',
-      }),
-    ).toBe('on-entry')
+    // Said after the pump, these waited on the old account's server, which
+    // somebody leaving it may no longer reach -- and then nothing was said. A
+    // link that cannot be used, a service out of reach and a device that could
+    // not keep the new account each have a sentence of their own, and each is
+    // owed at once.
+    const failures = [
+      { kind: 'unusable', reason: 'this invitation cannot be used' },
+      { kind: 'retry', reason: 'the invitation service could not be reached' },
+      { kind: 'spent', reason: 'this device could not keep the new account' },
+    ] as const
+    expect(failures.map(failure => whenToSay(failure))).toEqual([
+      'on-entry',
+      'on-entry',
+      'on-entry',
+    ])
   })
 
   it('says at once why a link into another server was not followed', () => {

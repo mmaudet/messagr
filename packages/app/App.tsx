@@ -244,7 +244,8 @@ import { useKeyboardInset } from './src/ui/keyboardInset'
 import { sweepWhatThePickerLeft } from './src/runtime/imageLibrary'
 import { afterReinstall } from './src/runtime/afterReinstall'
 import { departureFrom } from './src/runtime/leavingThisDevice'
-import { putTheAccountInQuestion } from './src/runtime/accountInQuestion'
+import { theAccountsInQuestion } from './src/runtime/accountInQuestion'
+import { questionOnScreen, type Asked } from './src/runtime/questionOnScreen'
 import { whenToSay } from './src/runtime/whenToSay'
 import { launchEntries } from './src/runtime/launchEntries'
 import {
@@ -1007,22 +1008,16 @@ export function App({
    * `null` on every other launch. While it is not, the screen is the question
    * and nothing else, because the launch is waiting inside entry: for the
    * answer, then after a yes for the claim, which is what `answered` draws.
-   * The answer travels through `answerTheQuestionRef`: a function held in
-   * state would be called by React as an updater.
    */
-  const [otherServerQuestion, setOtherServerQuestion] = useState<{
-    readonly account: string
-    readonly link: string
-    readonly answered: boolean
-  } | null>(null)
-  const answerTheQuestionRef = useRef<
-    ((answer: 'leave' | 'stay') => void) | null
-  >(null)
+  const [otherServerQuestion, setOtherServerQuestion] = useState<Asked | null>(
+    null,
+  )
   /**
-   * Whether a run of the launch is between putting that question and its
-   * entry answering. No second question is put meanwhile. See the launch.
+   * What puts that question and what answers it: its two buttons, the back
+   * gesture, and this screen going away. See `questionOnScreen.ts`. Held per
+   * mount, like the launch below.
    */
-  const questionBusyRef = useRef(false)
+  const questionRef = useRef(questionOnScreen(setOtherServerQuestion))
   /**
    * Which entries belong to the launch of this screen. See `launchEntries.ts`:
    * held per mount, since a screen mounted again reads its link the way a
@@ -1622,9 +1617,9 @@ export function App({
       // WHETHER THIS ENTRY BELONGS TO THE LAUNCH, decided by when it begins
       // rather than by how its link arrived. See `launchEntries.ts`.
       const thisEntry = launchRef.current.begin()
-      // What lifts the question this run put, when it put one. See
-      // `accountInQuestion.ts`.
-      let releaseTheQuestion: (() => void) | null = null
+      // What takes the question this run put off the screen, when it put one.
+      // See `questionOnScreen.ts`.
+      let settleTheQuestion: (() => void) | null = null
       // ONE CLAIM PER LINK AT A TIME. A link another run of this launch is
       // still claiming is not handed over again, and the mark is lifted the
       // moment this entry answers -- so the same link opened again after a
@@ -1665,24 +1660,19 @@ export function App({
                     // THE QUESTION, ON THE SCREEN AND AWAITED. This launch
                     // waits inside entry until it is answered, and the
                     // re-entry after a reinstall and the pump both come
-                    // after.
-                    //
-                    // One question at a time. A second one, arriving while
-                    // the first is answered or a yes is carried out, is
-                    // answered « stay » without being put: staying sends
-                    // nothing, and that run then stops at the wait below.
+                    // after. One question at a time: a second one is
+                    // answered « stay » without being shown, and that run
+                    // then waits at the gate below. See
+                    // `questionOnScreen.ts`.
                     ask: hosts => {
-                      if (questionBusyRef.current) {
-                        return Promise.resolve('stay')
-                      }
-                      questionBusyRef.current = true
-                      releaseTheQuestion = putTheAccountInQuestion()
-                      return new Promise<'leave' | 'stay'>(resolve => {
-                        answerTheQuestionRef.current = resolve
-                        setOtherServerQuestion({ ...hosts, answered: false })
-                      })
+                      const put = questionRef.current.put(hosts)
+                      settleTheQuestion = put.settle
+                      return put.answer
                     },
                     aMachineIsRunning: aCryptoMachineIsRunning,
+                    holdInQuestion: theAccountsInQuestion.hold,
+                    after: ms =>
+                      new Promise(resolve => setTimeout(resolve, ms)),
                     departure: departureFrom(storeDir),
                   }
                 : null,
@@ -1690,11 +1680,7 @@ export function App({
         )
         .finally(() => {
           thisEntry.end()
-          if (releaseTheQuestion !== null) {
-            questionBusyRef.current = false
-            setOtherServerQuestion(null)
-            releaseTheQuestion()
-          }
+          if (settleTheQuestion !== null) settleTheQuestion()
         })
       // WHAT BECAME OF AN ACCOUNT THIS LAUNCH LEFT, ON ITS OWN SERVER. #304.
       // Logged whenever that server answers, which may be after this launch
@@ -1717,8 +1703,8 @@ export function App({
       const leftAnAccount = entered.entered && entered.left !== undefined
       if (leftAnAccount) setSummaries([])
       const opening = leftAnAccount ? await bindNotebook() : opened
-      // A RUN THAT RESTORED A SESSION WAITS FOR ANY ENTRY STILL SPENDING A
-      // LINK, THEN LOOKS AGAIN AT WHICH ACCOUNT THIS DEVICE HOLDS. #304.
+      // A RUN THAT RESTORED THE ACCOUNT IN QUESTION WAITS FOR THE ANSWER, THEN
+      // LOOKS AGAIN AT WHICH ACCOUNT THIS DEVICE HOLDS. #304.
       //
       // One opening of a link can start two runs of this launch, and the run
       // handed no link restores the session it found while the other may be
@@ -1726,10 +1712,15 @@ export function App({
       // it, or publish under it, before the person answered. So this run
       // waits, and if the account was left meanwhile it has nothing left to
       // launch: the run that asked carries the launch from here.
+      //
+      // ONLY THEN. A run whose account nobody is asking about goes on at once,
+      // as it did before #304: waiting for any claim under way made the same
+      // link into the same server, delivered twice, wait for the other run's
+      // claim, half a minute at worst. See `accountInQuestion.ts`.
       if (
         entered.entered &&
         !entered.claimed &&
-        (await spentLinksRef.current.waitedForAnotherEntry()) &&
+        (await theAccountsInQuestion.waitFor(entered.session)) &&
         !sameSession(await loadSession(sessionSecrets), entered.session)
       ) {
         logEvent('info', 'MESSAGR_LAUNCH_SUPERSEDED', {})
@@ -3550,6 +3541,10 @@ export function App({
   // which is a worse bug than the one it fixes.
   useEffect(() => {
     const back = () => {
+      // THE QUESTION A LINK INTO ANOTHER SERVER PUTS, which is the whole
+      // screen while it is there. Back answers it « stay » (#304): see
+      // `questionOnScreen.ts`.
+      if (questionRef.current.back()) return true
       if (trust !== null) {
         setTrust(null)
         return true
@@ -3610,6 +3605,14 @@ export function App({
     invite.stage,
     tab,
   ])
+
+  // A SCREEN THAT GOES AWAY WITH THE QUESTION UNANSWERED ANSWERS IT « STAY »
+  // (#304): nobody is left to say yes, and entry must not keep the account in
+  // question for a question nobody can see.
+  useEffect(() => {
+    const question = questionRef.current
+    return () => question.unmounted()
+  }, [])
 
   // STABLE ACROSS RENDERS, AND THAT IS THE WHOLE POINT.
   //
@@ -3721,16 +3724,6 @@ export function App({
   // meanwhile: a list drawn from an account that may be about to go is a list
   // of conversations the next tap could make disappear.
   if (otherServerQuestion !== null) {
-    const answer = (given: 'leave' | 'stay') => {
-      const resolve = answerTheQuestionRef.current
-      answerTheQuestionRef.current = null
-      // A yes keeps the question on the screen, drawn as under way, until
-      // entry answers: the claim comes first and can take half a minute.
-      setOtherServerQuestion(
-        given === 'leave' ? { ...otherServerQuestion, answered: true } : null,
-      )
-      resolve?.(given)
-    }
     return (
       <GestureHandlerRootView style={styles.root}>
         <SafeAreaProvider>
@@ -3738,8 +3731,8 @@ export function App({
             account={otherServerQuestion.account}
             link={otherServerQuestion.link}
             working={otherServerQuestion.answered}
-            onLeave={() => answer('leave')}
-            onStay={() => answer('stay')}
+            onLeave={() => questionRef.current.answer('leave')}
+            onStay={() => questionRef.current.answer('stay')}
           />
         </SafeAreaProvider>
       </GestureHandlerRootView>
