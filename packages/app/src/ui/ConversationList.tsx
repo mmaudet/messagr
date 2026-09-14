@@ -142,12 +142,14 @@ export function ConversationList({
           would send them to ask for a new link, and a new link into that
           server would only put the same question again. So does one that
           arrived while Messagr was open: only a cold launch can follow it,
-          and the sentence says how to get one. And so does a yes that could
-          not be carried out, in one of three sentences, because a person acts
-          on the difference: a link refused, which only a new one replaces; a
-          claim that may go through next time, which opening the link again
-          retries; and a link spent for an account this device could not
-          keep. The old account stays in all three. */}
+          and the sentence says how to get one. And so does a link that could
+          not replace the account this device holds -- after a yes (#304), or
+          for a session this device can no longer use (#307) -- in one of
+          three sentences, because a person acts on the difference: a link
+          refused, which only a new one replaces; a claim that may go through
+          next time, which opening the link again retries; and a link spent
+          for an account this device could not keep. The old account stays in
+          all three. */}
       {invitation !== null && invitation !== undefined && (
         <Text style={styles.ignored} testID="list-invitation-ignored">
           {invitation.kind === 'used'

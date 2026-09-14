@@ -1649,40 +1649,48 @@ export function App({
               // 409, and reports a link that cannot be used -- which is what it
               // does on a device with nothing else changed.
               wait: ms => new Promise(resolve => setTimeout(resolve, ms)),
-              // A LINK INTO ANOTHER SERVER IS FOLLOWED FROM A COLD LAUNCH ONLY
-              // (#304, decided on 14 September 2026). `null` for an entry that
-              // is not part of the launch, and `entry.ts` then says to reopen
-              // Messagr. Whether a crypto machine already runs -- one a wake
-              // started, say -- entry asks itself, before the question and
-              // again after the answer.
-              otherServer: thisEntry.cold
-                ? {
-                    // THE QUESTION, ON THE SCREEN AND AWAITED. This launch
-                    // waits inside entry until it is answered, and the
-                    // re-entry after a reinstall and the pump both come
-                    // after. One question at a time: a second one is
-                    // answered « stay » without being shown, and that run
-                    // then waits at the gate below. See
-                    // `questionOnScreen.ts`.
-                    ask: hosts => {
+              // A SESSION THIS DEVICE CAN NO LONGER USE -- its store gone, no
+              // password kept -- is told apart before the link is spent for
+              // it (#307). See `entry.ts`.
+              storeExists: account =>
+                cryptoStoreExists(storeDir, account.deviceId),
+              // LEAVING THE ACCOUNT THIS DEVICE HOLDS FOR A LINK: after a
+              // question when the link leads to another server (#304), or
+              // without one for a session this device can no longer use
+              // (#307). Whether a crypto machine already runs -- one a wake
+              // started, say -- entry asks itself.
+              leaving: {
+                // A LINK INTO ANOTHER SERVER IS FOLLOWED FROM A COLD LAUNCH
+                // ONLY (#304, decided on 14 September 2026). `null` for an
+                // entry that is not part of the launch, and `entry.ts` then
+                // says to reopen Messagr.
+                //
+                // THE QUESTION, ON THE SCREEN AND AWAITED. This launch waits
+                // inside entry until it is answered, and the re-entry after a
+                // reinstall and the pump both come after. One question at a
+                // time: a second one is answered « stay » without being
+                // shown, and that run then waits at the gate below. See
+                // `questionOnScreen.ts`.
+                ask: thisEntry.cold
+                  ? hosts => {
                       const put = questionRef.current.put(hosts)
                       settleTheQuestion = put.settle
                       return put.answer
-                    },
-                    aMachineIsRunning: aCryptoMachineIsRunning,
-                    holdInQuestion: theAccountsInQuestion.hold,
-                    after: ms =>
-                      new Promise(resolve => setTimeout(resolve, ms)),
-                    departure: departureFrom(storeDir),
-                  }
-                : null,
+                    }
+                  : null,
+                aMachineIsRunning: aCryptoMachineIsRunning,
+                holdInQuestion: theAccountsInQuestion.hold,
+                after: ms => new Promise(resolve => setTimeout(resolve, ms)),
+                departure: departureFrom(storeDir),
+              },
             }),
         )
         .finally(() => {
           thisEntry.end()
           if (settleTheQuestion !== null) settleTheQuestion()
         })
-      // WHAT BECAME OF AN ACCOUNT THIS LAUNCH LEFT, ON ITS OWN SERVER. #304.
+      // WHAT BECAME OF AN ACCOUNT THIS LAUNCH LEFT, ON ITS OWN SERVER. #304,
+      // #307.
       // Logged whenever that server answers, which may be after this launch
       // has finished, or never: nothing waits for it, on purpose.
       if (entered.entered && entered.left !== undefined) {
@@ -1708,10 +1716,11 @@ export function App({
       //
       // One opening of a link can start two runs of this launch, and the run
       // handed no link restores the session it found while the other may be
-      // asking whether to leave that very account. Going on would re-enter
-      // it, or publish under it, before the person answered. So this run
-      // waits, and if the account was left meanwhile it has nothing left to
-      // launch: the run that asked carries the launch from here.
+      // asking whether to leave that very account -- or leaving it without a
+      // question, when this device can no longer use it (#307). Going on
+      // would re-enter it, or publish under it, before that is settled. So
+      // this run waits, and if the account was left meanwhile it has nothing
+      // left to launch: the run that left carries the launch from here.
       //
       // ONLY THEN. A run whose account nobody is asking about goes on at once,
       // as it did before #304: waiting for any claim under way made the same
