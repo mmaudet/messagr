@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
+  AccessibilityInfo,
   AppState,
   BackHandler,
   Linking,
@@ -1058,6 +1059,11 @@ export function App({
           setBackupPrompt({ restoreKey: shown.restoreKey })
         } else if (shown.show === 'failure') {
           setAcceptFailed(from)
+          // A CARD NOBODY SEES IS THE SILENCE THIS REPLACED. Somebody using a
+          // screen reader hears nothing when a card appears under a button,
+          // and would believe their keys were kept. Only here: the gate
+          // answers `failure` for the attempt of this very screen.
+          AccessibilityInfo.announceForAccessibility(t('backup_accept_failed'))
         }
         // `nothing`: the screen it came from was left, and a failure said now
         // would land on a screen that is not the one it was about.
