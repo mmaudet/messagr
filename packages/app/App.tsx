@@ -1092,10 +1092,10 @@ export function App({
     })
   })
   // THIS MOUNT RECEIVES WHAT SETTLES, an acceptance's or a replacement's, a
-  // key included that settled while no mount was there to show it (#284). A
-  // key is always shown: it opens a backup that now exists, and nothing can
-  // show it later. A failure is said only while the screen it is about is
-  // showing, and dropped otherwise.
+  // key included that settled while no mount was there to show it, or while
+  // the one it went to was going away (#284). A key is always shown: it opens
+  // a backup that now exists, and nothing can show it later. A failure is said
+  // only while the screen it is about is showing, and dropped otherwise.
   useEffect(
     () =>
       backupAcceptance.receive(settled => {
@@ -5195,10 +5195,12 @@ export function App({
             <BackupOffer
               failed={acceptFailed === 'offer'}
               working={backupWorking !== null}
-              // The key exists for exactly as long as `backupPrompt` holds
-              // it: nothing else has a copy, here or on the homeserver.
-              // `acceptBackup.ts` hands it back precisely once and never on a
-              // failure, and a failure keeps this screen up to say so.
+              // The key exists for exactly as long as the key screen is up:
+              // `backupPrompt` holds it, and `backupAcceptance` beside it
+              // until `onDone`, and nothing else has a copy, here or on the
+              // homeserver. `acceptBackup.ts` hands it back precisely once and
+              // never on a failure, and a failure keeps this screen up to say
+              // so.
               onAccept={() => acceptTheBackup('offer')}
               onRefuse={() => {
                 // An acceptance still running goes on: its key is shown if
@@ -5337,13 +5339,18 @@ export function App({
               onCopy={() => Clipboard.setString(backupPrompt.restoreKey)}
               // DROPPED HERE AND NOWHERE ELSE. Leaving this screen is the
               // moment the only copy of the key stops existing in this
-              // process, which is what « montrée une fois » means in code.
+              // process, which is what « montrée une fois » means in code:
+              // `backupAcceptance` keeps it until then, so that a mount going
+              // away cannot take the one sight of it with it (#284).
               //
               // And whatever is behind is put right here rather than when it
               // was left: a Réglages screen that said « vos messages ne sont
               // pas sauvegardés » before this key existed would be lying the
               // moment it came back into view.
-              onDone={() => setBackupPrompt(null)}
+              onDone={() => {
+                backupAcceptance.keyDone()
+                setBackupPrompt(null)
+              }}
             />
           </SafeAreaView>
         )}

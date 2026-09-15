@@ -44,10 +44,15 @@ export type AcceptanceSettled =
  *
  * # A KEY IS KEPT, A FAILURE IS NOT
  *
- * A key that settles while no screen is mounted waits for the next one,
- * because it opens a backup that now exists and nothing can show it later. A
- * failure with nobody to tell is let go. Whether a failure is said, and where,
- * is for the screen that receives it to decide, from what it shows now.
+ * A key is kept until the key screen is done with it, and handed to every
+ * screen that starts receiving before then, because it opens a backup that now
+ * exists and nothing can show it later. Found in review: it was kept only while
+ * no screen was mounted, but a mount lets go in its passive cleanup, after it
+ * has stopped drawing, and a key that settled in between went to a screen that
+ * could no longer show it.
+ *
+ * A failure with nobody to tell is let go. Whether a failure is said, and
+ * where, is for the screen that receives it to decide, from what it shows now.
  */
 export interface Acceptance {
   /**
@@ -73,16 +78,22 @@ export interface Acceptance {
   readonly subscribe: (changed: () => void) => () => void
   /**
    * Makes `settled` the one screen that receives what settles, and hands it at
-   * once a key that settled while none was mounted. Answers how to let go, and
+   * once a key the key screen is not done with yet. Answers how to let go, and
    * letting go after another screen took over changes nothing.
    */
   readonly receive: (settled: (what: AcceptanceSettled) => void) => () => void
+  /**
+   * The key screen is done with the key: somebody said they put it away. No
+   * screen is handed it again, and the copy kept here goes.
+   */
+  readonly keyDone: () => void
 }
 
 export function acceptance(): Acceptance {
   let running: BackupGesture | null = null
   let receiver: ((what: AcceptanceSettled) => void) | null = null
-  let pendingKey: Extract<AcceptanceSettled, { show: 'key' }> | null = null
+  /** The key the key screen is not done with yet. */
+  let heldKey: Extract<AcceptanceSettled, { show: 'key' }> | null = null
   const watchers = new Set<() => void>()
 
   const setRunning = (now: BackupGesture | null) => {
@@ -92,7 +103,8 @@ export function acceptance(): Acceptance {
 
   /**
    * One gesture behind the gate, whichever it is: what it settles goes to the
-   * screen mounted, and a key to the next one when none is.
+   * screen mounted, and a key is kept as well, for every screen that starts
+   * receiving before the key screen is done with it.
    */
   const run = <Outcome>(
     name: BackupGesture,
@@ -109,8 +121,10 @@ export function acceptance(): Acceptance {
       .then(settles, (): AcceptanceSettled => refused)
       .then(what => {
         setRunning(null)
+        // KEPT BEFORE IT IS HANDED, whoever receives it: the screen mounted
+        // may be going away, and nothing here can tell.
+        if (what.show === 'key') heldKey = what
         if (receiver !== null) receiver(what)
-        else if (what.show === 'key') pendingKey = what
       })
     return true
   }
@@ -151,14 +165,13 @@ export function acceptance(): Acceptance {
     },
     receive: settled => {
       receiver = settled
-      if (pendingKey !== null) {
-        const key = pendingKey
-        pendingKey = null
-        settled(key)
-      }
+      if (heldKey !== null) settled(heldKey)
       return () => {
         if (receiver === settled) receiver = null
       }
+    },
+    keyDone: () => {
+      heldKey = null
     },
   }
 }

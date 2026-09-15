@@ -174,9 +174,10 @@ describe('one acceptance at a time, whatever mounts the screen', () => {
     expect(shown).toEqual([{ show: 'failure' }, { show: 'failure' }])
   })
 
-  it('keeps a key that settled while no screen was mounted, for the next one', async () => {
+  it('keeps a key that settled while no screen was mounted, until the key screen is done with it', async () => {
     // The whole of the remount: the acceptance went through with no App to
-    // show its key, and the next App has to show it, once.
+    // show its key, and the next App has to show it, until somebody has said
+    // they put it away.
     const backup = acceptance()
     backup.start(async () => ACCEPTED)
     await settled()
@@ -184,10 +185,44 @@ describe('one acceptance at a time, whatever mounts the screen', () => {
     const first: unknown[] = []
     const second: unknown[] = []
     backup.receive(what => first.push(what))
+    backup.keyDone()
     backup.receive(what => second.push(what))
 
     expect(first).toEqual([{ show: 'key', restoreKey: 'EsTx aaaa bbbb cccc' }])
     expect(second).toEqual([])
+  })
+
+  it('hands a key again to the next screen when the one it went to was going away', async () => {
+    // #284, found in review: a mount lets go in its passive cleanup, after it
+    // has stopped drawing. A key that settled in between went to a screen that
+    // could no longer show it, and the next mount received nothing: a backup
+    // whose key nobody has seen.
+    const backup = acceptance()
+    const going: unknown[] = []
+    const next: unknown[] = []
+    const letGo = backup.receive(what => going.push(what))
+    backup.start(async () => ACCEPTED)
+    await settled()
+    letGo()
+    backup.receive(what => next.push(what))
+
+    expect(going).toEqual([{ show: 'key', restoreKey: 'EsTx aaaa bbbb cccc' }])
+    expect(next).toEqual([{ show: 'key', restoreKey: 'EsTx aaaa bbbb cccc' }])
+  })
+
+  it('hands a key to no later screen once the key screen is done with it', async () => {
+    // « Montrée une fois »: once somebody has said they put it away, no copy
+    // is left for a later mount to draw.
+    const backup = acceptance()
+    backup.receive(() => undefined)
+    backup.start(async () => ACCEPTED)
+    await settled()
+    backup.keyDone()
+
+    const later: unknown[] = []
+    backup.receive(what => later.push(what))
+
+    expect(later).toEqual([])
   })
 
   it('lets a failure go when no screen was mounted to say it', async () => {
