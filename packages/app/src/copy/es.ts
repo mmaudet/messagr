@@ -544,6 +544,7 @@ export const es: Readonly<Record<CopyKey, string>> = {
   backup_offer_accept: 'Guardar mis claves',
   backup_offer_refuse: 'Ahora no',
   backup_offer_later: 'Podrá activarlo más tarde desde Ajustes.',
+  backup_accept_failed: 'No se ha podido activar la copia. Inténtelo de nuevo.',
   backup_replace_title: 'Sustituir su clave de recuperación',
   backup_replace_lead: 'Antes de decidir, lo que este gesto se lleva.',
   backup_replace_fact_old: 'La clave antigua no abrirá nada',

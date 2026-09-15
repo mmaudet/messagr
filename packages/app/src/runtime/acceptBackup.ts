@@ -1,4 +1,6 @@
 import type { BackupCommitment } from './backupCommitment'
+import { getErrorMessage } from './errors'
+import { logEvent } from './log'
 
 /**
  * Accepting the backup: four steps, two of which are this application's own
@@ -130,8 +132,9 @@ export async function acceptBackup(
   // worth making all the same.
   await deps.rememberAsked()
 
-  // Outside every `try` below: it cannot fail, and wrapping it would put a
-  // branch in this function for a case that does not exist.
+  // Outside every `try` below: it makes no request and changes nothing, and
+  // it throws only when the bridge's native module never installed, which no
+  // step here names. `acceptBackupFrom` answers that rejection as `thrown`.
   const setup = deps.createKeyBackup()
 
   let version: string
@@ -160,4 +163,64 @@ export async function acceptBackup(
   }
 
   return { accepted: true, restoreKey: setup.restoreKey }
+}
+
+/** The two screens an acceptance starts from. */
+export type AcceptedFrom = 'offer' | 'settings'
+
+/**
+ * What a screen is answered: the acceptance's own answer, or `thrown` for one
+ * that rejected instead of answering.
+ */
+export type BackupAcceptedFrom =
+  BackupAccepted | { readonly accepted: false; readonly failedAt: 'thrown' }
+
+/**
+ * An acceptance as a screen runs it: it never rejects, and a failure leaves a
+ * line saying where it stopped (#284).
+ *
+ * # WHY THIS EXISTS
+ *
+ * The offer and Réglages each ran the acceptance and, when it failed, drew
+ * nothing and wrote nothing. The offer closed, Réglages stayed as it was, and
+ * the person was left believing their keys were kept, while nobody reading
+ * the telephone's log could tell an acceptance had even been tried. Since
+ * #314 a failed acceptance also counts as an answer, so the offer never comes
+ * back to catch it: what the screen says at that moment is all there is.
+ *
+ * # `thrown`, BESIDE THE THREE STEPS
+ *
+ * `createKeyBackup` is called outside every `try` above, and the bridge
+ * throws from it when its native module never installed. A rejection is
+ * answered as a failure like the other three, so the screen says so instead
+ * of nothing.
+ *
+ * # WHAT THE LINE CARRIES
+ *
+ * The step and the screen, which a store build writes: `log.ts` names both in
+ * TRACE. The cause of a throw only where the whole log is written, because an
+ * error message can carry an account or an address.
+ */
+export async function acceptBackupFrom(
+  from: AcceptedFrom,
+  accept: () => Promise<BackupAccepted>,
+): Promise<BackupAcceptedFrom> {
+  let outcome: BackupAccepted
+  try {
+    outcome = await accept()
+  } catch (cause: unknown) {
+    logEvent('warn', 'MESSAGR_BACKUP_ACCEPT_FAILED', {
+      from,
+      failedAt: 'thrown',
+      because: getErrorMessage(cause),
+    })
+    return { accepted: false, failedAt: 'thrown' }
+  }
+  if (!outcome.accepted) {
+    logEvent('warn', 'MESSAGR_BACKUP_ACCEPT_FAILED', {
+      from,
+      failedAt: outcome.failedAt,
+    })
+  }
+  return outcome
 }

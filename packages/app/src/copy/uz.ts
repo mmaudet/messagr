@@ -560,6 +560,7 @@ export const uz: Readonly<Record<CopyKey, string>> = {
   backup_offer_accept: 'Kalitlarimni zaxiralash',
   backup_offer_refuse: 'Hozir emas',
   backup_offer_later: 'Buni keyinroq Sozlamalardan yoqishingiz mumkin.',
+  backup_accept_failed: 'Zaxirani yoqib boʻlmadi. Qayta urinib koʻring.',
   backup_replace_title: 'Tiklash kalitingizni almashtirish',
   backup_replace_lead: 'Qaror qilishdan oldin, bu imo nimani olib ketadi.',
   backup_replace_fact_old: 'Eski kalit endi hech nimani ochmaydi',

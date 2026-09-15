@@ -71,6 +71,7 @@ import {
   type CallRecord,
 } from './src/runtime/callLogStore'
 import { CallsList } from './src/ui/CallsList'
+import { acceptBackupFrom, type AcceptedFrom } from './src/runtime/acceptBackup'
 import type { BackupVersionInfo } from './src/runtime/backupCalls'
 import { getErrorMessage } from './src/runtime/errors'
 import {
@@ -563,6 +564,20 @@ export function App({
     | null
   >(null)
   /**
+   * Which screen's acceptance of the backup did not go through, so that
+   * screen can say so (#284).
+   *
+   * Beside `backupPrompt` rather than a fourth value of it. The offer stays
+   * `'offering'`, and a failure from Réglages covers nothing: held in
+   * `backupPrompt`, it would also have held back the reading of the backup
+   * screen, which waits for `null` before it asks.
+   *
+   * Cleared when an acceptance starts, when the offer is refused and when the
+   * backup screen is left: a failure is said where it happened, not the next
+   * time somebody comes back.
+   */
+  const [acceptFailed, setAcceptFailed] = useState<AcceptedFrom | null>(null)
+  /**
    * Reads the backup's state whenever that screen is showing and nothing is
    * covering it.
    *
@@ -994,6 +1009,37 @@ export function App({
     readonly baseUrl: string
     readonly accessToken: string
   } | null>(null)
+  /**
+   * Accepts the backup from one of the two screens that offer it, and puts
+   * what came of it on that screen (#284).
+   *
+   * One function for both, because two handlers each settling the outcome on
+   * their own is how the failure went unsaid in both: each turned it into a
+   * `null` and drew nothing. A success shows the key; a failure keeps the
+   * screen and says so there, and `acceptBackupFrom` writes the line.
+   *
+   * A launch that holds no session answers a failure like any other. The tap
+   * used to do nothing at all, which is the silence this is here to end.
+   */
+  const acceptTheBackup = (from: AcceptedFrom) => {
+    setAcceptFailed(null)
+    const session = sessionClientRef.current
+    acceptBackupFrom(from, () =>
+      session === null
+        ? Promise.reject(new Error('this launch holds no session'))
+        : acceptKeyBackup(session),
+    )
+      .then(outcome => {
+        if (outcome.accepted) {
+          setBackupPrompt({ restoreKey: outcome.restoreKey })
+        } else {
+          setAcceptFailed(from)
+        }
+      })
+      // `acceptBackupFrom` does not reject. This is the belt on the promise,
+      // and it says the same thing rather than nothing.
+      .catch(() => setAcceptFailed(from))
+  }
   const [claimed, setClaimed] = useState<HistoryClaim | null>(null)
   // Set once, at entry, and never cleared: the launch either was opened with
   // an unspent invitation or it was not, and a note that disappeared while
@@ -4370,6 +4416,7 @@ export function App({
                 <BackupSettings
                   reading={backupState}
                   onRetry={() => setAttempt(attempt + 1)}
+                  failed={acceptFailed === 'settings'}
                   restorable={restorableFromSettings}
                   onRestore={() => {
                     // The same surface the offer leads to, reached from the
@@ -4390,6 +4437,9 @@ export function App({
                     // again, and a value held between them would be the
                     // screen describing a backup as it was.
                     setBackupState({ reading: 'waiting' })
+                    // And the failure with it, for the same reason: it
+                    // was about asking just now, not about coming back.
+                    setAcceptFailed(null)
                   }}
                   onEnable={() => {
                     // THE DOOR A REFUSAL HONOURED FOR GOOD OWES SOMEBODY.
@@ -4398,11 +4448,11 @@ export function App({
                     // taken once and never revisitable.
                     //
                     // The same sequence the offer runs, and the same place
-                    // to show what it produced: this screen closes and the
-                    // key takes the whole surface, because it is shown
-                    // once and must not sit behind a settings row.
-                    const session = sessionClientRef.current
-                    if (session === null) return
+                    // to show what it produced: the key takes the whole
+                    // surface, because it is shown once and must not sit
+                    // behind a settings row. A failure stays on this screen,
+                    // under the button that was pressed.
+                    //
                     // NOTHING IS UNMOUNTED UNDER THE FINGER, and that is
                     // not caution -- it is a defect this had.
                     //
@@ -4418,15 +4468,7 @@ export function App({
                     // The key screen covers everything anyway, so there is
                     // nothing to close: `onDone` below does it, once the
                     // finger is long gone.
-                    acceptKeyBackup(session)
-                      .then(outcome => {
-                        setBackupPrompt(
-                          outcome.accepted
-                            ? { restoreKey: outcome.restoreKey }
-                            : null,
-                        )
-                      })
-                      .catch(() => setBackupPrompt(null))
+                    acceptTheBackup('settings')
                   }}
                   onReplace={() => {
                     // #220's third criterion, built. The confirmation is
@@ -4992,27 +5034,16 @@ export function App({
             style={[StyleSheet.absoluteFill, styles.root]}
             edges={['top', 'bottom', 'left', 'right']}>
             <BackupOffer
-              onAccept={() => {
-                const session = sessionClientRef.current
-                if (session === null) {
-                  setBackupPrompt(null)
-                  return
-                }
-                acceptKeyBackup(session)
-                  .then(outcome => {
-                    // The key exists for exactly as long as this state
-                    // holds it: nothing else has a copy, here or on the
-                    // homeserver. `acceptBackup.ts` hands it back precisely
-                    // once and never on a failure.
-                    setBackupPrompt(
-                      outcome.accepted
-                        ? { restoreKey: outcome.restoreKey }
-                        : null,
-                    )
-                  })
-                  .catch(() => setBackupPrompt(null))
+              failed={acceptFailed === 'offer'}
+              // The key exists for exactly as long as `backupPrompt` holds
+              // it: nothing else has a copy, here or on the homeserver.
+              // `acceptBackup.ts` hands it back precisely once and never on a
+              // failure, and a failure keeps this screen up to say so.
+              onAccept={() => acceptTheBackup('offer')}
+              onRefuse={() => {
+                setAcceptFailed(null)
+                setBackupPrompt(null)
               }}
-              onRefuse={() => setBackupPrompt(null)}
             />
           </SafeAreaView>
         )}

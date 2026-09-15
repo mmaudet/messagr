@@ -36,9 +36,10 @@ import type { Logger } from 'matrix-js-sdk/lib/logger'
  * So a store build writes the trace (#285): the events `TRACE` lists, with
  * only the fields it names, each of which must read as a flag, a count or
  * words. What is left says how a call moved and ended, what a notification
- * woke, what became of the pusher and whether the backup was offered, and it
- * names nobody. The whole log is for a build somebody is going to read on a
- * cable, and `writesTheWholeLog` says how a bundle declares that.
+ * woke, what became of the pusher, whether the backup was offered and where
+ * accepting it stopped, and it names nobody. The whole log is for a build
+ * somebody is going to read on a cable, and `writesTheWholeLog` says how a
+ * bundle declares that.
  *
  * On Android either one lands in logcat under `ReactNativeJS`. On iOS it
  * lands in the unified log under `com.facebook.react.log`, where React Native
@@ -124,6 +125,9 @@ const TRACE = new Map<string, Shape>([
       unreadable: 'words',
     },
   ],
+  // Where accepting the backup stopped, and from which screen (#284). Never
+  // its cause: an error message can carry an account or an address.
+  ['MESSAGR_BACKUP_ACCEPT_FAILED', { from: 'words', failedAt: 'words' }],
 ])
 
 /**

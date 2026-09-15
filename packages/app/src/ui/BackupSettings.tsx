@@ -93,6 +93,7 @@ export function BackupSettings({
   onConfirming,
   restorable,
   onRestore,
+  failed,
 }: {
   readonly reading: BackupReading
   readonly onBack: () => void
@@ -136,6 +137,14 @@ export function BackupSettings({
    */
   readonly restorable: boolean
   readonly onRestore: () => void
+  /**
+   * Whether accepting from this screen did not go through (#284).
+   *
+   * Said under the button that was pressed, and only there. The state above
+   * already says the messages are not backed up; what it cannot say is that
+   * asking just now failed, which is what the tap left somebody waiting for.
+   */
+  readonly failed: boolean
 }) {
   const enabled = reading.reading === 'read' && reading.enabled
   const behind =
@@ -347,6 +356,17 @@ export function BackupSettings({
               onPress={onEnable}
               wide
             />
+            {/* UNDER THE BUTTON, SO NOTHING MOVES UNDER THE FINGER (#284). A
+                second tap lands on the button again, which is what the
+                sentence asks for. The ochre is the state's own: an acceptance
+                that failed leaves this device with no backup. */}
+            {failed && (
+              <View
+                style={[styles.card, styles.off]}
+                testID="backup-settings-failed">
+                <Text style={styles.body}>{t('backup_accept_failed')}</Text>
+              </View>
+            )}
             {/* THE DOOR THE OFFER PROMISED. Only when there is something
                 behind it: a button that opened onto an account with no
                 backup would be the dead control this screen has already had

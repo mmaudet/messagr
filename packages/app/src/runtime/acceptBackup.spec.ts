@@ -1,6 +1,10 @@
 import { describe, expect, it, vi } from 'vitest'
 
-import { acceptBackup, type AcceptBackupDeps } from './acceptBackup'
+import {
+  acceptBackup,
+  acceptBackupFrom,
+  type AcceptBackupDeps,
+} from './acceptBackup'
 import {
   rememberBackupCommitment,
   type BackupCommitment,
@@ -256,4 +260,153 @@ describe('what an acceptance leaves behind', () => {
       expect(reading.decision).toEqual({ offer: false })
     },
   )
+})
+
+/** Every line a gesture wrote, whatever the level it wrote it at. */
+async function linesWrittenDuring(
+  gesture: () => Promise<unknown>,
+): Promise<string[]> {
+  const lines: string[] = []
+  const spies = (['log', 'warn', 'error'] as const).map(method =>
+    vi.spyOn(console, method).mockImplementation((...written: unknown[]) => {
+      lines.push(String(written[0]))
+    }),
+  )
+  try {
+    await gesture()
+  } finally {
+    for (const spy of spies) spy.mockRestore()
+  }
+  return lines
+}
+
+describe('accepting from a screen', () => {
+  // #284. Both screens ran the acceptance and, when it failed, drew nothing
+  // and wrote nothing: the offer closed, Réglages stayed as it was, and the
+  // person was left believing their keys were kept. Since #314 a failed
+  // acceptance also counts as an answer, so the offer never comes back to
+  // catch it.
+  it('hands back the key to show, and writes nothing about a failure', async () => {
+    let outcome: unknown
+    const lines = await linesWrittenDuring(async () => {
+      outcome = await acceptBackupFrom('offer', () => acceptBackup(deps()))
+    })
+
+    expect(outcome).toEqual({
+      accepted: true,
+      restoreKey: 'EsTx aaaa bbbb cccc',
+    })
+    expect(lines).toEqual([])
+  })
+
+  it.each<{
+    readonly failedAt: 'publishing' | 'remembering' | 'enabling'
+    readonly over: Partial<AcceptBackupDeps>
+  }>([
+    {
+      failedAt: 'publishing',
+      over: {
+        publishVersion: async () => {
+          throw new Error('502')
+        },
+      },
+    },
+    { failedAt: 'remembering', over: { remember: async () => false } },
+    {
+      failedAt: 'enabling',
+      over: {
+        enable: async () => {
+          throw new Error('malformed_identifier')
+        },
+      },
+    },
+  ])(
+    'answers a failure at $failedAt, and writes where it stopped and from which screen',
+    async ({ failedAt, over }) => {
+      let outcome: unknown
+      const lines = await linesWrittenDuring(async () => {
+        outcome = await acceptBackupFrom('settings', () =>
+          acceptBackup(deps(over)),
+        )
+      })
+
+      expect(outcome).toEqual({ accepted: false, failedAt })
+      expect(lines).toEqual([
+        `MESSAGR_BACKUP_ACCEPT_FAILED {"from":"settings","failedAt":"${failedAt}"}`,
+      ])
+    },
+  )
+
+  it('writes that line in a store build too', async () => {
+    // What the Play and TestFlight builds are to `log.ts`: `__DEV__` false,
+    // and neither flag a bench sets on a bundle it is going to read. A store
+    // build writes only what TRACE names, and this line is the one a tester's
+    // telephone can give back about an acceptance that did not go through.
+    vi.stubGlobal('__DEV__', false)
+    vi.stubEnv('MESSAGR_SEND_PROBE', '')
+    vi.stubEnv('MESSAGR_WHOLE_LOG', '')
+    try {
+      const lines = await linesWrittenDuring(() =>
+        acceptBackupFrom('offer', () =>
+          acceptBackup(deps({ remember: async () => false })),
+        ),
+      )
+
+      expect(lines).toEqual([
+        'MESSAGR_BACKUP_ACCEPT_FAILED {"from":"offer","failedAt":"remembering"}',
+      ])
+    } finally {
+      vi.unstubAllGlobals()
+      vi.unstubAllEnvs()
+    }
+  })
+
+  it('answers an acceptance that threw as a failure, and writes why', async () => {
+    // `createKeyBackup` sits outside every `try` in `acceptBackup`, and the
+    // bridge throws from it when its native module never installed. Both
+    // screens caught the rejection and drew nothing.
+    let outcome: unknown
+    const lines = await linesWrittenDuring(async () => {
+      outcome = await acceptBackupFrom('offer', () =>
+        acceptBackup(
+          deps({
+            createKeyBackup: () => {
+              throw new Error('the native module never installed')
+            },
+          }),
+        ),
+      )
+    })
+
+    expect(outcome).toEqual({ accepted: false, failedAt: 'thrown' })
+    expect(lines).toEqual([
+      'MESSAGR_BACKUP_ACCEPT_FAILED {"from":"offer","failedAt":"thrown","because":"the native module never installed"}',
+    ])
+  })
+
+  it('never writes the cause of a throw in a store build', async () => {
+    // Whatever threw, its message is not the trace's to carry: a transport
+    // error names the homeserver, and a refusal can name the account.
+    vi.stubGlobal('__DEV__', false)
+    vi.stubEnv('MESSAGR_SEND_PROBE', '')
+    vi.stubEnv('MESSAGR_WHOLE_LOG', '')
+    try {
+      const lines = await linesWrittenDuring(() =>
+        acceptBackupFrom('settings', () =>
+          Promise.reject(
+            new Error(
+              'M_UNKNOWN_TOKEN: @rabr642vve6v:messagr.eu at https://messagr.eu/_matrix/client/v3/room_keys/version',
+            ),
+          ),
+        ),
+      )
+
+      expect(lines).toEqual([
+        'MESSAGR_BACKUP_ACCEPT_FAILED {"from":"settings","failedAt":"thrown"}',
+      ])
+    } finally {
+      vi.unstubAllGlobals()
+      vi.unstubAllEnvs()
+    }
+  })
 })

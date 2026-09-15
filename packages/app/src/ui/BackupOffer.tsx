@@ -69,6 +69,7 @@ import { NotchedButton } from './NotchedButton'
 export function BackupOffer({
   onAccept,
   onRefuse,
+  failed,
 }: {
   readonly onAccept: () => void
   /**
@@ -77,6 +78,15 @@ export function BackupOffer({
    * that was made. See `offerBackup.ts`.
    */
   readonly onRefuse: () => void
+  /**
+   * Whether the acceptance started here did not go through (#284).
+   *
+   * The screen stays and says so. It used to close, and somebody who had just
+   * asked for their keys to be kept was left believing they were. Since #314
+   * the offer never comes back after an answer, so this is the one moment it
+   * can be said.
+   */
+  readonly failed: boolean
 }) {
   return (
     <View style={styles.screen} testID="backup-offer">
@@ -113,6 +123,19 @@ export function BackupOffer({
           tone="quiet"
           wide
         />
+        {/* UNDER THE BUTTONS, AND NOT FOR THE LOOK OF IT (#284). This screen
+            does not scroll. Above them, the card would move the button just
+            pressed from under the finger, and on a short telephone push the
+            refusal off the bottom: an overlay with no way out. Here it moves
+            nothing anybody can touch, and the sentence below still says
+            where to try again later. */}
+        {failed && (
+          <View
+            style={[styles.card, styles.weigh]}
+            testID="backup-offer-failed">
+            <Text style={styles.body}>{t('backup_accept_failed')}</Text>
+          </View>
+        )}
         {/* The one sentence that makes the refusal honest. Without it, "Pas
             maintenant" reads as a postponement the product will chase, and
             it will not: ADR-0013 records the refusal for good and leaves a
