@@ -36,8 +36,11 @@ ten and #91 is.
       package name until 6 September 2026 and has named the two certificates
       Play App Signing signs with since 7 September (**#114**). Those are
       what reach a device from the internal testing track, so a build from
-      the track is expected to verify. Expected, not yet observed: on a
-      device that installed from the track,
+      the track is expected to verify, and on Android it was observed: on
+      14 September 2026 a Pixel 10 on Android 16, which had just installed
+      version 135 from the track, answered `messagr.eu: verified`, and the
+      invitation opened again after the install entered the application.
+      Check it again on the participant's kind of device:
       `adb shell pm get-app-links eu.messagr` should answer
       `messagr.eu: verified`, and a real link tapped there should open the
       application. Check it there, not on a phone that was sideloaded: a
@@ -120,6 +123,16 @@ just failed.
 So help, write down exactly what the help was, record step 1 as blocked, and
 give it its own ticket. With the fingerprints served, it is not a known limit
 but something to find the cause of.
+
+**On an iPhone, another application's own browser is the same stop, and it is
+a known one** (#308). On 14 September 2026 an invitation sent through Twake
+Chat opened in Twake Chat's built-in browser, on an iPhone where Messagr was
+installed and where the same link, tapped in Messages or in Notes, opened
+Messagr at once. The page's **Open in Messagr** is its own address, and iOS
+does not hand that to the application from inside a page either. Until #308 is
+resolved, the channel that carries the invitation decides whether step 1 can
+happen at all: choose it before the day, write it down, and do not count a stop
+inside an application's browser as a finding about Messagr's screens.
 
 ## The path, and what to watch at each step
 

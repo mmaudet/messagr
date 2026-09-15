@@ -117,6 +117,38 @@ describe('claimInvitation', () => {
     if (!result.claimed) expect(result.reason).toContain('could not be reached')
   })
 
+  it('says the same when the service answers with a failure of its own', async () => {
+    // #306. nginx answers 502 while the service restarts, and the service
+    // answers 503 while its homeserver is away. Neither says anything about
+    // the link, which may be perfectly good, and opening it again tries again.
+    const failures = [
+      { status: 502, body: '<html><h1>502 Bad Gateway</h1></html>' },
+      { status: 503, body: '{"errcode":"MESSAGR_UPSTREAM"}' },
+      { status: 500, body: '{"errcode":"M_UNKNOWN"}' },
+      { status: 504, body: '<html><h1>504 Gateway Time-out</h1></html>' },
+    ]
+    for (const failure of failures) {
+      const p = poster(() => failure)
+      expect(await claimInvitation(p, LINK)).toEqual({
+        claimed: false,
+        reason: 'the invitation service could not be reached',
+      })
+    }
+  })
+
+  it('still gives the one refusal for every 4xx, whichever it is', async () => {
+    // Only the 5xx moved (#306). Malformed, unauthenticated, revoked, unknown,
+    // expired or spent, and too many at once: telling any of them apart would
+    // start rebuilding the oracle `REFUSED` refuses to be.
+    for (const status of [400, 401, 403, 404, 410, 429]) {
+      const p = poster(() => ({ status, body: '{}' }))
+      expect(await claimInvitation(p, LINK)).toEqual({
+        claimed: false,
+        reason: 'this invitation cannot be used',
+      })
+    }
+  })
+
   it('refuses an answer that is missing any part of the session', async () => {
     // A partial session is worse than none: it would be stored, restored, and
     // fail later somewhere with no connection to this moment.
