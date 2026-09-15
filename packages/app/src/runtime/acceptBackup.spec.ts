@@ -1,7 +1,35 @@
 import { describe, expect, it, vi } from 'vitest'
 
 import { acceptBackup, type AcceptBackupDeps } from './acceptBackup'
-import type { BackupCommitment } from './backupCommitment'
+import {
+  rememberBackupCommitment,
+  type BackupCommitment,
+} from './backupCommitment'
+import { rememberBackupAsked, shouldOfferBackup } from './backupPrompt'
+import type { SecretStore } from './sessionStore'
+
+/** A store backed by one variable, which is what the real one is. */
+function store(initial: string | null = null): SecretStore {
+  const held = { value: initial }
+  return {
+    read: async () => held.value,
+    write: async (value: string) => {
+      held.value = value
+    },
+  }
+}
+
+/** A keystore that does not answer, as a launch can find it. */
+function refusing(): SecretStore {
+  return {
+    read: async () => {
+      throw new Error('keystore unavailable')
+    },
+    write: async () => {
+      throw new Error('keystore unavailable')
+    },
+  }
+}
 
 const SETUP = {
   restoreKey: 'EsTx aaaa bbbb cccc',
@@ -21,6 +49,7 @@ function deps(over: Partial<AcceptBackupDeps> = {}): AcceptBackupDeps & {
   return {
     kept,
     enabled,
+    rememberAsked: async () => true,
     createKeyBackup: () => SETUP,
     publishVersion: async () => '947281',
     remember: async commitment => {
@@ -168,4 +197,63 @@ describe('accepting the backup', () => {
       expect(JSON.stringify(outcome)).not.toContain('EsTx')
     }
   })
+})
+
+describe('what an acceptance leaves behind', () => {
+  // #291, on the telephone that invited to the trial of 13 September 2026.
+  // The backup was accepted in the morning, and the first message from the
+  // person invited brought the offer back.
+  //
+  // The offer records the question before it is answered. Réglages accepted
+  // without recording anything, so the one thing left between a message
+  // received and the offer was a commitment that exists and reads back --
+  // and an acceptance that stopped short, or a keystore that did not answer
+  // at the next launch, leaves none. Each case goes through the real
+  // sequence and the real decision, with the stores a relaunch reads.
+  it.each<{
+    readonly when: string
+    readonly over: Partial<AcceptBackupDeps>
+    readonly commitmentAnswersNextLaunch: boolean
+  }>([
+    {
+      when: 'the homeserver refused it',
+      over: {
+        publishVersion: async () => {
+          throw new Error('502')
+        },
+      },
+      commitmentAnswersNextLaunch: true,
+    },
+    {
+      when: 'the keystore did not keep the commitment',
+      over: { remember: async () => false },
+      commitmentAnswersNextLaunch: true,
+    },
+    {
+      when: 'it went through and its commitment does not answer at the next launch',
+      over: {},
+      commitmentAnswersNextLaunch: false,
+    },
+  ])(
+    'offers nothing once a message arrives, when $when',
+    async ({ over, commitmentAnswersNextLaunch }) => {
+      const commitment = store()
+      const asked = store()
+      await acceptBackup(
+        deps({
+          remember: kept => rememberBackupCommitment(commitment, kept),
+          rememberAsked: () => rememberBackupAsked(asked),
+          ...over,
+        }),
+      )
+
+      const reading = await shouldOfferBackup({
+        commitment: commitmentAnswersNextLaunch ? commitment : refusing(),
+        asked,
+        received: store('yes'),
+      })
+
+      expect(reading.decision).toEqual({ offer: false })
+    },
+  )
 })

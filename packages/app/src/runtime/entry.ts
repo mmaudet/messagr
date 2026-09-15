@@ -213,14 +213,15 @@ export type InvitationOutcome =
    */
   | { readonly kind: 'unusable'; readonly reason: string }
   /**
-   * For a link that was to replace the account this device holds, whose claim
-   * did not go through for a reason that may not hold next time -- a service
-   * out of reach, one that did not answer in time, or an issuer whose
-   * application has not let the account in yet. The old account stays, and
-   * opening the link again tries again.
+   * For a link whose claim did not go through for a reason that may not hold
+   * next time -- a service out of reach or failing on its own side, one that
+   * did not answer in time, or an issuer whose application has not let the
+   * account in yet. The link was to replace the account this device holds or,
+   * since #306, to be spent for it. That account stays, and opening the link
+   * again tries again.
    *
-   * Not `unusable`: « demandez-en une nouvelle » is wrong for a link that may
-   * be perfectly good. Said on entry, for the same reason.
+   * Neither `unusable` nor `refused`: « demandez-en une nouvelle » is wrong for
+   * a link that may be perfectly good. Said on entry, as `whenToSay.ts` says.
    */
   | { readonly kind: 'retry'; readonly reason: string }
   /**
@@ -337,13 +338,19 @@ export async function enterWithASession(deps: EntryDeps): Promise<EntryResult> {
     // device holds is touched, which is the property the rule above exists
     // to protect.
     const invited = await claimForExistingAccount(poster, usable, held, wait)
+    // TWO SENTENCES FOR A CLAIM THAT DID NOT GO THROUGH, as `leaveForTheLink`
+    // says them: a refusal is final, and anything else may go through next
+    // time. `refused` used to carry both, and a 502 from a restarting service
+    // had the list send somebody holding a good link to ask for another (#306).
     return {
       entered: true,
       session: held,
       claimed: false,
       invitation: invited.invited
         ? { kind: 'used' }
-        : { kind: 'refused', reason: invited.reason },
+        : invited.reason === REFUSED
+          ? { kind: 'refused', reason: invited.reason }
+          : { kind: 'retry', reason: invited.reason },
     }
   }
 

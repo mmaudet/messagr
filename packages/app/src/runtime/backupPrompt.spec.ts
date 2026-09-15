@@ -109,6 +109,20 @@ describe('telling a working refusal from a broken one', () => {
     expect(reading.unreadable).toEqual(['asked'])
   })
 
+  it('names an unreadable commitment, and stays silent', async () => {
+    // #291. `readBackupCommitment` answers null for a store that will not
+    // answer, which is right for resuming a backup and was wrong here: the
+    // commitment read as none, a device that had accepted was offered the
+    // backup again, and `unreadable` could never name the store that did it.
+    const reading = await shouldOfferBackup(
+      stores({ received: store('yes'), commitment: refusing() }),
+    )
+
+    expect(reading.decision).toEqual({ offer: false })
+    expect(reading.backedUp).toBe(true)
+    expect(reading.unreadable).toEqual(['commitment'])
+  })
+
   it('says nothing was unreadable when everything answered', async () => {
     // The line a device proof reads on a healthy device. Without this
     // assertion the field could be populated by accident and mean nothing.

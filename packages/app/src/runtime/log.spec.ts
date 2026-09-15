@@ -10,7 +10,7 @@ import { logger as sdkLogger, type Logger } from 'matrix-js-sdk/lib/logger'
 import { TypedEventEmitter } from 'matrix-js-sdk/lib/models/typed-event-emitter'
 
 import type { LogFields } from './log'
-import { keepTheSdkToWarnings, logEvent } from './log'
+import { keepTheSdkToWarnings, logEvent, logWhenChanged } from './log'
 
 function captured(level: 'info' | 'warn' | 'error', fields: LogFields): string {
   const method = level === 'error' ? 'error' : level === 'warn' ? 'warn' : 'log'
@@ -303,6 +303,83 @@ describe('a store build', () => {
       ),
     ).toEqual([
       'MESSAGR_BACKUP_OFFER {"offer":false,"backedUp":false,"asked":true,"received":false,"unreadable":"commitment,asked"}',
+    ])
+  })
+
+  it('writes the decision on the backup offer once while it stays the same', () => {
+    // #291. Build 135, a tester who had backed up, during a call: this very
+    // line ten times in seventeen seconds, once for each sync cycle that
+    // touched the open conversation. A telephone's log buffer holds 256 KiB,
+    // and a line repeated pushes out the ones that would have explained
+    // something.
+    const decision = logWhenChanged('MESSAGR_BACKUP_OFFER')
+
+    expect(
+      linesWrittenBy(() => {
+        for (let cycle = 0; cycle < 10; cycle += 1) {
+          decision.log('info', {
+            offer: false,
+            backedUp: true,
+            asked: true,
+            received: true,
+            unreadable: 'none',
+          })
+        }
+      }),
+    ).toEqual([
+      'MESSAGR_BACKUP_OFFER {"offer":false,"backedUp":true,"asked":true,"received":true,"unreadable":"none"}',
+    ])
+  })
+
+  it('writes the decision again as soon as what it says changes', () => {
+    // The offer made, and then the question recorded: the second line is the
+    // one that says the offer will not come back, and it must not be taken
+    // for a repeat of the first.
+    const decision = logWhenChanged('MESSAGR_BACKUP_OFFER')
+    const offered = {
+      offer: true,
+      backedUp: false,
+      asked: false,
+      received: true,
+      unreadable: 'none',
+    }
+
+    expect(
+      linesWrittenBy(() => {
+        decision.log('info', offered)
+        decision.log('info', offered)
+        decision.log('info', { ...offered, offer: false, asked: true })
+        decision.log('info', { ...offered, offer: false, asked: true })
+      }),
+    ).toEqual([
+      'MESSAGR_BACKUP_OFFER {"offer":true,"backedUp":false,"asked":false,"received":true,"unreadable":"none"}',
+      'MESSAGR_BACKUP_OFFER {"offer":false,"backedUp":false,"asked":true,"received":true,"unreadable":"none"}',
+    ])
+  })
+
+  it('writes the decision again after forgetting it, as opening a conversation does', () => {
+    // The device suite opens a conversation and reads the decision that
+    // follows its own tap (`e2e/conversation.ts`), and two openings can share
+    // a launch. A line held back because the opening before already said it
+    // would leave the second one waiting for nothing.
+    const decision = logWhenChanged('MESSAGR_BACKUP_OFFER')
+    const settled = {
+      offer: false,
+      backedUp: true,
+      asked: true,
+      received: true,
+      unreadable: 'none',
+    }
+
+    expect(
+      linesWrittenBy(() => {
+        decision.log('info', settled)
+        decision.forget()
+        decision.log('info', settled)
+      }),
+    ).toEqual([
+      'MESSAGR_BACKUP_OFFER {"offer":false,"backedUp":true,"asked":true,"received":true,"unreadable":"none"}',
+      'MESSAGR_BACKUP_OFFER {"offer":false,"backedUp":true,"asked":true,"received":true,"unreadable":"none"}',
     ])
   })
 })

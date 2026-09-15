@@ -160,7 +160,8 @@ export const backupSecrets = keychainStore('eu.messagr.backup', 'account')
 /**
  * Whether this device has ever put the backup question. See backupPrompt.ts:
  * a refusal is recorded for good, so this is what stops the product asking
- * twice.
+ * twice. Every acceptance writes it too, Réglages included, since #291: see
+ * acceptBackup.ts.
  *
  * Its own entry rather than a field beside the commitment, because the two
  * are written at unrelated moments by unrelated code and either can be true

@@ -81,7 +81,7 @@ import {
 import { unreadableConversations } from './src/runtime/unreadableConversations'
 import { mergeSummaries } from './src/runtime/mergeSummaries'
 import { computeHermesReport } from './src/runtime/hermes'
-import { logEvent } from './src/runtime/log'
+import { logEvent, logWhenChanged } from './src/runtime/log'
 import { polyfillReport } from './src/runtime/bootstrap'
 import { computeRuntimeGapReport } from './src/runtime/runtimeGaps'
 import { computeNewArchitectureReport } from './src/runtime/newArchitecture'
@@ -1099,6 +1099,13 @@ export function App({
   // It runs on every conversation that draws, which writes the same flag
   // again and costs a keystore write nobody notices. Reading first to avoid
   // it would be two operations where there is one.
+  //
+  // WHAT IT DECIDES IS NOT WRITTEN EACH TIME, which is #291's other half. A
+  // conversation draws again on every sync cycle that touches it, and during
+  // a call on build 135 that was the same `MESSAGR_BACKUP_OFFER` ten times in
+  // seventeen seconds, in a log buffer of 256 KiB. Held in a ref because what
+  // was last written has to outlive the effect that wrote it.
+  const backupOfferLog = useRef(logWhenChanged('MESSAGR_BACKUP_OFFER'))
   useEffect(() => {
     if (conversation === null || selfUserId === '') return
     const received = receivedFromSomebodyElse(conversation, selfUserId)
@@ -1132,7 +1139,12 @@ export function App({
       // are the feature working and one is the feature absent. The first
       // device run of this prompt showed nothing and there was no way to
       // tell which, which is why this line exists.
-      logEvent('info', 'MESSAGR_BACKUP_OFFER', {
+      //
+      // Once, and again only when it changes or a conversation is opened:
+      // `showConversation` forgets what was written, because the device
+      // suite reads the decision after its own tap (`e2e/conversation.ts`)
+      // and two openings can share a launch.
+      backupOfferLog.current.log('info', {
         offer: reading.decision.offer,
         backedUp: reading.backedUp,
         asked: reading.asked,
@@ -2075,6 +2087,12 @@ export function App({
               setOpenScope(scope)
               openScopeRef.current = scope
               setConversation(null)
+              // THE BACKUP DECISION IS WRITTEN AGAIN FOR THIS OPENING, even
+              // unchanged. The device suite reads it after its own tap
+              // (`e2e/conversation.ts`), and two openings can share a launch:
+              // held back because the opening before said the same, it would
+              // leave the second one waiting for a line that never comes.
+              backupOfferLog.current.forget()
               // A conversation opens at its newest message, so nothing is
               // away from it yet. `onContentSizeChange` says the same thing
               // when the frame lays out, but a frame away from the newest

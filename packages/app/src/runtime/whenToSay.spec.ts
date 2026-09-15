@@ -10,15 +10,14 @@ describe('whenToSay', () => {
     expect(whenToSay({ kind: 'used' })).toBe('after-the-pump')
   })
 
-  it('says a link was refused only after the pump, which a launch that could not reach its service never reaches', () => {
-    // « Demandez-en une nouvelle » sends somebody to ask for another link.
-    // When the service could not be reached, the link may be perfectly good,
-    // and the launch that could not reach it stops before the pump too.
+  it('says a link was refused only after the pump, as it always was', () => {
+    // « Demandez-en une nouvelle » sends somebody to ask for another link, so
+    // it is said only of a link the service refused. It used to be said of a
+    // service that could not be reached too, on the reasoning that such a
+    // launch stops before the pump. A 502 from nginx in front of a restarting
+    // service does not stop it (#306): that claim is `retry` now.
     expect(
-      whenToSay({
-        kind: 'refused',
-        reason: 'the invitation service could not be reached',
-      }),
+      whenToSay({ kind: 'refused', reason: 'this invitation cannot be used' }),
     ).toBe('after-the-pump')
   })
 

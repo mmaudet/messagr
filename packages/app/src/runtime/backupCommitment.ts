@@ -87,6 +87,22 @@ export async function readBackupCommitment(
   } catch {
     return null
   }
+  return parseBackupCommitment(held)
+}
+
+/**
+ * The commitment a stored value holds, or `null`: the half of
+ * `readBackupCommitment` that does not touch the store.
+ *
+ * Apart so that a caller can tell a store that did not answer from one that
+ * answered nothing. `readBackupCommitment` gives both the same `null`, which
+ * is right for resuming a backup -- there is nothing to resume either way --
+ * and was wrong for deciding whether to offer one: `backupPrompt.ts` took a
+ * keystore that did not answer for a device that never accepted (#291).
+ */
+export function parseBackupCommitment(
+  held: string | null,
+): BackupCommitment | null {
   if (held === null || held === '') return null
 
   let parsed: unknown

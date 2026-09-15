@@ -13,6 +13,7 @@ function deps(over: Partial<ReplaceBackupDeps> = {}) {
   const done: string[] = []
   const retired: string[] = []
   const base: ReplaceBackupDeps = {
+    rememberAsked: async () => true,
     createKeyBackup: () => {
       done.push('made')
       return SETUP
