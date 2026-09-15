@@ -185,7 +185,7 @@
         Ce que Messagr ne vous demande pas, ce que le service ne peut pas lire,
         et ce que le serveur voit malgré tout.
       </p>
-      <p class="stamp">Version du 13 septembre 2026</p>
+      <p class="stamp">Version du 15 septembre 2026</p>
 
       <h2>Qui traite vos données</h2>
       <p>
@@ -266,6 +266,12 @@
           la liste des appareils d'un compte et leurs clés publiques&nbsp;;
         </li>
         <li>la taille approximative de ce qui transite&nbsp;;</li>
+        <li>
+          quand un compte est en appel&nbsp;: pour chaque appel, l'application
+          demande au serveur l'accès au relais qui achemine le son et
+          l'image&nbsp;; ce relais voit l'adresse IP des téléphones qui s'en
+          servent, jamais le contenu de l'appel&nbsp;;
+        </li>
         <li>
           les adresses IP au moment des requêtes, dans les journaux techniques.
         </li>
@@ -361,9 +367,15 @@
 
       <h2>Où vos données sont traitées</h2>
       <p>
-        Le serveur est hébergé par Hetzner Online GmbH, à Helsinki, en Finlande
-        — donc au sein de l'Union européenne. Il n'y a aucun transfert hors de
-        l'Union.
+        Le serveur est hébergé par Hetzner Online GmbH, à Helsinki, en Finlande,
+        au sein de l'Union européenne.
+      </p>
+      <p>
+        Une exception&nbsp;: le signal qui réveille votre téléphone, décrit plus
+        haut, passe par Firebase Cloud Messaging (Google) sur Android et par le
+        service de notifications d'Apple sur iOS. Ces services peuvent le traiter
+        hors de l'Union. Il ne porte que l'identifiant technique de votre
+        appareil, une priorité de remise et un nombre tiré au hasard.
       </p>
 
       <h2>Sur quelle base</h2>
