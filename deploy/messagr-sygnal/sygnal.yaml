@@ -434,6 +434,13 @@ apps:
     key_id: YKZW452SYM
     team_id: KUT463DS29
     topic: eu.messagr
+    # LE JETON ARRIVE EN HEXADECIMAL, ET SYGNAL ATTEND DU BASE64 PAR DEFAUT.
+    # L'application declare comme pushkey le jeton de `getAPNSToken`, en
+    # hexadecimal. Sans ce reglage, sygnal le decode en base64 et envoie a
+    # Apple 48 octets de rebut : BadDeviceToken a chaque poussee, avec une
+    # paire d'environnements parfaitement accordee. Constate et regle en
+    # production le 15 septembre 2026 (#325).
+    convert_device_token_to_hex: false
     push_type: background
     send_badge_counts: false
     inflight_request_limit: 512

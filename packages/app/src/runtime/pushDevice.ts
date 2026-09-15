@@ -46,12 +46,11 @@ import type { Road } from './pusher'
  * launch asks again" -- which is true and was not sufficient. On a device
  * that loses the race every time, the pusher is never registered at all,
  * and the account keeps whatever pusher it had: on the tester's telephone,
- * a token minted months earlier by a build whose entitlement was still
- * `development`, which Apple then answers `BadDeviceToken` for ever because
- * a sandbox token pushed to production is exactly that.
- *
- * Sixteen rejections in two hours, one token, and a build eleven that never
- * replaced it.
+ * sixteen `BadDeviceToken` in two hours for one token, and a build eleven
+ * that never replaced it. They were read then as a sandbox token from an old
+ * `development` entitlement. On 15 September 2026 every iOS push turned out
+ * to be refused because sygnal base64-decoded a hexadecimal token (#325), so
+ * that reading is not established. The race is real either way.
  *
  * So it waits, briefly, inside the launch that asked. Not for ever: a device
  * with no Apple to answer -- a simulator, an account with notifications

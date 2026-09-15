@@ -70,7 +70,7 @@ fi
 # ── 4. The two halves that have to agree ──────────────────────────────────
 # `aps-environment: production` needs sygnal on `platform: production`, and
 # the reverse. A mismatch answers BadDeviceToken and delivers nothing, with
-# no other sign.
+# no other sign. It is not the only road to BadDeviceToken: see 5.
 SYGNAL="$ROOT/deploy/messagr-sygnal/sygnal.yaml"
 if [ -f "$SYGNAL" ] && [ -f "$ENTITLEMENTS" ]; then
   # Read with sed rather than a YAML parser: PyYAML is not in the standard
@@ -85,6 +85,22 @@ if [ -f "$SYGNAL" ] && [ -f "$ENTITLEMENTS" ]; then
     say_ok "sygnal is on platform '$platform', which matches aps-environment '$environment'"
   else
     say_bad "sygnal is on '$platform' and the build asks for '$environment': Apple would answer BadDeviceToken"
+  fi
+fi
+
+# ── 5. The token's encoding ───────────────────────────────────────────────
+# The application registers the APNs token as `getAPNSToken` hands it over, in
+# hexadecimal (`pusher.ts`). sygnal base64-decodes an APNs pushkey unless told
+# not to, and then sends Apple 48 bytes that are not the token: BadDeviceToken
+# at every push, with the environments perfectly paired. That is how every
+# iOS push failed until 15 September 2026 (#325), while check 4 stayed green.
+if [ -f "$SYGNAL" ]; then
+  convert="$(sed -n '/^  eu\.messagr\.apns:/,/^  [a-z]/p' "$SYGNAL" \
+    | sed -n 's/^    convert_device_token_to_hex: *//p' | head -1)"
+  if [ "$convert" = "false" ]; then
+    say_ok "sygnal takes the hexadecimal APNs token as it is (convert_device_token_to_hex: false)"
+  else
+    say_bad "sygnal would base64-decode the hexadecimal APNs token: Apple would answer BadDeviceToken"
   fi
 fi
 
