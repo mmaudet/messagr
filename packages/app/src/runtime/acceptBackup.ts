@@ -126,6 +126,12 @@ export type BackupAccepted =
        * a report wants to name.
        */
       readonly failedAt: 'publishing' | 'remembering' | 'enabling'
+      /**
+       * Present, and `false`, only when enabling failed and the keystore
+       * refused twice to forget the commitment: the next launch will turn on
+       * a backup whose key nobody saw, and a report has to be able to say so.
+       */
+      readonly forgotten?: false
     }
 
 export async function acceptBackup(
@@ -170,8 +176,12 @@ export async function acceptBackup(
     // it finds. A failure hands no key back, so the device would back up
     // under a key nobody was shown, and Réglages would say the messages are
     // kept.
-    await deps.forget()
-    return { accepted: false, failedAt: 'enabling' }
+    // TWICE, IF THE FIRST TRY IS REFUSED: a keystore that refuses once is a
+    // telephone having a bad moment, and giving up costs what is above.
+    const forgotten = (await deps.forget()) || (await deps.forget())
+    return forgotten
+      ? { accepted: false, failedAt: 'enabling' }
+      : { accepted: false, failedAt: 'enabling', forgotten: false }
   }
 
   return { accepted: true, restoreKey: setup.restoreKey }
@@ -232,6 +242,7 @@ export async function acceptBackupFrom(
     logEvent('warn', 'MESSAGR_BACKUP_ACCEPT_FAILED', {
       from,
       failedAt: outcome.failedAt,
+      ...(outcome.forgotten === false ? { forgotten: false } : {}),
     })
   }
   return outcome

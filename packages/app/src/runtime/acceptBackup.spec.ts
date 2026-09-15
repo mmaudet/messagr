@@ -282,6 +282,50 @@ describe('what an acceptance leaves behind', () => {
 
     expect(await readBackupCommitment(commitment)).toBeNull()
   })
+
+  it('forgets on a second try when the keystore refused the first', async () => {
+    // A keystore that refuses once is a telephone having a bad moment, and
+    // the cost of giving up is the one above: a backup turned on at the next
+    // launch under a key nobody saw.
+    const commitment = store()
+    let refusals = 1
+    const flaky: SecretStore = {
+      read: commitment.read,
+      write: async value => {
+        if (value === '' && refusals > 0) {
+          refusals -= 1
+          throw new Error('keystore busy')
+        }
+        await commitment.write(value)
+      },
+    }
+    await acceptBackup(
+      deps({
+        remember: kept => rememberBackupCommitment(flaky, kept),
+        forget: () => forgetBackupCommitment(flaky),
+        enable: async () => {
+          throw new Error('malformed_identifier')
+        },
+      }),
+    )
+
+    expect(await readBackupCommitment(commitment)).toBeNull()
+  })
+
+  it('says so when the keystore refused to forget twice', async () => {
+    // The commitment is still there, and the next launch will turn it on.
+    // Nothing more can be done from here, and the failure has to say so.
+    expect(
+      await acceptBackup(
+        deps({
+          forget: async () => false,
+          enable: async () => {
+            throw new Error('malformed_identifier')
+          },
+        }),
+      ),
+    ).toEqual({ accepted: false, failedAt: 'enabling', forgotten: false })
+  })
 })
 
 /** Every line a gesture wrote, whatever the level it wrote it at. */
@@ -376,6 +420,35 @@ describe('accepting from a screen', () => {
 
       expect(lines).toEqual([
         'MESSAGR_BACKUP_ACCEPT_FAILED {"from":"offer","failedAt":"remembering"}',
+      ])
+    } finally {
+      vi.unstubAllGlobals()
+      vi.unstubAllEnvs()
+    }
+  })
+
+  it('writes, in a store build too, that a commitment could not be forgotten', async () => {
+    // The one failure that leaves something behind: the next launch turns on
+    // a backup whose key nobody saw. A tester's log is where that shows.
+    vi.stubGlobal('__DEV__', false)
+    vi.stubEnv('MESSAGR_SEND_PROBE', '')
+    vi.stubEnv('MESSAGR_WHOLE_LOG', '')
+    try {
+      const lines = await linesWrittenDuring(() =>
+        acceptBackupFrom('settings', () =>
+          acceptBackup(
+            deps({
+              forget: async () => false,
+              enable: async () => {
+                throw new Error('malformed_identifier')
+              },
+            }),
+          ),
+        ),
+      )
+
+      expect(lines).toEqual([
+        'MESSAGR_BACKUP_ACCEPT_FAILED {"from":"settings","failedAt":"enabling","forgotten":false}',
       ])
     } finally {
       vi.unstubAllGlobals()

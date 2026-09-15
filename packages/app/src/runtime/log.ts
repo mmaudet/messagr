@@ -125,9 +125,13 @@ const TRACE = new Map<string, Shape>([
       unreadable: 'words',
     },
   ],
-  // Where accepting the backup stopped, and from which screen (#284). Never
-  // its cause: an error message can carry an account or an address.
-  ['MESSAGR_BACKUP_ACCEPT_FAILED', { from: 'words', failedAt: 'words' }],
+  // Where accepting the backup stopped, and from which screen (#284), and
+  // whether a commitment the next launch would turn on could not be forgotten.
+  // Never its cause: an error message can carry an account or an address.
+  [
+    'MESSAGR_BACKUP_ACCEPT_FAILED',
+    { from: 'words', failedAt: 'words', forgotten: 'flag' },
+  ],
 ])
 
 /**
