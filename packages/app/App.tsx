@@ -81,7 +81,11 @@ import {
 import { CallsList } from './src/ui/CallsList'
 import { acceptBackupFrom, type AcceptedFrom } from './src/runtime/acceptBackup'
 import { acceptance } from './src/runtime/acceptanceGate'
-import { replaceBackupFrom } from './src/runtime/replaceBackup'
+import {
+  failedReplacementSentence,
+  replaceBackupFrom,
+  type ReplaceFailedAt,
+} from './src/runtime/replaceBackup'
 import type { BackupVersionInfo } from './src/runtime/backupCalls'
 import { getErrorMessage } from './src/runtime/errors'
 import {
@@ -597,11 +601,13 @@ export function App({
    */
   const [acceptFailed, setAcceptFailed] = useState<AcceptedFrom | null>(null)
   /**
-   * Whether the key replacement asked for on the Sauvegarde screen did not go
-   * through, so that screen says so (#284). Kept and cleared beside
-   * `acceptFailed`, for the same reasons.
+   * Where the key replacement asked for on the Sauvegarde screen stopped, when
+   * it did not go through, so that screen says so (#284). The step and not a
+   * flag, because what the screen may truthfully say depends on it. Kept and
+   * cleared beside `acceptFailed`, for the same reasons.
    */
-  const [replaceFailed, setReplaceFailed] = useState(false)
+  const [replaceFailedAt, setReplaceFailedAt] =
+    useState<ReplaceFailedAt | null>(null)
   /**
    * Whether an acceptance is running, read from `backupAcceptance` rather than
    * held by this mount (#284): a mount that arrives mid-acceptance draws
@@ -617,7 +623,7 @@ export function App({
   // the whole of what this listens for.
   useEffect(() => {
     setAcceptFailed(null)
-    setReplaceFailed(false)
+    setReplaceFailedAt(null)
   }, [tab])
   /**
    * Reads the backup's state whenever that screen is showing and nothing is
@@ -1119,7 +1125,7 @@ export function App({
   /** A card is about asking just now: leaving its screen takes it down. */
   const clearBackupCards = () => {
     setAcceptFailed(null)
-    setReplaceFailed(false)
+    setReplaceFailedAt(null)
   }
   const [claimed, setClaimed] = useState<HistoryClaim | null>(null)
   // Set once, at entry, and never cleared: the launch either was opened with
@@ -4506,7 +4512,7 @@ export function App({
                   onRetry={() => setAttempt(attempt + 1)}
                   failed={acceptFailed === 'settings'}
                   working={acceptWorking}
-                  replaceFailed={replaceFailed}
+                  replaceFailedAt={replaceFailedAt}
                   restorable={restorableFromSettings}
                   onRestore={() => {
                     // The same surface the offer leads to, reached from the
@@ -4573,23 +4579,29 @@ export function App({
                     // gesture to whatever React draws underneath.
                     const session = sessionClientRef.current
                     if (session === null) return
-                    // SAID ON THIS SCREEN, AND THE STATE READ AGAIN (#284).
-                    // A replacement that fails at enabling leaves no
-                    // commitment behind, so « vos messages sont
-                    // sauvegardés » may no longer hold: the reading is
-                    // taken again whatever is showing. The card and the
+                    // SAID ON THIS SCREEN, IN THE SENTENCE ITS STEP ALLOWS
+                    // (#284): « rien n'a changé » only before the publish,
+                    // as `failedReplacementSentence` says. The card and the
                     // announcement follow the acceptance's rule, and only
                     // land while this screen is the one showing.
-                    const sayItFailed = () => {
+                    //
+                    // The reading is taken again whatever is showing, and it
+                    // proves nothing about the failure. It is the bridge's,
+                    // and `enabled` means only that `enableKeyBackup` was
+                    // called in this process: after a failure past the
+                    // publish it can go on saying « vos messages sont
+                    // sauvegardés » of a version the homeserver no longer
+                    // takes (#327). What the server holds is #323's.
+                    const sayItFailed = (failedAt: ReplaceFailedAt) => {
                       if (backupShowing.current.backupScreen) {
-                        setReplaceFailed(true)
+                        setReplaceFailedAt(failedAt)
                         AccessibilityInfo.announceForAccessibility(
-                          t('backup_replace_failed'),
+                          t(failedReplacementSentence(failedAt)),
                         )
                       }
                       setAttempt(n => n + 1)
                     }
-                    setReplaceFailed(false)
+                    setReplaceFailedAt(null)
                     // A failure writes where it stopped: `replaceBackupFrom`.
                     replaceBackupFrom(() => replaceKeyBackup(session))
                       .then(outcome => {
@@ -4616,13 +4628,15 @@ export function App({
                           // plain `null` settling in the same frame as a
                           // success would take the one sight of it away.
                           setBackupPrompt(p => (p === 'offering' ? null : p))
-                          sayItFailed()
+                          sayItFailed(outcome.failedAt)
                         }
                       })
                       .catch(() => {
+                        // `replaceBackupFrom` does not reject, so only a
+                        // throw in the handler above lands here.
                         setReplaceConfirming(false)
                         setBackupPrompt(p => (p === 'offering' ? null : p))
-                        sayItFailed()
+                        sayItFailed('thrown')
                       })
                   }}
                 />

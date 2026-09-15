@@ -228,3 +228,29 @@ export async function replaceBackupFrom(
   }
   return outcome
 }
+
+/** Where a replacement that did not go through stopped. */
+export type ReplaceFailedAt = Extract<
+  BackupReplacedFrom,
+  { readonly replaced: false }
+>['failedAt']
+
+/**
+ * The sentence the Sauvegarde screen shows, and announces, for a replacement
+ * that did not go through (#284).
+ *
+ * Found in review: every failure said « rien n'a changé : votre ancienne clé
+ * ouvre toujours votre sauvegarde ». That holds at `publishing`, and for
+ * `thrown`, which `replaceBackup` lets out only before the publish. From
+ * `remembering` on, the homeserver holds the new version as its current one,
+ * and the true sentence is the acceptance's own: the backup could not be
+ * turned on. A step this does not name gets that one too, because it claims
+ * less.
+ */
+export function failedReplacementSentence(
+  failedAt: ReplaceFailedAt,
+): 'backup_replace_failed' | 'backup_accept_failed' {
+  return failedAt === 'publishing' || failedAt === 'thrown'
+    ? 'backup_replace_failed'
+    : 'backup_accept_failed'
+}

@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest'
 
 import {
+  failedReplacementSentence,
   replaceBackup,
   replaceBackupFrom,
   type ReplaceBackupDeps,
@@ -289,5 +290,21 @@ describe('replacing from the Sauvegarde screen', () => {
     expect(lines).toEqual([
       'MESSAGR_BACKUP_ACCEPT_FAILED {"from":"replace","failedAt":"thrown","because":"the native module never installed"}',
     ])
+  })
+})
+
+describe('what the Sauvegarde screen says of a replacement that failed', () => {
+  // #284, found in review: every failure said « rien n'a changé : votre
+  // ancienne clé ouvre toujours votre sauvegarde ». That holds until the
+  // publish. From there on the homeserver holds the new version as its
+  // current one, and the sentence becomes a lie.
+  it.each([
+    ['publishing', 'backup_replace_failed'],
+    ['thrown', 'backup_replace_failed'],
+    ['remembering', 'backup_accept_failed'],
+    ['enabling', 'backup_accept_failed'],
+    ['thrownAfterPublishing', 'backup_accept_failed'],
+  ] as const)('after a failure at %s, says %s', (failedAt, sentence) => {
+    expect(failedReplacementSentence(failedAt)).toBe(sentence)
   })
 })

@@ -3,6 +3,10 @@ import { Pressable, StyleSheet, Text, View } from 'react-native'
 
 import { t } from '../copy'
 import { color, floors, layout, space, stroke, type } from '../design/tokens'
+import {
+  failedReplacementSentence,
+  type ReplaceFailedAt,
+} from '../runtime/replaceBackup'
 import { Consequences } from './Consequences'
 import { NotchedButton } from './NotchedButton'
 
@@ -95,18 +99,22 @@ export function BackupSettings({
   onRestore,
   failed,
   working,
-  replaceFailed,
+  replaceFailedAt,
 }: {
   readonly reading: BackupReading
   /**
-   * Whether the key replacement asked for here did not go through (#284).
+   * Where the key replacement asked for here stopped, when it did not go
+   * through (#284), or `null`. It decides the sentence: « rien n'a changé »
+   * holds only before the publish, as `failedReplacementSentence` says.
    *
    * Above everything on this screen, because the reading taken again after it
-   * can land in either branch, or be waiting: the replacement may have left
-   * no backup running on this device, and the sentence has to be seen
-   * whichever one the screen then draws.
+   * can land in either branch, or be waiting, and the sentence has to be seen
+   * whichever one the screen then draws. That reading says nothing of what
+   * the failure left: it is the bridge's, whose `enabled` means only that
+   * `enableKeyBackup` was called in this process, so it can go on saying
+   * « sauvegardés » of a version the homeserver no longer takes (#327).
    */
-  readonly replaceFailed: boolean
+  readonly replaceFailedAt: ReplaceFailedAt | null
   /**
    * Whether an acceptance is running (#284), from this screen or from the
    * offer. The button waits, inert, under a label that says so.
@@ -194,12 +202,16 @@ export function BackupSettings({
 
       {/* THE REPLACEMENT THAT DID NOT GO THROUGH (#284). Its confirmation has
           closed by the time this draws, so nothing moves under a finger. The
-          ochre is the state's own, as for an acceptance that failed. */}
-      {replaceFailed && (
+          ochre is the state's own, as for an acceptance that failed. The
+          sentence is the one the step allows: past the publish, nothing is
+          as it was. */}
+      {replaceFailedAt !== null && (
         <View
           style={[styles.card, styles.off]}
           testID="backup-settings-replace-failed">
-          <Text style={styles.body}>{t('backup_replace_failed')}</Text>
+          <Text style={styles.body}>
+            {t(failedReplacementSentence(replaceFailedAt))}
+          </Text>
         </View>
       )}
 
