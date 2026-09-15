@@ -1,4 +1,11 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import React, {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  useSyncExternalStore,
+} from 'react'
 import {
   AccessibilityInfo,
   AppState,
@@ -73,7 +80,7 @@ import {
 } from './src/runtime/callLogStore'
 import { CallsList } from './src/ui/CallsList'
 import { acceptBackupFrom, type AcceptedFrom } from './src/runtime/acceptBackup'
-import { acceptanceGate } from './src/runtime/acceptanceGate'
+import { acceptance } from './src/runtime/acceptanceGate'
 import type { BackupVersionInfo } from './src/runtime/backupCalls'
 import { getErrorMessage } from './src/runtime/errors'
 import {
@@ -315,6 +322,15 @@ type PumpStatus =
  * it should have read all along: a line of JSON cannot be scrolled off, and
  * it says the same thing whatever the screens become.
  */
+/**
+ * The acceptance of the backup, once for the whole JavaScript runtime rather
+ * than once per mount of App (#284). A mount that arrives mid-acceptance, after
+ * the Activity was finished or recreated, draws it running, cannot start a
+ * second one, and receives the key when it settles. `acceptanceGate.ts` says
+ * why.
+ */
+const backupAcceptance = acceptance()
+
 export function App({
   // Absent on any host that has not been updated to supply it (iOS has not
   // been, this ticket is Android-only): `computeCryptoMachineConfig` treats
@@ -580,19 +596,19 @@ export function App({
    */
   const [acceptFailed, setAcceptFailed] = useState<AcceptedFrom | null>(null)
   /**
-   * One acceptance at a time (#284). A ref and not state, because two taps can
-   * land before the screen draws again; `acceptanceGate.ts` says what two
-   * acceptances cost. `acceptWorking` is what the two screens draw from: set
-   * when an acceptance starts, cleared once it has settled.
+   * Whether an acceptance is running, read from `backupAcceptance` rather than
+   * held by this mount (#284): a mount that arrives mid-acceptance draws
+   * « Activation… » too, and the two screens draw from this.
    */
-  const acceptance = useRef(acceptanceGate())
-  const [acceptWorking, setAcceptWorking] = useState(false)
-  // A TAB CHANGE LEAVES THE ATTEMPT TOO (#284). The tab bar resets neither
-  // the backup screen nor its card, so a failure set before going elsewhere,
-  // or settling while away, was still there on coming back. `tab` is read by
-  // nothing inside: changing is the whole of what this listens for.
+  const acceptWorking = useSyncExternalStore(
+    backupAcceptance.subscribe,
+    backupAcceptance.running,
+  )
+  // A CARD IS ABOUT ASKING JUST NOW (#284). The tab bar resets neither the
+  // backup screen nor its card, so a card standing before going elsewhere was
+  // still there on coming back. `tab` is read by nothing inside: changing is
+  // the whole of what this listens for.
   useEffect(() => {
-    acceptance.current.forget()
     setAcceptFailed(null)
   }, [tab])
   /**
@@ -1028,59 +1044,72 @@ export function App({
     readonly accessToken: string
   } | null>(null)
   /**
-   * Accepts the backup from one of the two screens that offer it, and puts
-   * what came of it on that screen (#284).
+   * What is on screen now, for an acceptance that settles later (#284).
+   *
+   * Read when it settles and not when it started: somebody who leaves
+   * Sauvegarde and comes straight back is looking at the screen a failure is
+   * about, and somebody who has gone elsewhere is not. Kept in step after
+   * each drawing, so it is what was last drawn.
+   */
+  const backupShowing = useRef({ offer: false, backupScreen: false })
+  useEffect(() => {
+    backupShowing.current = {
+      offer: backupPrompt === 'offering',
+      backupScreen: openScope === null && tab === 'settings' && backupOpen,
+    }
+  })
+  // THIS MOUNT RECEIVES WHAT SETTLES, a key included that settled while no
+  // mount was there to show it (#284). A key is always shown: it opens a
+  // backup that now exists, and nothing can show it later. A failure is said
+  // only while the screen it is about is showing, and dropped otherwise.
+  useEffect(
+    () =>
+      backupAcceptance.receive(settled => {
+        if (settled.show === 'key') {
+          setBackupPrompt({ restoreKey: settled.restoreKey })
+          return
+        }
+        const where: AcceptedFrom | null = backupShowing.current.offer
+          ? 'offer'
+          : backupShowing.current.backupScreen
+            ? 'settings'
+            : null
+        if (where === null) return
+        setAcceptFailed(where)
+        // A CARD NOBODY SEES IS THE SILENCE THIS REPLACED. Somebody using a
+        // screen reader hears nothing when a card appears under a button, and
+        // would believe their keys were kept.
+        AccessibilityInfo.announceForAccessibility(t('backup_accept_failed'))
+      }),
+    [],
+  )
+  /**
+   * Accepts the backup from one of the two screens that offer it (#284).
    *
    * One function for both, because two handlers each settling the outcome on
-   * their own is how the failure went unsaid in both: each turned it into a
-   * `null` and drew nothing. A success shows the key; a failure keeps the
-   * screen and says so there, and `acceptBackupFrom` writes the line.
+   * their own is how the failure went unsaid in both. What comes of it
+   * arrives through the receiver above, and `acceptBackupFrom` writes the
+   * line.
    *
    * A launch that holds no session answers a failure like any other. The tap
    * used to do nothing at all, which is the silence this is here to end.
    */
   const acceptTheBackup = (from: AcceptedFrom) => {
     const session = sessionClientRef.current
-    const settling = acceptance.current.run(() =>
+    const started = backupAcceptance.start(() =>
       acceptBackupFrom(from, () =>
         session === null
           ? Promise.reject(new Error('this launch holds no session'))
           : acceptKeyBackup(session),
       ),
     )
-    // ONE IS ALREADY RUNNING. The button is inert by the time the screen
-    // draws again, and a tap that got in before it did changes nothing.
-    if (settling === null) return
-    setAcceptFailed(null)
-    setAcceptWorking(true)
-    settling
-      .then(shown => {
-        if (shown.show === 'key') {
-          setBackupPrompt({ restoreKey: shown.restoreKey })
-        } else if (shown.show === 'failure') {
-          setAcceptFailed(from)
-          // A CARD NOBODY SEES IS THE SILENCE THIS REPLACED. Somebody using a
-          // screen reader hears nothing when a card appears under a button,
-          // and would believe their keys were kept. Only here: the gate
-          // answers `failure` for the attempt of this very screen.
-          AccessibilityInfo.announceForAccessibility(t('backup_accept_failed'))
-        }
-        // `nothing`: the screen it came from was left, and a failure said now
-        // would land on a screen that is not the one it was about.
-      })
-      // The gate hands back what `acceptBackupFrom` answered, and that does
-      // not reject. This is the belt on the promise, and it says the same
-      // thing rather than nothing.
-      .catch(() => setAcceptFailed(from))
-      .finally(() => setAcceptWorking(false))
+    // NOT STARTED: one is running already, maybe from a mount before this
+    // one. The button is inert by the time the screen draws again, and a tap
+    // that got in before it did changes nothing.
+    if (started) setAcceptFailed(null)
   }
-  /**
-   * The screen an acceptance was started from has been left: a failure
-   * standing there, or still to settle, is no longer said (#284). A key is
-   * still shown, and `acceptanceGate.ts` is where that rule is held.
-   */
-  const leaveTheAttempt = () => {
-    acceptance.current.forget()
+  /** A card is about asking just now: leaving its screen takes it down. */
+  const clearBackupCards = () => {
     setAcceptFailed(null)
   }
   const [claimed, setClaimed] = useState<HistoryClaim | null>(null)
@@ -4488,10 +4517,11 @@ export function App({
                     // again, and a value held between them would be the
                     // screen describing a backup as it was.
                     setBackupState({ reading: 'waiting' })
-                    // And the attempt with it, for the same reason: it was
+                    // And the card with it, for the same reason: it was
                     // about asking just now, not about coming back. A
-                    // failure that settles after this is not said here.
-                    leaveTheAttempt()
+                    // failure that settles once this screen is gone is not
+                    // said: the receiver reads what is showing.
+                    clearBackupCards()
                   }}
                   onEnable={() => {
                     // THE DOOR A REFUSAL HONOURED FOR GOOD OWES SOMEBODY.
@@ -5098,8 +5128,9 @@ export function App({
               onAccept={() => acceptTheBackup('offer')}
               onRefuse={() => {
                 // An acceptance still running goes on: its key is shown if
-                // it comes, and its failure is not said to a closed offer.
-                leaveTheAttempt()
+                // it comes, and its failure, settling on a closed offer, is
+                // not said.
+                clearBackupCards()
                 // ONLY THE OFFER IS CLOSED. A success settling in the same
                 // frame has already put its key here, and a plain `null`
                 // would take the one sight of it away.

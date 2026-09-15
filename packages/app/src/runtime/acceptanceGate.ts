@@ -1,84 +1,108 @@
 import type { BackupAcceptedFrom } from './acceptBackup'
 
-/** What a screen shows once an acceptance it started has settled. */
-export type AcceptanceShown =
+/** What an acceptance hands the screen once it has settled. */
+export type AcceptanceSettled =
   | { readonly show: 'key'; readonly restoreKey: string }
   | { readonly show: 'failure' }
-  | { readonly show: 'nothing' }
 
 /**
- * One acceptance of the backup at a time (#284).
+ * The acceptance of the backup: one at a time, and what it produces handed to
+ * whichever screen is mounted when it settles (#284).
  *
- * # WHY
+ * # ONE AT A TIME
  *
  * Found in review. A first tap failed on a slow network and the card said
  * « Réessayez »; nothing showed the retry running, so more taps started more
- * acceptances. Each makes its own key and its own version, and they settle in
- * any order: the screen could end on one key while the keystore kept the
- * other, which the next launch turns on. From the offer, a second success
- * could also swap the key under somebody copying it.
+ * acceptances, each with its own key and its own version. They settle in any
+ * order: the screen could end on one key while the keystore kept the other,
+ * which the next launch turns on. The button is disabled as well, but only
+ * once the screen draws again, and two taps can land before it does.
  *
- * # A GATE, AND NOT ONLY A DISABLED BUTTON
+ * # ONCE PER RUNTIME, NOT PER MOUNT
  *
- * The button is disabled too, but only once the screen draws again, and two
- * taps can land before it does. The gate answers the second one at once.
+ * Found in the second review. This lived in one mount of App. On Android 7 to
+ * 11 a back press that reaches the system finishes the Activity, and a change
+ * of font size or language recreates it, while JavaScript runs on: the
+ * acceptance went through, its key went to a mount nobody sees, and the next
+ * mount started with a fresh gate that let a second acceptance begin. So the
+ * caller keeps one of these at module scope, and a mount only receives.
  *
- * # A FAILURE IS SAID WHERE IT WAS ASKED FOR, A KEY WHEREVER
+ * # A KEY IS KEPT, A FAILURE IS NOT
  *
- * Also found in review. A failure was set whenever its acceptance settled, so
- * leaving Sauvegarde while one ran brought back a card saying « Réessayez »
- * before any tap. Each run takes a number, and leaving moves past it: the
- * failure of an attempt left behind is not said. A key is shown whatever
- * happened since, because it opens a backup that now exists and nothing can
- * show it later.
- *
- * # IT SAYS WHAT TO SHOW
- *
- * So a screen holds one answer rather than conditions of its own, and both
- * rules are written where a test can hold them.
+ * A key that settles while no screen is mounted waits for the next one,
+ * because it opens a backup that now exists and nothing can show it later. A
+ * failure with nobody to tell is let go. Whether a failure is said, and where,
+ * is for the screen that receives it to decide, from what it shows now.
  */
-export interface AcceptanceGate {
+export interface Acceptance {
   /**
-   * Runs `accept`, unless an acceptance is still running: then nothing runs
-   * and this answers `null`. The gate opens again however the last one ended,
-   * a rejection included.
+   * Starts `accept`, unless an acceptance is still running: then nothing
+   * starts and this answers `false`. It opens again however the last one
+   * ended, and a rejection counts as a failure.
    */
-  readonly run: (
-    accept: () => Promise<BackupAcceptedFrom>,
-  ) => Promise<AcceptanceShown> | null
+  readonly start: (accept: () => Promise<BackupAcceptedFrom>) => boolean
+  /** Whether an acceptance is running: `useSyncExternalStore`'s snapshot. */
+  readonly running: () => boolean
+  /** Calls `changed` whenever `running` changes, and answers how to stop. */
+  readonly subscribe: (changed: () => void) => () => void
   /**
-   * The screen the running acceptance was started from has been left: its
-   * failure, once it settles, is not said, and its key still is. An
-   * acceptance started afterwards is a new attempt, whose failure is said.
+   * Makes `settled` the one screen that receives what settles, and hands it at
+   * once a key that settled while none was mounted. Answers how to let go, and
+   * letting go after another screen took over changes nothing.
    */
-  readonly forget: () => void
+  readonly receive: (settled: (what: AcceptanceSettled) => void) => () => void
 }
 
-export function acceptanceGate(): AcceptanceGate {
+export function acceptance(): Acceptance {
   let running = false
-  // The attempt a failure may still be said for. A run takes the next
-  // number, and leaving takes one more, which no run holds.
-  let latest = 0
+  let receiver: ((what: AcceptanceSettled) => void) | null = null
+  let pendingKey: string | null = null
+  const watchers = new Set<() => void>()
+
+  const setRunning = (now: boolean) => {
+    running = now
+    for (const watcher of [...watchers]) watcher()
+  }
+
   return {
-    run: accept => {
-      if (running) return null
-      running = true
-      latest += 1
-      const attempt = latest
-      return (async (): Promise<AcceptanceShown> => {
-        try {
-          const outcome = await accept()
-          if (outcome.accepted) {
-            return { show: 'key', restoreKey: outcome.restoreKey }
-          }
-          return attempt === latest ? { show: 'failure' } : { show: 'nothing' }
-        } finally {
-          running = false
-        }
-      })()
+    start: accept => {
+      if (running) return false
+      setRunning(true)
+      // On the next microtask, so a throw from `accept` itself settles like a
+      // rejection instead of escaping with the gate shut.
+      Promise.resolve()
+        .then(accept)
+        .then(
+          (outcome): AcceptanceSettled =>
+            outcome.accepted
+              ? { show: 'key', restoreKey: outcome.restoreKey }
+              : { show: 'failure' },
+          (): AcceptanceSettled => ({ show: 'failure' }),
+        )
+        .then(what => {
+          setRunning(false)
+          if (receiver !== null) receiver(what)
+          else if (what.show === 'key') pendingKey = what.restoreKey
+        })
+      return true
     },
-    forget: () => {
-      latest += 1
+    running: () => running,
+    subscribe: changed => {
+      watchers.add(changed)
+      return () => {
+        watchers.delete(changed)
+      }
+    },
+    receive: settled => {
+      receiver = settled
+      if (pendingKey !== null) {
+        const restoreKey = pendingKey
+        pendingKey = null
+        settled({ show: 'key', restoreKey })
+      }
+      return () => {
+        if (receiver === settled) receiver = null
+      }
     },
   }
 }
