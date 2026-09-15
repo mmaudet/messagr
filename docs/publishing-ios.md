@@ -26,6 +26,8 @@ ne se justifie pas.
   le seul travail iOS de la CI est une build simulateur, qui ne signe rien.
 - `aps-environment: production` dans les entitlements, et `platform: production`
   côté sygnal. **Les deux ensemble, et c'est le point le plus facile à rater.**
+- `convert_device_token_to_hex: false` côté sygnal, parce que l'application
+  enregistre le jeton APNs en hexadécimal. Ajouté le 15 septembre 2026 (#325).
 
 ## Le piège, avant tout le reste
 
@@ -38,6 +40,13 @@ notification qui ne viendra jamais, et une conclusion fausse sur #109.
 
 `scripts/assert-ios-push.sh` refuse que l'entitlement et le `platform` de
 sygnal divergent, dans `checks`, en lisant les sources.
+
+**Un second piège a tenu jusqu'au 15 septembre 2026** (#325). L'application
+enregistre le jeton APNs tel que `getAPNSToken` le donne, en hexadécimal. Par
+défaut, sygnal décode un pushkey APNs en base64 : il envoyait donc à Apple
+48 octets sans rapport avec le jeton, et Apple répondait `BadDeviceToken`, avec
+une paire d'environnements parfaitement accordée. `convert_device_token_to_hex:
+false` sur `eu.messagr.apns` le règle, et `scripts/assert-ios-push.sh` le vérifie.
 `scripts/assert-ipa-push.sh` refuse le même désaccord dans le **binaire
 construit**, juste avant le téléversement — et c'est celui-là qui compte,
 parce que la signature peut changer l'entitlement sans que la source bouge.
@@ -185,8 +194,10 @@ et elle se vérifie en une minute :
 
 Ce que #107 exige de la notification vaut pour iOS comme pour Android : elle
 nomme la conversation et ne nomme personne d'autre. S'il ne se passe rien, la
-première chose à regarder est le journal de sygnal — `BadDeviceToken` y
-désignerait la paire d'environnements, et non l'application.
+première chose à regarder est le journal de sygnal. `BadDeviceToken` y a deux
+causes connues : la paire d'environnements, ou l'encodage du jeton. Mesurer la
+longueur du jeton rejeté, sans l'afficher : 64 caractères hexadécimaux,
+l'encodage est juste ; 96, sygnal a décodé en base64 un jeton hexadécimal.
 
 ## Tests externes : faire entrer le relecteur d'Apple
 
