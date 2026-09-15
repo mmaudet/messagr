@@ -4542,24 +4542,27 @@ export function App({
                         // the key is the row rather than the panel that
                         // produced it.
                         setReplaceConfirming(false)
-                        setBackupPrompt(
-                          outcome.replaced
-                            ? {
-                                restoreKey: outcome.restoreKey,
-                                // CARRIED, NOT DROPPED. A replacement whose
-                                // retirement failed is a success with one
-                                // true sentence attached: the old key still
-                                // opens the old backup. Rounding that up to
-                                // « c'est fait » would tell somebody their
-                                // lost key is harmless when it is not.
-                                oldStillOpens: !outcome.oldRetired,
-                              }
-                            : null,
-                        )
+                        if (outcome.replaced) {
+                          setBackupPrompt({
+                            restoreKey: outcome.restoreKey,
+                            // CARRIED, NOT DROPPED. A replacement whose
+                            // retirement failed is a success with one true
+                            // sentence attached: the old key still opens the
+                            // old backup. Rounding that up to « c'est fait »
+                            // would tell somebody their lost key is harmless
+                            // when it is not.
+                            oldStillOpens: !outcome.oldRetired,
+                          })
+                        } else {
+                          // A key already on screen stays there (#284): a
+                          // plain `null` settling in the same frame as a
+                          // success would take the one sight of it away.
+                          setBackupPrompt(p => (p === 'offering' ? null : p))
+                        }
                       })
                       .catch(() => {
                         setReplaceConfirming(false)
-                        setBackupPrompt(null)
+                        setBackupPrompt(p => (p === 'offering' ? null : p))
                       })
                   }}
                 />
@@ -5097,7 +5100,10 @@ export function App({
                 // An acceptance still running goes on: its key is shown if
                 // it comes, and its failure is not said to a closed offer.
                 leaveTheAttempt()
-                setBackupPrompt(null)
+                // ONLY THE OFFER IS CLOSED. A success settling in the same
+                // frame has already put its key here, and a plain `null`
+                // would take the one sight of it away.
+                setBackupPrompt(p => (p === 'offering' ? null : p))
               }}
             />
           </SafeAreaView>
