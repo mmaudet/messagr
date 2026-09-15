@@ -8,10 +8,12 @@
 #
 # Two rules so far, each learned by having a delivery refused.
 #
-# ITMS-90683: `react-native-webrtc` references the camera. Messagr does not: this lot is
-# audio and video is not offered (#88). Apple asks the string of whoever
-# *references* the API, not whoever calls it -- so the obligation follows the
-# dependency list, which is what this reads.
+# ITMS-90683: `react-native-webrtc` references the camera, and the string was
+# demanded while Messagr did not call it: that lot was audio and video was not
+# offered (#88). Apple asks the string of whoever *references* the API, not
+# whoever calls it -- so the obligation follows the dependency list, which is
+# what this reads. Video calls (#199) call it now, which changed what the
+# string must say (#296) and not whether it must exist.
 #
 # WHAT IT COST TO LEARN. The build compiled, signed, validated (`altool
 # --validate-app` said VERIFY SUCCEEDED), uploaded, and was refused an hour

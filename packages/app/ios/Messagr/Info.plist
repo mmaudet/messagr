@@ -54,7 +54,7 @@
 		<key>NSAllowsLocalNetworking</key>
 		<true/>
 	</dict>
-	<!-- LES DEUX TEXTES QU'APPLE A RECLAMES, ET POURQUOI L'UN EST UN AVEU.
+	<!-- LES DEUX TEXTES QU'APPLE A RECLAMES.
 
 	     ITMS-90683, sur la premiere livraison de #109 : le binaire reference des
 	     API sensibles, donc l'Info.plist doit porter le texte correspondant,
@@ -62,7 +62,7 @@
 	     construit, se signe, se televerse et se fait refuser au traitement,
 	     par courriel, une heure plus tard.
 
-	     `scripts/assert-ios-purpose-strings.sh` refuse desormais ca dans
+	     `scripts/assert-ios-info-plist.sh` refuse desormais ca dans
 	     `checks`, a partir des dependances declarees. -->
 	<!-- LE MOMENT DE LA DEMANDE NE CHANGE PAS SUR IOS.
 	     Android demande le micro, et la camera pour un appel video, avant que
@@ -74,14 +74,18 @@
 	     avant. `src/calls/permissions.ts` porte la regle. -->
 	<key>NSMicrophoneUsageDescription</key>
 	<string>Pour que votre correspondant vous entende pendant un appel. Le son est chiffré de bout en bout : ni le serveur ni Messagr ne peuvent l’écouter, et rien n’est enregistré.</string>
-	<!-- UN TEXTE POUR UNE AUTORISATION QUI NE SERA JAMAIS DEMANDEE.
-	     Messagr ne touche pas la camera : ce lot est audio, et la video n'est
-	     pas offerte (#88). C'est `react-native-webrtc` qui reference l'API, et
-	     Apple exige le texte de qui la reference, pas de qui l'appelle. Le
-	     texte dit donc la verite plutot que d'annoncer une fonction absente :
-	     si jamais il s'affichait, il ne mentirait pas. -->
+	<!-- LA CAMERA, POUR UN APPEL VIDEO ET RIEN D'AUTRE.
+	     Ce texte promettait que l'autorisation ne serait jamais demandee.
+	     C'etait vrai tant que les appels etaient audio (#88) : la cle n'etait
+	     la que parce que `react-native-webrtc` reference la camera, et Apple
+	     exige le texte de qui reference l'API. Les appels video (#199) ont
+	     rendu la promesse fausse. La camera est ouverte par `captureVideo`,
+	     dans `src/runtime/callMedia.ts`, et seulement pour un appel : en
+	     placer un en video, en decrocher un en video, ou allumer la camera
+	     pendant un appel. `react-native-image-picker` ne sert qu'a la
+	     phototheque (`src/runtime/imageLibrary.ts`), jamais a la camera. -->
 	<key>NSCameraUsageDescription</key>
-	<string>Messagr n’utilise pas l’appareil photo. Ce texte est exigé par iOS parce que la bibliothèque d’appels référence cette API ; l’autorisation ne vous sera pas demandée.</string>
+	<string>Pour que votre correspondant vous voie pendant un appel vidéo. L’image est chiffrée de bout en bout : ni le serveur ni Messagr ne peuvent la voir, et rien n’est enregistré.</string>
 	<key>NSPhotoLibraryUsageDescription</key>
 	<string>Pour choisir une image à envoyer dans une conversation. L’image est chiffrée sur cet appareil avant d’être envoyée : ni le serveur ni Messagr ne peuvent la lire.</string>
 	<!-- DEUX CLES ET NON UNE, ET LA DIFFERENCE COMPTE.
