@@ -72,6 +72,17 @@ its members. Anonymity holds against its administrators too.
 The relation between a participant and a conversation space, carrying role,
 status, join source and visibility.
 
+**Invitation**:
+An inviter's offer to enter a conversation, limited in uses and in time. It
+travels as a capability link, or arrives inside the application for a findable
+account.
+_Avoid_: Friend request, contact request, link when the invitation has none
+
+**Inviter**:
+The account that issued an invitation, and the only one who can vouch for the
+person who entered through it.
+_Avoid_: Sender, sponsor, referrer, host
+
 **Entrant**:
 A participant who entered a conversation space through an invitation and has
 not been vouched for yet. A membership status, never a trust state: an entrant
@@ -107,12 +118,41 @@ write to them.
 _Avoid_: Search, lookup, contact sync
 
 **Discovery identity**:
-A discoverability attribute the user declares, such as a hashed phone number or
-an opt-in username. Never conflated with the account identity.
+A discoverability attribute the user declares, such as a phone number they have
+proved they hold. Never conflated with the account identity, and never declared
+without the user's explicit consent.
+_Avoid_: Hashed phone number, which names a storage choice rather than the
+attribute
+
+**Proof**:
+The demonstration that a user holds the discovery identity they declare. A
+proof lapses, because numbers change hands, and has to be renewed for the
+account to stay findable.
+_Avoid_: Verification, which is the act that changes a trust state;
+confirmation, the application's word for a verification made in person;
+validation
+
+**Findable account**:
+An account whose discovery identity carries a current proof, so that anyone
+whose contacts hold that identity can find it. Only a findable account may look
+for its own contacts. Being findable depends on the proof alone, never on
+vouching or on a membership status.
+_Avoid_: Discoverable, which Matrix uses for identity-server lookups; listed,
+public
+
+**Contact**:
+An entry in the device's address book: a person known outside Messagr. It never
+leaves the device.
+_Avoid_: Contact for a Messagr account
+
+**Match**:
+The link, established on the device, between a contact and the account whose
+proven discovery identity appears in that contact.
+_Avoid_: Hit, sync result
 
 **Trust state**:
 The product-visible signal `unverified`, `recognized` or `verified`. It
-describes what is known about a contact, not what may be done with them.
+describes what is known about another account, not what may be done with it.
 
 **Verification**:
 The cryptographic act that changes a trust state, by comparing a short string
@@ -138,8 +178,9 @@ spending an invitation.
 _Avoid_: Permission, authorization, right
 
 **Recognition**:
-Reaching `recognized` through address book matching or another reliable local
-signal. Weaker than verification and never a substitute for it.
+Reaching `recognized` through a match or another reliable local signal. Weaker
+than verification, never a substitute for it, and attached to the matched
+account rather than to its number.
 _Avoid_: Using this word for the inviter's judgement, which is vouching
 
 **Vouching**:
@@ -196,7 +237,8 @@ participant; the `:server` suffix is never imposed on screen.
 
 **Linked device**:
 A secondary device attached to an account, desktop companions included. A
-device never appears quietly: verified contacts see it arrive.
+device never appears quietly: whoever has verified the account sees it
+arrive.
 
 **Recovery key**:
 The generated 256-bit secret that opens a key backup, shown once in Matrix's
