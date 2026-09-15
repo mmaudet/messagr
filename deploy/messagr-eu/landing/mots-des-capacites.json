@@ -25,22 +25,6 @@
     "retire d'ici."
   ],
   "aVenir": {
-    "appels": {
-      "fr": ["appels", "appel audio", "appeler"],
-      "en": ["audio call", "audio calls", "phone call"],
-      "de": ["Audioanruf", "Audioanrufe", "anrufen"],
-      "es": ["llamada de audio", "llamadas de audio"],
-      "it": ["chiamata audio", "chiamate audio"],
-      "nl": ["audiogesprek", "audiogesprekken"]
-    },
-    "video": {
-      "fr": ["appel vidéo", "appels vidéo", "visioconférence"],
-      "en": ["video call", "video calls"],
-      "de": ["Videoanruf", "Videoanrufe"],
-      "es": ["videollamada", "videollamadas"],
-      "it": ["videochiamata", "videochiamate"],
-      "nl": ["videogesprek", "videogesprekken"]
-    },
     "vocaux": {
       "fr": ["message vocal", "messages vocaux"],
       "en": ["voice message", "voice messages"],
@@ -106,6 +90,22 @@
     },
     "notifications": {
       "fr": ["notifications"]
+    },
+    "appels": {
+      "fr": ["appels", "appel audio", "appeler"],
+      "en": ["audio call", "audio calls", "phone call"],
+      "de": ["Audioanruf", "Audioanrufe", "anrufen"],
+      "es": ["llamada de audio", "llamadas de audio"],
+      "it": ["chiamata audio", "chiamate audio"],
+      "nl": ["audiogesprek", "audiogesprekken"]
+    },
+    "video": {
+      "fr": ["appel vidéo", "appels vidéo", "visioconférence"],
+      "en": ["video call", "video calls"],
+      "de": ["Videoanruf", "Videoanrufe"],
+      "es": ["videollamada", "videollamadas"],
+      "it": ["videochiamata", "videochiamate"],
+      "nl": ["videogesprek", "videogesprekken"]
     }
   },
   "jamais": {

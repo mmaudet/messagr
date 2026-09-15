@@ -17,7 +17,8 @@ et `{{ c.label }}` montré à un lecteur est pire qu'un silence.
 
 Sur la conversation, quatre choses de plus sont parties parce qu'elles ne
 tournent pas : les boutons d'appel, le message vocal, la vignette
-photographique, et la légende qui la désignait. Le détail est en tête de
+photographique, et la légende qui la désignait. Les appels tournent depuis, et cette
+conversation ne montre toujours pas leurs boutons. Le détail est en tête de
 `landing/conversation.html`.
 
 ## Ce que chacun montre, et son état
@@ -29,7 +30,7 @@ photographique, et la légende qui la désignait. Le détail est en tête de
 | (`../conversation.html`) | La conversation en tête-à-tête | Fait |
 | `salon.html` | Une conversation à plusieurs | À venir |
 | `agent.html` | La fiche de capacités d'un agent | À venir |
-| `appel.html` | Un appel chiffré de bout en bout | En cours |
+| `appel.html` | Un appel chiffré de bout en bout | Fait |
 
 L'état n'est pas lu depuis le tableau daté de #149 : il est écrit deux fois, ici
 et dans la page. Ce qui empêche les deux de se contredire est
@@ -41,6 +42,9 @@ page la démentait.
 L'appel est passé de « À venir » à « En cours » le 7 septembre 2026 : le module
 `src/calls/` existe sur master, couvert par ses `.spec`, et n'est importé par
 rien -- écrit, éprouvé, pas embarqué.
+
+Il est passé à « Fait » le 15 septembre 2026 : les appels audio et vidéo sont
+dans les builds distribuées, et ont tenu les répétitions des 13 et 14 septembre.
 
 ## La page d'invitation, qui n'est pas de cette famille
 

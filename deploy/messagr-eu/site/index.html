@@ -553,8 +553,8 @@
   <section class="bande" id="galerie">
     <div class="mesure">
       <h2 data-t="galerie-titre">Ce que vous verrez.</h2>
-      <p class="amorce" data-t="galerie-amorce">Trois de ces écrans existent aujourd'hui.
-      Les trois autres sont dessinés et ne tournent pas encore.</p>
+      <p class="amorce" data-t="galerie-amorce">Quatre de ces écrans existent aujourd'hui.
+      Les deux autres sont dessinés et ne tournent pas encore.</p>
 
       <div class="galerie">
       <div class="vue" data-cap="invitation">
@@ -607,7 +607,7 @@
           <a class="agrandir" href="#loupe-appel"><img src="/messagr-ecran-appel.png" alt="" loading="lazy" decoding="async"></a>
           <figcaption>
             <span class="quoi" data-t="ecran-appel">Un appel chiffré</span>
-            <span class="etat encours" data-t="etat-encours">En cours</span>
+            <span class="etat fait" data-t="etat-fait">Fait</span>
           </figcaption>
         </figure>
       </div>
@@ -629,16 +629,17 @@
             <li data-t="serveur-non1">Le texte de vos messages</li>
             <li data-t="serveur-non2">Vos photographies</li>
             <li data-t="serveur-non3">Vos réactions</li>
-            <!-- LA PASTILLE EST LÀ PARCE QUE LA LIGNE ÉTAIT UNE SURANNONCE.
-                 La phrase est vraie du code -- `src/calls/transport.ts` fait
-                 passer les événements m.call.* par la même porte que les
-                 messages -- et fausse du produit : rien n'importe ce module,
-                 et aucune de ses chaînes n'est dans le paquet servi. Un
-                 lecteur lisait une liste de ce que l'application fait. Même
-                 famille que « Vos messages exportables à tout moment », qui a
-                 vécu ici jusqu'au 7 septembre 2026. -->
-            <li data-cap="appels"><span data-t="serveur-non4">Qu'un appel est un
-              appel</span> <span class="etat encours" data-t="etat-encours">En cours</span></li>
+            <!-- LE CONTENU D'UN APPEL, PAS SON EXISTENCE.
+                 Cette ligne disait « Qu'un appel est un appel », avec une
+                 pastille « En cours » tant que les appels n'étaient pas dans
+                 le produit. Ils y sont, et la phrase est devenue fausse : à
+                 chaque appel, l'application demande au serveur l'accès au
+                 relais (`/_matrix/client/v3/voip/turnServer`, dans
+                 `src/calls/session.ts`), et le serveur apprend ainsi qu'un
+                 compte est en appel. Ce qu'il ne peut pas savoir, c'est ce qui
+                 s'y dit et s'y montre. Corrigé le 15 septembre 2026, avec la
+                 ligne « Quand un compte est en appel » en face. -->
+            <li data-t="serveur-non4">Le son et l'image de vos appels</li>
             <li data-t="serveur-non5">Les noms que vous donnez à vos contacts</li>
           </ul>
         </div>
@@ -648,6 +649,7 @@
             <li data-t="serveur-oui1">Quels comptes échangent, et à quel moment</li>
             <li data-t="serveur-oui2">La taille de ce qui passe</li>
             <li data-t="serveur-oui3">Qu'un appareil doit être réveillé, sans savoir pourquoi</li>
+            <li data-t="serveur-oui4">Quand un compte est en appel</li>
           </ul>
         </div>
       </div>
@@ -780,20 +782,20 @@
           <li data-cap="noms" data-t="cap-noms">Noms donnés, gardés sur l'appareil</li>
           <li data-cap="parrainage" data-t="cap-parrainage">Parrainage et éviction</li>
           <li data-cap="notifications" data-t="cap-notifications">Notifications</li>
+          <li data-cap="appels" data-t="cap-appels">Appels audio</li>
+          <li data-cap="video" data-t="cap-video">Appels vidéo</li>
         </ul>
       </div>
       <div class="groupe">
         <h3><span class="etat encours" data-t="etat-encours">En cours</span></h3>
         <ul>
           <li data-cap="iphone" data-t="cap-iphone">iPhone</li>
-          <li data-cap="appels" data-t="cap-appels">Appels audio</li>
         </ul>
       </div>
       <div class="groupe">
         <h3><span class="etat avenir" data-t="etat-avenir">À venir</span></h3>
         <ul>
           <li data-cap="vocaux" data-t="cap-vocaux">Messages vocaux</li>
-          <li data-cap="video" data-t="cap-video">Appels vidéo</li>
           <li data-cap="salons" data-t="cap-salons">Salons</li>
           <li data-cap="communautes" data-t="cap-communautes">Communautés</li>
           <li data-cap="agents" data-t="cap-agents">Agents</li>
@@ -1032,7 +1034,7 @@
       <img src="/messagr-ecran-appel.png" alt="">
       <figcaption>
         <span class="quoi" data-t="ecran-appel">Un appel chiffré</span>
-        <span class="etat encours" data-t="etat-encours">En cours</span>
+        <span class="etat fait" data-t="etat-fait">Fait</span>
         <a class="fermer" href="#galerie"><span aria-hidden="true">&#215;</span><span class="lu" data-t="fermer">Fermer</span></a>
       </figcaption>
     </figure>
