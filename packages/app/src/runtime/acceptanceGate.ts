@@ -1,9 +1,24 @@
 import type { BackupAcceptedFrom } from './acceptBackup'
+import type { BackupReplacedFrom, ReplaceFailedAt } from './replaceBackup'
 
-/** What an acceptance hands the screen once it has settled. */
+/** Which gesture on the backup is running. */
+export type BackupGesture = 'accept' | 'replace'
+
+/** What a gesture on the backup hands the screen once it has settled. */
 export type AcceptanceSettled =
-  | { readonly show: 'key'; readonly restoreKey: string }
+  | {
+      readonly show: 'key'
+      readonly restoreKey: string
+      /**
+       * A replacement's only: whether the old key still opens the old backup,
+       * because the version it opened would not go.
+       */
+      readonly oldStillOpens?: boolean
+    }
+  /** An acceptance that did not go through, a rejection included. */
   | { readonly show: 'failure' }
+  /** A replacement that did not go through, and where it stopped. */
+  | { readonly show: 'replacementFailure'; readonly failedAt: ReplaceFailedAt }
 
 /**
  * The acceptance of the backup: one at a time, and what it produces handed to
@@ -36,13 +51,24 @@ export type AcceptanceSettled =
  */
 export interface Acceptance {
   /**
-   * Starts `accept`, unless an acceptance is still running: then nothing
-   * starts and this answers `false`. It opens again however the last one
-   * ended, and a rejection counts as a failure.
+   * Starts `accept`, unless a gesture on the backup is still running: then
+   * nothing starts and this answers `false`. It opens again however the last
+   * one ended, and a rejection counts as a failure.
    */
   readonly start: (accept: () => Promise<BackupAcceptedFrom>) => boolean
-  /** Whether an acceptance is running: `useSyncExternalStore`'s snapshot. */
-  readonly running: () => boolean
+  /**
+   * Starts `replace`, on the same terms as `start` and behind the same gate:
+   * nothing starts while an acceptance or a replacement runs (#284). A second
+   * tap on the confirmation started a second replacement, and one beside an
+   * acceptance publishes a second version all the same.
+   */
+  readonly replace: (replace: () => Promise<BackupReplacedFrom>) => boolean
+  /**
+   * Which gesture is running, or `null`: `useSyncExternalStore`'s snapshot.
+   * The gesture and not a flag, because the button of the one running says
+   * so, and every other button only waits.
+   */
+  readonly running: () => BackupGesture | null
   /** Calls `changed` whenever `running` changes, and answers how to stop. */
   readonly subscribe: (changed: () => void) => () => void
   /**
@@ -54,38 +80,68 @@ export interface Acceptance {
 }
 
 export function acceptance(): Acceptance {
-  let running = false
+  let running: BackupGesture | null = null
   let receiver: ((what: AcceptanceSettled) => void) | null = null
-  let pendingKey: string | null = null
+  let pendingKey: Extract<AcceptanceSettled, { show: 'key' }> | null = null
   const watchers = new Set<() => void>()
 
-  const setRunning = (now: boolean) => {
+  const setRunning = (now: BackupGesture | null) => {
     running = now
     for (const watcher of [...watchers]) watcher()
   }
 
+  /**
+   * One gesture behind the gate, whichever it is: what it settles goes to the
+   * screen mounted, and a key to the next one when none is.
+   */
+  const run = <Outcome>(
+    name: BackupGesture,
+    gesture: () => Promise<Outcome>,
+    settles: (outcome: Outcome) => AcceptanceSettled,
+    refused: AcceptanceSettled,
+  ): boolean => {
+    if (running !== null) return false
+    setRunning(name)
+    // On the next microtask, so a throw from the gesture itself settles like
+    // a rejection instead of escaping with the gate shut.
+    Promise.resolve()
+      .then(gesture)
+      .then(settles, (): AcceptanceSettled => refused)
+      .then(what => {
+        setRunning(null)
+        if (receiver !== null) receiver(what)
+        else if (what.show === 'key') pendingKey = what
+      })
+    return true
+  }
+
   return {
-    start: accept => {
-      if (running) return false
-      setRunning(true)
-      // On the next microtask, so a throw from `accept` itself settles like a
-      // rejection instead of escaping with the gate shut.
-      Promise.resolve()
-        .then(accept)
-        .then(
-          (outcome): AcceptanceSettled =>
-            outcome.accepted
-              ? { show: 'key', restoreKey: outcome.restoreKey }
-              : { show: 'failure' },
-          (): AcceptanceSettled => ({ show: 'failure' }),
-        )
-        .then(what => {
-          setRunning(false)
-          if (receiver !== null) receiver(what)
-          else if (what.show === 'key') pendingKey = what.restoreKey
-        })
-      return true
-    },
+    start: accept =>
+      run(
+        'accept',
+        accept,
+        outcome =>
+          outcome.accepted
+            ? { show: 'key', restoreKey: outcome.restoreKey }
+            : { show: 'failure' },
+        { show: 'failure' },
+      ),
+    replace: replace =>
+      run(
+        'replace',
+        replace,
+        outcome =>
+          outcome.replaced
+            ? {
+                show: 'key',
+                restoreKey: outcome.restoreKey,
+                oldStillOpens: !outcome.oldRetired,
+              }
+            : { show: 'replacementFailure', failedAt: outcome.failedAt },
+        // `thrown`, as `replaceBackupFrom` answers a rejection: `replaceBackup`
+        // lets a throw out only before the publish.
+        { show: 'replacementFailure', failedAt: 'thrown' },
+      ),
     running: () => running,
     subscribe: changed => {
       watchers.add(changed)
@@ -96,9 +152,9 @@ export function acceptance(): Acceptance {
     receive: settled => {
       receiver = settled
       if (pendingKey !== null) {
-        const restoreKey = pendingKey
+        const key = pendingKey
         pendingKey = null
-        settled({ show: 'key', restoreKey })
+        settled(key)
       }
       return () => {
         if (receiver === settled) receiver = null

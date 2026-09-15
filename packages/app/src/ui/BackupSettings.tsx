@@ -3,6 +3,7 @@ import { Pressable, StyleSheet, Text, View } from 'react-native'
 
 import { t } from '../copy'
 import { color, floors, layout, space, stroke, type } from '../design/tokens'
+import type { BackupGesture } from '../runtime/acceptanceGate'
 import {
   failedReplacementSentence,
   type ReplaceFailedAt,
@@ -116,10 +117,12 @@ export function BackupSettings({
    */
   readonly replaceFailedAt: ReplaceFailedAt | null
   /**
-   * Whether an acceptance is running (#284), from this screen or from the
-   * offer. The button waits, inert, under a label that says so.
+   * Which gesture on the backup is running, if any (#284): an acceptance,
+   * from this screen or from the offer, or a replacement of the key. One runs
+   * at a time, so every button that would start one, or cover this screen,
+   * waits inert while either does, and the button of the one running says so.
    */
-  readonly working: boolean
+  readonly working: BackupGesture | null
   readonly onBack: () => void
   /** Takes the reading again. Offered only when it could not be taken. */
   readonly onRetry: () => void
@@ -333,7 +336,11 @@ export function BackupSettings({
               finally={t('backup_replace_final')}>
               <NotchedButton
                 testID="backup-replace-confirm"
-                label={t('backup_replace_confirm')}
+                label={
+                  working === 'replace'
+                    ? t('backup_replace_working')
+                    : t('backup_replace_confirm')
+                }
                 onPress={() => {
                   // NOT CLOSED HERE. The key screen covers everything the
                   // moment it arrives, and unmounting under the finger is
@@ -341,6 +348,11 @@ export function BackupSettings({
                   // gesture lands on whatever React drew underneath.
                   onReplace()
                 }}
+                // INERT WHILE A GESTURE ON THE BACKUP RUNS (#284). A second
+                // tap started a second replacement: two versions published,
+                // and the keystore ending on either. The store refuses it as
+                // well; this is what shows it.
+                disabled={working !== null}
                 wide
               />
               <NotchedButton
@@ -375,6 +387,10 @@ export function BackupSettings({
                 testID="backup-settings-replace"
                 label={t('backup_settings_replace')}
                 onPress={() => onConfirming(true)}
+                // Inert while an acceptance runs (#284), or a replacement
+                // whose confirmation was cancelled: the store would refuse
+                // the gesture this row leads to.
+                disabled={working !== null}
                 tone="quiet"
                 wide
               />
@@ -392,12 +408,12 @@ export function BackupSettings({
             <NotchedButton
               testID="backup-settings-enable"
               label={
-                working
+                working === 'accept'
                   ? t('backup_accept_working')
                   : t('backup_settings_enable')
               }
               onPress={onEnable}
-              disabled={working}
+              disabled={working !== null}
               wide
             />
             {/* UNDER THE BUTTON, SO NOTHING MOVES UNDER THE FINGER (#284). A
@@ -424,10 +440,10 @@ export function BackupSettings({
                   testID="backup-settings-restore"
                   label={t('settings_restore')}
                   onPress={onRestore}
-                  // Inert while an acceptance runs (#284): the key entry would
-                  // cover this screen, and a failure said then would land
-                  // behind it, card and announcement both.
-                  disabled={working}
+                  // Inert while a gesture on the backup runs (#284): the key
+                  // entry would cover this screen, and a failure said then
+                  // would land behind it, card and announcement both.
+                  disabled={working !== null}
                   tone="quiet"
                   wide
                 />

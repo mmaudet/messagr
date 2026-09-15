@@ -609,11 +609,12 @@ export function App({
   const [replaceFailedAt, setReplaceFailedAt] =
     useState<ReplaceFailedAt | null>(null)
   /**
-   * Whether an acceptance is running, read from `backupAcceptance` rather than
-   * held by this mount (#284): a mount that arrives mid-acceptance draws
-   * « Activation… » too, and the two screens draw from this.
+   * Which gesture on the backup is running, if any, read from
+   * `backupAcceptance` rather than held by this mount (#284): a mount that
+   * arrives mid-acceptance or mid-replacement draws it running too, and the
+   * two screens draw from this.
    */
-  const acceptWorking = useSyncExternalStore(
+  const backupWorking = useSyncExternalStore(
     backupAcceptance.subscribe,
     backupAcceptance.running,
   )
@@ -1072,15 +1073,47 @@ export function App({
       backupScreen: openScope === null && tab === 'settings' && backupOpen,
     }
   })
-  // THIS MOUNT RECEIVES WHAT SETTLES, a key included that settled while no
-  // mount was there to show it (#284). A key is always shown: it opens a
-  // backup that now exists, and nothing can show it later. A failure is said
-  // only while the screen it is about is showing, and dropped otherwise.
+  // THIS MOUNT RECEIVES WHAT SETTLES, an acceptance's or a replacement's, a
+  // key included that settled while no mount was there to show it (#284). A
+  // key is always shown: it opens a backup that now exists, and nothing can
+  // show it later. A failure is said only while the screen it is about is
+  // showing, and dropped otherwise.
   useEffect(
     () =>
       backupAcceptance.receive(settled => {
         if (settled.show === 'key') {
-          setBackupPrompt({ restoreKey: settled.restoreKey })
+          // A REPLACEMENT'S CONFIRMATION IS CLOSED HERE, and only here. The
+          // finger is long gone, and the key screen is about to cover
+          // everything, so what is behind the key is the row rather than the
+          // panel that produced it.
+          setReplaceConfirming(false)
+          setBackupPrompt({
+            restoreKey: settled.restoreKey,
+            // CARRIED, NOT DROPPED. A replacement whose retirement failed is
+            // a success with one true sentence attached: the old key still
+            // opens the old backup. Rounding that up to « c'est fait » would
+            // tell somebody their lost key is harmless when it is not.
+            oldStillOpens: settled.oldStillOpens,
+          })
+          return
+        }
+        if (settled.show === 'replacementFailure') {
+          setReplaceConfirming(false)
+          // THE READING TAKEN AGAIN, whatever is showing, and it proves
+          // nothing about the failure. It is the bridge's, and `enabled`
+          // means only that `enableKeyBackup` was called in this process:
+          // after a failure past the publish it can go on saying « vos
+          // messages sont sauvegardés » of a version the homeserver no
+          // longer takes (#327). What the server holds is #323's.
+          setAttempt(n => n + 1)
+          // SAID ON SAUVEGARDE ONLY, IN THE SENTENCE ITS STEP ALLOWS:
+          // « rien n'a changé » only before the publish, as
+          // `failedReplacementSentence` says.
+          if (!backupShowing.current.backupScreen) return
+          setReplaceFailedAt(settled.failedAt)
+          AccessibilityInfo.announceForAccessibility(
+            t(failedReplacementSentence(settled.failedAt)),
+          )
           return
         }
         const where: AcceptedFrom | null = backupShowing.current.offer
@@ -1117,10 +1150,13 @@ export function App({
           : acceptKeyBackup(session),
       ),
     )
-    // NOT STARTED: one is running already, maybe from a mount before this
-    // one. The button is inert by the time the screen draws again, and a tap
-    // that got in before it did changes nothing.
-    if (started) setAcceptFailed(null)
+    // NOT STARTED: a gesture on the backup is running already, maybe from a
+    // mount before this one. The button is inert by the time the screen draws
+    // again, and a tap that got in before it did changes nothing.
+    if (started) {
+      setAcceptFailed(null)
+      setReplaceFailedAt(null)
+    }
   }
   /** A card is about asking just now: leaving its screen takes it down. */
   const clearBackupCards = () => {
@@ -3705,7 +3741,7 @@ export function App({
       // (#284). On Android 7 to 11 a back that reaches the system finishes
       // the root Activity while JavaScript runs on: an acceptance would end,
       // and its key go to a screen nobody sees. The buttons are the way out.
-      if (backupPrompt !== null || acceptWorking) return true
+      if (backupPrompt !== null || backupWorking !== null) return true
       // THE QUESTION A LINK INTO ANOTHER SERVER PUTS, which is the whole
       // screen while it is there. Back answers it « stay » (#304): see
       // `questionOnScreen.ts`.
@@ -3770,7 +3806,7 @@ export function App({
     invite.stage,
     tab,
     backupPrompt,
-    acceptWorking,
+    backupWorking,
   ])
 
   // A SCREEN THAT GOES AWAY WITH THE QUESTION UNANSWERED ANSWERS IT « STAY »
@@ -4511,7 +4547,7 @@ export function App({
                   reading={backupState}
                   onRetry={() => setAttempt(attempt + 1)}
                   failed={acceptFailed === 'settings'}
-                  working={acceptWorking}
+                  working={backupWorking}
                   replaceFailedAt={replaceFailedAt}
                   restorable={restorableFromSettings}
                   onRestore={() => {
@@ -4577,67 +4613,25 @@ export function App({
                     // `onEnable`: the key screen covers everything anyway,
                     // and unmounting under the finger sends the rest of the
                     // gesture to whatever React draws underneath.
-                    const session = sessionClientRef.current
-                    if (session === null) return
-                    // SAID ON THIS SCREEN, IN THE SENTENCE ITS STEP ALLOWS
-                    // (#284): « rien n'a changé » only before the publish,
-                    // as `failedReplacementSentence` says. The card and the
-                    // announcement follow the acceptance's rule, and only
-                    // land while this screen is the one showing.
                     //
-                    // The reading is taken again whatever is showing, and it
-                    // proves nothing about the failure. It is the bridge's,
-                    // and `enabled` means only that `enableKeyBackup` was
-                    // called in this process: after a failure past the
-                    // publish it can go on saying « vos messages sont
-                    // sauvegardés » of a version the homeserver no longer
-                    // takes (#327). What the server holds is #323's.
-                    const sayItFailed = (failedAt: ReplaceFailedAt) => {
-                      if (backupShowing.current.backupScreen) {
-                        setReplaceFailedAt(failedAt)
-                        AccessibilityInfo.announceForAccessibility(
-                          t(failedReplacementSentence(failedAt)),
-                        )
-                      }
-                      setAttempt(n => n + 1)
-                    }
-                    setReplaceFailedAt(null)
-                    // A failure writes where it stopped: `replaceBackupFrom`.
-                    replaceBackupFrom(() => replaceKeyBackup(session))
-                      .then(outcome => {
-                        // CLOSED HERE, and only here. The finger is long
-                        // gone by the time this settles, and the key screen
-                        // is about to cover everything anyway -- so nothing
-                        // is unmounted under a gesture, and what is behind
-                        // the key is the row rather than the panel that
-                        // produced it.
-                        setReplaceConfirming(false)
-                        if (outcome.replaced) {
-                          setBackupPrompt({
-                            restoreKey: outcome.restoreKey,
-                            // CARRIED, NOT DROPPED. A replacement whose
-                            // retirement failed is a success with one true
-                            // sentence attached: the old key still opens the
-                            // old backup. Rounding that up to « c'est fait »
-                            // would tell somebody their lost key is harmless
-                            // when it is not.
-                            oldStillOpens: !outcome.oldRetired,
-                          })
-                        } else {
-                          // A key already on screen stays there (#284): a
-                          // plain `null` settling in the same frame as a
-                          // success would take the one sight of it away.
-                          setBackupPrompt(p => (p === 'offering' ? null : p))
-                          sayItFailed(outcome.failedAt)
-                        }
-                      })
-                      .catch(() => {
-                        // `replaceBackupFrom` does not reject, so only a
-                        // throw in the handler above lands here.
-                        setReplaceConfirming(false)
-                        setBackupPrompt(p => (p === 'offering' ? null : p))
-                        sayItFailed('thrown')
-                      })
+                    // THROUGH THE STORE, LIKE AN ACCEPTANCE (#284). A second
+                    // tap on the confirmation started a second replacement:
+                    // the store starts nothing while a gesture on the backup
+                    // runs, and what comes of this one arrives through the
+                    // receiver above. `replaceBackupFrom` writes where a
+                    // failure stopped, and a launch that holds no session
+                    // answers a failure like any other.
+                    const session = sessionClientRef.current
+                    const started = backupAcceptance.replace(() =>
+                      replaceBackupFrom(() =>
+                        session === null
+                          ? Promise.reject(
+                              new Error('this launch holds no session'),
+                            )
+                          : replaceKeyBackup(session),
+                      ),
+                    )
+                    if (started) clearBackupCards()
                   }}
                 />
               </View>
@@ -5164,7 +5158,7 @@ export function App({
             edges={['top', 'bottom', 'left', 'right']}>
             <BackupOffer
               failed={acceptFailed === 'offer'}
-              working={acceptWorking}
+              working={backupWorking !== null}
               // The key exists for exactly as long as `backupPrompt` holds
               // it: nothing else has a copy, here or on the homeserver.
               // `acceptBackup.ts` hands it back precisely once and never on a

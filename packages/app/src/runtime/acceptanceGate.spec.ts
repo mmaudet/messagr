@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 
 import type { BackupAcceptedFrom } from './acceptBackup'
 import { acceptance } from './acceptanceGate'
+import type { BackupReplacedFrom } from './replaceBackup'
 
 /** A promise the test settles when it chooses, as a slow homeserver would. */
 function pending<T>() {
@@ -18,6 +19,99 @@ const ACCEPTED: BackupAcceptedFrom = {
   accepted: true,
   restoreKey: 'EsTx aaaa bbbb cccc',
 }
+
+const REPLACED: BackupReplacedFrom = {
+  replaced: true,
+  restoreKey: 'EsTx dddd eeee ffff',
+  oldRetired: true,
+}
+
+describe('one gesture on the backup at a time, a replacement included', () => {
+  // #284, found in review: a second tap on « Oui, remplacer ma clé » started a
+  // second replacement, because the replacement ran outside this gate. Two
+  // replacements, or one beside an acceptance, publish two versions, and the
+  // keystore ends holding either one.
+  it('starts no replacement while an acceptance is running', async () => {
+    const backup = acceptance()
+    const accepting = pending<BackupAcceptedFrom>()
+    let replacementRan = false
+
+    expect(backup.start(() => accepting.promise)).toBe(true)
+    expect(
+      backup.replace(async () => {
+        replacementRan = true
+        return REPLACED
+      }),
+    ).toBe(false)
+    await settled()
+    expect(replacementRan).toBe(false)
+  })
+
+  it('starts neither an acceptance nor a second replacement while a replacement is running', async () => {
+    // The second tap the review found, and its mirror: an acceptance begun
+    // from the offer while the key is being replaced.
+    const backup = acceptance()
+    const replacing = pending<BackupReplacedFrom>()
+    let anotherRan = false
+
+    expect(backup.replace(() => replacing.promise)).toBe(true)
+    expect(
+      backup.replace(async () => {
+        anotherRan = true
+        return REPLACED
+      }),
+    ).toBe(false)
+    expect(
+      backup.start(async () => {
+        anotherRan = true
+        return ACCEPTED
+      }),
+    ).toBe(false)
+    await settled()
+    expect(anotherRan).toBe(false)
+  })
+
+  it("hands a replacement's key to the screen mounted, with whether the old key still opens", async () => {
+    // What a replacement adds to its key: an old version that would not go
+    // still opens the old backup, and the key screen has to say so.
+    const backup = acceptance()
+    const shown: unknown[] = []
+    backup.receive(what => shown.push(what))
+    backup.replace(async (): Promise<BackupReplacedFrom> => ({
+      replaced: true,
+      restoreKey: 'EsTx dddd eeee ffff',
+      oldRetired: false,
+    }))
+    await settled()
+
+    expect(shown).toEqual([
+      { show: 'key', restoreKey: 'EsTx dddd eeee ffff', oldStillOpens: true },
+    ])
+  })
+
+  it("hands a replacement's failure to the screen mounted, with where it stopped, a throw included", async () => {
+    // What the screen may say depends on the step: « rien n'a changé » only
+    // before the publish. A rejection is `thrown`, as `replaceBackupFrom`
+    // answers one, because `replaceBackup` lets a throw out only before it.
+    const backup = acceptance()
+    const shown: unknown[] = []
+    backup.receive(what => shown.push(what))
+    backup.replace(async (): Promise<BackupReplacedFrom> => ({
+      replaced: false,
+      failedAt: 'enabling',
+    }))
+    await settled()
+    backup.replace(async () => {
+      throw new Error('the native module never installed')
+    })
+    await settled()
+
+    expect(shown).toEqual([
+      { show: 'replacementFailure', failedAt: 'enabling' },
+      { show: 'replacementFailure', failedAt: 'thrown' },
+    ])
+  })
+})
 
 describe('one acceptance at a time, whatever mounts the screen', () => {
   // #284, found in review twice. First: more taps started more acceptances,
@@ -130,22 +224,30 @@ describe('one acceptance at a time, whatever mounts the screen', () => {
     expect(old).toEqual([])
   })
 
-  it('says whether an acceptance is running, and tells watchers when that changes', async () => {
-    // What a screen mounted mid-acceptance draws « Activation… » from.
+  it('says which gesture is running, and tells watchers when that changes', async () => {
+    // What a screen mounted mid-gesture draws « Activation… » or
+    // « Remplacement… » from, and what leaves every other button inert.
     const backup = acceptance()
-    const first = pending<BackupAcceptedFrom>()
+    const accepting = pending<BackupAcceptedFrom>()
+    const replacing = pending<BackupReplacedFrom>()
     let told = 0
     backup.subscribe(() => {
       told += 1
     })
 
-    backup.start(() => first.promise)
-    expect(backup.running()).toBe(true)
-    first.settle(ACCEPTED)
+    backup.start(() => accepting.promise)
+    expect(backup.running()).toBe('accept')
+    accepting.settle(ACCEPTED)
+    await settled()
+    expect(backup.running()).toBe(null)
+
+    backup.replace(() => replacing.promise)
+    expect(backup.running()).toBe('replace')
+    replacing.settle(REPLACED)
     await settled()
 
-    expect(backup.running()).toBe(false)
-    expect(told).toBe(2)
+    expect(backup.running()).toBe(null)
+    expect(told).toBe(4)
   })
 })
 
