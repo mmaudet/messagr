@@ -596,6 +596,12 @@ export function App({
    */
   const [acceptFailed, setAcceptFailed] = useState<AcceptedFrom | null>(null)
   /**
+   * Whether the key replacement asked for on the Sauvegarde screen did not go
+   * through, so that screen says so (#284). Kept and cleared beside
+   * `acceptFailed`, for the same reasons.
+   */
+  const [replaceFailed, setReplaceFailed] = useState(false)
+  /**
    * Whether an acceptance is running, read from `backupAcceptance` rather than
    * held by this mount (#284): a mount that arrives mid-acceptance draws
    * « Activation… » too, and the two screens draw from this.
@@ -605,11 +611,12 @@ export function App({
     backupAcceptance.running,
   )
   // A CARD IS ABOUT ASKING JUST NOW (#284). The tab bar resets neither the
-  // backup screen nor its card, so a card standing before going elsewhere was
+  // backup screen nor its cards, so a card standing before going elsewhere was
   // still there on coming back. `tab` is read by nothing inside: changing is
   // the whole of what this listens for.
   useEffect(() => {
     setAcceptFailed(null)
+    setReplaceFailed(false)
   }, [tab])
   /**
    * Reads the backup's state whenever that screen is showing and nothing is
@@ -1111,6 +1118,7 @@ export function App({
   /** A card is about asking just now: leaving its screen takes it down. */
   const clearBackupCards = () => {
     setAcceptFailed(null)
+    setReplaceFailed(false)
   }
   const [claimed, setClaimed] = useState<HistoryClaim | null>(null)
   // Set once, at entry, and never cleared: the launch either was opened with
@@ -4497,6 +4505,7 @@ export function App({
                   onRetry={() => setAttempt(attempt + 1)}
                   failed={acceptFailed === 'settings'}
                   working={acceptWorking}
+                  replaceFailed={replaceFailed}
                   restorable={restorableFromSettings}
                   onRestore={() => {
                     // The same surface the offer leads to, reached from the
@@ -4563,6 +4572,23 @@ export function App({
                     // gesture to whatever React draws underneath.
                     const session = sessionClientRef.current
                     if (session === null) return
+                    // SAID ON THIS SCREEN, AND THE STATE READ AGAIN (#284).
+                    // A replacement that fails at enabling leaves no
+                    // commitment behind, so « vos messages sont
+                    // sauvegardés » may no longer hold: the reading is
+                    // taken again whatever is showing. The card and the
+                    // announcement follow the acceptance's rule, and only
+                    // land while this screen is the one showing.
+                    const sayItFailed = () => {
+                      if (backupShowing.current.backupScreen) {
+                        setReplaceFailed(true)
+                        AccessibilityInfo.announceForAccessibility(
+                          t('backup_replace_failed'),
+                        )
+                      }
+                      setAttempt(n => n + 1)
+                    }
+                    setReplaceFailed(false)
                     replaceKeyBackup(session)
                       .then(outcome => {
                         // CLOSED HERE, and only here. The finger is long
@@ -4588,11 +4614,13 @@ export function App({
                           // plain `null` settling in the same frame as a
                           // success would take the one sight of it away.
                           setBackupPrompt(p => (p === 'offering' ? null : p))
+                          sayItFailed()
                         }
                       })
                       .catch(() => {
                         setReplaceConfirming(false)
                         setBackupPrompt(p => (p === 'offering' ? null : p))
+                        sayItFailed()
                       })
                   }}
                 />

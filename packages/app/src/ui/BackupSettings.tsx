@@ -95,8 +95,18 @@ export function BackupSettings({
   onRestore,
   failed,
   working,
+  replaceFailed,
 }: {
   readonly reading: BackupReading
+  /**
+   * Whether the key replacement asked for here did not go through (#284).
+   *
+   * Above everything on this screen, because the reading taken again after it
+   * can land in either branch, or be waiting: the replacement may have left
+   * no backup running on this device, and the sentence has to be seen
+   * whichever one the screen then draws.
+   */
+  readonly replaceFailed: boolean
   /**
    * Whether an acceptance is running (#284), from this screen or from the
    * offer. The button waits, inert, under a label that says so.
@@ -181,6 +191,17 @@ export function BackupSettings({
       </Pressable>
 
       <Text style={styles.title}>{t('settings_backup')}</Text>
+
+      {/* THE REPLACEMENT THAT DID NOT GO THROUGH (#284). Its confirmation has
+          closed by the time this draws, so nothing moves under a finger. The
+          ochre is the state's own, as for an acceptance that failed. */}
+      {replaceFailed && (
+        <View
+          style={[styles.card, styles.off]}
+          testID="backup-settings-replace-failed">
+          <Text style={styles.body}>{t('backup_replace_failed')}</Text>
+        </View>
+      )}
 
       {reading.reading === 'waiting' && (
         <View
