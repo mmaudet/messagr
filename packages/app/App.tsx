@@ -81,6 +81,7 @@ import {
 import { CallsList } from './src/ui/CallsList'
 import { acceptBackupFrom, type AcceptedFrom } from './src/runtime/acceptBackup'
 import { acceptance } from './src/runtime/acceptanceGate'
+import { replaceBackupFrom } from './src/runtime/replaceBackup'
 import type { BackupVersionInfo } from './src/runtime/backupCalls'
 import { getErrorMessage } from './src/runtime/errors'
 import {
@@ -4589,7 +4590,8 @@ export function App({
                       setAttempt(n => n + 1)
                     }
                     setReplaceFailed(false)
-                    replaceKeyBackup(session)
+                    // A failure writes where it stopped: `replaceBackupFrom`.
+                    replaceBackupFrom(() => replaceKeyBackup(session))
                       .then(outcome => {
                         // CLOSED HERE, and only here. The finger is long
                         // gone by the time this settles, and the key screen

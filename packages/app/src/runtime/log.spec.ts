@@ -290,6 +290,22 @@ describe('a store build', () => {
     ).toEqual(['MESSAGR_CALL_STATE {"call":"reconnecting","secondsLeft":12}'])
   })
 
+  it('writes where replacing the recovery key stopped, under the word replace', () => {
+    // #284, found in review: a replacement that failed wrote no line at all.
+    // It writes the acceptance's line, and `from` says it was a replacement.
+    expect(
+      linesWrittenBy(() =>
+        logEvent('warn', 'MESSAGR_BACKUP_ACCEPT_FAILED', {
+          from: 'replace',
+          failedAt: 'thrownAfterPublishing',
+          forgotten: false,
+        }),
+      ),
+    ).toEqual([
+      'MESSAGR_BACKUP_ACCEPT_FAILED {"from":"replace","failedAt":"thrownAfterPublishing","forgotten":false}',
+    ])
+  })
+
   it('writes which stores a backup reading could not open', () => {
     expect(
       linesWrittenBy(() =>

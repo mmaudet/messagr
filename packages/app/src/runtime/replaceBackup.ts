@@ -1,4 +1,10 @@
-import { acceptBackup, type AcceptBackupDeps } from './acceptBackup'
+import {
+  acceptBackup,
+  type AcceptBackupDeps,
+  type BackupAccepted,
+} from './acceptBackup'
+import { getErrorMessage } from './errors'
+import { logEvent } from './log'
 
 /**
  * Replacing the recovery key: accepting again, and then retiring what the
@@ -81,8 +87,19 @@ export type BackupReplaced =
     }
   | {
       readonly replaced: false
-      /** As `acceptBackup`: nothing here changed what the old key opens. */
-      readonly failedAt: 'publishing' | 'remembering' | 'enabling'
+      /**
+       * As `acceptBackup`. Nothing here retires the old version, but only a
+       * failure at `publishing` leaves the homeserver as it was: from
+       * `remembering` on, the new version is already its current one.
+       *
+       * `thrownAfterPublishing` is a step that threw instead of answering, once
+       * the new version was published. A throw before that still rejects, and
+       * nothing had changed.
+       */
+      readonly failedAt:
+        'publishing' | 'remembering' | 'enabling' | 'thrownAfterPublishing'
+      /** As `acceptBackup`: present, and `false`, only when it could not forget. */
+      readonly forgotten?: false
     }
 
 export async function replaceBackup(
@@ -109,16 +126,30 @@ export async function replaceBackup(
   // of every screen that accepts a backup, and none of them has any business
   // with it.
   let published: string | null = null
-  const accepted = await acceptBackup({
-    ...deps,
-    publishVersion: async body => {
-      const version = await deps.publishVersion(body)
-      published = version
-      return version
-    },
-  })
+  let accepted: BackupAccepted
+  try {
+    accepted = await acceptBackup({
+      ...deps,
+      publishVersion: async body => {
+        const version = await deps.publishVersion(body)
+        published = version
+        return version
+      },
+    })
+  } catch (cause: unknown) {
+    // A THROW PAST THE PUBLISH IS ANSWERED, NOT THROWN (#284). The homeserver
+    // now holds the new version as its current one, which a rejection cannot
+    // say: the screen took every one for « rien n'a changé ». Before the
+    // publish nothing had changed, and the rejection goes on to the caller.
+    if (published === null) throw cause
+    return { replaced: false, failedAt: 'thrownAfterPublishing' }
+  }
   if (!accepted.accepted) {
-    return { replaced: false, failedAt: accepted.failedAt }
+    return {
+      replaced: false,
+      failedAt: accepted.failedAt,
+      ...(accepted.forgotten === false ? { forgotten: false } : {}),
+    }
   }
 
   // Nothing to retire, and nothing standing.
@@ -153,4 +184,47 @@ export async function replaceBackup(
       oldRetired: false,
     }
   }
+}
+
+/**
+ * What the Sauvegarde screen is answered: the replacement's own answer, or
+ * `thrown` for one that rejected instead of answering. `replaceBackup` rejects
+ * only before the publish, so nothing on the homeserver moved.
+ */
+export type BackupReplacedFrom =
+  BackupReplaced | { readonly replaced: false; readonly failedAt: 'thrown' }
+
+/**
+ * A replacement as the Sauvegarde screen runs it: it never rejects, and a
+ * failure leaves a line saying where it stopped (#284).
+ *
+ * Found in review. A replacement that failed wrote nothing, so a tester's log
+ * could not tell one had even been tried, and `forgotten: false` went no
+ * further than the handler that dropped it. The line is the acceptance's own,
+ * `MESSAGR_BACKUP_ACCEPT_FAILED`, with `replace` where it names a screen: a
+ * replacement is an acceptance with one step more. The cause of a throw only
+ * where the whole log is written, as `acceptBackupFrom` says.
+ */
+export async function replaceBackupFrom(
+  replace: () => Promise<BackupReplaced>,
+): Promise<BackupReplacedFrom> {
+  let outcome: BackupReplaced
+  try {
+    outcome = await replace()
+  } catch (cause: unknown) {
+    logEvent('warn', 'MESSAGR_BACKUP_ACCEPT_FAILED', {
+      from: 'replace',
+      failedAt: 'thrown',
+      because: getErrorMessage(cause),
+    })
+    return { replaced: false, failedAt: 'thrown' }
+  }
+  if (!outcome.replaced) {
+    logEvent('warn', 'MESSAGR_BACKUP_ACCEPT_FAILED', {
+      from: 'replace',
+      failedAt: outcome.failedAt,
+      ...(outcome.forgotten === false ? { forgotten: false } : {}),
+    })
+  }
+  return outcome
 }
