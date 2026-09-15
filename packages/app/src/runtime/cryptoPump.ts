@@ -66,9 +66,11 @@ import {
   readBackupCommitment,
   rememberBackupCommitment,
 } from './backupCommitment'
+import { rememberBackupAsked } from './backupPrompt'
 import type { IdentityEntitlement } from './crossSigningIdentity'
 import { computeCryptoMachineConfig } from './cryptoMachineConfig'
 import {
+  backupAskedSecrets,
   backupSecrets,
   cryptoStoreFormMarker,
   cryptoStoreSecrets,
@@ -1235,6 +1237,7 @@ export async function acceptKeyBackup(
 ): Promise<BackupAccepted> {
   const http = makePumpHttp(sessionClient)
   return acceptBackup({
+    rememberAsked: () => rememberBackupAsked(backupAskedSecrets),
     createKeyBackup,
     publishVersion: body => publishVersion(http, body),
     remember: commitment => rememberBackupCommitment(backupSecrets, commitment),
@@ -1258,6 +1261,7 @@ export async function replaceKeyBackup(
 ): Promise<BackupReplaced> {
   const http = makePumpHttp(sessionClient)
   return replaceBackup({
+    rememberAsked: () => rememberBackupAsked(backupAskedSecrets),
     createKeyBackup,
     publishVersion: body => publishVersion(http, body),
     remember: commitment => rememberBackupCommitment(backupSecrets, commitment),

@@ -29,8 +29,9 @@ import { markTheLog, whatCameAfter, whatItReported } from './reported'
  * « Toucher "Pas maintenant" s'il est visible » répondrait selon l'heure à
  * laquelle on regarde. Le produit écrit ce qu'il décide, dans deux lignes
  * faites pour ça : `MESSAGR_BACKUP_TRIGGER` pour chaque conversation qui se
- * dessine, avec `received`, puis `MESSAGR_BACKUP_OFFER`, avec `offer`, chaque
- * fois qu'un message reçu pose la question. Le test lit les deux après son
+ * dessine, avec `received`, puis `MESSAGR_BACKUP_OFFER`, avec `offer`, une
+ * fois par conversation ouverte et de nouveau quand la décision change, mais
+ * pas à chaque tour de synchronisation (#291). Le test lit les deux après son
  * propre toucher, et attend l'écran si et seulement si elles disent qu'il
  * vient.
  *

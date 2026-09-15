@@ -31,10 +31,22 @@ import type { BackupCommitment } from './backupCommitment'
  * `RecoveryKeyShown.tsx`, and the one moment it exists is between this call
  * returning and that screen being dismissed.
  *
- * **It does not record that the question was asked.** That belongs to the
- * moment the question is *put*, not the moment it is answered — see
- * `backupPrompt.ts`, which records it before the person answers because an
- * offer interrupted is an offer that was made.
+ * # IT RECORDS THAT THE QUESTION WAS ANSWERED, BEFORE ANY STEP
+ *
+ * This used to refuse, on the ground that recording belongs to the moment
+ * the question is put. True of the offer, which records it before the person
+ * answers. Not of Réglages, which puts no question: somebody goes there and
+ * accepts, and nothing kept that they had. Afterwards the only thing between
+ * a message received and the offer was a commitment that exists and reads
+ * back, and an acceptance that stopped short, or a keystore that did not
+ * answer, left none. On 13 September 2026 the offer came back, at the first
+ * message from the person invited, on the telephone that had accepted the
+ * backup that morning (#291).
+ *
+ * So every acceptance records it, whichever screen it comes from, and before
+ * any step that can fail: an acceptance interrupted is an answer that was
+ * given. The offer still records it earlier, when it is put; the second write
+ * is the same value.
  *
  * # WHY EVERY DEPENDENCY IS INJECTED
  *
@@ -55,6 +67,15 @@ export interface BackupSetup {
 }
 
 export interface AcceptBackupDeps {
+  /**
+   * Keeps that the question has been answered, in the entry the offer reads:
+   * `backupPrompt.ts`'s `rememberBackupAsked`. `false` when the keystore
+   * refused it.
+   *
+   * Required here rather than left to each screen, because a screen left to
+   * it is how Réglages came to accept without it (#291).
+   */
+  readonly rememberAsked: () => Promise<boolean>
   /** The bridge's `createKeyBackup`. Synchronous, and makes no request. */
   readonly createKeyBackup: () => BackupSetup
   /**
@@ -102,6 +123,13 @@ export type BackupAccepted =
 export async function acceptBackup(
   deps: AcceptBackupDeps,
 ): Promise<BackupAccepted> {
+  // FIRST, AND WHATEVER IT ANSWERS. An acceptance interrupted -- the
+  // application killed during the request, a homeserver that refuses -- is
+  // an answer that was given, and nothing may ask it again. A keystore that
+  // would not keep it is no reason to stop somebody accepting: the backup is
+  // worth making all the same.
+  await deps.rememberAsked()
+
   // Outside every `try` below: it cannot fail, and wrapping it would put a
   // branch in this function for a case that does not exist.
   const setup = deps.createKeyBackup()
