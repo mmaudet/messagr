@@ -3657,6 +3657,11 @@ export function App({
   // which is a worse bug than the one it fixes.
   useEffect(() => {
     const back = () => {
+      // THE BACKUP, WHILE IT ASKS, SHOWS A KEY OR RUNS: BACK DOES NOTHING
+      // (#284). On Android 7 to 11 a back that reaches the system finishes
+      // the root Activity while JavaScript runs on: an acceptance would end,
+      // and its key go to a screen nobody sees. The buttons are the way out.
+      if (backupPrompt !== null || acceptWorking) return true
       // THE QUESTION A LINK INTO ANOTHER SERVER PUTS, which is the whole
       // screen while it is there. Back answers it « stay » (#304): see
       // `questionOnScreen.ts`.
@@ -3720,6 +3725,8 @@ export function App({
     legalOpen,
     invite.stage,
     tab,
+    backupPrompt,
+    acceptWorking,
   ])
 
   // A SCREEN THAT GOES AWAY WITH THE QUESTION UNANSWERED ANSWERS IT « STAY »
