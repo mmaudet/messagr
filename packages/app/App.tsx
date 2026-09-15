@@ -72,6 +72,7 @@ import {
 } from './src/runtime/callLogStore'
 import { CallsList } from './src/ui/CallsList'
 import { acceptBackupFrom, type AcceptedFrom } from './src/runtime/acceptBackup'
+import { acceptanceGate } from './src/runtime/acceptanceGate'
 import type { BackupVersionInfo } from './src/runtime/backupCalls'
 import { getErrorMessage } from './src/runtime/errors'
 import {
@@ -578,6 +579,14 @@ export function App({
    */
   const [acceptFailed, setAcceptFailed] = useState<AcceptedFrom | null>(null)
   /**
+   * One acceptance at a time (#284). A ref and not state, because two taps can
+   * land before the screen draws again; `acceptanceGate.ts` says what two
+   * acceptances cost. `acceptWorking` is what the two screens draw from: set
+   * when an acceptance starts, cleared once it has settled.
+   */
+  const acceptance = useRef(acceptanceGate())
+  const [acceptWorking, setAcceptWorking] = useState(false)
+  /**
    * Reads the backup's state whenever that screen is showing and nothing is
    * covering it.
    *
@@ -1022,23 +1031,32 @@ export function App({
    * used to do nothing at all, which is the silence this is here to end.
    */
   const acceptTheBackup = (from: AcceptedFrom) => {
-    setAcceptFailed(null)
     const session = sessionClientRef.current
-    acceptBackupFrom(from, () =>
-      session === null
-        ? Promise.reject(new Error('this launch holds no session'))
-        : acceptKeyBackup(session),
+    const settling = acceptance.current.run(() =>
+      acceptBackupFrom(from, () =>
+        session === null
+          ? Promise.reject(new Error('this launch holds no session'))
+          : acceptKeyBackup(session),
+      ),
     )
-      .then(outcome => {
-        if (outcome.accepted) {
-          setBackupPrompt({ restoreKey: outcome.restoreKey })
+    // ONE IS ALREADY RUNNING. The button is inert by the time the screen
+    // draws again, and a tap that got in before it did changes nothing.
+    if (settling === null) return
+    setAcceptFailed(null)
+    setAcceptWorking(true)
+    settling
+      .then(shown => {
+        if (shown.show === 'key') {
+          setBackupPrompt({ restoreKey: shown.restoreKey })
         } else {
           setAcceptFailed(from)
         }
       })
-      // `acceptBackupFrom` does not reject. This is the belt on the promise,
-      // and it says the same thing rather than nothing.
+      // The gate hands back what `acceptBackupFrom` answered, and that does
+      // not reject. This is the belt on the promise, and it says the same
+      // thing rather than nothing.
       .catch(() => setAcceptFailed(from))
+      .finally(() => setAcceptWorking(false))
   }
   const [claimed, setClaimed] = useState<HistoryClaim | null>(null)
   // Set once, at entry, and never cleared: the launch either was opened with
@@ -4417,6 +4435,7 @@ export function App({
                   reading={backupState}
                   onRetry={() => setAttempt(attempt + 1)}
                   failed={acceptFailed === 'settings'}
+                  working={acceptWorking}
                   restorable={restorableFromSettings}
                   onRestore={() => {
                     // The same surface the offer leads to, reached from the
@@ -5035,6 +5054,7 @@ export function App({
             edges={['top', 'bottom', 'left', 'right']}>
             <BackupOffer
               failed={acceptFailed === 'offer'}
+              working={acceptWorking}
               // The key exists for exactly as long as `backupPrompt` holds
               // it: nothing else has a copy, here or on the homeserver.
               // `acceptBackup.ts` hands it back precisely once and never on a

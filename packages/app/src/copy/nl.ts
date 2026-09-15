@@ -547,6 +547,7 @@ export const nl: Readonly<Record<CopyKey, string>> = {
   backup_offer_later: 'U kunt het later inschakelen bij Instellingen.',
   backup_accept_failed:
     'De back-up kon niet worden ingeschakeld. Probeer opnieuw.',
+  backup_accept_working: 'Bezig met inschakelen…',
   backup_replace_title: 'Uw herstelsleutel vervangen',
   backup_replace_lead: 'Voordat u beslist: wat dit meeneemt.',
   backup_replace_fact_old: 'De oude sleutel opent niets meer',

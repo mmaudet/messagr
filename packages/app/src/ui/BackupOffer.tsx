@@ -70,8 +70,15 @@ export function BackupOffer({
   onAccept,
   onRefuse,
   failed,
+  working,
 }: {
   readonly onAccept: () => void
+  /**
+   * Whether an acceptance is running (#284). The button waits, inert, under a
+   * label that says so: a tap that shows nothing invites another, and two
+   * acceptances make two keys.
+   */
+  readonly working: boolean
   /**
    * Recorded before the answer, and the caller owes that ordering: an offer
    * interrupted — the application killed, the screen turned — is an offer
@@ -108,8 +115,11 @@ export function BackupOffer({
       <View style={styles.actions}>
         <NotchedButton
           testID="backup-offer-accept"
-          label={t('backup_offer_accept')}
+          label={
+            working ? t('backup_accept_working') : t('backup_offer_accept')
+          }
           onPress={onAccept}
+          disabled={working}
           wide
         />
         {/* `quiet`, which is the tone that exists so a refusal can be a

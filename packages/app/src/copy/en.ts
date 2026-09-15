@@ -546,6 +546,7 @@ export const en: Readonly<Record<CopyKey, string>> = {
   backup_offer_refuse: 'Not now',
   backup_offer_later: 'You can turn it on later from Settings.',
   backup_accept_failed: 'The backup could not be turned on. Try again.',
+  backup_accept_working: 'Turning on…',
   backup_replace_title: 'Replace your recovery key',
   backup_replace_lead: 'Before you decide, what this carries away.',
   backup_replace_fact_old: 'The old key will open nothing',

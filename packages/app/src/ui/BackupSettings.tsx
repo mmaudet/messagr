@@ -94,8 +94,14 @@ export function BackupSettings({
   restorable,
   onRestore,
   failed,
+  working,
 }: {
   readonly reading: BackupReading
+  /**
+   * Whether an acceptance is running (#284), from this screen or from the
+   * offer. The button waits, inert, under a label that says so.
+   */
+  readonly working: boolean
   readonly onBack: () => void
   /** Takes the reading again. Offered only when it could not be taken. */
   readonly onRetry: () => void
@@ -352,8 +358,13 @@ export function BackupSettings({
                 find. */}
             <NotchedButton
               testID="backup-settings-enable"
-              label={t('backup_settings_enable')}
+              label={
+                working
+                  ? t('backup_accept_working')
+                  : t('backup_settings_enable')
+              }
               onPress={onEnable}
+              disabled={working}
               wide
             />
             {/* UNDER THE BUTTON, SO NOTHING MOVES UNDER THE FINGER (#284). A
