@@ -1242,6 +1242,7 @@ export async function acceptKeyBackup(
     publishVersion: body => publishVersion(http, body),
     remember: commitment => rememberBackupCommitment(backupSecrets, commitment),
     enable: (sealingKey, version) => enableKeyBackup(sealingKey, version),
+    forget: () => forgetBackupCommitment(backupSecrets),
   })
 }
 
@@ -1266,6 +1267,7 @@ export async function replaceKeyBackup(
     publishVersion: body => publishVersion(http, body),
     remember: commitment => rememberBackupCommitment(backupSecrets, commitment),
     enable: (sealingKey, version) => enableKeyBackup(sealingKey, version),
+    forget: () => forgetBackupCommitment(backupSecrets),
     currentVersion: async () => {
       const found = await readVersion(
         http,

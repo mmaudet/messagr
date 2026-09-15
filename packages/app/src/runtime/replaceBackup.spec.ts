@@ -30,6 +30,10 @@ function deps(over: Partial<ReplaceBackupDeps> = {}) {
       done.push('remembered')
       return true
     },
+    forget: async () => {
+      done.push('forgotten')
+      return true
+    },
     enable: async () => {
       done.push('enabled')
     },

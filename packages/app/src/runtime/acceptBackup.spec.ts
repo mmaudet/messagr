@@ -6,6 +6,8 @@ import {
   type AcceptBackupDeps,
 } from './acceptBackup'
 import {
+  forgetBackupCommitment,
+  readBackupCommitment,
   rememberBackupCommitment,
   type BackupCommitment,
 } from './backupCommitment'
@@ -63,6 +65,7 @@ function deps(over: Partial<AcceptBackupDeps> = {}): AcceptBackupDeps & {
     enable: async (sealingKey, version) => {
       enabled.push([sealingKey, version])
     },
+    forget: async () => true,
     ...over,
   }
 }
@@ -260,6 +263,25 @@ describe('what an acceptance leaves behind', () => {
       expect(reading.decision).toEqual({ offer: false })
     },
   )
+
+  it('leaves nothing for the next launch to turn on when enabling fails', async () => {
+    // Remembering comes before enabling, and a failure hands no key back. A
+    // commitment left in the keystore is one `resumeKeyBackup` turns on at the
+    // next launch: a backup under a key nobody was shown, and Réglages saying
+    // the messages are kept.
+    const commitment = store()
+    await acceptBackup(
+      deps({
+        remember: kept => rememberBackupCommitment(commitment, kept),
+        forget: () => forgetBackupCommitment(commitment),
+        enable: async () => {
+          throw new Error('malformed_identifier')
+        },
+      }),
+    )
+
+    expect(await readBackupCommitment(commitment)).toBeNull()
+  })
 })
 
 /** Every line a gesture wrote, whatever the level it wrote it at. */

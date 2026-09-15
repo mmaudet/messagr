@@ -94,6 +94,12 @@ export interface AcceptBackupDeps {
   readonly remember: (commitment: BackupCommitment) => Promise<boolean>
   /** The bridge's `enableKeyBackup`. */
   readonly enable: (sealingKey: string, version: string) => Promise<void>
+  /**
+   * Forgets the commitment: `backupCommitment.ts`'s `forgetBackupCommitment`.
+   * Called when enabling fails after the commitment was kept, so the next
+   * launch does not turn on a backup whose key nobody was shown (#284).
+   */
+  readonly forget: () => Promise<boolean>
 }
 
 export type BackupAccepted =
@@ -159,6 +165,12 @@ export async function acceptBackup(
   try {
     await deps.enable(setup.sealingKey, version)
   } catch {
+    // FORGOTTEN, OR THE NEXT LAUNCH FINISHES WHAT THIS REFUSED. The commitment
+    // was kept a step ago, and `resumeKeyBackup` turns on whatever commitment
+    // it finds. A failure hands no key back, so the device would back up
+    // under a key nobody was shown, and Réglages would say the messages are
+    // kept.
+    await deps.forget()
     return { accepted: false, failedAt: 'enabling' }
   }
 
