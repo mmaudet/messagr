@@ -35,8 +35,14 @@ export function backupOnScreen(drawn: BackupDrawn): BackupOnScreen {
   return {
     offer: drawn.backupPrompt === 'offering',
     key: drawn.backupPrompt !== null && drawn.backupPrompt !== 'offering',
+    // NOT UNDER THE RESTORE OVERLAY, found in review: it covers Sauvegarde,
+    // and a failure that settled then was said behind it, card and
+    // announcement both.
     backupScreen:
-      drawn.openScope === null && drawn.tab === 'settings' && drawn.backupOpen,
+      drawn.openScope === null &&
+      drawn.tab === 'settings' &&
+      drawn.backupOpen &&
+      drawn.restorePrompt === null,
   }
 }
 

@@ -1,6 +1,7 @@
 import React, {
   useCallback,
   useEffect,
+  useLayoutEffect,
   useMemo,
   useRef,
   useState,
@@ -1071,13 +1072,17 @@ export function App({
    * about, and somebody who has gone elsewhere is not. Kept in step after
    * each drawing, so it is what was last drawn. `backupOnScreen` reads it, as
    * it does for Android's back below.
+   *
+   * WRITTEN IN A LAYOUT EFFECT, found in review: a passive effect runs after
+   * the frame is painted, and a gesture that settled in between read the
+   * screen before the one somebody was already looking at.
    */
   const backupShowing = useRef<BackupOnScreen>({
     offer: false,
     key: false,
     backupScreen: false,
   })
-  useEffect(() => {
+  useLayoutEffect(() => {
     backupShowing.current = backupOnScreen({
       backupPrompt,
       openScope,

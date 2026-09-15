@@ -60,3 +60,22 @@ describe('Android back, for the backup', () => {
     expect(backupHoldsBack(backupOnScreen(key), null)).toBe(true)
   })
 })
+
+describe('Sauvegarde, as the screen a failure is said on', () => {
+  // #284, found in review: the restore overlay covers Sauvegarde, and a failure
+  // that settled then was said behind it, card and announcement both.
+  it('is not the screen showing under the restore overlay', () => {
+    const offered = {
+      ...SAUVEGARDE,
+      restorePrompt: { stage: 'offering', unreadable: 3 },
+    }
+    const entering = { ...SAUVEGARDE, restorePrompt: { stage: 'entering' } }
+
+    expect(backupOnScreen(offered).backupScreen).toBe(false)
+    expect(backupOnScreen(entering).backupScreen).toBe(false)
+  })
+
+  it('is the screen showing with nothing over it', () => {
+    expect(backupOnScreen(SAUVEGARDE).backupScreen).toBe(true)
+  })
+})
