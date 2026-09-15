@@ -391,6 +391,10 @@ export function BackupSettings({
                   testID="backup-settings-restore"
                   label={t('settings_restore')}
                   onPress={onRestore}
+                  // Inert while an acceptance runs (#284): the key entry would
+                  // cover this screen, and a failure said then would land
+                  // behind it, card and announcement both.
+                  disabled={working}
                   tone="quiet"
                   wide
                 />
