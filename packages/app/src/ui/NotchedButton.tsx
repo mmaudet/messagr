@@ -79,6 +79,15 @@ export interface NotchedButtonProps {
    * *« Le refus est un bouton de même rang que l'acceptation. »*
    */
   readonly tone?: 'brand' | 'measure' | 'quiet'
+  /**
+   * Whether the action can be taken yet.
+   *
+   * Drawn as the tokens' inert plate, `state.disabled`, whatever the tone: the
+   * surface `neutral.200`, the label `neutral.300`, no border and no opacity.
+   * Pressing it does nothing, and a screen reader is told so. It exists for a
+   * button that looked ready and did nothing when touched: see `KeyVault`.
+   */
+  readonly disabled?: boolean
 }
 
 export function NotchedButton({
@@ -88,6 +97,7 @@ export function NotchedButton({
   testID,
   onGeometry,
   tone = 'brand',
+  disabled = false,
 }: NotchedButtonProps) {
   const [size, setSize] = useState<{ width: number; height: number } | null>(
     null,
@@ -117,10 +127,12 @@ export function NotchedButton({
     <Pressable
       testID={testID}
       onPress={onPress}
+      disabled={disabled}
       onLayout={measure}
       style={[styles.button, wide && styles.wide]}
       accessibilityRole="button"
-      accessibilityLabel={label}>
+      accessibilityLabel={label}
+      accessibilityState={{ disabled }}>
       {/* Behind the label rather than around it: the shape is painted, and a
           label inside an Svg would not wrap, select or scale with the
           system's text size. */}
@@ -134,14 +146,22 @@ export function NotchedButton({
                 notchLegFor(size.height),
               )}
               fill={
-                tone === 'measure'
-                  ? palette.deny['500']
-                  : tone === 'quiet'
-                    ? 'transparent'
-                    : palette.brand.green500
+                disabled
+                  ? palette.neutral['200']
+                  : tone === 'measure'
+                    ? palette.deny['500']
+                    : tone === 'quiet'
+                      ? 'transparent'
+                      : palette.brand.green500
               }
-              stroke={tone === 'quiet' ? palette.neutral['300'] : undefined}
-              strokeWidth={tone === 'quiet' ? stroke.base : undefined}
+              stroke={
+                !disabled && tone === 'quiet'
+                  ? palette.neutral['300']
+                  : undefined
+              }
+              strokeWidth={
+                !disabled && tone === 'quiet' ? stroke.base : undefined
+              }
             />
           </Svg>
         </View>
@@ -161,8 +181,11 @@ export function NotchedButton({
         style={[
           styles.label,
           {
-            color:
-              tone === 'quiet' ? palette.neutral['900'] : palette.brand.ink900,
+            color: disabled
+              ? palette.neutral['300']
+              : tone === 'quiet'
+                ? palette.neutral['900']
+                : palette.brand.ink900,
           },
         ]}>
         {label}
