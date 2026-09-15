@@ -586,6 +586,14 @@ export function App({
    */
   const acceptance = useRef(acceptanceGate())
   const [acceptWorking, setAcceptWorking] = useState(false)
+  // A TAB CHANGE LEAVES THE ATTEMPT TOO (#284). The tab bar resets neither
+  // the backup screen nor its card, so a failure set before going elsewhere,
+  // or settling while away, was still there on coming back. `tab` is read by
+  // nothing inside: changing is the whole of what this listens for.
+  useEffect(() => {
+    acceptance.current.forget()
+    setAcceptFailed(null)
+  }, [tab])
   /**
    * Reads the backup's state whenever that screen is showing and nothing is
    * covering it.
@@ -1048,15 +1056,26 @@ export function App({
       .then(shown => {
         if (shown.show === 'key') {
           setBackupPrompt({ restoreKey: shown.restoreKey })
-        } else {
+        } else if (shown.show === 'failure') {
           setAcceptFailed(from)
         }
+        // `nothing`: the screen it came from was left, and a failure said now
+        // would land on a screen that is not the one it was about.
       })
       // The gate hands back what `acceptBackupFrom` answered, and that does
       // not reject. This is the belt on the promise, and it says the same
       // thing rather than nothing.
       .catch(() => setAcceptFailed(from))
       .finally(() => setAcceptWorking(false))
+  }
+  /**
+   * The screen an acceptance was started from has been left: a failure
+   * standing there, or still to settle, is no longer said (#284). A key is
+   * still shown, and `acceptanceGate.ts` is where that rule is held.
+   */
+  const leaveTheAttempt = () => {
+    acceptance.current.forget()
+    setAcceptFailed(null)
   }
   const [claimed, setClaimed] = useState<HistoryClaim | null>(null)
   // Set once, at entry, and never cleared: the launch either was opened with
@@ -4456,9 +4475,10 @@ export function App({
                     // again, and a value held between them would be the
                     // screen describing a backup as it was.
                     setBackupState({ reading: 'waiting' })
-                    // And the failure with it, for the same reason: it
-                    // was about asking just now, not about coming back.
-                    setAcceptFailed(null)
+                    // And the attempt with it, for the same reason: it was
+                    // about asking just now, not about coming back. A
+                    // failure that settles after this is not said here.
+                    leaveTheAttempt()
                   }}
                   onEnable={() => {
                     // THE DOOR A REFUSAL HONOURED FOR GOOD OWES SOMEBODY.
@@ -5061,7 +5081,9 @@ export function App({
               // failure, and a failure keeps this screen up to say so.
               onAccept={() => acceptTheBackup('offer')}
               onRefuse={() => {
-                setAcceptFailed(null)
+                // An acceptance still running goes on: its key is shown if
+                // it comes, and its failure is not said to a closed offer.
+                leaveTheAttempt()
                 setBackupPrompt(null)
               }}
             />

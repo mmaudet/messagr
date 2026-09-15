@@ -67,3 +67,51 @@ describe('one acceptance at a time', () => {
     ).toEqual({ show: 'failure' })
   })
 })
+
+describe('a screen that was left', () => {
+  // #284, found in review. A failure was set whenever its acceptance settled,
+  // wherever the person had gone since: leave Sauvegarde while it ran, come
+  // back, and the card said « Réessayez » before any tap.
+  it('still shows the key of an acceptance that went through', async () => {
+    // Never ignored. That key opens a backup that now exists, and it is shown
+    // once or never.
+    const gate = acceptanceGate()
+    const first = pending<BackupAcceptedFrom>()
+
+    const running = gate.run(() => first.promise)
+    gate.forget()
+    first.settle(ACCEPTED)
+
+    expect(await running).toEqual({
+      show: 'key',
+      restoreKey: 'EsTx aaaa bbbb cccc',
+    })
+  })
+
+  it('says nothing of a failure that settles after it was left', async () => {
+    const gate = acceptanceGate()
+    const first = pending<BackupAcceptedFrom>()
+
+    const running = gate.run(() => first.promise)
+    gate.forget()
+    first.settle({ accepted: false, failedAt: 'publishing' })
+
+    expect(await running).toEqual({ show: 'nothing' })
+  })
+
+  it('says the failure of an acceptance started after it was left', async () => {
+    // Leaving silences the attempt of that moment, not every one after it: a
+    // silence that stayed would be the one #284 is about, and App.tsx leaves
+    // on every tab change, the first drawing included.
+    const gate = acceptanceGate()
+    await gate.run(async () => ACCEPTED)
+    gate.forget()
+
+    expect(
+      await gate.run(async (): Promise<BackupAcceptedFrom> => ({
+        accepted: false,
+        failedAt: 'publishing',
+      })),
+    ).toEqual({ show: 'failure' })
+  })
+})
