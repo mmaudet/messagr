@@ -82,6 +82,11 @@ import { CallsList } from './src/ui/CallsList'
 import { acceptBackupFrom, type AcceptedFrom } from './src/runtime/acceptBackup'
 import { acceptance } from './src/runtime/acceptanceGate'
 import {
+  backupHoldsBack,
+  backupOnScreen,
+  type BackupOnScreen,
+} from './src/runtime/backupOnScreen'
+import {
   failedReplacementSentence,
   replaceBackupFrom,
   type ReplaceFailedAt,
@@ -1064,14 +1069,22 @@ export function App({
    * Read when it settles and not when it started: somebody who leaves
    * Sauvegarde and comes straight back is looking at the screen a failure is
    * about, and somebody who has gone elsewhere is not. Kept in step after
-   * each drawing, so it is what was last drawn.
+   * each drawing, so it is what was last drawn. `backupOnScreen` reads it, as
+   * it does for Android's back below.
    */
-  const backupShowing = useRef({ offer: false, backupScreen: false })
+  const backupShowing = useRef<BackupOnScreen>({
+    offer: false,
+    key: false,
+    backupScreen: false,
+  })
   useEffect(() => {
-    backupShowing.current = {
-      offer: backupPrompt === 'offering',
-      backupScreen: openScope === null && tab === 'settings' && backupOpen,
-    }
+    backupShowing.current = backupOnScreen({
+      backupPrompt,
+      openScope,
+      tab,
+      backupOpen,
+      restorePrompt,
+    })
   })
   // THIS MOUNT RECEIVES WHAT SETTLES, an acceptance's or a replacement's, a
   // key included that settled while no mount was there to show it (#284). A
@@ -3737,11 +3750,27 @@ export function App({
   // which is a worse bug than the one it fixes.
   useEffect(() => {
     const back = () => {
-      // THE BACKUP, WHILE IT ASKS, SHOWS A KEY OR RUNS: BACK DOES NOTHING
-      // (#284). On Android 7 to 11 a back that reaches the system finishes
-      // the root Activity while JavaScript runs on: an acceptance would end,
-      // and its key go to a screen nobody sees. The buttons are the way out.
-      if (backupPrompt !== null || backupWorking !== null) return true
+      // THE BACKUP, WHILE IT ASKS OR SHOWS A KEY, AND SAUVEGARDE WHILE A
+      // GESTURE RUNS: BACK DOES NOTHING (#284). On Android 7 to 11 a back that
+      // reaches the system finishes the root Activity while JavaScript runs
+      // on, and the buttons are the way out. Nowhere else, which a review
+      // found: held everywhere while an acceptance ran, back stayed dead in a
+      // conversation for as long as a keystore write never settled. See
+      // `backupHoldsBack`.
+      if (
+        backupHoldsBack(
+          backupOnScreen({
+            backupPrompt,
+            openScope,
+            tab,
+            backupOpen,
+            restorePrompt,
+          }),
+          backupWorking,
+        )
+      ) {
+        return true
+      }
       // THE QUESTION A LINK INTO ANOTHER SERVER PUTS, which is the whole
       // screen while it is there. Back answers it « stay » (#304): see
       // `questionOnScreen.ts`.
@@ -3807,6 +3836,8 @@ export function App({
     tab,
     backupPrompt,
     backupWorking,
+    backupOpen,
+    restorePrompt,
   ])
 
   // A SCREEN THAT GOES AWAY WITH THE QUESTION UNANSWERED ANSWERS IT « STAY »
