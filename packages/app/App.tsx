@@ -730,9 +730,11 @@ export function App({
     // no longer re-runs a reading that does not depend on it.
   }, [backupOpen, backupPrompt, attempt])
   /**
-   * What the bridge says about the backup, while that screen is open.
+   * What the backup's state is, while that screen is open: the bridge, the
+   * account and the keystore read together (#323). `backupStanding.ts` names
+   * the states and argues them.
    *
-   * # THREE STATES, AND THE THIRD IS WHY THIS IS NOT A NULLABLE OBJECT
+   * # NOT A NULLABLE OBJECT, AND THAT IS WHY
    *
    * It was `{...} | null`, with `null` standing for both "not asked yet" and
    * "could not be read", and the screen was drawn only when it held an
@@ -746,10 +748,11 @@ export function App({
    * did not even log -- the `catch` swallowed the cause.
    *
    * So the screen is drawn from the moment it is opened, and it says which
-   * of the three it is. `waiting` is honest for the second the bridge takes.
-   * `unreadable` is honest for ever, and carries a way to ask again. Neither
-   * asserts anything about the backup, which was the whole point of the
-   * paragraph above.
+   * state it is in. `waiting` is honest for the second the readings take,
+   * `unreadable` is honest for ever and carries a way to ask again, and
+   * `unchecked` is the homeserver's silence rather than this telephone's.
+   * None of the three asserts anything about the backup, which was the whole
+   * point of the paragraph above.
    */
   const [backupState, setBackupState] = useState<BackupStanding>({
     standing: 'waiting',
@@ -1145,12 +1148,12 @@ export function App({
         }
         if (settled.show === 'replacementFailure') {
           setReplaceConfirming(false)
-          // THE READING TAKEN AGAIN, whatever is showing, and it proves
-          // nothing about the failure. It is the bridge's, and `enabled`
-          // means only that `enableKeyBackup` was called in this process:
-          // after a failure past the publish it can go on saying « vos
-          // messages sont sauvegardés » of a version the homeserver no
-          // longer takes (#327). What the server holds is #323's.
+          // THE READING TAKEN AGAIN, whatever is showing. It asks the
+          // account as well as the bridge since #323, so it is now the
+          // reading that SAYS what a failure left: a replacement stopped at
+          // `enabling` lands on « une sauvegarde existe sur le serveur, mais
+          // cet appareil ne l'alimente pas », which is exactly what happened
+          // and what the sentence below cannot say on its own.
           setAttempt(n => n + 1)
           // SAID ON SAUVEGARDE ONLY, IN THE SENTENCE WHAT IT LEFT ALLOWS:
           // « rien n'a changé » when the publication went back, which since

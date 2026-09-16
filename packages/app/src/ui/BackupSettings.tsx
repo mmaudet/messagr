@@ -225,8 +225,9 @@ export function BackupSettings({
       {/* THE REPLACEMENT THAT DID NOT GO THROUGH (#284). Its confirmation has
           closed by the time this draws, so nothing moves under a finger. The
           ochre is the state's own, as for an acceptance that failed. The
-          sentence is the one the step allows: past the publish, nothing is
-          as it was. */}
+          sentence is the one what it left allows: « rien n'a changé » when
+          the publication went back, which since #327 a failure past the
+          publish can manage. */}
       {replaceFailure !== null && (
         <View
           style={[styles.card, styles.off]}
