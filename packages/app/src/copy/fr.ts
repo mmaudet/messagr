@@ -428,6 +428,11 @@ export const fr = {
   list_nothing_said: 'Rien n’a encore été dit',
   list_unreadable: 'Cet appareil ne peut pas lire le dernier message',
   list_unreachable: 'Cette conversation n’a pas pu être relue',
+  // À la place de l'aperçu, sur la ligne qu'on vient de toucher, tant que le
+  // lancement n'est pas en état d'ouvrir une conversation (#280). La ligne
+  // n'est pas un aperçu de plus : elle répond au geste. Voir
+  // `waitingToOpen.ts`.
+  list_opening: 'Ouverture…',
   list_name_action: 'Donner un nom',
   list_name_title: 'Comment appelez-vous cette personne ?',
   list_name_hint:
