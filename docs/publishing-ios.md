@@ -33,9 +33,10 @@ ne se justifie pas.
   côté sygnal. **Les deux ensemble, et c'est le point le plus facile à rater.**
 - `convert_device_token_to_hex: false` côté sygnal, parce que l'application
   enregistre le jeton APNs en hexadécimal. Ajouté le 15 septembre 2026 (#325).
-- `FirebaseMessagingAutoInitEnabled: false` dans `Info.plist`, pour que le SDK
-  de Firebase ne fabrique pas de jeton FCM de son côté. Ajouté le 16 septembre
-  2026 (#334), et **pas encore vérifié sur un appareil** : voir plus bas.
+- **Aucun Firebase dans la cible iOS**, depuis le 16 septembre 2026 (#334) :
+  l'exclusion vit dans `packages/app/react-native.config.js`, le jeton d'Apple
+  est lu par `MessagrApplePush` à côté de l'AppDelegate, et l'autorisation est
+  demandée à notifee. Android est inchangé. Voir plus bas.
 
 ## Le piège, avant tout le reste
 
@@ -65,28 +66,80 @@ téléphone branché ne peut plus être réveillée**, puisqu'elle réclamerait 
 jeton de production sans y avoir droit. Si vous voulez un jour tester en
 développement, il faut rebasculer les deux, ensemble.
 
-## Ce que Firebase fait sur iPhone, et ce qu'on n'a pas encore mesuré
+## Firebase a quitté l'iPhone, et par où passe le jeton maintenant
 
-Le réveil iOS passe par Apple seule, et la page de confidentialité le promet :
-« Sur iOS le même rôle est tenu par le service de notifications d'Apple. »
-Firebase est quand même embarqué, parce que `getAPNSToken` est la façon dont
-l'application lit le jeton d'Apple. En lisant les sources de FirebaseMessaging
-12.18.0, #334 a trouvé que le SDK s'enregistre de lui-même auprès de Google
-au passage.
+Le réveil iOS passe par Apple seule, et la page de confidentialité le promet.
+Firebase était quand même embarqué, parce que `getAPNSToken` était la façon
+dont l'application lisait le jeton d'Apple. En lisant les sources de
+FirebaseMessaging 12.18.0, #334 a trouvé que le SDK s'enregistrait de lui-même
+auprès de Google au passage, et #361 que `FirebaseMessagingAutoInitEnabled`, le
+levier documenté, ne garde pas ce chemin-là : la demande qui porte le jeton
+APNs à Google part de `setAPNSToken:withUserInfo:`, qui ne lit cette clé à
+aucun moment.
 
-`FirebaseMessagingAutoInitEnabled: false` est le levier documenté par Firebase,
-et il est posé. **Il ne suffit probablement pas**, et c'est le point à ne pas
-oublier : la demande qui porte le jeton APNs à Google part du gestionnaire de
-jetons, dans le setter qui reçoit ce jeton, et ce setter ne lit pas cette clé.
-La lecture ne peut pas aller plus loin ; seul un iPhone dont on observe le
-trafic tranche.
+**Le 16 septembre 2026, les douze pods sont sortis de la cible iOS.** Trois
+morceaux remplacent ce que Firebase faisait :
 
-`scripts/assert-ios-push.sh` refuse que la clé disparaisse, dans `checks`. Il
-prouve que la clé est dans le plist, **pas** qu'aucune requête ne part vers
-Google : ne lisez pas son `OK` comme une réponse à la question de #334.
+| Ce qu'il faisait                                | Ce qui le fait                                                                      |
+| ----------------------------------------------- | ----------------------------------------------------------------------------------- |
+| demander l'autorisation de notifier             | `notifee.requestPermission()`, déjà une dépendance                                  |
+| appeler `registerForRemoteNotifications`        | `MessagrApplePush.askApple`, dans `packages/app/ios/Messagr/MessagrApplePush.swift` |
+| recevoir la réponse d'Apple et garder le jeton  | les deux rappels d'`AppDelegate.swift`, qui remettent le jeton au même module       |
+| le rendre à JavaScript en hexadécimal majuscule | `MessagrApplePush.readApple`, lu par `packages/app/src/runtime/applePushToken.ts`   |
 
-La marche exacte de la mesure est écrite dans #334, et se groupe avec celles
-de #308 et #341 sur le même appareil.
+**La casse est ce qu'il ne faut pas toucher.** `%02.2hhX`, majuscules, sans
+séparateur : c'est le `pushkey` que le compte porte, et sygnal l'envoie tel
+quel (`convert_device_token_to_hex: false`). Un jeton en minuscules
+enregistrerait un second pusher et refabriquerait #325 — tout vert jusqu'à
+Apple. `applePushToken.ts` le refuse au lieu de le corriger, et son test le
+prouve.
+
+**Ce que le retrait ne prouve pas encore.** Que rien ne partait vers Google
+reste une lecture, pas une mesure ; ce qui est établi est qu'aucun code de
+Google n'est plus dans le paquet iOS pour le faire. `scripts/assert-ios-push.sh`
+tient les quatre choses qui le gardent vrai — pas de `GoogleService-Info.plist`,
+aucun pod de la famille dans le verrou, aucun `FirebaseCore` dans l'AppDelegate,
+et **l'exclusion dans `packages/app/react-native.config.js`**. La quatrième est
+celle qui compte : sans elle, un `pod install` remet les douze pods, en
+silence, avec une CI verte.
+
+**Android ne bouge pas.** Les deux paquets npm restent, le greffon Gradle
+aussi, et `index.js` n'enregistre le gestionnaire d'arrière-plan de Firebase
+que sur Android. Sur iPhone il était déjà mort : le pont ne remet une poussée à
+JavaScript que si elle porte `gcm.message_id`, qu'une poussée venant de sygnal
+ne porte jamais (#341).
+
+### Vérifier sur un iPhone
+
+Sur un appareil **neuf ou effacé**, sinon la mesure ne dit rien : le jeton et
+l'identifiant d'installation de Firebase vivent dans le trousseau, qu'une
+désinstallation ne vide pas de façon fiable.
+
+1. Installer la build, ouvrir l'application, accepter les notifications.
+2. Sur le compte de test :
+   `curl -H "Authorization: Bearer <jeton>" https://messagr.eu/_matrix/client/v3/pushers`
+   — un `pushkey` de **64 caractères hexadécimaux MAJUSCULES** sous
+   `eu.messagr.apns`, postérieur à l'installation. La casse compte autant que
+   la longueur : c'est elle qui dit si le module natif tient son contrat.
+3. Envoyer un message depuis un autre compte, et lire sygnal : un `200` sans
+   `BadDeviceToken`.
+4. Le témoin de ce que ce ticket ferme : aucune requête vers
+   `firebaseinstallations.googleapis.com` ni `fcmtoken.googleapis.com` pendant
+   le lancement.
+
+**Ce qui ne peut pas servir de témoin** : l'absence d'erreur, une CI verte, et
+« la notification arrive sur un iPhone verrouillé » — d'après #341, aucune
+notification ne peut encore s'afficher sur iPhone, quel que soit l'état de
+l'application.
+
+**Et si aucun jeton n'arrive**, le journal le dit maintenant sous un mot par
+cause plutôt qu'une seule phrase de patience : `MESSAGR_APNS_TOKEN_UNREAD`
+avec `noModule` (le module natif n'est pas dans la build), `appleRefused`
+(Apple a dit non : entitlement ou profil), `notHex` (le jeton n'a pas la forme
+qu'on peut enregistrer), `noAnswer` (la seule vraie attente) ou `threw`. Sur
+l'appareil, `MESSAGR_APNS_REFUSED` porte en plus ce qu'Apple a répondu.
+
+La mesure se groupe avec celles de #308 et #341 sur le même appareil.
 
 ## Les gestes, dans l'ordre
 

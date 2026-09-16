@@ -49,8 +49,25 @@
 		Contacts and DeviceID carry the owner's decision of 16 September 2026
 		(#321, questions 1 to 3). EmailsOrTextMessages carries that document's
 		recommended answer to its question 4, which is still open.
-		Firebase's collection is not repeated here: its pods carry their own
-		manifests, and Xcode's privacy report adds them to this one.
+
+		AUCUNE CLÉ N'A BOUGÉ QUAND FIREBASE A QUITTÉ L'IPHONE (#334), et c'est
+		normal : ce fichier déclare ce que l'application fait collecter, pas ce
+		que collectent les bibliothèques qu'elle embarque. Apple : « Your app's
+		privacy manifest file doesn't need to cover data collected by
+		third-party SDKs that your app links to. »
+
+		CE QUI A CHANGÉ EST LE RAPPORT DE CONFIDENTIALITÉ D'XCODE, qui agrège
+		les manifestes des pods : neuf des dix manifestes du projet
+		appartenaient à la famille Google, et ils sont partis avec les pods. Il
+		n'en reste qu'un, celui de react-native-fs. Ce fichier-ci est donc
+		désormais à peu près tout ce que ce rapport contient, et la phrase que
+		ce commentaire portait — « Firebase's collection is not repeated here:
+		its pods carry their own manifests, and Xcode's privacy report adds
+		them to this one » — n'a plus d'objet sur iOS.
+
+		`docs/declarations-magasins.md`, point 5, porte ce que cela change chez
+		App Store Connect, et ce qui reste à mesurer sur un appareil avant de
+		le changer.
 	-->
 	<key>NSPrivacyCollectedDataTypes</key>
 	<array>
