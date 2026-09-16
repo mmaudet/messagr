@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 
 import { accountsInQuestion } from './accountInQuestion'
 import { afterReinstall } from './afterReinstall'
+import { theAwaitedInvitations } from './awaitedInvitations'
 import type { ServicePoster } from './claimInvitation'
 import { enterWithASession, type EntryDeps, type Leaving } from './entry'
 import type { Departure } from './leaveAccount'
@@ -1421,5 +1422,96 @@ describe('the rule of #279, whichever the answer', () => {
         'https://other.example/_messagr/invitations/claim',
       ]),
     )
+  })
+})
+
+describe('the invitation a spent link waits for (#329)', () => {
+  // ONE LINK SPENT, ONE INVITATION EXPECTED. Entry spends the link and the
+  // pump walks through the invitation it opens, in two modules that never
+  // meet; the register of `awaitedInvitations.ts` is what carries the fact
+  // from one to the other. Read here as a difference, because the register
+  // belongs to the process rather than to a test.
+
+  it('waits for the invitation the link that made this account was for', async () => {
+    const before = theAwaitedInvitations.count()
+    const result = await enterWithASession({
+      secrets: store(),
+      poster: granting,
+      link: async () => HERE,
+      ...nobodyAsked,
+      signUp: markerStore().secrets,
+      recovery: store(),
+    })
+    expect(result.entered && result.claimed).toBe(true)
+    expect(theAwaitedInvitations.count()).toBe(before + 1)
+  })
+
+  it('waits for the invitation a link spent for the account it holds was for', async () => {
+    const before = theAwaitedInvitations.count()
+    const result = await enterWithASession({
+      secrets: store(JSON.stringify(SESSION)),
+      poster: recordingPoster(),
+      link: async () => HERE,
+      ...nobodyAsked,
+      signUp: markerStore().secrets,
+      recovery: store(),
+    })
+    expect(result.entered && result.invitation).toEqual({ kind: 'used' })
+    expect(theAwaitedInvitations.count()).toBe(before + 1)
+  })
+
+  it('waits for the invitation the link it left its account for was for', async () => {
+    const here = device()
+    const { leaving } = answering('leave', here)
+    const before = theAwaitedInvitations.count()
+    const result = await entering(here, leaving)
+    expect(result.entered && result.claimed).toBe(true)
+    expect(theAwaitedInvitations.count()).toBe(before + 1)
+  })
+
+  it('waits for nothing when a session was merely restored', async () => {
+    // No link was spent, so no invitation is owed to this launch.
+    const before = theAwaitedInvitations.count()
+    await enterWithASession({
+      secrets: store(JSON.stringify(SESSION)),
+      poster: granting,
+      link: async () => null,
+      ...nobodyAsked,
+      signUp: markerStore().secrets,
+      recovery: store(),
+    })
+    expect(theAwaitedInvitations.count()).toBe(before)
+  })
+
+  it('waits for nothing when the link could not be used', async () => {
+    const before = theAwaitedInvitations.count()
+    const result = await enterWithASession({
+      secrets: store(JSON.stringify(SESSION)),
+      poster: refusing,
+      link: async () => HERE,
+      ...nobodyAsked,
+      signUp: markerStore().secrets,
+      recovery: store(),
+    })
+    expect(result.entered && result.invitation).toEqual({
+      kind: 'refused',
+      reason: 'this invitation cannot be used',
+    })
+    expect(theAwaitedInvitations.count()).toBe(before)
+  })
+
+  it('waits for nothing when the account the link made could not be kept', async () => {
+    // The claim went through and the keystore refused the new session, so
+    // this device stays on the account it held -- and the invitation the link
+    // opened is for an account it will never run.
+    const here = device({ sessionWrite: 'refused' })
+    const { leaving } = answering('leave', here)
+    const before = theAwaitedInvitations.count()
+    const result = await entering(here, leaving)
+    expect(result.entered && result.invitation).toEqual({
+      kind: 'spent',
+      reason: 'this device could not keep the new account',
+    })
+    expect(theAwaitedInvitations.count()).toBe(before)
   })
 })
