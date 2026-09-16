@@ -3,7 +3,26 @@
   "compilerOptions": {
     // The end-to-end suite runs under Jest, unlike the unit tests, so it needs
     // the types the app's own config deliberately excludes.
-    "types": ["jest", "detox"]
+    "types": ["jest", "detox"],
+
+    // EXPLICITE, PARCE QUE CETTE SUITE IMPORTE DE `src/` DEPUIS #276.
+    //
+    // `eviction.ts` importe `evictOutcomeTestId` de `../src/runtime/evict`,
+    // et c'est voulu : un `testID` recopié dans le banc dérive du jour où
+    // l'écran le change, ce que ce ticket répare précisément.
+    //
+    // Mais cet import tire `src/runtime` dans le programme, et le répertoire
+    // racine déduit ne couvrait plus tous les fichiers. Detox compile pour de
+    // vrai, donc TypeScript refusait : « TS5011: The common source directory
+    // of 'tsconfig.json' is '../src/runtime'. The 'rootDir' setting must be
+    // explicitly set. » La suite entière ne se chargeait plus, et le test
+    // d'éviction ne tournait pas du tout.
+    //
+    // CE QUE `tsc --noEmit` NE PEUT PAS ATTRAPER : TS5011 porte sur la
+    // disposition de la sortie, qu'une vérification sans émission ne calcule
+    // jamais. Le contrôle local était vert, le banc rouge, et les deux
+    // disaient vrai.
+    "rootDir": ".."
   },
   "include": ["./**/*.ts"],
   // Repeated rather than inherited: the parent excludes this directory, and an
