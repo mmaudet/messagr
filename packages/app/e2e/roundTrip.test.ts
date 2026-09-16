@@ -6,6 +6,7 @@ import { expect } from '@jest/globals'
 import { by, device, element, waitFor } from 'detox'
 
 import { openTheFirstConversation } from './conversation'
+import { demandTheRotation, type OutcomeScreen } from './eviction'
 import { IGNORING_THE_LIVE_POLL } from './longPoll'
 import { acceptThePromise } from './promise'
 import { NOTIFICATIONS_GRANTED } from './permissions'
@@ -94,7 +95,7 @@ const hasCounterparty =
   INVITATION !== undefined
 
 function runCounterparty(
-  phase: 'send' | 'send-file' | 'claim-place',
+  phase: 'send' | 'send-file' | 'claim-place' | 'witness-eviction',
   extra: Record<string, string> = {},
 ): void {
   execFileSync('python3', [COUNTERPARTY, phase], {
@@ -123,6 +124,59 @@ function claimedRoom(): string {
     throw new Error('claim-place joined a room and wrote no identifier for it')
   }
   return room
+}
+
+/**
+ * Écrire un message dans la conversation ouverte, et attendre de le voir.
+ *
+ * `replaceText` plutôt que `typeText` : le clavier de l'émulateur ne sait pas
+ * traduire un accent en événement de touche, et échoue sur un message qui
+ * parle de touches plutôt que d'accents. C'est ce que fait déjà boot.test.ts,
+ * qui est la preuve que ce geste marche sur ce banc.
+ *
+ * Le rond du composeur est un micro quand le champ est vide et un envoi quand
+ * il ne l'est pas : `composer-send` n'existe donc qu'après le texte, et on
+ * l'attend au lieu de le supposer.
+ *
+ * `toExist` ET PAS `toBeVisible`, ET LA DISTINCTION EST CELLE DE
+ * boot.test.ts. Detox exige de `toBeVisible` que 75 % de l'aire de l'élément
+ * soient à l'écran, ce qui est une question sur la géométrie du composeur
+ * sous un clavier ouvert par `replaceText` -- une question que ce test ne
+ * pose pas. Celle qu'il pose est « le rond est-il devenu un envoi », et
+ * `toExist` la pose exactement. Ce qui doit être VU l'est plus bas, sur le
+ * message lui-même, où le mot a un sens.
+ */
+async function sendInTheConversation(written: string): Promise<void> {
+  await waitFor(element(by.id('conversation-input')))
+    .toBeVisible()
+    .withTimeout(60000)
+  await element(by.id('conversation-input')).replaceText(written)
+  await waitFor(element(by.id('composer-send')))
+    .toExist()
+    .withTimeout(30000)
+  await element(by.id('composer-send')).tap()
+  // VU À L'ÉCRAN, ET PAS SEULEMENT ENVOYÉ. Cela chiffre, partage une clé de
+  // salon si la session en demande une, envoie, puis relit le salon.
+  await waitFor(element(by.text(written)))
+    .toBeVisible()
+    .withTimeout(60000)
+}
+
+/**
+ * L'écran, tel que la garde d'éviction le questionne. Detox lève quand il ne
+ * trouve pas ; ici « pas là » est une réponse, pas une panne.
+ */
+const onTheScreen: OutcomeScreen = {
+  appeared: async (testID: string, within: number) => {
+    try {
+      await waitFor(element(by.id(testID)))
+        .toBeVisible()
+        .withTimeout(within)
+      return true
+    } catch {
+      return false
+    }
+  },
 }
 
 const describeRoundTrip = hasCounterparty ? describe : describe.skip
@@ -482,6 +536,14 @@ describeRoundTrip('encrypted round trip', () => {
     // §13.26 : la ligne paraît dès que le salon compte plus d'un autre
     // membre, ce qui est le cas de celui-ci -- le rapport dit `whoElse`
     // joined 3. Un salon à deux nomme personne, et c'est délibéré.
+    //
+    // ET LE TROISIÈME COMPTE VIENT DE boot.test.ts. Les deux suites entrent
+    // dans le même salon du banc, un entrant chacune : tant que boot n'est
+    // pas passée, celui-ci en compte deux, la ligne est absente à bon droit
+    // et ce test cherche ce que le produit a raison de ne pas montrer.
+    // Mesuré sur le run 35103084809, où l'ordre des fichiers s'était
+    // inversé : `joined 2`, et « Got: was null ». L'ordre est tenu par
+    // `e2e/sequencer.js`, qui dit pourquoi.
     // PLUS HAUT QUE L'ÉCRAN, ET UNE PERSONNE REMONTE POUR LE LIRE.
     //
     // La conversation s'ouvre sur son message le plus récent, et celui que
@@ -519,6 +581,44 @@ describeRoundTrip('encrypted round trip', () => {
     // Les `testID` d'éviction existent depuis `dd896dc` et **rien ne les
     // pilotait** : `git grep evict packages/app/e2e` rendait zéro. Le code
     // était écrit, la vérification demandée n'avait pas eu lieu.
+    //
+    // # CE QUE CE TEST ASSERTAIT, ET POURQUOI C'ÉTAIT PIRE QUE RIEN
+    //
+    // Il touchait `evict-confirm`, attendait `evict-outcome`, prenait une
+    // capture. L'écran portait `evict-outcome` pour les QUATRE issues : le
+    // texte changeait, le `testID` non. Ce test passait donc aussi quand
+    // l'éviction échouait, et quand aucune clé n'avait tourné -- sous un nom
+    // qui annonce une éviction prouvée. Une porte laissée ouverte par ce qui
+    // a l'air de la fermer : personne ne va vérifier derrière. C'est #276.
+    //
+    // Il exige maintenant `evict-outcome-rotated`, et `eviction.ts` nomme ce
+    // que l'écran dit à la place quand ce n'est pas elle. Cette garde a été
+    // vue rougir sur chacune des trois autres issues, sans appareil, dans
+    // `eviction.spec.ts` -- une garde qu'on n'a jamais vue échouer ne prouve
+    // rien, et c'est le défaut qu'on répare ici.
+    //
+    // # DEUX MESSAGES, UN AVANT ET UN APRÈS, ET AUCUN N'EST DÉCORATIF
+    //
+    // AVANT : sans lui, ce salon est muet, aucune clé de cet appareil n'y a
+    // jamais servi, et l'issue honnête de l'éviction est
+    // `evict-outcome-no-key` -- un succès qui ne fait tourner aucune clé.
+    // Exiger la rotation sur un salon muet, ce serait exiger ce que le
+    // produit n'a pas à faire.
+    //
+    // APRÈS : « la partie retirée ne peut pas déchiffrer un message envoyé
+    // après l'éviction » n'est une preuve que s'il existe un tel message.
+    // Sans lui, la garde serait vraie faute de matière -- une garde qui
+    // fabrique son entrée, le défaut jumeau de celui-ci.
+    //
+    // # ET LE JUGE N'EST PAS L'APPLICATION
+    //
+    // L'écran ci-dessous est le témoignage de l'application sur elle-même.
+    // `witness-eviction` interroge le homeserver avec la session de la
+    // contrepartie : le retrait a eu lieu, c'est l'application qui l'a posé,
+    // ce qu'elle avait écrit avant est passé chiffré, et rien de ce qu'elle a
+    // envoyé après n'est visible. Ce que ce banc ne permet PAS de prouver --
+    // la rotation elle-même -- est écrit au long dans le docstring de cette
+    // phase, plutôt que maquillé en assertion.
     //
     // # POURQUOI CE TEST DOIT INVITER D'ABORD
     //
@@ -600,6 +700,20 @@ describeRoundTrip('encrypted round trip', () => {
       .toBeVisible()
       .withTimeout(60000)
     await element(by.id(`avatar-${scope}`)).tap()
+
+    // UN MESSAGE AVANT, POUR QU'IL Y AIT UNE CLÉ À FAIRE TOURNER.
+    //
+    // `discardScopeKey` rend `false` quand cet appareil n'a jamais chiffré
+    // dans le salon -- ce qui est le cas d'une conversation qui vient de
+    // naître et où rien n'a été dit. L'issue serait alors
+    // `evict-outcome-no-key` : un succès, et pas une rotation. Ce message
+    // crée la session Megolm que l'éviction devra invalider.
+    //
+    // `replaceText` puis `composer-send`, comme boot.test.ts : le clavier de
+    // l'émulateur ne sait pas traduire un accent en événement de touche.
+    await sendInTheConversation(`avant l'éviction ${Date.now()}`)
+    await device.takeScreenshot('eviction-4-avant-leviction')
+
     await waitFor(element(by.id('open-person')))
       .toBeVisible()
       .withTimeout(30000)
@@ -608,7 +722,7 @@ describeRoundTrip('encrypted round trip', () => {
     await waitFor(element(by.id('evict-open')))
       .toBeVisible()
       .withTimeout(30000)
-    await device.takeScreenshot('eviction-4-la-personne')
+    await device.takeScreenshot('eviction-5-la-personne')
     await element(by.id('evict-open')).tap()
 
     // DEUX TEMPS, et le second est celui qui agit. La forme est celle de
@@ -618,9 +732,25 @@ describeRoundTrip('encrypted round trip', () => {
       .withTimeout(30000)
     await element(by.id('evict-confirm')).tap()
 
-    await waitFor(element(by.id('evict-outcome')))
-      .toBeVisible()
-      .withTimeout(120000)
-    await device.takeScreenshot('eviction-5-le-resultat')
-  }, 420000)
+    // L'ISSUE LUE À L'ISSUE PRÈS. Voir eviction.ts : `evict-outcome-rotated`
+    // et rien d'autre, et un échec qui nomme laquelle des trois autres est à
+    // l'écran plutôt que de dire « élément introuvable ».
+    await demandTheRotation(onTheScreen)
+    await device.takeScreenshot('eviction-6-le-resultat')
+
+    // UN MESSAGE APRÈS, DANS LA MÊME CONVERSATION. C'est celui dont le juge
+    // constatera qu'il n'arrive pas jusqu'à la personne retirée. Le geste
+    // s'est fait depuis l'écran de la personne ; on revient à la
+    // conversation, qui est toujours là -- l'application en est membre.
+    await element(by.id('person-back')).tap()
+    await sendInTheConversation(`après l'éviction ${Date.now()}`)
+    await device.takeScreenshot('eviction-7-apres-leviction')
+
+    // LE JUGE, ET IL N'EST PAS CETTE APPLICATION. Il sort non nul, donc
+    // `runCounterparty` lève, et son propre texte dit ce qu'il a constaté.
+    runCounterparty('witness-eviction')
+    // ÉLARGI DE 420 À 600 SECONDES : deux envois et le juge s'ajoutent à ce
+    // que ce test faisait déjà, et un budget dépassé tue le test sur le temps
+    // plutôt que sur ce qu'il mesure -- ce qui ne dit rien de l'éviction.
+  }, 600000)
 })

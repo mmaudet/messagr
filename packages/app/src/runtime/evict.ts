@@ -84,6 +84,41 @@ export type EvictOutcome =
       readonly rotated: boolean
     }
 
+/**
+ * Le `testID` sous lequel un résultat se montre, un par phrase.
+ *
+ * # POURQUOI UN IDENTIFIANT PAR ISSUE, ET PAS UN SEUL
+ *
+ * L'écran portait `evict-outcome` pour les quatre issues. Le texte changeait,
+ * l'identifiant non -- et le test de bout en bout attendait cet identifiant,
+ * donc il passait aussi quand l'éviction échouait, et quand aucune clé
+ * n'avait tourné. C'est #276 : une porte laissée ouverte par ce qui avait
+ * l'air de la fermer, ce qui est pire qu'un test absent, parce que personne
+ * ne va vérifier derrière.
+ *
+ * Un identifiant par phrase, donc. Ce que l'écran DIT et ce qu'un test peut
+ * ATTENDRE ne peuvent plus diverger d'un état : `Evict.tsx` pose son `testID`
+ * avec cette fonction et choisit son texte sur les mêmes conditions, dans le
+ * même ordre.
+ *
+ * `evict-outcome-no-key` est un succès, et c'est pour lui que le découpage
+ * existe : « la clé a tourné » et « il n'y avait aucune clé de cet appareil à
+ * remplacer » sont deux faits différents sur la conversation, et un test qui
+ * assert le premier ne doit pas passer sur le second.
+ */
+export function evictOutcomeTestId(outcome: EvictOutcome): string {
+  if (outcome.evicted) {
+    return outcome.rotated ? 'evict-outcome-rotated' : 'evict-outcome-no-key'
+  }
+  // `removing` est le seul échec qui n'a rien changé. `rotating` et
+  // `settling` partagent une phrase -- la personne est dehors et garde une
+  // clé qui ouvre -- donc ils partagent un identifiant : un par phrase, pas
+  // un par étape.
+  return outcome.stage === 'removing'
+    ? 'evict-outcome-nothing-changed'
+    : 'evict-outcome-key-still-valid'
+}
+
 function why(cause: unknown): string {
   return cause instanceof Error ? cause.message : String(cause)
 }

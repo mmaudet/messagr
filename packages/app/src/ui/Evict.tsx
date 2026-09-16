@@ -3,7 +3,7 @@ import { StyleSheet, Text, View } from 'react-native'
 
 import { t } from '../copy'
 import { color, space, type as typeScale } from '../design/tokens'
-import type { EvictOutcome } from '../runtime/evict'
+import { evictOutcomeTestId, type EvictOutcome } from '../runtime/evict'
 import { Consequences } from './Consequences'
 import { NotchedButton } from './NotchedButton'
 
@@ -64,8 +64,19 @@ export function Evict({ memberId, onEvict, state }: EvictProps) {
 
   if (state !== 'idle' && state !== 'working') {
     return (
+      // UN IDENTIFIANT PAR PHRASE, ET C'EST LE CORRECTIF DE #276.
+      //
+      // Ce `testID` était `evict-outcome` pour les quatre issues. Le texte
+      // dessous changeait, l'identifiant non, et le test de bout en bout
+      // n'attendait que l'identifiant : il passait donc aussi quand
+      // l'éviction avait échoué, et quand aucune clé n'avait tourné, sous un
+      // nom qui annonçait une éviction prouvée.
+      //
+      // La condition ci-dessous et `evictOutcomeTestId` lisent le même état
+      // dans le même ordre, à dessein : l'identifiant nomme la phrase, donc
+      // une issue ne peut plus se montrer sous le nom d'une autre.
       <Text
-        testID="evict-outcome"
+        testID={evictOutcomeTestId(state)}
         style={[styles.outcome, { color: palette.neutral['600'] }]}>
         {state.evicted
           ? state.rotated
