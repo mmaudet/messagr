@@ -119,6 +119,16 @@ domains the same day. On any other device that installed from the track, the
 check stays the same: ask Android to verify again, then read the answer.
 `messagr.eu: verified` is the one that settles it.
 
+**And since 16 September 2026, the bench is no longer claimed** (#287). The
+application declared `messagr-fork.maudet.cloud` beside messagr.eu, on both
+platforms, so that an invitation issued on the bench would open it too. The
+inventory that decision asked for found nothing depending on it, and a build
+installed from a store should not claim a domain that is not the service it
+serves. A phone updated after that date will therefore answer nothing at all
+for the bench host, which is the expected reading and not a regression. The
+line above records what a Pixel 10 answered on 14 September, before the
+change.
+
     adb shell pm verify-app-links --re-verify eu.messagr
     adb shell pm get-app-links eu.messagr
 

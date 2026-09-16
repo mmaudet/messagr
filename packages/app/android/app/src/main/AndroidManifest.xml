@@ -187,15 +187,28 @@
           https on the same day. Until then nothing here could have verified.
 
           `autoVerify` is what makes the difference between opening and
-          offering a chooser: Android fetches the two hosts' assetlinks.json
-          at install and again on update, and a verified filter opens the
+          offering a chooser: Android fetches the host's assetlinks.json at
+          install and again on update, and a verified filter opens the
           application with no question asked. A filter without it is the
           chooser the old comment refused.
 
-          TWO HOSTS, BECAUSE A LINK NAMES ITS INSTANCE. The host of an
-          invitation is the homeserver of the account that invited:
-          messagr.eu in production, the bench for an invitation issued there.
-          Declaring one would leave half of them opening a browser.
+          ONE HOST, AND THE BENCH IS NOT IT. Decided by the owner on
+          16 September 2026 (#287). A link names its instance, the host of
+          an invitation being the homeserver of the account that invited, and
+          this filter used to name `messagr-fork.maudet.cloud` beside
+          messagr.eu, so that an invitation issued on the bench would open
+          here too. The inventory that decision asked for found nothing that
+          needed it: the Detox suite names the bench nowhere, no script does,
+          and the only opener was a person on a test device. Against that, a
+          build installed from Play claimed a domain that is not the service
+          it serves, and the tester of 13 September saw both listed under
+          "Open by default".
+
+          The cost is named rather than hidden: an invitation issued from a
+          bench account now opens a browser on a store build. Whoever needs
+          the other behaviour adds the host back on purpose, here and in
+          `Messagr.entitlements`, which `scripts/assert-invitation-links.sh`
+          keeps in step.
 
           WHAT THIS DOES NOT DO, said so nobody measures it and concludes the
           filter is broken: verification is against the certificate the
@@ -210,7 +223,6 @@
             <category android:name="android.intent.category.DEFAULT" />
             <category android:name="android.intent.category.BROWSABLE" />
             <data android:scheme="https" android:host="messagr.eu" android:pathPrefix="/i/" />
-            <data android:scheme="https" android:host="messagr-fork.maudet.cloud" android:pathPrefix="/i/" />
         </intent-filter>
       </activity>
     </application>
