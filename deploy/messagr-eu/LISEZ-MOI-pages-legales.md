@@ -1,6 +1,8 @@
 # Les pages légales de messagr.eu
 
-Deux pages, servies à `/confidentialite` et `/conditions-generales`.
+Deux pages, servies à `/confidentialite` et `/conditions-generales`, et une
+troisième à `/aide` qui n'est pas un texte juridique mais que les magasins
+exigent au même titre : voir « La page d'aide » plus bas.
 
 ## Pourquoi elles sont ici
 
@@ -53,10 +55,39 @@ Le chemin exact du racine web est celui que nginx sert pour messagr.eu ; il est
 décrit dans `nginx-messagr-eu.conf` de l'ancien dépôt. Le rapatriement complet
 du site relève de #47.
 
+## La page d'aide, `/aide`
+
+Elle est arrivée avec #333, et elle lève deux exigences d'un coup.
+
+**Google Play.** Une application qui crée un compte doit offrir un chemin de
+suppression dans l'application et une ressource web où la demander, où « the
+pathway to request account deletion should be prominently featured and easily
+discoverable on the page ». C'est la section `#supprimer-votre-compte`, et son
+adresse complète est
+`https://messagr.eu/aide/#supprimer-votre-compte`.
+
+**Apple.** La fiche de l'App Store exige une URL d'assistance, et le relecteur
+la visite. Elle pointait faute de mieux sur les conditions générales, qui sont
+un texte juridique et non une page d'aide. C'est `https://messagr.eu/aide/`.
+
+**L'ancre est une adresse publiée.** L'écran « Informations légales » de
+l'application l'ouvre, et les deux fiches la portent. La renommer ne fait
+répondre 404 à personne : la page s'ouvre, le lecteur arrive en haut, et rien
+ne dit qu'il a manqué ce qu'il venait chercher.
+
+**Ce qu'elle ne promet pas.** Aucun délai que le produit ne tient pas. Elle
+cite l'engagement de la politique de confidentialité — désactivation
+immédiate, purge sous trente jours — et écrit dans la même carte que cette
+purge est faite à la main à l'échelle de la bêta (#71).
+
 ## Vérifier après publication
 
     curl -sS -o /dev/null -w '%{http_code}\n' https://messagr.eu/confidentialite
     curl -sS -o /dev/null -w '%{http_code}\n' https://messagr.eu/conditions-generales
+    curl -sS -o /dev/null -w '%{http_code}\n' https://messagr.eu/aide
 
-Les deux doivent répondre 200. Google suit le lien pendant l'examen, et une
-404 le fait échouer sans dire clairement pourquoi.
+Les trois doivent répondre 200, et `scripts/assert-legal-pages.sh` fait
+exactement ces trois requêtes — le travail de publication le lance avant de
+construire quoi que ce soit. Google suit le lien de la politique pendant
+l'examen, il va chercher la ressource de suppression, Apple visite l'URL
+d'assistance, et une 404 fait échouer sans dire clairement pourquoi.
