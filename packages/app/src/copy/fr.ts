@@ -802,14 +802,39 @@ export const fr = {
   'backup_settings_progress %1$d %2$d': '%1$d clés sauvegardées sur %2$d',
   backup_settings_catching_up:
     'Le reste part au fil des synchronisations. Rien n’est perdu en attendant.',
-  'backup_settings_count %1$d':
-    '%1$d clés sauvegardées : c’est ce que Messagr voit sur le serveur.',
+  // LE COMPTE DIT D'OÙ IL VIENT, ET IL VIENT D'ICI (#323). Il annonçait
+  // « c'est ce que Messagr voit sur le serveur » en affichant un compteur
+  // local, sur le seul écran dont toute la valeur est d'être cru.
+  'backup_settings_count %1$d': '%1$d clés envoyées depuis cet appareil.',
   backup_settings_reading: "Lecture de l'état de la sauvegarde…",
   backup_settings_unreadable:
     "L'état de la sauvegarde n'a pas pu être lu sur cet appareil.",
   backup_settings_unreadable_why:
     "Cela ne dit rien de la sauvegarde elle-même : si elle était active, elle l'est toujours, et rien n'a été modifié ici.",
   backup_settings_retry: 'Réessayer',
+  // LES CINQ ÉTATS DE #323, VALIDÉS PAR LE PORTEUR LE 15 SEPTEMBRE 2026.
+  // Repris mot pour mot : ce sont les phrases sur lesquelles la décision a
+  // été prise, et les réécrire ici reviendrait à la reprendre tout seul.
+  //
+  // « Une autre sauvegarde a remplacé celle de cet appareil » couvre aussi
+  // la version simplement disparue : ce que la personne peut en faire est le
+  // même dans les deux cas, et c'est ce que les deux actions disent.
+  backup_settings_superseded:
+    "Une autre sauvegarde a remplacé celle de cet appareil : plus rien ne part d'ici.",
+  backup_settings_dormant:
+    "Une sauvegarde existe sur le serveur, mais cet appareil ne l'alimente pas.",
+  // NI « PAS DE SAUVEGARDE » NI « SAUVEGARDÉS », qui sont les deux états
+  // que celui-ci ne doit jamais se faire prendre pour. La seconde phrase est
+  // ce qui empêche de lire la première comme une panne de l'appareil.
+  backup_settings_unchecked:
+    "Le serveur n'a pas répondu : l'état de la sauvegarde n'a pas pu être vérifié.",
+  backup_settings_unchecked_why: "Rien n'a été modifié ici.",
+  backup_settings_enter_current: 'Entrer la clé actuelle',
+  backup_settings_enter_key: 'Entrer ma clé de récupération',
+  // Passe par l'écran de conséquences du remplacement : créer une nouvelle
+  // sauvegarde retire celle du serveur, et la clé d'avant cesse d'ouvrir
+  // quoi que ce soit.
+  backup_settings_new: 'Créer une nouvelle sauvegarde',
   backup_settings_enable: 'Sauvegarder mes messages',
   backup_settings_never_shown:
     'Votre clé actuelle ne peut pas être réaffichée, ici ni ailleurs.',
@@ -913,8 +938,6 @@ export const fr = {
   settings_vault_hint:
     'Un fichier, pour qui ne veut rien laisser sur un serveur.',
   restore_done_close: 'Fermer',
-  settings_restore: 'Retrouver mes anciens messages',
-  settings_restore_hint: 'Si vous avez votre clé de récupération.',
   back_to_newest: 'Revenir au dernier message',
 } as const
 

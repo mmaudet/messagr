@@ -519,14 +519,23 @@ export const nl: Readonly<Record<CopyKey, string>> = {
   'backup_settings_progress %1$d %2$d': '%1$d van %2$d sleutels bewaard',
   backup_settings_catching_up:
     'De rest gaat mee met de volgende synchronisaties. Ondertussen gaat er niets verloren.',
-  'backup_settings_count %1$d':
-    '%1$d sleutels bewaard: dat is wat Messagr op de server ziet.',
+  'backup_settings_count %1$d': '%1$d sleutels vanaf dit toestel verstuurd.',
   backup_settings_reading: 'De staat van de back-up wordt gelezen…',
   backup_settings_unreadable:
     'De staat van de back-up kon op dit apparaat niet gelezen worden.',
   backup_settings_unreadable_why:
     'Dat zegt niets over de back-up zelf: stond die aan, dan staat die nog aan, en hier is niets veranderd.',
   backup_settings_retry: 'Opnieuw proberen',
+  backup_settings_superseded:
+    'Een andere back-up heeft die van dit toestel vervangen: hiervandaan gaat niets meer weg.',
+  backup_settings_dormant:
+    'Er staat een back-up op de server, maar dit toestel voedt die niet.',
+  backup_settings_unchecked:
+    'De server heeft niet geantwoord: de staat van de back-up kon niet gecontroleerd worden.',
+  backup_settings_unchecked_why: 'Hier is niets veranderd.',
+  backup_settings_enter_current: 'De huidige sleutel invoeren',
+  backup_settings_enter_key: 'Mijn herstelsleutel invoeren',
+  backup_settings_new: 'Een nieuwe back-up maken',
   backup_settings_enable: 'Mijn berichten bewaren',
   backup_settings_never_shown:
     'Uw huidige sleutel kan niet opnieuw worden getoond, hier niet en elders niet.',
@@ -629,7 +638,5 @@ export const nl: Readonly<Record<CopyKey, string>> = {
   settings_vault: 'Sleutelkluis',
   settings_vault_hint: 'Een bestand, voor wie niets op een server wil laten.',
   restore_done_close: 'Sluiten',
-  settings_restore: 'Mijn oudere berichten terughalen',
-  settings_restore_hint: 'Als u uw herstelsleutel hebt.',
   back_to_newest: 'Terug naar het nieuwste bericht',
 }

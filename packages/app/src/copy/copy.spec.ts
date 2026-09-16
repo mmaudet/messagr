@@ -79,8 +79,29 @@ describe('the copy catalogue', () => {
     // is a human judgement that proves nothing cryptographically. A screen
     // that borrowed the word would be telling somebody they had done the
     // one when they had done the other.
-    const offending = Object.entries(fr).filter(([, value]) =>
-      /vérifi|verifi/i.test(value),
+    //
+    // # ONE SENTENCE IS ALLOWED, AND IT IS NAMED WITH ITS TEXT
+    //
+    // #323's fifth state, validated by the account holder on 15 September
+    // 2026: *« Le serveur n'a pas répondu : l'état de la sauvegarde n'a pas
+    // pu être vérifié. »* The rule above is about a human act this product
+    // performs -- comparing a short string, scanning a code -- and this is
+    // about a request that got no answer. The word is the ordinary one, in a
+    // sentence where no ceremony is on offer and nothing about a person is
+    // being claimed.
+    //
+    // The exception is a key AND its value, so it cannot widen: a different
+    // key carrying the word fails, and so does an edit to this one. The rest
+    // of the rule is untouched.
+    const ALLOWED = new Map([
+      [
+        'backup_settings_unchecked',
+        "Le serveur n'a pas répondu : l'état de la sauvegarde n'a pas pu être vérifié.",
+      ],
+    ])
+    const offending = Object.entries(fr).filter(
+      ([key, value]) =>
+        /vérifi|verifi/i.test(value) && ALLOWED.get(key) !== value,
     )
     expect(offending).toEqual([])
   })

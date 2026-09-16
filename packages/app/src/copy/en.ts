@@ -519,14 +519,23 @@ export const en: Readonly<Record<CopyKey, string>> = {
   'backup_settings_progress %1$d %2$d': '%1$d keys backed up out of %2$d',
   backup_settings_catching_up:
     'The rest goes as the conversations sync. Nothing is lost in the meantime.',
-  'backup_settings_count %1$d':
-    '%1$d keys backed up: that is what Messagr sees on the server.',
+  'backup_settings_count %1$d': '%1$d keys sent from this device.',
   backup_settings_reading: 'Reading the state of the backup…',
   backup_settings_unreadable:
     'The state of the backup could not be read on this device.',
   backup_settings_unreadable_why:
     'That says nothing about the backup itself: if it was on, it still is, and nothing here was changed.',
   backup_settings_retry: 'Try again',
+  backup_settings_superseded:
+    'Another backup has replaced the one from this device: nothing leaves here any more.',
+  backup_settings_dormant:
+    'A backup exists on the server, but this device does not feed it.',
+  backup_settings_unchecked:
+    'The server did not answer: the state of the backup could not be checked.',
+  backup_settings_unchecked_why: 'Nothing here was changed.',
+  backup_settings_enter_current: 'Enter the current key',
+  backup_settings_enter_key: 'Enter my recovery key',
+  backup_settings_new: 'Create a new backup',
   backup_settings_enable: 'Back up my messages',
   backup_settings_never_shown:
     'Your current key cannot be shown again, here or anywhere else.',
@@ -629,7 +638,5 @@ export const en: Readonly<Record<CopyKey, string>> = {
   settings_vault_hint:
     'A file, for somebody who wants nothing left on a server.',
   restore_done_close: 'Close',
-  settings_restore: 'Get my older messages back',
-  settings_restore_hint: 'If you have your recovery key.',
   back_to_newest: 'Back to the latest message',
 }
