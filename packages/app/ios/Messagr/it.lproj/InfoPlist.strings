@@ -1,0 +1,17 @@
+/* Italian.
+
+   Translated from the English base. Why each string says what it says — and
+   what it is not allowed to promise — is written beside the keys in
+   Info.plist; `scripts/assert-ios-localisation.sh` refuses a language that is
+   missing one.
+
+   `lei` and the vocabulary of `src/copy/it.ts`: cifrato end-to-end, server,
+   fototeca, interlocutore. */
+
+"NSMicrophoneUsageDescription" = "Perché il suo interlocutore la senta durante una chiamata. L’audio è cifrato end-to-end: né il server né Messagr possono ascoltarlo, e nulla viene registrato.";
+
+"NSCameraUsageDescription" = "Perché il suo interlocutore la veda durante una videochiamata. L’immagine è cifrata end-to-end: né il server né Messagr possono vederla, e nulla viene registrato.";
+
+"NSPhotoLibraryUsageDescription" = "Per scegliere un’immagine da inviare in una conversazione. L’immagine viene cifrata su questo dispositivo prima di essere inviata: né il server né Messagr possono leggerla.";
+
+"NSPhotoLibraryAddUsageDescription" = "Per salvare nella sua fototeca una fotografia ricevuta in una conversazione, quando lo chiede. Un’immagine salvata esce da Messagr: segue poi i backup e i permessi della sua fototeca.";

@@ -54,6 +54,26 @@
 		<key>NSAllowsLocalNetworking</key>
 		<true/>
 	</dict>
+	<!-- CES QUATRE TEXTES SONT EN ANGLAIS, ET C'EST LA BASE.
+
+	     CFBundleDevelopmentRegion vaut `en`. Un texte francais ici s'affichait
+	     donc sur tout iPhone, quelle que soit sa langue : la boite
+	     d'autorisation est dessinee par iOS, qui ne lit pas le catalogue de
+	     l'application mais ce fichier, et ce fichier n'avait aucune traduction
+	     a cote de lui (#320).
+
+	     Les sept langues vivent dans `Messagr/<langue>.lproj/InfoPlist.strings`,
+	     les memes sept que `src/copy/` : une autorisation demandee dans une
+	     langue que l'ecran ne parle pas ne veut rien dire. Ce que l'iPhone
+	     affiche est la traduction ; ce qui est ecrit ici est ce qu'il affiche
+	     quand il ne parle aucune des sept.
+
+	     `scripts/assert-ios-localisation.sh` tient les deux ensemble dans
+	     `checks` : une langue sans texte, un texte ajoute ici sans traduction,
+	     ou un fichier que le projet Xcode ne copie pas. Le dernier est le
+	     silencieux, et c'est pour lui que le script lit aussi le pbxproj : un
+	     `.lproj` qu'aucun groupe de variantes ne nomme ne casse aucune build,
+	     il n'arrive simplement jamais sur l'appareil. -->
 	<!-- LES DEUX TEXTES QU'APPLE A RECLAMES.
 
 	     ITMS-90683, sur la premiere livraison de #109 : le binaire reference des
@@ -73,7 +93,7 @@
 	     react-native-webrtc. iOS demande donc toujours a la capture, comme
 	     avant. `src/calls/permissions.ts` porte la regle. -->
 	<key>NSMicrophoneUsageDescription</key>
-	<string>Pour que votre correspondant vous entende pendant un appel. Le son est chiffré de bout en bout : ni le serveur ni Messagr ne peuvent l’écouter, et rien n’est enregistré.</string>
+	<string>So the person you are speaking to can hear you during a call. The sound is end-to-end encrypted: neither the server nor Messagr can listen to it, and nothing is recorded.</string>
 	<!-- LA CAMERA, POUR UN APPEL VIDEO ET RIEN D'AUTRE.
 	     Ce texte promettait que l'autorisation ne serait jamais demandee.
 	     C'etait vrai tant que les appels etaient audio (#88) : la cle n'etait
@@ -85,9 +105,9 @@
 	     pendant un appel. `react-native-image-picker` ne sert qu'a la
 	     phototheque (`src/runtime/imageLibrary.ts`), jamais a la camera. -->
 	<key>NSCameraUsageDescription</key>
-	<string>Pour que votre correspondant vous voie pendant un appel vidéo. L’image est chiffrée de bout en bout : ni le serveur ni Messagr ne peuvent la voir, et rien n’est enregistré.</string>
+	<string>So the person you are speaking to can see you during a video call. The picture is end-to-end encrypted: neither the server nor Messagr can see it, and nothing is recorded.</string>
 	<key>NSPhotoLibraryUsageDescription</key>
-	<string>Pour choisir une image à envoyer dans une conversation. L’image est chiffrée sur cet appareil avant d’être envoyée : ni le serveur ni Messagr ne peuvent la lire.</string>
+	<string>To choose a picture to send in a conversation. The picture is encrypted on this device before it is sent: neither the server nor Messagr can read it.</string>
 	<!-- DEUX CLES ET NON UNE, ET LA DIFFERENCE COMPTE.
 	     Celle du dessus est le droit de LIRE la photothèque, demande pour
 	     choisir une image a envoyer. Celle-ci est le droit d'y AJOUTER, et
@@ -96,7 +116,7 @@
 	     les deux usages demanderait un acces en lecture dont ce geste n'a
 	     pas besoin. -->
 	<key>NSPhotoLibraryAddUsageDescription</key>
-	<string>Pour enregistrer dans votre photothèque une photographie reçue dans une conversation, lorsque vous le demandez. Une image enregistrée quitte Messagr : elle suit ensuite les sauvegardes et les autorisations de votre photothèque.</string>
+	<string>To save a photograph received in a conversation to your photo library, when you ask for it. A saved picture leaves Messagr: it then follows the backups and the permissions of your photo library.</string>
 	<key>RCTNewArchEnabled</key>
 	<true/>
 	<!-- L'EXPORT, DECLARE EXEMPTE, ET C'EST LE COMPTE QUI LE DIT.
