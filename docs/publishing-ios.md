@@ -33,6 +33,9 @@ ne se justifie pas.
   côté sygnal. **Les deux ensemble, et c'est le point le plus facile à rater.**
 - `convert_device_token_to_hex: false` côté sygnal, parce que l'application
   enregistre le jeton APNs en hexadécimal. Ajouté le 15 septembre 2026 (#325).
+- `FirebaseMessagingAutoInitEnabled: false` dans `Info.plist`, pour que le SDK
+  de Firebase ne fabrique pas de jeton FCM de son côté. Ajouté le 16 septembre
+  2026 (#334), et **pas encore vérifié sur un appareil** : voir plus bas.
 
 ## Le piège, avant tout le reste
 
@@ -61,6 +64,29 @@ Le prix de ce réglage est réel : **une build lancée depuis Xcode sur un
 téléphone branché ne peut plus être réveillée**, puisqu'elle réclamerait un
 jeton de production sans y avoir droit. Si vous voulez un jour tester en
 développement, il faut rebasculer les deux, ensemble.
+
+## Ce que Firebase fait sur iPhone, et ce qu'on n'a pas encore mesuré
+
+Le réveil iOS passe par Apple seule, et la page de confidentialité le promet :
+« Sur iOS le même rôle est tenu par le service de notifications d'Apple. »
+Firebase est quand même embarqué, parce que `getAPNSToken` est la façon dont
+l'application lit le jeton d'Apple. En lisant les sources de FirebaseMessaging
+12.18.0, #334 a trouvé que le SDK s'enregistre de lui-même auprès de Google
+au passage.
+
+`FirebaseMessagingAutoInitEnabled: false` est le levier documenté par Firebase,
+et il est posé. **Il ne suffit probablement pas**, et c'est le point à ne pas
+oublier : la demande qui porte le jeton APNs à Google part du gestionnaire de
+jetons, dans le setter qui reçoit ce jeton, et ce setter ne lit pas cette clé.
+La lecture ne peut pas aller plus loin ; seul un iPhone dont on observe le
+trafic tranche.
+
+`scripts/assert-ios-push.sh` refuse que la clé disparaisse, dans `checks`. Il
+prouve que la clé est dans le plist, **pas** qu'aucune requête ne part vers
+Google : ne lisez pas son `OK` comme une réponse à la question de #334.
+
+La marche exacte de la mesure est écrite dans #334, et se groupe avec celles
+de #308 et #341 sur le même appareil.
 
 ## Les gestes, dans l'ordre
 
