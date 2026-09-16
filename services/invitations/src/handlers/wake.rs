@@ -38,6 +38,72 @@ use crate::AppState;
 /// the guarantee above would hold only as long as every client chose to let it.
 /// Dropping `data` makes it hold by construction.
 ///
+/// Since #341 a `data` goes out again, and it is **written here rather than
+/// passed on**. One field of what arrives is read — a language tag, matched
+/// against a closed set of seven — and not one byte of it is ever copied into
+/// what leaves. What a client sends is still thrown away; what leaves is a
+/// constant this service holds.
+///
+/// # THE VISIBLE FALLBACK, AND WHY IT SAYS SO LITTLE (#341)
+///
+/// ADR-0009 decided two things. The first is everything above. The second was
+/// never built:
+///
+/// ```text
+/// A silent wake is not guaranteed. […] So there must be a visible fallback
+/// for the case where the wake does not happen or does not finish in time.
+/// That fallback must also say nothing. "New message" and nothing else —
+/// no sender, no conversation, no count.
+/// ```
+///
+/// On 16 September 2026 a killed and locked iPhone showed nothing at all while
+/// sygnal had sent and Apple had answered 200. The reason is in sygnal's own
+/// code: `_get_payload_event_id_only` starts from
+/// `device.data["default_payload"]` and adds `room_id`, `event_id` and the
+/// counts. With `data` dropped, no room id and the counts closed, what reached
+/// Apple was `{"event_id": "$…"}` — **no `aps` dictionary**, so nothing for
+/// iOS to display and nothing to wake either.
+///
+/// So this forwards a `default_payload` carrying an `aps.alert` and nothing
+/// else, and `deploy/messagr-sygnal/sygnal.yaml` moves that pushkin from
+/// `push_type: background` to `alert`. An alert needs nobody's help to appear:
+/// it shows on a phone that is killed and locked, which is the one case a wake
+/// cannot reach.
+///
+/// ## The words live here, because the alternative undoes the section above
+///
+/// They are the application's own — `notify_blind_title` and
+/// `notify_blind_body`, in the seven languages it speaks — and
+/// `scripts/assert-push-payload.sh` reads both sides so the two cannot drift
+/// apart. Letting the CLIENT send the sentence would have been one line here
+/// and would have given back exactly what "`data` is dropped" buys: a
+/// `default_payload` passed through is a `default_payload` anything holding an
+/// access token can write.
+///
+/// ## Who chooses the language, and what that tells anybody
+///
+/// The device does, once, when it registers its pusher — `pusher.ts` writes
+/// `data.lang`, and the homeserver hands it back with every notification. This
+/// service does not know what language anybody reads and must not learn it
+/// from a message; it reads a tag, matches it against seven, and picks a
+/// sentence it already holds.
+///
+/// What that costs is that Apple sees which of seven sentences a device is
+/// sent, which is the language its owner reads — a thing an Apple device told
+/// Apple itself long before this. It is the same value for every push, never
+/// per message and never per correspondent, so it correlates nobody with
+/// anybody.
+///
+/// ## APPLE ONLY, AND THAT IS NOT A DETAIL
+///
+/// sygnal's Firebase pushkin merges `default_payload` into the data message
+/// exactly as the Apple one does (`gcmpushkin.py`, `_build_data`). Attaching
+/// the template to an Android device would push these words, and the language
+/// they name, across Google — for a field Android never reads, on the platform
+/// where the silent wake already works. So it goes to `APPLE` and nowhere
+/// else, and `the_fallback_is_attached_to_apples_transport_only` is what holds
+/// that.
+///
 /// # SYGNAL WILL NOT SEND NOTHING, SO IT IS GIVEN NOISE
 ///
 /// The first version of this forwarded a notification carrying only its
@@ -170,6 +236,94 @@ pub struct Notification {
 pub struct Device {
     app_id: String,
     pushkey: String,
+    /// The pusher's own `data`, which the homeserver hands back with every
+    /// notification, minus its `url`.
+    ///
+    /// **ONE FIELD OF IT IS READ AND NONE OF IT IS FORWARDED.** `spoken` takes
+    /// `lang` and matches it against seven; `strip` writes a `data` of its
+    /// own. A client that wrote anything else here — a `default_payload`, a
+    /// name, a room — is writing into a value nothing copies.
+    #[serde(default)]
+    data: Option<Value>,
+}
+
+/// The `app_id` whose pushkin talks to Apple, and the only transport the
+/// visible fallback is attached to.
+///
+/// It has to equal a key of `apps:` in `deploy/messagr-sygnal/sygnal.yaml` and
+/// the `app_id` that `packages/app/src/runtime/pusher.ts` registers for iOS. A
+/// disagreement between the three produces no error anywhere, which is the
+/// reason `pusher.ts` carries the same constant with the same warning.
+const APPLE: &str = "eu.messagr.apns";
+
+/// The seven languages this application is written in, as a closed set.
+///
+/// Closed is the whole point. What arrives is a string a client wrote, and the
+/// only thing done with it is to choose among sentences that are already here.
+/// A `String` kept from the notification would be a way back in for whatever
+/// the client felt like putting in it.
+#[derive(Clone, Copy, Debug, PartialEq)]
+enum Spoken {
+    De,
+    En,
+    Es,
+    Fr,
+    It,
+    Nl,
+    Uz,
+}
+
+/// Which of the seven a device asked for, and French when it asked for
+/// nothing this application speaks.
+///
+/// French rather than a refusal, and rather than nothing: `chosenLanguage.ts`
+/// falls back the same way, and a notification lost because a language tag was
+/// odd would be this ticket's own defect drawn one layer down.
+fn spoken(device: &Device) -> Spoken {
+    let asked = device
+        .data
+        .as_ref()
+        .and_then(|data| data.get("lang"))
+        .and_then(Value::as_str);
+    match asked {
+        Some("de") => Spoken::De,
+        Some("en") => Spoken::En,
+        Some("es") => Spoken::Es,
+        Some("it") => Spoken::It,
+        Some("nl") => Spoken::Nl,
+        Some("uz") => Spoken::Uz,
+        _ => Spoken::Fr,
+    }
+}
+
+/// **What an iPhone shows when nothing woke it, and everything it may say.**
+///
+/// A title and a body, both constants of this file. The title is the product's
+/// name and the body says that something arrived — no sender, no conversation,
+/// no count, which is ADR-0009's requirement and not a shortage of room.
+///
+/// The temptation this guards against is small and permanent: the notification
+/// reads poorly, somebody puts a name in it, and nobody sees it happen because
+/// it happens on other people's lock screens. `scripts/assert-push-payload.sh`
+/// pins every string literal below against the application's own catalogues,
+/// so a new word here fails the build rather than shipping.
+fn blind_alert(language: Spoken) -> Value {
+    json!({
+        "aps": {
+            "alert": {
+                "title": "Messagr",
+                "body": match language {
+                    Spoken::De => "Es ist etwas angekommen.",
+                    Spoken::En => "Something arrived.",
+                    Spoken::Es => "Ha llegado algo.",
+                    Spoken::Fr => "Quelque chose est arrivé.",
+                    Spoken::It => "È arrivato qualcosa.",
+                    Spoken::Nl => "Er is iets aangekomen.",
+                    Spoken::Uz => "Bir narsa keldi.",
+                },
+            }
+        }
+    })
 }
 
 impl Notification {
@@ -464,10 +618,28 @@ fn strip(devices: &[Device], prio: &str, event_id: &str) -> Value {
             "event_id": event_id,
             "devices": devices
                 .iter()
-                .map(|device| json!({
-                    "app_id": device.app_id,
-                    "pushkey": device.pushkey,
-                }))
+                .map(|device| {
+                    // ANDROID IS GIVEN NOTHING NEW, AND THAT IS DELIBERATE.
+                    //
+                    // sygnal's Firebase pushkin merges `default_payload` into
+                    // the data message just as Apple's does, so a template
+                    // here would push the sentence -- and the language it
+                    // names -- across Google, for a field Android never reads.
+                    if device.app_id != APPLE {
+                        return json!({
+                            "app_id": device.app_id,
+                            "pushkey": device.pushkey,
+                        });
+                    }
+                    json!({
+                        "app_id": device.app_id,
+                        "pushkey": device.pushkey,
+                        // ADR-0009's visible fallback. Written here from
+                        // constants, never read off the notification: the
+                        // device picks the language and this picks the words.
+                        "data": { "default_payload": blind_alert(spoken(device)) },
+                    })
+                })
                 .collect::<Vec<_>>(),
             // Kept because it is about delivery and not about the message: a
             // call has to wake a sleeping phone and a message does not need
@@ -612,6 +784,218 @@ mod tests {
                 "data":{"default_payload":{"body":"secret"}}}]}}"##,
         );
         assert!(!stripped(&smuggled).to_string().contains("secret"));
+    }
+
+    // ======================================================================
+    // #341 — THE VISIBLE FALLBACK, AND THE WORDS IT IS ALLOWED TO SAY
+    //
+    // ADR-0009 decided two things and only one of them was built. The wake
+    // that carries nothing is here; the other half is not:
+    //
+    //   "A silent wake is not guaranteed. […] So there must be a visible
+    //    fallback for the case where the wake does not happen or does not
+    //    finish in time. That fallback must also say nothing."
+    //
+    // On 16 September 2026 a killed and locked iPhone showed nothing at all
+    // while sygnal had sent and Apple had answered 200 — because what left
+    // here carried no `aps` dictionary, so there was nothing for iOS to act
+    // on. The tests below are that fallback, and the fence around its words.
+    // ======================================================================
+
+    /// An Apple device, as a homeserver hands one over.
+    const IPHONE: &str = r##"{"notification":{"devices":[
+        {"app_id":"eu.messagr.apns","pushkey":"K","data":{"lang":"fr"}}]}}"##;
+
+    /// What Apple would be asked to display for the first device.
+    fn alert_of(sent: &Value) -> Value {
+        sent["notification"]["devices"][0]["data"]["default_payload"]["aps"]["alert"].clone()
+    }
+
+    fn one_iphone(data: &str) -> Value {
+        let raw = format!(
+            r##"{{"notification":{{"devices":[
+                {{"app_id":"eu.messagr.apns","pushkey":"K",{data}}}]}}}}"##
+        );
+        stripped(&notification(&raw))
+    }
+
+    /// An iPhone nothing could wake still shows something, and what it shows
+    /// is a title and a body and no third thing.
+    #[test]
+    fn an_iphone_is_given_something_to_show() {
+        let alert = alert_of(&stripped(&notification(IPHONE)));
+        let mut keys: Vec<&str> = alert
+            .as_object()
+            .expect("the fallback is an alert dictionary")
+            .keys()
+            .map(String::as_str)
+            .collect();
+        keys.sort_unstable();
+        assert_eq!(keys, vec!["body", "title"]);
+        assert_eq!(alert["title"], "Messagr");
+        assert_eq!(alert["body"], "Quelque chose est arrivé.");
+    }
+
+    /// **WHO CHOOSES THE LANGUAGE.** Not this service, which does not know
+    /// what anybody reads and must not learn it from a message. The device
+    /// says so once, when it registers its pusher (`pusher.ts`), and the
+    /// homeserver hands that back in `data` with every notification. The
+    /// WORDS live here: a client picks among seven and writes none of them.
+    #[test]
+    fn the_device_chooses_among_seven_and_writes_none_of_them() {
+        for (tag, expected) in [
+            ("de", "Es ist etwas angekommen."),
+            ("en", "Something arrived."),
+            ("es", "Ha llegado algo."),
+            ("fr", "Quelque chose est arrivé."),
+            ("it", "È arrivato qualcosa."),
+            ("nl", "Er is iets aangekomen."),
+            ("uz", "Bir narsa keldi."),
+        ] {
+            let sent = one_iphone(&format!(r#""data":{{"lang":"{tag}"}}"#));
+            assert_eq!(alert_of(&sent)["body"], expected, "{tag}");
+        }
+    }
+
+    /// A device that named no language, or named one this application does
+    /// not speak, still gets a notification — in French, which is what the
+    /// application itself falls back to (`chosenLanguage.ts`). Never an
+    /// error: a notification lost over an odd language tag would be this
+    /// ticket's own bug, drawn again one layer down.
+    #[test]
+    fn a_device_that_names_no_language_still_gets_a_notification() {
+        for data in [
+            r#""data":{}"#,
+            r#""data":{"lang":"xx"}"#,
+            r#""data":{"lang":12}"#,
+            r#""data":null"#,
+            r#""pushkey_ts":1"#,
+        ] {
+            assert_eq!(
+                alert_of(&one_iphone(data))["body"],
+                "Quelque chose est arrivé.",
+                "{data} lost the notification"
+            );
+        }
+    }
+
+    /// **The fence, as an assertion.** The template is built here out of
+    /// constants and never out of what arrived, so a client holding an access
+    /// token cannot put one word in it. That is the property the module
+    /// header claims for `data` as a whole, and it has to survive one field
+    /// of `data` finally being read.
+    #[test]
+    fn a_client_cannot_write_the_words_of_the_fallback() {
+        let smuggled = notification(
+            r##"{"notification":{"devices":[{"app_id":"eu.messagr.apns","pushkey":"K",
+                "data":{"lang":"fr","default_payload":{"aps":{"alert":
+                    {"title":"Maria","body":"see you at eight"}}}}}]}}"##,
+        );
+        let wire = stripped(&smuggled).to_string();
+        assert!(!wire.contains("Maria"), "{wire}");
+        assert!(!wire.contains("see you at eight"), "{wire}");
+    }
+
+    /// And the language tag is a CHOICE AMONG SEVEN rather than a string that
+    /// is copied. Copying it would make the tag itself the way back in.
+    #[test]
+    fn a_language_tag_is_never_copied_into_the_payload() {
+        let hostile = one_iphone(r#""data":{"lang":"Maria: see you at eight"}"#);
+        assert!(!hostile.to_string().contains("Maria"), "{hostile}");
+    }
+
+    /// **NOTHING NEW CROSSES GOOGLE.** sygnal's Firebase pushkin merges
+    /// `default_payload` into the data message exactly as the Apple one does
+    /// (`gcmpushkin.py`, `_build_data`), so attaching the template to an
+    /// Android device would send these words — and, by which of the seven,
+    /// the language its owner reads — across Google, for a field Android
+    /// never looks at. Apple's transport is the only one that gets it.
+    #[test]
+    fn the_fallback_is_attached_to_apples_transport_only() {
+        let both = notification(
+            r##"{"notification":{"devices":[
+                {"app_id":"eu.messagr","pushkey":"ANDROID","data":{"lang":"nl"}},
+                {"app_id":"eu.messagr.apns","pushkey":"IPHONE","data":{"lang":"nl"}}]}}"##,
+        );
+        let sent = stripped(&both);
+        let devices = sent["notification"]["devices"].as_array().unwrap();
+
+        let android = devices[0].as_object().unwrap();
+        let mut keys: Vec<&str> = android.keys().map(String::as_str).collect();
+        keys.sort_unstable();
+        assert_eq!(keys, vec!["app_id", "pushkey"], "{android:?}");
+
+        assert_eq!(
+            devices[1]["data"]["default_payload"]["aps"]["alert"]["body"], "Er is iets aangekomen.",
+            "the iPhone of the same account got nothing to show"
+        );
+    }
+
+    /// The whole notification again, on the road that now carries a template:
+    /// what the homeserver said about the message is still nowhere in it, and
+    /// neither is anything else the client wrote under `data`.
+    #[test]
+    fn nothing_about_the_message_survives_on_apples_road() {
+        let full = notification(
+            r##"{"notification":{
+                "event_id":"$abc:messagr.eu",
+                "room_id":"!room:messagr.eu",
+                "type":"m.room.message",
+                "sender":"@her:messagr.eu",
+                "sender_display_name":"Maria",
+                "room_name":"Maria",
+                "content":{"msgtype":"m.text","body":"see you at eight"},
+                "counts":{"unread":3},
+                "devices":[{"app_id":"eu.messagr.apns","pushkey":"KEY",
+                            "data":{"lang":"en","format":"event_id_only"}}]
+            }}"##,
+        );
+        let sent = stripped(&full);
+        let device = sent["notification"]["devices"][0].as_object().unwrap();
+        let mut keys: Vec<&str> = device.keys().map(String::as_str).collect();
+        keys.sort_unstable();
+        assert_eq!(keys, vec!["app_id", "data", "pushkey"]);
+        assert_eq!(
+            device["data"],
+            json!({"default_payload":{"aps":{"alert":
+                {"title":"Messagr","body":"Something arrived."}}}}),
+            "the only thing under `data` is the template this service wrote"
+        );
+
+        let wire = sent.to_string();
+        for leak in [
+            "$abc",
+            "!room",
+            "@her",
+            "Maria",
+            "see you at eight",
+            "m.room.message",
+            "unread",
+            "event_id_only",
+        ] {
+            assert!(!wire.contains(leak), "{leak} crossed the push gateway");
+        }
+    }
+
+    /// **The risk this ticket leaves behind, written down as a test.** One
+    /// day the fallback will look poor to somebody, and the way to improve it
+    /// is to put a name in it. These seven sentences are everything it may
+    /// say, and the title is the product's own name.
+    #[test]
+    fn the_fallback_says_that_something_arrived_and_never_who() {
+        for tag in ["de", "en", "es", "fr", "it", "nl", "uz"] {
+            let sent = one_iphone(&format!(r#""data":{{"lang":"{tag}"}}"#));
+            let alert = alert_of(&sent);
+            assert_eq!(alert["title"], "Messagr", "{tag}");
+            let body = alert["body"].as_str().unwrap();
+            assert!(!body.is_empty(), "{tag}");
+            for named in ['@', '!', ':', '#'] {
+                assert!(
+                    !body.contains(named),
+                    "{tag} says {body:?}, and {named:?} is how a name gets in"
+                );
+            }
+        }
     }
 
     /// Priority describes delivery, not the message: a call has to wake a

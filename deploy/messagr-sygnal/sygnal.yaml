@@ -413,11 +413,38 @@ apps:
   # l'horaire de chaque reveil -- sur la seule plateforme ou le canal
   # direct etait deja configure.
   #
-  # push_type: background, et pas alert. Une notification `alert`
-  # s'afficherait d'elle-meme avec un texte fourni par le serveur, ce que
-  # ce produit ne peut pas faire : le serveur ne lit pas les messages. Un
-  # reveil silencieux laisse l'application dechiffrer et poser une
-  # notification locale, comme sur Android.
+  # push_type: alert, ET C'EST LE CHANGEMENT DU 16 SEPTEMBRE 2026 (#341).
+  #
+  # Ce bloc disait « background, et pas alert », au motif qu'une alerte
+  # s'affiche d'elle-meme avec un texte fourni par le serveur et que ce
+  # serveur ne lit pas les messages. Le motif etait juste et la conclusion
+  # trop large : ADR-0009 avait deja tranche qu'un reveil silencieux n'est
+  # pas garanti et qu'il faut donc un repli visible QUI NE DIT RIEN. C'est
+  # ce repli qui part ici, et non un texte lu sur un message.
+  #
+  # Ce que la passerelle transmet est un `aps.alert` constant, ecrit dans
+  # services/invitations/src/handlers/wake.rs : « Messagr » et « Quelque
+  # chose est arrivé. », identique pour tout le monde, ne nommant ni salon,
+  # ni expediteur, ni compte, ni compteur. scripts/assert-push-payload.sh
+  # refuse tout mot de plus, et compare ceux-la aux catalogues de
+  # l'application.
+  #
+  # SANS `alert`, RIEN NE S'AFFICHE ET RIEN NE SE REVEILLE. Un iPhone tue
+  # et verrouille a recu 200 d'Apple sans rien montrer, parce que la charge
+  # utile ne portait aucun dictionnaire `aps` : sygnal part de
+  # `device.data["default_payload"]`, que la passerelle jetait, puis ajoute
+  # `room_id` (absent), `event_id` et les compteurs (fermes). Il ne restait
+  # que `{"event_id": "$..."}`, sur quoi iOS n'a rien a faire. Constate le
+  # 16 septembre 2026, sygnal ayant envoye et Apple ayant repondu 200.
+  #
+  # CE QUE CELA COUTE, ET IL FAUT LE DIRE : `alert` sans
+  # `content-available` n'appelle plus l'application en arriere-plan. Sur
+  # iOS la notification affichee est donc celle-ci, et jamais une
+  # notification locale plus riche posee apres dechiffrement -- ce qu'aucune
+  # application ne peut faire sur un iPhone tue sans une extension qui
+  # dechiffre, laquelle est hors de ce ticket. Android est inchange : reveil
+  # silencieux, notification ecrite par l'appareil, et aucun `aps` ne
+  # traverse Google.
   #
   # platform: sandbox. A BASCULER SUR production LE JOUR DE LA PREMIERE
   # BUILD SIGNEE. Un jeton produit par TestFlight ou l'App Store est un
@@ -441,6 +468,6 @@ apps:
     # paire d'environnements parfaitement accordee. Constate et regle en
     # production le 15 septembre 2026 (#325).
     convert_device_token_to_hex: false
-    push_type: background
+    push_type: alert
     send_badge_counts: false
     inflight_request_limit: 512

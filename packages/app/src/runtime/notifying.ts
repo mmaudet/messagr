@@ -58,20 +58,6 @@ export function readNotification(
 }
 
 /**
- * Which conversation a notification was about, when a person taps it.
- *
- * # The identifier is the conversation, and that is not a coincidence
- *
- * `readNotification` keys by the scope so a second message replaces the
- * first rather than stacking. The same key is what routes the tap: there is
- * no separate payload to carry, and nothing to keep in step.
- *
- * `null` for the blind notification, which has no conversation to open --
- * nothing that woke this device said which one. Tapping it opens the
- * application, which then syncs and shows the list with something waiting.
- * That is the honest destination, not a fallback.
- */
-/**
  * A ringing call, as a notification.
  *
  * # THE IDENTIFIER SAYS IT IS A CALL, BECAUSE THE PRESS HAS TO KNOW
@@ -146,10 +132,46 @@ export function ringingOfPress(id: string | undefined): string | null {
     : null
 }
 
+/** What a Matrix room identifier begins with, and nothing else does. */
+const ROOM = '!'
+
+/**
+ * Which conversation a notification was about, when a person taps it.
+ *
+ * # The identifier is the conversation, and that is not a coincidence
+ *
+ * `readNotification` keys by the scope so a second message replaces the
+ * first rather than stacking. The same key is what routes the tap: there is
+ * no separate payload to carry, and nothing to keep in step.
+ *
+ * `null` for the blind notification, which has no conversation to open --
+ * nothing that woke this device said which one. Tapping it opens the
+ * application, which then syncs and shows the list with something waiting.
+ * That is the honest destination, not a fallback.
+ *
+ * # AND `null` FOR AN IDENTIFIER THIS APPLICATION NEVER CHOSE (#341)
+ *
+ * Since ADR-0009's visible fallback shipped, a notification can be drawn by
+ * iOS itself, from the `aps.alert` the push gateway sends -- on a phone that
+ * is killed and locked, which is the case the wake cannot reach and the whole
+ * reason the fallback exists. Its identifier is then Apple's own, and this
+ * read every identifier as a conversation to open.
+ *
+ * The ADR asks for both halves in the same breath: *"A notification the user
+ * taps must land somewhere sensible even when the wake failed and the
+ * application does not yet know what arrived."* Somewhere sensible is the
+ * list. A conversation is a Matrix room, whose identifier begins with `!`;
+ * anything else is not one, and opening a conversation named after a system
+ * identifier is a screen for a conversation nobody has.
+ */
 export function scopeOfPress(id: string | undefined): string | null {
   if (id === undefined || id === BLIND_ID) return null
   // A ringing press is not a conversation press. It carries the same scope
   // and means something else entirely, and the caller that wants the
   // conversation must not be handed one for a call it never answered.
-  return ringingOfPress(id) === null ? id : null
+  if (ringingOfPress(id) !== null) return null
+  // Named rather than merely not-blind: see the note above. Everything this
+  // application keys a notification by is a room, and everything else that
+  // can arrive here was chosen by the platform.
+  return id.startsWith(ROOM) ? id : null
 }
