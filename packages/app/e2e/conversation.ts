@@ -52,33 +52,42 @@ import { markTheLog, whatCameAfter, whatItReported } from './reported'
  * suivantes lisent `offer: false` et passent.
  */
 export async function openTheFirstConversation(): Promise<void> {
-  // ET PAS AVANT QUE LA LIGNE SACHE OUVRIR QUOI QUE CE SOIT.
+  // ET PAS AVANT QUE LE LANCEMENT SACHE OUVRIR QUOI QUE CE SOIT.
   //
   // La liste est dessinée depuis le carnet au tout début du lancement
-  // (`MESSAGR_LIST_REMEMBERED`), et chaque ligne appelle
-  // `openConversationRef.current?.(scope)`. `App.tsx` ne lie cette référence
+  // (`MESSAGR_LIST_REMEMBERED`), et `App.tsx` ne lie ce qu'une ligne appelle
   // qu'à la fin de son chemin de lancement, après la pompe, la sonde d'envoi
-  // et `enterAnyInvitations` : avant, un toucher ne fait rien, et rien ne le
-  // dit.
+  // et `enterAnyInvitations`.
   //
   // Mesuré sur le run 34717623056, où le test du `m.file` touchait 29 ms
   // après le retour de `launchApp` : Espresso a effectué ses trois touchers
   // 158, 201 et 837 ms au moins avant que la référence soit liée, et aucune
   // conversation ne s'est ouverte. Detox n'avait aucune raison d'attendre :
   // `/sync` est hors de sa synchronisation (longPoll.ts), et c'est un `/sync`
-  // que le lancement attendait à chaque fois. Une personne qui touche aussi
-  // tôt perd son toucher de la même façon ; ce n'est pas l'objet de ce
-  // fichier.
+  // que le lancement attendait à chaque fois.
+  //
+  // CE QUE #280 A CHANGÉ, ET CE QU'IL N'A PAS CHANGÉ. Le produit ne perd plus
+  // ce toucher-là : il le garde et l'ouvre dès que le lancement peut
+  // (`waitingToOpen.ts`), et la ligne touchée dit « Ouverture… » en
+  // attendant. La phrase « un toucher ne fait rien et rien ne le dit » était
+  // vraie et ne l'est plus.
+  //
+  // L'attente ci-dessous reste, et pour une autre raison que celle-là : cet
+  // aide-mémoire sert à ouvrir une conversation de façon reproductible dans
+  // toute la suite, pas à éprouver la course. Toucher tôt ferait dépendre
+  // chaque test qui passe par ici du délai que met le lancement à répondre.
+  // Un test qui touche exprès à 29 ms et attend l'ouverture prouverait #280
+  // sur un appareil ; il n'existe pas, et ce fichier n'est pas l'endroit.
   //
   // Le signal est le rapport du lancement. `MESSAGR_RUNTIME` n'est écrit
-  // qu'au bout du chemin qui lie la référence, et `pump.outcome` à `ran` dit
+  // qu'au bout du chemin qui lie l'ouverture, et `pump.outcome` à `ran` dit
   // que c'est bien ce chemin-là qu'il a parcouru. Rien n'est attendu au
   // jugé : c'est une ligne que le produit écrit après le moment qui compte.
   //
   // « Stable » ne veut pas dire que la liste ne bouge plus, la boucle la
   // redessine à chaque tour. Ses lignes sont indexées par salon, donc un
   // nouveau dessin garde le même `Pressable` : ce qui décidait du sort d'un
-  // toucher, c'était la référence.
+  // toucher, c'était l'état du lancement et non la ligne.
   //
   // Cela suppose le journal vidé avant la relance, comme chaque lancement de
   // cette suite le fait : sinon le rapport lu serait celui du lancement

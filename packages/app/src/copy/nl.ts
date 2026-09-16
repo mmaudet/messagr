@@ -277,6 +277,7 @@ export const nl: Readonly<Record<CopyKey, string>> = {
   list_nothing_said: 'Er is nog niets gezegd',
   list_unreadable: 'Dit apparaat kan het laatste bericht niet lezen',
   list_unreachable: 'Dit gesprek kon niet worden herlezen',
+  list_opening: 'Wordt geopend…',
   list_name_action: 'Een naam geven',
   list_name_title: 'Hoe noemt u deze persoon?',
   list_name_hint:

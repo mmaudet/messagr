@@ -85,6 +85,17 @@ export interface ConversationListProps {
    */
   readonly shareRefused?: ShareRefusal | null
   /**
+   * La conversation qu'un toucher attend, quand il y en a une.
+   *
+   * La liste est dessinée depuis le carnet avant que le lancement soit en
+   * état d'ouvrir quoi que ce soit, et un toucher fait pendant ces quelques
+   * secondes était perdu sans un mot (#280). Il est gardé maintenant, et la
+   * ligne touchée le dit tant qu'elle attend : un geste sans réponse est un
+   * geste dont on croit qu'il n'a pas été pris, et on recommence ou on
+   * repose le téléphone. Voir `waitingToOpen.ts`.
+   */
+  readonly opening?: string | null
+  /**
    * The clock, injectable. A list reading `Date.now()` inside itself is one
    * nothing can screenshot twice and get the same answer from.
    */
@@ -99,6 +110,7 @@ export function ConversationList({
   reinstalled = null,
   notInYet = false,
   shareRefused = null,
+  opening = null,
   now = Date.now(),
 }: ConversationListProps) {
   return (
@@ -219,6 +231,7 @@ export function ConversationList({
               }
               onOpen={onOpen}
               now={now}
+              opening={summary.scope === opening}
               first={index === 0}
             />
           </View>
@@ -263,11 +276,14 @@ function Row({
   name,
   onOpen,
   now,
+  opening = false,
   first = false,
 }: {
   readonly summary: ConversationSummary
   readonly name: string | undefined
   readonly onOpen: (scope: string) => void
+  /** Whether this row's conversation is the one a touch is waiting on. */
+  readonly opening?: boolean
   /** Whether this is the top row. See the identifier below. */
   readonly first?: boolean
   /** Passed in rather than read here, so a row is a pure function of it. */
@@ -330,6 +346,11 @@ function Row({
       onPress={() => onOpen(summary.scope)}
       style={styles.row}
       accessibilityRole="button"
+      // WHAT THE SECOND LINE SAYS IS NOT SAID ALOUD BY ITSELF. A screen
+      // reader announces the label, and the row's label is the person's
+      // name -- so somebody who cannot see « Ouverture… » would get exactly
+      // the silence #280 is about. `busy` is the state that says it.
+      accessibilityState={{ busy: opening }}
       accessibilityLabel={shown}>
       {/* An identifier is set in the mono role, a name is not. That is the
           one thing distinguishing "somebody I named" from "somebody I have
@@ -354,8 +375,18 @@ function Row({
         <Text numberOfLines={1} style={named ? styles.name : styles.identifier}>
           {shown}
         </Text>
-        <Text numberOfLines={1} style={styles.preview}>
-          {previewOf(summary)}
+        {/* THE ANSWER TO THE TOUCH GOES WHERE THE PREVIEW WAS, and not
+            beside it. The row has one line for what is going on in the
+            conversation, and « Ouverture… » is what is going on in it right
+            now -- a second line appearing under the first would reflow the
+            list under somebody's finger, which is the one thing a list
+            must not do at the moment it is being touched. The preview comes
+            back by itself, because the conversation replaces the screen. */}
+        <Text
+          numberOfLines={1}
+          style={styles.preview}
+          testID={opening ? 'conversation-opening' : undefined}>
+          {opening ? t('list_opening') : previewOf(summary)}
         </Text>
       </View>
       {/* Nothing at all for a conversation that has never moved: `0` is not a

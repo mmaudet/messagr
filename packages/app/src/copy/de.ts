@@ -285,6 +285,7 @@ export const de: Readonly<Record<CopyKey, string>> = {
   list_nothing_said: 'Es wurde noch nichts gesagt',
   list_unreadable: 'Dieses Gerät kann die letzte Nachricht nicht lesen',
   list_unreachable: 'Diese Unterhaltung konnte nicht erneut gelesen werden',
+  list_opening: 'Wird geöffnet …',
   list_name_action: 'Namen vergeben',
   list_name_title: 'Wie nennen Sie diese Person?',
   list_name_hint:

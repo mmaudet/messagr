@@ -279,6 +279,7 @@ export const es: Readonly<Record<CopyKey, string>> = {
   list_nothing_said: 'Todavía no se ha dicho nada',
   list_unreadable: 'Este dispositivo no puede leer el último mensaje',
   list_unreachable: 'No se ha podido releer esta conversación',
+  list_opening: 'Abriendo…',
   list_name_action: 'Poner un nombre',
   list_name_title: '¿Cómo llama a esta persona?',
   list_name_hint:

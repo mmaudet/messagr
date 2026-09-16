@@ -294,6 +294,7 @@ export const uz: Readonly<Record<CopyKey, string>> = {
   list_nothing_said: 'Hali hech nima aytilmagan',
   list_unreadable: 'Bu qurilma oxirgi xabarni oʻqiy olmaydi',
   list_unreachable: 'Bu suhbatni qayta oʻqib boʻlmadi',
+  list_opening: 'Ochilmoqda…',
   list_name_action: 'Nom berish',
   list_name_title: 'Bu odamni nima deb ataysiz?',
   list_name_hint:

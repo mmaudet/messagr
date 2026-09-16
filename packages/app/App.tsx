@@ -274,6 +274,7 @@ import { theAccountsInQuestion } from './src/runtime/accountInQuestion'
 import { questionOnScreen, type Asked } from './src/runtime/questionOnScreen'
 import { whenToSay } from './src/runtime/whenToSay'
 import { launchEntries } from './src/runtime/launchEntries'
+import { waitingToOpen } from './src/runtime/waitingToOpen'
 import {
   cryptoStoreExists,
   homeserverCalls,
@@ -1059,7 +1060,45 @@ export function App({
   const reactRef = useRef<
     ((target: string, key: string, own: string | null) => void) | null
   >(null)
-  const openConversationRef = useRef<((scope: string) => void) | null>(null)
+  /**
+   * The conversation a row asked for while the launch could not open one.
+   *
+   * THIS REPLACES THE REFERENCE THE ROWS USED TO CALL, and it replaces it
+   * rather than wrapping it because a reference that can be `null` is a
+   * gesture that can be dropped: `openConversationRef.current?.(scope)` did
+   * nothing, said nothing and returned, for the four to five seconds #280
+   * measured. `waitingToOpen.ts` argues the whole of it. Held per mount, like
+   * the question and the launch entries above.
+   */
+  const [waitingOn, setWaitingOn] = useState<string | null>(null)
+  const waitingRef = useRef(waitingToOpen(setWaitingOn))
+  /**
+   * What a row does when it is touched, wherever the row is.
+   *
+   * The conversation list, the recent calls and the kept messages all open a
+   * conversation, and all three were drawn before the launch had bound one.
+   * #280 was measured on the first; the other two are the same two lines of
+   * code and would have read the same way.
+   *
+   * NEITHER OF THE TWO LINES IT WRITES CARRIES THE CONVERSATION. A scope is a
+   * room identifier, and the log is what adb, a bug report and anything
+   * holding READ_LOGS can read -- `log.ts` and #319. What is worth having
+   * afterwards is that a touch was made too early at all, and the opening
+   * that follows already writes its own `MESSAGR_BACKUP_TRIGGER`.
+   */
+  const openConversation = (scope: string) => {
+    const took = waitingRef.current.touch(scope)
+    if (took === 'opened') return
+    if (took === 'held') {
+      logEvent('info', 'MESSAGR_OPEN_HELD', {})
+      return
+    }
+    // The launch ended without ever being able to open a conversation. This
+    // is the only case left where a touch really does nothing, and it says so
+    // here rather than being inferred from an absence -- which is exactly
+    // what made #280 take a device run and three launches to find.
+    logEvent('warn', 'MESSAGR_OPEN_REFUSED', {})
+  }
   const runningSyncRef = useRef<RunningSyncLoop | null>(null)
   // Set once by the launch effect, which is the only place that holds
   // everything a loop needs. Read by the foreground handler below, which
@@ -1957,7 +1996,15 @@ export function App({
       // of its own before anything is drawn from it, and the rows remembered
       // for the old account go with it.
       const leftAnAccount = entered.entered && entered.left !== undefined
-      if (leftAnAccount) setSummaries([])
+      if (leftAnAccount) {
+        setSummaries([])
+        // AND A TOUCH MADE ON THOSE ROWS GOES WITH THEM. A conversation
+        // touched on the list of the account this launch has just left
+        // belongs to that account, and replaying it once the opener is bound
+        // would ask the account just entered for a room it is not in. The
+        // rows are gone from the screen; the gesture made on them goes too.
+        waitingRef.current.letGo()
+      }
       const opening = leftAnAccount ? await bindNotebook() : opened
       // A RUN THAT RESTORED THE ACCOUNT IN QUESTION WAITS FOR THE ANSWER, THEN
       // LOOKS AGAIN AT WHICH ACCOUNT THIS DEVICE HOLDS. #304.
@@ -2449,7 +2496,13 @@ export function App({
                 }),
               )
             }
-            openConversationRef.current = showConversation
+            // AND WHATEVER WAS TOUCHED WHILE THERE WAS NOTHING TO CALL OPENS
+            // HERE. Everything above this line is why the binding is late:
+            // the crypto machine, the pump and `enterAnyInvitations`. None of
+            // it can move -- a conversation opened before the machine has
+            // started draws messages this device cannot decrypt yet -- so the
+            // gesture waits instead of the person. See `waitingToOpen.ts`.
+            waitingRef.current.bind(showConversation)
 
             // THE WORDS BEHIND THE MARKS, bound where the client is.
             // `readFavourites.ts` says why they are derived rather than
@@ -3757,19 +3810,35 @@ export function App({
       })
     }
 
-    probeAndReport().catch((cause: unknown) => {
-      // The stack, not only the message. A launch failure reported as
-      // "TypeError: cyclical structure in JSON object" names a symptom and
-      // no location, and the first real device run of #34 spent its
-      // diagnosis on exactly that. Reported through a second call so a
-      // stack that is itself unserialisable cannot swallow the first.
-      logEvent('error', 'MESSAGR_RUNTIME_FAILED', { reason: String(cause) })
-      if (cause instanceof Error && typeof cause.stack === 'string') {
-        logEvent('error', 'MESSAGR_RUNTIME_FAILED_WHERE', {
-          stack: cause.stack.split('\n').slice(0, 8).join(' | '),
-        })
-      }
-    })
+    probeAndReport()
+      .catch((cause: unknown) => {
+        // The stack, not only the message. A launch failure reported as
+        // "TypeError: cyclical structure in JSON object" names a symptom and
+        // no location, and the first real device run of #34 spent its
+        // diagnosis on exactly that. Reported through a second call so a
+        // stack that is itself unserialisable cannot swallow the first.
+        logEvent('error', 'MESSAGR_RUNTIME_FAILED', { reason: String(cause) })
+        if (cause instanceof Error && typeof cause.stack === 'string') {
+          logEvent('error', 'MESSAGR_RUNTIME_FAILED_WHERE', {
+            stack: cause.stack.split('\n').slice(0, 8).join(' | '),
+          })
+        }
+      })
+      // A LAUNCH THAT IS OVER AND NEVER BOUND AN OPENER LETS THE TOUCH GO.
+      //
+      // There are several of those and none of them is exotic: no session at
+      // all, a crypto machine that would not start, a sync the homeserver
+      // refused, or the failure just above. The list is still drawn from the
+      // notebook on every one of them, so the row is still touchable -- and
+      // « Ouverture… » left on it for the life of the process would be a
+      // promise nothing is going to keep. `finally` rather than `catch`,
+      // because a launch that ends tidily without credentials ends the wait
+      // just as completely as one that throws.
+      //
+      // Harmless on the ordinary launch: the binding a few thousand lines
+      // above has already happened by here, and `giveUp` is a run saying it
+      // lost rather than the process saying it is finished.
+      .finally(() => waitingRef.current.giveUp())
     // THE DEPENDENCY LIST IS DELIBERATE, AND `warmLink` IS NOT IN IT.
     //
     // The object is rebuilt on every arrival, so watching it would re-run the
@@ -3901,6 +3970,28 @@ export function App({
     const question = questionRef.current
     return () => question.unmounted()
   }, [])
+
+  // WHATEVER TAKES THE LIST OFF THE SCREEN LETS GO OF A TOUCH IT WAS HOLDING.
+  //
+  // The touch is kept, not confiscated. Somebody who touches a row, sees
+  // « Ouverture… », changes their mind and goes to another tab, to the
+  // invitation screen or back out of the application must not be pulled into
+  // a conversation seconds later by a launch finally binding its opener.
+  //
+  // The condition is the one the list is drawn under, written once more
+  // rather than inferred: the thing being let go of is the gesture made on
+  // that screen, so it ends when that screen does. It is also why this is an
+  // effect and not a call inside the tab bar and the back handler and the
+  // floating action -- one of those three would have been forgotten, and the
+  // one forgotten is the one somebody uses.
+  //
+  // Not a leak on the ordinary opening: `bind` lets go before it opens, so by
+  // the time `openScope` sends this round there is nothing left to release.
+  useEffect(() => {
+    if (openScope !== null || tab !== 'chat' || invite.stage !== 'shut') {
+      waitingRef.current.letGo()
+    }
+  }, [openScope, tab, invite.stage])
 
   // STABLE ACROSS RENDERS, AND THAT IS THE WHOLE POINT.
   //
@@ -4470,9 +4561,9 @@ export function App({
                   shownFor={who => displayNameFor(who, names.get(who))}
                   onOpen={scope => {
                     setTab('chat')
-                    // The launch effect binds it; a screen drawn before the
-                    // session exists has no conversation to open anyway.
-                    openConversationRef.current?.(scope)
+                    // Held when the launch has not bound an opener yet, like
+                    // every other row. See `waitingToOpen.ts`.
+                    openConversation(scope)
                   }}
                   onCall={(scope, peer) => {
                     // A call already up owns the microphone, and placing a
@@ -4745,7 +4836,7 @@ export function App({
                     setFavouritesOpen(false)
                     setKeptMessages(null)
                     setTab('chat')
-                    openConversationRef.current?.(scope)
+                    openConversation(scope)
                   }}
                 />
               </View>
@@ -4765,7 +4856,8 @@ export function App({
                     reinstalled={reinstalled}
                     notInYet={inYet === false}
                     shareRefused={shareRefused}
-                    onOpen={scope => openConversationRef.current?.(scope)}
+                    opening={waitingOn}
+                    onOpen={openConversation}
                   />
                 </View>
               )}
