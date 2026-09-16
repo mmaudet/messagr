@@ -140,6 +140,14 @@ const TRACE = new Map<string, Shape>([
     'MESSAGR_BACKUP_ACCEPT_FAILED',
     { from: 'words', failedAt: 'words', undone: 'flag', forgotten: 'flag' },
   ],
+  // Why the device's own language could not be read (#353), which is the
+  // difference between « je ne sais pas » and « c'est du français ». It
+  // belongs to the trace because a store build is exactly where it went
+  // unseen: every installed build read the constant as a property, answered
+  // "no idea", and opened in French with nothing written anywhere. The tag
+  // itself is never carried -- only which platform was asked and how the
+  // reading failed, both of which name nobody.
+  ['MESSAGR_DEVICE_LOCALE_UNREAD', { platform: 'words', unread: 'words' }],
 ])
 
 /**
