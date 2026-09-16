@@ -118,13 +118,21 @@ const CLASSES = {
   },
 }
 
-// « Required if app runs on iPad ». Une seule des deux classes d'iPhone
-// suffit, l'autre étant mise à l'échelle par la console.
+// « Required if app runs on iPad », et la V1 ne tourne pas sur iPad : le
+// porteur l'a tranché le 16 septembre 2026, et `TARGETED_DEVICE_FAMILY = "1"`
+// dans `project.pbxproj` le dit au système. La capture d'iPad n'est donc plus
+// exigée, et ce contrôle ne la réclame plus.
+//
+// CE N'EST PAS UNE CASE DE MOINS À COCHER. La capture d'iPad montrait l'écran
+// de promesse dessiné à la mise en page d'un téléphone, avec deux grandes
+// bandes vides de chaque côté. Elle était fidèle, et c'est ce qui a décidé :
+// une fiche qui promet un iPad doit tenir cette promesse, et la V1 ne la tient
+// pas. Le jour où elle la tiendra, remettre `"1,2"` ici ET dans le pbxproj,
+// et la ligne ci-dessous avec.
+//
+// Une seule des deux classes d'iPhone suffit, l'autre étant mise à l'échelle
+// par la console.
 const EXIGENCES = [
-  {
-    classes: ['ipad-13'],
-    pourquoi: 'exigée dès que l’application tourne sur iPad',
-  },
   {
     classes: ['iphone-6.9', 'iphone-6.5'],
     pourquoi: 'la console exige l’une des deux et met l’autre à l’échelle',
@@ -378,7 +386,7 @@ function selfTest() {
     'une capture à la mauvaise taille est refusée',
     racine => {
       completeEtSaine(racine)
-      ecrire(racine, '01-promesse-ipad-13.png', pngDe(1179, 2556, false))
+      ecrire(racine, '01-promesse-iphone-6.9.png', pngDe(1179, 2556, false))
     },
     1,
   )
@@ -387,8 +395,18 @@ function selfTest() {
     'une classe exigée absente est refusée',
     racine => {
       completeEtSaine(racine)
-      // L'iPad retiré : la console refuse la soumission sans lui.
-      unlinkSync(join(racine, '01-promesse-ipad-13.png'))
+      // LES DEUX CLASSES D'IPHONE RETIRÉES, ET PAS L'IPAD.
+      //
+      // Ce cas retirait la capture d'iPad, exigée tant que l'application
+      // tournait dessus. Depuis le 16 septembre 2026 la V1 ne revendique plus
+      // l'iPad, donc son absence est devenue normale et ce cas passait au vert
+      // en disant le contraire de son nom -- exactement le défaut que
+      // `assert-ios-captures` existe pour empêcher ailleurs.
+      //
+      // Il porte donc sur ce qui reste exigé : la console veut l'une des deux
+      // classes d'iPhone, et les retirer toutes les deux doit être refusé.
+      unlinkSync(join(racine, '01-promesse-iphone-6.9.png'))
+      unlinkSync(join(racine, '01-promesse-iphone-6.5.png'))
     },
     1,
   )

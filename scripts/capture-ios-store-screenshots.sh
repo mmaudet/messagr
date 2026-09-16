@@ -177,7 +177,13 @@ ipad-13|iPad Pro 13-inch (M5);iPad Pro 13-inch (M4);iPad Pro (12.9-inch) (6th ge
 # two slots the console insists on has moved before. Producing both costs one
 # device and two launches, and neither slot can then be the one that blocks a
 # submission.
-CLASSES="${MESSAGR_CAPTURE_CLASSES:-iphone-6.9 iphone-6.5 ipad-13}"
+# L'IPAD N'EST PLUS DANS LA LISTE PAR DÉFAUT, ET LA RECETTE RESTE.
+# La V1 ne revendique pas l'iPad (`TARGETED_DEVICE_FAMILY = "1"`), donc la
+# console ne réclame plus sa capture. La classe `ipad-13` reste connue de ce
+# script : `MESSAGR_CAPTURE_CLASSES="ipad-13" ./scripts/...` la produit encore,
+# pour le jour où la fiche revendiquera l'iPad. Retirer la recette aurait
+# obligé à la réécrire ce jour-là.
+CLASSES="${MESSAGR_CAPTURE_CLASSES:-iphone-6.9 iphone-6.5}"
 
 # ── Nothing this run made is left behind ──────────────────────────────────
 #

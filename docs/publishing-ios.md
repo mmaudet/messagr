@@ -223,9 +223,23 @@ l'encodage est juste ; 96, sygnal a décodé en base64 un jeton hexadécimal.
 ## Les captures d'écran de la fiche
 
 App Store Connect refuse la soumission d'une version tant que la fiche n'a pas
-ses captures. Deux cases pour cette application : **iPad 13 pouces**, exigée
-parce que `TARGETED_DEVICE_FAMILY = "1,2"`, et une case iPhone, qu'une capture
-de **6,5** ou de **6,9 pouces** remplit.
+ses captures. **Une seule case pour cette application** : l'iPhone, qu'une
+capture de **6,5** ou de **6,9 pouces** remplit, la console mettant l'autre à
+l'échelle.
+
+**L'iPad n'en est plus, et ce n'est pas une case gagnée.** La règle d'Apple est
+« Required if app runs on iPad » : elle suivait `TARGETED_DEVICE_FAMILY`, qui
+valait `"1,2"`. Le 16 septembre 2026, le porteur a tranché que la V1 ne
+revendique pas l'iPad, et le réglage vaut `"1"`.
+
+Ce qui l'a décidé est la capture elle-même : l'écran de promesse y était
+dessiné à la mise en page d'un téléphone, avec deux grandes bandes vides de
+chaque côté. Elle était fidèle, et c'est ce qui comptait — une fiche qui promet
+un iPad doit tenir cette promesse. Le jour où la V1 la tiendra, il faut remettre
+`"1,2"` dans le pbxproj **et** la classe `ipad-13` dans les exigences de
+`scripts/assert-ios-captures.mjs`, qui la code en dur. La recette du simulateur
+iPad reste dans le script de capture : `MESSAGR_CAPTURE_CLASSES="ipad-13"` la
+produit encore.
 
 ```
 ./scripts/capture-ios-store-screenshots.sh [répertoire]
