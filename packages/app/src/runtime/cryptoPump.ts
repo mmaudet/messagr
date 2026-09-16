@@ -46,6 +46,7 @@ import {
 
 import { acceptBackup, type BackupAccepted } from './acceptBackup'
 import { theAccountsInQuestion } from './accountInQuestion'
+import { theAwaitedInvitations } from './awaitedInvitations'
 import { oneMachine } from './oneMachine'
 import type { EventCache } from './eventCacheStore'
 import { eventsToBuildFrom } from './eventsToBuildFrom'
@@ -544,6 +545,15 @@ export async function loadConversation(
  */
 const declined = new Set<string>()
 
+/**
+ * The conversations already reported as waiting for a screen.
+ *
+ * An invitation this device spent no link for stands on every tick until
+ * something decides it, and a line per tick would bury the one that matters.
+ * Said once, like everything else here.
+ */
+const standing = new Set<string>()
+
 export async function enterAnyInvitations(
   sessionClient: ReturnType<typeof createClient>,
   selfUserId: string,
@@ -555,6 +565,9 @@ export async function enterAnyInvitations(
       (await fetchInvitations(asking)).filter(one => !declined.has(one.scope)),
     join: joinRoom,
     decline: declineRoom,
+    // ONE DOOR PER LINK SPENT. Entry records a claim in the same register on
+    // the other side of the launch; see `awaitedInvitations.ts`.
+    awaited: theAwaitedInvitations.count,
     // ONE CALL PER CONVERSATION, and `enterInvitations` is careful about
     // when it asks: never on a tick with no invitation on it, which is
     // almost every tick. Direct conversations only -- a room of three has
@@ -572,15 +585,26 @@ export async function enterAnyInvitations(
     },
   })
   for (const one of entered.collapsed) declined.add(one.scope)
+  // WHAT THIS WALK ANSWERED, back to the register. A door entered and a
+  // conversation declined each answer one invitation this device was waiting
+  // for; a join that failed answered nothing, so the next tick is owed it
+  // again.
+  theAwaitedInvitations.settled(
+    entered.joined.length + entered.collapsed.length,
+  )
+  const nowStanding = entered.waiting.filter(one => !standing.has(one.scope))
+  for (const one of nowStanding) standing.add(one.scope)
   // Only when something happened: this runs on every sync tick, and a line
   // per tick saying "nobody invited anybody" would bury the one that matters.
   if (
     entered.joined.length > 0 ||
     entered.refused.length > 0 ||
-    entered.collapsed.length > 0
+    entered.collapsed.length > 0 ||
+    nowStanding.length > 0
   ) {
     logEvent(entered.refused.length > 0 ? 'warn' : 'info', 'MESSAGR_ENTERED', {
       ...entered,
+      waiting: nowStanding,
     })
   }
   return entered

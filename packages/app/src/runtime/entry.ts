@@ -1,5 +1,6 @@
 import type { InQuestion } from './accountInQuestion'
 import { afterReinstall } from './afterReinstall'
+import { theAwaitedInvitations } from './awaitedInvitations'
 import {
   claimForExistingAccount,
   claimInvitation,
@@ -293,7 +294,52 @@ export type EntryResult =
     }
   | { readonly entered: false; readonly reason: string }
 
+/**
+ * Enters, and records the invitation a spent link leaves this device waiting
+ * for. #329.
+ *
+ * # WHY THE RECORD IS TAKEN HERE
+ *
+ * Spending a link is the person's decision, and this module is where it is
+ * spent, whichever of the three roads the link took: a device with no
+ * account, a device that already has one, or a device leaving the account it
+ * held. The conversation the link was for then sends this device a Matrix
+ * invitation, a moment or a poll later, and `enterInvitations.ts` walks
+ * through exactly the invitations a link was spent for.
+ *
+ * Read off the answer rather than written at each claim, so the three roads
+ * cannot drift apart: what is recorded is what this entry tells its caller,
+ * and an entry that claimed an account this device did not keep says
+ * `spent` and is waiting for nothing.
+ *
+ * The register is a module of its own rather than a dependency of
+ * `EntryDeps`: there is one per JavaScript context, as `accountInQuestion.ts`
+ * has one, and the pump reads it from the other side of the launch.
+ */
 export async function enterWithASession(deps: EntryDeps): Promise<EntryResult> {
+  const result = await entryWith(deps)
+  if (spentALink(result)) theAwaitedInvitations.claimed()
+  return result
+}
+
+/**
+ * Whether `result` spent a link, and so is waiting for the invitation that
+ * link was for.
+ *
+ * The two ways a link is spent and this device goes on with what it made:
+ * `claimed`, when the account this device now runs came from the link, and
+ * `used`, when the link was spent for the account it already had. Every
+ * other outcome -- a refusal, a link for another server the person kept away
+ * from, an account claimed and not kept -- leaves this device on an account
+ * no invitation was opened for.
+ */
+function spentALink(result: EntryResult): boolean {
+  if (!result.entered) return false
+  return result.claimed || result.invitation?.kind === 'used'
+}
+
+/** The entry itself: a session already kept, a link to spend, or neither. */
+async function entryWith(deps: EntryDeps): Promise<EntryResult> {
   const { secrets, poster, link, wait } = deps
 
   const held = await loadSession(secrets)
