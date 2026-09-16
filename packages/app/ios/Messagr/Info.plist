@@ -64,9 +64,15 @@
 
 	     Les sept langues vivent dans `Messagr/<langue>.lproj/InfoPlist.strings`,
 	     les memes sept que `src/copy/` : une autorisation demandee dans une
-	     langue que l'ecran ne parle pas ne veut rien dire. Ce que l'iPhone
-	     affiche est la traduction ; ce qui est ecrit ici est ce qu'il affiche
-	     quand il ne parle aucune des sept.
+	     langue que l'ecran ne parle pas ne veut rien dire.
+
+	     UN IPHONE REGLE SUR UNE HUITIEME LANGUE NE LIT PAS CE FICHIER POUR
+	     AUTANT. Il retombe sur le catalogue de la region de developpement, donc
+	     sur `en.lproj`. Ce qui est ecrit ici est le cran d'en dessous : ce qui
+	     reste si la ressource localisee n'arrive pas du tout, ce qui est
+	     exactement la panne que la lecture du pbxproj plus bas surveille. Les
+	     deux chemins doivent finir dans la meme langue, et c'est ce que le
+	     script compare, mot pour mot.
 
 	     `scripts/assert-ios-localisation.sh` tient les deux ensemble dans
 	     `checks` : une langue sans texte, un texte ajoute ici sans traduction,

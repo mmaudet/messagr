@@ -29,6 +29,7 @@ ROOT="$(cd "$(dirname "$0")" && pwd)/.."
 
 if ! python3 - "$ROOT" <<'PY'
 import os
+import plistlib
 import re
 import sys
 
@@ -70,8 +71,6 @@ if len(languages) < 2:
     sys.exit(1)
 
 # ── What Info.plist asks for, and in which language it asks ───────────────
-import plistlib
-
 try:
     plist = plistlib.load(open(plist_path, 'rb'))
 except Exception as refused:
@@ -165,19 +164,24 @@ if not failed:
 
 # ── The base is the plist, word for word ──────────────────────────────────
 #
-# THE RULE THAT KEEPS THE BUG FROM COMING BACK. The plist is what a telephone
-# gets when it speaks none of the seven, so the plist must be in the
-# development region's language -- and the only way to say that mechanically
-# is to hold it to the development region's own catalogue. Somebody editing
-# the plist in French again, as #320 found it, fails here.
+# THE RULE THAT KEEPS THE BUG FROM COMING BACK, and the mechanism is worth
+# being exact about. A telephone speaking none of the seven does not read the
+# plist: it falls back to the development region's .lproj, which is English.
+# The plist is one step further down still -- what is left if the localised
+# resource is not found at all, which is precisely the failure the pbxproj
+# rules below guard. Both roads must end in the same language, and holding the
+# plist to the development region's own catalogue is the only way to say
+# "the base is in English" mechanically. Somebody editing the plist back into
+# French, as #320 found it, fails here.
 for key in wanted:
     theirs = catalogues.get(base, {}).get(key)
     if theirs is None:
         continue
     if theirs != plist[key]:
         bad(f'Info.plist and {base}.lproj disagree on {key}. The plist is the '
-            f'fallback for every language this application does not speak, '
-            f'so it must say what {base} says.')
+            f'last thing iOS falls back to, under the {base} catalogue that '
+            f'every unspoken language already lands on, so it must say what '
+            f'{base} says.')
 if not failed:
     ok(f'Info.plist says exactly what {base}.lproj says, so the fallback is '
        f'in {base}')
