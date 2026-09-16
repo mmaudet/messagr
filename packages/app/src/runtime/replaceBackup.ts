@@ -3,6 +3,7 @@ import {
   type AcceptBackupDeps,
   type BackupAccepted,
 } from './acceptBackup'
+import type { BackupCommitment } from './backupCommitment'
 import { getErrorMessage } from './errors'
 import { logEvent } from './log'
 
@@ -75,20 +76,33 @@ import { logEvent } from './log'
  * can write to or open — so both are answered the same way: the published
  * version is retired, and the account is left holding what it held.
  *
- * `undone` says whether the gesture left NOTHING behind, and it is what the
- * screen's sentence reads. It is true when the version went and the keystore
- * was never written to, which is the `remembering` case; false at `enabling`,
- * where the old commitment was overwritten and then forgotten (#284) and this
- * device stops feeding the backup it goes back to; false when the retirement
- * itself failed, because « rien n'a changé » would then be a lie.
+ * **And the commitment goes back with it.** The acceptance overwrites the
+ * keystore entry at step three and, when enabling then fails, forgets it
+ * (#284) — so a device that was feeding a backup stops feeding it, and the
+ * next launch resumes nothing. Restoring that needs the OLD sealing key,
+ * which no request answers and which only the entry held, so it is read
+ * before anything is published, beside the old version.
  *
- * **What it does not restore is the old commitment**, which would need the
- * old sealing key, and the only copy of that is the keystore entry the
- * acceptance overwrote. Putting it back means reading it before step one,
- * which is a dependency this module's caller has to bind — and the caller is
- * `cryptoPump.ts`. Until it does, the state that leaves is the third one
- * Réglages now names: a backup on the account that this device does not feed,
- * with the key entry beside it.
+ * That reading is not what decides which version to retire. `currentVersion`
+ * is, for the reason the paragraph above gives: the homeserver holds the
+ * answer and the keystore can be wrong about it. The two readings have two
+ * jobs — one says what to retire, the other says what to put back — and the
+ * case where they disagree is exactly the one that makes keeping them apart
+ * worth the extra line.
+ *
+ * `undone` says whether the gesture left NOTHING behind, and it is what the
+ * screen's sentence reads. It is true when the published version went and the
+ * keystore entry holds what it held: untouched at `remembering`, written back
+ * at `enabling` and after a throw. It is false when either would not go,
+ * because « rien n'a changé » would then be a lie about the account or about
+ * the telephone.
+ *
+ * **What it does not put back is the bridge in this process.** A failed
+ * `enableKeyBackup` may already have dropped the version it was holding, so
+ * this device backs nothing up until the next launch reads the commitment
+ * again. The commitment is what that launch reads, and the state card above
+ * the sentence says what is true now — which is why the sentence is allowed
+ * to speak of the account and the key rather than of the process.
  */
 export interface ReplaceBackupDeps extends AcceptBackupDeps {
   /**
@@ -99,6 +113,20 @@ export interface ReplaceBackupDeps extends AcceptBackupDeps {
    * simply accepting.
    */
   readonly currentVersion: () => Promise<string | null>
+  /**
+   * What this device is committed to, read before anything is published so
+   * that a failure past the publish can put it back (#327).
+   *
+   * `backupCommitment.ts`'s `readBackupCommitment`. Read on EVERY
+   * replacement, including the one that works: a dependency only a failure
+   * path reaches is one a caller can forget to bind, and nothing notices
+   * until the day it is needed.
+   *
+   * `null` both for a device that holds no commitment and for a keystore that
+   * would not answer, exactly as that function answers, and what is done with
+   * it is the same either way: the entry is put back to holding nothing.
+   */
+  readonly commitment: () => Promise<BackupCommitment | null>
   /** `DELETE /room_keys/version/{version}`. See `backupCalls.ts`. */
   readonly retire: (version: string) => Promise<void>
 }
@@ -133,12 +161,13 @@ export type BackupReplaced =
       /**
        * Whether this gesture left nothing behind it (#327).
        *
-       * `true` when the account holds what it held AND this device's
-       * commitment was never touched. That is every failure before the
-       * publish, and a publication retired at `remembering`.
+       * `true` when the account holds the version it held AND the keystore
+       * entry holds what it held — untouched before the publish, written back
+       * after it.
        *
        * `false` is the answer a screen must not round up: the published
-       * version stands, or the commitment this device backs up under is gone.
+       * version stands, or the commitment this device backs up under is not
+       * the one it had.
        */
       readonly undone: boolean
       /** As `acceptBackup`: present, and `false`, only when it could not forget. */
@@ -163,6 +192,18 @@ export async function replaceBackup(
     previous = null
   }
 
+  // WHAT TO PUT BACK, READ BEFORE STEP THREE OVERWRITES IT (#327), and on
+  // every replacement rather than only the ones that fail: a dependency a
+  // success never touches is a dependency a caller can leave unbound, and the
+  // first thing to notice would be a rollback that threw instead of running.
+  //
+  // Unguarded, deliberately, and it costs nothing to be: this is before the
+  // publish, so a throw here goes out as a rejection, `replaceBackupFrom`
+  // answers `thrown` with `undone: true`, and « rien n'a changé » is true.
+  // An unbound dependency is therefore loud and harmless rather than quiet
+  // and late -- the ordinary gesture stops, in a way a bench run sees.
+  const held = await deps.commitment()
+
   // WRAPPED TO LEARN THE NEW VERSION, which `acceptBackup` does not return
   // -- and does not need to, since the one caller that wants it is this one.
   // Widening its result for a single consumer would put the version in reach
@@ -185,25 +226,41 @@ export async function replaceBackup(
     // say: the screen took every one for « rien n'a changé ». Before the
     // publish nothing had changed, and the rejection goes on to the caller.
     if (published === null) throw cause
-    // TAKEN BACK ALL THE SAME (#327), and claiming nothing about the
-    // keystore: a `remember` that rejected left the old commitment, a
-    // `forget` that rejected left the new one, and nothing here can tell
-    // which threw.
-    await takeBackThePublication(deps, previous, published)
-    return { replaced: false, failedAt: 'thrownAfterPublishing', undone: false }
+    // TAKEN BACK ALL THE SAME (#327). Nothing here can tell which step threw
+    // -- a `remember` that rejected leaves the old commitment, a `forget`
+    // that rejected leaves the new one -- so the entry is written back over
+    // whatever is in it. Writing the same value twice costs nothing; leaving
+    // the new one costs a launch that resumes a version this just retired.
+    const takenBack = await takeBackThePublication(deps, previous, published)
+    const keystoreBack = await putTheCommitmentBack(deps, held)
+    return {
+      replaced: false,
+      failedAt: 'thrownAfterPublishing',
+      undone: takenBack && keystoreBack,
+    }
   }
   if (!accepted.accepted) {
     const takenBack = await takeBackThePublication(deps, previous, published)
+    // NOTHING LEFT BEHIND, WHICH IS MORE THAN THE VERSION HAVING GONE.
+    // `enabling` is the step that overwrote the entry and then forgot it, so
+    // it is the one with something to put back; before it, the keystore was
+    // never written to and putting anything back would be a write nobody
+    // asked for on a store that has just refused one.
+    const keystoreBack =
+      accepted.failedAt !== 'enabling' ||
+      (await putTheCommitmentBack(deps, held))
     return {
       replaced: false,
       failedAt: accepted.failedAt,
-      // NOTHING LEFT BEHIND, WHICH IS MORE THAN THE VERSION HAVING GONE.
-      // `enabling` overwrote the commitment and then forgot it, so this
-      // device no longer writes to the backup the account is back to --
-      // true of the account and not of the telephone, and the sentence has
-      // to hold for both.
-      undone: takenBack && accepted.failedAt !== 'enabling',
-      ...(accepted.forgotten === false ? { forgotten: false } : {}),
+      undone: takenBack && keystoreBack,
+      // DROPPED ONCE THE ENTRY IS BACK. `forgotten: false` means « le
+      // prochain lancement activera une sauvegarde dont personne n'a vu la
+      // clé »; with the old commitment written over it, that is no longer
+      // what the next launch finds, and reporting it would send somebody
+      // after a state this has just repaired.
+      ...(accepted.forgotten === false && !keystoreBack
+        ? { forgotten: false }
+        : {}),
     }
   }
 
@@ -265,6 +322,31 @@ async function takeBackThePublication(
   try {
     await deps.retire(published)
     return true
+  } catch {
+    return false
+  }
+}
+
+/**
+ * Puts the keystore entry back to what it held before this replacement began
+ * (#327). Answers whether it did.
+ *
+ * `null` is put back by emptying rather than by writing: a device that held
+ * no commitment must not be left holding the one the acceptance made, which
+ * points at a version this has just retired. The acceptance's own `forget`
+ * may have run already, in which case this writes the same emptiness twice
+ * and costs a keystore call.
+ *
+ * A rejection is an answer here rather than a throw: `rememberBackupCommitment`
+ * and `forgetBackupCommitment` both catch, and a double this module is handed
+ * in a test need not.
+ */
+async function putTheCommitmentBack(
+  deps: ReplaceBackupDeps,
+  held: BackupCommitment | null,
+): Promise<boolean> {
+  try {
+    return held === null ? await deps.forget() : await deps.remember(held)
   } catch {
     return false
   }

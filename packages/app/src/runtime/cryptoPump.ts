@@ -1299,6 +1299,13 @@ export async function replaceKeyBackup(
       )
       return found?.version ?? null
     },
+    // THE OTHER HALF OF WHAT A FAILURE PAST THE PUBLISH HAS TO PUT BACK
+    // (#327). `currentVersion` says which version to retire and this says
+    // which commitment to write again -- the sealing key included, which no
+    // request answers and which step three is about to overwrite. The same
+    // entry `resumeKeyBackup` reads on every launch, so putting it back is
+    // putting this device back to feeding the backup it fed.
+    commitment: () => readBackupCommitment(backupSecrets),
     retire: version => retireVersion(http, version),
   })
 }
