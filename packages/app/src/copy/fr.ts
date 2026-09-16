@@ -828,6 +828,8 @@ export const fr = {
   backup_offer_accept: 'Sauvegarder mes clés',
   backup_offer_refuse: 'Pas maintenant',
   backup_offer_later: 'Vous pourrez l’activer plus tard depuis Réglages.',
+  backup_accept_failed: 'La sauvegarde n’a pas pu être activée. Réessayez.',
+  backup_accept_working: 'Activation…',
   backup_replace_title: 'Remplacer votre clé de récupération',
   backup_replace_lead: 'Avant de décider, ce que ce geste emporte.',
   backup_replace_fact_old: "L'ancienne clé n'ouvrira plus rien",

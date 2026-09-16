@@ -3,6 +3,11 @@ import { Pressable, StyleSheet, Text, View } from 'react-native'
 
 import { t } from '../copy'
 import { color, floors, layout, space, stroke, type } from '../design/tokens'
+import type { BackupGesture } from '../runtime/acceptanceGate'
+import {
+  failedReplacementSentence,
+  type ReplaceFailedAt,
+} from '../runtime/replaceBackup'
 import { Consequences } from './Consequences'
 import { NotchedButton } from './NotchedButton'
 
@@ -93,8 +98,31 @@ export function BackupSettings({
   onConfirming,
   restorable,
   onRestore,
+  failed,
+  working,
+  replaceFailedAt,
 }: {
   readonly reading: BackupReading
+  /**
+   * Where the key replacement asked for here stopped, when it did not go
+   * through (#284), or `null`. It decides the sentence: « rien n'a changé »
+   * holds only before the publish, as `failedReplacementSentence` says.
+   *
+   * Above everything on this screen, because the reading taken again after it
+   * can land in either branch, or be waiting, and the sentence has to be seen
+   * whichever one the screen then draws. That reading says nothing of what
+   * the failure left: it is the bridge's, whose `enabled` means only that
+   * `enableKeyBackup` was called in this process, so it can go on saying
+   * « sauvegardés » of a version the homeserver no longer takes (#327).
+   */
+  readonly replaceFailedAt: ReplaceFailedAt | null
+  /**
+   * Which gesture on the backup is running, if any (#284): an acceptance,
+   * from this screen or from the offer, or a replacement of the key. One runs
+   * at a time, so every button that would start one, or cover this screen,
+   * waits inert while either does, and the button of the one running says so.
+   */
+  readonly working: BackupGesture | null
   readonly onBack: () => void
   /** Takes the reading again. Offered only when it could not be taken. */
   readonly onRetry: () => void
@@ -136,6 +164,14 @@ export function BackupSettings({
    */
   readonly restorable: boolean
   readonly onRestore: () => void
+  /**
+   * Whether accepting from this screen did not go through (#284).
+   *
+   * Said under the button that was pressed, and only there. The state above
+   * already says the messages are not backed up; what it cannot say is that
+   * asking just now failed, which is what the tap left somebody waiting for.
+   */
+  readonly failed: boolean
 }) {
   const enabled = reading.reading === 'read' && reading.enabled
   const behind =
@@ -166,6 +202,21 @@ export function BackupSettings({
       </Pressable>
 
       <Text style={styles.title}>{t('settings_backup')}</Text>
+
+      {/* THE REPLACEMENT THAT DID NOT GO THROUGH (#284). Its confirmation has
+          closed by the time this draws, so nothing moves under a finger. The
+          ochre is the state's own, as for an acceptance that failed. The
+          sentence is the one the step allows: past the publish, nothing is
+          as it was. */}
+      {replaceFailedAt !== null && (
+        <View
+          style={[styles.card, styles.off]}
+          testID="backup-settings-replace-failed">
+          <Text style={styles.body}>
+            {t(failedReplacementSentence(replaceFailedAt))}
+          </Text>
+        </View>
+      )}
 
       {reading.reading === 'waiting' && (
         <View
@@ -285,7 +336,11 @@ export function BackupSettings({
               finally={t('backup_replace_final')}>
               <NotchedButton
                 testID="backup-replace-confirm"
-                label={t('backup_replace_confirm')}
+                label={
+                  working === 'replace'
+                    ? t('backup_replace_working')
+                    : t('backup_replace_confirm')
+                }
                 onPress={() => {
                   // NOT CLOSED HERE. The key screen covers everything the
                   // moment it arrives, and unmounting under the finger is
@@ -293,6 +348,11 @@ export function BackupSettings({
                   // gesture lands on whatever React drew underneath.
                   onReplace()
                 }}
+                // INERT WHILE A GESTURE ON THE BACKUP RUNS (#284). A second
+                // tap started a second replacement: two versions published,
+                // and the keystore ending on either. The store refuses it as
+                // well; this is what shows it.
+                disabled={working !== null}
                 wide
               />
               <NotchedButton
@@ -327,6 +387,10 @@ export function BackupSettings({
                 testID="backup-settings-replace"
                 label={t('backup_settings_replace')}
                 onPress={() => onConfirming(true)}
+                // Inert while an acceptance runs (#284), or a replacement
+                // whose confirmation was cancelled: the store would refuse
+                // the gesture this row leads to.
+                disabled={working !== null}
                 tone="quiet"
                 wide
               />
@@ -343,10 +407,26 @@ export function BackupSettings({
                 find. */}
             <NotchedButton
               testID="backup-settings-enable"
-              label={t('backup_settings_enable')}
+              label={
+                working === 'accept'
+                  ? t('backup_accept_working')
+                  : t('backup_settings_enable')
+              }
               onPress={onEnable}
+              disabled={working !== null}
               wide
             />
+            {/* UNDER THE BUTTON, SO NOTHING MOVES UNDER THE FINGER (#284). A
+                second tap lands on the button again, which is what the
+                sentence asks for. The ochre is the state's own: an acceptance
+                that failed leaves this device with no backup. */}
+            {failed && (
+              <View
+                style={[styles.card, styles.off]}
+                testID="backup-settings-failed">
+                <Text style={styles.body}>{t('backup_accept_failed')}</Text>
+              </View>
+            )}
             {/* THE DOOR THE OFFER PROMISED. Only when there is something
                 behind it: a button that opened onto an account with no
                 backup would be the dead control this screen has already had
@@ -360,6 +440,10 @@ export function BackupSettings({
                   testID="backup-settings-restore"
                   label={t('settings_restore')}
                   onPress={onRestore}
+                  // Inert while a gesture on the backup runs (#284): the key
+                  // entry would cover this screen, and a failure said then
+                  // would land behind it, card and announcement both.
+                  disabled={working !== null}
                   tone="quiet"
                   wide
                 />

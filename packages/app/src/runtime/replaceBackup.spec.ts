@@ -1,6 +1,11 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 
-import { replaceBackup, type ReplaceBackupDeps } from './replaceBackup'
+import {
+  failedReplacementSentence,
+  replaceBackup,
+  replaceBackupFrom,
+  type ReplaceBackupDeps,
+} from './replaceBackup'
 
 const SETUP = {
   restoreKey: 'EsTx-2WeD-3rFv-4tGb',
@@ -28,6 +33,10 @@ function deps(over: Partial<ReplaceBackupDeps> = {}) {
     },
     remember: async () => {
       done.push('remembered')
+      return true
+    },
+    forget: async () => {
+      done.push('forgotten')
       return true
     },
     enable: async () => {
@@ -177,5 +186,125 @@ describe('when the replacement itself fails', () => {
 
     expect(await replaceBackup(d)).toEqual({ replaced: false, failedAt })
     expect(retired).toEqual([])
+  })
+
+  it('says so when the keystore refused twice to forget the new commitment', async () => {
+    // #284, found in review: the acceptance answers `forgotten: false` and the
+    // replacement dropped it. It is the one failure that leaves a commitment
+    // the next launch turns on, and nothing downstream could say so.
+    const { deps: d } = deps({
+      enable: async () => Promise.reject(new Error('malformed_identifier')),
+      forget: async () => false,
+    })
+
+    expect(await replaceBackup(d)).toEqual({
+      replaced: false,
+      failedAt: 'enabling',
+      forgotten: false,
+    })
+  })
+
+  it('answers a step that throws once the new version is published, instead of throwing', async () => {
+    // #284, found in review. Past the publish, the homeserver holds the new
+    // version as its current one, and a rejection says nothing of that: the
+    // screen answered every one with « rien n'a changé ».
+    const { deps: d, retired } = deps({
+      remember: async () => {
+        throw new Error('keystore unavailable')
+      },
+    })
+
+    expect(await replaceBackup(d)).toEqual({
+      replaced: false,
+      failedAt: 'thrownAfterPublishing',
+    })
+    expect(retired).toEqual([])
+  })
+})
+
+/** Every line a gesture wrote, whatever the level it wrote it at. */
+async function linesWrittenDuring(
+  gesture: () => Promise<unknown>,
+): Promise<string[]> {
+  const lines: string[] = []
+  const spies = (['log', 'warn', 'error'] as const).map(method =>
+    vi.spyOn(console, method).mockImplementation((...written: unknown[]) => {
+      lines.push(String(written[0]))
+    }),
+  )
+  try {
+    await gesture()
+  } finally {
+    for (const spy of spies) spy.mockRestore()
+  }
+  return lines
+}
+
+describe('replacing from the Sauvegarde screen', () => {
+  // #284, found in review. A replacement that failed wrote nothing, so a
+  // tester's log could not tell one had even been tried, and `forgotten: false`
+  // was lost on the way.
+  it('writes, in a store build too, where it stopped and that a commitment could not be forgotten', async () => {
+    vi.stubGlobal('__DEV__', false)
+    vi.stubEnv('MESSAGR_SEND_PROBE', '')
+    vi.stubEnv('MESSAGR_WHOLE_LOG', '')
+    try {
+      const { deps: d } = deps({
+        enable: async () => Promise.reject(new Error('malformed_identifier')),
+        forget: async () => false,
+      })
+      let outcome: unknown
+      const lines = await linesWrittenDuring(async () => {
+        outcome = await replaceBackupFrom(() => replaceBackup(d))
+      })
+
+      expect(outcome).toEqual({
+        replaced: false,
+        failedAt: 'enabling',
+        forgotten: false,
+      })
+      expect(lines).toEqual([
+        'MESSAGR_BACKUP_ACCEPT_FAILED {"from":"replace","failedAt":"enabling","forgotten":false}',
+      ])
+    } finally {
+      vi.unstubAllGlobals()
+      vi.unstubAllEnvs()
+    }
+  })
+
+  it('answers a replacement that threw before publishing as a failure, and writes why', async () => {
+    // `replaceBackup` rejects only before the publish, so nothing on the
+    // homeserver moved. The screen is answered like any other failure instead
+    // of a rejection nobody draws.
+    const { deps: d } = deps({
+      createKeyBackup: () => {
+        throw new Error('the native module never installed')
+      },
+    })
+    let outcome: unknown
+    const lines = await linesWrittenDuring(async () => {
+      outcome = await replaceBackupFrom(() => replaceBackup(d))
+    })
+
+    expect(outcome).toEqual({ replaced: false, failedAt: 'thrown' })
+    expect(lines).toEqual([
+      'MESSAGR_BACKUP_ACCEPT_FAILED {"from":"replace","failedAt":"thrown","because":"the native module never installed"}',
+    ])
+  })
+})
+
+describe('what the Sauvegarde screen says of a replacement that failed', () => {
+  // #284, found in review: every failure said « rien n'a changé : votre
+  // ancienne clé ouvre toujours votre sauvegarde ». That holds until the
+  // publish. From there on the homeserver holds the new version as its
+  // current one, and the sentence becomes a lie.
+  it.each([
+    ['publishing', 'backup_replace_failed'],
+    ['thrown', 'backup_replace_failed'],
+    ['remembering', 'backup_accept_failed'],
+    ['enabling', 'backup_accept_failed'],
+    ['thrownAfterPublishing', 'backup_accept_failed'],
+  ] as const)('after a failure at %s, says %s', (failedAt, sentence) => {
+    expect(failedReplacementSentence(failedAt)).toBe(sentence)
   })
 })

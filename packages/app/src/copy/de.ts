@@ -555,6 +555,9 @@ export const de: Readonly<Record<CopyKey, string>> = {
   backup_offer_accept: 'Meine Schlüssel sichern',
   backup_offer_refuse: 'Jetzt nicht',
   backup_offer_later: 'Sie können es später in den Einstellungen einschalten.',
+  backup_accept_failed:
+    'Die Sicherung konnte nicht eingeschaltet werden. Versuchen Sie es erneut.',
+  backup_accept_working: 'Wird eingeschaltet…',
   backup_replace_title: 'Ihren Wiederherstellungsschlüssel ersetzen',
   backup_replace_lead: 'Bevor Sie entscheiden: was dieser Schritt mitnimmt.',
   backup_replace_fact_old: 'Der alte Schlüssel öffnet nichts mehr',

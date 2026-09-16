@@ -69,14 +69,31 @@ import { NotchedButton } from './NotchedButton'
 export function BackupOffer({
   onAccept,
   onRefuse,
+  failed,
+  working,
 }: {
   readonly onAccept: () => void
+  /**
+   * Whether an acceptance is running (#284). The button waits, inert, under a
+   * label that says so: a tap that shows nothing invites another, and two
+   * acceptances make two keys.
+   */
+  readonly working: boolean
   /**
    * Recorded before the answer, and the caller owes that ordering: an offer
    * interrupted — the application killed, the screen turned — is an offer
    * that was made. See `offerBackup.ts`.
    */
   readonly onRefuse: () => void
+  /**
+   * Whether the acceptance started here did not go through (#284).
+   *
+   * The screen stays and says so. It used to close, and somebody who had just
+   * asked for their keys to be kept was left believing they were. Since #314
+   * the offer never comes back after an answer, so this is the one moment it
+   * can be said.
+   */
+  readonly failed: boolean
 }) {
   return (
     <View style={styles.screen} testID="backup-offer">
@@ -98,8 +115,11 @@ export function BackupOffer({
       <View style={styles.actions}>
         <NotchedButton
           testID="backup-offer-accept"
-          label={t('backup_offer_accept')}
+          label={
+            working ? t('backup_accept_working') : t('backup_offer_accept')
+          }
           onPress={onAccept}
+          disabled={working}
           wide
         />
         {/* `quiet`, which is the tone that exists so a refusal can be a
@@ -113,6 +133,19 @@ export function BackupOffer({
           tone="quiet"
           wide
         />
+        {/* UNDER THE BUTTONS, AND NOT FOR THE LOOK OF IT (#284). This screen
+            does not scroll. Above them, the card would move the button just
+            pressed from under the finger, and on a short telephone push the
+            refusal off the bottom: an overlay with no way out. Here it moves
+            nothing anybody can touch, and the sentence below still says
+            where to try again later. */}
+        {failed && (
+          <View
+            style={[styles.card, styles.weigh]}
+            testID="backup-offer-failed">
+            <Text style={styles.body}>{t('backup_accept_failed')}</Text>
+          </View>
+        )}
         {/* The one sentence that makes the refusal honest. Without it, "Pas
             maintenant" reads as a postponement the product will chase, and
             it will not: ADR-0013 records the refusal for good and leaves a

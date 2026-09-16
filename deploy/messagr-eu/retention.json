@@ -33,9 +33,9 @@
     "$manque": "Aucune purge automatique n'existe. À l'échelle de la bêta l'opération est manuelle ; elle doit être outillée avant la production. Voir #71."
   },
   "journal_de_lappareil": {
-    "$note": "Quelques lignes dans le journal du système de l'appareil (logcat sous Android, journal unifié sous iOS), limitées aux appels, aux réveils par notification, à l'enregistrement des notifications et à l'offre de sauvegarde, sans contenu ni identifiant. L'application ne les envoie nulle part. Aucune durée n'est déclarée, et ce n'est pas un oubli : c'est le système de l'appareil qui garde ces lignes et les efface, pas l'application ni le serveur. Ce que la page en dit est sous « dit », et scripts/assert-retention.sh le vérifie comme une durée.",
+    "$note": "Quelques lignes dans le journal du système de l'appareil (logcat sous Android, journal unifié sous iOS), limitées aux appels, aux réveils par notification, à l'enregistrement des notifications, à l'offre de sauvegarde et aux sauvegardes qui n'ont pas pu être activées, sans contenu ni identifiant. L'application ne les envoie nulle part. Aucune durée n'est déclarée, et ce n'est pas un oubli : c'est le système de l'appareil qui garde ces lignes et les efface, pas l'application ni le serveur. Ce que la page en dit est sous « dit », et scripts/assert-retention.sh le vérifie comme une durée.",
     "dit": [
-      "limitées aux appels, aux réveils par notification, à l'enregistrement des notifications et à l'offre de sauvegarde",
+      "limitées aux appels, aux réveils par notification, à l'enregistrement des notifications, à l'offre de sauvegarde et aux sauvegardes qui n'ont pas pu être activées",
       "ni contenu ni identifiant, et l'application ne les envoie nulle part"
     ],
     "applique_par": [
