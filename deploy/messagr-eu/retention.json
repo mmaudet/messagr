@@ -1,13 +1,18 @@
 {
   "$note": "Les durées de conservation, écrites une fois. La page publiée et la configuration du serveur doivent toutes deux s'y accorder, et scripts/assert-retention.sh le vérifie. La politique a déjà affirmé une durée que le code ne pratiquait pas ; c'est ce fichier qui empêche que cela recommence.",
   "journaux_techniques": {
+    "$note": "Le lien d'invitation porte son jeton dans le chemin, et le jeton est un secret porteur : tant que l'invitation n'est ni réclamée ni expirée, il fait entrer. Jusqu'au 15 septembre 2026 nginx écrivait ce chemin entier, gardé 366 jours (#313). La durée ne bouge pas — le décret l'impose aux données de connexion — mais le jeton n'en fait plus partie : le vhost journalise « /i/... » à la place du chemin, et le référent est réduit à « - ». Ce que la page en dit est sous « dit », et scripts/assert-retention.sh le vérifie comme une durée.",
     "duree": "douze mois",
     "jours": 366,
     "impose_par": "décret n° 2021-1362",
+    "dit": ["le lien d'invitation n'y est pas écrit"],
     "applique_par": [
       "/etc/logrotate.d/nginx : rotate 366",
-      "/etc/systemd/journald.conf : MaxRetentionSec=1year"
-    ]
+      "/etc/systemd/journald.conf : MaxRetentionSec=1year",
+      "deploy/messagr-eu/nginx-messagr-eu.conf : map $request_uri et log_format messagr_sans_jeton, posés sur location /i/ et location = /i",
+      "deploy/messagr-eu/tests/journal-sans-jeton.js : la forme du map, du log_format et des deux access_log"
+    ],
+    "$manque": "Les journaux écrits AVANT le déploiement du vhost portent encore leur jeton, et logrotate les garde jusqu'à 366 jours. deploy/messagr-eu/purge-jetons-journaux.sh les réécrit sans perdre une ligne ; il n'a pas encore tourné en production. Cette entrée disparaît le jour où il aura tourné, avec sa date."
   },
   "graphe_invitations": {
     "duree": "trente jours",
