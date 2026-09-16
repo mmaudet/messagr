@@ -201,6 +201,34 @@ jobs:
       - name: Assert an invitation link opens the application
         run: ./scripts/assert-invitation-links.sh
 
+      # LES DEUX FICHES DE MAGASIN, TENUES À LEURS LIMITES ICI ET PAS AILLEURS.
+      #
+      # `play-listing/check.py` existe depuis le début, et n'était appelé que
+      # par `store-listing.yml`, qui attend une main (`workflow_dispatch`). Un
+      # champ trop long s'y découvrait donc AU MOMENT D'ENVOYER, c'est-à-dire
+      # après la revue, après la fusion, et devant un formulaire ouvert.
+      #
+      # La fiche App Store est pire, et c'est ce qui a fait déplacer les deux
+      # ici : il n'y a pas d'API pour elle. L'`issuer id` et la clé `.p8`
+      # d'App Store Connect vivent hors du dépôt, donc la fiche est recopiée à
+      # la main dans la console. Il n'existe aucun « moment d'envoyer » où
+      # quelque chose pourrait refuser. Ce job est le seul.
+      #
+      # `--self-test` en plus du contrôle : `check.py` se casse lui-même d'une
+      # quinzaine de façons et exige un refus à chaque fois, pour le bon champ.
+      # Un contrôleur qui n'a jamais refusé ne prouve rien, et celui-ci porte
+      # la seule limite d'Apple qui ne se compte pas en caractères — les
+      # mots-clés se comptent en OCTETS, et un `é` en coûte deux.
+      #
+      # `python3` est celui du runner : les deux scripts ne lisent que la
+      # bibliothèque standard, et installer une version épinglée pour lire des
+      # fichiers JSON coûterait plus que ça ne garantit.
+      - name: Assert both store listings fit the stores' limits
+        run: |
+          python3 deploy/messagr-eu/play-listing/check.py
+          python3 deploy/messagr-eu/app-store-listing/check.py
+          python3 deploy/messagr-eu/app-store-listing/check.py --self-test
+
       # THE SITE, BUILT AND THEN CHECKED -- not the committed pages.
       #
       # `build-site.sh` exists because the substitution it performs used to
