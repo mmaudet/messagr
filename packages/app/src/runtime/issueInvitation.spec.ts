@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from 'vitest'
 
 import {
   admitDrawnEntrant,
+  anAdmissionIsRunning,
   issueInvitation,
   type InvitationService,
   type IssuingDeps,
@@ -29,6 +30,14 @@ function harness(
     refuseInviteWhen?: (who: string) => boolean
     issue?: { status: number; body: string } | Error
     status?: readonly ({ status: number; body: string } | Error)[]
+    /**
+     * What the service answers once the scripted answers run out.
+     *
+     * The real one goes on naming whoever it drew for as long as the
+     * invitation is pending, which a list of fixed answers cannot say: a run
+     * asks thirty times, and several runs at once share this counter.
+     */
+    after?: { status: number; body: string }
   } = {},
 ) {
   const calls: Call[] = []
@@ -72,10 +81,11 @@ function harness(
       )
     },
     status: async () => {
-      const scripted = options.status?.[asked] ?? {
-        status: 200,
-        body: JSON.stringify({}),
-      }
+      const scripted = options.status?.[asked] ??
+        options.after ?? {
+          status: 200,
+          body: JSON.stringify({}),
+        }
       asked += 1
       if (scripted instanceof Error) throw scripted
       return scripted
@@ -409,5 +419,88 @@ describe('admitDrawnEntrant', () => {
     const admission = await admitDrawnEntrant(deps, 'inv-1', '!made:x')
     expect(admission.admitted).toBe(false)
     if (!admission.admitted) expect(admission.reason).toContain('@her:x')
+  })
+
+  const settle = () => new Promise(resolve => setTimeout(resolve, 0))
+
+  /**
+   * #277: fifteen invites in four seconds, for one entrant.
+   *
+   * The sync loop starts an admission on every tick and does not wait for it
+   * (App.tsx: « the loop's tick must not wait on a poll of the invitation
+   * service »), while one admission lasts a minute. So the ticks pile up --
+   * and each invite is itself a membership event, which ends the long poll,
+   * which makes the next tick, which invites again. A loop that feeds
+   * itself, and the artefacts of run 34738990621 counted fifteen turns of it
+   * before it stopped.
+   *
+   * The repetition is not the defect and is not removed here: a link is
+   * opened whenever it is opened, and `nio_counterparty.py` claims in a loop
+   * inside that same minute. What these say is that the repetition belongs
+   * to one run.
+   */
+  it('sends one invite when fifteen sync ticks admit the same entrant at once', async () => {
+    // The service names her on every poll, because that is what it does
+    // until somebody claims: it is the client's turn that has to end, not
+    // the service's answer.
+    const { deps, calls } = harness({ after: drawn('@her:x') })
+    // Parked where a real run spends fifty-eight of its sixty seconds:
+    // between two polls. Every wait shares this one promise, so releasing it
+    // lets every run finish and leaves nothing in flight.
+    let release!: () => void
+    const parked = new Promise<void>(resolve => {
+      release = resolve
+    })
+    const ticking: IssuingDeps = { ...deps, wait: () => parked }
+
+    const first = admitDrawnEntrant(ticking, 'inv-277', '!made:x')
+    await settle()
+    const later = Array.from({ length: 14 }, () =>
+      admitDrawnEntrant(ticking, 'inv-277', '!made:x'),
+    )
+    await settle()
+
+    expect(calls.filter(call => call.path.endsWith('/invite'))).toHaveLength(1)
+    // What the fourteen others are told to write in their log line.
+    expect(anAdmissionIsRunning('inv-277')).toBe(true)
+
+    release()
+    const answers = await Promise.all([first, ...later])
+    // AND NOBODY IS LEFT WITHOUT AN ANSWER, which is why the later ticks
+    // join the run rather than being turned away. The gesture that issued
+    // the invitation calls this too, and it is the one that puts the given
+    // name on whoever came in and tells the screen they are in; a tick that
+    // beat it to the call must not cost it that.
+    expect(answers).toEqual(
+      Array.from({ length: 15 }, () => ({
+        admitted: true,
+        entrants: ['@her:x'],
+      })),
+    )
+    expect(calls.filter(call => call.path.endsWith('/invite'))).toHaveLength(1)
+    // AND NOTHING IS LEFT BEHIND. A run that stayed on the register would
+    // make the guard a latch: the invitation would never be admitted again,
+    // for the life of the process.
+    expect(anAdmissionIsRunning('inv-277')).toBe(false)
+  })
+
+  it('admits somebody who claims after the previous round gave up', async () => {
+    // The other half of the rule, and the reason this is one admission at a
+    // time rather than one admission ever. A minute of asking that found
+    // nobody says nothing about the next minute: the link is good for an
+    // hour and `admitAnyoneWaiting` keeps the row for it.
+    const nobodyYet = harness()
+    expect(
+      await admitDrawnEntrant(nobodyYet.deps, 'inv-277-late', '!x'),
+    ).toEqual({ admitted: false, reason: 'nobody has opened the link yet' })
+
+    const opened = harness({ after: drawn('@her:x') })
+    expect(await admitDrawnEntrant(opened.deps, 'inv-277-late', '!x')).toEqual({
+      admitted: true,
+      entrants: ['@her:x'],
+    })
+    expect(
+      opened.calls.filter(call => call.path.endsWith('/invite')),
+    ).toHaveLength(1)
   })
 })
