@@ -72,11 +72,11 @@ Six phrases de l'aide Play décident de presque tout.
 
 ### Étape « Collecte des données et sécurité »
 
-| Question                                                                                                      | Réponse                |
-| ------------------------------------------------------------------------------------------------------------- | ---------------------- |
-| L'application collecte-t-elle ou partage-t-elle « l'un des types de données utilisateur obligatoires » ?      | **Oui**                |
-| « Les données utilisateur que collecte votre application sont-elles toutes chiffrées lors de leur transit ? » | **Oui**, à trancher, 6 |
-| « Proposez-vous aux utilisateurs un moyen de demander la suppression de leurs données ? »                     | **Oui**, à trancher, 7 |
+| Question                                                                                                      | Réponse                      |
+| ------------------------------------------------------------------------------------------------------------- | ---------------------------- |
+| L'application collecte-t-elle ou partage-t-elle « l'un des types de données utilisateur obligatoires » ?      | **Oui**                      |
+| « Les données utilisateur que collecte votre application sont-elles toutes chiffrées lors de leur transit ? » | **Oui**, tranché le 16/09, 6 |
+| « Proposez-vous aux utilisateurs un moyen de demander la suppression de leurs données ? »                     | **Oui**, à trancher, 7       |
 
 **Des données sont collectées**, et la page le dit en ouvrant sa liste : « Faire circuler un message suppose de savoir où l'envoyer, et le serveur conserve donc : ».
 
@@ -408,9 +408,16 @@ Le coût est assumé : sur une fiche, « Contacts » se lira « lit mon carnet d
 
 **Les règles.** Apple fait déclarer les partenaires : « You must include information about your app's privacy practices and those of third-party partners whose code you integrate into your app. » Les manifestes des pods Firebase déclarent `DeviceID`, `OtherDataTypes` et `OtherDiagnosticData` (tableau du manifeste, plus haut).
 
-**Tranché le 16 septembre 2026 : corriger le code, et c'est #334.**
+**Tranché le 16 septembre 2026 au matin, puis RÉVISÉ le soir même. Les deux chemins sont pris, dans cet ordre.**
 
-- Mettre `FirebaseMessagingAutoInitEnabled` à `NO` dans `Info.plist`, puis vérifier sur un iPhone que le jeton APNs arrive toujours, que la notification arrive, et qu'aucune requête ne part vers Google. La page redevient vraie telle qu'elle est écrite. La vérification se groupe avec celles de #325 et #308, sur le même appareil. L'autre chemin, écarté : réécrire la page pour dire que Google reçoit aussi quelque chose sur iPhone, ce qui affaiblit la promesse sur iOS et demande un redéploiement du site.
+La décision du matin était : corriger le code, et rien d'autre. Mettre `FirebaseMessagingAutoInitEnabled` à `NO` dans `Info.plist`, après quoi la page redeviendrait vraie telle qu'elle était écrite. L'autre chemin — réécrire la page pour dire que Google reçoit aussi quelque chose sur iPhone — était écarté, au motif qu'il affaiblit la promesse sur iOS et demande un redéploiement du site.
+
+**Ce qui a changé : la clé ne coupe pas ce qu'on croyait.** En la posant (#361), la lecture du pod a montré que ses trois seuls points de lecture sont hors de portée de cette application, et que la demande qui porte le jeton APNs vers Google part d'ailleurs — `setAPNSToken:withUserInfo:` dans `FIRMessagingTokenManager.m`, qui ne consulte cette clé à aucun moment. Le détail est en fin de point. La page ne redevenait donc pas vraie, et rien n'avait été corrigé.
+
+- **La page est réécrite, et c'est fait** (#365). Elle dit désormais que le réveil d'un iPhone passe par Apple **et** que Google reçoit tout de même un identifiant d'installation et le jeton d'Apple, parce que la bibliothèque s'enregistre d'elle-même. Elle précise que c'est une correction de description et non de comportement, la section « Modifications » de cette page promettant qu'un changement est annoncé avant d'être appliqué. Date de version portée au 16 septembre 2026. **Ce n'est pas un affaiblissement de la promesse : c'est la promesse cessant de dire moins que ce qui se passe.**
+- **Le code est corrigé ensuite, et autrement** : sortir Firebase du paquet iOS, où il ne sert qu'à demander le jeton d'Apple, et obtenir ce jeton par UIKit. En hexadécimal, comme `getAPNSToken` le rend aujourd'hui, sygnal étant configuré `convert_device_token_to_hex: false` (#325). En cadrage au 16 septembre 2026. Le jour où c'est fait, les deux paragraphes ajoutés à la page se resimplifient.
+- **La vérification sur iPhone reste due**, et elle se groupe avec celles de #308 et #341, sur le même appareil. Elle exige un appareil **neuf ou effacé** : supprimer l'application ne vide pas de façon fiable le jeton conservé dans le trousseau, et une capture sur un téléphone qui a déjà porté `eu.messagr` ne prouverait rien. La marche exacte est écrite dans #361.
+- La clé `FirebaseMessagingAutoInitEnabled` reste posée à `false`, et gardée par `scripts/assert-ios-push.sh` : elle remplace un défaut implicite par un choix explicite, ce qui vaut d'être tenu même si elle ne coupe rien.
 - **D'ici là, chez Apple**, « Device ID » est déjà coché pour d'autres raisons. Ajouter « Other Diagnostic Data », non lié, « App Functionality », comme le déclare FirebaseMessaging.
 - **Pas d'« Analytics »**, bien que FirebaseInstallations et GoogleDataTransport le déclarent. GoogleDataTransport n'est appelé que par `exportDeliveryMetricsToBigQueryWithMessageInfo:` (`FIRMessagingExtensionHelper.m`), que l'application n'appelle pas, et Firebase décrit cet export comme optionnel : « Collects and sends message delivery metrics to BigQuery if the BigQuery integration is enabled and setDeliveryMetricsExportToBigQuery is set to true. » Le reste sert à Google « to determine platform and version adoption in order to provide, maintain, and improve Firebase services », ce qui n'est pas évaluer le comportement des personnes dans l'application, la définition d'« Analytics » chez Apple.
 - **Sur Android**, le même « Firebase user agent » part avec les requêtes de Firebase : « Device metadata: OS version, name, model, brand, and form factor », le magasin d'installation et les SDK présents. Il ne correspond à aucun type de Play : ce n'est pas un identifiant (« It is never linked to a user or device identifier. »), ni une mesure de performance. Ne rien ajouter sur Play, mais le dire sur la page.
@@ -427,7 +434,15 @@ Le coût est assumé : sur une fiche, « Contacts » se lira « lit mon carnet d
 
 **La règle.** Play demande si les données « sont-elles chiffrées lors de leur transfert entre l'appareil de l'utilisateur final et le serveur ? », et précise, dans le format proposé aux fournisseurs de SDK, que « les développeurs ne peuvent déclarer le chiffrement en transit que s'il s'applique à toutes les données utilisateur collectées par leur application (y compris l'ensemble des bibliothèques et des SDK) et transmises en dehors de l'appareil de l'utilisateur. »
 
-**Recommandation : Oui, une fois l'un de ces deux points établi.** Soit le serveur ne distribue plus que `turns:`, soit le nom d'utilisateur TURN de messagr.eu ne porte pas l'identifiant du compte. Tant que ni l'un ni l'autre n'est vérifié, « Oui » est discutable, et « Non » est la réponse exacte.
+**RÉPONSE : Oui. Le premier des deux points est établi depuis le 16 septembre 2026** (#338).
+
+`turn_uris` du homeserver de production ne porte plus qu'une adresse, `turns:messagr.eu:5350?transport=tcp`. Les deux `turn:messagr.eu:3479` sont retirées, donc le nom d'utilisateur — `<expiration>:<user_id>` — ne traverse plus le réseau en clair.
+
+Mettre `turns:` en premier ne suffisait pas, et le croire était l'erreur à défaire : WebRTC alloue contre **chaque** URI de la liste pendant la collecte de candidats, il n'essaie pas la première puis les suivantes. L'ordre pèse sur la priorité des candidats obtenus, pas sur le fait de contacter un serveur (`packages/app/src/calls/ice.ts` garde toutes les URI qui relaient, `callMedia.ts:164` les verse toutes dans une seule entrée `iceServers`).
+
+**Le filet retiré, et pourquoi il pouvait l'être.** Les URI en clair servaient de secours : un certificat expiré ne fait pas tomber coturn, il le fait retomber sur l'écouteur en clair ; sans elles, il fera échouer les appels. Ce filet n'a été retiré qu'après avoir **mesuré** le renouvellement, et non l'avoir supposé. `/etc/letsencrypt/renewal-hooks/deploy/messagr-turn.sh` recopie le certificat puis envoie `SIGUSR2` à `messagr-turn` ; exercé à la main comme certbot l'appelle, coturn a journalisé « Reloading TLS certificates and keys » et son PID n'a pas bougé — donc pas une allocation coupée. `certbot.timer` tourne deux fois par jour depuis mai 2026. Et si ce crochet échouait, l'ancien certificat reste valide un mois après la date de renouvellement.
+
+**Ce qui n'est pas mesuré**, et ne l'empêche pas : que les adresses en clair étaient effectivement jointes. Une adresse qu'on n'annonce plus ne peut pas l'être.
 
 ### 7. La suppression de compte
 
