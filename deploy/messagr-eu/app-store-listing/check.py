@@ -30,7 +30,7 @@ ne juge que l'existence : il lit l'arbre committé, pas le serveur.
 
 # LE CONTRÔLEUR EST LUI-MÊME ÉPROUVÉ
 
-`--self-test` reprend la fiche réelle, la casse d'une douzaine de façons — une
+`--self-test` reprend la fiche réelle, la casse d'une quinzaine de façons — une
 description de 4001 caractères, des mots-clés de 101 octets qui ne font que 87
 caractères, une URL vide, une URL que le dépôt ne sert pas — et exige un refus
 à chaque fois, pour le bon champ. Un contrôleur qui n'a jamais refusé ne prouve
