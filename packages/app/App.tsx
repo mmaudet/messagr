@@ -1413,10 +1413,23 @@ export function App({
     const look = async () => {
       if (await askedToRestore(restoreAskedSecrets)) return
       const found = await findBackupOnAccount(session)
+      // WHICH VERSION THIS DEVICE WRITES TO (#328). Read here rather than
+      // guessed from the bridge: this effect runs again when the key screen
+      // closes, and on a telephone whose past is unreadable that is the
+      // moment the account holds the empty version this device has just
+      // made. Offering it would be « vos anciens messages sont là » about a
+      // box that holds none of them.
+      const commitment = await readBackupCommitment(backupSecrets)
+      const mine =
+        found !== null &&
+        commitment !== null &&
+        commitment.version === found.version
       const decision = offerRestore({
         backupExists: found !== null,
         unreadable: stranded,
         asked: false,
+        mine,
+        keys: found?.count ?? null,
       })
       // SAID EVERY TIME, for the reason the backup offer's own line exists:
       // a refusal here has several causes and they look identical from
@@ -1425,6 +1438,10 @@ export function App({
         offer: decision.offer,
         backupExists: found !== null,
         unreadable: stranded,
+        mine,
+        // The homeserver's own count, or the word for having named none: a
+        // number would make silence look like a measurement.
+        keys: found?.count ?? 'unknown',
       })
       if (!decision.offer || stale) return
       // RECORDED BEFORE THE ANSWER. Same discipline as the backup's, same

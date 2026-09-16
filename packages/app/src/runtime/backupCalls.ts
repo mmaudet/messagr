@@ -34,6 +34,20 @@ export interface BackupVersionInfo {
   readonly version: string
   /** The whole description, for `restoreKeyMatches`. */
   readonly info: unknown
+  /**
+   * How many keys the homeserver says the version holds, or `null` when it
+   * named none (#328).
+   *
+   * `count` is in the specification's answer and is read out here because a
+   * version holding nothing restores nothing: `offerRestore` refuses to offer
+   * somebody their past back out of an empty box, which is what the backup
+   * this device created a moment ago is.
+   *
+   * `null` rather than `0` when the field is absent or is not a number.
+   * Silence is not emptiness, and a caller that read it as zero would
+   * withdraw the offer from somebody holding a real key.
+   */
+  readonly count: number | null
 }
 
 /**
@@ -89,7 +103,10 @@ export async function readVersion(
     throw cause
   }
 
-  const parsed = JSON.parse(answer) as { version?: unknown }
+  const parsed = JSON.parse(answer) as {
+    version?: unknown
+    count?: unknown
+  }
   if (typeof parsed.version !== 'string' || parsed.version === '') {
     // A description with no usable version is a description of nothing this
     // client can restore from, and saying "there is no backup" is both true
@@ -97,7 +114,11 @@ export async function readVersion(
     // offering a restore that cannot run.
     return null
   }
-  return { version: parsed.version, info: parsed }
+  return {
+    version: parsed.version,
+    info: parsed,
+    count: typeof parsed.count === 'number' ? parsed.count : null,
+  }
 }
 
 /**
