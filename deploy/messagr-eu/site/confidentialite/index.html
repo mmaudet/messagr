@@ -185,7 +185,7 @@
         Ce que Messagr ne vous demande pas, ce que le service ne peut pas lire,
         et ce que le serveur voit malgré tout.
       </p>
-      <p class="stamp">Version du 15 septembre 2026</p>
+      <p class="stamp">Version du 16 septembre 2026</p>
 
       <h2>Qui traite vos données</h2>
       <p>
@@ -357,8 +357,27 @@
         Ce que Google détient donc, c'est un jeton d'appareil et le fait que
         quelque chose est arrivé à un moment donné. Le jeton est un identifiant
         d'installation, renouvelé par Google, conservé tant que l'application
-        est installée. Sur iOS le même rôle est tenu par le service de
-        notifications d'Apple.
+        est installée.
+      </p>
+      <p>
+        <strong
+          >Le réveil d'un iPhone passe par Apple, et Google reçoit tout de
+          même un jeton.</strong
+        >
+        La notification part de notre serveur vers celui d'Apple, directement.
+        Mais l'application embarque la bibliothèque de Firebase, la même que sur
+        Android, et cette bibliothèque s'enregistre d'elle-même&nbsp;: à la
+        première ouverture, elle envoie à Google un identifiant d'installation
+        et le jeton qu'Apple vient de donner à votre téléphone. Nous ne le lui
+        demandons pas et nous n'en faisons rien&nbsp;; elle le fait parce
+        qu'elle est là.
+      </p>
+      <p>
+        Cette page disait auparavant que sur iOS ce rôle était tenu par le
+        service de notifications d'Apple, sans plus. C'était incomplet. La
+        correction ne change rien à ce que fait l'application&nbsp;: elle décrit
+        ce qu'elle faisait déjà. Retirer cette bibliothèque du paquet iPhone, où
+        elle ne sert qu'à demander le jeton d'Apple, est en cours.
       </p>
       <p>
         <strong>Sur iPhone, une phrase en plus, et toujours la même.</strong>
