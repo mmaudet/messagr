@@ -116,6 +116,13 @@ const TRACE = new Map<string, Shape>([
   ['MESSAGR_PUSH_REGISTERED', {}],
   ['MESSAGR_PUSH_NOT_REGISTERED', { reason: 'words' }],
   ['MESSAGR_PUSH_REMOVED', {}],
+  // Why an iPhone has no token of Apple's (#334), which is four different
+  // failures that read as one wait. Firebase used to ask Apple for that
+  // token; now a fifty-line module does, and a build that does not carry it,
+  // a registration Apple refused and a token of the wrong shape all look
+  // exactly like a launch that was simply early. The token is never carried
+  // here -- only the word for what went wrong, which names nobody.
+  ['MESSAGR_APNS_TOKEN_UNREAD', { unread: 'words' }],
   // Whether the backup was offered, and what that decision read.
   [
     'MESSAGR_BACKUP_OFFER',

@@ -31,27 +31,27 @@ Toutes lues le 15 septembre 2026, dans des copies faites ce jour-là.
 
 Les deux premières pages d'Apple n'ont pas de version française lisible : leur adresse sous `developer.apple.com/fr/` répond « Page non trouvée ». Les libellés Apple sont donc donnés en anglais, tels que la documentation les écrit, et la console peut les afficher traduits.
 
-**Le code, lu et non mesuré.** Aucun appareil n'a servi à ce document. Ce qu'il dit du comportement de l'application vient de `packages/app/src/runtime/pushDevice.ts`, `pusher.ts`, `mediaRepository.ts`, `sendImage.ts`, `sendFile.ts` et `backupCalls.ts`, de `packages/app/ios/Messagr/AppDelegate.swift`, et des sources de FirebaseMessaging 12.18.0 installées par CocoaPods dans `packages/app/ios/Pods`, hors dépôt.
+**Le code, lu et non mesuré.** Aucun appareil n'a servi à ce document. Ce qu'il dit du comportement de l'application vient de `packages/app/src/runtime/pushDevice.ts`, `pusher.ts`, `mediaRepository.ts`, `sendImage.ts`, `sendFile.ts` et `backupCalls.ts`, de `packages/app/ios/Messagr/AppDelegate.swift`, et des sources de FirebaseMessaging 12.18.0 installées par CocoaPods dans `packages/app/ios/Pods`, hors dépôt. **Ces dernières ne valent plus que pour Android** : depuis le 16 septembre 2026 (#334), la cible iOS ne porte plus aucun pod de cette famille, et ce que ce document dit du jeton d'Apple vient de `packages/app/ios/Messagr/MessagrApplePush.swift` et de `packages/app/src/runtime/applePushToken.ts`.
 
 ## Ce que la page dit, donnée par donnée
 
-| Donnée                                         | Où                               | Combien de temps                                                                             | Déclarée                      |
-| ---------------------------------------------- | -------------------------------- | -------------------------------------------------------------------------------------------- | ----------------------------- |
-| Identifiant du compte, pseudonyme              | serveur                          | vie du compte                                                                                | oui                           |
-| Appartenance aux conversations                 | serveur                          | vie du compte                                                                                | oui                           |
-| Date et heure des événements, taille           | serveur                          | vie du compte                                                                                | oui                           |
-| Appareils du compte et leurs clés publiques    | serveur                          | vie du compte                                                                                | oui                           |
-| Demande d'accès au relais pour un appel        | serveur, relais                  | la page ne le dit pas                                                                        | oui                           |
-| Adresses IP des requêtes                       | journaux techniques              | douze mois                                                                                   | oui                           |
-| Jeton de notification                          | serveur, Google ou Apple         | tant que les notifications sont actives, et chez Google tant que l'application est installée | oui                           |
-| Lien entre celui qui invite et celui qui entre | service d'invitations            | trente jours après la dépense de l'invitation                                                | oui                           |
-| Contenu : textes, photos, fichiers             | serveur, chiffré de bout en bout | vie de la conversation                                                                       | non, illisible                |
-| Son et image des appels                        | relais, chiffrés                 | temps réel                                                                                   | non                           |
-| Clés, session, journal de l'appareil           | appareil                         | sans objet                                                                                   | non, ne quitte pas l'appareil |
+| Donnée                                         | Où                                             | Combien de temps                                                                                     | Déclarée                      |
+| ---------------------------------------------- | ---------------------------------------------- | ---------------------------------------------------------------------------------------------------- | ----------------------------- |
+| Identifiant du compte, pseudonyme              | serveur                                        | vie du compte                                                                                        | oui                           |
+| Appartenance aux conversations                 | serveur                                        | vie du compte                                                                                        | oui                           |
+| Date et heure des événements, taille           | serveur                                        | vie du compte                                                                                        | oui                           |
+| Appareils du compte et leurs clés publiques    | serveur                                        | vie du compte                                                                                        | oui                           |
+| Demande d'accès au relais pour un appel        | serveur, relais                                | la page ne le dit pas                                                                                | oui                           |
+| Adresses IP des requêtes                       | journaux techniques                            | douze mois                                                                                           | oui                           |
+| Jeton de notification                          | serveur ; Google sur Android, Apple sur iPhone | tant que les notifications sont actives, et chez Google tant que l'application Android est installée | oui                           |
+| Lien entre celui qui invite et celui qui entre | service d'invitations                          | trente jours après la dépense de l'invitation                                                        | oui                           |
+| Contenu : textes, photos, fichiers             | serveur, chiffré de bout en bout               | vie de la conversation                                                                               | non, illisible                |
+| Son et image des appels                        | relais, chiffrés                               | temps réel                                                                                           | non                           |
+| Clés, session, journal de l'appareil           | appareil                                       | sans objet                                                                                           | non, ne quitte pas l'appareil |
 
 À la suppression d'un compte, la page promet une désactivation immédiate et une purge sous trente jours. `deploy/messagr-eu/retention.json` note que cette purge est encore manuelle (#71).
 
-Deux faits que la page ne dit pas pèsent sur les réponses : les clés de salon sont sauvegardées sur le serveur, chiffrées (ADR 0013), et Firebase est initialisé sur iOS. Ils sont traités aux points 4 et 5 de « À trancher par le porteur », et repris dans « Ce que la page ne dit pas encore ».
+Deux faits que la page ne dit pas pèsent sur les réponses : les clés de salon sont sauvegardées sur le serveur, chiffrées (ADR 0013), et Firebase était initialisé sur iOS — il ne l'est plus depuis le 16 septembre 2026 (#334), et le point 5 dit ce que cela change. Ils sont traités aux points 4 et 5 de « À trancher par le porteur », et repris dans « Ce que la page ne dit pas encore ».
 
 ## Google Play : « Sécurité des données »
 
@@ -213,7 +213,7 @@ Les deux se saisissent dans « App Privacy », à côté de « Privacy Policy »
 - « User Content » → « Emails or Text Messages », tranché, 4 ;
 - « Contacts » → « Contacts », tranché, 3 ;
 - « Usage Data » → « Other Usage Data » ;
-- « Diagnostics » → « Other Diagnostic Data », tranché, 5.
+- ~~« Diagnostics » → « Other Diagnostic Data »~~ : **à décocher**, tranché, 5. Il n'était coché que pour ce que déclaraient les pods Firebase, qui ne sont plus dans le paquet iOS.
 
 ### Pour chaque type
 
@@ -228,7 +228,6 @@ Apple ne demande ni si la donnée est partagée, ni si elle est facultative. Son
 | Emails or Text Messages | App Functionality | Yes                | No       |
 | Contacts                | App Functionality | Yes                | No       |
 | Other Usage Data        | App Functionality | Yes                | No       |
-| Other Diagnostic Data   | App Functionality | No                 | No       |
 
 « App Functionality » se lit « Such as to authenticate the user, enable features, prevent fraud, implement security measures, ensure server up-time, minimize app crashes, improve scalability and performance, or perform customer support ». Elle couvre donc aussi la sécurité et la révocation d'une branche d'invitation, que Play range à part. Aucune autre finalité : ni « Analytics », ni « Product Personalization », ni publicité.
 
@@ -241,7 +240,7 @@ Apple ne demande ni si la donnée est partagée, ni si elle est facultative. Son
 #### « Device ID »
 
 - **Définition Apple.** « Such as the device's advertising identifier, or other device-level ID »
-- **Ce que cela couvre.** Les identifiants et les clés publiques des appareils du compte ; le jeton APNs que le serveur garde pour réveiller l'iPhone ; les adresses IP des journaux techniques et du relais, tranché, 2 ; et, chez Google, l'identifiant d'installation Firebase, tranché, 5.
+- **Ce que cela couvre.** Les identifiants et les clés publiques des appareils du compte ; le jeton APNs que le serveur garde pour réveiller l'iPhone ; les adresses IP des journaux techniques et du relais, tranché, 2 ; et, **sur Android seulement**, chez Google, l'identifiant d'installation Firebase, tranché, 5.
 - **Page.** « la liste des appareils d'un compte et leurs clés publiques » ; « Sur iOS le même rôle est tenu par le service de notifications d'Apple. » ; « les adresses IP au moment des requêtes, dans les journaux techniques. »
 - **Lié : oui.** Chaque appareil et chaque jeton sont enregistrés sous un compte.
 
@@ -266,12 +265,12 @@ Apple ne demande ni si la donnée est partagée, ni si elle est facultative. Son
 - **Page.** « la date et l'heure de chaque événement » ; « la taille approximative de ce qui transite » ; « quand un compte est en appel ».
 - **Lié : oui.**
 
-#### « Other Diagnostic Data »
+#### « Other Diagnostic Data », qui n'est plus déclaré
 
 - **Définition Apple.** « Any other data collected for the purposes of measuring technical diagnostics related to the app »
-- **Ce que cela couvre.** Ce que le SDK de Firebase envoie de lui-même à Google sur iOS, et que ses pods déclarent sous ce type. Rien de ce que l'application écrit : son journal ne quitte pas l'appareil. À trancher, 5.
-- **Page.** Aucune phrase, et c'est l'objet du point 5.
-- **Lié : non.** Les pods Firebase le déclarent avec `NSPrivacyCollectedDataTypeLinked` à `false`.
+- **Ce que cela couvrait.** Ce que le SDK de Firebase envoyait de lui-même à Google sur iOS, et que ses pods déclaraient sous ce type. Rien de ce que l'application écrit : son journal ne quitte pas l'appareil.
+- **Pourquoi il part.** Ce type n'avait pas d'autre motif que ces pods, et ces pods ne sont plus dans le paquet iOS depuis le 16 septembre 2026 (#334). La fiche App Store décrit l'application iOS ; la règle d'Apple vise « third-party partners whose code you integrate into your app », et il n'y en a plus sur ce chemin. Tranché, 5.
+- **Sur Android**, rien ne change : Firebase y reste, et Play n'a pas de type équivalent — voir le point 5.
 
 ### Ce qui n'est pas déclaré sur l'App Store
 
@@ -324,7 +323,7 @@ Il déclare ce que l'application fait collecter elle-même, c'est-à-dire ce que
 
 `NSPrivacyTracking` reste à `false`, sans `NSPrivacyTrackingDomains`, qu'Apple ne demande que dans l'autre cas : « To provide a list of internet domains in `NSPrivacyTrackingDomains`, set `NSPrivacyTracking` to `true`. » Les quatre catégories d'API à raison déclarée (`NSPrivacyAccessedAPITypes`) n'ont pas changé.
 
-**Le rapport de confidentialité de Xcode en montrera davantage.** « Xcode can create a privacy report by aggregating the privacy manifests from your app and the third-party SDKs it links to. » Les pods Firebase que verrouille `Podfile.lock` déclarent, dans leurs propres manifestes :
+**Le rapport de confidentialité de Xcode n'en montre plus davantage.** « Xcode can create a privacy report by aggregating the privacy manifests from your app and the third-party SDKs it links to. » Il agrégeait les manifestes des pods, et **neuf des dix manifestes du projet appartenaient à la famille Google** : `FirebaseCore`, `FirebaseCoreExtension`, `FirebaseCoreInternal`, `FirebaseInstallations`, `FirebaseMessaging`, `GoogleDataTransport`, `GoogleUtilities`, `nanopb` et `FBLPromises`. Ils déclaraient ceci :
 
 | Pod                   | Type                  | Linked  | Purposes         |
 | --------------------- | --------------------- | ------- | ---------------- |
@@ -334,7 +333,7 @@ Il déclare ce que l'application fait collecter elle-même, c'est-à-dire ce que
 | FirebaseInstallations | `OtherDiagnosticData` | `false` | Analytics        |
 | GoogleDataTransport   | `OtherDiagnosticData` | `false` | Analytics        |
 
-Pourquoi les réponses d'App Store Connect n'en reprennent qu'une partie : tranché, 5.
+**Les douze pods sont sortis de la cible iOS le 16 septembre 2026** (#334). Il ne reste que le manifeste de react-native-fs, et le rapport d'Xcode ne dit donc plus guère que ce que le manifeste ci-dessus déclare. C'est ce qui fait décocher « Other Diagnostic Data » : tranché, 5.
 
 ## Les jugements
 
@@ -394,17 +393,19 @@ Le coût est assumé : sur une fiche, « Contacts » se lira « lit mon carnet d
 
 **Et la note au relecteur est écrite d'avance**, pour que la seule discussion probable se règle avant d'être ouverte plutôt qu'en pleine revue. Elle est plus bas, dans « La note au relecteur d'App Store Connect ». Déclarer « Photos or Videos » aurait fermé la question aussi, au prix d'une étiquette disant que Messagr collecte vos photos, liées à votre compte, ce que le serveur ne peut pas faire.
 
-### 5. Firebase sur iOS, et ce que le SDK envoie de lui-même
+### 5. Firebase sur iOS, et ce que le SDK envoyait de lui-même
 
 **Les faits, lus dans le code et non mesurés sur un appareil.**
 
-- L'application iOS ne demande à Firebase que le jeton APNs : `pushDevice.ts` appelle `registerDeviceForRemoteMessages`, puis `getAPNSToken`, et le réveil passe par Apple seule.
-- Mais `AppDelegate.swift` appelle `FirebaseApp.configure()` dès que `GoogleService-Info.plist` est dans le bundle, et il y est.
-- FirebaseMessaging 12.18.0 lit son initialisation automatique dans la clé `FirebaseMessagingAutoInitEnabled`. Faute de cette clé dans `Info.plist`, et faute de `firebase.json`, il se rabat sur le réglage global de collecte de Firebase, actif par défaut (`FIRMessaging.m`). La clé y est depuis #334, à `false` ; ce qu'elle change et ce qu'elle ne change pas est en fin de point.
+**Ce point est clos depuis le 16 septembre 2026 au soir : Firebase n'est plus dans le paquet iOS** (#334). Les faits ci-dessous sont ce qui l'a décidé, gardés parce qu'ils disent pourquoi le levier documenté ne suffisait pas.
+
+- L'application iOS ne demandait à Firebase que le jeton APNs : `pushDevice.ts` appelait `registerDeviceForRemoteMessages`, puis `getAPNSToken`, et le réveil passait par Apple seule.
+- Mais `AppDelegate.swift` appelait `FirebaseApp.configure()` dès que `GoogleService-Info.plist` était dans le bundle, et il y était.
+- FirebaseMessaging 12.18.0 lit son initialisation automatique dans la clé `FirebaseMessagingAutoInitEnabled`. Faute de cette clé dans `Info.plist`, et faute de `firebase.json`, il se rabat sur le réglage global de collecte de Firebase, actif par défaut (`FIRMessaging.m`). La clé y a été posée à `false` par #361, puis retirée avec les pods : ce qu'elle changeait et ce qu'elle ne changeait pas est plus bas.
 - Quand le jeton APNs arrive sur une installation neuve, le gestionnaire de jetons obtient un identifiant d'installation Firebase, puis prépare une demande de jeton FCM qui porte le jeton APNs et l'identifiant de l'application Firebase (`FIRMessagingTokenManager.m`). Ses opérations de jeton reçoivent le « heartbeat » de Firebase.
 - Firebase le dit à sa manière : « The FCM SDK performs method swizzling in two key areas: mapping your APNs token to the Firebase Installation ID or FCM registration token and capturing analytics data during downstream message callback handling. »
 
-**Ce que cela contredit.** La page : « Sur iOS le même rôle est tenu par le service de notifications d'Apple. » Et `pushDevice.ts` : « Nothing about the push then goes near Google ». C'est vrai du réveil. D'après ce code, ce ne l'est pas de l'enregistrement : Google recevrait le jeton APNs et un identifiant d'installation.
+**Ce que cela contredisait.** La page : « Sur iOS le même rôle est tenu par le service de notifications d'Apple. » Et `pushDevice.ts` : « Nothing about the push then goes near Google ». C'est vrai du réveil. D'après ce code, ce ne l'est pas de l'enregistrement : Google recevrait le jeton APNs et un identifiant d'installation.
 
 **Les règles.** Apple fait déclarer les partenaires : « You must include information about your app's privacy practices and those of third-party partners whose code you integrate into your app. » Les manifestes des pods Firebase déclarent `DeviceID`, `OtherDataTypes` et `OtherDiagnosticData` (tableau du manifeste, plus haut).
 
@@ -412,21 +413,27 @@ Le coût est assumé : sur une fiche, « Contacts » se lira « lit mon carnet d
 
 La décision du matin était : corriger le code, et rien d'autre. Mettre `FirebaseMessagingAutoInitEnabled` à `NO` dans `Info.plist`, après quoi la page redeviendrait vraie telle qu'elle était écrite. L'autre chemin — réécrire la page pour dire que Google reçoit aussi quelque chose sur iPhone — était écarté, au motif qu'il affaiblit la promesse sur iOS et demande un redéploiement du site.
 
-**Ce qui a changé : la clé ne coupe pas ce qu'on croyait.** En la posant (#361), la lecture du pod a montré que ses trois seuls points de lecture sont hors de portée de cette application, et que la demande qui porte le jeton APNs vers Google part d'ailleurs — `setAPNSToken:withUserInfo:` dans `FIRMessagingTokenManager.m`, qui ne consulte cette clé à aucun moment. Le détail est en fin de point. La page ne redevenait donc pas vraie, et rien n'avait été corrigé.
+**Ce qui a changé : la clé ne coupe pas ce qu'on croyait.** En la posant (#361), la lecture du pod a montré que ses trois seuls points de lecture sont hors de portée de cette application — la branche de `didCompleteConfigure` qui exige un jeton APNs déjà présent, ce qui n'arrive jamais pendant `FirebaseApp.configure()` ; `deleteDataWithCompletion:` ; et le passage de `setAutoInitEnabled:` à `YES` — et que la demande qui porte le jeton APNs vers Google part d'ailleurs : de `setAPNSToken:withUserInfo:` dans `FIRMessagingTokenManager.m`, qui sur une installation neuve demande un identifiant d'installation puis un jeton FCM, et ne consulte cette clé à aucun moment. La page ne redevenait donc pas vraie, et rien n'avait été corrigé.
 
 - **La page est réécrite, et c'est fait** (#365). Elle dit désormais que le réveil d'un iPhone passe par Apple **et** que Google reçoit tout de même un identifiant d'installation et le jeton d'Apple, parce que la bibliothèque s'enregistre d'elle-même. Elle précise que c'est une correction de description et non de comportement, la section « Modifications » de cette page promettant qu'un changement est annoncé avant d'être appliqué. Date de version portée au 16 septembre 2026. **Ce n'est pas un affaiblissement de la promesse : c'est la promesse cessant de dire moins que ce qui se passe.**
-- **Le code est corrigé ensuite, et autrement** : sortir Firebase du paquet iOS, où il ne sert qu'à demander le jeton d'Apple, et obtenir ce jeton par UIKit. En hexadécimal, comme `getAPNSToken` le rend aujourd'hui, sygnal étant configuré `convert_device_token_to_hex: false` (#325). En cadrage au 16 septembre 2026. Le jour où c'est fait, les deux paragraphes ajoutés à la page se resimplifient.
-- **La vérification sur iPhone reste due**, et elle se groupe avec celles de #308 et #341, sur le même appareil. Elle exige un appareil **neuf ou effacé** : supprimer l'application ne vide pas de façon fiable le jeton conservé dans le trousseau, et une capture sur un téléphone qui a déjà porté `eu.messagr` ne prouverait rien. La marche exacte est écrite dans #361.
-- La clé `FirebaseMessagingAutoInitEnabled` reste posée à `false`, et gardée par `scripts/assert-ios-push.sh` : elle remplace un défaut implicite par un choix explicite, ce qui vaut d'être tenu même si elle ne coupe rien.
-- **D'ici là, chez Apple**, « Device ID » est déjà coché pour d'autres raisons. Ajouter « Other Diagnostic Data », non lié, « App Functionality », comme le déclare FirebaseMessaging.
-- **Pas d'« Analytics »**, bien que FirebaseInstallations et GoogleDataTransport le déclarent. GoogleDataTransport n'est appelé que par `exportDeliveryMetricsToBigQueryWithMessageInfo:` (`FIRMessagingExtensionHelper.m`), que l'application n'appelle pas, et Firebase décrit cet export comme optionnel : « Collects and sends message delivery metrics to BigQuery if the BigQuery integration is enabled and setDeliveryMetricsExportToBigQuery is set to true. » Le reste sert à Google « to determine platform and version adoption in order to provide, maintain, and improve Firebase services », ce qui n'est pas évaluer le comportement des personnes dans l'application, la définition d'« Analytics » chez Apple.
-- **Sur Android**, le même « Firebase user agent » part avec les requêtes de Firebase : « Device metadata: OS version, name, model, brand, and form factor », le magasin d'installation et les SDK présents. Il ne correspond à aucun type de Play : ce n'est pas un identifiant (« It is never linked to a user or device identifier. »), ni une mesure de performance. Ne rien ajouter sur Play, mais le dire sur la page.
+- **Le code est corrigé ensuite, et autrement, ET C'EST FAIT** (#334, le 16 septembre 2026 au soir). Firebase est sorti du paquet iOS, où il ne servait qu'à demander le jeton d'Apple, et ce jeton est demandé à UIKit. Trois morceaux remplacent le SDK : `notifee.requestPermission()` pour l'autorisation, `MessagrApplePush` (Swift, à côté de l'AppDelegate) pour demander le jeton et le garder, `applePushToken.ts` pour le lire. En hexadécimal majuscule, exactement comme `getAPNSToken` le rendait, sygnal étant configuré `convert_device_token_to_hex: false` (#325). **Douze pods racine, `GoogleService-Info.plist`, la phase de build de react-native-firebase et neuf manifestes de confidentialité sur dix quittent le paquet iOS.** Android ne bouge pas : FCM y est la seule route.
+- **Ce qui garde ce retrait**, et ce n'est pas ce qu'on croirait : l'exclusion dans `packages/app/react-native.config.js`. Sans elle, `use_native_modules!` relie de nouveau les deux paquets au prochain `pod install`, les douze pods reviennent, et **rien ne rougit** — une application avec Firebase dedans compile aussi bien qu'une sans. `scripts/assert-ios-push.sh` lit ce fichier, en plus du verrou, du plist et de l'AppDelegate.
+- **La vérification sur iPhone reste due**, et elle se groupe avec celles de #308 et #341, sur le même appareil. Elle exige un appareil **neuf ou effacé** : supprimer l'application ne vide pas de façon fiable le jeton conservé dans le trousseau, et une capture sur un téléphone qui a déjà porté `eu.messagr` ne prouverait rien. La marche exacte est dans `docs/publishing-ios.md`. Ce qu'elle mesure a changé de nature : il ne s'agit plus de savoir si Firebase parle à Google, mais de constater que le jeton d'Apple arrive toujours sans lui — le `pushkey` de 64 hexadécimaux **majuscules** sur le compte, et sygnal qui répond `200` sans `BadDeviceToken`.
+- La clé `FirebaseMessagingAutoInitEnabled` est **retirée d'`Info.plist`** avec les pods : une clé que plus aucun code ne lit est une clé qui ment sur ce qu'elle garde. Le contrôle 6 de `scripts/assert-ios-push.sh` ne la lit plus non plus ; il lit les quatre choses du point précédent.
+- **Chez Apple, décocher « Other Diagnostic Data »**, non lié, « App Functionality ». Il n'était coché que pour ce que déclaraient les manifestes des pods Firebase, et ces manifestes ne sont plus dans le paquet. « Device ID » reste coché, pour d'autres raisons (point 1 et point 2).
+- **Pas d'« Analytics »**, et cela n'a jamais tenu qu'à Android désormais. FirebaseInstallations et GoogleDataTransport le déclarent ; GoogleDataTransport n'est appelé que par `exportDeliveryMetricsToBigQueryWithMessageInfo:` (`FIRMessagingExtensionHelper.m`), que l'application n'appelle pas, et Firebase décrit cet export comme optionnel : « Collects and sends message delivery metrics to BigQuery if the BigQuery integration is enabled and setDeliveryMetricsExportToBigQuery is set to true. » Le reste sert à Google « to determine platform and version adoption in order to provide, maintain, and improve Firebase services », ce qui n'est pas évaluer le comportement des personnes dans l'application, la définition d'« Analytics » chez Apple.
+- **Sur Android**, rien ne change. Le même « Firebase user agent » part avec les requêtes de Firebase : « Device metadata: OS version, name, model, brand, and form factor », le magasin d'installation et les SDK présents. Il ne correspond à aucun type de Play : ce n'est pas un identifiant (« It is never linked to a user or device identifier. »), ni une mesure de performance. Ne rien ajouter sur Play, mais le dire sur la page.
 
-**Ce que la clé fait, relu le 16 septembre 2026 en la posant (#334), et il en faut moins que ce qui est écrit plus haut.** `FirebaseMessagingAutoInitEnabled` est posée à `false`, et elle ne garde, dans FirebaseMessaging 12.18.0, que trois endroits dont aucun n'est atteint par cette application : la branche de `didCompleteConfigure` qui exige un jeton APNs déjà présent, ce qui n'arrive jamais pendant `FirebaseApp.configure()` ; `deleteDataWithCompletion:` ; et le passage de `setAutoInitEnabled:` à `YES`. La demande décrite au quatrième point ci-dessus part d'ailleurs : de `setAPNSToken:withUserInfo:` dans `FIRMessagingTokenManager.m`, qui sur une installation neuve demande un identifiant d'installation puis un jeton FCM, et ne lit cette clé à aucun moment. Le jeton APNs, lui, continue d'arriver : rien sur son chemin ne lit cette clé non plus.
+**POURQUOI LE CONDITIONNEL EST REMPLI, ET PAR UN AUTRE ARGUMENT QUE CELUI QU'IL ATTENDAIT.** Ce point portait, jusqu'au 16 septembre au soir : « Si Firebase cesse de parler à Google sur iOS, retirer "Other Diagnostic Data" d'App Store Connect. **La condition est une mesure sur un appareil, pas la présence de la clé.** » Cette phrase refusait qu'une lecture de code tienne lieu de mesure, et elle avait raison de le refuser.
 
-**Ce que la clé ne fait donc pas encore, et ce que cela change pour les formulaires.** Il faut tenir pour possible que Firebase parle toujours à Google sur iPhone. « Other Diagnostic Data » reste donc déclaré, et le conditionnel ci-dessous n'est pas encore rempli. Les deux hôtes à observer pendant la mesure de #334 sont `firebaseinstallations.googleapis.com` et `fcmtoken.googleapis.com`, et au besoin `fcmregistrations.googleapis.com` et `device-provisioning.googleapis.com`.
+Ce qui l'a remplie n'est ni une mesure ni une lecture : **le code qui pouvait parler à Google n'est plus dans le binaire iOS.** C'est un argument plus fort que celui qui était demandé, et il faut le dire ainsi plutôt que le laisser passer pour l'autre. Une mesure aurait établi qu'une version donnée, sur un appareil donné, n'a rien envoyé ce jour-là ; un paquet qui ne contient pas le SDK ne peut rien envoyer sur aucun appareil et dans aucune version. Ce qui garde cette phrase vraie demain n'est donc pas une capture réseau mais `scripts/assert-ios-push.sh`, et c'est pour cela que sa quatrième lecture existe.
 
-**Si Firebase cesse de parler à Google sur iOS**, retirer « Other Diagnostic Data » d'App Store Connect. Le rapport de Xcode continuera d'afficher les types que déclarent les pods, puisqu'il lit leurs manifestes et non leur comportement. **La condition est une mesure sur un appareil, pas la présence de la clé** : c'est exactement ce que la lecture ci-dessus dit de ne pas confondre.
+**Ce que cela ne dit toujours pas.** Que Firebase parlait effectivement à Google depuis cet iPhone n'a jamais été mesuré, et ne le sera plus : la question est close par la suppression, pas par une réponse. Si quelqu'un a besoin de cette réponse pour une raison de conformité, elle se mesure encore sur une build antérieure au 16 septembre 2026, avec `firebaseinstallations.googleapis.com`, `fcmtoken.googleapis.com`, et au besoin `fcmregistrations.googleapis.com` et `device-provisioning.googleapis.com`.
+
+**Ce qui reste à faire ailleurs**, et qui n'est pas dans ce document :
+
+- `deploy/messagr-eu/site/confidentialite/index.html` : les deux paragraphes ajoutés par #365 peuvent se resimplifier, et la phrase « Elle contient **une** bibliothèque tierce » ne vaut plus sur iPhone. Attention en réécrivant : `scripts/assert-push-payload.sh` épingle l'absence de « il n'existe aucun tiers dans cette application », qui parle de l'application entière et resterait fausse sur Android.
+- `deploy/messagr-eu/app-store-listing/fr-FR.json`, bloc « LES NOTIFICATIONS, ET CE QU'APPLE EN APPREND » : « L'application contient une bibliothèque tierce » est désormais faux sur iOS, dans le sens de la modestie. Rien ne garde ce texte : `check.py` contrôle des longueurs et des URL, jamais le contenu.
 
 ### 6. « Toutes chiffrées lors de leur transit », et le relais en `turn:`
 
@@ -466,8 +473,8 @@ Mettre `turns:` en premier ne suffisait pas, et le croire était l'erreur à dé
 Ce que les questions des magasins demandent et que la page ne permet pas de citer. Aucun de ces points n'a été corrigé ici : #321 ne touche pas la page.
 
 1. **La sauvegarde des clés de salon sur le serveur**, chiffrée sous une clé qu'il n'a pas (ADR 0013). La page dit : « Les clés ne quittent jamais les appareils. » (point 4)
-2. **Firebase sur iOS.** La page ne nomme qu'Apple pour l'iPhone ; d'après le code du SDK, Google reçoit le jeton APNs et un identifiant d'installation. (point 5)
-3. **Ce que le SDK de Firebase envoie de lui-même**, sur les deux plateformes : l'identifiant d'installation, le modèle et la version du système, les SDK présents. La page ne nomme que « un jeton d'appareil ». (point 5)
+2. ~~**Firebase sur iOS.**~~ Réglé aux deux bouts : la page le dit depuis #365, et depuis #334 il n'y a plus rien à dire — Firebase n'est plus dans le paquet iOS. Les deux paragraphes que #365 a ajoutés peuvent s'y resimplifier, et ce n'est pas fait. (point 5)
+3. **Ce que le SDK de Firebase envoie de lui-même**, **sur Android**, désormais : l'identifiant d'installation, le modèle et la version du système, les SDK présents. La page ne nomme que « un jeton d'appareil ». (point 5)
 4. **Le chiffrement du transport.** Play le demande ; la page ne parle que du contenu. (point 6)
 5. **Comment demander la suppression d'un compte**, dans une section qu'un lien peut viser, avec ce qui reste après. (point 7)
 6. **Combien de temps durent la trace des demandes d'accès au relais et les adresses IP qu'il voit.** La page dit ce que voit le relais, pas combien de temps il le garde.

@@ -1,6 +1,8 @@
-// The one module that names `@notifee/react-native`. See `pushDevice.ts` for
-// the rule; what this adapts is `notifying.ts`, which decides what a
-// notification says and is tested without a device.
+// One of the two modules that name `@notifee/react-native`: this one draws,
+// and `pushDevice.ts` asks for the permission this one needs -- which it took
+// over from Firebase when Firebase left the iOS build (#334). See
+// `pushDevice.ts` for the rule; what this adapts is `notifying.ts`, which
+// decides what a notification says and is tested without a device.
 import notifee, {
   AndroidCategory,
   AndroidImportance,
