@@ -90,9 +90,14 @@ import {
 import {
   failedReplacementSentence,
   replaceBackupFrom,
-  type ReplaceFailedAt,
+  type ReplaceFailure,
 } from './src/runtime/replaceBackup'
 import type { BackupVersionInfo } from './src/runtime/backupCalls'
+import { readBackupCommitment } from './src/runtime/backupCommitment'
+import {
+  backupStanding,
+  type BackupStanding,
+} from './src/runtime/backupStanding'
 import { getErrorMessage } from './src/runtime/errors'
 import {
   askedToRestore,
@@ -223,7 +228,7 @@ import { Conversation } from './src/ui/Conversation'
 import { ConversationList } from './src/ui/ConversationList'
 import { Invite, type InviteStage } from './src/ui/Invite'
 import { BackupOffer } from './src/ui/BackupOffer'
-import { BackupSettings, type BackupReading } from './src/ui/BackupSettings'
+import { BackupSettings } from './src/ui/BackupSettings'
 import { Favourites } from './src/ui/Favourites'
 import { RecoveryKeyEntry } from './src/ui/RecoveryKeyEntry'
 import { RecoveryKeyShown } from './src/ui/RecoveryKeyShown'
@@ -547,15 +552,6 @@ export function App({
   >(null)
   const restoreTargetRef = useRef<BackupVersionInfo | null>(null)
   /**
-   * Whether the backup screen may offer to bring a past back.
-   *
-   * Read only while that screen is open and only when it says the backup is
-   * off: a device already backing up has its keys, and one whose account has
-   * no backup would be shown a door onto nothing. One request, on a screen
-   * somebody opened on purpose.
-   */
-  const [restorableFromSettings, setRestorableFromSettings] = useState(false)
-  /**
    * Whether the replacement's confirmation is standing.
    *
    * Here rather than inside `BackupSettings`, because closing it is
@@ -607,13 +603,15 @@ export function App({
    */
   const [acceptFailed, setAcceptFailed] = useState<AcceptedFrom | null>(null)
   /**
-   * Where the key replacement asked for on the Sauvegarde screen stopped, when
-   * it did not go through, so that screen says so (#284). The step and not a
-   * flag, because what the screen may truthfully say depends on it. Kept and
-   * cleared beside `acceptFailed`, for the same reasons.
+   * The key replacement asked for on the Sauvegarde screen, when it did not go
+   * through, so that screen says so (#284). The step AND what it left behind,
+   * not a flag: what the screen may truthfully say depends on the second, and
+   * the log wants the first (#327). Kept and cleared beside `acceptFailed`,
+   * for the same reasons.
    */
-  const [replaceFailedAt, setReplaceFailedAt] =
-    useState<ReplaceFailedAt | null>(null)
+  const [replaceFailure, setReplaceFailure] = useState<ReplaceFailure | null>(
+    null,
+  )
   /**
    * Which gesture on the backup is running, if any, read from
    * `backupAcceptance` rather than held by this mount (#284): a mount that
@@ -630,7 +628,7 @@ export function App({
   // the whole of what this listens for.
   useEffect(() => {
     setAcceptFailed(null)
-    setReplaceFailedAt(null)
+    setReplaceFailure(null)
   }, [tab])
   /**
    * Reads the backup's state whenever that screen is showing and nothing is
@@ -651,60 +649,92 @@ export function App({
   useEffect(() => {
     if (!backupOpen || backupPrompt !== null) return
     let stale = false
-    setBackupState({ reading: 'waiting' })
-    readKeyBackupState()
-      .then(async state => {
-        // SAID EVERY TIME, for the reason the offer's own line exists: a
-        // screen showing the wrong branch and a screen showing the right one
-        // are indistinguishable from outside, and this is the line that says
-        // which the bridge actually answered.
-        logEvent('info', 'MESSAGR_BACKUP_STATE', {
-          enabled: state.enabled,
-          total: state.total,
-          backedUp: state.backedUp,
-          stale,
-        })
-        if (!stale) setBackupState({ reading: 'read', ...state })
-        // ASKED ONLY WHEN THERE IS A REASON TO. A device that is backing up
-        // has its keys; a device with nothing it cannot read has nothing to
-        // bring back. Both skip the request entirely.
-        if (state.enabled) {
-          if (!stale) setRestorableFromSettings(false)
-          return
-        }
-        const session = sessionClientRef.current
-        if (session === null || unreadableConversations(summaries) === 0) {
-          if (!stale) setRestorableFromSettings(false)
-          return
-        }
-        const found = await findBackupOnAccount(session)
-        restoreTargetRef.current = found
-        if (!stale) setRestorableFromSettings(found !== null)
+    setBackupState({ standing: 'waiting' })
+    const look = async () => {
+      const device = await readKeyBackupState()
+      // SAID EVERY TIME, for the reason the offer's own line exists: a
+      // screen showing the wrong branch and a screen showing the right one
+      // are indistinguishable from outside, and this is the line that says
+      // which the bridge actually answered.
+      logEvent('info', 'MESSAGR_BACKUP_STATE', {
+        enabled: device.enabled,
+        total: device.total,
+        backedUp: device.backedUp,
+        stale,
       })
-      .catch((cause: unknown) => {
-        // THE CAUSE, WHICH THIS USED TO SWALLOW. An empty `catch` is how a
-        // blank page on somebody else's telephone became something nobody
-        // here could explain: the screen said nothing and so did the log.
-        logEvent('warn', 'MESSAGR_BACKUP_STATE_UNREADABLE', {
-          because: getErrorMessage(cause),
-          stale,
-        })
-        if (!stale) setBackupState({ reading: 'unreadable' })
+
+      // THE ACCOUNT, WHICH THIS SCREEN USED NEVER TO ASK (#323). One request
+      // on a screen somebody opened on purpose, and it is the only thing that
+      // can tell « la sauvegarde tourne » from « une autre l'a remplacée ».
+      // Asked whatever the bridge answered: a device that says off may have a
+      // backup on its account, and that is where an interrupted acceptance
+      // shows.
+      //
+      // A refusal is `unanswered` and never `null`: « aucune sauvegarde » is
+      // what a 404 means, and telling somebody their past is gone during an
+      // outage is the one mistake `backupCalls.ts` exists to prevent.
+      const session = sessionClientRef.current
+      let account: string | null | 'unanswered' = 'unanswered'
+      if (session !== null) {
+        try {
+          const found = await findBackupOnAccount(session)
+          // Kept for the key entry this screen opens, as it was when only a
+          // restore asked for it.
+          restoreTargetRef.current = found
+          account = found?.version ?? null
+        } catch (cause: unknown) {
+          logEvent('warn', 'MESSAGR_BACKUP_ACCOUNT_UNREADABLE', {
+            because: getErrorMessage(cause),
+            stale,
+          })
+        }
+      }
+
+      // WHICH VERSION THIS DEVICE WRITES TO, which the bridge does not hand
+      // back through `readKeyBackupState` and the keystore does. It is also
+      // what the next launch resumes, so it is the one worth comparing.
+      const commitment = await readBackupCommitment(backupSecrets)
+      const standing = backupStanding({
+        device,
+        account,
+        writesTo: commitment?.version ?? null,
       })
+      logEvent('info', 'MESSAGR_BACKUP_STANDING', {
+        standing: standing.standing,
+        stale,
+      })
+      if (!stale) setBackupState(standing)
+    }
+    look().catch((cause: unknown) => {
+      // THE CAUSE, WHICH THIS USED TO SWALLOW. An empty `catch` is how a
+      // blank page on somebody else's telephone became something nobody
+      // here could explain: the screen said nothing and so did the log.
+      logEvent('warn', 'MESSAGR_BACKUP_STATE_UNREADABLE', {
+        because: getErrorMessage(cause),
+        stale,
+      })
+      // The bridge, or the keystore: either way this device could not read
+      // its own state, which is a different sentence from the server's
+      // silence and is the one this branch is about.
+      if (!stale) setBackupState({ standing: 'unreadable' })
+    })
     return () => {
       stale = true
     }
     // `attempt` is here so the retry on the screen re-runs this effect. It
     // is otherwise unused, which is the point: nothing else has to know how
     // the reading is taken.
-    // `summaries` is here because the reading asks whether anything is
-    // unreadable. It costs nothing while the screen is closed -- the first
-    // line returns -- and while it is open the list rarely redraws.
-  }, [backupOpen, backupPrompt, attempt, summaries])
+    //
+    // `summaries` is gone with the condition that read it: the account is
+    // asked whatever this device can or cannot read, so the list redrawing
+    // no longer re-runs a reading that does not depend on it.
+  }, [backupOpen, backupPrompt, attempt])
   /**
-   * What the bridge says about the backup, while that screen is open.
+   * What the backup's state is, while that screen is open: the bridge, the
+   * account and the keystore read together (#323). `backupStanding.ts` names
+   * the states and argues them.
    *
-   * # THREE STATES, AND THE THIRD IS WHY THIS IS NOT A NULLABLE OBJECT
+   * # NOT A NULLABLE OBJECT, AND THAT IS WHY
    *
    * It was `{...} | null`, with `null` standing for both "not asked yet" and
    * "could not be read", and the screen was drawn only when it held an
@@ -718,13 +748,14 @@ export function App({
    * did not even log -- the `catch` swallowed the cause.
    *
    * So the screen is drawn from the moment it is opened, and it says which
-   * of the three it is. `waiting` is honest for the second the bridge takes.
-   * `unreadable` is honest for ever, and carries a way to ask again. Neither
-   * asserts anything about the backup, which was the whole point of the
-   * paragraph above.
+   * state it is in. `waiting` is honest for the second the readings take,
+   * `unreadable` is honest for ever and carries a way to ask again, and
+   * `unchecked` is the homeserver's silence rather than this telephone's.
+   * None of the three asserts anything about the backup, which was the whole
+   * point of the paragraph above.
    */
-  const [backupState, setBackupState] = useState<BackupReading>({
-    reading: 'waiting',
+  const [backupState, setBackupState] = useState<BackupStanding>({
+    standing: 'waiting',
   })
   /**
    * The kept messages, with their words, while that screen is open.
@@ -1117,20 +1148,21 @@ export function App({
         }
         if (settled.show === 'replacementFailure') {
           setReplaceConfirming(false)
-          // THE READING TAKEN AGAIN, whatever is showing, and it proves
-          // nothing about the failure. It is the bridge's, and `enabled`
-          // means only that `enableKeyBackup` was called in this process:
-          // after a failure past the publish it can go on saying « vos
-          // messages sont sauvegardés » of a version the homeserver no
-          // longer takes (#327). What the server holds is #323's.
+          // THE READING TAKEN AGAIN, whatever is showing. It asks the
+          // account as well as the bridge since #323, so it is now the
+          // reading that SAYS what a failure left: a replacement stopped at
+          // `enabling` lands on « une sauvegarde existe sur le serveur, mais
+          // cet appareil ne l'alimente pas », which is exactly what happened
+          // and what the sentence below cannot say on its own.
           setAttempt(n => n + 1)
-          // SAID ON SAUVEGARDE ONLY, IN THE SENTENCE ITS STEP ALLOWS:
-          // « rien n'a changé » only before the publish, as
+          // SAID ON SAUVEGARDE ONLY, IN THE SENTENCE WHAT IT LEFT ALLOWS:
+          // « rien n'a changé » when the publication went back, which since
+          // #327 a failure past the publish can manage, as
           // `failedReplacementSentence` says.
           if (!backupShowing.current.backupScreen) return
-          setReplaceFailedAt(settled.failedAt)
+          setReplaceFailure(settled.failure)
           AccessibilityInfo.announceForAccessibility(
-            t(failedReplacementSentence(settled.failedAt)),
+            t(failedReplacementSentence(settled.failure)),
           )
           return
         }
@@ -1173,13 +1205,13 @@ export function App({
     // again, and a tap that got in before it did changes nothing.
     if (started) {
       setAcceptFailed(null)
-      setReplaceFailedAt(null)
+      setReplaceFailure(null)
     }
   }
   /** A card is about asking just now: leaving its screen takes it down. */
   const clearBackupCards = () => {
     setAcceptFailed(null)
-    setReplaceFailedAt(null)
+    setReplaceFailure(null)
   }
   const [claimed, setClaimed] = useState<HistoryClaim | null>(null)
   // Set once, at entry, and never cleared: the launch either was opened with
@@ -1384,10 +1416,23 @@ export function App({
     const look = async () => {
       if (await askedToRestore(restoreAskedSecrets)) return
       const found = await findBackupOnAccount(session)
+      // WHICH VERSION THIS DEVICE WRITES TO (#328). Read here rather than
+      // guessed from the bridge: this effect runs again when the key screen
+      // closes, and on a telephone whose past is unreadable that is the
+      // moment the account holds the empty version this device has just
+      // made. Offering it would be « vos anciens messages sont là » about a
+      // box that holds none of them.
+      const commitment = await readBackupCommitment(backupSecrets)
+      const mine =
+        found !== null &&
+        commitment !== null &&
+        commitment.version === found.version
       const decision = offerRestore({
         backupExists: found !== null,
         unreadable: stranded,
         asked: false,
+        mine,
+        keys: found?.count ?? null,
       })
       // SAID EVERY TIME, for the reason the backup offer's own line exists:
       // a refusal here has several causes and they look identical from
@@ -1396,6 +1441,10 @@ export function App({
         offer: decision.offer,
         backupExists: found !== null,
         unreadable: stranded,
+        mine,
+        // The homeserver's own count, or the word for having named none: a
+        // number would make silence look like a measurement.
+        keys: found?.count ?? 'unknown',
       })
       if (!decision.offer || stale) return
       // RECORDED BEFORE THE ANSWER. Same discipline as the backup's, same
@@ -4580,12 +4629,11 @@ export function App({
             {openScope === null && tab === 'settings' && backupOpen && (
               <View style={styles.block}>
                 <BackupSettings
-                  reading={backupState}
+                  standing={backupState}
                   onRetry={() => setAttempt(attempt + 1)}
                   failed={acceptFailed === 'settings'}
                   working={backupWorking}
-                  replaceFailedAt={replaceFailedAt}
-                  restorable={restorableFromSettings}
+                  replaceFailure={replaceFailure}
                   onRestore={() => {
                     // The same surface the offer leads to, reached from the
                     // door instead. Nothing is closed here: the entry covers
@@ -4604,7 +4652,7 @@ export function App({
                     // Dropped rather than kept: the next opening asks
                     // again, and a value held between them would be the
                     // screen describing a backup as it was.
-                    setBackupState({ reading: 'waiting' })
+                    setBackupState({ standing: 'waiting' })
                     // And the card with it, for the same reason: it was
                     // about asking just now, not about coming back. A
                     // failure that settles once this screen is gone is not

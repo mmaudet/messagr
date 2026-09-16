@@ -99,6 +99,7 @@ describe('one gesture on the backup at a time, a replacement included', () => {
     backup.replace(async (): Promise<BackupReplacedFrom> => ({
       replaced: false,
       failedAt: 'enabling',
+      undone: false,
     }))
     await settled()
     backup.replace(async () => {
@@ -107,8 +108,16 @@ describe('one gesture on the backup at a time, a replacement included', () => {
     await settled()
 
     expect(shown).toEqual([
-      { show: 'replacementFailure', failedAt: 'enabling' },
-      { show: 'replacementFailure', failedAt: 'thrown' },
+      {
+        show: 'replacementFailure',
+        failure: { failedAt: 'enabling', undone: false },
+      },
+      // Nothing was left behind by a throw: `replaceBackup` lets one out only
+      // before the publish (#327).
+      {
+        show: 'replacementFailure',
+        failure: { failedAt: 'thrown', undone: true },
+      },
     ])
   })
 })

@@ -1,5 +1,5 @@
 import type { BackupAcceptedFrom } from './acceptBackup'
-import type { BackupReplacedFrom, ReplaceFailedAt } from './replaceBackup'
+import type { BackupReplacedFrom, ReplaceFailure } from './replaceBackup'
 
 /** Which gesture on the backup is running. */
 export type BackupGesture = 'accept' | 'replace'
@@ -17,8 +17,12 @@ export type AcceptanceSettled =
     }
   /** An acceptance that did not go through, a rejection included. */
   | { readonly show: 'failure' }
-  /** A replacement that did not go through, and where it stopped. */
-  | { readonly show: 'replacementFailure'; readonly failedAt: ReplaceFailedAt }
+  /**
+   * A replacement that did not go through: where it stopped, and what it left
+   * behind (#327). Both, because the sentence reads the second and the log
+   * reads the first.
+   */
+  | { readonly show: 'replacementFailure'; readonly failure: ReplaceFailure }
 
 /**
  * The acceptance of the backup: one at a time, and what it produces handed to
@@ -151,10 +155,19 @@ export function acceptance(): Acceptance {
                 restoreKey: outcome.restoreKey,
                 oldStillOpens: !outcome.oldRetired,
               }
-            : { show: 'replacementFailure', failedAt: outcome.failedAt },
+            : {
+                show: 'replacementFailure',
+                failure: {
+                  failedAt: outcome.failedAt,
+                  undone: outcome.undone,
+                },
+              },
         // `thrown`, as `replaceBackupFrom` answers a rejection: `replaceBackup`
-        // lets a throw out only before the publish.
-        { show: 'replacementFailure', failedAt: 'thrown' },
+        // lets a throw out only before the publish, so nothing was left behind.
+        {
+          show: 'replacementFailure',
+          failure: { failedAt: 'thrown', undone: true },
+        },
       ),
     running: () => running,
     subscribe: changed => {

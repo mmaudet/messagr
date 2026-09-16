@@ -131,9 +131,14 @@ const TRACE = new Map<string, Shape>([
   // for a replacement of the key (#284), and whether a commitment the next
   // launch would turn on could not be forgotten. Never its cause: an error
   // message can carry an account or an address.
+  //
+  // `undone` is a replacement's (#327): whether the version it published was
+  // taken back, which is what tells « rien n'a changé » from a device that
+  // has stopped feeding its backup. A flag, and one this line is no use
+  // without: the same step reads two different ways depending on it.
   [
     'MESSAGR_BACKUP_ACCEPT_FAILED',
-    { from: 'words', failedAt: 'words', forgotten: 'flag' },
+    { from: 'words', failedAt: 'words', undone: 'flag', forgotten: 'flag' },
   ],
 ])
 

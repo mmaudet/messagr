@@ -519,14 +519,23 @@ export const it: Readonly<Record<CopyKey, string>> = {
   'backup_settings_progress %1$d %2$d': '%1$d chiavi salvate su %2$d',
   backup_settings_catching_up:
     'Il resto parte con le prossime sincronizzazioni. Nel frattempo non si perde nulla.',
-  'backup_settings_count %1$d':
-    '%1$d chiavi salvate: è quello che Messagr vede sul server.',
+  'backup_settings_count %1$d': '%1$d chiavi inviate da questo dispositivo.',
   backup_settings_reading: 'Lettura dello stato del backup…',
   backup_settings_unreadable:
     'Lo stato del backup non è stato letto su questo dispositivo.',
   backup_settings_unreadable_why:
     'Questo non dice nulla sul backup stesso: se era attivo, lo è ancora, e qui non è stato cambiato nulla.',
   backup_settings_retry: 'Riprovare',
+  backup_settings_superseded:
+    'Un altro backup ha sostituito quello di questo dispositivo: da qui non parte più nulla.',
+  backup_settings_dormant:
+    'Sul server esiste un backup, ma questo dispositivo non lo alimenta.',
+  backup_settings_unchecked:
+    'Il server non ha risposto: lo stato del backup non è stato letto.',
+  backup_settings_unchecked_why: 'Qui non è stato cambiato nulla.',
+  backup_settings_enter_current: 'Inserire la chiave attuale',
+  backup_settings_enter_key: 'Inserire la mia chiave di recupero',
+  backup_settings_new: 'Creare un nuovo backup',
   backup_settings_enable: 'Salvare i miei messaggi',
   backup_settings_never_shown:
     'La sua chiave attuale non può essere mostrata di nuovo, né qui né altrove.',
@@ -629,7 +638,5 @@ export const it: Readonly<Record<CopyKey, string>> = {
   settings_vault_hint:
     'Un file, per chi non vuole lasciare nulla su un server.',
   restore_done_close: 'Chiudere',
-  settings_restore: 'Ritrovare i miei vecchi messaggi',
-  settings_restore_hint: 'Se ha la sua chiave di recupero.',
   back_to_newest: 'Torna all’ultimo messaggio',
 }

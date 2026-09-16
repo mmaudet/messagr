@@ -535,13 +535,22 @@ export const uz: Readonly<Record<CopyKey, string>> = {
   'backup_settings_progress %1$d %2$d': '%2$d tadan %1$d kalit zaxiralandi',
   backup_settings_catching_up:
     'Qolgani suhbatlar sinxronlangani sari ketadi. Bu orada hech nima yoʻqolmaydi.',
-  'backup_settings_count %1$d':
-    '%1$d kalit zaxiralandi: Messagr serverda shuni koʻradi.',
+  'backup_settings_count %1$d': '%1$d kalit shu qurilmadan yuborildi.',
   backup_settings_reading: 'Zaxira holati oʻqilmoqda…',
   backup_settings_unreadable: 'Zaxira holatini bu qurilmada oʻqib boʻlmadi.',
   backup_settings_unreadable_why:
     'Bu zaxiraning oʻzi haqida hech nima demaydi: yoqilgan boʻlsa, hamon yoqilgan, va bu yerda hech nima oʻzgartirilmadi.',
   backup_settings_retry: 'Qayta urinish',
+  backup_settings_superseded:
+    'Boshqa zaxira shu qurilmanikining oʻrnini egalladi: bu yerdan endi hech nima ketmaydi.',
+  backup_settings_dormant:
+    'Serverda zaxira bor, lekin bu qurilma uni toʻldirmayapti.',
+  backup_settings_unchecked:
+    'Server javob bermadi: zaxira holatini oʻqib boʻlmadi.',
+  backup_settings_unchecked_why: 'Bu yerda hech nima oʻzgartirilmadi.',
+  backup_settings_enter_current: 'Joriy kalitni kiritish',
+  backup_settings_enter_key: 'Tiklash kalitimni kiritish',
+  backup_settings_new: 'Yangi zaxira yaratish',
   backup_settings_enable: 'Xabarlarimni zaxiralash',
   backup_settings_never_shown:
     'Joriy kalitingizni qayta koʻrsatib boʻlmaydi — na bu yerda, na boshqa joyda.',
@@ -644,7 +653,5 @@ export const uz: Readonly<Record<CopyKey, string>> = {
   settings_vault_hint:
     'Fayl — serverda hech nima qoldirishni istamaganlar uchun.',
   restore_done_close: 'Yopish',
-  settings_restore: 'Eski xabarlarimni qaytarish',
-  settings_restore_hint: 'Agar tiklash kalitingiz boʻlsa.',
   back_to_newest: 'Oxirgi xabarga qaytish',
 }
