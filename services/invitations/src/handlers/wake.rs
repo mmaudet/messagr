@@ -119,13 +119,33 @@ use crate::AppState;
 ///   and an APNs `BadDeviceToken` both end up. Passed back verbatim, as above,
 ///   and the two transports are coherent because they end in this same list.
 /// - **the notification names it by elimination** — the forward carrying this
-///   device was refused while the forward carrying another was accepted. Our
-///   credentials, our project and our payload were identical across the two;
-///   the pushkey is the only thing that differed, so the refusal is about it.
+///   device was refused while the forward carrying another device **of the
+///   same `app_id`** was accepted. Our credentials, our project and our
+///   payload were identical across the two; the pushkey is the only thing that
+///   differed, so the refusal is about it.
 ///
 /// Anything else is written to the log and rejects nobody. What that costs is
 /// a wasted push per event for one dead token, on a deployment whose
 /// credentials work; what it buys is that no outage can empty the pushers.
+///
+/// **The same `app_id` is not a detail.** It is what picks the pushkin, and a
+/// pushkin holds its own credentials: `eu.messagr` is a Firebase service
+/// account, `eu.messagr.apns` is an Apple key, and they fail apart. A person
+/// with an Android phone and an iPhone puts one of each in the same
+/// notification — so eliminating across app ids would read an accepted APNs
+/// device as proof that Firebase works, and the day that key expires, delete
+/// the Android pusher of everybody who also owns an iPhone.
+///
+/// # WHAT THIS STILL CANNOT TELL APART
+///
+/// Sygnal sheds load with a `502` of its own once a pushkin passes
+/// `inflight_request_limit` (512 in `sygnal.yaml`). A notification whose
+/// devices share a pushkin could therefore, on a busy enough deployment, have
+/// one accepted and one shed — and the rule above would read the shed one as a
+/// dead token. `AT_ONCE` keeps this service from ever being the cause of that
+/// by itself; a deployment busy enough for it to happen anyway is one where
+/// this rule wants revisiting, and the log line says which branch was taken
+/// every time.
 ///
 /// # AND THIS HANDLER DOES NOT FAIL
 ///
@@ -208,6 +228,20 @@ enum Forwarded {
     Unanswered(String),
 }
 
+/// How many forwards of one notification may be in flight at once.
+///
+/// A homeserver's notify request is for one account's own pushers, so real
+/// traffic is a handful and never meets this. What it bounds is the shape this
+/// route took on when the forward was split.
+///
+/// The body limit on the route admits a body naming thousands of devices, and
+/// its comment reasons about that costing ONE outbound request: sygnal owned
+/// the fan-out and shed load with its own `inflight_request_limit`. Since #286
+/// the fan-out is here, and unbounded it would be thousands of simultaneous
+/// connections out of this process -- on the one route in this service that
+/// authenticates nobody.
+const AT_ONCE: usize = 8;
+
 /// One device, and what became of the forward that carried it.
 struct Answer {
     /// Its rank in the notification the homeserver sent. The forwards finish
@@ -252,12 +286,18 @@ pub async fn notify(State(st): State<Arc<AppState>>, Json(body): Json<Notify>) -
     // hold this request for minutes, which the single batched forward never
     // did.
     let mut forwards = tokio::task::JoinSet::new();
+    let at_once = Arc::new(tokio::sync::Semaphore::new(AT_ONCE));
     for (at, device) in body.notification.devices.iter().enumerate() {
         let payload = strip(std::slice::from_ref(device), &prio, &event_id);
         let gateway = gateway.to_owned();
         let app_id = device.app_id.clone();
         let pushkey = device.pushkey.clone();
+        let at_once = at_once.clone();
         forwards.spawn(async move {
+            // Held for the forward and released with the task. `ok()` and not
+            // `unwrap()`: the semaphore is never closed, so this cannot fail,
+            // and a forward is not worth a panic if that ever stops being true.
+            let _permit = at_once.acquire_owned().await.ok();
             let outcome = forward(&gateway, &payload).await;
             Answer {
                 at,
@@ -337,35 +377,44 @@ fn named(rejected: Option<&Value>) -> Vec<String> {
 ///
 /// The module header carries the reasoning; this is it, applied.
 fn rejections(answers: &[Answer]) -> Vec<String> {
-    // Naming by elimination needs something to eliminate against: a forward
-    // sygnal accepted proves our credentials, our project and our payload are
-    // fine, so a refusal of a sibling forward is about that sibling's pushkey.
-    let anything_accepted = answers
+    // Naming by elimination needs something to eliminate against, and it has
+    // to be an acceptance UNDER THE SAME `app_id`.
+    //
+    // `app_id` is what picks the pushkin, and a pushkin carries its own
+    // credentials: `eu.messagr` is the Firebase service account, `eu.messagr
+    // .apns` is an Apple key, and they can fail apart. A person with an
+    // Android phone and an iPhone has one of each in the same notification, so
+    // eliminating across app ids would read an accepted APNs device as proof
+    // that our Firebase service account works -- and the day that key expires,
+    // delete the Android pusher of everybody who also owns an iPhone.
+    let accepted: std::collections::HashSet<&str> = answers
         .iter()
-        .any(|answer| matches!(answer.outcome, Forwarded::Named(_)));
+        .filter(|answer| matches!(answer.outcome, Forwarded::Named(_)))
+        .map(|answer| answer.app_id.as_str())
+        .collect();
 
     let mut rejected = Vec::new();
     for answer in answers {
         match &answer.outcome {
             Forwarded::Named(names) => rejected.extend(names.iter().cloned()),
-            Forwarded::Refused(status) if anything_accepted => {
+            Forwarded::Refused(status) if accepted.contains(answer.app_id.as_str()) => {
                 tracing::info!(
                     app_id = %answer.app_id, pushkey = %tail(&answer.pushkey), status = %status,
                     "the push gateway refused this device and accepted another of the \
-                     same notification: the pushkey is the only thing that differed \
-                     between the two, so it is reported rejected. A token an \
-                     application no longer holds is an ordinary event"
+                     same notification under the same app id: the pushkey is the only \
+                     thing that differed between the two, so it is reported rejected. \
+                     A token an application no longer holds is an ordinary event"
                 );
                 rejected.push(answer.pushkey.clone());
             }
             Forwarded::Refused(status) => {
                 tracing::warn!(
                     app_id = %answer.app_id, pushkey = %tail(&answer.pushkey), status = %status,
-                    "the push gateway refused this device and accepted none of this \
-                     notification, so nothing is reported rejected: a token FCM will \
-                     never accept and a service account that is no longer authorised \
-                     arrive here as the same bodiless 502, and only the second is a \
-                     reason to keep this deployment's pushers"
+                    "the push gateway refused this device and accepted nothing else \
+                     under this app id, so nothing is reported rejected: a token FCM \
+                     will never accept and a service account that is no longer \
+                     authorised arrive here as the same bodiless 502, and only the \
+                     second is a reason to keep this deployment's pushers"
                 );
             }
             Forwarded::Unanswered(why) => {
@@ -835,6 +884,40 @@ mod tests {
             json!([]),
             "an upstream that accepted nothing at all is an upstream that \
              has not said anything about anybody's token"
+        );
+    }
+
+    /// **An acceptance under another `app_id` proves nothing.**
+    ///
+    /// A person with an Android phone and an iPhone puts two app ids in one
+    /// notification, and they are two pushkins with two sets of credentials: a
+    /// Firebase service account and an Apple key, which fail apart. The day
+    /// the Firebase key expires, every Android forward comes back a bodiless
+    /// 502 while the iPhone is delivered — and eliminating across app ids
+    /// would delete the Android pusher of everybody who also owns an iPhone.
+    #[sqlx::test(migrations = "./migrations")]
+    async fn an_acceptance_on_another_transport_rejects_nothing(pool: SqlitePool) {
+        let (gateway, _seen) = sygnal(|carried: &[String]| {
+            if carried.iter().any(|key| key == "ANDROID") {
+                bodiless_502()
+            } else {
+                accepted(&[])
+            }
+        })
+        .await;
+        let (status, body) = answer(
+            state(pool, Some(gateway)),
+            r##"{"notification":{"devices":[
+                 {"app_id":"eu.messagr.apns","pushkey":"IPHONE"},
+                 {"app_id":"eu.messagr","pushkey":"ANDROID"}]}}"##,
+        )
+        .await;
+        assert_eq!(status, StatusCode::OK);
+        assert_eq!(
+            body["rejected"],
+            json!([]),
+            "an accepted Apple push says nothing about the Firebase service \
+             account, and this is how an expired key would empty the pushers"
         );
     }
 
