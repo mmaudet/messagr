@@ -515,6 +515,22 @@ export const fr = {
   legal_report_scope:
     'Messagr est un service d’hébergement et non une plateforme en ligne, le considérant 14 du DSA écartant les services de messagerie interpersonnelle. Les articles 20 et 21 ne s’appliquent donc pas, et ce texte ne prétend pas les offrir.',
 
+  // #333 : LE CHEMIN DE SUPPRESSION, ET IL EST ICI PARCE QUE PLAY L'EXIGE.
+  //
+  // Une application qui crée un compte doit offrir « an in-app path to delete
+  // their app accounts », et Play accepte que ce chemin soit un lien vers la
+  // ressource web où la suppression se demande. Messagr crée un compte à
+  // l'ouverture d'une invitation, et ne portait ni l'un ni l'autre.
+  //
+  // CE QUE CET ÉCRAN DIT, LA PAGE LE DIT AUSSI, et c'est la règle de tout ce
+  // bloc : scripts/assert-legal-screen.sh existe parce qu'un texte publié a
+  // déjà promis un geste que le code ne portait pas. Aucun délai n'est affiché
+  // ici : la page d'aide porte celui que la politique engage, et dit dans la
+  // même phrase que la purge est faite à la main (#71).
+  legal_delete_title: 'Supprimer votre compte',
+  legal_delete_body:
+    'La suppression se demande par courriel à conformite@messagr.eu : le geste depuis l’application n’existe pas encore. Le compte est alors désactivé et ses données sont purgées ; les messages déjà envoyés restent des événements des salons où ils ont été écrits, et le serveur ne peut pas les en retirer puisqu’il ne peut pas les lire.',
+  legal_delete_link: 'Demander la suppression : messagr.eu/aide',
   legal_full_terms: 'Conditions générales complètes : messagr.eu',
 
   // LA CONFIANCE, EXPLIQUÉE PLUTÔT QUE SIGNALÉE.

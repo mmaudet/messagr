@@ -14,6 +14,9 @@ changed.
       .well-known/            the app-link declarations, Android and Apple
       confidentialite/        the privacy policy (Google follows this link)
       conditions-generales/   the terms the first-launch screen links to
+      aide/                   the help page: Apple's support URL, and the
+                              account deletion resource Play requires, at
+                              #supprimer-votre-compte (#333)
     build-site.sh             produces the served tree; run in CI
     deploy.sh                 publishes it to the server
     nginx-messagr-eu.conf     the vhost
@@ -272,6 +275,7 @@ Verify after:
     curl -sS -o /dev/null -w '%{http_code}\n' https://messagr.eu/
     curl -sS -o /dev/null -w '%{http_code}\n' https://messagr.eu/confidentialite
     curl -sS -o /dev/null -w '%{http_code}\n' https://messagr.eu/conditions-generales
+    curl -sS -o /dev/null -w '%{http_code}\n' https://messagr.eu/aide
     deploy/messagr-eu/tests/identical-page-invitation.sh /tmp/messagr-site \
       deploy/messagr-eu/nginx-messagr-eu.conf --live
     node deploy/messagr-eu/tests/conformite-site-deploye.js --live
