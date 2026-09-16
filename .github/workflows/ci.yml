@@ -164,6 +164,23 @@ jobs:
       - name: Assert Info.plist says what App Store Connect requires
         run: ./scripts/assert-ios-info-plist.sh
 
+      # LA MÊME FORME ENCORE, ET CELLE-CI, PERSONNE NE LA REFUSE.
+      #
+      # Les quatre textes d'autorisation vivaient en français dans un
+      # Info.plist dont la région de développement est `en`, sans aucun
+      # `.lproj` à côté : tout iPhone, quelle que soit sa langue, demandait le
+      # micro en français (#320). Apple l'accepte, la build est verte, et la
+      # seule personne à qui ça se voit tient un téléphone réglé en allemand
+      # au moment où on lui demande son micro.
+      #
+      # Le script lit aussi le pbxproj, et c'est sa moitié silencieuse : un
+      # `.lproj` qu'aucun groupe de variantes ne nomme, ou une région absente
+      # de `knownRegions`, ne casse rien du tout et n'arrive jamais dans le
+      # paquet. Le job `ios-simulator` prouve que le projet est bien formé,
+      # pas ce qu'il y a dans les fichiers.
+      - name: Assert the permission dialogs speak every language
+        run: ./scripts/assert-ios-localisation.sh
+
       # THE FOURTH OF THE SAME SHAPE, AND THE FIRST THAT SPANS BOTH
       # PLATFORMS. The invitation page's button is meant to be intercepted by
       # the operating system, and was intercepted by neither: iOS had no

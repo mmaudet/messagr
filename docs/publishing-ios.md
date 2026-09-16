@@ -149,6 +149,27 @@ carré blanc, et la CI reste verte : App Store Connect a été la première chos
 Réparé depuis `design/brand/messagr-icone-ios-1024.svg`, et
 `scripts/assert-ios-icon.sh` le vérifie maintenant dans `checks`.
 
+#### Les textes d'autorisation, et la langue où ils s'affichent
+
+Les quatre textes que réclame Apple (micro, caméra, photothèque en lecture,
+photothèque en écriture) étaient écrits en français dans `Info.plist`, dont la
+région de développement est `en`, et aucun `.lproj` ne vivait à côté. Tout
+iPhone les affichait donc en français, quelle que soit sa langue (#320).
+
+Ces boîtes sont dessinées par iOS. Il ne demande rien à l'application et ne lit
+jamais `src/copy/` : il lit le paquet. La base anglaise reste dans
+`Info.plist`, et les sept langues vivent dans
+`packages/app/ios/Messagr/<langue>.lproj/InfoPlist.strings`, les mêmes sept que
+`src/copy/`.
+
+Rien d'autre ne voyait ce défaut, et rien d'autre ne le verrait revenir : une
+traduction absente se compile, se signe, se téléverse, passe la revue d'Apple
+et s'installe. `scripts/assert-ios-localisation.sh` le refuse dans `checks`, et
+il lit aussi `project.pbxproj` : un `.lproj` qu'aucun groupe de variantes ne
+nomme, ou une langue absente de `knownRegions`, est un fichier que la build
+ignore sans rien dire. La même garde tient `Info.plist` sur l'anglais, en le
+comparant mot pour mot à `en.lproj`.
+
 #### La conformité à l'export
 
 Déclarée **exemptée**, dans le build comme dans le compte :

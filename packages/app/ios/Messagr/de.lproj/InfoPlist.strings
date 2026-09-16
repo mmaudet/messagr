@@ -1,0 +1,17 @@
+/* German.
+
+   Translated from the English base. Why each string says what it says — and
+   what it is not allowed to promise — is written beside the keys in
+   Info.plist; `scripts/assert-ios-localisation.sh` refuses a language that is
+   missing one.
+
+   `Sie` and not `du`, and the vocabulary of `src/copy/de.ts`: Ende-zu-Ende
+   verschlüsselt, Server, Fotomediathek, Unterhaltung. */
+
+"NSMicrophoneUsageDescription" = "Damit Ihr Gegenüber Sie während eines Anrufs hört. Der Ton ist Ende-zu-Ende verschlüsselt: weder der Server noch Messagr kann ihn mithören, und nichts wird aufgezeichnet.";
+
+"NSCameraUsageDescription" = "Damit Ihr Gegenüber Sie während eines Videoanrufs sieht. Das Bild ist Ende-zu-Ende verschlüsselt: weder der Server noch Messagr kann es sehen, und nichts wird aufgezeichnet.";
+
+"NSPhotoLibraryUsageDescription" = "Um ein Bild auszuwählen, das in einer Unterhaltung gesendet wird. Das Bild wird auf diesem Gerät verschlüsselt, bevor es gesendet wird: weder der Server noch Messagr kann es lesen.";
+
+"NSPhotoLibraryAddUsageDescription" = "Um ein in einer Unterhaltung empfangenes Foto in Ihrer Fotomediathek zu sichern, wenn Sie es verlangen. Ein gesichertes Bild verlässt Messagr: es folgt danach den Sicherungen und den Berechtigungen Ihrer Fotomediathek.";
