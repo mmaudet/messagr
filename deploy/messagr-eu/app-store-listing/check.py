@@ -322,9 +322,20 @@ def self_test():
             "supportUrl",
         ),
         (
+            # UNE ADRESSE QUE RIEN NE SERVIRA JAMAIS, ET C'EST LE SUJET.
+            #
+            # Ce cas portait `https://messagr.eu/aide`, qui n'était servi par
+            # rien quand il a été écrit. La PR de la page d'aide l'a créé, et
+            # ce cas est passé au vert en cessant de vouloir dire quelque
+            # chose : il ne refusait plus rien, puisque l'adresse existait.
+            #
+            # Il n'a été vu que parce que les deux changements ont été
+            # éprouvés ensemble ; chacun était vert de son côté. L'adresse
+            # ci-dessous est donc choisie pour ne jamais devenir une page :
+            # si quelqu'un la crée un jour, ce test doit rougir et le dire.
             "une URL d'assistance que ce dépôt ne sert pas",
             "supportUrl",
-            "https://messagr.eu/aide",
+            "https://messagr.eu/rien-ici-et-jamais-rien",
             "adresse",
         ),
         (
