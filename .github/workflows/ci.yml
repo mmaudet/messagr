@@ -146,12 +146,15 @@ jobs:
       # and an unentitled build compiles. It registers with Apple, is
       # refused, and reports nothing.
       #
-      # LE SCRIPT PORTE AUSSI CE QUI NE DOIT PAS ARRIVER (#334) :
-      # `FirebaseMessagingAutoInitEnabled` à `false` dans le même Info.plist.
-      # Absente, la clé laisse le SDK retomber sur le réglage global de
-      # collecte de Firebase, actif par défaut. Le nom de l'étape dit les
-      # deux, parce qu'une étape nommée pour un seul de ses refus envoie la
-      # personne qui la voit rouge lire le mauvais fichier.
+      # LE SCRIPT PORTE AUSSI CE QUI NE DOIT PAS ARRIVER (#334) : plus rien de
+      # Firebase dans la cible iOS. Son contrôle le plus important n'est pas
+      # l'état du verrou mais l'exclusion dans
+      # `packages/app/react-native.config.js` : sans elle, `use_native_modules!`
+      # relie les deux paquets au prochain `pod install`, les douze pods
+      # reviennent, et RIEN NE ROUGIT — une application avec Firebase dedans
+      # compile aussi bien qu'une sans. Le nom de l'étape dit les deux, parce
+      # qu'une étape nommée pour un seul de ses refus envoie la personne qui la
+      # voit rouge lire le mauvais fichier.
       - name: Assert an iPhone built from this tree could be woken, and quietly
         run: ./scripts/assert-ios-push.sh
 

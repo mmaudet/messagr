@@ -2,7 +2,7 @@
  * @format
  */
 
-import { AppRegistry } from 'react-native'
+import { AppRegistry, Platform } from 'react-native'
 
 // Ordering is load-bearing. The bootstrap patches the runtime, and App pulls
 // in matrix-js-sdk, which reaches for crypto.getRandomValues while it is being
@@ -23,6 +23,14 @@ AppRegistry.registerComponent(appName, () => App)
 // while nothing is mounted, and a handler registered inside a screen would
 // not exist then. This is the only file that runs early enough.
 //
+// SUR ANDROID SEULEMENT DEPUIS #334, ET CE N'EST PAS UNE PERTE.
+//
+// `RNFBMessaging+AppDelegate.m` l. 233 ne remet une poussée à JavaScript que
+// si elle porte `gcm.message_id`, qu'une poussée envoyée par sygnal à Apple
+// ne porte jamais : ce gestionnaire était déjà mort sur iPhone avant que
+// Firebase quitte le paquet iOS (#341 l'a mesuré). Ce qui réveille vraiment
+// un iPhone est #341, et n'est pas ceci.
+//
 // What it does is `src/runtime/wake.ts`, which is a function of ports and is
 // tested without a device. What it CAN do is bounded by what woke it: the
 // push carried `{"prio":"high"}` and nothing else, on purpose, so there is no
@@ -34,6 +42,12 @@ AppRegistry.registerComponent(appName, () => App)
 // unlocked since the phone was switched on -- answers `null`, and `null`
 // draws the notification that names nobody. That fallback is #90's own
 // criterion, not a stand-in for this.
+// AU NIVEAU DU MODULE, ET SUR LES DEUX PLATEFORMES.
+//
+// Le paquet npm reste installé pour Android ; seul le pod a quitté la cible
+// iOS. `require` ne lève donc rien sur iPhone — react-native-firebase lève
+// paresseusement, au premier appel — et `getMessaging()` plus bas n'est
+// atteint que sur Android.
 const {
   setBackgroundMessageHandler,
   getMessaging,
@@ -89,6 +103,29 @@ try {
 }
 
 function registerTheWake() {
+  // AT MODULE SCOPE, WHICH IS THE ONLY PLACE IT WORKS.
+  //
+  // notifee refuses to hold a press without a background handler, and said so
+  // on a device: "no background event handler has been set". Registered inside
+  // a component it does not exist when the process is headless -- which is
+  // every case a background press happens in.
+  //
+  // The refusal needs a session and a crypto machine, which is everything
+  // the notification adapter exists not to know about -- so it is handed in.
+  //
+  // PREMIER, ET SUR LES DEUX PLATEFORMES : C'EST LE PIÈGE DE #334.
+  //
+  // Ceci est notifee, pas Firebase. Cette ligne vivait sous le
+  // `getMessaging()` d'en dessous, donc sortir Firebase de l'iPhone l'aurait
+  // emportée avec lui — sans rien casser à la compilation, sans un mot dans
+  // le journal, et la seule personne à qui ça se serait vu est quelqu'un
+  // refusant un appel sur un iPhone verrouillé.
+  rememberBackgroundPresses(refuseTheCallHere)
+
+  // ANDROID SEUL. Sur iPhone il n'y a plus de Firebase dans le paquet, et il
+  // n'y avait déjà rien à remettre : voir l'en-tête.
+  if (Platform.OS !== 'android') return
+
   setBackgroundMessageHandler(getMessaging(), async () => {
     // THE SETTING IS CHECKED HERE TOO, AND NOT ONLY AT REGISTRATION.
     //
@@ -124,17 +161,4 @@ function registerTheWake() {
     // The one line anybody debugging a push has. There is no screen here.
     logEvent('info', 'MESSAGR_WOKE', outcome)
   })
-
-  // AT MODULE SCOPE, WHICH IS THE ONLY PLACE IT WORKS.
-  //
-  // notifee refuses to hold a press without a background handler, and said so
-  // on a device: "no background event handler has been set". Registered inside
-  // a component it does not exist when the process is headless -- which is
-  // every case a background press happens in.
-  //
-  // Inside the guard with the handler above: both belong to being woken, and
-  // a device that cannot be woken has nothing to hold a press for.
-  // The refusal needs a session and a crypto machine, which is everything
-  // the notification adapter exists not to know about -- so it is handed in.
-  rememberBackgroundPresses(refuseTheCallHere)
 }
