@@ -301,6 +301,24 @@ export const en: Readonly<Record<CopyKey, string>> = {
   invite_failed: 'The invitation could not be created.',
   invite_waiting: 'Nobody has opened the link yet.',
   invite_admitted: 'Done: this person can come in.',
+  invited_title: 'Invitation received',
+  invited_lead: 'Invites you to join a conversation.',
+  invited_who_unknown:
+    'This conversation does not say who created it. Nobody can be named here.',
+  'invited_instance %@': 'This account is hosted by %@.',
+  'invited_instance_elsewhere %@':
+    'This account is hosted by %@, which is not your server.',
+  invited_terms_unknown:
+    'No link was opened here for this invitation: how long it lasts and how many uses it has left cannot be read from this device.',
+  invited_nothing_sent:
+    'Nothing has been sent yet. Until you answer, this invitation stays where it is.',
+  'invited_behind %1$d':
+    '%1$d other invitation(s) are waiting behind this one.',
+  invited_join: 'Join the conversation',
+  invited_refuse: 'Refuse the invitation',
+  invited_working: 'One moment…',
+  invited_failed:
+    'Nothing has changed: this invitation was neither joined nor refused. You can try again.',
   list_name_not_kept:
     'The name could not be kept: it will be forgotten at the next launch.',
   settings_action: 'Settings',
