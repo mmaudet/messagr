@@ -477,10 +477,11 @@ force :
    L'application affiche, sur l'appareil, des textes et des photographies
    écrits par quelqu'un d'autre. Elle les affiche.
 3. **La confirmation demandée est satisfaite par sa seconde branche.** « all
-   the necessary rights […] **or be otherwise permitted to use it** » : les
-   conditions générales disent ce qu'une personne peut publier, et leurs §4 et
-   §5 portent le mécanisme de signalement et de retrait du règlement
-   2022/2065. C'est cette branche-là qui tient, pas la première.
+   the necessary rights […] **or be otherwise permitted to use it** » : le §2
+   des conditions générales dit ce qu'une personne ne peut pas publier, et les
+   §3 à §5 portent la modération, le signalement et le réexamen humain, au
+   sens du règlement 2022/2065. C'est cette branche-là qui tient, pas la
+   première.
 
 **Le chiffrement de bout en bout ne change pas la réponse**, et c'est le
 contresens à éviter : l'éditeur ne voit jamais ce contenu, mais la question
