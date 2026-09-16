@@ -77,6 +77,17 @@ jobs:
       - name: Assert the reviewer's admission decides the way it is meant to
         run: node scripts/testflight-reviewer.mjs --self-test
 
+      # LA TABLE DE TAILLES EST LA SEULE CHOSE QUE CE CONTRÔLE SAIT, et une
+      # taille fautive s'y verrait pour la première fois dans App Store
+      # Connect, après le téléversement -- c'est-à-dire à l'endroit exact où
+      # on ne veut pas l'apprendre. Rien d'autre ne peut l'exercer : les
+      # captures elles-mêmes demandent un simulateur, que ce runner n'a pas,
+      # et `scripts/` n'a pas de harnais de tests. Le fichier porte donc ses
+      # cas, comme `release-notes.mjs` et `testflight-reviewer.mjs` portent
+      # les leurs, et ceci est ce qui les lance.
+      - name: Assert the iOS screenshot sizes are the ones Apple accepts
+        run: node scripts/assert-ios-captures.mjs --self-test
+
       - run: yarn lint
       - run: yarn format
       - run: yarn typecheck
