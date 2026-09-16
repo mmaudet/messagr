@@ -7,7 +7,7 @@ import type { BackupGesture } from '../runtime/acceptanceGate'
 import type { BackupStanding } from '../runtime/backupStanding'
 import {
   failedReplacementSentence,
-  type ReplaceFailedAt,
+  type ReplaceFailure,
 } from '../runtime/replaceBackup'
 import { Consequences } from './Consequences'
 import { NotchedButton } from './NotchedButton'
@@ -103,7 +103,7 @@ export function BackupSettings({
   onRestore,
   failed,
   working,
-  replaceFailedAt,
+  replaceFailure,
 }: {
   /**
    * What this device could learn about its backup, from the bridge, the
@@ -112,15 +112,16 @@ export function BackupSettings({
    */
   readonly standing: BackupStanding
   /**
-   * Where the key replacement asked for here stopped, when it did not go
-   * through (#284), or `null`. It decides the sentence: « rien n'a changé »
-   * holds only before the publish, as `failedReplacementSentence` says.
+   * The key replacement asked for here, when it did not go through (#284), or
+   * `null`. It decides the sentence: « rien n'a changé » holds when the
+   * gesture left nothing behind, which since #327 is a thing a failure past
+   * the publish can also be. `failedReplacementSentence` says it.
    *
    * Above everything on this screen, because the reading taken after it can
    * land in any state, or be waiting, and the sentence has to be seen
    * whichever one the screen then draws.
    */
-  readonly replaceFailedAt: ReplaceFailedAt | null
+  readonly replaceFailure: ReplaceFailure | null
   /**
    * Which gesture on the backup is running, if any (#284): an acceptance,
    * from this screen or from the offer, or a replacement of the key. One runs
@@ -226,12 +227,12 @@ export function BackupSettings({
           ochre is the state's own, as for an acceptance that failed. The
           sentence is the one the step allows: past the publish, nothing is
           as it was. */}
-      {replaceFailedAt !== null && (
+      {replaceFailure !== null && (
         <View
           style={[styles.card, styles.off]}
           testID="backup-settings-replace-failed">
           <Text style={styles.body}>
-            {t(failedReplacementSentence(replaceFailedAt))}
+            {t(failedReplacementSentence(replaceFailure))}
           </Text>
         </View>
       )}

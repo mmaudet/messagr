@@ -90,7 +90,7 @@ import {
 import {
   failedReplacementSentence,
   replaceBackupFrom,
-  type ReplaceFailedAt,
+  type ReplaceFailure,
 } from './src/runtime/replaceBackup'
 import type { BackupVersionInfo } from './src/runtime/backupCalls'
 import { readBackupCommitment } from './src/runtime/backupCommitment'
@@ -603,13 +603,15 @@ export function App({
    */
   const [acceptFailed, setAcceptFailed] = useState<AcceptedFrom | null>(null)
   /**
-   * Where the key replacement asked for on the Sauvegarde screen stopped, when
-   * it did not go through, so that screen says so (#284). The step and not a
-   * flag, because what the screen may truthfully say depends on it. Kept and
-   * cleared beside `acceptFailed`, for the same reasons.
+   * The key replacement asked for on the Sauvegarde screen, when it did not go
+   * through, so that screen says so (#284). The step AND what it left behind,
+   * not a flag: what the screen may truthfully say depends on the second, and
+   * the log wants the first (#327). Kept and cleared beside `acceptFailed`,
+   * for the same reasons.
    */
-  const [replaceFailedAt, setReplaceFailedAt] =
-    useState<ReplaceFailedAt | null>(null)
+  const [replaceFailure, setReplaceFailure] = useState<ReplaceFailure | null>(
+    null,
+  )
   /**
    * Which gesture on the backup is running, if any, read from
    * `backupAcceptance` rather than held by this mount (#284): a mount that
@@ -626,7 +628,7 @@ export function App({
   // the whole of what this listens for.
   useEffect(() => {
     setAcceptFailed(null)
-    setReplaceFailedAt(null)
+    setReplaceFailure(null)
   }, [tab])
   /**
    * Reads the backup's state whenever that screen is showing and nothing is
@@ -1150,13 +1152,14 @@ export function App({
           // messages sont sauvegardés » of a version the homeserver no
           // longer takes (#327). What the server holds is #323's.
           setAttempt(n => n + 1)
-          // SAID ON SAUVEGARDE ONLY, IN THE SENTENCE ITS STEP ALLOWS:
-          // « rien n'a changé » only before the publish, as
+          // SAID ON SAUVEGARDE ONLY, IN THE SENTENCE WHAT IT LEFT ALLOWS:
+          // « rien n'a changé » when the publication went back, which since
+          // #327 a failure past the publish can manage, as
           // `failedReplacementSentence` says.
           if (!backupShowing.current.backupScreen) return
-          setReplaceFailedAt(settled.failedAt)
+          setReplaceFailure(settled.failure)
           AccessibilityInfo.announceForAccessibility(
-            t(failedReplacementSentence(settled.failedAt)),
+            t(failedReplacementSentence(settled.failure)),
           )
           return
         }
@@ -1199,13 +1202,13 @@ export function App({
     // again, and a tap that got in before it did changes nothing.
     if (started) {
       setAcceptFailed(null)
-      setReplaceFailedAt(null)
+      setReplaceFailure(null)
     }
   }
   /** A card is about asking just now: leaving its screen takes it down. */
   const clearBackupCards = () => {
     setAcceptFailed(null)
-    setReplaceFailedAt(null)
+    setReplaceFailure(null)
   }
   const [claimed, setClaimed] = useState<HistoryClaim | null>(null)
   // Set once, at entry, and never cleared: the launch either was opened with
@@ -4610,7 +4613,7 @@ export function App({
                   onRetry={() => setAttempt(attempt + 1)}
                   failed={acceptFailed === 'settings'}
                   working={backupWorking}
-                  replaceFailedAt={replaceFailedAt}
+                  replaceFailure={replaceFailure}
                   onRestore={() => {
                     // The same surface the offer leads to, reached from the
                     // door instead. Nothing is closed here: the entry covers

@@ -131,7 +131,7 @@ function screen(
       onConfirming: nothing,
       failed: false,
       working: null,
-      replaceFailedAt: null,
+      replaceFailure: null,
       ...over,
     }),
   )
@@ -232,11 +232,34 @@ describe('what the actions on this screen lead to', () => {
       { standing: 'superseded' } as const,
       { standing: 'dormant' } as const,
     ]) {
-      const drawn = screen(standing, { replaceFailedAt: 'publishing' })
+      const drawn = screen(standing, {
+        replaceFailure: { failedAt: 'publishing', undone: true },
+      })
 
       expect(hostOf(drawn, 'backup-settings-replace-failed')).toBeDefined()
       expect(sentences(drawn)).toContain(t('backup_replace_failed'))
     }
+  })
+
+  it('says a replacement that failed left the account as it was, when it did', () => {
+    // #327: past the publish the old sentence was a lie, and it is true again
+    // once the published version has been taken back.
+    const drawn = screen(
+      { standing: 'sending', backedUp: 13, total: 13 },
+      { replaceFailure: { failedAt: 'remembering', undone: true } },
+    )
+
+    expect(sentences(drawn)).toContain(t('backup_replace_failed'))
+  })
+
+  it('does not say it when the publication could not be taken back', () => {
+    const drawn = screen(
+      { standing: 'superseded' },
+      { replaceFailure: { failedAt: 'enabling', undone: false } },
+    )
+
+    expect(sentences(drawn)).toContain(t('backup_accept_failed'))
+    expect(sentences(drawn)).not.toContain(t('backup_replace_failed'))
   })
 
   it('holds every button inert while a gesture on the backup runs', () => {

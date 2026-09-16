@@ -55,6 +55,40 @@ import { logEvent } from './log'
  * new key works AND the old one still opens the old backup — which is the
  * one fact somebody replacing a key because they lost control of the old one
  * needs to be told.
+ *
+ * # A FAILURE PAST THE PUBLISH TAKES THE PUBLICATION BACK (#327)
+ *
+ * The publish is the step that changes the account: from it on, vN is the
+ * homeserver's current version, and the version the old key opens is not.
+ * What that left, before this:
+ *
+ * - **Stopped at `remembering`.** The keystore still holds the OLD
+ *   commitment and the bridge still writes to the old version, which the
+ *   homeserver now refuses — `M_WRONG_ROOM_KEYS_VERSION`, at every launch,
+ *   for ever. Réglages said « sauvegardés » throughout.
+ * - **Stopped at `enabling`.** vN is current and its restore key was never
+ *   shown to anybody, because a failure hands none back. A restore on a new
+ *   telephone reads vN and refuses the old key as `wrong-key`: the person's
+ *   whole past, behind a key that exists nowhere.
+ *
+ * Both are the same defect — a version left current that nothing on earth
+ * can write to or open — so both are answered the same way: the published
+ * version is retired, and the account is left holding what it held.
+ *
+ * `undone` says whether the gesture left NOTHING behind, and it is what the
+ * screen's sentence reads. It is true when the version went and the keystore
+ * was never written to, which is the `remembering` case; false at `enabling`,
+ * where the old commitment was overwritten and then forgotten (#284) and this
+ * device stops feeding the backup it goes back to; false when the retirement
+ * itself failed, because « rien n'a changé » would then be a lie.
+ *
+ * **What it does not restore is the old commitment**, which would need the
+ * old sealing key, and the only copy of that is the keystore entry the
+ * acceptance overwrote. Putting it back means reading it before step one,
+ * which is a dependency this module's caller has to bind — and the caller is
+ * `cryptoPump.ts`. Until it does, the state that leaves is the third one
+ * Réglages now names: a backup on the account that this device does not feed,
+ * with the key entry beside it.
  */
 export interface ReplaceBackupDeps extends AcceptBackupDeps {
   /**
@@ -88,16 +122,25 @@ export type BackupReplaced =
   | {
       readonly replaced: false
       /**
-       * As `acceptBackup`. Nothing here retires the old version, but only a
-       * failure at `publishing` leaves the homeserver as it was: from
-       * `remembering` on, the new version is already its current one.
+       * As `acceptBackup`, plus the step that threw.
        *
-       * `thrownAfterPublishing` is a step that threw instead of answering, once
-       * the new version was published. A throw before that still rejects, and
-       * nothing had changed.
+       * `thrownAfterPublishing` is a step that threw instead of answering,
+       * once the new version was published. A throw before that still
+       * rejects, and nothing had changed.
        */
       readonly failedAt:
         'publishing' | 'remembering' | 'enabling' | 'thrownAfterPublishing'
+      /**
+       * Whether this gesture left nothing behind it (#327).
+       *
+       * `true` when the account holds what it held AND this device's
+       * commitment was never touched. That is every failure before the
+       * publish, and a publication retired at `remembering`.
+       *
+       * `false` is the answer a screen must not round up: the published
+       * version stands, or the commitment this device backs up under is gone.
+       */
+      readonly undone: boolean
       /** As `acceptBackup`: present, and `false`, only when it could not forget. */
       readonly forgotten?: false
     }
@@ -142,12 +185,24 @@ export async function replaceBackup(
     // say: the screen took every one for « rien n'a changé ». Before the
     // publish nothing had changed, and the rejection goes on to the caller.
     if (published === null) throw cause
-    return { replaced: false, failedAt: 'thrownAfterPublishing' }
+    // TAKEN BACK ALL THE SAME (#327), and claiming nothing about the
+    // keystore: a `remember` that rejected left the old commitment, a
+    // `forget` that rejected left the new one, and nothing here can tell
+    // which threw.
+    await takeBackThePublication(deps, previous, published)
+    return { replaced: false, failedAt: 'thrownAfterPublishing', undone: false }
   }
   if (!accepted.accepted) {
+    const takenBack = await takeBackThePublication(deps, previous, published)
     return {
       replaced: false,
       failedAt: accepted.failedAt,
+      // NOTHING LEFT BEHIND, WHICH IS MORE THAN THE VERSION HAVING GONE.
+      // `enabling` overwrote the commitment and then forgot it, so this
+      // device no longer writes to the backup the account is back to --
+      // true of the account and not of the telephone, and the sentence has
+      // to hold for both.
+      undone: takenBack && accepted.failedAt !== 'enabling',
       ...(accepted.forgotten === false ? { forgotten: false } : {}),
     }
   }
@@ -187,12 +242,47 @@ export async function replaceBackup(
 }
 
 /**
+ * Retires the version this replacement published, so the account is left
+ * holding the version it held (#327). Answers whether nothing of the
+ * publication stands.
+ *
+ * The guard is the retirement-after-success's own, and for the same reason: a
+ * homeserver that answered the same identifier twice would have this delete
+ * the backup that was already there, which is the one case where taking the
+ * gesture back costs more than leaving it. It answers `false` rather than
+ * `true` because it cannot know what such a homeserver did to the description
+ * it kept.
+ */
+async function takeBackThePublication(
+  deps: ReplaceBackupDeps,
+  previous: string | null,
+  published: string | null,
+): Promise<boolean> {
+  // Nothing reached the homeserver: a publish that failed, or one that named
+  // no usable version, which `acceptBackup` refuses rather than carries.
+  if (published === null || published === '') return true
+  if (published === previous) return false
+  try {
+    await deps.retire(published)
+    return true
+  } catch {
+    return false
+  }
+}
+
+/**
  * What the Sauvegarde screen is answered: the replacement's own answer, or
  * `thrown` for one that rejected instead of answering. `replaceBackup` rejects
- * only before the publish, so nothing on the homeserver moved.
+ * only before the publish, so nothing on the homeserver moved — which is why
+ * that answer carries `undone: true`.
  */
 export type BackupReplacedFrom =
-  BackupReplaced | { readonly replaced: false; readonly failedAt: 'thrown' }
+  | BackupReplaced
+  | {
+      readonly replaced: false
+      readonly failedAt: 'thrown'
+      readonly undone: true
+    }
 
 /**
  * A replacement as the Sauvegarde screen runs it: it never rejects, and a
@@ -215,14 +305,19 @@ export async function replaceBackupFrom(
     logEvent('warn', 'MESSAGR_BACKUP_ACCEPT_FAILED', {
       from: 'replace',
       failedAt: 'thrown',
+      undone: true,
       because: getErrorMessage(cause),
     })
-    return { replaced: false, failedAt: 'thrown' }
+    return { replaced: false, failedAt: 'thrown', undone: true }
   }
   if (!outcome.replaced) {
     logEvent('warn', 'MESSAGR_BACKUP_ACCEPT_FAILED', {
       from: 'replace',
       failedAt: outcome.failedAt,
+      // What the failure left, which is the other half of where it stopped
+      // (#327): the same step reads differently depending on whether the
+      // publication went back.
+      undone: outcome.undone,
       ...(outcome.forgotten === false ? { forgotten: false } : {}),
     })
   }
@@ -235,6 +330,13 @@ export type ReplaceFailedAt = Extract<
   { readonly replaced: false }
 >['failedAt']
 
+/** A replacement that did not go through: where it stopped, and what it left. */
+export interface ReplaceFailure {
+  readonly failedAt: ReplaceFailedAt
+  /** See `BackupReplaced`: whether the gesture left nothing behind it. */
+  readonly undone: boolean
+}
+
 /**
  * The sentence the Sauvegarde screen shows, and announces, for a replacement
  * that did not go through (#284).
@@ -242,15 +344,19 @@ export type ReplaceFailedAt = Extract<
  * Found in review: every failure said « rien n'a changé : votre ancienne clé
  * ouvre toujours votre sauvegarde ». That holds at `publishing`, and for
  * `thrown`, which `replaceBackup` lets out only before the publish. From
- * `remembering` on, the homeserver holds the new version as its current one,
- * and the true sentence is the acceptance's own: the backup could not be
- * turned on. A step this does not name gets that one too, because it claims
- * less.
+ * `remembering` on, the homeserver held the new version as its current one,
+ * and the true sentence was the acceptance's own: the backup could not be
+ * turned on.
+ *
+ * **The step is no longer what decides it (#327), because the step is no
+ * longer what determines the state.** A publication taken back IS nothing
+ * having changed, whichever step stopped, and a publication that could not be
+ * taken back is not, whichever step stopped. So one thing is read, and it is
+ * the thing the sentence claims. `failedAt` travels beside it for the log,
+ * which is where knowing the step is what helps.
  */
 export function failedReplacementSentence(
-  failedAt: ReplaceFailedAt,
+  failure: ReplaceFailure,
 ): 'backup_replace_failed' | 'backup_accept_failed' {
-  return failedAt === 'publishing' || failedAt === 'thrown'
-    ? 'backup_replace_failed'
-    : 'backup_accept_failed'
+  return failure.undone ? 'backup_replace_failed' : 'backup_accept_failed'
 }
