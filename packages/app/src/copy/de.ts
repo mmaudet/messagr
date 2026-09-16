@@ -276,6 +276,23 @@ export const de: Readonly<Record<CopyKey, string>> = {
     'Sie haben bereits ein Gespräch mit %@. Dieses läuft weiter: die Einladung hat kein zweites eröffnet.',
   list_not_in_yet:
     'Sie sind noch nicht drin. Öffnen Sie den Einladungslink, den Ihnen jemand geschickt hat: er ist die einzige Tür, und davor kann die Anwendung nichts tun.',
+  // DIE ZWEITE TÜR, UND NUR DIE ZWEITE. #367. Die ganze Begründung steht im
+  // französischen Katalog: die Anwendung liest die Zwischenablage nie von
+  // sich aus, und was ein kopierter Link kostet, wird dort gesagt, wo er
+  // verlangt wird.
+  list_paste_lead:
+    'Wenn sich der Link nicht von selbst öffnet, kopieren Sie ihn und fügen Sie ihn hier ein.',
+  list_paste_cost:
+    'Ein kopierter Link ist für die anderen Anwendungen auf diesem Telefon lesbar. Dieser gilt eine Stunde und nur ein einziges Mal.',
+  list_paste_field: 'Einladungslink einfügen',
+  list_paste_confirm: 'Eintreten',
+  list_paste_working: 'Einladung wird geöffnet…',
+  list_paste_not_a_link:
+    'Das ist kein Messagr-Einladungslink. Es wurde nichts gesendet, und keine Einladung wurde verbraucht.',
+  list_paste_refused:
+    'Diese Einladung kann nicht verwendet werden. Bitten Sie die Person, die sie Ihnen geschickt hat, um eine neue.',
+  list_paste_retry:
+    'Dieser Einladung konnte vorerst nicht gefolgt werden. Versuchen Sie es gleich noch einmal: der Link selbst bleibt gültig.',
   list_reinstalled_back:
     'Dieses Gerät wurde neu installiert. Es ist mit einer neuen Geräteidentität zurück, und Nachrichten von vor der Neuinstallation bleiben unlesbar: ihre Schlüssel sind mit der alten Installation gegangen.',
   list_reinstalled_stranded:

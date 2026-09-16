@@ -281,6 +281,11 @@ import { departureFrom } from './src/runtime/leavingThisDevice'
 import { theAccountsInQuestion } from './src/runtime/accountInQuestion'
 import { questionOnScreen, type Asked } from './src/runtime/questionOnScreen'
 import { whenToSay } from './src/runtime/whenToSay'
+import {
+  invitationPasted,
+  whatThePasteBecame,
+  type PasteSaid,
+} from './src/runtime/pastedLink'
 import { launchEntries } from './src/runtime/launchEntries'
 import { waitingToOpen } from './src/runtime/waitingToOpen'
 import {
@@ -1425,7 +1430,28 @@ export function App({
   const [warmLink, setWarmLink] = useState<{
     readonly url: string
     readonly count: number
+    /**
+     * Whether this link was pasted by hand rather than handed over by the
+     * operating system. #367.
+     *
+     * LE MÊME CANAL, PAS UN SECOND CHEMIN. Un lien collé est dépensé par
+     * `spentLinks` puis `entry.ts`, exactement comme celui que le système
+     * remet : deux chemins d'entrée finiraient par diverger, et c'est l'un
+     * des deux que personne ne mettrait à jour.
+     *
+     * Ce drapeau ne change rien à ce qui est fait du lien. Il dit seulement
+     * où la réponse doit être lue : sur le champ où le geste a été fait,
+     * puisque l'écran d'avant l'entrée ne dessine aucune des phrases que
+     * `entry.ts` destine à un appareil qui a déjà un compte.
+     */
+    readonly pasted?: boolean
   } | null>(null)
+  /**
+   * Ce qu'est devenu le lien collé sur l'écran d'avant l'entrée. #367.
+   *
+   * `null` tant que personne n'a rien collé, ce qui est presque toujours.
+   */
+  const [pasting, setPasting] = useState<PasteSaid | null>(null)
   // The links a launch is claiming right now. The same link handed over twice
   // for one opening -- getInitialURL and then a url event, or two events close
   // together -- runs the launch twice, and the two runs must agree that only
@@ -1701,6 +1727,45 @@ export function App({
       }),
     [],
   )
+
+  /**
+   * LE LIEN QUE QUELQU'UN COLLE, remis au même chemin que celui du système.
+   * #367.
+   *
+   * # POURQUOI IL Y A UN CHAMP
+   *
+   * Sur iPhone, une invitation ouverte dans le navigateur intégré d'une autre
+   * messagerie n'atteint jamais Messagr, et le bouton « Ouvrir dans Messagr »
+   * de la page est un lien vers son propre domaine, qu'iOS ne remet pas à
+   * l'application qui le revendique. C'est une règle d'Apple. La personne voit
+   * l'invitation, a l'application, et n'a aucune porte (#308).
+   *
+   * # L'APPLICATION NE LIT JAMAIS LE PRESSE-PAPIERS
+   *
+   * Un jeton d'invitation est un porteur (ADR-0004) et un presse-papiers se
+   * lit depuis n'importe quelle autre application. Aujourd'hui Messagr y écrit
+   * et ne le lit jamais ; cette asymétrie est la protection, et elle ne se
+   * rompt que par le geste de la personne, dans un champ qu'elle remplit.
+   * Jamais au lancement, jamais en arrière-plan, jamais « pour proposer de
+   * coller ». `pastedLink.spec.ts` le tient comme un test.
+   *
+   * # CE QUI EST LU ICI, ET CE QUI NE L'EST PAS
+   *
+   * Une adresse qui n'est pas une invitation est écartée par le seul lecteur
+   * du produit et ne part nulle part : rien n'est envoyé, aucun jeton n'est
+   * dépensé, et le champ le dit. Tout le reste -- dépensé, expiré, révoqué,
+   * service injoignable -- est décidé par `entry.ts` comme pour n'importe quel
+   * lien, et la réponse revient plus bas.
+   */
+  const pasteTheLink = useCallback((raw: string) => {
+    const url = invitationPasted(raw)
+    if (url === null) {
+      setPasting('not-a-link')
+      return
+    }
+    setPasting('working')
+    setWarmLink(held => ({ url, count: (held?.count ?? 0) + 1, pasted: true }))
+  }, [])
 
   /**
    * Dire qu'un partage n'a pas abouti, là où la phrase se lit.
@@ -2069,6 +2134,27 @@ export function App({
           thisEntry.end()
           if (settleTheQuestion !== null) settleTheQuestion()
         })
+      // CE QU'EST DEVENU UN LIEN COLLÉ, DIT LÀ OÙ IL A ÉTÉ COLLÉ. #367.
+      //
+      // Dès que l'entrée a répondu, et pas après la pompe : sur l'écran
+      // d'avant l'entrée il n'y a pas de compte, donc aucune des phrases que
+      // `whenToSay.ts` arbitre ne s'y dessine. La personne vient de faire un
+      // geste ; ce qu'il est devenu se lit à l'endroit où elle l'a fait.
+      //
+      // `null` quand elle est entrée : l'écran qui portait le champ n'est
+      // plus dessiné une seconde plus tard, et une phrase de refus laissée là
+      // reviendrait sur la liste de quelqu'un qui est entré.
+      if (warmLink?.pasted === true) {
+        const became = whatThePasteBecame(entered)
+        setPasting(became === 'in' ? null : became)
+        // LA RAISON VA AU JOURNAL ET PAS À L'ÉCRAN, §13.27 : le service ne
+        // distingue pas inconnu, dépensé, révoqué et expiré, et l'écran ne
+        // fait pas semblant. C'est la ligne qu'il faut pour diagnostiquer.
+        logEvent(became === 'in' ? 'info' : 'warn', 'MESSAGR_LINK_PASTED', {
+          became,
+          ...(entered.entered ? {} : { reason: entered.reason }),
+        })
+      }
       // WHAT BECAME OF AN ACCOUNT THIS LAUNCH LEFT, ON ITS OWN SERVER. #304,
       // #307.
       // Logged whenever that server answers, which may be after this launch
@@ -3948,6 +4034,13 @@ export function App({
             stack: cause.stack.split('\n').slice(0, 8).join(' | '),
           })
         }
+        // ET UN LIEN COLLÉ N'ATTEND PAS UNE RÉPONSE QUI NE VIENDRA PLUS.
+        // #367 : ce lancement s'est arrêté avant d'avoir dit ce que le lien
+        // était devenu, et « Ouverture de l'invitation… » laissé là pour la
+        // vie du processus est une promesse que rien ne tiendra -- avec, en
+        // plus, le bouton éteint. « Réessayez » est vrai : c'est le
+        // lancement qui a échoué, pas le lien.
+        setPasting(held => (held === 'working' ? 'retry' : held))
       })
       // A LAUNCH THAT IS OVER AND NEVER BOUND AN OPENER LETS THE TOUCH GO.
       //
@@ -4980,6 +5073,8 @@ export function App({
                     invitation={linkOutcome}
                     reinstalled={reinstalled}
                     notInYet={inYet === false}
+                    onPasteLink={pasteTheLink}
+                    pasting={pasting}
                     shareRefused={shareRefused}
                     opening={waitingOn}
                     onOpen={openConversation}

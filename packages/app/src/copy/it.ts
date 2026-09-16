@@ -267,6 +267,21 @@ export const it: Readonly<Record<CopyKey, string>> = {
     'Avete già una conversazione con %@. È quella che prosegue: l’invito non ne ha aperta una seconda.',
   list_not_in_yet:
     'Non è ancora entrato. Apra il link di invito che le hanno mandato: è l’unica porta, e prima l’applicazione non può fare nulla.',
+  // LA SECONDA PORTA, E SOLO LA SECONDA. #367. Tutto il ragionamento sta nel
+  // catalogo francese: l’applicazione non legge mai gli appunti da sola, e
+  // quanto costa un link copiato è detto dove viene chiesto.
+  list_paste_lead: 'Se il link non si apre da solo, lo copi e lo incolli qui.',
+  list_paste_cost:
+    'Un link copiato può essere letto dalle altre applicazioni di questo telefono. Questo vale un’ora e serve una sola volta.',
+  list_paste_field: 'Incolli il link di invito',
+  list_paste_confirm: 'Entrare',
+  list_paste_working: 'Apertura dell’invito…',
+  list_paste_not_a_link:
+    'Questo non è un link di invito Messagr. Non è stato inviato nulla, e nessun invito è stato speso.',
+  list_paste_refused:
+    'Questo invito non può essere utilizzato. Ne chieda uno nuovo alla persona che gliel’ha mandato.',
+  list_paste_retry:
+    'Questo invito non ha potuto essere seguito per ora. Riprovi tra un momento: il link resta valido.',
   list_reinstalled_back:
     'Questo dispositivo è stato reinstallato. È tornato con una nuova identità di dispositivo, e i messaggi ricevuti prima della reinstallazione restano illeggibili: le loro chiavi sono partite con l’installazione precedente.',
   list_reinstalled_stranded:

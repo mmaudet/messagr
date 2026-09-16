@@ -272,6 +272,23 @@ export const en: Readonly<Record<CopyKey, string>> = {
     'You already have a conversation with %@. That one carries on: the invitation did not open a second.',
   list_not_in_yet:
     'You are not in yet. Open the invitation link somebody sent you: it is the only door, and the application can do nothing before it.',
+  // THE SECOND DOOR, AND ONLY THE SECOND. #367. See the French catalogue for
+  // the whole of the reasoning, which is a product decision rather than a
+  // wording one: the application never reads the clipboard by itself, and
+  // what a copied link costs is said where it is asked for.
+  list_paste_lead:
+    'If the link will not open by itself, copy it and paste it here.',
+  list_paste_cost:
+    'A copied link can be read by the other applications on this telephone. This one is good for one hour and for a single use.',
+  list_paste_field: 'Paste the invitation link',
+  list_paste_confirm: 'Enter',
+  list_paste_working: 'Opening the invitation…',
+  list_paste_not_a_link:
+    'That is not a Messagr invitation link. Nothing was sent, and no invitation was spent.',
+  list_paste_refused:
+    'This invitation cannot be used. Ask the person who sent it to you for a new one.',
+  list_paste_retry:
+    'This invitation could not be followed for now. Try again in a moment: the link itself is still good.',
   list_reinstalled_back:
     'This device was reinstalled. It has come back under a new device identity, and messages received before the reinstall stay unreadable: their keys went with the old installation.',
   list_reinstalled_stranded:

@@ -415,6 +415,33 @@ export const fr = {
     'Cette invitation a été utilisée, mais cet appareil n’a pas pu garder le nouveau compte. Votre compte reste sur cet appareil. Demandez une nouvelle invitation à la personne qui vous l’a envoyée.',
   list_not_in_yet:
     'Vous n’êtes pas encore entré. Ouvrez le lien d’invitation qu’on vous a envoyé : c’est la seule porte, et l’application ne peut rien faire avant.',
+  // LA SECONDE PORTE, ET ELLE N'EST QUE LA SECONDE. #367, sous la phrase
+  // ci-dessus et nulle part ailleurs. Sur iPhone, une invitation ouverte dans
+  // le navigateur intégré d'une autre messagerie n'atteint jamais Messagr :
+  // c'est une règle d'Apple, pas un défaut. La personne voit l'invitation, a
+  // l'application, et n'a aucune porte.
+  //
+  // CE QUE ÇA COÛTE EST DIT LÀ OÙ ON LE DEMANDE. Un jeton d'invitation est un
+  // porteur (ADR-0004) et un presse-papiers se lit depuis n'importe quelle
+  // autre application. L'application, elle, n'y écrit que : elle ne le lit
+  // jamais d'elle-même, et ce champ est le geste de la personne.
+  list_paste_lead:
+    'Si le lien ne s’ouvre pas tout seul, copiez-le et collez-le ici.',
+  list_paste_cost:
+    'Un lien copié peut être lu par les autres applications de ce téléphone. Celui-ci est valable une heure et ne sert qu’une fois.',
+  list_paste_field: 'Collez le lien d’invitation',
+  list_paste_confirm: 'Entrer',
+  list_paste_working: 'Ouverture de l’invitation…',
+  // TROIS REFUS, TROIS GESTES DIFFÉRENTS. Une adresse qui n'est pas une
+  // invitation n'a rien dépensé du tout, et le dire évite de chercher une
+  // panne là où il n'y en a pas. Un refus du service est définitif : seule une
+  // nouvelle invitation le remplace. Le reste peut passer au coup suivant.
+  list_paste_not_a_link:
+    'Ce n’est pas un lien d’invitation Messagr. Rien n’a été envoyé, et aucune invitation n’a été dépensée.',
+  list_paste_refused:
+    'Cette invitation ne peut pas être utilisée. Demandez-en une nouvelle à la personne qui vous l’a envoyée.',
+  list_paste_retry:
+    'Cette invitation n’a pas pu être suivie pour l’instant. Réessayez dans un moment : le lien, lui, reste bon.',
   // #190. Deux issues, deux phrases : revenir sous une identité neuve est la
   // bonne, et c'est quand même une perte ; rester dehors est l'autre, et là
   // la personne a quelque chose à faire. Ni l'une ni l'autre ne prétend que
