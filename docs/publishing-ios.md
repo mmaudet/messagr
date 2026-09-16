@@ -3,6 +3,11 @@
 Le pendant iOS de `publishing-android.md`, et il commence plus bas : l'Android
 avait déjà sa machinerie quand ce document a été écrit, l'iOS n'avait rien.
 
+**Il va maintenant jusqu'au magasin.** Le titre dit TestFlight parce que c'est
+par là qu'il a commencé ; la section « Soumettre une version à l'App Store »,
+en fin de document, tient ce que la console exige avant d'accepter une version,
+et les deux déclarations qu'on ne peut pas deviner.
+
 ## Pourquoi TestFlight et pas autre chose
 
 Un collègue à distance ne peut pas brancher son téléphone sur votre Mac. Les
@@ -414,6 +419,142 @@ completes.
 Accounts are pseudonymous: Messagr asks for no email address and no phone
 number, which is why we cannot provide demo credentials.
 ```
+
+## Soumettre une version à l'App Store
+
+Ce document s'arrêtait à TestFlight. Le 16 septembre 2026, la soumission de la
+1.0 a été refusée par App Store Connect avec **neuf blocages**, et aucun
+n'était écrit nulle part : ils auraient été redécouverts un par un, dans une
+console, à la version suivante. Voici ce que la console exige, et **pourquoi**
+là où ce n'est pas évident.
+
+| Ce que la console réclame                        | Où                            | État                                              |
+| ------------------------------------------------ | ----------------------------- | ------------------------------------------------- |
+| Tarification                                     | Tarification et disponibilité | Fait, 16 septembre 2026                           |
+| « Nom d'utilisateur — ce champ est obligatoire » | Informations de vérification  | Fait : la case « Connexion requise » est décochée |
+| Droits relatifs au contenu                       | Informations sur l'app        | Une déclaration à signer, voir plus bas           |
+| Informations de copyright                        | Version 1.0                   | `app-store-listing/fr-FR.json`, `copyright`       |
+| Description (français)                           | Version 1.0                   | `app-store-listing/fr-FR.json`, `description`     |
+| Mots-clés (français)                             | Version 1.0                   | `app-store-listing/fr-FR.json`, `keywords`        |
+| URL de l'assistance (français)                   | Version 1.0                   | `app-store-listing/fr-FR.json`, `supportUrl`      |
+| Une capture iPad 13 pouces                       | Version 1.0                   | 2064 × 2752 en portrait, de une à dix             |
+| Une capture iPhone 6,5 pouces                    | Version 1.0                   | 1284 × 2778 en portrait, de une à dix             |
+
+Les tailles de captures viennent de « Screenshot specifications », qui donne
+l'iPad 13 pouces « Required if app runs on iPad » et le 6,5 pouces « Required
+if app runs on iPhone and screenshots for 6.9" display aren't provided » :
+<https://developer.apple.com/help/app-store-connect/reference/screenshot-specifications/>.
+
+### La fiche vient du dépôt, et se recopie à la main
+
+Les quatre champs textuels sont écrits dans
+`deploy/messagr-eu/app-store-listing/fr-FR.json`, comme ceux de Play le sont
+dans `play-listing/`, et pour la raison que `store-listing.yml` donne en tête :
+une fiche dans le dépôt se relit en diff, une fiche tapée dans une console se
+relit dans le souvenir de celui qui l'a tapée. Les deux corrections #295 et
+#322 sont arrivées par ce chemin.
+
+`app-store-listing/check.py` tient les limites d'Apple, chacune avec la phrase
+qui l'établit, et la CI l'appelle sur chaque PR — avec `--self-test`, qui casse
+la fiche d'une quinzaine de façons et exige un refus à chaque fois.
+
+**Il n'y a pas de `publish.py`, et c'est ce qui rend ce contrôle nécessaire.**
+Play a une API et un compte de service dans les secrets Actions ; App Store
+Connect demanderait l'`issuer id` et la clé `.p8`, qui vivent dans
+`~/.appstoreconnect/` et n'ont aucune raison d'entrer dans un dépôt public. La
+fiche se recopie donc à la main, champ par champ, et **le dernier moment où
+quelque chose peut refuser est la PR**.
+
+Ce qu'il faudrait pour ouvrir ce chemin plus tard, si on le veut : les trois
+secrets que la section « Et la CI » nomme déjà pour le téléversement
+(`MESSAGR_ASC_KEY_ID`, `MESSAGR_ASC_ISSUER_ID`, `MESSAGR_ASC_KEY_BASE64`), sur
+la forme que `publish.yml` a pour Play ; une clé au rôle « App Manager » et non
+« Developer » ; et les points de terminaison
+`appStoreVersionLocalizations` et `appInfoLocalizations` de l'API App Store
+Connect — les deux, parce que le nom et le sous-titre ne vivent pas sur la
+même ressource que la description.
+
+### « Connexion requise » reste décochée
+
+App Store Connect refusait avec « **Nom d'utilisateur — ce champ est
+obligatoire** ». Ça se lit comme un champ à remplir. **Ça n'en est pas un** :
+c'est la case **« Connexion requise »** des informations de vérification qui
+était cochée, et la cocher rend obligatoires un nom d'utilisateur et un mot de
+passe. Décochée, l'erreur disparaît.
+
+**Elle doit rester décochée, et ce n'est pas un oubli.** On n'entre dans
+Messagr que par invitation (ADR-0004) : il n'y a ni formulaire, ni nom
+d'utilisateur, ni mot de passe. Le compte est créé sur l'appareil au moment où
+un lien d'invitation est ouvert. Il n'existe aucun identifiant à inventer, et
+quelqu'un qui en chercherait un pour faire taire ce message en fabriquerait un
+qui ne mène nulle part — et le relecteur se retrouverait devant un écran qui
+ne demande rien de ce qu'on lui a donné.
+
+Ce qu'Apple attend de cette case est un compte de démonstration : « Sign-in
+information for a demo account. […] The demo account is used during the App
+Review process and must not expire. » Et la règle 2.1 dit quoi faire quand on
+ne peut pas en fournir : « If you are unable to provide a demo account due to
+legal or security obligations, you may include a built-in demo mode in lieu of
+a demo account with prior approval by Apple. »
+
+Messagr ne fait ni l'un ni l'autre : il fait entrer le relecteur pour de bon,
+avec une invitation que `scripts/testflight-reviewer.mjs` tient vivante, et
+les notes de revue plus haut expliquent le geste pas à pas. La dernière phrase
+de ces notes est celle qui répond à la question que la case pose :
+« Accounts are pseudonymous: Messagr asks for no email address and no phone
+number, which is why we cannot provide demo credentials. »
+
+### Les droits relatifs au contenu, et ce qu'Apple ne tranche pas
+
+Informations sur l'app → **Droits relatifs au contenu**. La console demande si
+l'application contient, affiche ou accède à du contenu de tiers, et, si oui,
+fait confirmer qu'on en a les droits.
+
+La seule phrase normative d'Apple est celle de son aide : « Apps that contain,
+show, or access third-party content must have all the necessary rights to that
+content or be otherwise permitted to use it under the laws of each App Store
+country or region in which they're available »
+(<https://developer.apple.com/help/app-store-connect/reference/app-information/app-information/>,
+lue le 16 septembre 2026).
+
+**Apple ne définit nulle part « third-party content », et ne dit nulle part si
+ce qu'écrivent les utilisateurs en fait partie.** Les deux règles voisines
+tirent dans des sens opposés, et aucune ne conclut :
+
+- la 5.2.1 vise ce que l'éditeur embarque — « Don't use protected third-party
+  material such as trademarks, copyrighted works, or patented ideas in your
+  app without permission » — et Messagr n'embarque rien de tel ;
+- la 1.2 traite le contenu produit par les utilisateurs comme un sujet à part,
+  avec ses propres obligations, ce qui **suggère** qu'Apple sépare les deux
+  notions. Suggère seulement : elle ne l'écrit pas.
+
+**La réponse recommandée est « oui ».** Trois raisons, dans l'ordre de leur
+force :
+
+1. **L'asymétrie du risque tranche à elle seule.** Un « oui » de trop déclare
+   qu'on a les droits sur un contenu qu'on a de toute façon le droit de
+   transmettre. Un « non » de trop déclare que rien dans l'application ne
+   vient d'un tiers, ce qui est manifestement faux pour une messagerie, et la
+   2.3.1 punit exactement ce genre d'affirmation.
+2. **Les mots de la question sont larges** : « contain, show, or **access** ».
+   L'application affiche, sur l'appareil, des textes et des photographies
+   écrits par quelqu'un d'autre. Elle les affiche.
+3. **La confirmation demandée est satisfaite par sa seconde branche.** « all
+   the necessary rights […] **or be otherwise permitted to use it** » : le §2
+   des conditions générales dit ce qu'une personne ne peut pas publier, et les
+   §3 à §5 portent la modération, le signalement et le réexamen humain, au
+   sens du règlement 2022/2065. C'est cette branche-là qui tient, pas la
+   première.
+
+**Le chiffrement de bout en bout ne change pas la réponse**, et c'est le
+contresens à éviter : l'éditeur ne voit jamais ce contenu, mais la question
+porte sur ce que **l'application** contient, affiche ou atteint, pas sur ce que
+le serveur peut lire.
+
+**Ceci est une lecture, pas une citation.** Apple ne tranche pas, la case est
+une déclaration, et une déclaration fausse se paie en revue : c'est au porteur
+de la signer. Quelle que soit la réponse retenue, elle s'écrit ici, pour que la
+version suivante ne la retourne pas par hasard.
 
 ## Ce que la build écrit d'elle-même
 
