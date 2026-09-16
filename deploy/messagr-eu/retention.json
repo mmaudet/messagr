@@ -39,7 +39,8 @@
       "ni contenu ni identifiant, et l'application ne les envoie nulle part"
     ],
     "applique_par": [
-      "packages/app/src/runtime/log.ts : TRACE, les seuls évènements et les seuls champs qu'une build de store écrit"
+      "packages/app/src/runtime/log.ts : TRACE, les seuls évènements et les seuls champs qu'une build de store écrit",
+      "packages/app/src/runtime/log.ts : keepTheSdkToWarnings, qui relit mot à mot les avertissements et les erreurs de matrix-js-sdk, seules autres lignes qu'une build de store écrit, et remplace par [withheld] tout mot qui pourrait être un salon, un compte ou un évènement (#319)"
     ]
   }
 }
