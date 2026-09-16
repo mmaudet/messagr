@@ -45,6 +45,44 @@
 	</array>
 	<key>CFBundleVersion</key>
 	<string>$(CURRENT_PROJECT_VERSION)</string>
+	<!-- FIREBASE NE DOIT PAS S'ENREGISTRER DE LUI-MÊME (#334).
+
+	     CE QUE LA CLÉ FAIT. FirebaseMessaging 12.18.0 la lit dans ce fichier
+	     (`FIRMessaging.m`, `isAutoInitEnabledWithUserDefaults:`), après les
+	     préférences utilisateur et avant le réglage global de collecte de
+	     Firebase. Sans elle, c'est ce réglage global qui décide, et il vaut
+	     « oui » par défaut : le dépôt ne disait donc rien, et le défaut
+	     répondait à sa place. `false`, le `NO` de la documentation Firebase,
+	     dit que ce build ne veut pas de jeton FCM fabriqué pour lui.
+
+	     CE QU'ELLE NE CASSE PAS, et c'était la crainte. Le jeton APNs ne
+	     passe par aucun chemin gardé par cette clé. `pushDevice.ts` appelle
+	     `registerDeviceForRemoteMessages`, que le pont traduit en
+	     `registerForRemoteNotifications` d'UIKit ; Apple répond à
+	     l'AppDelegate, qui remet le jeton à `FIRMessaging` ; et
+	     `getAPNSToken` relit la propriété où celui-ci l'a gardé en mémoire
+	     (`FIRMessaging.m`, `APNSToken`). Aucune des trois étapes ne lit
+	     l'initialisation automatique.
+
+	     CE QU'ELLE NE SUFFIT PAS À FAIRE, ET IL FAUT LE SAVOIR AVANT DE
+	     CROIRE CE FICHIER. Les trois seuls endroits que cette clé garde dans
+	     12.18.0 sont hors de portée de cette application. Dans
+	     `didCompleteConfigure`, la branche gardée exige un jeton APNs déjà
+	     présent, ce qui n'arrive jamais pendant `FirebaseApp.configure()` ;
+	     `deleteDataWithCompletion:` et `setAutoInitEnabled:` ne sont appelés
+	     par personne ici, ni par l'application ni par le pont. La demande
+	     qui porte le jeton APNs à Google part d'ailleurs : quand le jeton
+	     arrive sur une installation neuve, `FIRMessagingTokenManager`,
+	     `setAPNSToken:withUserInfo:`, demande un identifiant d'installation
+	     puis un jeton FCM, et ne lit cette clé à aucun moment.
+
+	     RIEN DE TOUT CELA N'A ÉTÉ MESURÉ : c'est une lecture des sources des
+	     pods, hors dépôt. Le juge est un iPhone, et ce qu'il faut y regarder
+	     est écrit dans #334. Tant que cette mesure n'a pas eu lieu, ce
+	     commentaire ne prouve pas qu'aucune requête ne part vers Google, et
+	     ne doit pas servir à s'en dispenser. -->
+	<key>FirebaseMessagingAutoInitEnabled</key>
+	<false/>
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
 	<key>NSAppTransportSecurity</key>

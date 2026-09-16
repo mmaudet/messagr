@@ -39,6 +39,21 @@ import type { Road } from './pusher'
  * push then goes near Google: sygnal talks to Apple, and the `app_id` in the
  * pusher says so (`pusher.ts`).
  *
+ * # THE SENTENCE ABOVE IS ABOUT THE WAKE, AND NOT ABOUT THE REGISTRATION
+ *
+ * It says nothing about what the SDK does on its own while this function
+ * runs, and reading FirebaseMessaging 12.18.0 says it does something: the
+ * APNs token handed to `FIRMessaging` here makes the token manager ask
+ * Google for an installation identifier and then for an FCM token that
+ * carries the APNs token. `Info.plist` now sets
+ * `FirebaseMessagingAutoInitEnabled` to false, and that comment explains why
+ * the key alone is probably not enough to stop it.
+ *
+ * NOBODY HAS MEASURED ANY OF THIS ON AN IPHONE. Until somebody has, treat
+ * the paragraph above as a claim about sygnal and Apple, which it is, and
+ * not as a claim about the whole launch, which it is not. #334 holds the
+ * question and says exactly what to watch for.
+ *
  * # `getAPNSToken` CAN ANSWER `null`, AND WAITING ONE LAUNCH IS NOT ENOUGH
  *
  * Registration with Apple is asynchronous, and the token arrives after the
