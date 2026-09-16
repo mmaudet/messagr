@@ -14,6 +14,13 @@
 # exactly `devices` and `prio` -- and stated in another, the published page.
 # Nothing but this script makes the two agree.
 #
+# SINCE #286 THE VALUE AND ITS BUILDER ARE IN TWO PLACES. `strip` builds what
+# leaves, one device at a time; the meaningless event id is drawn by `notify`,
+# once per notification, and handed down. So the payload is read out of one
+# function and the provenance of the event id out of the other. Reading only
+# `strip` would have found `"event_id": event_id` and called it generated,
+# which says nothing at all -- the parameter could carry the real one.
+#
 # It also guards a claim that was FALSE for as long as it took to notice: the
 # page said the application contained no third-party library "parce qu'il
 # n'existe aucun tiers dans cette application", which stopped being true the
@@ -38,7 +45,17 @@ say_bad() { printf '  FAIL  %s\n' "$1" >&2; failed=1; }
 if [ ! -f "$GATEWAY" ]; then
   say_bad "the push gateway is not where this expects it: $GATEWAY"
 else
-  kept="$(sed -n '/^pub fn strip/,/^}/p' "$GATEWAY" | grep -o '"[a-z_]*":' | tr -d '":' | sort -u | tr '\n' ' ')"
+  payload="$(sed -n '/^fn strip(/,/^}/p' "$GATEWAY")"
+  handler="$(sed -n '/^pub async fn notify(/,/^}/p' "$GATEWAY")"
+
+  # NAMED RATHER THAN INFERRED FROM AN EMPTY RESULT. A renamed function would
+  # otherwise make every check below pass over nothing at all, and the only
+  # sign would be an empty field list -- which reads like a gateway that
+  # forwards nothing, the safest-looking failure there is.
+  [ -n "$payload" ] || say_bad "the payload is no longer built by \`fn strip(\` in $GATEWAY"
+  [ -n "$handler" ] || say_bad "the handler is no longer \`pub async fn notify(\` in $GATEWAY"
+
+  kept="$(printf '%s' "$payload" | grep -o '"[a-z_]*":' | tr -d '":' | sort -u | tr '\n' ' ')"
   # `notification` is the envelope the push gateway API defines, not a field
   # about a message. The other four are what goes inside it.
   expected="app_id devices event_id notification prio pushkey "
@@ -50,7 +67,7 @@ else
   fi
 
   for leaked in room_id sender content room_name membership type; do
-    if sed -n '/^pub fn strip/,/^}/p' "$GATEWAY" | grep -q "\"$leaked\""; then
+    if printf '%s' "$payload" | grep -q "\"$leaked\""; then
       say_bad "the gateway forwards $leaked, which the page says it does not"
     fi
   done
@@ -62,14 +79,26 @@ else
   # sent nothing. So a value has to be there, and it is a random one. Passing
   # the real event id instead would be the leak this gateway exists to
   # prevent, and it is a one-word edit away.
-  if sed -n '/^pub fn strip/,/^}/p' "$GATEWAY" | grep -q 'meaningless_id()'; then
+  #
+  # Read in the HANDLER, which is where the value is drawn since #286, and
+  # not in the builder that receives it.
+  if printf '%s' "$handler" | grep -q 'let event_id = meaningless_id();'; then
     say_ok "the event id sent is generated, not the message's"
   else
     say_bad "the gateway's event id is no longer a generated one"
   fi
-  if sed -n '/^pub fn strip/,/^}/p' "$GATEWAY" | grep -q 'notification.event_id'; then
-    say_bad "the gateway reads the real event id, which must never leave"
+  # And the builder still puts THAT value in the payload, rather than one of
+  # its own or one read off the notification.
+  if printf '%s' "$payload" | grep -q '"event_id": event_id,'; then
+    say_ok "the generated event id is the one that goes out"
+  else
+    say_bad "the payload's event id is not the value the handler drew"
   fi
+  for place in "$payload" "$handler"; do
+    if printf '%s' "$place" | grep -q 'notification.event_id'; then
+      say_bad "the gateway reads the real event id, which must never leave"
+    fi
+  done
 fi
 
 # ── What the page says, in the repository and live ────────────────────────
