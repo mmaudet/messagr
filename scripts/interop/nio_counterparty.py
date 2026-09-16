@@ -876,6 +876,38 @@ async def claim_place(session_file: Path, store: Path) -> int:
     return 0
 
 
+def departure_of(events: list, who: str):
+    """Le rang du dernier événement qui fait sortir `who`, ou None.
+
+    Le DERNIER, pas le premier : une contrepartie peut avoir été invitée,
+    entrée, sortie et réinvitée dans la même fenêtre, et c'est la sortie la
+    plus récente qui décide de l'état où le salon se trouve maintenant.
+    """
+    found = None
+    for rank, event in enumerate(events):
+        if (
+            event.get("type") == "m.room.member"
+            and event.get("state_key") == who
+            and (event.get("content") or {}).get("membership") == "leave"
+        ):
+            found = rank
+    return found
+
+
+def inventory(events: list) -> str:
+    """Ce qu'une liste d'événements contient, pour qu'un échec le nomme.
+
+    Un échec qui dit « rien ne t'en retire » sans dire ce qu'il a lu envoie
+    chercher un défaut du produit là où il y a une fenêtre mal demandée. C'est
+    ce qui a coûté le run 35094474747.
+    """
+    counted: dict = {}
+    for event in events:
+        key = f"{event.get('type')} from {event.get('sender')}"
+        counted[key] = counted.get(key, 0) + 1
+    return ", ".join(f"{n}x {key}" for key, n in sorted(counted.items())) or "nothing"
+
+
 async def witness_eviction(session_file: Path, store: Path) -> int:
     """Constater son propre retrait, du dehors, et ce qu'il ferme.
 
@@ -887,6 +919,33 @@ async def witness_eviction(session_file: Path, store: Path) -> int:
     interroge le homeserver avec la session de la contrepartie, une
     implémentation qui n'a rien de commun avec l'application, et ne croit rien
     de ce que l'écran a dit.
+
+    # OÙ ELLE REGARDE, ET CE QUE LE VRAI HOMESERVER A APPRIS
+
+    **`from` n'est pas facultatif en pratique.** La spécification le dit
+    facultatif depuis la v1.3, et annonce qu'un serveur sans `from` repart du
+    dernier événement visible quand `dir=b`. Mesuré sur le banc, run Device
+    35094474747 : `/messages?dir=b&limit=100` sans `from` a rendu **un seul
+    événement**, vingt-trois fois de suite, sur un salon qui en comptait une
+    dizaine et où le retrait avait bel et bien eu lieu -- l'écran de
+    l'application montrait `evict-outcome-rotated`. Continuwuity repart donc
+    du PREMIER événement du salon, et remonter en arrière depuis le premier ne
+    rend que lui. La phase a conclu « la contrepartie est encore membre » sur
+    une fenêtre mal demandée, ce qui est le genre d'erreur que ce dépôt
+    collectionne : une mesure qui accuse le produit.
+
+    Le jeton vient donc d'un `/sync`, et n'est plus supposé. La même réponse
+    sert deux fois : elle dit l'appartenance -- le salon est dans `join`, dans
+    `leave` ou nulle part -- et elle donne le `next_batch` d'où `/messages`
+    repart en arrière. Les deux lectures sont tentées à chaque tour, et la
+    première qui porte le retrait l'emporte ; un homeserver qui n'honorerait
+    pas `include_leave` ne fait donc pas échouer la phase.
+
+    Et c'est de l'HTTP nu, sans nio : le magasin est partagé entre les phases
+    et `store_sync_tokens` fait avancer le jeton à chaque réponse, de sorte
+    qu'une synchronisation nio ici ferait passer derrière lui ce que `collect`
+    doit encore lire. Un `/sync` sans `since` sur le jeton d'accès n'avance
+    rien ; `claim_place` note la même chose.
 
     # CE QU'ELLE ÉTABLIT
 
@@ -959,90 +1018,136 @@ async def witness_eviction(session_file: Path, store: Path) -> int:
     session = json.loads(session_file.read_text())
     user_id = session["user_id"]
     bearer = {"Authorization": f"Bearer {session['access_token']}"}
-    # `/messages` PLUTÔT QUE `/sync`, ET POUR DEUX RAISONS.
-    #
-    # Une partie qui a quitté un salon garde le droit d'en paginer l'histoire
-    # jusqu'à son départ (`allow_departed_users`), et rien au-delà : c'est
-    # précisément la vue qu'on veut mesurer. Un `/sync` demanderait en plus un
-    # filtre `include_leave` et rendrait la même chose en moins lisible.
-    #
-    # Et c'est de l'HTTP nu, sans nio : le magasin est partagé entre les
-    # phases et `store_sync_tokens` fait avancer le jeton à chaque réponse, de
-    # sorte qu'une synchronisation ici ferait passer derrière lui ce que
-    # `collect` doit encore lire. `claim_place` note la même chose.
-    messages = (
+    sync_url = f"{homeserver}/_matrix/client/v3/sync"
+    messages_url = (
         f"{homeserver}/_matrix/client/v3/rooms/"
         f"{quote(room_id, safe='!')}/messages"
+    )
+    leaving = json.dumps(
+        {"room": {"include_leave": True, "timeline": {"limit": WITNESS_EVENTS}}}
     )
 
     clock = asyncio.get_running_loop()
     started = clock.time()
     deadline = started + WITNESS_DEADLINE_SECONDS
     looks = 0
-    chunk: list = []
-    removal = None
+    where = "nowhere"
+    counts: dict = {}
+    history: list = []
+    source = "nothing was read"
+    reading = "not asked"
+    kick_at = None
 
     async with aiohttp.ClientSession() as http:
-        while True:
-            looks += 1
+
+        async def ask(url, params, what):
             try:
                 async with http.get(
-                    messages,
-                    params={"dir": "b", "limit": str(WITNESS_EVENTS)},
+                    url,
+                    params=params,
                     headers=bearer,
                     timeout=aiohttp.ClientTimeout(total=HOMESERVER_REQUEST_SECONDS),
                 ) as response:
-                    status = response.status
-                    body = await response.text()
+                    return response.status, await response.text()
             except (aiohttp.ClientError, asyncio.TimeoutError) as error:
                 print(
-                    f"FAIL: look {looks} at {room_id} got no answer "
+                    f"FAIL: {what} got no answer after {looks} look(s), "
+                    f"{clock.time() - started:.1f}s in "
                     f"({type(error).__name__}: {error})",
                     file=sys.stderr,
                 )
-                return 1
+                return None
 
+        while kick_at is None:
+            looks += 1
+
+            # LA SYNCHRONISATION SERT DEUX FOIS : l'appartenance, et le jeton.
+            answered = await ask(
+                sync_url, {"timeout": "0", "filter": leaving}, "the sync"
+            )
+            if answered is None:
+                return 1
+            status, body = answered
             if status != 200:
                 print(
-                    f"FAIL: the homeserver refused to show {room_id} to "
-                    f"{user_id} ({status}): {body}\n"
-                    "      A departed party may still paginate up to its own "
-                    "departure, so this is neither the eviction working nor\n"
-                    "      this witness being shut out on purpose: it is an "
-                    "answer nothing here knows how to read.",
+                    f"FAIL: the sync was refused ({status}) for {user_id}: "
+                    f"{body}",
                     file=sys.stderr,
                 )
                 return 1
-
-            # Du plus récent au plus ancien : `dir=b` remonte le fil.
-            chunk = json.loads(body).get("chunk") or []
-            removal = next(
-                (
-                    rank
-                    for rank, event in enumerate(chunk)
-                    if event.get("type") == "m.room.member"
-                    and event.get("state_key") == user_id
-                    and (event.get("content") or {}).get("membership") == "leave"
-                ),
-                None,
+            payload = json.loads(body)
+            token = payload.get("next_batch")
+            rooms = payload.get("rooms") or {}
+            sections = {
+                name: (rooms.get(name) or {}) for name in ("join", "invite", "leave")
+            }
+            counts = {name: len(held) for name, held in sections.items()}
+            where = next(
+                (name for name, held in sections.items() if room_id in held),
+                "nowhere",
             )
-            if removal is not None:
-                break
+
+            if where == "leave":
+                left = sections["leave"][room_id]
+                timeline = list((left.get("timeline") or {}).get("events") or [])
+                found = departure_of(timeline, user_id)
+                if found is not None:
+                    history, kick_at = timeline, found
+                    source = "the leave section of /sync"
+                    break
+                if timeline:
+                    history, source = timeline, "the leave section of /sync"
+
+            # PUIS L'HISTOIRE, REPRISE EN ARRIÈRE DEPUIS CE JETON. Sans
+            # `from`, ce homeserver repart du premier événement du salon et
+            # n'en rend qu'un : voir le docstring.
+            if isinstance(token, str) and token:
+                answered = await ask(
+                    messages_url,
+                    {"from": token, "dir": "b", "limit": str(WITNESS_EVENTS)},
+                    "the room history",
+                )
+                if answered is None:
+                    return 1
+                status, body = answered
+                reading = str(status)
+                if status == 200:
+                    # `dir=b` remonte le fil : remis dans l'ordre du salon.
+                    back = list(reversed(json.loads(body).get("chunk") or []))
+                    found = departure_of(back, user_id)
+                    if found is not None:
+                        history, kick_at = back, found
+                        source = "/messages, back from the sync token"
+                        break
+                    if len(back) > len(history):
+                        history = back
+                        source = "/messages, back from the sync token"
 
             if clock.time() + CLAIM_PAUSE_SECONDS + HOMESERVER_REQUEST_SECONDS > deadline:
                 print(
-                    f"FAIL: {user_id} is still in {room_id} after {looks} "
-                    f"look(s) over {clock.time() - started:.1f}s.\n"
-                    f"      Nothing in the last {len(chunk)} event(s) of that "
-                    "room removes it, so the eviction did not land on the\n"
-                    "      homeserver -- whatever the application's screen "
-                    "said. That screen is what #276 is about.",
+                    f"FAIL: nothing removes {user_id} from {room_id}, after "
+                    f"{looks} look(s) over {clock.time() - started:.1f}s.\n"
+                    f"      /sync puts that room in: {where} "
+                    f"(rooms seen: {counts}).\n"
+                    f"      /messages answered {reading}, and the best window "
+                    f"read was {len(history)} event(s) from {source}:\n"
+                    f"      {inventory(history)}\n"
+                    "      READ THAT INVENTORY BEFORE BLAMING THE EVICTION. A "
+                    "window carrying the room's FIRST events rather than\n"
+                    "      its last is a window asked for wrongly, not a "
+                    "removal that did not happen -- which is what cost run\n"
+                    "      35094474747, where `/messages` without `from` "
+                    "answered with one event, twenty-three times.\n"
+                    "      An eviction that genuinely did not happen reads "
+                    "differently: the room stays in `join`, and the window\n"
+                    "      carries the application's recent events with no "
+                    "departure of this account's among them.",
                     file=sys.stderr,
                 )
                 return 1
             await asyncio.sleep(CLAIM_PAUSE_SECONDS)
 
-    kick = chunk[removal]
+    kick = history[kick_at]
     remover = kick.get("sender")
     if remover == user_id:
         print(
@@ -1061,11 +1166,11 @@ async def witness_eviction(session_file: Path, store: Path) -> int:
         )
         return 1
 
-    # PLUS RÉCENT QUE LE RETRAIT : ce que l'application a envoyé après, et qui
-    # ne doit pas être ici. Le test en envoie un exprès, sinon cette assertion
-    # serait vraie faute de matière.
+    # APRÈS LE RETRAIT : ce que l'application a envoyé ensuite, et qui ne doit
+    # pas être ici. Le test en envoie un exprès, sinon cette assertion serait
+    # vraie faute de matière.
     after = [
-        event for event in chunk[:removal] if event.get("sender") == application
+        event for event in history[kick_at + 1 :] if event.get("sender") == application
     ]
     if after:
         kinds = sorted({str(event.get("type")) for event in after})
@@ -1077,14 +1182,10 @@ async def witness_eviction(session_file: Path, store: Path) -> int:
         )
         return 1
 
-    # PLUS ANCIEN QUE LE RETRAIT : ce que l'application avait écrit avant, et
-    # sous quelle forme il est passé sur le fil.
-    before = [
-        event for event in chunk[removal + 1 :] if event.get("sender") == application
-    ]
-    clear = [
-        event for event in before if event.get("type") == "m.room.message"
-    ]
+    # AVANT LE RETRAIT : ce que l'application avait écrit, et sous quelle forme
+    # il est passé sur le fil.
+    before = [event for event in history[:kick_at] if event.get("sender") == application]
+    clear = [event for event in before if event.get("type") == "m.room.message"]
     if clear:
         print(
             f"FAIL: the application put {len(clear)} message(s) in clear in "
@@ -1094,34 +1195,33 @@ async def witness_eviction(session_file: Path, store: Path) -> int:
         )
         return 1
 
-    sealed = [
-        event for event in before if event.get("type") == "m.room.encrypted"
-    ]
+    sealed = [event for event in before if event.get("type") == "m.room.encrypted"]
     if not sealed:
         print(
             "FAIL: the application wrote nothing this witness could see in "
             f"{room_id} before the removal.\n"
-            f"      {len(chunk)} event(s) were read, back from the removal. "
-            "Without one, « the key was rotated » has nothing to be about:\n"
-            "      no key of the application's ever existed in this "
-            "conversation, and the outcome the screen owes is\n"
-            "      evict-outcome-no-key rather than evict-outcome-rotated. "
-            "The end-to-end test sends one before it evicts.",
+            f"      The window read was {len(history)} event(s) from "
+            f"{source}: {inventory(history)}\n"
+            "      Without an encrypted event of the application's, « the key "
+            "was rotated » has nothing to be about: no key of\n"
+            "      hers ever existed in this conversation, and the outcome "
+            "the screen owes is evict-outcome-no-key rather\n"
+            "      than evict-outcome-rotated. The end-to-end test sends one "
+            "before it evicts.",
             file=sys.stderr,
         )
         return 1
 
     seen = sorted(
-        {
-            str((event.get("content") or {}).get("session_id"))
-            for event in sealed
-        }
+        {str((event.get("content") or {}).get("session_id")) for event in sealed}
     )
     print(
         f"OK: {user_id} was removed from {room_id} by {application}, and "
         f"nothing the application sent afterwards is visible to it.\n"
-        f"    Before the removal it sent {len(sealed)} encrypted event(s), "
-        f"under Megolm session(s) {seen}.\n"
+        f"    Read from {source}, {len(history)} event(s), {looks} look(s) in "
+        f"{clock.time() - started:.1f}s.\n"
+        f"    Before the removal the application sent {len(sealed)} encrypted "
+        f"event(s), under Megolm session(s) {seen}.\n"
         "    NOT PROVEN HERE, ON PURPOSE: that the room key rotated. This "
         "device never held a key of the application's --\n"
         "    identity-based sharing excludes it, which `collect` asserts -- "
