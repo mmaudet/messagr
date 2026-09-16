@@ -519,4 +519,205 @@ describe("matrix-js-sdk's own logger", () => {
       `[${build}] FetchHttpApi: --> GET https://messagr.eu/_matrix/client/v3/sync?timeout=xxx`,
     )
   })
+
+  // #319: WHAT A STORE BUILD STILL WROTE, AND WHOM IT NAMED.
+  //
+  // #312 kept the library's warnings and errors on purpose -- they are the
+  // lines that say why it failed -- and said what it had not fixed: "the
+  // library names a room in some of them". Twenty-seven lines of
+  // matrix-js-sdk 42.3.0 warn or error with a room's identifier in them, and
+  // the page this application publishes says the lines it leaves on the
+  // device carry "ni contenu ni identifiant".
+  //
+  // The identifiers below are one account's, in the shapes the library
+  // interpolates. Nothing of them may survive: not the identifier whole, not
+  // the opaque part that would still tell two rooms apart, not the server.
+  const ROOM = '!OGEhHVWSdvArJzumhm:messagr.eu'
+  const ACCOUNT = '@rabr642vve6v:messagr.eu'
+  const EVENT = '$VKSfJkXhoGbEQDHcA_5ptO9MUYdxBEqqr7DVy-sMEYY'
+  const NOTHING_OF_THEM = [
+    ROOM,
+    ACCOUNT,
+    EVENT,
+    'OGEhHVWSdvArJzumhm',
+    'rabr642vve6v',
+    'VKSfJkXhoGbEQDHcA',
+    'messagr.eu',
+  ]
+
+  /**
+   * Lines matrix-js-sdk 42.3.0 warns or errors with, quoted from the library
+   * as it is installed here, each at the file and line it is written on. One
+   * of every shape the library uses: an identifier in a sentence, one in a
+   * list of `key=value`, one handed over as a second argument, one
+   * substituted into a format string, and one in the name of a `LogSpan`.
+   */
+  const NAMES_SOMEBODY: ReadonlyArray<readonly [string, readonly unknown[]]> = [
+    [
+      'rust-crypto/rust-crypto.js:1493',
+      [
+        `Room ${ROOM}: ignoring crypto event with invalid algorithm m.megolm.v1.aes-sha2`,
+      ],
+    ],
+    [
+      'rust-crypto/rust-crypto.js:1427',
+      [`Error attempting to download key bundle for room ${ROOM}`],
+    ],
+    [
+      'rust-crypto/libolm_migration.js:278',
+      [
+        `Room ${ROOM}: ignoring settings {"algorithm":"m.megolm.v1.aes-sha2"} which caused error Error: no`,
+      ],
+    ],
+    [
+      'models/room-receipts.js:118',
+      [
+        `hasUserReadEvent event ID ${EVENT} not found in room ${ROOM}: this shouldn't happen!`,
+      ],
+    ],
+    ['models/room.js:537', [`URGENT upgrade required on ${ROOM}`]],
+    [
+      'models/event-timeline-set.js:790',
+      [
+        `EventTimelineSet:canContain event encountered which cannot be added to any timeline roomId=${ROOM} eventId=${EVENT} threadId=${EVENT}`,
+      ],
+    ],
+    [
+      'webrtc/groupCallEventHandler.js:145',
+      [`Received invalid group call intent (type=m.call, roomId=${ROOM})`],
+    ],
+    [
+      'sliding-sync-sdk.js:131',
+      ["got account data for room but room doesn't exist on client:", ROOM],
+    ],
+    [
+      'sync.js:502',
+      [
+        '[%s] Peek poll failed: %s',
+        ROOM,
+        new Error('MatrixError: [500] Internal server error'),
+      ],
+    ],
+    [
+      'rust-crypto/rust-crypto.js:223',
+      [`maybeAcceptKeyBundle(${ROOM}, ${ACCOUNT}): no bundle`],
+    ],
+  ]
+
+  describe('a store build', () => {
+    beforeEach(() => {
+      vi.stubGlobal('__DEV__', false)
+      vi.stubEnv('MESSAGR_SEND_PROBE', '')
+      vi.stubEnv('MESSAGR_WHOLE_LOG', '')
+    })
+
+    it.each(NAMES_SOMEBODY)(
+      'names nobody in the line at %s',
+      async (where, wrote) => {
+        const sdk = sdkLogger.getChild(`[${where}]`)
+        keepTheSdkToWarnings(sdk)
+        const lines = await sdkLinesWrittenBy(async () => {
+          sdk.warn(...wrote)
+          sdk.error(...wrote)
+        })
+        // It wrote them: what changed is what they carry, not whether the
+        // library can still say that something went wrong.
+        expect(lines).toHaveLength(2)
+        for (const part of NOTHING_OF_THEM) {
+          expect(lines.join('\n')).not.toContain(part)
+        }
+      },
+    )
+
+    it('leaves the line saying what the library was warning about', async () => {
+      // The two lines #319 quotes, whole, as a store build now writes them.
+      const sdk = sdkLogger.getChild('[crypto]')
+      keepTheSdkToWarnings(sdk)
+      expect(
+        await sdkLinesWrittenBy(async () => {
+          sdk.warn(
+            `Room ${ROOM}: ignoring crypto event with invalid algorithm m.megolm.v1.aes-sha2`,
+          )
+          sdk.error(`Error attempting to download key bundle for room ${ROOM}`)
+        }),
+      ).toEqual([
+        '[crypto] Room [withheld] ignoring crypto event with invalid algorithm [withheld]',
+        '[crypto] Error attempting to download key bundle for room [withheld]',
+      ])
+    })
+
+    it('names no room in the name of a logger the library made after one', async () => {
+      // `rust-crypto.js:1515` gives each room's encryptor a logger of its
+      // own, named after the room. That name is on every line that encryptor
+      // writes and it is in none of them: the logger prepends it.
+      const root = sdkLogger.getChild('[roomEncryptors]')
+      keepTheSdkToWarnings(root)
+      const encryptor = root.getChild(`[${ROOM} encryption]`)
+      expect(
+        await sdkLinesWrittenBy(async () => {
+          encryptor.warn('Error encrypting event')
+        }),
+      ).toEqual([
+        '[roomEncryptors][[withheld] encryption] Error encrypting event',
+      ])
+    })
+
+    it('withholds what an error the library hands over says', async () => {
+      // `rust-crypto.js:1428` hands the error itself to `logger.error`, one
+      // line under the message. A request that failed says which one.
+      const sdk = sdkLogger.getChild('[bundles]')
+      keepTheSdkToWarnings(sdk)
+      expect(
+        await sdkLinesWrittenBy(async () => {
+          sdk.error(
+            new Error(
+              `MatrixError: [403] Forbidden (https://messagr.eu/_matrix/client/v3/rooms/${ROOM}/messages)`,
+            ),
+          )
+        }),
+      ).toEqual(['[bundles] Error: MatrixError: [403] Forbidden ([withheld])'])
+    })
+
+    it('does not throw on an argument that cannot even be read', async () => {
+      // The rule the whole module is about: the report must not take down
+      // what it reports on.
+      const sdk = sdkLogger.getChild('[hostile]')
+      keepTheSdkToWarnings(sdk)
+      const hostile = {
+        toString(): never {
+          throw new Error('no')
+        },
+      }
+      const unreadable = new Error('no')
+      Object.defineProperty(unreadable, 'message', {
+        get(): never {
+          throw new Error('nor this')
+        },
+      })
+      expect(
+        await sdkLinesWrittenBy(async () => {
+          expect(() =>
+            sdk.warn('what it was', hostile, unreadable),
+          ).not.toThrow()
+        }),
+      ).toEqual(['[hostile] what it was {} [withheld]'])
+    })
+  })
+
+  it('keeps the room in a build that is going to be read', async () => {
+    // The price is a store build's alone. Read on a cable, the room is what
+    // makes the warning mean anything.
+    vi.stubGlobal('__DEV__', false)
+    vi.stubEnv('MESSAGR_SEND_PROBE', '1')
+    vi.stubEnv('MESSAGR_WHOLE_LOG', '')
+    const sdk = sdkLogger.getChild('[on a cable]')
+    keepTheSdkToWarnings(sdk)
+    expect(
+      await sdkLinesWrittenBy(async () => {
+        sdk.warn(`Error attempting to download key bundle for room ${ROOM}`)
+      }),
+    ).toEqual([
+      `[on a cable] Error attempting to download key bundle for room ${ROOM}`,
+    ])
+  })
 })

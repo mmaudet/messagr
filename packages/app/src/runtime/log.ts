@@ -49,8 +49,10 @@ import type { Logger } from 'matrix-js-sdk/lib/logger'
  * # Except matrix-js-sdk, which writes around it
  *
  * The library logs through a logger of its own, straight to the console. A
- * store build keeps that one to warnings and errors: `keepTheSdkToWarnings`
- * says what it wrote before, and why it is set before the library loads.
+ * store build keeps that one to warnings and errors, and takes out of those
+ * every word that could name a room, an account or an event:
+ * `keepTheSdkToWarnings` says what it wrote before, why it is set before the
+ * library loads, and how a line of the library's is read.
  */
 export type LogLevel = 'info' | 'warn' | 'error'
 
@@ -257,6 +259,106 @@ export function logEvent(
 /** What a store build makes nothing of, in matrix-js-sdk's logger. */
 const BELOW_WARNINGS: ReadonlySet<string> = new Set(['trace', 'debug', 'info'])
 
+/** What stands in a line of the library's for a word withheld from it. */
+const WITHHELD = '[withheld]'
+
+/**
+ * One word of a line the library wrote: what runs up to the next space, or
+ * bracket, or quote.
+ *
+ * None of those separators can be inside a Matrix identifier, and each stays
+ * where it is, so a line keeps its shape: `(roomId=...)` reads back as
+ * `([withheld])`, and the name a logger prepends still reads as a name.
+ */
+const WORD = /[^\s[\](){}<>"]+/g
+
+/** A word can end on these without any of it being an identifier's. */
+const ENDS_ON = /[.,:;!?]+$/
+
+/** Printable ASCII. Nothing outside it is a word of a line in English. */
+const PRINTABLE = /^[!-~]+$/
+
+/** What makes a word more than punctuation. */
+const LETTER_OR_DIGIT = /[A-Za-z0-9]/
+
+/** A count, or a status. */
+const COUNT = /^[0-9]+$/
+
+/** A directive `console` fills in from one of the arguments after it. */
+const DIRECTIVE = /^%[sdifjoOc%]$/
+
+/**
+ * Whether a word of a line the library wrote can leave in a store build.
+ *
+ * `WORDS` decides, for the reason it was written: what it refuses is
+ * everything an identifier is made of. Three things pass beside it, and none
+ * of them can carry one:
+ *
+ *   - punctuation alone, so `-->` and a stray `:` stay legible;
+ *   - a run of digits, which is a count or a status -- the kind `TRACE` calls
+ *     a `count`. An identifier is never one: it carries a sigil or a colon,
+ *     and that character is inside this same word;
+ *   - a `console` directive, which says nothing of itself and is filled in
+ *     from an argument this same test has already read.
+ *
+ * Trailing punctuation comes off first, because a sentence ends on it and no
+ * identifier does. Everything else is withheld, which costs `URGENT`, `ID`
+ * and every algorithm name: the price `WORDS` already names.
+ */
+function saysNobody(word: string): boolean {
+  if (PRINTABLE.test(word) && !LETTER_OR_DIGIT.test(word)) return true
+  const core = word.replace(ENDS_ON, '')
+  return DIRECTIVE.test(core) || COUNT.test(core) || WORDS.test(core)
+}
+
+/** A line of the library's, with every word that could name somebody gone. */
+function withoutIdentifiers(line: string): string {
+  return line.replace(WORD, word => (saysNobody(word) ? word : WITHHELD))
+}
+
+/**
+ * What an argument the library handed its logger says, as a line to read.
+ *
+ * An `Error` says its name and its message, which is where a request that
+ * failed names what it asked for. Its stack says a bundle's own line numbers
+ * and not why anything failed, so it is not worth the room it takes in a
+ * buffer of 256 KiB.
+ */
+function asALine(value: unknown): string {
+  if (typeof value === 'string') return value
+  if (
+    value !== null &&
+    typeof value === 'object' &&
+    !(value instanceof Error)
+  ) {
+    return render(value as LogFields)
+  }
+  try {
+    return String(value)
+  } catch {
+    // A `toString` that throws. The rule the whole module is about holds
+    // here too: a log must not be able to take down what it is logging.
+    return WITHHELD
+  }
+}
+
+/**
+ * The library's own logger, under a name read like everything else.
+ *
+ * The name is in none of the messages: the method the library's factory makes
+ * puts it there itself, out of `this` (`logger.js`). And it is a room often
+ * enough to matter -- `rust-crypto.js` names each room's encryptor after its
+ * room, so that name is on every line that encryptor ever writes. The call is
+ * made on a logger whose `prefix` has been read, rather than on the logger.
+ */
+function underAReadName(logger: unknown): unknown {
+  const named = logger as { prefix?: unknown } | null | undefined
+  if (typeof named?.prefix !== 'string') return logger
+  const read = Object.create(named) as { prefix: string }
+  read.prefix = withoutIdentifiers(named.prefix)
+  return read
+}
+
 /**
  * Keeps matrix-js-sdk's own logger to warnings and errors in a store build.
  *
@@ -279,12 +381,27 @@ const BELOW_WARNINGS: ReadonlySet<string> = new Set(['trace', 'debug', 'info'])
  * one while its modules load (`models/room-sticky-events.js`). That is why
  * `bootstrap.ts` calls this, ahead of everything `index.js` loads after it.
  *
- * # Warnings and errors still go out
+ * # Warnings and errors still go out, word by word
  *
- * They are the lines that say why the library failed. They are not the trace:
- * the library names a room in some of them, and nothing here reads them first.
+ * They are the lines that say why the library failed, so a store build keeps
+ * them. It does not keep whom they name (#319): twenty-seven lines of
+ * matrix-js-sdk 42.3.0 warn or error with a room in them -- among them
+ * `Room ${room.roomId}: ignoring crypto event with invalid algorithm ...`
+ * (`rust-crypto.js`) -- and the page this application publishes says the lines
+ * it leaves on a telephone carry no identifier at all.
  *
- * A debug bundle and a bundle built to be read keep every line, as
+ * So every word of them is read before it goes out, by the test `TRACE`
+ * applies to a field: a word that could be a room, an account, an event, a
+ * device, a token or an address is replaced by `[withheld]`, and what is left
+ * is the part that says what went wrong. The name the logger prepends is read
+ * the same way, and so is each argument the library hands over, an error
+ * among them.
+ *
+ * A line is read rather than dropped because dropping it would leave a
+ * failure with nothing said about it at all, and rewritten here rather than
+ * asked of the library, which has no such setting.
+ *
+ * A debug bundle and a bundle built to be read keep every line whole, as
  * `writesTheWholeLog` says.
  */
 export function keepTheSdkToWarnings(sdk: Logger): void {
@@ -299,8 +416,18 @@ export function keepTheSdkToWarnings(sdk: Logger): void {
     rebuild: () => void
   }
   const make = made.methodFactory
-  made.methodFactory = (method, level, name) =>
-    BELOW_WARNINGS.has(method) ? () => undefined : make(method, level, name)
+  made.methodFactory = (method, level, name) => {
+    if (BELOW_WARNINGS.has(method)) return () => undefined
+    const write = make(method, level, name)
+    // Not an arrow: the method the library's factory makes reads the
+    // logger's name off `this`, and `underAReadName` is what it reads.
+    return function (this: unknown, ...message: unknown[]): void {
+      write.apply(
+        underAReadName(this),
+        message.map(value => withoutIdentifiers(asALine(value))),
+      )
+    }
+  }
   made.rebuild()
 }
 
