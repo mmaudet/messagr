@@ -46,8 +46,9 @@
 		What the server keeps, as docs/declarations-magasins.md declares it to
 		App Store Connect, and as the privacy page says it: these five types,
 		linked to the account, used for no tracking, for app functionality only.
-		Contacts, DeviceID and EmailsOrTextMessages carry that document's
-		recommended answer to a question still open for the owner (#321).
+		Contacts and DeviceID carry the owner's decision of 16 September 2026
+		(#321, questions 1 to 3). EmailsOrTextMessages carries that document's
+		recommended answer to its question 4, which is still open.
 		Firebase's collection is not repeated here: its pods carry their own
 		manifests, and Xcode's privacy report adds them to this one.
 	-->

@@ -6,7 +6,9 @@ Ce qu'il faut répondre dans la Play Console (« Sécurité des données ») et 
 
 **Ce qui était déclaré jusqu'ici était faux.** `scripts/setup-play-publishing.sh` consignait « this application sends no analytics and collects no data », et le formulaire Play a été rempli sur cette phrase. Le manifeste iOS déclarait une liste vide. La page dit le contraire : le serveur conserve des métadonnées, et Google comme Apple reçoivent un jeton d'appareil.
 
-**Certaines réponses sont des jugements.** Elles portent un renvoi, par exemple « à trancher, 2 », vers la section « À trancher par le porteur », où chaque point donne la règle lue et une recommandation. Les tableaux et le manifeste portent la réponse recommandée.
+**Certaines réponses sont des jugements.** Elles portent un renvoi, par exemple « tranché, 2 » ou « à trancher, 6 », vers la section « Les jugements », où chaque point donne la règle lue et la réponse. Les tableaux et le manifeste portent cette réponse.
+
+**Les points 1, 2 et 3 sont tranchés** par le porteur le 16 septembre 2026. Les points 4 à 7 restent ouverts, et deux d'entre eux sont du travail plutôt qu'un choix.
 
 ## Sources
 
@@ -89,9 +91,9 @@ Six phrases de l'aide Play décident de presque tout.
 Cocher ces quatre types, et aucun autre :
 
 - « Informations personnelles » → « ID utilisateur » ;
-- « Contacts » → « Contacts », à trancher, 3 ;
+- « Contacts » → « Contacts », tranché, 3 ;
 - « Activité dans les applications » → « Autres actions » ;
-- « Appareil ou autres ID » → « Appareil ou autres ID », à trancher, 1 et 2.
+- « Appareil ou autres ID » → « Appareil ou autres ID », tranché, 1 et 2.
 
 ### Étape « Utilisation et traitement des données »
 
@@ -151,11 +153,11 @@ Le chiffrement en transit et la suppression se déclarent pour toute l'applicati
   - les identifiants des appareils du compte et leurs clés publiques ;
   - le jeton FCM que l'application enregistre auprès du serveur pour être réveillée ;
   - l'identifiant d'installation Firebase, que le SDK génère et envoie à Google ;
-  - les adresses IP des journaux techniques, et celles que voit le relais d'appel, à trancher, 2.
+  - les adresses IP des journaux techniques, et celles que voit le relais d'appel, tranché, 2.
 - **Définition Play.** « Identifiants associés à un appareil, à un navigateur ou à une application donnés. Par exemple, code IMEI, adresse MAC, ID d'appareil Widevine, ID d'installation Firebase ou identifiant publicitaire. »
 - **Firebase.** Firebase Cloud Messaging dépend du SDK d'installations, qui « Generates and collects a per-installation identifier (FID) that does not uniquely identify a user or physical device. »
 - **Page.** « la liste des appareils d'un compte et leurs clés publiques » ; « Le signal envoyé porte l'identifiant technique de votre appareil, une priorité de remise, et un nombre tiré au hasard. » ; « Ce que Google détient donc, c'est un jeton d'appareil et le fait que quelque chose est arrivé à un moment donné. » ; « les adresses IP au moment des requêtes, dans les journaux techniques. »
-- **Partagé : non.** Google achemine le réveil pour le compte de Messagr, ce qui est la définition du fournisseur de services : à trancher, 1.
+- **Partagé : non.** Google achemine le réveil pour le compte de Messagr, ce qui est la définition du fournisseur de services : tranché, 1.
 - **Éphémère : non.** Chez Google, le jeton est « conservé tant que l'application est installée » ; les journaux techniques gardent les adresses douze mois.
 - **Obligatoire.** Le jeton seul serait facultatif, puisque « Les notifications se désactivent dans les réglages de l'application ». Mais le type couvre aussi les clés d'appareil et les adresses IP, sans lesquelles rien ne fonctionne, et Play tranche : « Si la fonctionnalité principale de votre application nécessite ce type de données, vous devez déclarer ces données comme “obligatoires”. »
 - **Finalités.** « Fonctionnement de l'application ». « Prévention des fraudes, sécurité et conformité », pour les adresses IP que le décret n° 2021-1362 impose de conserver.
@@ -207,9 +209,9 @@ Les deux se saisissent dans « App Privacy », à côté de « Privacy Policy »
 ### Les types à cocher
 
 - « Identifiers » → « User ID » ;
-- « Identifiers » → « Device ID », à trancher, 1 et 2 ;
+- « Identifiers » → « Device ID », tranché, 1 et 2 ;
 - « User Content » → « Emails or Text Messages », à trancher, 4 ;
-- « Contacts » → « Contacts », à trancher, 3 ;
+- « Contacts » → « Contacts », tranché, 3 ;
 - « Usage Data » → « Other Usage Data » ;
 - « Diagnostics » → « Other Diagnostic Data », à trancher, 5.
 
@@ -239,7 +241,7 @@ Apple ne demande ni si la donnée est partagée, ni si elle est facultative. Son
 #### « Device ID »
 
 - **Définition Apple.** « Such as the device's advertising identifier, or other device-level ID »
-- **Ce que cela couvre.** Les identifiants et les clés publiques des appareils du compte ; le jeton APNs que le serveur garde pour réveiller l'iPhone ; les adresses IP des journaux techniques et du relais, à trancher, 2 ; et, chez Google, l'identifiant d'installation Firebase, à trancher, 5.
+- **Ce que cela couvre.** Les identifiants et les clés publiques des appareils du compte ; le jeton APNs que le serveur garde pour réveiller l'iPhone ; les adresses IP des journaux techniques et du relais, tranché, 2 ; et, chez Google, l'identifiant d'installation Firebase, à trancher, 5.
 - **Page.** « la liste des appareils d'un compte et leurs clés publiques » ; « Sur iOS le même rôle est tenu par le service de notifications d'Apple. » ; « les adresses IP au moment des requêtes, dans les journaux techniques. »
 - **Lié : oui.** Chaque appareil et chaque jeton sont enregistrés sous un compte.
 
@@ -307,9 +309,13 @@ Il déclare ce que l'application fait collecter elle-même, c'est-à-dire ce que
 
 Pourquoi les réponses d'App Store Connect n'en reprennent qu'une partie : à trancher, 5.
 
-## À trancher par le porteur
+## Les jugements
 
-Sept questions où la règle laisse un choix. Chacune donne les faits, la règle lue, la réponse recommandée, et ce qui change si vous tranchez autrement. Les tableaux plus haut et le manifeste portent la recommandation.
+Sept questions où la règle laisse un choix. Chacune donne les faits, la règle lue, la réponse, et ce qui change si elle est prise autrement. Les tableaux plus haut et le manifeste portent cette réponse.
+
+**Tranchés par le porteur le 16 septembre 2026 :** les points 1, 2 et 3.
+
+**Encore ouverts :** les points 4 à 7. Le 6 n'attend pas une décision mais une lecture de la configuration du relais. Le 7 n'est pas une réponse de formulaire mais une exigence de Play qui n'est pas remplie.
 
 ### 1. Le jeton de notification compte-t-il comme collecté ?
 
@@ -317,9 +323,9 @@ Sept questions où la règle laisse un choix. Chacune donne les faits, la règle
 
 **Les règles.** Apple ne compte comme collecte que ce qui est gardé « for a period longer than what is necessary to service the transmitted request in real time ». Play n'exempte que le traitement éphémère, où les données « ne sont conservées en mémoire que le temps de répondre en temps réel à une demande précise », et cite l'« ID d'installation Firebase » parmi les exemples d'« Appareil ou autres ID ».
 
-**Recommandation : collecté, et non partagé.** Le jeton est conservé, donc aucune des deux exceptions ne s'applique. Il n'est pas partagé au sens de Play, parce que Google ne s'en sert que pour acheminer le réveil de Messagr, ce qui fait de lui un fournisseur de services. Apple ne pose pas la question du partage, et ce qu'Apple garde elle-même ne se déclare pas.
+**Tranché le 16 septembre 2026 : collecté, et non partagé.** Le jeton est conservé, donc aucune des deux exceptions ne s'applique. Il n'est pas partagé au sens de Play, parce que Google ne s'en sert que pour acheminer le réveil de Messagr, ce qui fait de lui un fournisseur de services. Apple ne pose pas la question du partage, et ce qu'Apple garde elle-même ne se déclare pas.
 
-**Si vous tranchez autrement.** « Appareil ou autres ID » et « Device ID » restent déclarés, pour les identifiants et les clés des appareils du compte. Seule la description change, et le manifeste ne bouge pas.
+**L'autre réponse, écartée.** « Appareil ou autres ID » et « Device ID » seraient restés déclarés de toute façon, pour les identifiants et les clés des appareils du compte. Seule la description aurait changé, et le manifeste n'aurait pas bougé.
 
 ### 2. Les adresses IP : dans quelle catégorie ?
 
@@ -327,9 +333,11 @@ Sept questions où la règle laisse un choix. Chacune donne les faits, la règle
 
 **Les règles.** Apple : « Declare the relevant data types based on how you use IP address, such as precise location, coarse location, device ID, or diagnostics. » Play : « vous devez indiquer que vous collectez, utilisez et partagez les adresses IP en fonction de leur utilisation et de leurs pratiques. Par exemple, si des développeurs se servent d'adresses IP pour déterminer la zone géographique, ils doivent déclarer ce type de données. »
 
-**Recommandation : un identifiant d'appareil.** L'usage que la page nomme est celui du décret : conserver « les données permettant d'identifier la source d'une connexion, dont les adresses IP ». Identifier la source d'une connexion est l'usage d'un identifiant. D'où « Appareil ou autres ID » sur Play, avec « Prévention des fraudes, sécurité et conformité », et « Device ID » chez Apple, avec « App Functionality », qui couvre « implement security measures ».
+**Tranché le 16 septembre 2026 : un identifiant d'appareil.** L'usage que la page nomme est celui du décret : conserver « les données permettant d'identifier la source d'une connexion, dont les adresses IP ». Identifier la source d'une connexion est l'usage d'un identifiant. D'où « Appareil ou autres ID » sur Play et « Device ID » chez Apple, avec « App Functionality », qui couvre « implement security measures ».
 
-**Si vous tranchez autrement.** Des diagnostics : « Diagnostics » sur Play, « Other Diagnostic Data » chez Apple, avec les mêmes finalités. C'est défendable pour des journaux de serveur web, moins pour une conservation que la loi impose afin d'identifier. Chez Apple, la conservation légale pourrait aussi ajouter « Other Purposes » (« Any other purposes not listed ») ; ce n'est pas recommandé, « App Functionality » la couvrant déjà.
+Sur Play, **deux finalités et non une seule**, parce que les adresses sont à deux endroits pour deux raisons : « Prévention des fraudes, sécurité et conformité » pour la conservation qu'impose le décret, et « Fonctionnement de l'application » pour le relais d'appel, qui voit une adresse afin d'acheminer le son et l'image. Le tableau de « Appareil ou autres ID », plus haut, porte déjà les deux.
+
+**L'autre réponse, écartée.** Des diagnostics : « Diagnostics » sur Play, « Other Diagnostic Data » chez Apple, avec les mêmes finalités. C'est défendable pour des journaux de serveur web, moins pour une conservation que la loi impose afin d'identifier. Chez Apple, la conservation légale pourrait aussi ajouter « Other Purposes » (« Any other purposes not listed ») ; ce n'est pas recommandé, « App Functionality » la couvrant déjà.
 
 ### 3. « Contacts » pour le graphe des échanges et des invitations
 
@@ -337,9 +345,11 @@ Sept questions où la règle laisse un choix. Chacune donne les faits, la règle
 
 **Les règles.** Les deux définitions vont au-delà du carnet d'adresses. Play vise les « informations des graphes sociaux comme les noms d'utilisateur, la récence et la fréquence des contacts, la durée des interactions, et l'historique des appels ». Apple : « Such as a list of contacts in the user's phone, address book, or social graph ».
 
-**Recommandation : déclarer « Contacts » dans les deux magasins.** Le serveur garde exactement un graphe social : « donc qui échange avec qui », et le lien « entre celui qui invite et celui qui entre ». Ne pas le déclarer reviendrait à choisir la lecture la plus commode d'une définition qui nomme ce cas. La nuance, un carnet d'adresses jamais lu, est dans la page, que les deux fiches lient.
+**Tranché le 16 septembre 2026 : déclarer « Contacts » dans les deux magasins.** Le serveur garde exactement un graphe social : « donc qui échange avec qui », et le lien « entre celui qui invite et celui qui entre ». Ne pas le déclarer reviendrait à choisir la lecture la plus commode d'une définition qui nomme ce cas. La nuance, un carnet d'adresses jamais lu, est dans la page, que les deux fiches lient.
 
-**Si vous tranchez autrement.** Sur Play, tout ranger sous « Autres actions ». Chez Apple, garder « Emails or Text Messages » pour les échanges et ajouter « Other Data Types » pour les invitations. Retirer alors `NSPrivacyCollectedDataTypeContacts` du manifeste, et y mettre `NSPrivacyCollectedDataTypeOtherDataTypes`.
+Le coût est assumé : sur une fiche, « Contacts » se lira « lit mon carnet d'adresses », ce qui est faux. Deux choses l'atténuent. La page dit déjà « pas de carnet d'adresses, ni de contacts lus sur votre appareil ». Et la découverte par carnet d'adresses est en cadrage (#38) : le jour où elle arrive, ce type devra être déclaré de toute façon, et l'ajouter à ce moment-là ressemblerait à un aveu tardif.
+
+**L'autre réponse, écartée.** Sur Play, tout ranger sous « Autres actions ». Chez Apple, garder « Emails or Text Messages » pour les échanges et ajouter « Other Data Types » pour les invitations. Retirer alors `NSPrivacyCollectedDataTypeContacts` du manifeste, et y mettre `NSPrivacyCollectedDataTypeOtherDataTypes`.
 
 ### 4. Le contenu chiffré de bout en bout, et la sauvegarde des clés
 
