@@ -1,6 +1,11 @@
 import { describe, expect, it } from 'vitest'
 
-import { evictFrom, type RotatingMachine } from './evict'
+import {
+  evictFrom,
+  evictOutcomeTestId,
+  type EvictOutcome,
+  type RotatingMachine,
+} from './evict'
 import type { HttpRequester } from './pump'
 
 const SCOPE = '!scope:example.org'
@@ -121,5 +126,88 @@ describe('evicting somebody', () => {
     expect(outcome).toMatchObject({ evicted: false, stage: 'settling' })
     if (outcome.evicted) return
     expect(outcome.rotated).toBe(true)
+  })
+})
+
+/**
+ * L'identifiant sous lequel chaque issue se montre, épinglé sur des chaînes
+ * écrites en toutes lettres.
+ *
+ * # POURQUOI CES QUATRE CHAÎNES SONT ÉCRITES ICI
+ *
+ * Elles sont le contrat entre l'écran et le banc : `Evict.tsx` les pose,
+ * `e2e/eviction.ts` les attend. Un test qui les dériverait de la fonction
+ * qu'il éprouve ne dirait rien -- une fonction qui rendrait « x » partout le
+ * passerait. Alors elles sont recopiées, et c'est cette recopie qui fait la
+ * garde.
+ *
+ * #276 : l'écran portait un seul identifiant pour les quatre, le test
+ * l'attendait, et il passait donc aussi sur une éviction échouée.
+ */
+describe("le nom sous lequel une issue d'éviction se montre", () => {
+  const RETIREE_CLE_TOURNEE: EvictOutcome = { evicted: true, rotated: true }
+  const RETIREE_SANS_CLE: EvictOutcome = { evicted: true, rotated: false }
+  const RIEN_CHANGE: EvictOutcome = {
+    evicted: false,
+    stage: 'removing',
+    reason: '403 forbidden',
+    rotated: false,
+  }
+  const CLE_TOUJOURS_VALIDE: EvictOutcome = {
+    evicted: false,
+    stage: 'rotating',
+    reason: 'store unavailable',
+    rotated: false,
+  }
+  const DRAINAGE_MANQUE: EvictOutcome = {
+    evicted: false,
+    stage: 'settling',
+    reason: 'the queue could not be read',
+    rotated: true,
+  }
+
+  it('nomme la rotation, et elle seule', () => {
+    expect(evictOutcomeTestId(RETIREE_CLE_TOURNEE)).toBe(
+      'evict-outcome-rotated',
+    )
+  })
+
+  it("donne un autre nom au succès où il n'y avait aucune clé", () => {
+    // LE CAS QUI FAISAIT PASSER LE TEST POUR RIEN. C'est un succès, et ce
+    // n'est pas une rotation : un banc qui assert « la clé a tourné » ne doit
+    // pas pouvoir être satisfait par lui.
+    expect(evictOutcomeTestId(RETIREE_SANS_CLE)).toBe('evict-outcome-no-key')
+  })
+
+  it('donne un nom à chacun des deux échecs', () => {
+    expect(evictOutcomeTestId(RIEN_CHANGE)).toBe(
+      'evict-outcome-nothing-changed',
+    )
+    expect(evictOutcomeTestId(CLE_TOUJOURS_VALIDE)).toBe(
+      'evict-outcome-key-still-valid',
+    )
+    // Une phrase, un nom : `settling` et `rotating` disent la même chose à
+    // l'écran -- la personne est dehors et une clé ouvre encore -- donc ils
+    // se montrent sous le même nom.
+    expect(evictOutcomeTestId(DRAINAGE_MANQUE)).toBe(
+      'evict-outcome-key-still-valid',
+    )
+  })
+
+  it('ne montre jamais deux issues distinctes sous le même nom', () => {
+    // La propriété qui compte, prise d'un coup : si deux issues que l'écran
+    // distingue partageaient un identifiant, le banc ne pourrait plus les
+    // distinguer non plus, et c'est exactement le défaut de #276.
+    const noms = [
+      RETIREE_CLE_TOURNEE,
+      RETIREE_SANS_CLE,
+      RIEN_CHANGE,
+      CLE_TOUJOURS_VALIDE,
+    ].map(evictOutcomeTestId)
+
+    expect(new Set(noms).size).toBe(noms.length)
+    // Et aucun ne s'appelle comme l'ancien identifiant partagé : un banc qui
+    // l'attendrait encore ne trouverait rien, au lieu de passer.
+    expect(noms).not.toContain('evict-outcome')
   })
 })
