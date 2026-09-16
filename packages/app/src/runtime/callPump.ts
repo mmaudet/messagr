@@ -15,6 +15,7 @@ import {
   type CallSessionFailure,
 } from '../calls/session'
 import type { Wants } from '../calls/media'
+import { startRingback } from '../calls/ringback'
 import { offersVideo } from '../calls/sdp'
 import type { CallEvent } from '../calls/wire'
 import { deviceCallAudio, type CallRole } from './callAudio'
@@ -256,14 +257,37 @@ export function startCallRuntime(
           devicePermissions,
           AppState.currentState === 'active',
         )
+  /**
+   * The caller's own tone, and the deadline that bounds it.
+   *
+   * `calls/ringback.ts` says why it cannot be left to the state transitions:
+   * the machine learns its deadline from a ticker, the ticker is a
+   * JavaScript timer, and the platform goes on looping the tone through a
+   * suspension that has frozen the timer (#294).
+   */
+  const ringback = startRingback(
+    {
+      now: () => Date.now(),
+      play: () => deviceCallAudio.ringAgain(),
+      silence: () => deviceCallAudio.stopRinging(),
+    },
+    AppState.currentState === 'active',
+  )
   // FOR THE LIFE OF THE RUNTIME, like the pictures below and for the same
   // reason: it is started once, at launch. A call that rang while the
-  // application was not in front is asked about the moment it comes back.
-  if (permissions !== null) {
-    AppState.addEventListener('change', state =>
-      permissions.foreground(state === 'active'),
-    )
-  }
+  // application was not in front is asked about the moment it comes back,
+  // and an invitation that ran out while it was away ends there too.
+  AppState.addEventListener('change', state => {
+    const inFront = state === 'active'
+    // THE CALL'S OWN TRUTH FIRST. An application coming back has a clock it
+    // could not read while it was away, and reading it here settles the
+    // invitation now rather than at whatever moment the suspended ticker
+    // happens to resume. Everything below then sees a call that has already
+    // ended, which is what stops a tone coming back for one.
+    if (inFront) held?.session.tick()
+    permissions?.foreground(inFront)
+    ringback.foreground(inFront)
+  })
   /**
    * Whether a call is waiting on its permissions before being placed.
    *
@@ -401,8 +425,10 @@ export function startCallRuntime(
         // THE RINGBACK STOPS WHEN THE FAR END PICKS UP, NOT WHEN THE CALL
         // ENDS. A tone still playing under somebody's voice is the loudest
         // possible way of saying the application has lost track of its own
-        // call.
-        if (state.call !== 'outgoingInvite') deviceCallAudio.stopRinging()
+        // call. Which of the two this is -- and whether the invitation has
+        // outlived itself meanwhile -- is decided upstairs, where it is
+        // tested.
+        ringback.state(state)
         const settled = outcomeOf(state)
         if (settled !== null && held !== null) {
           log.settle(held.scope, settled).catch(() => {})
@@ -447,6 +473,10 @@ export function startCallRuntime(
     // That is the whole hazard of this dependency -- everything works
     // without it, slightly wrong, and only a platform dump says so.
     deviceCallAudio.begin(role)
+    // AND THE TONE THAT CAME WITH IT, for a call this device places. Told
+    // rather than asked for: `begin` starts the two together, which is what
+    // puts the tone in the call's own audio mode rather than beside it.
+    if (role === 'caller') ringback.began()
     // `missed` is what every call starts as, and anything else is news. A
     // call that ends without ever being settled -- the application killed
     // mid-ring, the process frozen -- is a missed call, which is the truth.
@@ -614,6 +644,7 @@ export function startCallRuntime(
       // lets the screen lock again. A call that failed to tear down cleanly
       // must not leave a telephone that behaves as though it is still on
       // one.
+      ringback.over()
       deviceCallAudio.end()
       await running?.session.stop()
     },
