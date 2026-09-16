@@ -137,6 +137,14 @@ function claimedRoom(): string {
  * Le rond du composeur est un micro quand le champ est vide et un envoi quand
  * il ne l'est pas : `composer-send` n'existe donc qu'après le texte, et on
  * l'attend au lieu de le supposer.
+ *
+ * `toExist` ET PAS `toBeVisible`, ET LA DISTINCTION EST CELLE DE
+ * boot.test.ts. Detox exige de `toBeVisible` que 75 % de l'aire de l'élément
+ * soient à l'écran, ce qui est une question sur la géométrie du composeur
+ * sous un clavier ouvert par `replaceText` -- une question que ce test ne
+ * pose pas. Celle qu'il pose est « le rond est-il devenu un envoi », et
+ * `toExist` la pose exactement. Ce qui doit être VU l'est plus bas, sur le
+ * message lui-même, où le mot a un sens.
  */
 async function sendInTheConversation(written: string): Promise<void> {
   await waitFor(element(by.id('conversation-input')))
@@ -144,7 +152,7 @@ async function sendInTheConversation(written: string): Promise<void> {
     .withTimeout(60000)
   await element(by.id('conversation-input')).replaceText(written)
   await waitFor(element(by.id('composer-send')))
-    .toBeVisible()
+    .toExist()
     .withTimeout(30000)
   await element(by.id('composer-send')).tap()
   // VU À L'ÉCRAN, ET PAS SEULEMENT ENVOYÉ. Cela chiffre, partage une clé de
