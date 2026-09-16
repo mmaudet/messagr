@@ -528,6 +528,14 @@ describeRoundTrip('encrypted round trip', () => {
     // §13.26 : la ligne paraît dès que le salon compte plus d'un autre
     // membre, ce qui est le cas de celui-ci -- le rapport dit `whoElse`
     // joined 3. Un salon à deux nomme personne, et c'est délibéré.
+    //
+    // ET LE TROISIÈME COMPTE VIENT DE boot.test.ts. Les deux suites entrent
+    // dans le même salon du banc, un entrant chacune : tant que boot n'est
+    // pas passée, celui-ci en compte deux, la ligne est absente à bon droit
+    // et ce test cherche ce que le produit a raison de ne pas montrer.
+    // Mesuré sur le run 35103084809, où l'ordre des fichiers s'était
+    // inversé : `joined 2`, et « Got: was null ». L'ordre est tenu par
+    // `e2e/sequencer.js`, qui dit pourquoi.
     // PLUS HAUT QUE L'ÉCRAN, ET UNE PERSONNE REMONTE POUR LE LIRE.
     //
     // La conversation s'ouvre sur son message le plus récent, et celui que
