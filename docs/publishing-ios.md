@@ -404,9 +404,10 @@ fiche se recopie donc à la main, champ par champ, et **le dernier moment où
 quelque chose peut refuser est la PR**.
 
 Ce qu'il faudrait pour ouvrir ce chemin plus tard, si on le veut : les trois
-secrets que `publish.yml` porte déjà pour Play (`MESSAGR_ASC_KEY_ID`,
-`MESSAGR_ASC_ISSUER_ID`, `MESSAGR_ASC_KEY_BASE64`), une clé au rôle « App
-Manager » et non « Developer », et les points de terminaison
+secrets que la section « Et la CI » nomme déjà pour le téléversement
+(`MESSAGR_ASC_KEY_ID`, `MESSAGR_ASC_ISSUER_ID`, `MESSAGR_ASC_KEY_BASE64`), sur
+la forme que `publish.yml` a pour Play ; une clé au rôle « App Manager » et non
+« Developer » ; et les points de terminaison
 `appStoreVersionLocalizations` et `appInfoLocalizations` de l'API App Store
 Connect — les deux, parce que le nom et le sous-titre ne vivent pas sur la
 même ressource que la description.
