@@ -286,6 +286,22 @@ export const uz: Readonly<Record<CopyKey, string>> = {
     'Sizda %@ bilan suhbat allaqachon bor. Oʻsha davom etadi: taklif ikkinchisini ochmadi.',
   list_not_in_yet:
     'Siz hali ichkarida emassiz. Kimdir yuborgan taklif havolasini oching: bu yagona eshik va ilova undan oldin hech nima qila olmaydi.',
+  // IKKINCHI ESHIK, VA FAQAT IKKINCHISI. #367. Butun mulohaza fransuz
+  // katalogida: ilova buferni hech qachon oʻzi oʻqimaydi, va nusxalangan
+  // havola nimaga tushishi soʻralgan joyda aytiladi.
+  list_paste_lead:
+    'Agar havola oʻzi ochilmasa, uni nusxalab, shu yerga joylashtiring.',
+  list_paste_cost:
+    'Nusxalangan havolani bu telefondagi boshqa ilovalar ham oʻqiy oladi. Bu havola bir soat amal qiladi va faqat bir marta ishlaydi.',
+  list_paste_field: 'Taklif havolasini joylashtiring',
+  list_paste_confirm: 'Kirish',
+  list_paste_working: 'Taklif ochilmoqda…',
+  list_paste_not_a_link:
+    'Bu Messagr taklif havolasi emas. Hech nima yuborilmadi va hech qanday taklif sarflanmadi.',
+  list_paste_refused:
+    'Bu takliftan foydalanib boʻlmaydi. Uni yuborgan odamdan yangisini soʻrang.',
+  list_paste_retry:
+    'Bu taklifga hozircha amal qilib boʻlmadi. Bir ozdan keyin qayta urinib koʻring: havolaning oʻzi yaroqli.',
   list_reinstalled_back:
     'Bu qurilma qayta oʻrnatilgan. U yangi qurilma sifatida qaytdi va qayta oʻrnatishdan oldin kelgan xabarlar oʻqilmay qoladi: ularning kalitlari eski oʻrnatma bilan ketdi.',
   list_reinstalled_stranded:

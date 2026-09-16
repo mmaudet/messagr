@@ -1,4 +1,5 @@
 import { createElement, Fragment, isValidElement, type ReactNode } from 'react'
+import * as ReactNamespace from 'react'
 import { describe, expect, it, vi } from 'vitest'
 
 import { t } from '../copy'
@@ -15,15 +16,37 @@ import { ConversationList } from './ConversationList'
  * the row *says* so while it waits is this.
  */
 
+// The hooks, stood in for the same reason `Invited.spec.ts` stands them in:
+// the walk below calls components as functions, outside any renderer, and the
+// empty state carries one that holds a draft (`PasteLink`, #367).
+vi.mock('react', async importOriginal => ({
+  ...(await importOriginal<typeof import('react')>()),
+  useEffect: () => undefined,
+  useRef: (current: unknown) => ({ current }),
+  useState: (initial: unknown) => [initial, () => undefined],
+}))
+
 // The package itself is Flow source, which this workspace's transform cannot
 // read -- `import typeof` is a syntax error to it. Every screen spec here
 // stands the platform in rather than loading it.
 vi.mock('react-native', () => ({
   Pressable: 'Pressable',
-  StyleSheet: { create: (styles: object) => styles },
+  StyleSheet: { absoluteFill: {}, create: (styles: object) => styles },
   Text: 'Text',
+  TextInput: 'TextInput',
   View: 'View',
 }))
+
+vi.mock('react-native-svg', () => ({
+  default: 'Svg',
+  Circle: 'Circle',
+  Path: 'Path',
+  Rect: 'Rect',
+}))
+
+// As `BackupSettings.spec.ts`: the workspace compiles JSX to
+// `React.createElement`, and `NotchedButton` does not import React itself.
+vi.stubGlobal('React', ReactNamespace)
 
 const NOW = Date.UTC(2026, 8, 16, 10, 0, 0)
 
@@ -159,5 +182,63 @@ describe('a row whose conversation is waiting on the launch (#280)', () => {
     ;(row?.props.onPress as () => void)()
 
     expect(touched).toEqual(['!a:example.invalid'])
+  })
+})
+
+describe('somewhere to paste the link, before the entry (#367)', () => {
+  // #308 has no issue at all on an iPhone: an invitation opened from another
+  // messenger's built-in browser never reaches Messagr, and the page's own
+  // button is a link to its own domain, which iOS does not hand over. The
+  // person can see the invitation, has the application installed, and cannot
+  // get in. The field is the way out, and it belongs on the one screen that
+  // says « ouvrez le lien qu'on vous a envoyé », immediately under it.
+
+  it('offers the field under the sentence that says to open the link', () => {
+    const drawn = list({
+      summaries: [],
+      notInYet: true,
+      onPasteLink: () => undefined,
+    })
+
+    expect(words(drawn)).toContain(t('list_not_in_yet'))
+    expect(withId(drawn, 'paste-link')).toBeDefined()
+  })
+
+  it('offers it nowhere else', () => {
+    // The list or the way in, never both: somebody with conversations is in,
+    // and a field asking for an invitation on their list would be the
+    // application forgetting who it is talking to.
+    expect(
+      withId(
+        list({ notInYet: true, onPasteLink: () => undefined }),
+        'paste-link',
+      ),
+    ).toBeUndefined()
+    expect(
+      withId(
+        list({ summaries: [], notInYet: false, onPasteLink: () => undefined }),
+        'paste-link',
+      ),
+    ).toBeUndefined()
+  })
+
+  it('offers nothing where nothing can spend what is pasted', () => {
+    // Drawn only when an entry is wired to it. A field handing its link to
+    // nobody is a gesture with no answer, which is the defect this ticket is
+    // about rather than a smaller version of it.
+    expect(
+      withId(list({ summaries: [], notInYet: true }), 'paste-link'),
+    ).toBeUndefined()
+  })
+
+  it('carries what became of the last link it handed over', () => {
+    const drawn = list({
+      summaries: [],
+      notInYet: true,
+      onPasteLink: () => undefined,
+      pasting: 'refused',
+    })
+
+    expect(withId(drawn, 'paste-link-refused')).toBeDefined()
   })
 })

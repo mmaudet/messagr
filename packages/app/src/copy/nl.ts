@@ -268,6 +268,22 @@ export const nl: Readonly<Record<CopyKey, string>> = {
     'U hebt al een gesprek met %@. Dat loopt door: de uitnodiging heeft geen tweede geopend.',
   list_not_in_yet:
     'U bent er nog niet in. Open de uitnodigingslink die iemand u heeft gestuurd: dat is de enige deur, en daarvoor kan de applicatie niets doen.',
+  // DE TWEEDE DEUR, EN ALLEEN DE TWEEDE. #367. De hele redenering staat in de
+  // Franse catalogus: de applicatie leest het klembord nooit uit zichzelf, en
+  // wat een gekopieerde link kost wordt gezegd waar erom gevraagd wordt.
+  list_paste_lead:
+    'Als de link niet vanzelf opengaat, kopieer hem en plak hem hier.',
+  list_paste_cost:
+    'Een gekopieerde link kan door de andere applicaties op dit toestel gelezen worden. Deze is een uur geldig en werkt maar één keer.',
+  list_paste_field: 'Plak de uitnodigingslink',
+  list_paste_confirm: 'Binnenkomen',
+  list_paste_working: 'De uitnodiging wordt geopend…',
+  list_paste_not_a_link:
+    'Dit is geen uitnodigingslink van Messagr. Er is niets verstuurd, en er is geen uitnodiging verbruikt.',
+  list_paste_refused:
+    'Deze uitnodiging kan niet gebruikt worden. Vraag een nieuwe aan de persoon die hem u gestuurd heeft.',
+  list_paste_retry:
+    'Deze uitnodiging kon voorlopig niet gevolgd worden. Probeer het zo meteen opnieuw: de link zelf blijft goed.',
   list_reinstalled_back:
     'Dit toestel is opnieuw geïnstalleerd. Het is teruggekomen met een nieuwe toestelidentiteit, en berichten van vóór de herinstallatie blijven onleesbaar: hun sleutels zijn met de vorige installatie verdwenen.',
   list_reinstalled_stranded:
