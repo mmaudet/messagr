@@ -531,7 +531,7 @@ export const es: Readonly<Record<CopyKey, string>> = {
   backup_settings_dormant:
     'Hay una copia en el servidor, pero este dispositivo no la alimenta.',
   backup_settings_unchecked:
-    'El servidor no ha respondido: no se ha podido comprobar el estado de la copia.',
+    'El servidor no ha respondido: no se ha podido leer el estado de la copia.',
   backup_settings_unchecked_why: 'Aquí no se ha cambiado nada.',
   backup_settings_enter_current: 'Introducir la clave actual',
   backup_settings_enter_key: 'Introducir mi clave de recuperación',

@@ -531,7 +531,7 @@ export const en: Readonly<Record<CopyKey, string>> = {
   backup_settings_dormant:
     'A backup exists on the server, but this device does not feed it.',
   backup_settings_unchecked:
-    'The server did not answer: the state of the backup could not be checked.',
+    'The server did not answer: the state of the backup could not be read.',
   backup_settings_unchecked_why: 'Nothing here was changed.',
   backup_settings_enter_current: 'Enter the current key',
   backup_settings_enter_key: 'Enter my recovery key',

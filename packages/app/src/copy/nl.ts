@@ -531,7 +531,7 @@ export const nl: Readonly<Record<CopyKey, string>> = {
   backup_settings_dormant:
     'Er staat een back-up op de server, maar dit toestel voedt die niet.',
   backup_settings_unchecked:
-    'De server heeft niet geantwoord: de staat van de back-up kon niet gecontroleerd worden.',
+    'De server heeft niet geantwoord: de staat van de back-up kon niet gelezen worden.',
   backup_settings_unchecked_why: 'Hier is niets veranderd.',
   backup_settings_enter_current: 'De huidige sleutel invoeren',
   backup_settings_enter_key: 'Mijn herstelsleutel invoeren',

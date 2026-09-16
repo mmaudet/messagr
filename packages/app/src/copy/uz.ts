@@ -546,7 +546,7 @@ export const uz: Readonly<Record<CopyKey, string>> = {
   backup_settings_dormant:
     'Serverda zaxira bor, lekin bu qurilma uni toʻldirmayapti.',
   backup_settings_unchecked:
-    'Server javob bermadi: zaxira holatini tekshirib boʻlmadi.',
+    'Server javob bermadi: zaxira holatini oʻqib boʻlmadi.',
   backup_settings_unchecked_why: 'Bu yerda hech nima oʻzgartirilmadi.',
   backup_settings_enter_current: 'Joriy kalitni kiritish',
   backup_settings_enter_key: 'Tiklash kalitimni kiritish',

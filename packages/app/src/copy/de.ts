@@ -540,7 +540,7 @@ export const de: Readonly<Record<CopyKey, string>> = {
   backup_settings_dormant:
     'Auf dem Server liegt eine Sicherung, aber dieses Gerät speist sie nicht.',
   backup_settings_unchecked:
-    'Der Server hat nicht geantwortet: der Zustand der Sicherung konnte nicht geprüft werden.',
+    'Der Server hat nicht geantwortet: der Zustand der Sicherung konnte nicht gelesen werden.',
   backup_settings_unchecked_why: 'Hier wurde nichts geändert.',
   backup_settings_enter_current: 'Aktuellen Schlüssel eingeben',
   backup_settings_enter_key: 'Meinen Wiederherstellungsschlüssel eingeben',

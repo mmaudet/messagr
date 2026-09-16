@@ -826,8 +826,14 @@ export const fr = {
   // NI « PAS DE SAUVEGARDE » NI « SAUVEGARDÉS », qui sont les deux états
   // que celui-ci ne doit jamais se faire prendre pour. La seconde phrase est
   // ce qui empêche de lire la première comme une panne de l'appareil.
+  //
+  // « lu » et non « vérifié », tranché par le porteur le 16 septembre 2026 :
+  // c'est la requête qui n'a pas eu de réponse, et le catalogue français
+  // garde le mot « vérifier » pour ce qui se vérifie entre personnes (#34).
+  // Le voisin, `backup_settings_unreadable`, dit « sur cet appareil » : c'est
+  // ce qui sépare les deux silences.
   backup_settings_unchecked:
-    "Le serveur n'a pas répondu : l'état de la sauvegarde n'a pas pu être vérifié.",
+    "Le serveur n'a pas répondu : l'état de la sauvegarde n'a pas pu être lu.",
   backup_settings_unchecked_why: "Rien n'a été modifié ici.",
   backup_settings_enter_current: 'Entrer la clé actuelle',
   backup_settings_enter_key: 'Entrer ma clé de récupération',
