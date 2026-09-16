@@ -352,6 +352,10 @@ export const uz: Readonly<Record<CopyKey, string>> = {
     'Qarorga raqamini koʻrsatgan holda conformite@messagr.eu orqali eʼtiroz bildirish mumkin. Tashkilot imkon bergan har holatda uni qaror qabul qilgan odamdan boshqa birov qayta koʻrib chiqadi. Bir-ikki kishi yuritadigan xizmatda bu shart doim bajarilmaydi va buni yozib qoʻyish mavjud boʻlmagan ajratmani vaʼda qilishdan yaxshiroq.',
   legal_report_scope:
     'Messagr — hosting xizmati, onlayn platforma emas: DSA ning 14-bandi shaxslararo xabar almashish xizmatlarini bundan chiqaradi. Demak 20- va 21-moddalar qoʻllanmaydi va bu matn ularni taklif qilayotgani yoʻq.',
+  legal_delete_title: 'Hisobingizni oʻchirish',
+  legal_delete_body:
+    'Oʻchirish conformite@messagr.eu manziliga elektron xat orqali soʻraladi: ilovaning oʻzida bunday amal hali yoʻq. Shundan keyin hisob oʻchiriladi va uning maʼlumotlari tozalanadi; allaqachon yuborilgan xabarlar esa yozilgan xonalarning hodisasi boʻlib qoladi, va server ularni qaytarib ololmaydi, chunki ularni oʻqiy olmaydi.',
+  legal_delete_link: 'Oʻchirishni soʻrash: messagr.eu/aide',
   legal_full_terms: 'Toʻliq foydalanish shartlari: messagr.eu',
   trust_action: 'Bu odam haqida nima maʼlum',
   trust_title: 'Bu odam haqida nima maʼlum',

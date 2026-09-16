@@ -334,6 +334,10 @@ export const it: Readonly<Record<CopyKey, string>> = {
     'Una decisione può essere contestata presso conformite@messagr.eu, citando il riferimento. Viene riesaminata da una persona diversa da quella che l’ha presa ogni volta che l’organizzazione lo permette. In un servizio gestito da una o due persone, questa condizione non può sempre essere rispettata, e scriverlo vale più che promettere una separazione che non esisterebbe.',
   legal_report_scope:
     'Messagr è un servizio di hosting e non una piattaforma online, poiché il considerando 14 del DSA esclude i servizi di comunicazione interpersonale. Gli articoli 20 e 21 non si applicano quindi, e questo testo non pretende di offrirli.',
+  legal_delete_title: 'Eliminare il tuo account',
+  legal_delete_body:
+    'L’eliminazione si chiede per posta elettronica a conformite@messagr.eu: il gesto dall’applicazione non esiste ancora. L’account viene allora disattivato e i suoi dati cancellati; i messaggi già inviati restano eventi delle stanze in cui sono stati scritti, e il server non può ritirarli, poiché non può leggerli.',
+  legal_delete_link: 'Chiedere l’eliminazione: messagr.eu/aide',
   legal_full_terms: 'Condizioni generali complete: messagr.eu',
   trust_action: 'Ciò che si sa di questa persona',
   trust_title: 'Ciò che si sa di questa persona',

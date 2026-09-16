@@ -336,6 +336,10 @@ export const es: Readonly<Record<CopyKey, string>> = {
     'Una decisión puede recurrirse ante conformite@messagr.eu, citando la referencia. La reexamina una persona distinta de quien la tomó siempre que la organización lo permita. En un servicio explotado por una o dos personas, esa condición no siempre puede cumplirse, y escribirlo vale más que prometer una separación que no existiría.',
   legal_report_scope:
     'Messagr es un servicio de alojamiento y no una plataforma en línea; el considerando 14 del DSA excluye los servicios de comunicaciones interpersonales. Los artículos 20 y 21 no se aplican, por tanto, y este texto no pretende ofrecerlos.',
+  legal_delete_title: 'Eliminar su cuenta',
+  legal_delete_body:
+    'La eliminación se solicita por correo electrónico a conformite@messagr.eu: el gesto desde la aplicación aún no existe. La cuenta queda entonces desactivada y sus datos se purgan; los mensajes ya enviados siguen siendo eventos de las salas donde se escribieron, y el servidor no puede retirarlos, ya que no puede leerlos.',
+  legal_delete_link: 'Solicitar la eliminación: messagr.eu/aide',
   legal_full_terms: 'Condiciones generales completas: messagr.eu',
   trust_action: 'Lo que se sabe de esta persona',
   trust_title: 'Lo que se sabe de esta persona',

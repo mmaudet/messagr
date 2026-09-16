@@ -1,5 +1,5 @@
 import React from 'react'
-import { Pressable, StyleSheet, Text, View } from 'react-native'
+import { Linking, Pressable, StyleSheet, Text, View } from 'react-native'
 
 import { t, type CopyKey } from '../copy'
 import { color, floors, layout, space, type } from '../design/tokens'
@@ -21,6 +21,15 @@ import { color, floors, layout, space, type } from '../design/tokens'
  * the means of moderation actually employed, and how a report is handled. They
  * are in that order because it is the order a person reads them in: what is
  * forbidden, what happens when somebody breaks it, and what to do about it.
+ *
+ * # The fourth thing on this screen, and it is not article 14's
+ *
+ * Deleting an account. It is here rather than as a row of its own in Settings
+ * because this is the screen Settings already opens for everything the
+ * published pages promise, and because what Play requires is a *path* to the
+ * web resource rather than a screen of its own: Settings, this screen, the
+ * link, and the browser opens on the section. See `DELETE_ACCOUNT` below and
+ * #333.
  *
  * # What this screen says that a marketing page would not
  *
@@ -66,6 +75,22 @@ const SECTIONS: readonly {
   },
 ]
 
+/**
+ * Where an account is deleted, and the anchor is part of the address.
+ *
+ * #333: Play requires an application that creates an account to offer *« an
+ * in-app path to delete their app accounts »*, and accepts a link towards the
+ * web resource as that path. Messagr creates an account when an invitation is
+ * opened, and carried neither the path nor the resource.
+ *
+ * The fragment is load-bearing. `deploy/messagr-eu/site/aide/index.html`
+ * carries `id="supprimer-votre-compte"` and says, in a comment beside it, what
+ * renaming it would cost: the page still answers 200, the reader still lands
+ * on it, and nothing anywhere reports that they landed above what they came
+ * for.
+ */
+const DELETE_ACCOUNT = 'https://messagr.eu/aide/#supprimer-votre-compte'
+
 export function Legal({ onBack }: { readonly onBack: () => void }) {
   return (
     <View style={styles.screen} testID="legal">
@@ -91,10 +116,41 @@ export function Legal({ onBack }: { readonly onBack: () => void }) {
         </View>
       ))}
 
+      {/* #333, AND IT IS A LINK WHERE THE LINE UNDER IT IS NOT.
+          A readable address is enough for a document somebody consults once.
+          It is not enough here: what Play asks for is a PATH -- something a
+          person can follow from inside the application -- and an address
+          somebody has to retype by hand is not one. So the two differ on
+          purpose, and this is where that difference is written down.
+
+          The screen says what the page says, which is the rule this whole
+          screen lives under: `scripts/assert-legal-screen.sh` exists because a
+          published text once promised a gesture the code did not carry. No
+          deadline is shown here. The page carries the one the privacy policy
+          commits to, and says in the same breath that the purge is done by
+          hand today (#71). */}
+      <View style={styles.section}>
+        <Text style={styles.heading}>{t('legal_delete_title')}</Text>
+        <Text style={styles.paragraph}>{t('legal_delete_body')}</Text>
+        <Pressable
+          testID="legal-delete-link"
+          onPress={() => {
+            // Failure is ordinary: no browser, or somebody dismissed it.
+            // Nothing to report and nothing to retry -- the same as the first
+            // screen's link to the terms.
+            Linking.openURL(DELETE_ACCOUNT).catch(() => {})
+          }}
+          accessibilityRole="link"
+          style={styles.linkRow}>
+          <Text style={styles.link}>{t('legal_delete_link')}</Text>
+        </Pressable>
+      </View>
+
       {/* Not a link. Opening a browser from a legal screen is a gesture that
           leaves the application, and this one has nowhere to come back to
           yet; the address is readable and that is enough for a page a person
-          consults once. */}
+          consults once. The deletion link above is the exception, and the
+          comment there says why it had to be one. */}
       <Text testID="legal-terms" selectable style={styles.terms}>
         {t('legal_full_terms')}
       </Text>
@@ -136,6 +192,18 @@ const styles = StyleSheet.create({
   paragraph: {
     ...type.bodySm,
     color: color.neutral['900'],
+  },
+  // A row rather than a bare `Text`, so the tap target is the floor's height
+  // whatever the label's line-height is. The same shape as the terms link on
+  // the first screen.
+  linkRow: {
+    minHeight: floors.touchTargetMin,
+    justifyContent: 'center',
+  },
+  link: {
+    ...type.action,
+    color: color.brand.green700,
+    textDecorationLine: 'underline',
   },
   terms: {
     ...type.caption,

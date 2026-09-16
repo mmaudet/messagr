@@ -343,6 +343,10 @@ export const de: Readonly<Record<CopyKey, string>> = {
     'Einer Entscheidung kann unter conformite@messagr.eu unter Angabe der Referenz widersprochen werden. Sie wird von einer anderen Person als der entscheidenden erneut geprüft, wann immer die Organisation das zulässt. Bei einem Dienst, den ein oder zwei Personen betreiben, lässt sich das nicht immer einhalten, und das aufzuschreiben ist besser, als eine Trennung zu versprechen, die es nicht gäbe.',
   legal_report_scope:
     'Messagr ist ein Hostingdienst und keine Online-Plattform; Erwägungsgrund 14 des DSA nimmt interpersonelle Kommunikationsdienste aus. Die Artikel 20 und 21 gelten daher nicht, und dieser Text beansprucht nicht, sie zu bieten.',
+  legal_delete_title: 'Ihr Konto löschen',
+  legal_delete_body:
+    'Die Löschung wird per E-Mail an conformite@messagr.eu beantragt: In der Anwendung selbst gibt es diesen Schritt noch nicht. Das Konto wird dann deaktiviert und seine Daten werden gelöscht; bereits gesendete Nachrichten bleiben Ereignisse der Räume, in denen sie geschrieben wurden, und der Server kann sie nicht zurücknehmen, da er sie nicht lesen kann.',
+  legal_delete_link: 'Löschung beantragen: messagr.eu/aide',
   legal_full_terms: 'Vollständige Bedingungen: messagr.eu',
   trust_action: 'Was über diese Person bekannt ist',
   trust_title: 'Was über diese Person bekannt ist',

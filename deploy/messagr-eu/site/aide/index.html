@@ -1,0 +1,373 @@
+<!doctype html>
+<html lang="fr">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Aide — Messagr</title>
+    <meta
+      name="description"
+      content="À qui écrire pour obtenir de l'aide sur Messagr, ce que l'aide ne peut pas faire, et comment demander la suppression de son compte." />
+    <style>
+      :root {
+        --ground: #f7f5ef;
+        --surface: #ffffff;
+        --ink: #0c1f19;
+        --soft: #5a6b63;
+        --accent: #06614a;
+        --mark: #12b76a;
+        --bubble: #c9f2dc;
+        --rule: #e2ded2;
+      }
+      * {
+        box-sizing: border-box;
+      }
+      html,
+      body {
+        margin: 0;
+      }
+      body {
+        background: var(--ground);
+        color: var(--ink);
+        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+        line-height: 1.6;
+        -webkit-font-smoothing: antialiased;
+      }
+      main {
+        max-width: 640px;
+        margin: 0 auto;
+        padding: 56px 24px 80px;
+      }
+      .mark {
+        display: block;
+        margin-bottom: 40px;
+        width: max-content;
+      }
+      .mark:focus-visible {
+        outline: 3px solid var(--mark);
+        outline-offset: 4px;
+      }
+      .logotype {
+        display: block;
+        width: min(260px, 62vw);
+        height: auto;
+      }
+      .logotype.dark {
+        display: none;
+      }
+      h1 {
+        font-size: clamp(28px, 6vw, 38px);
+        line-height: 1.14;
+        letter-spacing: -0.025em;
+        font-weight: 650;
+        margin: 0 0 18px;
+        text-wrap: balance;
+      }
+      h2 {
+        font-size: 20px;
+        line-height: 1.25;
+        letter-spacing: -0.015em;
+        font-weight: 640;
+        margin: 38px 0 12px;
+      }
+      /* UN TITRE VISÉ PAR UN LIEN NE DOIT PAS ARRIVER COLLÉ AU BORD.
+         `/aide/#supprimer-votre-compte` est une adresse publiée, donnée à
+         Apple et à Google : ce qu'elle amène sous les yeux est le titre et
+         ce qui le suit, pas le titre seul en haut de l'écran. */
+      h2[id] {
+        scroll-margin-top: 24px;
+      }
+      .lead {
+        font-size: 18px;
+        color: var(--soft);
+        margin: 0 0 8px;
+        text-wrap: pretty;
+      }
+      .stamp {
+        font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+        font-size: 11px;
+        letter-spacing: 0.13em;
+        text-transform: uppercase;
+        color: var(--soft);
+        margin: 0 0 34px;
+      }
+      p {
+        margin: 0 0 14px;
+      }
+      ul {
+        list-style: none;
+        padding: 0;
+        margin: 0 0 18px;
+        display: flex;
+        flex-direction: column;
+        gap: 9px;
+      }
+      li {
+        display: flex;
+        gap: 11px;
+        align-items: baseline;
+        font-size: 16px;
+      }
+      li::before {
+        content: '◆';
+        color: var(--mark);
+        font-size: 12px;
+        flex: 0 0 auto;
+      }
+      .card {
+        background: var(--surface);
+        border: 1px solid var(--rule);
+        border-radius: 4px;
+        padding: 22px 24px;
+        margin: 22px 0;
+      }
+      .card p:last-child {
+        margin-bottom: 0;
+      }
+      .invite {
+        background: var(--bubble);
+        border-radius: 4px;
+        padding: 18px 20px;
+        font-size: 15.5px;
+        margin: 22px 0;
+      }
+      .invite b {
+        font-weight: 640;
+      }
+      code {
+        font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+        font-size: 14px;
+        background: var(--surface);
+        border: 1px solid var(--rule);
+        border-radius: 3px;
+        padding: 1px 5px;
+      }
+      a {
+        color: var(--accent);
+      }
+      footer {
+        margin-top: 46px;
+        padding-top: 20px;
+        border-top: 1px solid var(--rule);
+        font-size: 13.5px;
+        color: var(--soft);
+      }
+      @media (prefers-color-scheme: dark) {
+        :root {
+          --ground: #0b1a15;
+          --surface: #11241d;
+          --ink: #e9f1ec;
+          --soft: #93a89e;
+          --accent: #4fd39b;
+          --rule: #23392f;
+          --bubble: #1c3d30;
+        }
+        .logotype.light {
+          display: none;
+        }
+        .logotype.dark {
+          display: block;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <a class="mark" href="/" aria-label="Messagr">
+        <img
+          class="logotype light"
+          src="/messagr-logotype-vert.svg"
+          alt="Messagr"
+          width="260"
+          height="60" />
+        <img
+          class="logotype dark"
+          src="/messagr-logotype-vert-inverse.svg"
+          alt="Messagr"
+          width="260"
+          height="60" />
+      </a>
+
+      <h1>Aide</h1>
+      <p class="lead">
+        Une seule adresse, et une personne qui lit. Ce qu'elle peut faire, ce
+        qu'elle ne peut pas faire, et comment demander la suppression de votre
+        compte.
+      </p>
+      <p class="stamp">Version du 16 septembre 2026</p>
+
+      <!-- UNE SEULE ADRESSE, ET C'EST CELLE QUI EXISTE DÉJÀ.
+           `aide@messagr.eu` n'existe pas. Publier une adresse que personne ne
+           relève serait pire que d'en publier une seule qui répond, et ce
+           n'est pas une hypothèse : les conditions générales ont déjà eu à
+           corriger un signalement « accessible depuis l'application » que
+           rien dans le code ne portait. Le jour où une adresse d'assistance
+           distincte existera et sera relevée, elle se posera ici. -->
+      <div class="invite">
+        <b>Pour supprimer votre compte Messagr</b>, écrivez à
+        <a href="mailto:conformite@messagr.eu">conformite@messagr.eu</a>. Ce
+        qu'il faut écrire, ce qui se passe ensuite et ce qui reste après sont
+        dans <a href="#supprimer-votre-compte">Supprimer votre compte</a>, plus
+        bas sur cette page.
+      </div>
+
+      <h2 id="a-qui-ecrire">À qui écrire</h2>
+      <p>
+        <b>Messagr est exploité par RV Myriagone Holding</b>, société à
+        responsabilité limitée à associé unique immatriculée au registre du
+        commerce et des sociétés de Versailles sous le numéro
+        <b>894&nbsp;754&nbsp;548</b>, dont le siège est au 22 rue de la
+        Garenne, 78130 Chapet. L'identité complète de l'exploitant est dans les
+        <a href="/conditions-generales">conditions générales</a>.
+      </p>
+      <p>
+        <b
+          >Une seule adresse&nbsp;:
+          <a href="mailto:conformite@messagr.eu">conformite@messagr.eu</a></b
+        >, en français ou en anglais. C'est le point de contact des conditions
+        générales, et c'est la même adresse pour tout&nbsp;: une question, un
+        compte qui ne fonctionne pas, un signalement, une demande de
+        suppression. Il n'en existe pas d'autre, et l'écrire vaut mieux que
+        d'afficher un formulaire que personne ne relèverait.
+      </p>
+      <p>
+        <b>Ce qu'il faut mettre dans votre message.</b> Ce que vous vouliez
+        faire, ce qui s'est passé à la place, le modèle de votre téléphone et la
+        version de son système. L'application n'envoie aucun rapport
+        d'incident, et ne mesure rien&nbsp;: votre message est la seule chose
+        que nous ayons pour comprendre.
+      </p>
+      <p>
+        <b>Sous quel délai.</b> Une question ordinaire n'a pas de délai annoncé,
+        et en annoncer un que personne ne tiendrait vaudrait moins que se taire.
+        Un signalement, lui, en a un&nbsp;: un accusé de réception, puis une
+        décision motivée au plus tard trente jours après sa réception, comme les
+        <a href="/conditions-generales">conditions générales</a> l'engagent.
+      </p>
+
+      <!-- #333 : CETTE ANCRE EST UNE ADRESSE PUBLIÉE, PAS UN DÉTAIL DE MISE
+           EN PAGE.
+           Google Play exige d'une application qui crée un compte une
+           ressource web où la suppression se demande, où « the pathway to
+           request account deletion should be prominently featured and easily
+           discoverable on the page », et l'écran « Informations légales » de
+           l'application ouvre exactement cette adresse :
+           https://messagr.eu/aide/#supprimer-votre-compte
+           Renommer cet `id` casse les deux d'un coup SANS QU'AUCUN SERVEUR NE
+           RÉPONDE 404 : la page s'ouvre, le lecteur arrive en haut, et rien
+           nulle part ne dit qu'il a manqué ce qu'il venait chercher. -->
+      <h2 id="supprimer-votre-compte">Supprimer votre compte</h2>
+      <p>
+        <b>À qui.</b> À
+        <a href="mailto:conformite@messagr.eu">conformite@messagr.eu</a>,
+        l'adresse ci-dessus. C'est la seule voie&nbsp;: la suppression ne se
+        demande pas encore depuis l'application, et le dire vaut mieux que le
+        promettre.
+      </p>
+      <p>
+        <b>Quoi écrire.</b> Une phrase suffit&nbsp;: que vous demandez la
+        suppression de votre compte Messagr. Ajoutez ce qui permet de le
+        retrouver, c'est-à-dire le nom que vous portez dans vos conversations et
+        le nom de la personne qui vous a invité. Un compte Messagr ne porte ni
+        adresse électronique, ni numéro de téléphone, ni nom réel&nbsp;: ces
+        deux éléments sont ce qui reste pour désigner le vôtre. S'ils ne
+        suffisent pas, la réponse vous dira ce qui manque.
+      </p>
+      <div class="card">
+        <p>
+          <b>Ce qui se passe ensuite.</b> La
+          <a href="/confidentialite">politique de confidentialité</a>
+          l'engage&nbsp;: «&nbsp;À la suppression d'un compte, il est désactivé
+          immédiatement et ses données sont purgées sous trente jours.&nbsp;» La
+          désactivation empêche aussi toute réutilisation de l'identifiant du
+          compte.
+        </p>
+        <p>
+          <b>À l'échelle de la bêta, cette purge est faite à la main.</b> Le
+          délai de trente jours est celui que la politique engage, et il est
+          tenu aujourd'hui par une opération qu'une personne exécute, non par un
+          automatisme qui l'exécuterait tout seul. Nous l'écrivons parce qu'une
+          mécanique annoncée et inexistante est exactement ce que ces pages ont
+          déjà eu à corriger.
+        </p>
+      </div>
+      <p>
+        <b>Ce qui reste, et pourquoi.</b> La politique de confidentialité le dit
+        sans détour&nbsp;: «&nbsp;supprimer un compte le désactive et empêche
+        toute réutilisation de son identifiant, mais les événements qu'il a
+        produits restent des événements du salon.&nbsp;» Une conversation Matrix
+        ajoute des événements sans jamais en retirer, et ce qui reste est
+        chiffré&nbsp;: le serveur ne peut pas le trier, puisqu'il ne peut pas le
+        lire. C'est le revers de la propriété qui protège vos messages.
+      </p>
+      <p>
+        Restent aussi les copies que vos correspondants ont sur leurs appareils.
+        Elles sont chez eux, et aucune suppression faite sur le serveur ne les
+        atteint.
+      </p>
+      <p>
+        <b>Ce n'est pas la même chose que changer de compte sur un appareil.</b>
+        Suivre une nouvelle invitation remplace le compte que cet appareil
+        porte&nbsp;; l'ancien continue d'exister sur son serveur, et vos
+        correspondants gardent leurs conversations avec lui. Seule une demande
+        écrite à
+        <a href="mailto:conformite@messagr.eu">conformite@messagr.eu</a>
+        supprime un compte.
+      </p>
+
+      <h2 id="ce-que-l-aide-ne-peut-pas-faire">
+        Ce que l'aide ne peut pas faire
+      </h2>
+      <ul>
+        <li>
+          Lire vos messages, ni vous les restituer. La politique de
+          confidentialité le dit ainsi&nbsp;: «&nbsp;Nous ne pouvons pas vous
+          restituer le contenu de vos messages, parce que nous ne l'avons jamais
+          eu en clair.&nbsp;» Les clés ne quittent pas les appareils, et le
+          contenu, lui, est déjà chez vous.
+        </li>
+        <li>
+          Réinitialiser quoi que ce soit&nbsp;: un compte Messagr ne porte ni
+          adresse électronique, ni numéro de téléphone, ni mot de passe, donc il
+          n'y a rien à remettre à zéro.
+        </li>
+        <li>
+          Retirer un message précis d'une conversation, ni qualifier un contenu
+          par la lecture. Les
+          <a href="/conditions-generales">conditions générales</a> disent ce que
+          l'exploitant peut décider sans lire, et ce qu'il ne peut pas.
+        </li>
+      </ul>
+
+      <h2 id="signaler-contester-vos-droits">
+        Signaler, contester, exercer vos droits
+      </h2>
+      <ul>
+        <li>
+          <b>Signaler un contenu ou un comportement</b>, et contester une
+          décision&nbsp;: la marche à suivre, la référence du signalement et les
+          délais sont dans les
+          <a href="/conditions-generales">conditions générales</a>. La même
+          adresse les reçoit.
+        </li>
+        <li>
+          <b
+            >Accès, rectification, effacement, limitation, opposition,
+            portabilité</b
+          >&nbsp;: la
+          <a href="/confidentialite">politique de confidentialité</a> dit sur
+          quoi ces droits portent, et sur quoi ils ne peuvent pas porter. Elle
+          rappelle aussi que vous pouvez saisir la Commission nationale de
+          l'informatique et des libertés,
+          <a href="https://www.cnil.fr">cnil.fr</a>.
+        </li>
+      </ul>
+
+      <footer>
+        <a href="/">Messagr</a> ·
+        <a href="/confidentialite">Politique de confidentialité</a> ·
+        <a href="/conditions-generales">Conditions générales</a> ·
+        <a href="mailto:conformite@messagr.eu">conformite@messagr.eu</a>
+      </footer>
+    </main>
+  </body>
+</html>

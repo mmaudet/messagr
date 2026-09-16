@@ -335,6 +335,10 @@ export const nl: Readonly<Record<CopyKey, string>> = {
     'Tegen een beslissing kan bezwaar worden gemaakt bij conformite@messagr.eu, met vermelding van de referentie. Zij wordt opnieuw beoordeeld door iemand anders dan degene die haar nam, telkens wanneer de organisatie dat toelaat. Bij een dienst die door één of twee mensen wordt geëxploiteerd kan aan die voorwaarde niet altijd worden voldaan, en dat opschrijven is beter dan een scheiding beloven die niet zou bestaan.',
   legal_report_scope:
     'Messagr is een hostingdienst en geen onlineplatform; overweging 14 van de DSA sluit interpersoonlijke communicatiediensten uit. De artikelen 20 en 21 zijn dus niet van toepassing, en deze tekst beweert niet ze te bieden.',
+  legal_delete_title: 'Uw account verwijderen',
+  legal_delete_body:
+    'Verwijdering wordt per e-mail aangevraagd bij conformite@messagr.eu: vanuit de applicatie bestaat dat gebaar nog niet. Het account wordt dan gedeactiveerd en zijn gegevens worden gewist; reeds verzonden berichten blijven gebeurtenissen van de ruimtes waarin ze zijn geschreven, en de server kan ze niet terugnemen, omdat hij ze niet kan lezen.',
+  legal_delete_link: 'Verwijdering aanvragen: messagr.eu/aide',
   legal_full_terms: 'Volledige algemene voorwaarden: messagr.eu',
   trust_action: 'Wat er van deze persoon bekend is',
   trust_title: 'Wat er van deze persoon bekend is',
