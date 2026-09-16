@@ -118,6 +118,7 @@ import { enterInvitations, type Entered } from './enterInvitations'
 import { drainOutgoingRequests, makePumpHttp, PumpHttpError } from './pump'
 import {
   admitDrawnEntrant,
+  anAdmissionIsRunning,
   issueInvitation,
   type Admission,
   type Issued,
@@ -850,6 +851,12 @@ export async function admitEntrant(
   invitationId: string,
   scope: string,
 ): Promise<Admission> {
+  // BEFORE THE CALL, because that is the only turn in which it is true.
+  // `issueInvitation.ts` runs one admission at a time per invitation and
+  // hands every other caller the same run (#277), so most ticks make no
+  // request at all -- and a log line per tick saying nothing of the sort is
+  // what made fifteen invites look like fifteen admissions.
+  const joined = anAdmissionIsRunning(invitationId)
   const admission = await admitDrawnEntrant(
     {
       http: makePumpHttp(sessionClient),
@@ -865,6 +872,7 @@ export async function admitEntrant(
   // not.
   logEvent(admission.admitted ? 'info' : 'warn', 'MESSAGR_ADMIT', {
     ...admission,
+    joined,
   })
   return admission
 }
