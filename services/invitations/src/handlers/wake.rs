@@ -369,4 +369,292 @@ mod tests {
         assert!(!wire.contains("thread_root"));
         assert!(!wire.contains("@x:messagr.eu"));
     }
+
+    // ======================================================================
+    // #286 — A TOKEN THE GATEWAY REFUSES IS AN ORDINARY EVENT
+    //
+    // Measured on the production gateway on 13 September 2026: a
+    // notification carrying a device token FCM will never accept came back
+    // to the homeserver as `500 M_UNKNOWN`, with no `rejected` list and no
+    // push for the devices that were fine. The tests below are that probe,
+    // without a homeserver and without Google.
+    // ======================================================================
+
+    use crate::{config, matrix};
+    use axum::{http::StatusCode, response::IntoResponse};
+    use sqlx::SqlitePool;
+    use std::sync::Mutex;
+
+    /// An application state whose only live part is the gateway address:
+    /// `wake` reads nothing else. The homeserver points at a closed port on
+    /// purpose — nothing here may depend on anything reachable.
+    fn state(pool: SqlitePool, gateway: Option<String>) -> Arc<AppState> {
+        Arc::new(AppState {
+            pool,
+            mx: Arc::new(matrix::MatrixClient::new(
+                "http://127.0.0.1:1".into(),
+                "token".into(),
+            )),
+            cfg: config::Config {
+                database_url: String::new(),
+                homeserver_url: "http://127.0.0.1:1".into(),
+                registration_token: "token".into(),
+                encryption_key: [0u8; 32],
+                edge_retention_days: 30,
+                bind_addr: String::new(),
+                max_reserved_accounts_per_inviter: config::DEFAULT_RESERVED_ACCOUNTS_CEILING,
+                push_gateway_url: gateway,
+            },
+        })
+    }
+
+    /// Puts a notification through the handler and reads back what a
+    /// homeserver would receive: the STATUS and the BODY, not the Rust value.
+    /// The status is half of what #286 is about, and a test asserting on an
+    /// `Ok(...)` would not have seen it.
+    async fn answer(st: Arc<AppState>, raw: &str) -> (StatusCode, Value) {
+        let body: Notify = serde_json::from_str(raw).unwrap();
+        let response = notify(State(st), Json(body)).await.into_response();
+        let status = response.status();
+        let bytes = axum::body::to_bytes(response.into_body(), usize::MAX)
+            .await
+            .unwrap();
+        (status, serde_json::from_slice(&bytes).unwrap_or(Value::Null))
+    }
+
+    /// A stand-in for sygnal: it answers according to the pushkeys the
+    /// forwarded notification carries, and keeps every body it was given.
+    ///
+    /// It models the one behaviour of sygnal that this ticket is about: it
+    /// answers per REQUEST and not per device, so a single device it cannot
+    /// dispatch to takes the whole request down with it. That is written in
+    /// `deploy/messagr-sygnal/sygnal.yaml`, annex of 6 August 2026, read off
+    /// the code of the deployed image.
+    async fn sygnal(
+        reply: impl Fn(&[String]) -> (StatusCode, String) + Clone + Send + Sync + 'static,
+    ) -> (String, Arc<Mutex<Vec<Value>>>) {
+        let seen: Arc<Mutex<Vec<Value>>> = Arc::new(Mutex::new(Vec::new()));
+        let kept = seen.clone();
+        let app = axum::Router::new().route(
+            "/_matrix/push/v1/notify",
+            axum::routing::post(move |Json(body): Json<Value>| {
+                let reply = reply.clone();
+                let kept = kept.clone();
+                async move {
+                    let carried = pushkeys_of(&body);
+                    kept.lock().unwrap().push(body);
+                    reply(&carried)
+                }
+            }),
+        );
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let url = format!(
+            "http://{}/_matrix/push/v1/notify",
+            listener.local_addr().unwrap()
+        );
+        tokio::spawn(async move { axum::serve(listener, app).await.unwrap() });
+        (url, seen)
+    }
+
+    fn pushkeys_of(notification: &Value) -> Vec<String> {
+        notification["notification"]["devices"]
+            .as_array()
+            .map(|devices| {
+                devices
+                    .iter()
+                    .filter_map(|one| one["pushkey"].as_str())
+                    .map(str::to_owned)
+                    .collect()
+            })
+            .unwrap_or_default()
+    }
+
+    /// Sygnal's answer to a notification it could not dispatch: 502, and an
+    /// EMPTY body. `reqwest` then fails to decode with "EOF while parsing a
+    /// value", and that failure is what used to leave here as `500 M_UNKNOWN`.
+    ///
+    /// FCM's 400 INVALID_ARGUMENT — a token that is not a registration token
+    /// — arrives this way. So do its 401 UNAUTHENTICATED and 403
+    /// PERMISSION_DENIED, which are about OUR service account and not about
+    /// anybody's device. The three are indistinguishable from this side,
+    /// which is the whole difficulty of the ticket.
+    fn bodiless_502() -> (StatusCode, String) {
+        (StatusCode::BAD_GATEWAY, String::new())
+    }
+
+    /// Sygnal delivered, and names the pushkeys it refuses — its 200 path,
+    /// the one an APNs `BadDeviceToken` and an FCM 404 UNREGISTERED take.
+    fn accepted(rejected: &[&str]) -> (StatusCode, String) {
+        (StatusCode::OK, json!({ "rejected": rejected }).to_string())
+    }
+
+    const ONE_DEVICE: &str = r##"{"notification":{"event_id":"$realevent:messagr.eu",
+        "devices":[{"app_id":"eu.messagr","pushkey":"DEAD"}]}}"##;
+
+    const TWO_DEVICES: &str = r##"{"notification":{"event_id":"$realevent:messagr.eu",
+        "devices":[{"app_id":"eu.messagr","pushkey":"ALIVE"},
+                   {"app_id":"eu.messagr","pushkey":"DEAD"}]}}"##;
+
+    /// **The ticket, in one assertion.** An upstream answer this service
+    /// cannot read is a fact about the upstream, not a fault of its own, and
+    /// a homeserver must never be told `500 M_UNKNOWN` for it: it retries the
+    /// same notification for ever and learns nothing.
+    #[sqlx::test(migrations = "./migrations")]
+    async fn an_answer_that_carries_no_json_is_not_an_internal_error(pool: SqlitePool) {
+        let (gateway, _seen) = sygnal(|_| bodiless_502()).await;
+        let (status, body) = answer(state(pool, Some(gateway)), ONE_DEVICE).await;
+        assert_eq!(
+            status,
+            StatusCode::OK,
+            "a gateway that cannot read its upstream's answer must not \
+             report an internal error of its own"
+        );
+        assert_eq!(body["rejected"], json!([]));
+    }
+
+    /// A refusal that singles out ONE device, while another device of the
+    /// same notification went through, is about that device: the pushkey is
+    /// the only thing that differed between the two forwards.
+    #[sqlx::test(migrations = "./migrations")]
+    async fn a_refusal_that_singles_out_one_device_names_that_pushkey(pool: SqlitePool) {
+        let (gateway, _seen) = sygnal(|carried: &[String]| {
+            if carried.iter().any(|key| key == "DEAD") {
+                bodiless_502()
+            } else {
+                accepted(&[])
+            }
+        })
+        .await;
+        let (status, body) = answer(state(pool, Some(gateway)), TWO_DEVICES).await;
+        assert_eq!(status, StatusCode::OK);
+        assert_eq!(
+            body["rejected"],
+            json!(["DEAD"]),
+            "without this the homeserver never learns the token is dead, so \
+             it keeps aiming at it"
+        );
+    }
+
+    /// And the device that was fine is still woken. One bad token used to
+    /// cost the whole notification, on every device of the account.
+    #[sqlx::test(migrations = "./migrations")]
+    async fn a_device_is_still_woken_when_its_neighbour_is_refused(pool: SqlitePool) {
+        let (gateway, seen) = sygnal(|carried: &[String]| {
+            if carried.iter().any(|key| key == "DEAD") {
+                bodiless_502()
+            } else {
+                accepted(&[])
+            }
+        })
+        .await;
+        let (status, _) = answer(state(pool, Some(gateway)), TWO_DEVICES).await;
+        assert_eq!(status, StatusCode::OK);
+
+        let forwarded = seen.lock().unwrap().clone();
+        let carried: Vec<Vec<String>> = forwarded.iter().map(pushkeys_of).collect();
+        assert_eq!(
+            carried.len(),
+            2,
+            "one forward per device, or a refused device takes its \
+             neighbours with it: {carried:?}"
+        );
+        assert!(
+            carried.contains(&vec!["ALIVE".to_string()]),
+            "the device that was fine was never offered on its own: {carried:?}"
+        );
+    }
+
+    /// **The safeguard, and it is the important half.** When EVERY device is
+    /// refused, nothing is reported rejected.
+    ///
+    /// A bodiless 502 is what sygnal answers for FCM's 400 (this token is not
+    /// a token) and equally for its 401 and 403 (our service account is not
+    /// authorised) — the annex in `deploy/messagr-sygnal/sygnal.yaml` says so,
+    /// measured against FCM. Rejecting on that evidence alone would, the day a
+    /// service account key expires, delete every pusher on this deployment at
+    /// once, silently, and on a homeserver that honours `rejected` there is no
+    /// way back but every device registering again.
+    #[sqlx::test(migrations = "./migrations")]
+    async fn a_refusal_of_every_device_names_no_pushkey(pool: SqlitePool) {
+        let (gateway, _seen) = sygnal(|_| bodiless_502()).await;
+        let (status, body) = answer(state(pool, Some(gateway)), TWO_DEVICES).await;
+        assert_eq!(status, StatusCode::OK);
+        assert_eq!(
+            body["rejected"],
+            json!([]),
+            "an upstream that accepted nothing at all is an upstream that \
+             has not said anything about anybody's token"
+        );
+    }
+
+    /// The one thing here that must not be filtered, unchanged: what sygnal
+    /// names, the homeserver receives. This is the path an APNs
+    /// `BadDeviceToken` and an FCM 404 UNREGISTERED already took, and the
+    /// coherence between the two transports is that they end in this same
+    /// list.
+    #[sqlx::test(migrations = "./migrations")]
+    async fn what_the_gateway_names_is_passed_back_unchanged(pool: SqlitePool) {
+        let (gateway, _seen) = sygnal(|carried: &[String]| {
+            let gone: Vec<&str> = carried
+                .iter()
+                .filter(|key| key.as_str() == "DEAD")
+                .map(String::as_str)
+                .collect();
+            accepted(&gone)
+        })
+        .await;
+        let (status, body) = answer(state(pool, Some(gateway)), TWO_DEVICES).await;
+        assert_eq!(status, StatusCode::OK);
+        assert_eq!(body["rejected"], json!(["DEAD"]));
+    }
+
+    /// A gateway nothing answers at is not a dead token either. Port 1 on the
+    /// loopback: nothing listens there, and `reqwest` fails before any HTTP.
+    #[sqlx::test(migrations = "./migrations")]
+    async fn an_unreachable_gateway_names_nothing_and_is_not_an_error(pool: SqlitePool) {
+        let (status, body) = answer(
+            state(
+                pool,
+                Some("http://127.0.0.1:1/_matrix/push/v1/notify".into()),
+            ),
+            ONE_DEVICE,
+        )
+        .await;
+        assert_eq!(status, StatusCode::OK);
+        assert_eq!(body["rejected"], json!([]));
+    }
+
+    /// Splitting the forward per device must not multiply the meaningless
+    /// event id: one value per NOTIFICATION, as the module header sets out.
+    /// A fresh one per device would correlate nothing more — but the property
+    /// written down there is the one that was reasoned about, and a forward
+    /// that quietly stopped holding it would have nobody to notice.
+    #[sqlx::test(migrations = "./migrations")]
+    async fn the_devices_of_one_notification_share_one_meaningless_event_id(pool: SqlitePool) {
+        let (gateway, seen) = sygnal(|_| accepted(&[])).await;
+        let (status, _) = answer(state(pool, Some(gateway)), TWO_DEVICES).await;
+        assert_eq!(status, StatusCode::OK);
+
+        let forwarded = seen.lock().unwrap().clone();
+        assert_eq!(forwarded.len(), 2);
+        let ids: Vec<&str> = forwarded
+            .iter()
+            .map(|one| one["notification"]["event_id"].as_str().unwrap())
+            .collect();
+        assert_eq!(ids[0], ids[1], "one value per notification");
+        assert!(
+            !ids[0].contains("realevent"),
+            "the real event id crossed the push gateway"
+        );
+    }
+
+    /// Unchanged, and re-asserted through the response rather than through
+    /// the Rust value: a deployment with nowhere to forward answers
+    /// "delivered, nothing to clean up".
+    #[sqlx::test(migrations = "./migrations")]
+    async fn a_deployment_with_no_gateway_names_nothing(pool: SqlitePool) {
+        let (status, body) = answer(state(pool, None), ONE_DEVICE).await;
+        assert_eq!(status, StatusCode::OK);
+        assert_eq!(body["rejected"], json!([]));
+    }
 }
