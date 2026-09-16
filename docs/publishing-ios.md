@@ -220,6 +220,54 @@ causes connues : la paire d'environnements, ou l'encodage du jeton. Mesurer la
 longueur du jeton rejeté, sans l'afficher : 64 caractères hexadécimaux,
 l'encodage est juste ; 96, sygnal a décodé en base64 un jeton hexadécimal.
 
+## Les captures d'écran de la fiche
+
+App Store Connect refuse la soumission d'une version tant que la fiche n'a pas
+ses captures. Deux cases pour cette application : **iPad 13 pouces**, exigée
+parce que `TARGETED_DEVICE_FAMILY = "1,2"`, et une case iPhone, qu'une capture
+de **6,5** ou de **6,9 pouces** remplit.
+
+```
+./scripts/capture-ios-store-screenshots.sh [répertoire]
+```
+
+Le script ne construit rien. Il réutilise la build simulateur déjà posée à
+`packages/app/ios/build/Build/Products/Release-iphonesimulator/Messagr.app`,
+celle que `.detoxrc.js` nomme, et il refuse en redonnant la commande quand elle
+manque. Release et pas Debug : elle porte `main.jsbundle`, donc elle démarre
+sans serveur Metro.
+
+Pour chaque classe, il **fabrique** son simulateur, le démarre sans fenêtre,
+fige la barre d'état à 9:41, photographie l'écran d'accueil comme témoin,
+installe l'application, la lance, attend que l'écran soit immobile, tire la
+capture, puis supprime l'appareil. Compter cinq minutes et environ 1,9 Gio de
+disque pendant qu'un appareil tourne.
+
+**Il ne touche jamais à l'interface.** Ni frappe, ni appui à une coordonnée :
+une coordonnée se déplace avec la mise en page et photographie autre chose en
+silence, et une frappe destinée à un simulateur atterrit là où est le focus du
+clavier, ce qui a déjà été le terminal du porteur. Le simulateur est démarré
+sans fenêtre, donc il n'y a rien où frapper.
+
+**Ce qu'il atteint : un écran, la promesse.** C'est ce qu'affiche une
+installation neuve, et le reste est derrière « Commencer », donc derrière un
+geste. Le pendant Android en atteint deux parce que la suite Detox y laisse
+l'application dans une conversation ; la suite Detox iOS, elle, n'a jamais
+tourné. Le jour où elle tournera, ce script pourra photographier ce qu'elle
+laisse à l'écran.
+
+`scripts/assert-ios-captures.mjs` relit le répertoire et refuse une taille
+qu'Apple n'accepte pas, une classe exigée absente, un fichier qui n'est pas un
+PNG, une capture qui n'a rien rendu, et une capture identique à son témoin —
+c'est-à-dire une photographie de l'écran d'accueil du simulateur. Son
+`--self-test` tourne dans `checks`, parce qu'une taille fautive dans sa table
+se verrait sinon pour la première fois dans la console, après le téléversement.
+
+**Ce qui reste à faire à la main** : téléverser les fichiers dans App Store
+Connect, fiche par fiche et langue par langue. Il n'y a pas d'équivalent iOS de
+`store-listing.yml`, et ce document ne recommande pas d'en écrire un à coups de
+navigateur automatisé, pour la raison que ce fichier-là donne.
+
 ## Tests externes : faire entrer le relecteur d'Apple
 
 Un testeur externe ne reçoit une build qu'après la revue bêta d'Apple, et le relecteur doit pouvoir entrer dans l'application. Or on n'entre dans Messagr que par invitation (ADR-0004) : il n'y a ni formulaire, ni nom d'utilisateur, ni mot de passe à lui confier.
