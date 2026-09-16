@@ -8,7 +8,7 @@ Ce qu'il faut répondre dans la Play Console (« Sécurité des données ») et 
 
 **Certaines réponses sont des jugements.** Elles portent un renvoi, par exemple « tranché, 2 » ou « à trancher, 6 », vers la section « Les jugements », où chaque point donne la règle lue et la réponse. Les tableaux et le manifeste portent cette réponse.
 
-**Les points 1, 2 et 3 sont tranchés** par le porteur le 16 septembre 2026. Les points 4 à 7 restent ouverts, et deux d'entre eux sont du travail plutôt qu'un choix.
+**Les points 1 à 5 sont tranchés** par le porteur le 16 septembre 2026. Le 5 et le 7 sont devenus des tickets, #334 et #333. Le 6 attend ce que le porteur décide de la lecture faite le 16 septembre.
 
 ## Sources
 
@@ -167,13 +167,13 @@ Le chiffrement en transit et la suppression se déclarent pour toute l'applicati
 
 | Type Play                                                                              | Pourquoi                                                              | Règle                                             |
 | -------------------------------------------------------------------------------------- | --------------------------------------------------------------------- | ------------------------------------------------- |
-| « Messages » → « Autres messages dans l'application »                                  | chiffrés de bout en bout                                              | chiffrement de bout en bout, à trancher, 4        |
-| « Photos et vidéos » → « Photos »                                                      | chiffrées de bout en bout ; l'application n'envoie pas de vidéo       | chiffrement de bout en bout, à trancher, 4        |
-| « Fichiers et documents »                                                              | chiffrés de bout en bout                                              | chiffrement de bout en bout, à trancher, 4        |
+| « Messages » → « Autres messages dans l'application »                                  | chiffrés de bout en bout                                              | chiffrement de bout en bout, tranché, 4           |
+| « Photos et vidéos » → « Photos »                                                      | chiffrées de bout en bout ; l'application n'envoie pas de vidéo       | chiffrement de bout en bout, tranché, 4           |
+| « Fichiers et documents »                                                              | chiffrés de bout en bout                                              | chiffrement de bout en bout, tranché, 4           |
 | « Fichiers audio »                                                                     | pas de message vocal ; le son des appels passe chiffré, en temps réel | chiffrement de bout en bout ; traitement éphémère |
 | « Position »                                                                           | aucune position n'est déduite des adresses IP                         | la note de Play sur la position déduite           |
 | « Informations personnelles » : nom, adresse e-mail, téléphone, adresse                | jamais demandés                                                       | rien n'est transmis                               |
-| « Infos et performance des applis »                                                    | aucun outil de mesure ; le journal reste sur l'appareil               | traitement sur l'appareil, à trancher, 5          |
+| « Infos et performance des applis »                                                    | aucun outil de mesure ; le journal reste sur l'appareil               | traitement sur l'appareil, tranché, 5             |
 | Interactions, recherches, applications installées, navigation, agenda, finances, santé | rien de tel                                                           | rien n'est transmis                               |
 
 - **Le contenu.** « Le contenu de vos conversations est chiffré de bout en bout : il est chiffré sur l'appareil qui l'écrit et déchiffré sur celui qui le lit. Les clés ne quittent jamais les appareils. » Le code le confirme pour les photos et les fichiers : ce qui est téléversé est le chiffré, déclaré `application/octet-stream`, sans nom de fichier (`cryptoPump.ts`, `mediaRepository.ts`).
@@ -210,10 +210,10 @@ Les deux se saisissent dans « App Privacy », à côté de « Privacy Policy »
 
 - « Identifiers » → « User ID » ;
 - « Identifiers » → « Device ID », tranché, 1 et 2 ;
-- « User Content » → « Emails or Text Messages », à trancher, 4 ;
+- « User Content » → « Emails or Text Messages », tranché, 4 ;
 - « Contacts » → « Contacts », tranché, 3 ;
 - « Usage Data » → « Other Usage Data » ;
-- « Diagnostics » → « Other Diagnostic Data », à trancher, 5.
+- « Diagnostics » → « Other Diagnostic Data », tranché, 5.
 
 ### Pour chaque type
 
@@ -241,14 +241,14 @@ Apple ne demande ni si la donnée est partagée, ni si elle est facultative. Son
 #### « Device ID »
 
 - **Définition Apple.** « Such as the device's advertising identifier, or other device-level ID »
-- **Ce que cela couvre.** Les identifiants et les clés publiques des appareils du compte ; le jeton APNs que le serveur garde pour réveiller l'iPhone ; les adresses IP des journaux techniques et du relais, tranché, 2 ; et, chez Google, l'identifiant d'installation Firebase, à trancher, 5.
+- **Ce que cela couvre.** Les identifiants et les clés publiques des appareils du compte ; le jeton APNs que le serveur garde pour réveiller l'iPhone ; les adresses IP des journaux techniques et du relais, tranché, 2 ; et, chez Google, l'identifiant d'installation Firebase, tranché, 5.
 - **Page.** « la liste des appareils d'un compte et leurs clés publiques » ; « Sur iOS le même rôle est tenu par le service de notifications d'Apple. » ; « les adresses IP au moment des requêtes, dans les journaux techniques. »
 - **Lié : oui.** Chaque appareil et chaque jeton sont enregistrés sous un compte.
 
 #### « Emails or Text Messages »
 
 - **Définition Apple.** « Including subject line, sender, recipients, and contents of the email or message »
-- **Ce qui est collecté.** L'expéditeur et les destinataires, que le serveur lit. Pas le contenu, qu'il ne peut pas lire. Ce sont eux, et la consigne d'Apple sur la messagerie, qui font déclarer ce type : à trancher, 4.
+- **Ce qui est collecté.** L'expéditeur et les destinataires, que le serveur lit. Pas le contenu, qu'il ne peut pas lire. Ce sont eux, et la consigne d'Apple sur la messagerie, qui font déclarer ce type : tranché, 4.
 - **Page.** « l'appartenance aux conversations » et « donc qui échange avec qui » ; « Le serveur ne détient pas les clés : il ne peut pas lire vos messages ».
 - **Lié : oui.**
 
@@ -283,6 +283,33 @@ Apple ne demande ni si la donnée est partagée, ni si elle est facultative. Son
 - **« Customer Support ».** Une demande écrite à conformite@messagr.eu ne passe pas par l'application.
 - **« Product Interaction », « Search History », « Browsing History », « Purchases », « Financial Info », « Health & Fitness », « Sensitive Info », « Surroundings », « Body ».** Rien de tel.
 
+### La note au relecteur d'App Store Connect
+
+À coller dans « App Review Information > Notes » à chaque soumission, décidé au point 4. Elle est en anglais, la langue dans laquelle le relecteur lit.
+
+> Messagr is an end-to-end encrypted messenger. Photos, files and message
+> text are encrypted on the device before they are uploaded. The server
+> stores ciphertext only and never holds the key, so it cannot render any
+> of it.
+>
+> We therefore do not declare "Photos or Videos" or "Other User Content"
+> under App Privacy. We follow Apple's own definition of collection as
+> retaining data "in a readable form" (App privacy details on the App
+> Store). We are aware of the guidance that an app which lets users upload
+> a media type should disclose that type, and we read it against that
+> definition: there is no readable form of this data on our side to
+> disclose.
+>
+> We do declare "Emails or Text Messages", linked to the user, no tracking,
+> App Functionality. The server reads who sends to whom and when, which is
+> what that type covers here, and Apple's guidance on messaging apps asks
+> for it.
+>
+> Our full answers, question by question, each quoting the sentence of our
+> privacy policy it rests on, are public at
+> https://github.com/mmaudet/messagr/blob/master/docs/declarations-magasins.md
+> Our privacy policy is at https://messagr.eu/confidentialite
+
 ### Le manifeste `PrivacyInfo.xcprivacy`
 
 Il déclare ce que l'application fait collecter elle-même, c'est-à-dire ce que garde le serveur, et pas ce que collecte Firebase : « Third-party SDKs need to provide their own privacy manifest files that record the types of data they collect. Your app's privacy manifest file doesn't need to cover data collected by third-party SDKs that your app links to. »
@@ -307,15 +334,17 @@ Il déclare ce que l'application fait collecter elle-même, c'est-à-dire ce que
 | FirebaseInstallations | `OtherDiagnosticData` | `false` | Analytics        |
 | GoogleDataTransport   | `OtherDiagnosticData` | `false` | Analytics        |
 
-Pourquoi les réponses d'App Store Connect n'en reprennent qu'une partie : à trancher, 5.
+Pourquoi les réponses d'App Store Connect n'en reprennent qu'une partie : tranché, 5.
 
 ## Les jugements
 
 Sept questions où la règle laisse un choix. Chacune donne les faits, la règle lue, la réponse, et ce qui change si elle est prise autrement. Les tableaux plus haut et le manifeste portent cette réponse.
 
-**Tranchés par le porteur le 16 septembre 2026 :** les points 1, 2 et 3.
+**Tranchés par le porteur le 16 septembre 2026 :** les points 1, 2, 3, 4 et 5.
 
-**Encore ouverts :** les points 4 à 7. Le 6 n'attend pas une décision mais une lecture de la configuration du relais. Le 7 n'est pas une réponse de formulaire mais une exigence de Play qui n'est pas remplie.
+**Devenus des tickets :** le 5 est #334, le 7 est #333.
+
+**Encore ouvert :** le 6. Il n'attendait pas une décision mais une lecture de la configuration du relais, faite le 16 septembre ; ce qu'elle a trouvé est écrit dans sa section.
 
 ### 1. Le jeton de notification compte-t-il comme collecté ?
 
@@ -361,7 +390,9 @@ Le coût est assumé : sur une fiche, « Contacts » se lira « lit mon carnet d
 
 **Le risque.** Apple écrit aussi : « if you have a feature that enables users to upload a particular media type, such as photos or videos, then you'll need to disclose the specific type of data. » Un relecteur peut lire cette phrase sans la définition qui la précède. Déclarer « Photos or Videos » (App Functionality, lié, sans suivi) éviterait la discussion, au prix d'une collecte affichée que le serveur ne peut pas faire. Il faudrait alors ajouter `NSPrivacyCollectedDataTypePhotosorVideos` au manifeste, avec cette casse, qui est celle d'Apple.
 
-**Recommandation.** Sur Play, rien de plus que les quatre types. Chez Apple, « Emails or Text Messages » et pas « Photos or Videos ».
+**Tranché le 16 septembre 2026.** Sur Play, rien de plus que les quatre types. Chez Apple, « Emails or Text Messages » et pas « Photos or Videos ». C'est la réponse exacte : un chiffré dont le serveur n'a pas la clé n'est pas conservé « in a readable form ».
+
+**Et la note au relecteur est écrite d'avance**, pour que la seule discussion probable se règle avant d'être ouverte plutôt qu'en pleine revue. Elle est plus bas, dans « La note au relecteur d'App Store Connect ». Déclarer « Photos or Videos » aurait fermé la question aussi, au prix d'une étiquette disant que Messagr collecte vos photos, liées à votre compte, ce que le serveur ne peut pas faire.
 
 ### 5. Firebase sur iOS, et ce que le SDK envoie de lui-même
 
@@ -377,9 +408,9 @@ Le coût est assumé : sur une fiche, « Contacts » se lira « lit mon carnet d
 
 **Les règles.** Apple fait déclarer les partenaires : « You must include information about your app's privacy practices and those of third-party partners whose code you integrate into your app. » Les manifestes des pods Firebase déclarent `DeviceID`, `OtherDataTypes` et `OtherDiagnosticData` (tableau du manifeste, plus haut).
 
-**Recommandation.**
+**Tranché le 16 septembre 2026 : corriger le code, et c'est #334.**
 
-- **Un ticket d'abord**, hors de #321 : mettre `FirebaseMessagingAutoInitEnabled` à `NO` dans `Info.plist`, puis vérifier sur un appareil que le jeton APNs arrive toujours et qu'aucune requête ne part vers Google. La page redevient vraie telle qu'elle est écrite.
+- Mettre `FirebaseMessagingAutoInitEnabled` à `NO` dans `Info.plist`, puis vérifier sur un iPhone que le jeton APNs arrive toujours, que la notification arrive, et qu'aucune requête ne part vers Google. La page redevient vraie telle qu'elle est écrite. La vérification se groupe avec celles de #325 et #308, sur le même appareil. L'autre chemin, écarté : réécrire la page pour dire que Google reçoit aussi quelque chose sur iPhone, ce qui affaiblit la promesse sur iOS et demande un redéploiement du site.
 - **D'ici là, chez Apple**, « Device ID » est déjà coché pour d'autres raisons. Ajouter « Other Diagnostic Data », non lié, « App Functionality », comme le déclare FirebaseMessaging.
 - **Pas d'« Analytics »**, bien que FirebaseInstallations et GoogleDataTransport le déclarent. GoogleDataTransport n'est appelé que par `exportDeliveryMetricsToBigQueryWithMessageInfo:` (`FIRMessagingExtensionHelper.m`), que l'application n'appelle pas, et Firebase décrit cet export comme optionnel : « Collects and sends message delivery metrics to BigQuery if the BigQuery integration is enabled and setDeliveryMetricsExportToBigQuery is set to true. » Le reste sert à Google « to determine platform and version adoption in order to provide, maintain, and improve Firebase services », ce qui n'est pas évaluer le comportement des personnes dans l'application, la définition d'« Analytics » chez Apple.
 - **Sur Android**, le même « Firebase user agent » part avec les requêtes de Firebase : « Device metadata: OS version, name, model, brand, and form factor », le magasin d'installation et les SDK présents. Il ne correspond à aucun type de Play : ce n'est pas un identifiant (« It is never linked to a user or device identifier. »), ni une mesure de performance. Ne rien ajouter sur Play, mais le dire sur la page.
@@ -407,7 +438,7 @@ Le coût est assumé : sur une fiche, « Contacts » se lira « lit mon carnet d
 **Recommandation.**
 
 - Répondre **Oui** à « Proposez-vous aux utilisateurs un moyen de demander la suppression de leurs données ? » : conformite@messagr.eu en est un.
-- Savoir que l'exigence de suppression de compte n'est pas remplie pour autant. Deux tickets, hors de #321 : sur la page, une section consacrée à la suppression, avec une ancre, qui nomme Messagr et dit quoi écrire ; dans les réglages, un lien vers elle. L'adresse de cette section répond aussi à la question de Play sur le lien de suppression, et à « Privacy Choices » chez Apple.
+- Savoir que l'exigence de suppression de compte n'est pas remplie pour autant, et que c'est **#333** : sur la page, une section consacrée à la suppression, avec une ancre, qui nomme Messagr et dit quoi écrire ; dans les réglages, un lien vers elle. L'adresse de cette section répond aussi à la question de Play sur le lien de suppression, et à « Privacy Choices » chez Apple.
 - Outiller la purge (#71) avant d'afficher « trente jours » dans un magasin.
 - Les « App Review Guidelines » d'Apple ont une règle comparable sur la suppression de compte. Elles n'ont pas été relues pour ce document : à vérifier avant la prochaine soumission.
 
