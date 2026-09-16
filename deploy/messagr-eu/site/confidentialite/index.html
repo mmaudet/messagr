@@ -387,11 +387,22 @@
       </p>
 
       <h2>Combien de temps</h2>
+      <!-- #313 : le lien d'invitation porte son jeton dans son chemin, et ce
+           jeton est un secret porteur — tant que l'invitation n'est ni
+           réclamée ni expirée, il fait entrer. Le serveur qui sert la page
+           n'a pas à le garder, et il ne le garde plus : le vhost écrit
+           « /i/... » à la place du chemin. La phrase ci-dessous est celle que
+           `deploy/messagr-eu/retention.json` déclare sous « dit », et que
+           `scripts/assert-retention.sh` vérifie contre cette page. -->
       <p>
         <b>Les journaux techniques, douze mois.</b> Cette durée n'est pas un
         choix&nbsp;: le décret n°&nbsp;2021-1362 l'impose aux fournisseurs
         d'hébergement pour les données permettant d'identifier la source d'une
         connexion, dont les adresses IP. Passé ce délai, elles sont effacées.
+        En revanche, le lien d'invitation n'y est pas écrit&nbsp;: quand vous
+        ouvrez une invitation dans un navigateur, le serveur note la date,
+        l'adresse IP, le résultat et le navigateur, et
+        «&nbsp;/i/...&nbsp;» à la place du lien.
       </p>
       <p>
         <b>Les données d'identité civile, sans objet.</b> La loi en prévoit la

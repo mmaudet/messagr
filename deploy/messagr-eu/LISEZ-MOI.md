@@ -17,6 +17,7 @@ changed.
     build-site.sh             produces the served tree; run in CI
     deploy.sh                 publishes it to the server
     nginx-messagr-eu.conf     the vhost
+    purge-jetons-journaux.sh  takes invitation tokens out of logs already written
     android-fingerprints.json the signing-key registry — NEVER deployed
     tests/                    what holds all of it
 
@@ -36,6 +37,49 @@ rather than claimed in a comment:
 
 `build-site.sh` runs both on what it produced, so they are held by what is
 deployed and not only by what is committed.
+
+## The invitation token and the server's log
+
+The invitation link carries its token in the path,
+`https://messagr.eu/i/<token>`, and that token is a bearer secret: while the
+invitation is neither claimed nor expired, it lets somebody in. Until
+15 September 2026 nginx wrote that whole path into its access log, and
+`/etc/logrotate.d/nginx` keeps that log for 366 days — so every invitation
+opened in a browser left its token readable on the server for up to a
+year (#313).
+
+**The vhost stops the bleeding.** A `map` on `$request_uri` and a
+`log_format messagr_sans_jeton`, declared at the top of
+`nginx-messagr-eu.conf` and set on `location /i/` and on `location = /i`. The
+line still carries the date, the IP address, the status, the size and the
+user agent — `retention.json` declares twelve months for connection data and
+the decree imposes it — but the path reads `/i/...` and the referer reads
+`-`. It is the token that goes, not the line.
+
+**Three ASCII dots and not `…`, and that was measured.** nginx escapes every
+byte above 0x7E carried by a _variable_ in the log, so the ellipsis arrives
+written `\xE2\x80\xA6`. The only way to keep it readable would be
+`escape=none`, which would also stop escaping the user agent — text the caller
+chooses, and through which they could then write newlines into the log.
+
+**`purge-jetons-journaux.sh` deals with what has already been written**, the
+current log and the archived `.gz` alike. It rewrites the path, it never drops
+an entry: it refuses to replace a file that does not come out with exactly as
+many lines as went in, because a connection-log line is kept for twelve months
+by law. It is idempotent, it never prints a token, and it refuses to write at
+all until the deployed vhost carries `messagr_sans_jeton` — purging before the
+vhost is deployed would clean a file nginx is still filling with tokens.
+
+    # measure first, writes nothing, and does not need the vhost deployed
+    deploy/messagr-eu/purge-jetons-journaux.sh --dry-run /var/log/nginx
+
+    # then, with the owner's agreement, as root on hermes
+    deploy/messagr-eu/purge-jetons-journaux.sh /var/log/nginx
+
+`tests/journal-sans-jeton.js` holds both halves: the shape of the `map`, of
+the `log_format` and of the two `access_log`, and the purge itself against a
+fabricated log tree with fake tokens — current file, rotated file and `.gz`,
+run twice.
 
 ## Asking the server what it serves
 
