@@ -298,6 +298,23 @@ export const nl: Readonly<Record<CopyKey, string>> = {
   invite_failed: 'De uitnodiging kon niet worden aangemaakt.',
   invite_waiting: 'Nog niemand heeft de link geopend.',
   invite_admitted: 'Klaar: deze persoon kan binnenkomen.',
+  invited_title: 'Uitnodiging ontvangen',
+  invited_lead: 'Nodigt u uit voor een gesprek.',
+  invited_who_unknown:
+    'Dit gesprek zegt niet wie het heeft aangemaakt. Er kan hier dus niemand worden genoemd.',
+  'invited_instance %@': 'Dit account wordt gehost door %@.',
+  'invited_instance_elsewhere %@':
+    'Dit account wordt gehost door %@, en dat is niet uw server.',
+  invited_terms_unknown:
+    'Hier is geen link geopend voor deze uitnodiging: hoe lang ze geldig is en hoeveel keer ze nog geopend kan worden, is vanaf dit apparaat niet te lezen.',
+  invited_nothing_sent:
+    'Er is nog niets verzonden. Zolang u niet antwoordt, blijft deze uitnodiging waar ze is.',
+  'invited_behind %1$d': 'Er wachten nog %1$d uitnodiging(en) achter deze.',
+  invited_join: 'Deelnemen aan het gesprek',
+  invited_refuse: 'De uitnodiging weigeren',
+  invited_working: 'Een ogenblik…',
+  invited_failed:
+    'Er is niets veranderd: aan deze uitnodiging is niet deelgenomen en ze is niet geweigerd. U kunt het opnieuw proberen.',
   list_name_not_kept:
     'De naam kon niet worden bewaard: bij de volgende start is hij vergeten.',
   settings_action: 'Instellingen',

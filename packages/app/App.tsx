@@ -57,6 +57,8 @@ import {
   resumeKeyBackup,
   startCryptoMachine,
   enterAnyInvitations,
+  joinStandingInvitation,
+  declineStandingInvitation,
   sendDocument,
   openDocument,
   startLiveSync,
@@ -155,7 +157,12 @@ import {
 } from './src/design/tokens'
 import { mergeTimeline, type TimelineEntry } from './src/timeline/mergeTimeline'
 import { makePumpHttp } from './src/runtime/pump'
-import { fetchJoinedMembers } from './src/runtime/encryptedSend'
+import {
+  fetchJoinedMembers,
+  type Invitation,
+} from './src/runtime/encryptedSend'
+import { whatIsKnown } from './src/runtime/invitationOnScreen'
+import { sameThreshold, stillStanding } from './src/runtime/standingInvitations'
 import { theOtherMember, type VouchOutcome } from './src/runtime/vouch'
 import type { ConversationSummary } from './src/runtime/conversationList'
 import type { GivenNames } from './src/runtime/givenName'
@@ -227,6 +234,7 @@ import type { HistoryClaim } from './src/runtime/claimHistory'
 import { Conversation } from './src/ui/Conversation'
 import { ConversationList } from './src/ui/ConversationList'
 import { Invite, type InviteStage } from './src/ui/Invite'
+import { Invited } from './src/ui/Invited'
 import { BackupOffer } from './src/ui/BackupOffer'
 import { BackupSettings } from './src/ui/BackupSettings'
 import { Favourites } from './src/ui/Favourites'
@@ -1259,6 +1267,91 @@ export function App({
   // What became of an invitation this launch was opened with. `null` when
   // there was none, which is almost every launch.
   const [linkOutcome, setLinkOutcome] = useState<InvitationOutcome | null>(null)
+  /**
+   * The invitations standing on the threshold. #329, §13.3's first screen.
+   *
+   * An invitation reaches this list when no link was spent for it on this
+   * telephone: `enterInvitations.ts` walks through one door per link spent
+   * and leaves every other invitation exactly as it arrived, neither joined
+   * nor declined. The pump reports them on the launch and on every sync
+   * tick, the first of them is what `Invited.tsx` draws, and the rest wait
+   * behind it.
+   *
+   * AND THIS IS WHAT CLOSES THE WINDOW #335 LEFT OPEN. The register of what
+   * a spent link entitles this device to enter lives for the life of the
+   * process, so an application killed between the claim and the sync tick
+   * that crosses the door relaunches owing nothing. The invitation then
+   * arrives unowed and stands -- and now it stands here, named, rather than
+   * waiting for a screen that did not exist.
+   */
+  const [threshold, setThreshold] = useState<readonly Invitation[]>([])
+  /**
+   * What has been answered on this run.
+   *
+   * A ref rather than state: it is read from inside the launch and from the
+   * sync loop's callback, neither of which may take a dependency on a value
+   * that changes. Nothing draws from it -- `stillStanding` is what turns it
+   * into what the screen sees -- and it exists because neither answer takes
+   * effect in the same instant: a join takes a tick to leave `rooms.invite`,
+   * and a refusal goes on being listed for a while after it lands.
+   */
+  const answeredRef = useRef<Set<string>>(new Set())
+  /** Which of the two actions is under way, if either. */
+  const [answering, setAnswering] = useState<'join' | 'refuse' | null>(null)
+  /**
+   * The conversation whose answer did not go through, if one did not.
+   *
+   * The conversation rather than a flag: a failure that outlived its own
+   * invitation would tell somebody the NEXT invitation had failed, before
+   * they had touched anything.
+   */
+  const [answerFailed, setAnswerFailed] = useState<string | null>(null)
+  /**
+   * Answers the invitation on screen, and takes it off the threshold only
+   * once the homeserver has accepted the answer.
+   *
+   * SENT FIRST, DRAWN AFTER. A screen that closed on the tap and failed
+   * afterwards would leave somebody believing they had joined a conversation
+   * they are still only invited to -- the same defect #284 found in the
+   * backup offer, which used to close on a failure and say nothing.
+   */
+  const answerTheInvitation = (kind: 'join' | 'refuse', scope: string) => {
+    const session = sessionClientRef.current
+    if (session === null) {
+      setAnswerFailed(scope)
+      return
+    }
+    setAnswering(kind)
+    setAnswerFailed(null)
+    const sent =
+      kind === 'join'
+        ? joinStandingInvitation(session, scope)
+        : declineStandingInvitation(session, scope)
+    sent
+      .then(() => {
+        answeredRef.current.add(scope)
+        setThreshold(before => before.filter(one => one.scope !== scope))
+        // A conversation joined is a row the list does not have yet. A
+        // refusal changes nothing it draws.
+        if (kind === 'join') refreshListRef.current?.().catch(() => {})
+      })
+      .catch((cause: unknown) => {
+        logEvent('warn', 'MESSAGR_INVITATION_ANSWER_FAILED', {
+          kind,
+          reason: getErrorMessage(cause),
+        })
+        setAnswerFailed(scope)
+      })
+      .finally(() => setAnswering(null))
+  }
+  /**
+   * The one invitation being decided, if there is one.
+   *
+   * ONE AT A TIME. Two decisions on one screen is one decision taken
+   * carelessly, and the rest are counted under the buttons so that nobody
+   * believes they have finished when the next one appears.
+   */
+  const deciding = threshold[0] ?? null
   /**
    * The question a link into another server puts, while it is being put.
    * #304, and `entry.ts` says why it is a question.
@@ -2293,7 +2386,23 @@ export function App({
             // Before the list rather than after: a conversation joined a
             // moment later would be derived a moment too late and only appear
             // at the next tick.
-            await enterAnyInvitations(sessionClient, credentials.userId)
+            const walkedAtLaunch = await enterAnyInvitations(
+              sessionClient,
+              credentials.userId,
+            )
+            // WHAT STAYED ON THE THRESHOLD, PUT TO THE PERSON. #329, §13.3's
+            // first screen. An invitation this launch was owed nothing for
+            // is one nobody spent a link for -- or one whose link was spent
+            // by a run that was killed before the door opened, which is the
+            // window the first half of this ticket left open and named.
+            // Either way it is a decision, and this is where it is drawn.
+            setThreshold(before => {
+              const standing = stillStanding(
+                walkedAtLaunch.waiting,
+                answeredRef.current,
+              )
+              return sameThreshold(before, standing) ? before : standing
+            })
 
             // Attempted whether or not this run's own send worked: what is
             // being read was written by somebody else, and one direction
@@ -3550,6 +3659,22 @@ export function App({
                       if (first !== undefined) {
                         setLinkOutcome({ kind: 'already', from: first.from })
                       }
+                      // AND ON EVERY TICK FOR THE SAME REASON ENTERING IS
+                      // ON EVERY TICK: an invitation arrives at a device that
+                      // has finished launching. Replaced only when the
+                      // threshold has actually changed -- almost every tick
+                      // reports the same invitations standing, and a new
+                      // array each time would redraw the application several
+                      // times a minute for nothing.
+                      setThreshold(before => {
+                        const standing = stillStanding(
+                          walked.waiting,
+                          answeredRef.current,
+                        )
+                        return sameThreshold(before, standing)
+                          ? before
+                          : standing
+                      })
                     })
                     .catch((cause: unknown) =>
                       logEvent('warn', 'MESSAGR_ENTER_FAILED', {
@@ -5280,6 +5405,43 @@ export function App({
             )}
           </View>
         </SafeAreaView>
+
+        {/* THE INVITATION NOBODY SPENT A LINK FOR. §13.3's first screen.
+            OVER THE APPLICATION AND UNDER EVERYTHING BELOW, which is the
+            order the two rules here produce. It covers the list because a
+            decision is what it is asking for; every overlay after it -- the
+            backup offer, the vault, the recovery key, a call -- paints over
+            it, because each of those is either a secret shown once or
+            somebody already speaking.
+
+            AT REST, AND NOT IN THE MIDDLE OF A SENTENCE. `openScope === null
+            && tab === 'chat' && invite.stage === 'shut'` is the application's
+            own expression for the conversation list with nothing open on it,
+            and it is the condition the waiting-to-open guard already uses.
+            An invitation is not urgent: it has stood on the homeserver and
+            will still be standing in a minute. Covering somebody's composer
+            with a stranger's invitation, every sync tick until they answer,
+            would make this screen a nuisance surface rather than the
+            product's entry point -- and a decision taken to get a screen out
+            of the way is not the decision §13.3 is asking for. */}
+        {deciding !== null &&
+          openScope === null &&
+          tab === 'chat' &&
+          invite.stage === 'shut' && (
+            <SafeAreaView
+              testID="invited-overlay"
+              style={[StyleSheet.absoluteFill, styles.root]}
+              edges={['top', 'bottom', 'left', 'right']}>
+              <Invited
+                known={whatIsKnown(deciding, selfUserId, names)}
+                behind={threshold.length - 1}
+                working={answering}
+                failed={answerFailed === deciding.scope}
+                onJoin={() => answerTheInvitation('join', deciding.scope)}
+                onRefuse={() => answerTheInvitation('refuse', deciding.scope)}
+              />
+            </SafeAreaView>
+          )}
 
         {/* THE ONE TIME THIS PRODUCT ASKS SOMEBODY TO KEEP A SECRET, AND
             THE LAST CHILD OF THE ROOT SO THAT NOTHING CAN PAINT OVER IT.

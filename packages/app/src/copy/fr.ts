@@ -459,6 +459,42 @@ export const fr = {
   invite_failed: 'L’invitation n’a pas pu être créée.',
   invite_waiting: 'Personne n’a encore ouvert le lien.',
   invite_admitted: 'C’est fait : cette personne peut entrer.',
+  // L'INVITATION QUI ATTEND SUR LE SEUIL, et l'écran qui la décide. #329,
+  // §13.3 écran 1. C'est l'autre bout du bloc au-dessus : là on invite, ici
+  // on est invité.
+  //
+  // `invited_` et non `invitation_` : `copy.spec.ts` refuse ce préfixe, qui
+  // portait la copie d'une cérémonie ne gardant rien. C'est le préfixe qui
+  // est refusé, pas le mot : le produit n'en a pas d'autre.
+  //
+  // « Une conversation » et non « un salon », que dessine la maquette. Rien
+  // dans l'état transmis avec une invitation ne distingue les deux, et le
+  // produit ne crée aujourd'hui que des conversations à deux : écrire l'un
+  // ou l'autre serait deviner à l'endroit précis où quelqu'un décide.
+  invited_title: 'Invitation reçue',
+  invited_lead: 'Vous invite à rejoindre une conversation.',
+  // Quand l'état transmis par le serveur ne porte pas l'événement de
+  // création. Le dire vaut mieux qu'une ligne vide à la place d'un nom.
+  invited_who_unknown:
+    'Cette conversation ne dit pas qui l’a créée. Personne ne peut donc être nommé ici.',
+  'invited_instance %@': 'Ce compte est hébergé par %@.',
+  'invited_instance_elsewhere %@':
+    'Ce compte est hébergé par %@, qui n’est pas votre serveur.',
+  // CE QUE CET APPAREIL NE PEUT PAS DIRE, dit plutôt que laissé en creux. La
+  // durée et les ouvertures restantes appartiennent au lien, et aucun lien
+  // n'a été ouvert ici pour cette invitation-là. Une absence muette se
+  // lirait comme une invitation sans limite.
+  invited_terms_unknown:
+    'Aucun lien n’a été ouvert ici pour cette invitation : sa durée et le nombre d’ouvertures qui lui restent ne se lisent pas depuis cet appareil.',
+  invited_nothing_sent:
+    'Rien n’a encore été envoyé. Tant que vous n’avez pas répondu, cette invitation reste où elle est.',
+  'invited_behind %1$d':
+    '%1$d autre(s) invitation(s) attendent derrière celle-ci.',
+  invited_join: 'Rejoindre la conversation',
+  invited_refuse: 'Refuser l’invitation',
+  invited_working: 'Un instant…',
+  invited_failed:
+    'Rien n’a changé : cette invitation n’a été ni rejointe ni refusée. Vous pouvez réessayer.',
   list_name_not_kept:
     'Le nom n’a pas pu être conservé : il sera oublié au prochain démarrage.',
 

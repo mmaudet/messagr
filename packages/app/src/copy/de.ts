@@ -306,6 +306,23 @@ export const de: Readonly<Record<CopyKey, string>> = {
   invite_failed: 'Die Einladung konnte nicht erstellt werden.',
   invite_waiting: 'Noch niemand hat den Link geöffnet.',
   invite_admitted: 'Erledigt: diese Person kann hereinkommen.',
+  invited_title: 'Einladung erhalten',
+  invited_lead: 'Lädt Sie zu einem Gespräch ein.',
+  invited_who_unknown:
+    'Dieses Gespräch sagt nicht, wer es erstellt hat. Hier kann daher niemand genannt werden.',
+  'invited_instance %@': 'Dieses Konto wird von %@ gehostet.',
+  'invited_instance_elsewhere %@':
+    'Dieses Konto wird von %@ gehostet, und das ist nicht Ihr Server.',
+  invited_terms_unknown:
+    'Für diese Einladung wurde hier kein Link geöffnet: wie lange sie gilt und wie viele Öffnungen ihr bleiben, lässt sich von diesem Gerät nicht lesen.',
+  invited_nothing_sent:
+    'Es wurde noch nichts gesendet. Solange Sie nicht geantwortet haben, bleibt diese Einladung, wo sie ist.',
+  'invited_behind %1$d': '%1$d weitere Einladung(en) warten dahinter.',
+  invited_join: 'Dem Gespräch beitreten',
+  invited_refuse: 'Die Einladung ablehnen',
+  invited_working: 'Einen Moment…',
+  invited_failed:
+    'Nichts hat sich geändert: dieser Einladung wurde weder beigetreten noch wurde sie abgelehnt. Sie können es erneut versuchen.',
   list_name_not_kept:
     'Der Name konnte nicht behalten werden: beim nächsten Start ist er vergessen.',
   settings_action: 'Einstellungen',

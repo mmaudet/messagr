@@ -612,6 +612,47 @@ export async function enterAnyInvitations(
 }
 
 /**
+ * Phase twelve's other half: the answer somebody gives on screen 1 of §13.3.
+ *
+ * Pure glue, like everything else here. What reaches that screen and why is
+ * `Invited.tsx`; what this device can say about the invitation is
+ * `invitationOnScreen.ts`.
+ *
+ * NOT ONE OF THE DOORS THE REGISTER OWES. `awaitedInvitations.ts` counts
+ * invitations a spent link entitles this device to enter without asking. An
+ * invitation answered here was not owed to anybody -- the whole reason it
+ * reached a screen is that no link was spent for it -- so settling the
+ * register against it would pay off a debt that was never incurred, and the
+ * next invitation this device genuinely is waiting for would stand on the
+ * threshold instead of opening.
+ */
+export async function joinStandingInvitation(
+  sessionClient: ReturnType<typeof createClient>,
+  scope: string,
+): Promise<void> {
+  await joinRoom(makePumpHttp(sessionClient), scope)
+  logEvent('info', 'MESSAGR_INVITATION_JOINED', { scope })
+}
+
+/**
+ * The refusal, which is `/leave` on a room one has only been invited to.
+ *
+ * REMEMBERED HERE AS WELL AS SENT. The homeserver goes on listing a refused
+ * conversation in `rooms.invite` for a while after the refusal lands -- the
+ * same fact `declined` above exists for, measured on the bench in the minute
+ * after a collapse -- so without this the next sync tick would put the
+ * invitation somebody has just refused straight back on their screen.
+ */
+export async function declineStandingInvitation(
+  sessionClient: ReturnType<typeof createClient>,
+  scope: string,
+): Promise<void> {
+  await declineRoom(makePumpHttp(sessionClient), scope)
+  declined.add(scope)
+  logEvent('info', 'MESSAGR_INVITATION_REFUSED', { scope })
+}
+
+/**
  * The room to read from when this run's own send did not resolve one.
  *
  * `null` rather than a throw: an account in no room has nothing to receive,

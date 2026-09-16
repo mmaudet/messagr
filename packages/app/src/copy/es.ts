@@ -299,6 +299,23 @@ export const es: Readonly<Record<CopyKey, string>> = {
   invite_failed: 'No se ha podido crear la invitación.',
   invite_waiting: 'Todavía nadie ha abierto el enlace.',
   invite_admitted: 'Hecho: esta persona puede entrar.',
+  invited_title: 'Invitación recibida',
+  invited_lead: 'Le invita a unirse a una conversación.',
+  invited_who_unknown:
+    'Esta conversación no dice quién la creó. Por eso aquí no se puede nombrar a nadie.',
+  'invited_instance %@': 'Esta cuenta está alojada en %@.',
+  'invited_instance_elsewhere %@':
+    'Esta cuenta está alojada en %@, que no es su servidor.',
+  invited_terms_unknown:
+    'Aquí no se ha abierto ningún enlace para esta invitación: cuánto dura y cuántos usos le quedan no se pueden leer desde este dispositivo.',
+  invited_nothing_sent:
+    'Todavía no se ha enviado nada. Mientras no responda, esta invitación se queda donde está.',
+  'invited_behind %1$d': '%1$d invitación(es) más esperan detrás de esta.',
+  invited_join: 'Unirse a la conversación',
+  invited_refuse: 'Rechazar la invitación',
+  invited_working: 'Un momento…',
+  invited_failed:
+    'Nada ha cambiado: esta invitación no se ha aceptado ni rechazado. Puede intentarlo de nuevo.',
   list_name_not_kept:
     'El nombre no se ha podido conservar: se olvidará en el próximo arranque.',
   settings_action: 'Ajustes',

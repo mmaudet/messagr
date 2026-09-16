@@ -315,6 +315,23 @@ export const uz: Readonly<Record<CopyKey, string>> = {
   invite_failed: 'Taklifni yaratib boʻlmadi.',
   invite_waiting: 'Havolani hali hech kim ochmadi.',
   invite_admitted: 'Tayyor: bu odam kirishi mumkin.',
+  invited_title: 'Taklif keldi',
+  invited_lead: 'Sizni suhbatga qoʻshilishga taklif qiladi.',
+  invited_who_unknown:
+    'Bu suhbat kim tomonidan yaratilganini aytmaydi. Shu sababli bu yerda hech kimni nomlab boʻlmaydi.',
+  'invited_instance %@': 'Bu hisob %@ da joylashgan.',
+  'invited_instance_elsewhere %@':
+    'Bu hisob %@ da joylashgan, u esa sizning serveringiz emas.',
+  invited_terms_unknown:
+    'Bu taklif uchun bu yerda hech qanday havola ochilmagan: uning muddati va unga necha marta ochish qolgani bu qurilmadan oʻqilmaydi.',
+  invited_nothing_sent:
+    'Hali hech narsa yuborilmadi. Siz javob bermaguningizcha bu taklif joyida qoladi.',
+  'invited_behind %1$d': 'Bunisining orqasida yana %1$d taklif kutmoqda.',
+  invited_join: 'Suhbatga qoʻshilish',
+  invited_refuse: 'Taklifni rad etish',
+  invited_working: 'Bir daqiqa…',
+  invited_failed:
+    'Hech narsa oʻzgarmadi: bu taklifga na qoʻshildingiz, na uni rad etdingiz. Qayta urinib koʻrishingiz mumkin.',
   list_name_not_kept:
     'Nomni saqlab boʻlmadi: keyingi ishga tushirishda u unutiladi.',
   settings_action: 'Sozlamalar',
