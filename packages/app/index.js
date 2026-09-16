@@ -76,8 +76,13 @@ const { wakeSecrets } = require('./src/runtime/deviceSecrets')
 //
 // `getMessaging()` lève `No Firebase App '[DEFAULT]' has been created` quand
 // rien n'a initialisé Firebase. Sur Android, `google-services.json` et le
-// greffon Gradle le font ; sur iOS il faut `GoogleService-Info.plist` et
+// greffon Gradle le font ; sur iOS il fallait `GoogleService-Info.plist` et
 // `FirebaseApp.configure()`, et l'application n'en avait aucun des deux.
+//
+// L'iPhone est hors de portée de ce bogue depuis #334 — plus de Firebase dans
+// le paquet, et plus d'appel à `getMessaging()` sur cette plateforme. Le `try`
+// reste : il garde Android, et il garde la règle, qui est plus large que le
+// bogue qui l'a fait écrire.
 //
 // Au niveau du module, cette exception interrompt l'évaluation du bundle.
 // En débogage elle donne un écran rouge ; en production elle donne un écran

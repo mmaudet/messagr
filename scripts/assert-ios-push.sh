@@ -6,8 +6,10 @@
 # `ios-simulator` job was green. That job is right to be: a simulator build
 # proves compilation, and none of these is about compiling. They are about
 # entitlement, and an unentitled build registers with Apple, is refused, and
-# reports nothing -- `getAPNSToken` answers null for ever, which reads exactly
-# like "Apple has not answered yet".
+# reports nothing -- the token read answers null for ever, which reads exactly
+# like "Apple has not answered yet". (Since #334 that particular silence is
+# named `appleRefused` rather than confused with a wait, which narrows the
+# hunt but does not replace this script: an entitlement is a file here.)
 #
 # So this is the only thing that will ever notice. It runs in the ordinary
 # checks rather than only on macOS: all three are files in this repository,
@@ -118,8 +120,10 @@ if [ -f "$SYGNAL" ] && [ -f "$ENTITLEMENTS" ]; then
 fi
 
 # ── 5. The token's encoding ───────────────────────────────────────────────
-# The application registers the APNs token as `getAPNSToken` hands it over, in
-# hexadecimal (`pusher.ts`). sygnal base64-decodes an APNs pushkey unless told
+# The application registers the APNs token as `applePushToken.ts` hands it
+# over, in upper-case hexadecimal -- which is the form `getAPNSToken` produced
+# before it, and the reason that file refuses any other rather than repairing
+# it (`pusher.ts`). sygnal base64-decodes an APNs pushkey unless told
 # not to, and then sends Apple 48 bytes that are not the token: BadDeviceToken
 # at every push, with the environments perfectly paired. That is how every
 # iOS push failed until 15 September 2026 (#325), while check 4 stayed green.

@@ -51,7 +51,9 @@ notification qui ne viendra jamais, et une conclusion fausse sur #109.
 sygnal divergent, dans `checks`, en lisant les sources.
 
 **Un second piège a tenu jusqu'au 15 septembre 2026** (#325). L'application
-enregistre le jeton APNs tel que `getAPNSToken` le donne, en hexadécimal. Par
+enregistre le jeton APNs tel que le module natif le donne, en hexadécimal
+majuscule — c'était `getAPNSToken` jusqu'au 16 septembre, c'est
+`MessagrApplePush` depuis, et la forme n'a pas bougé d'un caractère. Par
 défaut, sygnal décode un pushkey APNs en base64 : il envoyait donc à Apple
 48 octets sans rapport avec le jeton, et Apple répondait `BadDeviceToken`, avec
 une paire d'environnements parfaitement accordée. `convert_device_token_to_hex:
