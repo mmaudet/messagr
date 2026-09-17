@@ -1,9 +1,30 @@
 import type { Invitation } from './encryptedSend'
 import { displayNameFor, isNamed } from './givenName'
+import type { Described } from './linkOnScreen'
 
 /**
  * What this device can truthfully state about an invitation it is being
  * asked to decide. #329, §13.3's first screen.
+ *
+ * # ONE INVITATION IS MET IN TWO PLACES, AND THEY KNOW OPPOSITE THINGS
+ *
+ * A LINK, before anything is spent: it names the instance it leads to and
+ * carries whatever name the inviter gave themselves, and it knows no Matrix
+ * identifier at all -- the account on the far side is drawn at the moment
+ * the token is spent, and nothing has been spent.
+ *
+ * AN INVITATION STANDING ON THE THRESHOLD, which no link was spent for on
+ * this telephone: it names the account that created the conversation, and
+ * carries no declared name whatsoever -- nothing travels with a Matrix
+ * invitation to say what its sender calls themselves, and the link that
+ * would have said so was never held here.
+ *
+ * Neither is a degraded version of the other, so `source` says which one is
+ * being drawn and the screen says different true things about each. The
+ * alternative -- inferring it from which fields happen to be empty -- would
+ * make « the link declares nobody » and « the conversation does not say who
+ * created it » the same sentence, and they are two different facts about two
+ * different things.
  *
  * # THE SCREEN ASKS FOR SIX FACTS AND THIS DEVICE HOLDS THREE
  *
@@ -53,8 +74,25 @@ import { displayNameFor, isNamed } from './givenName'
  * themselves.
  */
 export interface WhatIsKnown {
-  /** The conversation, which is what joining and refusing act on. */
+  /** Which of the two places this invitation is being met in. */
+  readonly source: 'link' | 'threshold'
+  /**
+   * The conversation, which is what joining and refusing act on. Empty on
+   * the link path: there is no conversation to act on yet, and the two
+   * actions there are answered by entry rather than by the homeserver.
+   */
   readonly scope: string
+  /**
+   * The name the inviter gave themselves, drawn as « Se présente comme %@ ».
+   * Empty when there is none.
+   *
+   * ONLY EVER FROM A LINK (`declaredName.ts`), and never the name this
+   * device gave somebody: §13.26's formula reports what its bearer claimed,
+   * and a given name was claimed by nobody. Putting one under that sentence
+   * would be this screen attributing to the inviter a word the person
+   * holding the telephone wrote themselves.
+   */
+  readonly declared: string
   /**
    * What to call whoever made the conversation: the name this device gave
    * them, or their localpart. Empty when nobody can be named.
@@ -78,7 +116,9 @@ export function whatIsKnown(
   const { scope, from } = invitation
   if (from === null) {
     return {
+      source: 'threshold',
       scope,
+      declared: '',
       who: '',
       named: false,
       identifier: '',
@@ -89,7 +129,11 @@ export function whatIsKnown(
   const given = names.get(from)
   const instance = serverOf(from)
   return {
+    source: 'threshold',
     scope,
+    // NOTHING TRAVELS WITH A MATRIX INVITATION TO SAY THIS. The name lives
+    // in the link's fragment and the link was never held on this telephone.
+    declared: '',
     who: displayNameFor(from, given),
     named: isNamed(given),
     identifier: from,
@@ -101,6 +145,34 @@ export function whatIsKnown(
       instance !== null &&
       serverOf(self) !== null &&
       instance.toLowerCase() !== serverOf(self)?.toLowerCase(),
+  }
+}
+
+/**
+ * The same screen, for a link nobody has spent yet. #329.
+ *
+ * Three facts and no more, because a link holds three. It names no account
+ * and gives nobody a name of this device's own: there is no participant yet
+ * to have been given one, and the drawn account does not exist until the
+ * token is spent.
+ *
+ * `elsewhere` is carried through rather than worked out again here. Entry
+ * decides it with `sameOrigin`, comparing the link's origin with the one the
+ * account's own session actually uses; a second answer computed off a server
+ * name would disagree with the first the day an instance is reached under a
+ * name its identifiers do not carry -- and the disagreement would show up as
+ * a warning on the screen where somebody decides.
+ */
+export function whatALinkSays(described: Described): WhatIsKnown {
+  return {
+    source: 'link',
+    scope: '',
+    declared: described.declared ?? '',
+    who: '',
+    named: false,
+    identifier: '',
+    instance: described.instance,
+    elsewhere: described.elsewhere,
   }
 }
 

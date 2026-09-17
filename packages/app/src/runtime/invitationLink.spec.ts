@@ -8,6 +8,7 @@ describe('parseInvitationLink', () => {
       token: 'abc123',
       homeserver: 'https://messagr.eu',
       service: 'https://messagr.eu/_messagr',
+      declared: null,
     })
   })
 
@@ -25,6 +26,7 @@ describe('parseInvitationLink', () => {
       token: 'abc123',
       homeserver: 'https://messagr.eu',
       service: 'https://messagr.eu/_messagr',
+      declared: null,
     })
   })
 
@@ -46,6 +48,7 @@ describe('parseInvitationLink', () => {
         token: 'abc123',
         homeserver: 'https://messagr.eu',
         service: 'https://messagr.eu/_messagr',
+        declared: null,
       })
     } finally {
       globalThis.URL = real
@@ -60,6 +63,7 @@ describe('parseInvitationLink', () => {
       token: 'AbC123',
       homeserver: 'https://messagr.eu',
       service: 'https://messagr.eu/_messagr',
+      declared: null,
     })
   })
 
@@ -94,5 +98,55 @@ describe('parseInvitationLink', () => {
     // http would carry the token in clear text, and a token is a bearer
     // credential: whoever reads it is the invited person.
     expect(parseInvitationLink('http://messagr.eu/i/abc123')).toBeNull()
+  })
+})
+
+describe('the name the link carries', () => {
+  it('reads the name the inviter gave themselves, out of the fragment', () => {
+    // #329. A FRAGMENT NEVER REACHES THE SERVER -- not nginx, not its log,
+    // not an intermediary -- which is what lets a name travel with an
+    // invitation without the service ever holding it.
+    expect(parseInvitationLink('https://messagr.eu/i/abc123#n=Nadia')).toEqual({
+      token: 'abc123',
+      homeserver: 'https://messagr.eu',
+      service: 'https://messagr.eu/_messagr',
+      declared: 'Nadia',
+    })
+  })
+
+  it('reads it off the application scheme too, which is the same link', () => {
+    expect(
+      parseInvitationLink('messagr://messagr.eu/i/abc123#n=Nadia')?.declared,
+    ).toBe('Nadia')
+  })
+
+  it('reads it past a trailing slash and a tracking query', () => {
+    expect(
+      parseInvitationLink('https://messagr.eu/i/abc123/?utm=x#n=Nadia')
+        ?.declared,
+    ).toBe('Nadia')
+  })
+
+  it('NEVER reads a name out of the query, which the server would see', () => {
+    // The query reaches nginx and its log; #313 took the token out of that
+    // log and nothing may put a name back into it. A `?n=` is read as what
+    // it is -- a tracking parameter -- and ignored.
+    const link = parseInvitationLink('https://messagr.eu/i/abc123?n=Nadia')
+    expect(link?.token).toBe('abc123')
+    expect(link?.declared).toBeNull()
+  })
+
+  it('still reads the token when the fragment carries nothing usable', () => {
+    // The link is what gets somebody in; the name is a courtesy on top of
+    // it. A fragment that arrived mangled must never cost an entry.
+    expect(parseInvitationLink('https://messagr.eu/i/abc123#n=%')).toEqual({
+      token: 'abc123',
+      homeserver: 'https://messagr.eu',
+      service: 'https://messagr.eu/_messagr',
+      declared: null,
+    })
+    expect(
+      parseInvitationLink('https://messagr.eu/i/abc123#utm=x')?.declared,
+    ).toBeNull()
   })
 })

@@ -138,6 +138,48 @@ describe('issueInvitation', () => {
     expect(issued.link).toBe('https://messagr-fork.example.org/i/a-token')
   })
 
+  it('writes the inviter’s declared name into the link’s fragment', async () => {
+    // #329, §13.26. The name the inviter gave THEMSELVES, and it goes after
+    // the `#` -- the one part of an address that is resolved on the device
+    // and never sent.
+    const { deps } = harness()
+    const issued = await issueInvitation(deps, 'messagr.eu', 'Nadia du club')
+    if (!issued.issued) throw new Error('expected an invitation')
+    expect(issued.link).toBe('https://messagr.eu/i/a-token#n=Nadia%20du%20club')
+  })
+
+  it('mints exactly the link it always did when nobody declared a name', async () => {
+    const { deps } = harness()
+    const issued = await issueInvitation(deps, 'messagr.eu', null)
+    if (!issued.issued) throw new Error('expected an invitation')
+    expect(issued.link).toBe('https://messagr.eu/i/a-token')
+  })
+
+  it('NEVER sends that name to the invitation service', async () => {
+    // #329, AND THIS IS WHAT « SANS QUE LE SERVICE LE GARDE » MEANS IN CODE.
+    // The service is asked for `max_uses`, `ttl_seconds` and `room_id`, and
+    // the name is added to the ANSWER rather than to the request. Every call
+    // this module makes is searched, homeserver included -- there is no
+    // column for a name in `migrations/001_init.sql` and no state event it
+    // could hide in either.
+    const { deps, calls, service } = harness()
+    const minted: string[] = []
+    const watching = {
+      ...service,
+      issue: async (body: string, key: string) => {
+        minted.push(body)
+        return service.issue(body, key)
+      },
+    }
+    await issueInvitation({ ...deps, service: watching }, 'messagr.eu', 'Nadia')
+    expect(minted).toEqual([
+      JSON.stringify({ max_uses: 1, ttl_seconds: 3600, room_id: '!made:x' }),
+    ])
+    for (const call of calls) {
+      expect(`${call.path} ${call.body ?? ''}`).not.toContain('Nadia')
+    }
+  })
+
   it('costs 50 to invite into and admits members at 0', async () => {
     // The rule the invitation service reads rather than taking this
     // application's word for. `createRoom` leaves no `invite` key at all, and

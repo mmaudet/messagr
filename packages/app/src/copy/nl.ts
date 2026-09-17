@@ -304,6 +304,9 @@ export const nl: Readonly<Record<CopyKey, string>> = {
   list_back: 'Gesprekken',
   invite_action: 'Iemand uitnodigen',
   invite_who: 'Wie nodigt u uit?',
+  invite_declared: 'Hoe stelt u zich voor?',
+  invite_declared_hint:
+    'Optioneel. Deze naam reist mee in de link en nergens anders: de dienst ontvangt hem niet en bewaart er niets van.',
   invite_working: 'Het gesprek wordt aangemaakt…',
   invite_ready:
     'Stuur deze link naar die persoon. Hij is een uur geldig en werkt één keer.',
@@ -318,13 +321,19 @@ export const nl: Readonly<Record<CopyKey, string>> = {
   invited_lead: 'Nodigt u uit voor een gesprek.',
   invited_who_unknown:
     'Dit gesprek zegt niet wie het heeft aangemaakt. Er kan hier dus niemand worden genoemd.',
+  invited_who_undeclared:
+    'Deze link zegt niet wie u uitnodigt: die persoon heeft zichzelf geen naam gegeven.',
   'invited_instance %@': 'Dit account wordt gehost door %@.',
   'invited_instance_elsewhere %@':
     'Dit account wordt gehost door %@, en dat is niet uw server.',
   invited_terms_unknown:
     'Hier is geen link geopend voor deze uitnodiging: hoe lang ze geldig is en hoeveel keer ze nog geopend kan worden, is vanaf dit apparaat niet te lezen.',
+  invited_terms_link:
+    'Hoe lang deze link geldig is en hoeveel keer hij nog geopend kan worden, is hier niet te lezen: alleen het account dat hem heeft uitgegeven kan ernaar vragen.',
   invited_nothing_sent:
     'Er is nog niets verzonden. Zolang u niet antwoordt, blijft deze uitnodiging waar ze is.',
+  invited_nothing_spent:
+    'Er is nog niets verzonden. Zolang u niet antwoordt, is deze link niet verbruikt.',
   'invited_behind %1$d': 'Er wachten nog %1$d uitnodiging(en) achter deze.',
   invited_join: 'Deelnemen aan het gesprek',
   invited_refuse: 'De uitnodiging weigeren',

@@ -867,6 +867,8 @@ export async function listConversations(
 export async function inviteSomebody(
   sessionClient: ReturnType<typeof createClient>,
   credentials: { readonly baseUrl: string; readonly accessToken: string },
+  /** The name the inviter gave themselves, or `null`. #329. */
+  declared: string | null = null,
 ): Promise<Issued> {
   return issueInvitation(
     {
@@ -877,6 +879,7 @@ export async function inviteSomebody(
       wait: ms => new Promise(resolve => setTimeout(resolve, ms)),
     },
     credentials.baseUrl.replace(/^https?:\/\//, ''),
+    declared,
   )
 }
 

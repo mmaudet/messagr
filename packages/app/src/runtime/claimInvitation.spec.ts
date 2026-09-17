@@ -6,6 +6,10 @@ const LINK = {
   token: 'abc123',
   homeserver: 'https://messagr.eu',
   service: 'https://messagr.eu/_messagr',
+  // The name its writer gave themselves (#329). Carried by the link and read
+  // by nothing here on purpose: a claim sends the token and the token alone,
+  // and the assertions below are what hold that.
+  declared: 'Nadia',
 }
 
 function poster(
@@ -29,6 +33,25 @@ const GRANTED = JSON.stringify({
 })
 
 describe('claimInvitation', () => {
+  it('NEVER sends the name the link carries, to anybody', async () => {
+    // #329, AND THIS IS THE ASSERTION THE PRIVACY PAGE RESTS ON. A declared
+    // name travels in the link's fragment, which no request carries; this is
+    // the one place in the application that could put it back into one, by
+    // reading it off the parsed link and adding it to the body. `LINK` above
+    // carries a name, and the whole body is compared rather than a field of
+    // it -- a test asking only « is `declared` absent » would pass over a
+    // name sent under some other key.
+    const p = poster(() => ({ status: 200, body: GRANTED }))
+    await claimInvitation(p, LINK)
+    expect(p.calls.map(call => call.body)).toEqual([
+      JSON.stringify({ token: 'abc123' }),
+    ])
+    for (const call of p.calls) {
+      expect(call.url).not.toContain('Nadia')
+      expect(call.body).not.toContain('Nadia')
+    }
+  })
+
   it('spends the token at the invitation service and returns a whole session', async () => {
     const p = poster(() => ({ status: 200, body: GRANTED }))
     const result = await claimInvitation(p, LINK)
@@ -175,6 +198,7 @@ describe('claimInvitation, the two-call handshake', () => {
     token: 'a-token',
     homeserver: 'https://messagr.eu',
     service: 'https://messagr.eu/_messagr',
+    declared: null,
   }
   const SESSION = JSON.stringify({
     user_id: '@her:messagr.eu',

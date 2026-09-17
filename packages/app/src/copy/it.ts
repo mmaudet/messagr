@@ -302,6 +302,9 @@ export const it: Readonly<Record<CopyKey, string>> = {
   list_back: 'Conversazioni',
   invite_action: 'Invitare qualcuno',
   invite_who: 'Chi sta invitando?',
+  invite_declared: 'Come si presenta?',
+  invite_declared_hint:
+    'Facoltativo. Questo nome viaggia nel link e da nessun’altra parte: il servizio non lo riceve e non ne conserva nulla.',
   invite_working: 'Creazione della conversazione…',
   invite_ready:
     'Invii questo link a questa persona. Vale un’ora e serve una volta sola.',
@@ -316,13 +319,19 @@ export const it: Readonly<Record<CopyKey, string>> = {
   invited_lead: 'La invita a entrare in una conversazione.',
   invited_who_unknown:
     'Questa conversazione non dice chi l’ha creata. Qui non si può quindi nominare nessuno.',
+  invited_who_undeclared:
+    'Questo link non dice chi la invita: quella persona non si è data alcun nome.',
   'invited_instance %@': 'Questo account è ospitato da %@.',
   'invited_instance_elsewhere %@':
     'Questo account è ospitato da %@, che non è il suo server.',
   invited_terms_unknown:
     'Qui non è stato aperto alcun link per questo invito: quanto dura e quante aperture gli restano non si leggono da questo dispositivo.',
+  invited_terms_link:
+    'Quanto dura questo link e quante aperture gli restano non si leggono qui: solo l’account che l’ha emesso può chiederlo.',
   invited_nothing_sent:
     'Non è ancora stato inviato nulla. Finché non risponde, questo invito resta dov’è.',
+  invited_nothing_spent:
+    'Non è ancora stato inviato nulla. Finché non risponde, questo link non è speso.',
   'invited_behind %1$d': '%1$d altro/i invito/i in attesa dietro a questo.',
   invited_join: 'Entrare nella conversazione',
   invited_refuse: 'Rifiutare l’invito',

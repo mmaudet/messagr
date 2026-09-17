@@ -321,6 +321,9 @@ export const uz: Readonly<Record<CopyKey, string>> = {
   list_back: 'Suhbatlar',
   invite_action: 'Odam taklif qilish',
   invite_who: 'Kimni taklif qilyapsiz?',
+  invite_declared: 'Oʻzingizni qanday tanishtirasiz?',
+  invite_declared_hint:
+    'Ixtiyoriy. Bu nom havola ichida sayohat qiladi, boshqa hech qayerda emas: xizmat uni olmaydi va undan hech narsa saqlamaydi.',
   invite_working: 'Suhbat yaratilmoqda…',
   invite_ready:
     'Bu havolani ularga yuboring. U bir soat amal qiladi va bir marta ishlaydi.',
@@ -335,13 +338,19 @@ export const uz: Readonly<Record<CopyKey, string>> = {
   invited_lead: 'Sizni suhbatga qoʻshilishga taklif qiladi.',
   invited_who_unknown:
     'Bu suhbat kim tomonidan yaratilganini aytmaydi. Shu sababli bu yerda hech kimni nomlab boʻlmaydi.',
+  invited_who_undeclared:
+    'Bu havola sizni kim taklif qilayotganini aytmaydi: u odam oʻziga nom bermagan.',
   'invited_instance %@': 'Bu hisob %@ da joylashgan.',
   'invited_instance_elsewhere %@':
     'Bu hisob %@ da joylashgan, u esa sizning serveringiz emas.',
   invited_terms_unknown:
     'Bu taklif uchun bu yerda hech qanday havola ochilmagan: uning muddati va unga necha marta ochish qolgani bu qurilmadan oʻqilmaydi.',
+  invited_terms_link:
+    'Bu havola qancha amal qilishi va unga necha marta ochish qolgani bu yerda oʻqilmaydi: faqat uni bergan hisob buni soʻray oladi.',
   invited_nothing_sent:
     'Hali hech narsa yuborilmadi. Siz javob bermaguningizcha bu taklif joyida qoladi.',
+  invited_nothing_spent:
+    'Hali hech narsa yuborilmadi. Siz javob bermaguningizcha bu havola sarflanmaydi.',
   'invited_behind %1$d': 'Bunisining orqasida yana %1$d taklif kutmoqda.',
   invited_join: 'Suhbatga qoʻshilish',
   invited_refuse: 'Taklifni rad etish',

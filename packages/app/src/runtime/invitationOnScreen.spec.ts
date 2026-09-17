@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import { whatIsKnown } from './invitationOnScreen'
+import { whatALinkSays, whatIsKnown } from './invitationOnScreen'
 
 const named = new Map([['@her:messagr.eu', 'Nadia']])
 
@@ -109,5 +109,71 @@ describe('whatIsKnown', () => {
       new Map(),
     )
     expect(known).toMatchObject({ who: '@her', instance: null })
+  })
+
+  it('carries no declared name, because nothing travels with a Matrix invitation', () => {
+    // §13.26's « Se présente comme » is for a name its bearer declared, and
+    // an invitation standing on the threshold carries none: the link it came
+    // from was never held on this telephone. The screen must not borrow the
+    // formula for a name this device gave somebody.
+    const known = whatIsKnown(
+      { scope: '!a:messagr.eu', from: '@her:messagr.eu' },
+      '@me:messagr.eu',
+      named,
+    )
+    expect(known).toMatchObject({ source: 'threshold', declared: '' })
+  })
+})
+
+describe('whatALinkSays', () => {
+  it('reads the declared name and the instance off the link itself', () => {
+    expect(
+      whatALinkSays({
+        instance: 'messagr.eu',
+        declared: 'Nadia',
+        elsewhere: false,
+        answered: false,
+      }),
+    ).toEqual({
+      source: 'link',
+      scope: '',
+      declared: 'Nadia',
+      who: '',
+      named: false,
+      identifier: '',
+      instance: 'messagr.eu',
+      elsewhere: false,
+    })
+  })
+
+  it('names no identifier, because the link names none', () => {
+    // THE TWO HALVES ARE COMPLEMENTARY, and that is structural. A link says
+    // who the inviter claims to be and which instance it leads to, and knows
+    // no Matrix identifier: the account is drawn at the moment the link is
+    // spent, and nothing has been spent yet. An invitation on the threshold
+    // is the other way round.
+    const known = whatALinkSays({
+      instance: 'messagr.eu',
+      declared: null,
+      elsewhere: false,
+      answered: false,
+    })
+    expect(known.identifier).toBe('')
+    expect(known.who).toBe('')
+    expect(known.declared).toBe('')
+  })
+
+  it('carries through that the link leads somewhere else', () => {
+    // Read by entry with `sameOrigin`, which is what already decides it, and
+    // not guessed again here: an account may reach its server under a name
+    // the identifier does not carry.
+    expect(
+      whatALinkSays({
+        instance: 'other.example',
+        declared: 'Nadia',
+        elsewhere: true,
+        answered: false,
+      }),
+    ).toMatchObject({ instance: 'other.example', elsewhere: true })
   })
 })

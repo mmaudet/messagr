@@ -476,6 +476,18 @@ export const fr = {
   // de côté et écrit quand on sait à qui il s'applique.
   invite_action: 'Inviter quelqu’un',
   invite_who: 'Qui invitez-vous ?',
+  // ET LE NOM QU'ON SE DONNE SOI-MÊME, qui est l'autre moitié et voyage,
+  // là où celui du dessus reste ici. #329, §13.26. Facultatif : rien ne se
+  // dessine sur l'écran d'en face quand il est vide, et une invitation sans
+  // nom reste une invitation.
+  //
+  // CE QU'IL DIT DU SERVICE EST VRAI PAR CONSTRUCTION. Le nom est écrit dans
+  // le fragment du lien, et un fragment n'est jamais transmis : ni au
+  // serveur, ni à son journal, ni à quoi que ce soit entre les deux. Voir
+  // `declaredName.ts`.
+  invite_declared: 'Comment vous présentez-vous ?',
+  invite_declared_hint:
+    'Facultatif. Ce nom voyage dans le lien, et nulle part ailleurs : le service ne le reçoit pas et n’en garde rien.',
   invite_working: 'Création de la conversation…',
   invite_ready:
     'Envoyez ce lien à cette personne. Il est valable une heure et ne sert qu’une fois.',
@@ -504,6 +516,11 @@ export const fr = {
   // création. Le dire vaut mieux qu'une ligne vide à la place d'un nom.
   invited_who_unknown:
     'Cette conversation ne dit pas qui l’a créée. Personne ne peut donc être nommé ici.',
+  // ET L'AUTRE ABSENCE, celle d'un lien : la personne qui l'a écrit n'a pas
+  // voulu se nommer. Deux faits différents sur deux choses différentes, donc
+  // deux phrases.
+  invited_who_undeclared:
+    'Ce lien ne dit pas qui vous invite : la personne ne s’est pas donné de nom.',
   'invited_instance %@': 'Ce compte est hébergé par %@.',
   'invited_instance_elsewhere %@':
     'Ce compte est hébergé par %@, qui n’est pas votre serveur.',
@@ -513,8 +530,18 @@ export const fr = {
   // lirait comme une invitation sans limite.
   invited_terms_unknown:
     'Aucun lien n’a été ouvert ici pour cette invitation : sa durée et le nombre d’ouvertures qui lui restent ne se lisent pas depuis cet appareil.',
+  // LE MÊME FAIT, DIT AUTREMENT QUAND UN LIEN A ÉTÉ OUVERT ICI. « Aucun lien
+  // n'a été ouvert » serait faux sur ce chemin-là ; ce qui reste vrai, c'est
+  // que `status.rs` ne répond qu'au compte émetteur.
+  invited_terms_link:
+    'La durée de ce lien et le nombre d’ouvertures qui lui restent ne se lisent pas ici : seul le compte qui l’a émis peut les demander.',
   invited_nothing_sent:
     'Rien n’a encore été envoyé. Tant que vous n’avez pas répondu, cette invitation reste où elle est.',
+  // PLUS FORT QUE LA PHRASE AU-DESSUS, et c'est pour ça qu'elle est à part :
+  // sur le chemin par lien, non seulement rien n'est parti, mais le jeton
+  // n'a pas été dépensé. Le lien est encore bon après un refus.
+  invited_nothing_spent:
+    'Rien n’a encore été envoyé. Tant que vous n’avez pas répondu, ce lien n’est pas dépensé.',
   'invited_behind %1$d':
     '%1$d autre(s) invitation(s) attendent derrière celle-ci.',
   invited_join: 'Rejoindre la conversation',

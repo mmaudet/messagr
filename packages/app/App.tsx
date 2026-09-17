@@ -161,7 +161,8 @@ import {
   fetchJoinedMembers,
   type Invitation,
 } from './src/runtime/encryptedSend'
-import { whatIsKnown } from './src/runtime/invitationOnScreen'
+import { whatALinkSays, whatIsKnown } from './src/runtime/invitationOnScreen'
+import { linkOnScreen, type Described } from './src/runtime/linkOnScreen'
 import { sameThreshold, stillStanding } from './src/runtime/standingInvitations'
 import { theOtherMember, type VouchOutcome } from './src/runtime/vouch'
 import type { ConversationSummary } from './src/runtime/conversationList'
@@ -472,7 +473,9 @@ export function App({
   const [admission, setAdmission] = useState<'waiting' | 'admitted' | null>(
     null,
   )
-  const inviteRef = useRef<((name: string | null) => void) | null>(null)
+  const inviteRef = useRef<
+    ((name: string | null, declared: string | null) => void) | null
+  >(null)
   const namesRef = useRef<GivenNames>(forgetfulGivenNames())
   // How far each conversation has been read here. Forgetful until the
   // notebook opens, and forgetful for good if it does not -- which shows
@@ -1375,6 +1378,22 @@ export function App({
    */
   const questionRef = useRef(questionOnScreen(setOtherServerQuestion))
   /**
+   * The link being described before it is spent, while it is being described.
+   * #329, §13.3's first screen on the link path.
+   *
+   * `null` on every launch that was not opened with an invitation, which is
+   * almost every launch. While it is not, the screen is that description and
+   * nothing else: the launch is waiting inside entry for the answer, and
+   * nothing has been claimed yet.
+   */
+  const [linkDescribed, setLinkDescribed] = useState<Described | null>(null)
+  /**
+   * What puts that description and what answers it: its two buttons, the back
+   * gesture, and this screen going away. See `linkOnScreen.ts`. Held per
+   * mount, like the question above.
+   */
+  const describeRef = useRef(linkOnScreen(setLinkDescribed))
+  /**
    * Which entries belong to the launch of this screen. See `launchEntries.ts`:
    * held per mount, since a screen mounted again reads its link the way a
    * launch does, and whether a second crypto machine would be needed is
@@ -2065,6 +2084,10 @@ export function App({
       // What takes the question this run put off the screen, when it put one.
       // See `questionOnScreen.ts`.
       let settleTheQuestion: (() => void) | null = null
+      // And the same for §13.3's description of the link, which stays up --
+      // drawn as under way -- from the moment somebody joins until entry has
+      // finished claiming. See `linkOnScreen.ts`.
+      let settleTheDescription: (() => void) | null = null
       // ONE CLAIM PER LINK AT A TIME. A link another run of this launch is
       // still claiming is not handed over again, and the mark is lifted the
       // moment this entry answers -- so the same link opened again after a
@@ -2128,11 +2151,26 @@ export function App({
                 after: ms => new Promise(resolve => setTimeout(resolve, ms)),
                 departure: departureFrom(storeDir),
               },
+              // §13.3'S FIRST SCREEN, PUT BEFORE THE LINK IS SPENT, AND
+              // AWAITED. #329.
+              //
+              // Put on every entry rather than at a cold launch only, unlike
+              // the question above: describing a link sends nothing, spends
+              // nothing and touches no account, so there is no state it could
+              // find in the wrong order. A link touched while Messagr is
+              // already open is exactly the case somebody most needs to see
+              // described -- it arrives with no warning at all.
+              describe: what => {
+                const put = describeRef.current.put(what)
+                settleTheDescription = put.settle
+                return put.answer
+              },
             }),
         )
         .finally(() => {
           thisEntry.end()
           if (settleTheQuestion !== null) settleTheQuestion()
+          if (settleTheDescription !== null) settleTheDescription()
         })
       // CE QU'EST DEVENU UN LIEN COLLÉ, DIT LÀ OÙ IL A ÉTÉ COLLÉ. #367.
       //
@@ -2144,13 +2182,20 @@ export function App({
       // `null` quand elle est entrée : l'écran qui portait le champ n'est
       // plus dessiné une seconde plus tard, et une phrase de refus laissée là
       // reviendrait sur la liste de quelqu'un qui est entré.
+      //
+      // ET RIEN NON PLUS QUAND LA PERSONNE A REFUSÉ (#329). Un lien collé
+      // ouvre maintenant l'écran de §13.3 avant d'être dépensé, et
+      // « Refuser l'invitation » en est une des deux actions. Aucune des deux
+      // phrases du champ n'est vraie de ce refus-là : le lien est bon et il
+      // n'y a rien à réessayer. Ce n'est pas non plus un avertissement.
       if (warmLink?.pasted === true) {
         const became = whatThePasteBecame(entered)
-        setPasting(became === 'in' ? null : became)
+        const answered = became === 'in' || became === 'declined'
+        setPasting(answered ? null : became)
         // LA RAISON VA AU JOURNAL ET PAS À L'ÉCRAN, §13.27 : le service ne
         // distingue pas inconnu, dépensé, révoqué et expiré, et l'écran ne
         // fait pas semblant. C'est la ligne qu'il faut pour diagnostiquer.
-        logEvent(became === 'in' ? 'info' : 'warn', 'MESSAGR_LINK_PASTED', {
+        logEvent(answered ? 'info' : 'warn', 'MESSAGR_LINK_PASTED', {
           became,
           ...(entered.entered ? {} : { reason: entered.reason }),
         })
@@ -3387,11 +3432,18 @@ export function App({
             // ordering the protocol allows, and the right one: the inviter
             // knows who they are inviting now and will not come back later
             // to say.
-            inviteRef.current = (name: string | null) => {
+            inviteRef.current = (
+              name: string | null,
+              declared: string | null,
+            ) => {
               setInvite({ stage: 'working' })
               setAdmission(null)
               const gesture = async () => {
-                const issued = await inviteSomebody(sessionClient, credentials)
+                const issued = await inviteSomebody(
+                  sessionClient,
+                  credentials,
+                  declared,
+                )
                 if (!issued.issued) {
                   setInvite({ stage: 'failed', reason: issued.reason })
                   return
@@ -4116,6 +4168,13 @@ export function App({
       // screen while it is there. Back answers it « stay » (#304): see
       // `questionOnScreen.ts`.
       if (questionRef.current.back()) return true
+      // AND §13.3'S DESCRIPTION OF A LINK, WHICH COMES BEFORE IT IN TIME AND
+      // AFTER IT HERE. The two are never on the screen together -- the
+      // description is answered before the question is put -- so the order is
+      // only a precaution; the question is the one entry is waiting on when
+      // both exist. Back refuses the invitation (#329), which sends nothing
+      // and leaves the link good: see `linkOnScreen.ts`.
+      if (describeRef.current.back()) return true
       if (trust !== null) {
         setTrust(null)
         return true
@@ -4187,6 +4246,15 @@ export function App({
   useEffect(() => {
     const question = questionRef.current
     return () => question.unmounted()
+  }, [])
+
+  // AND A SCREEN THAT GOES AWAY BEFORE §13.3'S DESCRIPTION IS DECIDED REFUSES
+  // IT (#329). Nobody is left to join, and the answer that sends nothing is
+  // the only one to give on somebody's behalf. The link is unspent, so the
+  // next launch describes it again.
+  useEffect(() => {
+    const described = describeRef.current
+    return () => described.unmounted()
   }, [])
 
   // WHATEVER TAKES THE LIST OFF THE SCREEN LETS GO OF A TOUCH IT WAS HOLDING.
@@ -4331,6 +4399,48 @@ export function App({
             onLeave={() => questionRef.current.answer('leave')}
             onStay={() => questionRef.current.answer('stay')}
           />
+        </SafeAreaProvider>
+      </GestureHandlerRootView>
+    )
+  }
+
+  // §13.3'S FIRST SCREEN, ON THE LINK PATH, AND NOTHING BESIDE IT. #329.
+  //
+  // *« Toute invitation par lien ouvre l'écran 1 de §13.3 avant toute
+  // décision. »* The whole screen, like the question above and for the same
+  // reason: the launch is waiting inside entry for the answer, and there is
+  // nothing underneath to use -- either this device has no account at all, or
+  // the account it has is about to be asked to spend a link.
+  //
+  // THE CONDITIONS THE OTHER `Invited` CARRIES ARE ABSENT HERE, and that is
+  // the difference between the two paths rather than an oversight. An
+  // invitation standing on the threshold is unsolicited and waits for the
+  // list to be at rest; this is the direct answer to a link somebody just
+  // touched, scanned or pasted, one second ago.
+  if (linkDescribed !== null) {
+    return (
+      <GestureHandlerRootView style={styles.root}>
+        <SafeAreaProvider>
+          <SafeAreaView
+            testID="invited-link"
+            style={styles.root}
+            edges={['top', 'bottom', 'left', 'right']}>
+            <Invited
+              known={whatALinkSays(linkDescribed)}
+              // Nothing stands behind a link: it is one address, opened once.
+              behind={0}
+              // A claim is two calls with the issuer's application in between
+              // and can take half a minute. The screen stays and says so.
+              working={linkDescribed.answered ? 'join' : null}
+              // What became of a claim is said by `whenToSay.ts` on the list,
+              // or on the field a link was pasted into -- both of which are
+              // drawn after this screen has gone. Saying it twice would be
+              // two places to keep in agreement.
+              failed={false}
+              onJoin={() => describeRef.current.answer('join')}
+              onRefuse={() => describeRef.current.answer('refuse')}
+            />
+          </SafeAreaView>
         </SafeAreaProvider>
       </GestureHandlerRootView>
     )
@@ -5089,7 +5199,9 @@ export function App({
                   <Invite
                     stage={invite}
                     admission={admission}
-                    onInvite={name => inviteRef.current?.(name)}
+                    onInvite={(name, declared) =>
+                      inviteRef.current?.(name, declared)
+                    }
                     onClose={() => {
                       setInvite({ stage: 'shut' })
                       setAdmission(null)
@@ -5501,7 +5613,11 @@ export function App({
           </View>
         </SafeAreaView>
 
-        {/* THE INVITATION NOBODY SPENT A LINK FOR. §13.3's first screen.
+        {/* THE INVITATION NOBODY SPENT A LINK FOR. §13.3's first screen,
+            and the OTHER half of it: the link path draws the same screen as
+            a whole screen, above, because entry is waiting inside a launch
+            for the answer. This one is unsolicited and waits.
+
             OVER THE APPLICATION AND UNDER EVERYTHING BELOW, which is the
             order the two rules here produce. It covers the list because a
             decision is what it is asking for; every overlay after it -- the

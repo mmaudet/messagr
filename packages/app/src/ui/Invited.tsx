@@ -9,22 +9,30 @@ import { NotchedButton } from './NotchedButton'
 /**
  * Screen 1 of §13.3 — receiving an invitation.
  *
- * # WHAT REACHES THIS SCREEN, AND WHAT NEVER DOES
+ * # WHAT REACHES THIS SCREEN, AND IT IS NOW BOTH WAYS IN
  *
- * Only an invitation nobody spent a link for on this telephone. Spending a
- * link **is** the decision — it was taken a moment earlier by the person
- * holding the device — so `enterInvitations.ts` walks through one door per
- * link spent without asking again, and leaves every other invitation exactly
- * as it arrived, neither joined nor declined. Those are the ones this screen
- * decides, and until it existed they simply stood there with nothing drawing
- * them.
+ * **A LINK, BEFORE ANYTHING IS SPENT.** *« Toute invitation par lien ouvre
+ * l'écran 1 de §13.3 avant toute décision. »* Until #329's second half, a
+ * link handed over by the operating system was spent the instant it arrived:
+ * an account drawn, a conversation joined, and the first thing anybody saw
+ * was a stranger on their list. `entry.ts` now stops above the fork and waits
+ * here (`linkOnScreen.ts`), and refusing costs nothing at all — no request,
+ * no token spent, and the link still good afterwards.
  *
- * That includes the case the first half of #329 left open and said so: a
- * link claimed, the application killed in the few seconds before the sync
- * tick that crosses the door, and a relaunch whose register is empty —
- * `awaitedInvitations.ts` lives for the life of the process. The invitation
- * arrives owed to nobody and stands. It now stands **here**, named, with two
- * actions under it.
+ * **AN INVITATION STANDING ON THE THRESHOLD**, which no link was spent for on
+ * this telephone. `enterInvitations.ts` walks through one door per link spent
+ * and leaves every other invitation exactly as it arrived, neither joined nor
+ * declined. That includes the case the first half of #329 left open and said
+ * so: a link claimed, the application killed in the few seconds before the
+ * sync tick that crosses the door, and a relaunch whose register is empty —
+ * `awaitedInvitations.ts` lives for the life of the process.
+ *
+ * THE TWO KNOW OPPOSITE THINGS, and `invitationOnScreen.ts` argues why that
+ * is structural rather than unfinished. A link carries the name its writer
+ * gave themselves and no Matrix identifier; an invitation on the threshold
+ * carries the identifier and no declared name. `known.source` says which is
+ * being drawn, and four sentences differ between them — because the same
+ * sentence would be false on one of the two paths.
  *
  * # THE LINK DESCRIBED BEFORE ANY DECISION, AS FAR AS THIS DEVICE CAN
  *
@@ -108,6 +116,7 @@ export function Invited({
   readonly onJoin: () => void
   readonly onRefuse: () => void
 }) {
+  const byLink = known.source === 'link'
   const nobody = known.identifier === ''
   return (
     <ScrollView
@@ -116,16 +125,46 @@ export function Invited({
       contentContainerStyle={styles.content}>
       <Text style={styles.title}>{t('invited_title')}</Text>
 
-      {nobody ? (
+      {known.declared !== '' ? (
+        /* « SE PRÉSENTE COMME », AND NEVER ANYTHING SHORTER. §13.26: a name
+           somebody wrote about themselves proves nothing about who holds the
+           account that wrote it, so the word is always *claims*. The sentence
+           is the one `Conversation.tsx` already puts above a message, read
+           from the same catalogue key on purpose -- §13.26 gives the product
+           one formula, and a second key carrying the same sentence is how two
+           screens come to say it differently.
+
+           No identifier under it on the link path, because the link names
+           none: the account is drawn at the moment the token is spent, and
+           nothing has been spent. Drawn when there is one, for the day
+           something carries both. */
+        <View style={styles.who} testID="invited-declared">
+          <Text style={styles.name}>
+            {t('conversation_sender_claimed %@', known.declared)}
+          </Text>
+          {known.identifier !== '' && (
+            <Text style={styles.identifier}>{known.identifier}</Text>
+          )}
+          <Text style={styles.lead}>{t('invited_lead')}</Text>
+        </View>
+      ) : nobody ? (
         <View style={[styles.card, styles.plain]} testID="invited-who-unknown">
-          <Text style={styles.body}>{t('invited_who_unknown')}</Text>
+          {/* TWO ABSENCES, TWO SENTENCES. A conversation that does not say
+              who created it is not a link whose writer chose not to name
+              themselves, and one sentence for both would be this screen
+              rounding two different facts to whichever it met first. */}
+          <Text style={styles.body}>
+            {byLink ? t('invited_who_undeclared') : t('invited_who_unknown')}
+          </Text>
         </View>
       ) : (
         <View style={styles.who} testID="invited-who">
           <Text style={styles.name}>{known.who}</Text>
           {/* The identifier under the name, as the prototype draws it and as
               `GiveName.tsx` already does: a name given here is this device's
-              own label, and the account it labels has to stay visible. */}
+              own label, and the account it labels has to stay visible. It is
+              NOT under « se présente comme »: this device wrote it, and the
+              inviter never claimed it. */}
           <Text style={styles.identifier}>{known.identifier}</Text>
           <Text style={styles.lead}>{t('invited_lead')}</Text>
         </View>
@@ -151,11 +190,24 @@ export function Invited({
       )}
 
       <View style={[styles.card, styles.plain]} testID="invited-terms">
-        <Text style={styles.body}>{t('invited_terms_unknown')}</Text>
+        {/* THE SAME FACT, AND NOT THE SAME SENTENCE. Validity and remaining
+            uses are answered only to the account that issued the invitation
+            (`status.rs`), whichever path this screen was reached by. But
+            « aucun lien n'a été ouvert ici » is plainly false of a link
+            somebody has just opened, and a screen that told them that would
+            be wrong about the one thing they can see for themselves. */}
+        <Text style={styles.body}>
+          {byLink ? t('invited_terms_link') : t('invited_terms_unknown')}
+        </Text>
       </View>
 
       <View style={[styles.card, styles.plain]} testID="invited-nothing-sent">
-        <Text style={styles.body}>{t('invited_nothing_sent')}</Text>
+        {/* And on the link path the stronger statement is available: not
+            only has nothing been sent, the token is unspent. Which is what
+            makes « Refuser » a real answer rather than a way out. */}
+        <Text style={styles.body}>
+          {byLink ? t('invited_nothing_spent') : t('invited_nothing_sent')}
+        </Text>
       </View>
 
       <View style={styles.actions}>
