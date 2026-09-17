@@ -1,3 +1,5 @@
+import { declaredNameInFragment } from './declaredName'
+
 /**
  * Reading an invitation link.
  *
@@ -44,6 +46,19 @@ export interface InvitationLink {
   readonly homeserver: string
   /** Where the invitation service answers on that instance. */
   readonly service: string
+  /**
+   * The name the inviter gave themselves, or `null` when they gave none.
+   * #329, and `declaredName.ts` holds its rules.
+   *
+   * READ OUT OF THE FRAGMENT AND NOWHERE ELSE. That is the point of the
+   * whole arrangement: a fragment is resolved on the client and never sent,
+   * so the name reaches the person invited without the invitation service
+   * ever receiving it, storing it or writing it to a log. A query WOULD
+   * reach nginx and its log, and #313 took the token out of that log -- so a
+   * `?n=` is read the way every other query has always been read here, as
+   * something a messenger attached, and ignored.
+   */
+  readonly declared: string | null
 }
 
 /**
@@ -51,12 +66,14 @@ export interface InvitationLink {
  * link into this instance shaped any other way is not an invitation, and
  * treating it as one would spend a token nobody offered.
  *
- * Anything after the token — a query or a fragment — is accepted and ignored,
- * because a link that travelled through a messenger may well come back with
- * tracking parameters attached to it.
+ * Anything after the token — a query or a fragment — is accepted, because a
+ * link that travelled through a messenger may well come back with tracking
+ * parameters attached to it. The two are now told apart rather than skipped
+ * together: the fragment is the one part of an address that never leaves the
+ * device, which is why it is the only part a declared name may travel in.
  */
 const INVITATION_LINK =
-  /^(https|messagr):\/\/([^/?#]+)\/i\/([^/?#]+?)\/?(?:[?#].*)?$/i
+  /^(https|messagr):\/\/([^/?#]+)\/i\/([^/?#]+?)\/?(?:\?[^#]*)?(?:#(.*))?$/i
 
 export function parseInvitationLink(raw: string): InvitationLink | null {
   const match = INVITATION_LINK.exec(raw.trim())
@@ -64,7 +81,7 @@ export function parseInvitationLink(raw: string): InvitationLink | null {
     return null
   }
 
-  const [, , host, token] = match
+  const [, , host, token, fragment] = match
   if (host === undefined || token === undefined) {
     return null
   }
@@ -83,5 +100,6 @@ export function parseInvitationLink(raw: string): InvitationLink | null {
     // The path the deployment already serves the invitation service on, and
     // the same one the bench provisioning script assumes.
     service: `${homeserver}/_messagr`,
+    declared: declaredNameInFragment(fragment ?? ''),
   }
 }

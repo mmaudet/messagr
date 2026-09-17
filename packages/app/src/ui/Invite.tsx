@@ -18,6 +18,7 @@ import {
   stroke,
   type,
 } from '../design/tokens'
+import { cleanDeclaredName } from '../runtime/declaredName'
 import { normaliseGivenName } from '../runtime/givenName'
 import { NotchedButton } from './NotchedButton'
 import { QrCode } from './QrCode'
@@ -33,6 +34,19 @@ import { QrCode } from './QrCode'
  * typed here is held and written when the account is drawn, which is the only
  * ordering the protocol allows and also the right one: the inviter knows who
  * they are inviting *now*, and will not come back later to say.
+ *
+ * # There are two names on this screen, and only one of them travels
+ *
+ * #329. Until it, this screen asked for the invitee's name and offered the
+ * inviter nowhere to say who *they* are — so the person opening the link met
+ * `@rabr642vve6v` and a decision to make about it. The second field is what
+ * `Invited.tsx` draws as « Se présente comme », and it is a claim rather than
+ * an identity (§13.26).
+ *
+ * It goes in the link's fragment, which is never transmitted: the invitation
+ * service is never sent it, has no column for it and could not read it if it
+ * wanted to. `declaredName.ts` argues that at length, and it is what makes
+ * the field cost nothing in what any server holds.
  *
  * # What this screen does not promise
  *
@@ -70,8 +84,14 @@ export type InviteStage =
 
 export interface InviteProps {
   readonly stage: InviteStage
-  /** Called with the name to hold for whoever claims the link, or `null`. */
-  readonly onInvite: (name: string | null) => void
+  /**
+   * Called with the two names, either of which may be `null`.
+   *
+   * `name` is what to hold for whoever claims the link, on this device.
+   * `declared` is what the person issuing it calls themselves, and it is the
+   * one that travels — in the link's fragment, and nowhere else.
+   */
+  readonly onInvite: (name: string | null, declared: string | null) => void
   readonly onClose: () => void
   /** What became of the far half, once it is known. */
   readonly admission: 'waiting' | 'admitted' | null
@@ -79,6 +99,7 @@ export interface InviteProps {
 
 export function Invite({ stage, onInvite, onClose, admission }: InviteProps) {
   const [draft, setDraft] = useState('')
+  const [presented, setPresented] = useState('')
 
   if (stage.stage === 'shut') return null
 
@@ -98,10 +119,36 @@ export function Invite({ stage, onInvite, onClose, admission }: InviteProps) {
           style={styles.field}
         />
         <Text style={styles.hint}>{t('list_name_hint')}</Text>
+
+        {/* TWO NAMES, AND THE TWO HINTS ARE THE TEACHING. #329.
+            The first is what you call THEM, and it stays on this telephone.
+            The second is what you call YOURSELF, and it is the only name in
+            this product that travels -- because the person opening the link
+            has never seen this account and `@rabr642vve6v` tells them
+            nothing about who is inviting them.
+
+            Optional, and empty every time. It is not remembered between two
+            invitations, on purpose: a declared name is a sentence in ONE
+            invitation rather than a property of an account, and a name
+            remembered and re-sent by default would be a name declared to
+            people who never watched it being typed. `declaredName.ts`. */}
+        <Text style={styles.who}>{t('invite_declared')}</Text>
+        <TextInput
+          testID="invite-declared"
+          value={presented}
+          onChangeText={setPresented}
+          placeholder={t('list_name_placeholder')}
+          placeholderTextColor={color.neutral['400']}
+          style={styles.field}
+        />
+        <Text style={styles.hint}>{t('invite_declared_hint')}</Text>
+
         <NotchedButton
           label={t('invite_action')}
           testID="invite"
-          onPress={() => onInvite(normaliseGivenName(draft))}
+          onPress={() =>
+            onInvite(normaliseGivenName(draft), cleanDeclaredName(presented))
+          }
         />
         <Pressable
           onPress={onClose}

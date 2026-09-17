@@ -85,6 +85,47 @@ export interface EntryDeps {
   readonly storeExists: (account: DeviceIdentity) => Promise<boolean>
   /** What leaving the account this device holds for a link needs. See `Leaving`. */
   readonly leaving: Leaving
+  /**
+   * §13.3's first screen, put before the link is spent, and awaited. #329.
+   *
+   * *« Toute invitation par lien ouvre l'écran 1 de §13.3 avant toute
+   * décision. »* Until this existed, spending the link WAS the decision:
+   * the operating system handed an address over and an account was drawn,
+   * a conversation joined and a stranger's name on the list before anybody
+   * had been told who was inviting them or from where. The other half of
+   * #329 -- `Invited.tsx` -- decides invitations no link was spent for, and
+   * this is the half §13.3 actually describes.
+   *
+   * # WHY IT IS HERE AND NOT AT THE THREE CLAIMS
+   *
+   * There are three roads a link can take -- a device with no account, one
+   * that already has one, one that is leaving the account it holds -- and
+   * all three send something. Put once, above the fork, they cannot come
+   * apart; put three times, the one nobody remembered is the one that spends
+   * a token in silence.
+   *
+   * # REFUSING COSTS NOTHING, WHICH IS WHAT MAKES IT A REAL ANSWER
+   *
+   * No request, no token spent, no account drawn, no keystore written.
+   * The link is exactly as good afterwards as it was before, so opening it
+   * again describes it again -- and there is no « continuer quand même »
+   * because there is nothing to continue.
+   *
+   * # WHY IT MAY BE ABSENT
+   *
+   * Like `leaving.ask`, for a context with nowhere to draw: a test, or a
+   * caller that has no screen. An entry with no screen enters as it always
+   * did rather than refusing everything, because refusing by default would
+   * make a missing dependency look like a person's decision.
+   */
+  readonly describe?: (what: {
+    /** The instance the link leads to, as a person reads it. */
+    readonly instance: string
+    /** The name the inviter gave themselves, or `null`. §13.26. */
+    readonly declared: string | null
+    /** Whether that is not the server this device's account lives on. */
+    readonly elsewhere: boolean
+  }) => Promise<'join' | 'refuse'>
 }
 
 /**
@@ -338,6 +379,37 @@ function spentALink(result: EntryResult): boolean {
   return result.claimed || result.invitation?.kind === 'used'
 }
 
+/**
+ * What a link refused at §13.3's screen leaves behind, for a device that had
+ * no account to fall back on. #329.
+ *
+ * ITS OWN REASON, AND NOT A FAILURE. Every other `entered: false` is
+ * something that went wrong; this one is somebody answering a question. The
+ * screen that put it needs to say nothing at all afterwards -- « demandez-en
+ * une nouvelle » is wrong for a link that is perfectly good, and « réessayez »
+ * is wrong for a decision -- so `pastedLink.ts` tells it apart by this
+ * constant, exactly as it tells `REFUSED` apart.
+ */
+export const DECLINED = 'this invitation was refused before anything was sent'
+
+/**
+ * §13.3's screen, if there is one to put it on, and what it answers.
+ *
+ * `join` when there is none. See `EntryDeps.describe`.
+ */
+async function decided(
+  deps: EntryDeps,
+  link: InvitationLink,
+  elsewhere: boolean,
+): Promise<'join' | 'refuse'> {
+  if (deps.describe === undefined) return 'join'
+  return deps.describe({
+    instance: hostShown(link.homeserver),
+    declared: link.declared,
+    elsewhere,
+  })
+}
+
 /** The entry itself: a session already kept, a link to spend, or neither. */
 async function entryWith(deps: EntryDeps): Promise<EntryResult> {
   const { secrets, poster, link, wait } = deps
@@ -353,6 +425,25 @@ async function entryWith(deps: EntryDeps): Promise<EntryResult> {
     const offered = await link()
     const usable = offered === null ? null : parseInvitationLink(offered)
     if (usable === null) {
+      return { entered: true, session: held, claimed: false }
+    }
+    // §13.3'S FIRST SCREEN, ABOVE THE FORK AND BEFORE ANYTHING IS SENT (#329).
+    //
+    // The three roads below all send something: a claim for this account, a
+    // claim for a new one, or the heavier question about leaving this one.
+    // Described once here, none of them can be reached without it.
+    //
+    // A REFUSAL RETURNS WHAT « NO LINK » RETURNS, and that is the honest
+    // shape: the account is untouched, nothing was spent, and the list says
+    // nothing -- somebody who refused an invitation on a full screen a second
+    // ago does not need a line telling them what they decided.
+    if (
+      (await decided(
+        deps,
+        usable,
+        !sameOrigin(usable.homeserver, held.baseUrl),
+      )) === 'refuse'
+    ) {
       return { entered: true, session: held, claimed: false }
     }
     // A SESSION THIS DEVICE CAN NO LONGER USE, AND A LINK TO ENTER WITH (#307).
@@ -412,6 +503,15 @@ async function entryWith(deps: EntryDeps): Promise<EntryResult> {
   const invitation = parseInvitationLink(raw)
   if (invitation === null) {
     return { entered: false, reason: 'this link is not an invitation' }
+  }
+
+  // THE NEWCOMER'S ROAD, WHICH IS THE ONE §13.3 IS WRITTEN ABOUT: the
+  // product's entry point, where the whole of somebody's relationship with
+  // this application is decided by a link they were handed. `elsewhere` is
+  // false by construction -- there is no account here for the link to lead
+  // away from.
+  if ((await decided(deps, invitation, false)) === 'refuse') {
+    return { entered: false, reason: DECLINED }
   }
 
   return claimWithoutAccount(deps, invitation)

@@ -4,7 +4,7 @@ import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
 
 import { REFUSED } from './claimInvitation'
-import type { EntryResult } from './entry'
+import { DECLINED, type EntryResult } from './entry'
 import { parseInvitationLink } from './invitationLink'
 import { invitationPasted, whatThePasteBecame } from './pastedLink'
 import type { RestoreCredentials } from './sessionCredentials'
@@ -116,6 +116,17 @@ describe('what became of a link that was handed over', () => {
         reason: 'the invitation service did not answer in time',
       }),
     ).toBe('retry')
+  })
+
+  it('tells a refusal of the service from a refusal of the person', () => {
+    // #329: a pasted link now opens §13.3's screen before it is spent, and
+    // « Refuser l'invitation » is one of its two actions. Neither of the two
+    // sentences above is true of it -- the link is perfectly good and there
+    // is nothing to try again -- so the field says nothing at all, which is
+    // what somebody who has just decided already knows.
+    expect(whatThePasteBecame({ entered: false, reason: DECLINED })).toBe(
+      'declined',
+    )
   })
 })
 

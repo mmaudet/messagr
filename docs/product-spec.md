@@ -1162,6 +1162,30 @@ nothing. A conversation with three people is not a conversation with
 somebody, and the product should not pretend it knows which of them is
 speaking.
 
+**The same formula names an inviter, and there the claim is the whole
+point.** Screen 1 of §13.3 has to say who is inviting somebody who has
+never seen the account before, and `@rabr642vve6v` says nothing at all.
+So the invitation carries a name its issuer gave *themselves* — a
+declared name — and the screen reports it with this sentence and never
+as an identity. Nothing has verified it; the account on the far side
+does not exist yet on the deciding device.
+
+**It travels in the link's fragment, which is the whole of how it can
+exist at all.** A fragment is resolved on the client and never sent: not
+to nginx, not to its log, not to any intermediary. The invitation
+service is therefore never asked to hold it, has no column for it, and
+could not read it if it wanted to. It is written nowhere on either
+device either, so it is a sentence in one invitation rather than a
+property of an account — which is what keeps a product that asks for no
+identity from quietly acquiring one.
+
+**The budget is a camera's.** The link is also a QR symbol (§13.25), and
+every byte added to it makes the grid one step denser. The name is
+therefore limited in encoded bytes rather than in characters — a limit
+in characters would cost three times as much in Japanese as in French
+for the same-looking name, and the person holding the camera would pay
+it.
+
 ### 13.27 The frame, and where the instrument went (designed here)
 
 **One scroll container per screen, and a new one each time.** Nothing in

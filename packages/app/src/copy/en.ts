@@ -308,6 +308,9 @@ export const en: Readonly<Record<CopyKey, string>> = {
   list_back: 'Conversations',
   invite_action: 'Invite someone',
   invite_who: 'Who are you inviting?',
+  invite_declared: 'How do you introduce yourself?',
+  invite_declared_hint:
+    'Optional. This name travels in the link and nowhere else: the service does not receive it and keeps nothing of it.',
   invite_working: 'Creating the conversation…',
   invite_ready:
     'Send this link to them. It is valid for an hour and works once.',
@@ -322,13 +325,19 @@ export const en: Readonly<Record<CopyKey, string>> = {
   invited_lead: 'Invites you to join a conversation.',
   invited_who_unknown:
     'This conversation does not say who created it. Nobody can be named here.',
+  invited_who_undeclared:
+    'This link does not say who is inviting you: that person gave themselves no name.',
   'invited_instance %@': 'This account is hosted by %@.',
   'invited_instance_elsewhere %@':
     'This account is hosted by %@, which is not your server.',
   invited_terms_unknown:
     'No link was opened here for this invitation: how long it lasts and how many uses it has left cannot be read from this device.',
+  invited_terms_link:
+    'How long this link lasts and how many uses it has left cannot be read here: only the account that issued it can ask.',
   invited_nothing_sent:
     'Nothing has been sent yet. Until you answer, this invitation stays where it is.',
+  invited_nothing_spent:
+    'Nothing has been sent yet. Until you answer, this link is not spent.',
   'invited_behind %1$d':
     '%1$d other invitation(s) are waiting behind this one.',
   invited_join: 'Join the conversation',

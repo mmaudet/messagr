@@ -96,6 +96,24 @@ that knows them.
 _Avoid_: Nickname, alias, contact name, display name. **Contact** in
 particular belongs to discovery and means something else here.
 
+**Declared name**:
+The name somebody issuing an invitation gives _themselves_, written into that
+invitation's link and read on the screen where the invitation is decided. It
+is the mirror image of a given name — the one is what you call them and stays
+here, the other is what they call themselves and travels — and it is the only
+name in the product that leaves the device that wrote it.
+
+It travels in the link's **fragment**, which is never transmitted: the
+invitation service is never sent it, has nowhere to store it, and could not
+read it if it wanted to. It is not kept on either device either. A declared
+name is a sentence in one invitation rather than an attribute of an account,
+which is what keeps a product that asks for no identity from acquiring one.
+
+It is a claim and is always reported as one — « Se présente comme » (§13.26).
+Nothing verifies it and nothing could.
+_Avoid_: Display name, profile name, account name, identity. The account
+carries none of these.
+
 ### Trust, discovery and verification
 
 These are three distinct notions. Conflating them is the most common error in

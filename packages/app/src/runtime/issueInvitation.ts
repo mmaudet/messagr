@@ -1,3 +1,4 @@
+import { linkWithDeclaredName } from './declaredName'
 import { getErrorMessage } from './errors'
 import type { HttpRequester } from './pump'
 
@@ -181,6 +182,17 @@ const ROOM_VERSION = '11'
 export async function issueInvitation(
   deps: IssuingDeps,
   linkHost: string,
+  /**
+   * The name the inviter gave themselves, or `null`. #329, §13.26.
+   *
+   * NOT IN THE BODY ABOVE, AND THAT IS THE POINT. The request that mints an
+   * invitation carries `max_uses`, `ttl_seconds` and `room_id`, and this is
+   * none of them: it is written into the link after the service has answered,
+   * in the fragment, which no request ever carries. The service is not asked
+   * to store it and has nowhere to store it — there is no column for it in
+   * `migrations/001_init.sql`.
+   */
+  declared: string | null = null,
 ): Promise<Issued> {
   let scope: string
   try {
@@ -269,7 +281,16 @@ export async function issueInvitation(
       //
       // No scanner is needed, and that is the point: the camera everybody
       // already has is the scanner.
-      link: `https://${linkHost}/i/${minted.token}`,
+      //
+      // AND THE DECLARED NAME AFTER THE TOKEN, IN THE FRAGMENT. The host
+      // and the path are what nginx and its log see; the fragment is the one
+      // part of an address that stops at the device. `declaredName.ts` says
+      // why that is the only place this name may be written, and the link
+      // comes back untouched when nobody declared one.
+      link: linkWithDeclaredName(
+        `https://${linkHost}/i/${minted.token}`,
+        declared,
+      ),
     }
   } catch (cause: unknown) {
     return {

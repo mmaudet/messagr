@@ -8,6 +8,7 @@ import { by, device, element, waitFor } from 'detox'
 import { openTheFirstConversation } from './conversation'
 import { demandTheRotation, type OutcomeScreen } from './eviction'
 import { IGNORING_THE_LIVE_POLL } from './longPoll'
+import { joinTheInvitation } from './invitation'
 import { acceptThePromise } from './promise'
 import { NOTIFICATIONS_GRANTED } from './permissions'
 import { forgetTheLog, whatItReported } from './reported'
@@ -207,6 +208,11 @@ describeRoundTrip('encrypted round trip', () => {
     // See promise.ts: `delete: true` cleared the flag, so the launch path is
     // waiting behind the first-launch screen and nothing below has started.
     await acceptThePromise()
+    // AND THE INVITATION IS ANSWERED, because it is now asked about (#329).
+    // This launch was opened with `INVITATION`, and §13.3's first screen now
+    // describes it before anything is spent -- so the claim, the key
+    // publication and the send below all wait on this tap. See invitation.ts.
+    await joinTheInvitation()
     // Existence first, then visibility. `toBeVisible` with a timeout was
     // answering two questions at once -- has the send finished, and can the
     // line be seen -- and the conversation screen rendering above the readout
@@ -657,6 +663,19 @@ describeRoundTrip('encrypted round trip', () => {
       .toBeVisible()
       .withTimeout(30000)
     await element(by.id('invite-name')).replaceText('la contrepartie')
+    // LE SECOND CHAMP EST LAISSÉ VIDE, ET C'EST LE CAS QU'IL FAUT TENIR ICI
+    // (#329). Un inviteur qui ne se donne pas de nom doit produire exactement
+    // le lien que ce produit a toujours émis : rien après le jeton. C'est ce
+    // que le découpage ci-dessous suppose, et ce que la capture montre.
+    //
+    // CHERCHÉ PLUTÔT QUE TOUCHÉ LÀ OÙ IL ÉTAIT. Le panneau porte deux
+    // questions depuis #329, et une action qu'on touche à sa position
+    // supposée ne tient que tant que l'écran reste court -- ce que l'écran de
+    // la promesse a coûté six exécutions à apprendre.
+    await waitFor(element(by.id('invite')))
+      .toBeVisible()
+      .whileElement(by.id('screen-scroll'))
+      .scroll(300, 'down')
     await element(by.id('invite')).tap()
 
     await waitFor(element(by.id('invite-link')))
@@ -671,7 +690,13 @@ describeRoundTrip('encrypted round trip', () => {
     }
     // LE JETON EST LE DERNIER SEGMENT. La page d'invitation le porte dans
     // son chemin, et c'est ce que le service attend -- pas l'adresse.
-    const token = link.trim().split('/').pop() ?? ''
+    // LE JETON S'ARRÊTE AU FRAGMENT. Depuis #329 un lien peut porter
+    // `#n=<nom>` -- le nom que l'inviteur se donne, qui voyage avec le lien
+    // et n'atteint aucun serveur. Le dernier segment le contiendrait, et le
+    // service se verrait offrir un jeton qui n'existe pas. Ici le champ est
+    // vide, donc il n'y a pas de fragment ; la coupe est là pour que ce soit
+    // vrai aussi le jour où il y en a un.
+    const token = (link.trim().split('#')[0] ?? '').split('/').pop() ?? ''
     if (token === '') throw new Error(`no token in the link shown: ${link}`)
 
     // Bloquant jusqu'à cent vingt secondes : la contrepartie réclame tant que

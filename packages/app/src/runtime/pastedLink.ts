@@ -1,5 +1,5 @@
 import { REFUSED } from './claimInvitation'
-import type { EntryResult } from './entry'
+import { DECLINED, type EntryResult } from './entry'
 import { parseInvitationLink } from './invitationLink'
 
 /**
@@ -60,10 +60,20 @@ export function invitationPasted(raw: string): string | null {
 }
 
 /** What became of a link this device pasted and handed over. */
-export type PasteOutcome = 'in' | 'refused' | 'retry'
+export type PasteOutcome = 'in' | 'declined' | 'refused' | 'retry'
 
-/** What the screen has to say about a pasted link, at each of its moments. */
-export type PasteSaid = 'not-a-link' | 'working' | Exclude<PasteOutcome, 'in'>
+/**
+ * What the screen has to say about a pasted link, at each of its moments.
+ *
+ * Neither `in` nor `declined` is here, and for one reason: both are answered
+ * somewhere other than this field. Entering takes the screen that carries it
+ * away, and a refusal at §13.3's screen was a decision the person made a
+ * second earlier on a full screen of their own -- a line under the field
+ * telling them what they had just decided would be the product explaining
+ * somebody to themselves.
+ */
+export type PasteSaid =
+  'not-a-link' | 'working' | Exclude<PasteOutcome, 'in' | 'declined'>
 
 /**
  * What became of a pasted link, once entry has answered.
@@ -78,6 +88,11 @@ export type PasteSaid = 'not-a-link' | 'working' | Exclude<PasteOutcome, 'in'>
  * reason.
  *
  * # THE DISCRIMINANT IS ENTRY'S OWN
+ *
+ * `DECLINED` is the person's own answer at §13.3's screen, which a pasted
+ * link now opens before it is spent (#329). It is not a failure and not a
+ * state of the link: the token was never offered to the service, so the link
+ * is exactly as good as it was and the same paste would describe it again.
  *
  * `REFUSED` is final and a new link is the only thing that replaces it: the
  * service answers unknown, spent, revoked and expired identically, on
@@ -94,5 +109,6 @@ export type PasteSaid = 'not-a-link' | 'working' | Exclude<PasteOutcome, 'in'>
  */
 export function whatThePasteBecame(result: EntryResult): PasteOutcome {
   if (result.entered) return 'in'
+  if (result.reason === DECLINED) return 'declined'
   return result.reason === REFUSED ? 'refused' : 'retry'
 }

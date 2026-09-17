@@ -313,6 +313,9 @@ export const de: Readonly<Record<CopyKey, string>> = {
   list_back: 'Unterhaltungen',
   invite_action: 'Jemanden einladen',
   invite_who: 'Wen laden Sie ein?',
+  invite_declared: 'Wie stellen Sie sich vor?',
+  invite_declared_hint:
+    'Optional. Dieser Name reist im Link mit und sonst nirgends: der Dienst erhält ihn nicht und behält nichts davon.',
   invite_working: 'Unterhaltung wird erstellt …',
   invite_ready:
     'Senden Sie dieser Person diesen Link. Er gilt eine Stunde und funktioniert einmal.',
@@ -327,13 +330,19 @@ export const de: Readonly<Record<CopyKey, string>> = {
   invited_lead: 'Lädt Sie zu einem Gespräch ein.',
   invited_who_unknown:
     'Dieses Gespräch sagt nicht, wer es erstellt hat. Hier kann daher niemand genannt werden.',
+  invited_who_undeclared:
+    'Dieser Link sagt nicht, wer Sie einlädt: diese Person hat sich keinen Namen gegeben.',
   'invited_instance %@': 'Dieses Konto wird von %@ gehostet.',
   'invited_instance_elsewhere %@':
     'Dieses Konto wird von %@ gehostet, und das ist nicht Ihr Server.',
   invited_terms_unknown:
     'Für diese Einladung wurde hier kein Link geöffnet: wie lange sie gilt und wie viele Öffnungen ihr bleiben, lässt sich von diesem Gerät nicht lesen.',
+  invited_terms_link:
+    'Wie lange dieser Link gilt und wie viele Öffnungen ihm bleiben, lässt sich hier nicht lesen: nur das Konto, das ihn ausgestellt hat, kann danach fragen.',
   invited_nothing_sent:
     'Es wurde noch nichts gesendet. Solange Sie nicht geantwortet haben, bleibt diese Einladung, wo sie ist.',
+  invited_nothing_spent:
+    'Es wurde noch nichts gesendet. Solange Sie nicht geantwortet haben, ist dieser Link nicht verbraucht.',
   'invited_behind %1$d': '%1$d weitere Einladung(en) warten dahinter.',
   invited_join: 'Dem Gespräch beitreten',
   invited_refuse: 'Die Einladung ablehnen',

@@ -99,10 +99,24 @@ function said(drawn: readonly Drawn[]): string[] {
 const nothing = () => undefined
 
 const her: WhatIsKnown = {
+  source: 'threshold',
   scope: '!a:messagr.eu',
+  declared: '',
   who: 'Nadia',
   named: true,
   identifier: '@her:messagr.eu',
+  instance: 'messagr.eu',
+  elsewhere: false,
+}
+
+/** The same screen, opened by a link nobody has spent yet. #329. */
+const byLink: WhatIsKnown = {
+  source: 'link',
+  scope: '',
+  declared: 'Nadia',
+  who: '',
+  named: false,
+  identifier: '',
   instance: 'messagr.eu',
   elsewhere: false,
 }
@@ -202,7 +216,9 @@ describe('the invitation standing on the threshold', () => {
   it('names nobody when nobody can be named, and still asks', () => {
     const drawn = screen({
       known: {
+        source: 'threshold',
         scope: '!a:x',
+        declared: '',
         who: '',
         named: false,
         identifier: '',
@@ -246,6 +262,16 @@ describe('the invitation standing on the threshold', () => {
     expect(said(screen({ failed: true }))).toContain(t('invited_failed'))
   })
 
+  it('never says « se présente comme » of a name this device gave', () => {
+    // §13.26's formula is for a name its bearer DECLARED. A given name is
+    // what this telephone calls somebody; borrowing the formula for it would
+    // put the inviter's word on something they never said.
+    expect(said(screen())).not.toContain(
+      t('conversation_sender_claimed %@', 'Nadia'),
+    )
+    expect(said(screen())).toContain('Nadia')
+  })
+
   it('announces no agent, because the product has none to announce', () => {
     // §13.3 asks for any agent in the room to be announced here. Nothing in
     // this application creates, inserts or reads an agent yet -- screens 3 to
@@ -255,5 +281,89 @@ describe('the invitation standing on the threshold', () => {
     for (const line of said(screen())) {
       expect(line.toLowerCase()).not.toContain('agent')
     }
+  })
+})
+
+describe('the same screen, opened by a link', () => {
+  it('names the inviter as claiming a name, never as being one', () => {
+    // §13.26, and the formula is the one `Conversation.tsx` already uses: a
+    // name travelling in a link is a name its sender WROTE. Nothing has
+    // proved who holds the account that issued it -- the account does not
+    // even exist on this device's side yet -- so the word is always
+    // « se présente comme ».
+    expect(said(screen({ known: byLink }))).toEqual([
+      t('invited_title'),
+      t('conversation_sender_claimed %@', 'Nadia'),
+      t('invited_lead'),
+      t('invited_instance %@', 'messagr.eu'),
+      t('invited_terms_link'),
+      t('invited_nothing_spent'),
+      t('invited_join'),
+      t('invited_refuse'),
+    ])
+  })
+
+  it('writes no identifier under it, because the link carries none', () => {
+    // The account is drawn at the moment the link is spent, and nothing has
+    // been spent. An identifier here would have to be invented.
+    expect(has(screen({ known: byLink }), 'invited-who')).toBe(false)
+    for (const line of said(screen({ known: byLink }))) {
+      expect(line).not.toContain('@')
+    }
+  })
+
+  it('says the link declares nobody, when it declares nobody', () => {
+    // A different absence from the threshold's, and it is said differently:
+    // there, the conversation does not say who created it. Here, the person
+    // who wrote the link chose not to give themselves a name.
+    const drawn = screen({ known: { ...byLink, declared: '' } })
+    expect(said(drawn)).toEqual([
+      t('invited_title'),
+      t('invited_who_undeclared'),
+      t('invited_instance %@', 'messagr.eu'),
+      t('invited_terms_link'),
+      t('invited_nothing_spent'),
+      t('invited_join'),
+      t('invited_refuse'),
+    ])
+    expect(said(drawn)).not.toContain(t('invited_who_unknown'))
+  })
+
+  it('does not claim a link was never opened here, because one was', () => {
+    // `invited_terms_unknown` says « aucun lien n'a été ouvert ici », which
+    // is exactly false on this path. The fact is the same -- validity and
+    // remaining uses are answered only to the account that issued them --
+    // and the sentence that carries it is not.
+    expect(said(screen({ known: byLink }))).not.toContain(
+      t('invited_terms_unknown'),
+    )
+  })
+
+  it('says the link is not spent, which is the stronger statement', () => {
+    expect(said(screen({ known: byLink }))).toContain(
+      t('invited_nothing_spent'),
+    )
+    expect(said(screen({ known: byLink }))).not.toContain(
+      t('invited_nothing_sent'),
+    )
+  })
+
+  it('marks an instance that is not this account’s, here too', () => {
+    expect(
+      said(
+        screen({
+          known: { ...byLink, instance: 'other.example', elsewhere: true },
+        }),
+      ),
+    ).toContain(t('invited_instance_elsewhere %@', 'other.example'))
+  })
+
+  it('keeps both actions, and waits under a label while a claim runs', () => {
+    // A claim is two calls with the issuer's application in between, which
+    // can take half a minute. The screen stays and says so.
+    const drawn = screen({ known: byLink, working: 'join' })
+    expect(find(drawn, 'invited-join')?.props.disabled).toBe(true)
+    expect(find(drawn, 'invited-refuse')?.props.disabled).toBe(true)
+    expect(said(drawn)).toContain(t('invited_working'))
   })
 })
