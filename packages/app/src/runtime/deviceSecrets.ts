@@ -130,6 +130,21 @@ export const deletionMarkSecrets = keychainStore(
 )
 
 /**
+ * The device a lost access came back as (#391), written with its session.
+ *
+ * « Revenir sur ce compte » logs in while the old device's crypto machine
+ * still runs, and keeps the new session for the next cold launch. That launch
+ * finds a session whose store does not exist yet -- which is what a reinstall
+ * looks like, and a reinstall logs in again. This says the store is missing
+ * because the device is new, the way a claim says it (`afterReinstall.ts`).
+ * The account's, because it goes when the account does.
+ */
+export const newDeviceSecrets = keychainStore(
+  'eu.messagr.new-device',
+  'account',
+)
+
+/**
  * The pushkey this device last registered a pusher under.
  *
  * WITHOUT IT, A GHOST IS PUSHED TO FOR EVER. A pusher is keyed by its token,

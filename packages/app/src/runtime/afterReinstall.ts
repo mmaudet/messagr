@@ -49,8 +49,16 @@ export function afterReinstall(launch: {
   readonly storeExists: boolean
   /** The password kept at claim time, when there is one. */
   readonly password: string | null
+  /**
+   * Whether this session is the new device a lost access came back as
+   * (#391, `lostAccess.ts`): its store does not exist yet either, and like a
+   * claim it is a device beginning rather than one returning.
+   */
+  readonly newDevice?: boolean
 }): AfterReinstall {
-  if (launch.claimed || launch.storeExists) return { kind: 'ordinary' }
+  if (launch.claimed || launch.newDevice === true || launch.storeExists) {
+    return { kind: 'ordinary' }
+  }
   return launch.password === null
     ? { kind: 'stranded' }
     : { kind: 'reenter', password: launch.password }

@@ -35,6 +35,11 @@ export class PumpHttpError extends Error {
   constructor(
     message: string,
     readonly status: number,
+    /**
+     * The homeserver's `errcode`, when it gave one. `M_UNKNOWN_TOKEN` is how
+     * the sync loop tells a token it has forgotten from any other 401 (#391).
+     */
+    readonly errcode?: string,
   ) {
     super(message)
     this.name = 'PumpHttpError'
@@ -326,7 +331,12 @@ export function makePumpHttp(
           'number'
             ? (cause as { httpStatus: number }).httpStatus
             : 0
-        throw new PumpHttpError(getErrorMessage(cause), status)
+        const errcode = (cause as { errcode?: unknown } | null)?.errcode
+        throw new PumpHttpError(
+          getErrorMessage(cause),
+          status,
+          typeof errcode === 'string' ? errcode : undefined,
+        )
       }
     },
   }

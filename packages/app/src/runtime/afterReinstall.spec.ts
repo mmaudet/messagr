@@ -17,6 +17,15 @@ describe('what a launch does about a store that is gone', () => {
     ).toEqual({ kind: 'ordinary' })
   })
 
+  it('does nothing on the first launch of a device that came back from lost access (#391)', () => {
+    // « Revenir sur ce compte » kept a new session while the old device's
+    // machine still ran: its store is not there yet, and a launch that took
+    // that for a reinstall would log in a second time and make another device.
+    expect(
+      afterReinstall({ ...LAUNCH, storeExists: false, newDevice: true }),
+    ).toEqual({ kind: 'ordinary' })
+  })
+
   it('comes back as a new device when a password was kept', () => {
     expect(afterReinstall({ ...LAUNCH, storeExists: false })).toEqual({
       kind: 'reenter',
