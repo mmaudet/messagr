@@ -1,7 +1,7 @@
 import type { SecretStore } from './sessionStore'
 
 /**
- * The password this account came with, kept for one purpose.
+ * The password this account came with, kept for two purposes.
  *
  * # ITS OWN ENTRY, BESIDE THE SESSION AND NOT INSIDE IT
  *
@@ -22,6 +22,9 @@ import type { SecretStore } from './sessionStore'
  * `reenter.ts` for the measurements that make it necessary and for what it
  * costs -- a password is strictly more powerful than an access token,
  * because it makes devices at will and cannot be revoked device by device.
+ *
+ * And, since #382, deleting the account: the homeserver deactivates one only
+ * on its password (`deleteAccount.ts`, ADR-0012's amendment).
  *
  * Nothing else reads it. It is never sent anywhere but the account's own
  * homeserver, never shown, and never used to authenticate an ordinary call:

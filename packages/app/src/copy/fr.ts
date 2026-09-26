@@ -347,6 +347,31 @@ export const fr = {
   leave_cancel: 'Garder mon compte',
   leave_working: 'En cours…',
 
+  // SUPPRIMER SON COMPTE, depuis l'application (#382, #380). La forme de tout
+  // geste que rien ne reprend (`Consequences.tsx`) : ce qui disparaît, ce qui
+  // reste, puis le mot. `CONTEXT.md` la distingue de « quitter ce compte »
+  // juste au-dessus : l'un fait cesser le compte pour tout le monde, l'autre ne
+  // concerne qu'un appareil. Aucun délai de purge n'est affiché, pour la raison
+  // que donne le bloc « legal_delete » plus bas (#71).
+  settings_delete_account: 'Supprimer mon compte',
+  delete_title: 'Supprimer mon compte',
+  delete_lead:
+    'Votre compte cesse d’exister pour tout le monde. Voici ce qui disparaît et ce qui reste, avant de décider.',
+  delete_fact_gone: 'Ce qui disparaît',
+  delete_gone_body:
+    'Votre compte, pour toujours : son identifiant ne servira plus jamais. Cet appareil oublie vos conversations et les clés qui les ouvrent, et personne ne peut plus vous joindre sur ce compte.',
+  delete_fact_stays: 'Ce qui reste',
+  delete_stays_body:
+    'Les messages que vous avez envoyés restent, chiffrés, dans les conversations des autres : le serveur ne peut ni les lire ni les reprendre. Vos correspondants gardent les copies qu’ils ont sur leurs appareils.',
+  delete_final: 'La suppression est immédiate et ne se défait pas.',
+  delete_confirm: 'Oui, supprimer mon compte',
+  delete_cancel: 'Garder mon compte',
+  delete_working: 'Suppression…',
+  delete_failed:
+    'Rien n’a été supprimé, et votre compte est tel qu’il était. Vous pouvez réessayer.',
+  deleted_title: 'Votre compte est supprimé.',
+  deleted_body: 'Fermez complètement Messagr : il repartira de zéro.',
+
   // THE PROMISE, shown once and before anything is asked of anybody.
   //
   // Verbatim from the prototype's §1, which is the only brand screen of the
@@ -617,10 +642,15 @@ export const fr = {
   // déjà promis un geste que le code ne portait pas. Aucun délai n'est affiché
   // ici : la page d'aide porte celui que la politique engage, et dit dans la
   // même phrase que la purge est faite à la main (#71).
+  //
+  // UN ÉCART DE PASSAGE, ET IL EST SUIVI. Depuis #382, cet écran dit que la
+  // suppression se fait dans les Réglages ; la page d'aide le dira avec #386,
+  // publiée seulement quand une build porte le geste. #387, la build 28, en
+  // dépend : aucune build qui affiche ce texte ne sort avant la page.
   legal_delete_title: 'Supprimer votre compte',
   legal_delete_body:
-    'La suppression se demande par courriel à conformite@messagr.eu : le geste depuis l’application n’existe pas encore. Le compte est alors désactivé et ses données sont purgées ; les messages déjà envoyés restent des événements des salons où ils ont été écrits, et le serveur ne peut pas les en retirer puisqu’il ne peut pas les lire.',
-  legal_delete_link: 'Demander la suppression : messagr.eu/aide',
+    'La suppression se fait depuis l’application : Réglages, puis « Supprimer mon compte ». Le compte est alors désactivé aussitôt et ses données sont purgées ; les messages déjà envoyés restent des événements des salons où ils ont été écrits, et le serveur ne peut pas les en retirer puisqu’il ne peut pas les lire. Sans cet appareil, ou quand l’application le demande, la suppression se demande par courriel à conformite@messagr.eu.',
+  legal_delete_link: 'Sans cet appareil : messagr.eu/aide',
   legal_full_terms: 'Conditions générales complètes : messagr.eu',
 
   // LA CONFIANCE, EXPLIQUÉE PLUTÔT QUE SIGNALÉE.

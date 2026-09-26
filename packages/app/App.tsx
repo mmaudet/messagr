@@ -126,6 +126,7 @@ import {
   promiseSecrets,
   receiptSecrets,
   recoverySecrets,
+  deletionMarkSecrets,
   sessionSecrets,
   signUpSecrets,
   keepEverySecrets,
@@ -261,11 +262,20 @@ import { Trust } from './src/ui/Trust'
 import { GiveName } from './src/ui/GiveName'
 import { FirstLaunch } from './src/ui/FirstLaunch'
 import { LeaveAccount } from './src/ui/LeaveAccount'
+import { DeleteAccount, type DeletionStage } from './src/ui/DeleteAccount'
+import { AccountDeleted } from './src/ui/AccountDeleted'
 import { Evict } from './src/ui/Evict'
 import { Vouch } from './src/ui/Vouch'
 import { setCatalogue, t } from './src/copy'
 import type { Language } from './src/copy/languages'
-import { enterWithASession, type InvitationOutcome } from './src/runtime/entry'
+import {
+  ACCOUNT_DELETED,
+  enterWithASession,
+  type InvitationOutcome,
+} from './src/runtime/entry'
+import { deleteAccount } from './src/runtime/deleteAccount'
+import { endingOnThisDevice } from './src/runtime/deletingThisDevice'
+import type { RestoreCredentials } from './src/runtime/sessionCredentials'
 import { initialLink, watchLinks } from './src/runtime/incomingLink'
 import { spentLinks } from './src/runtime/spentLinks'
 import { shareFrom, type SharedFile } from './src/runtime/incomingShare'
@@ -536,6 +546,8 @@ export function App({
     0,
   )
   const [legalOpen, setLegalOpen] = useState(false)
+  // DELETING THE ACCOUNT (#382), one stage at a time. See `DeletionStage`.
+  const [deletion, setDeletion] = useState<DeletionStage>({ stage: 'shut' })
   const [favouritesOpen, setFavouritesOpen] = useState(false)
   const [backupOpen, setBackupOpen] = useState(false)
   /** Whether the key vault screen is showing. ADR-0013's second route. */
@@ -1146,10 +1158,41 @@ export function App({
   // outside the effect that built the session, and re-rendering when a
   // client is stored would be a render nothing on screen depends on.
   const sessionClientRef = useRef<ReturnType<typeof createClient> | null>(null)
-  const credentialsRef = useRef<{
-    readonly baseUrl: string
-    readonly accessToken: string
-  } | null>(null)
+  // THE WHOLE SESSION, since #382: deleting the account needs whose it is.
+  const credentialsRef = useRef<RestoreCredentials | null>(null)
+  // DELETING THE ACCOUNT THIS DEVICE HOLDS, FROM SETTINGS (#382).
+  //
+  // The server first, then this device: `deleteAccount.ts` holds that order.
+  // Once the server has deactivated the account, the live sync stops and is
+  // not resumed on returning to the foreground -- its token opens nothing any
+  // more -- and the screen that says the account is deleted replaces
+  // everything. What the device keeps is forgotten at the next cold launch,
+  // by entry.
+  const deleteThisAccount = useCallback(() => {
+    const account = credentialsRef.current
+    if (account === null) return
+    setDeletion({ stage: 'working' })
+    deleteAccount(endingOnThisDevice(), account)
+      .then(outcome => {
+        if (outcome.deleted) {
+          logEvent(
+            outcome.marked ? 'info' : 'warn',
+            'MESSAGR_ACCOUNT_DELETED',
+            { marked: outcome.marked },
+          )
+          resumeSyncRef.current = null
+          runningSyncRef.current?.stop()
+          runningSyncRef.current = null
+          setDeletion({ stage: 'deleted' })
+        } else {
+          logEvent('warn', 'MESSAGR_ACCOUNT_NOT_DELETED', {
+            reason: outcome.reason,
+          })
+          setDeletion({ stage: 'asking', failed: true })
+        }
+      })
+      .catch(() => setDeletion({ stage: 'asking', failed: true }))
+  }, [])
   /**
    * What is on screen now, for an acceptance that settles later (#284).
    *
@@ -2112,6 +2155,9 @@ export function App({
               link,
               signUp: signUpSecrets,
               recovery: recoverySecrets,
+              // AN ACCOUNT DELETED FROM THIS DEVICE (#382) is forgotten here,
+              // at the cold launch after its deletion. See `entry.ts`.
+              deletionMark: deletionMarkSecrets,
               // A claim is two calls with the issuer's application in between.
               // See claimInvitation.ts: without a wait this tries once, is told
               // 409, and reports a link that cannot be used -- which is what it
@@ -2172,6 +2218,15 @@ export function App({
           if (settleTheQuestion !== null) settleTheQuestion()
           if (settleTheDescription !== null) settleTheDescription()
         })
+      // AN ACCOUNT DELETED FROM THIS DEVICE THAT A RUNNING MACHINE KEEPS HERE
+      // (#382). Entry forgot nothing, because it could not, and nothing is
+      // launched on an account its server has already deactivated: the
+      // screen that says the account is deleted comes back, and the next cold
+      // launch forgets.
+      if (!entered.entered && entered.reason === ACCOUNT_DELETED) {
+        setDeletion({ stage: 'deleted' })
+        return
+      }
       // CE QU'EST DEVENU UN LIEN COLLÉ, DIT LÀ OÙ IL A ÉTÉ COLLÉ. #367.
       //
       // Dès que l'entrée a répondu, et pas après la pompe : sur l'écran
@@ -2219,7 +2274,12 @@ export function App({
       // Leaving closed and erased it, so the account just entered is given one
       // of its own before anything is drawn from it, and the rows remembered
       // for the old account go with it.
-      const leftAnAccount = entered.entered && entered.left !== undefined
+      //
+      // AND SO DID THE ONE OF AN ACCOUNT DELETED FROM THIS DEVICE (#382), which
+      // entry has just forgotten, the notebook with it.
+      const leftAnAccount =
+        (entered.entered && entered.left !== undefined) ||
+        entered.deletedForgotten === true
       if (leftAnAccount) {
         setSummaries([])
         // AND A TOUCH MADE ON THOSE ROWS GOES WITH THEM. A conversation
@@ -4211,6 +4271,14 @@ export function App({
         setLegalOpen(false)
         return true
       }
+      // NOT WHILE THE SERVER IS BEING ASKED (#382): the answer would come back
+      // to a screen that has gone, and the person would not learn it. And
+      // only on Settings, where that screen is drawn: from another tab, back
+      // neither waits on it nor clears an answer nobody has read yet.
+      if (tab === 'settings' && deletion.stage !== 'shut') {
+        if (deletion.stage === 'asking') setDeletion({ stage: 'shut' })
+        return true
+      }
       if (invite.stage !== 'shut') {
         setInvite({ stage: 'shut' })
         setAdmission(null)
@@ -4232,6 +4300,7 @@ export function App({
     personOpen,
     openScope,
     legalOpen,
+    deletion.stage,
     invite.stage,
     tab,
     backupPrompt,
@@ -4308,6 +4377,21 @@ export function App({
         : openImageRef.current(file),
     [],
   )
+
+  // THE ACCOUNT IS DELETED, AND NOTHING ELSE IS DRAWN (#382).
+  //
+  // Before the promise and before every other whole screen: its server has
+  // deactivated it, so nothing underneath can be used, and the only thing
+  // left to do is the one `AccountDeleted.tsx` asks for.
+  if (deletion.stage === 'deleted') {
+    return (
+      <GestureHandlerRootView style={styles.root}>
+        <SafeAreaProvider>
+          <AccountDeleted />
+        </SafeAreaProvider>
+      </GestureHandlerRootView>
+    )
+  }
 
   // BEFORE ANYTHING ELSE, AND WITHOUT A FLASH BETWEEN.
   //
@@ -4917,12 +5001,16 @@ export function App({
             {openScope === null &&
               tab === 'settings' &&
               !legalOpen &&
+              deletion.stage === 'shut' &&
               !favouritesOpen &&
               !backupOpen && (
                 <View style={styles.block}>
                   <Settings
                     onBack={() => setTab('chat')}
                     onLegal={() => setLegalOpen(true)}
+                    onDeleteAccount={() =>
+                      setDeletion({ stage: 'asking', failed: false })
+                    }
                     onBackup={() => setBackupOpen(true)}
                     onVault={() => setVaultOpen(true)}
                     onFavourites={() => {
@@ -5037,6 +5125,19 @@ export function App({
                 <Legal onBack={() => setLegalOpen(false)} />
               </View>
             )}
+
+            {openScope === null &&
+              tab === 'settings' &&
+              (deletion.stage === 'asking' || deletion.stage === 'working') && (
+                <View style={styles.block}>
+                  <DeleteAccount
+                    working={deletion.stage === 'working'}
+                    failed={deletion.stage === 'asking' && deletion.failed}
+                    onDelete={deleteThisAccount}
+                    onKeep={() => setDeletion({ stage: 'shut' })}
+                  />
+                </View>
+              )}
 
             {/* NO `backupState` IN THIS CONDITION, AND THAT IS THE FIX.
               It read `backupState !== null`, so a reading that failed drew
@@ -5603,6 +5704,12 @@ export function App({
                   setOpenScope(null)
                   openScopeRef.current = null
                   setLegalOpen(false)
+                  // NOT WHILE THE SERVER IS BEING ASKED (#382), as on the back
+                  // gesture: a failure must come back to a screen that is
+                  // there when the person returns to Settings.
+                  if (deletion.stage === 'asking') {
+                    setDeletion({ stage: 'shut' })
+                  }
                   setInvite({ stage: 'shut' })
                   setAdmission(null)
                   setTab(next)

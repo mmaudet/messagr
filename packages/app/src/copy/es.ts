@@ -243,6 +243,24 @@ export const es: Readonly<Record<CopyKey, string>> = {
   leave_confirm: 'Sí, dejar esta cuenta',
   leave_cancel: 'Conservar mi cuenta',
   leave_working: 'En curso…',
+  settings_delete_account: 'Eliminar mi cuenta',
+  delete_title: 'Eliminar mi cuenta',
+  delete_lead:
+    'Su cuenta deja de existir para todos. Esto es lo que desaparece y lo que queda, antes de decidir.',
+  delete_fact_gone: 'Lo que desaparece',
+  delete_gone_body:
+    'Su cuenta, para siempre: su identificador no volverá a usarse. Este dispositivo olvida sus conversaciones y las claves que las abren, y nadie podrá ya contactarle en esta cuenta.',
+  delete_fact_stays: 'Lo que queda',
+  delete_stays_body:
+    'Los mensajes que envió permanecen, cifrados, en las conversaciones de los demás: el servidor no puede leerlos ni retirarlos. Sus interlocutores conservan las copias en sus propios dispositivos.',
+  delete_final: 'La eliminación es inmediata y no se puede deshacer.',
+  delete_confirm: 'Sí, eliminar mi cuenta',
+  delete_cancel: 'Conservar mi cuenta',
+  delete_working: 'Eliminando…',
+  delete_failed:
+    'No se ha eliminado nada y su cuenta sigue como estaba. Puede volver a intentarlo.',
+  deleted_title: 'Su cuenta está eliminada.',
+  deleted_body: 'Cierre Messagr por completo: volverá a empezar desde cero.',
   promise_thesis: 'La mensajería que no le pide nada.',
   promise_subtitle:
     'Sin número, sin cuenta, sin contraseña. Alguien le invita, usted escribe.',
@@ -380,8 +398,8 @@ export const es: Readonly<Record<CopyKey, string>> = {
     'Messagr es un servicio de alojamiento y no una plataforma en línea; el considerando 14 del DSA excluye los servicios de comunicaciones interpersonales. Los artículos 20 y 21 no se aplican, por tanto, y este texto no pretende ofrecerlos.',
   legal_delete_title: 'Eliminar su cuenta',
   legal_delete_body:
-    'La eliminación se solicita por correo electrónico a conformite@messagr.eu: el gesto desde la aplicación aún no existe. La cuenta queda entonces desactivada y sus datos se purgan; los mensajes ya enviados siguen siendo eventos de las salas donde se escribieron, y el servidor no puede retirarlos, ya que no puede leerlos.',
-  legal_delete_link: 'Solicitar la eliminación: messagr.eu/aide',
+    'La eliminación se hace desde la aplicación: Ajustes y, luego, «Eliminar mi cuenta». La cuenta queda entonces desactivada de inmediato y sus datos se purgan; los mensajes ya enviados siguen siendo eventos de las salas donde se escribieron, y el servidor no puede retirarlos porque no puede leerlos. Sin este dispositivo, o cuando la aplicación se lo pida, la eliminación se solicita por correo electrónico a conformite@messagr.eu.',
+  legal_delete_link: 'Sin este dispositivo: messagr.eu/aide',
   legal_full_terms: 'Condiciones generales completas: messagr.eu',
   trust_action: 'Lo que se sabe de esta persona',
   trust_title: 'Lo que se sabe de esta persona',

@@ -1232,6 +1232,102 @@ async def witness_eviction(session_file: Path, store: Path) -> int:
     return 0
 
 
+async def witness_deletion(session_file: Path, store: Path) -> int:
+    """Le compte de l'application est supprimé, vu d'ici (#382).
+
+    Ce témoin ne connaît pas le mot de passe du compte, que seule
+    l'application a reçu : il ne peut pas constater qu'il n'ouvre plus rien.
+    Il constate ce que le serveur fait d'un compte désactivé : le compte a
+    quitté la conversation qu'ils partagent, et il n'a plus aucun appareil.
+
+    LE DÉPART EST MESURÉ, LE RETRAIT DES APPAREILS NE L'ÉTAIT PAS. Le départ
+    l'a été en production le 26 septembre 2026 (commentaire de #381). Pas le
+    retrait des appareils : le compte d'essai, réclamé par script, n'en avait
+    publié aucun, et « aucun appareil » après la désactivation n'y prouvait
+    rien. Ce témoin est le premier à le mesurer, sur un compte qui a publié
+    les siens.
+
+    LES DEUX, ET CHACUN POUR SA RAISON. Quitter la conversation ne prouvera
+    plus rien le jour où l'application le fera d'elle-même avant de désactiver
+    (#383) ; et n'avoir aucun appareil ne prouve rien d'un compte qui n'en a
+    jamais publié. Ensemble, sur le compte de l'application, qui publie les
+    siens dès son premier lancement, ils disent qu'il est désactivé.
+    """
+    homeserver = env("MESSAGR_INTEROP_HOMESERVER")
+    room_id = env("MESSAGR_INTEROP_ROOM")
+    application = env("MESSAGR_INTEROP_SENDER")
+
+    session = json.loads(session_file.read_text())
+    bearer = {"Authorization": f"Bearer {session['access_token']}"}
+    members_url = (
+        f"{homeserver}/_matrix/client/v3/rooms/{quote(room_id, safe='!')}/members"
+    )
+    keys_url = f"{homeserver}/_matrix/client/v3/keys/query"
+
+    clock = asyncio.get_running_loop()
+    deadline = clock.time() + WITNESS_DEADLINE_SECONDS
+    # Ce qui a été lu en dernier, pour qu'un échec dise ce qu'il a vu plutôt
+    # que « rien ne sort » : c'est la leçon d'`inventory`.
+    seen = "nothing was read"
+
+    async with aiohttp.ClientSession() as http:
+
+        async def ask(method, url, body=None):
+            try:
+                async with http.request(
+                    method,
+                    url,
+                    json=body,
+                    headers=bearer,
+                    timeout=aiohttp.ClientTimeout(total=HOMESERVER_REQUEST_SECONDS),
+                ) as response:
+                    return response.status, await response.text()
+            except (aiohttp.ClientError, asyncio.TimeoutError) as error:
+                return None, f"{type(error).__name__}: {error}"
+
+        while True:
+            departed = None
+            devices = None
+            status, body = await ask("GET", members_url)
+            if status == 200:
+                members = json.loads(body).get("chunk") or []
+                departed = departure_of(members, application) is not None
+                room = ", ".join(
+                    f"{event.get('state_key')}="
+                    f"{(event.get('content') or {}).get('membership')}"
+                    for event in members
+                ) or "no member at all"
+            else:
+                room = f"{status}: {body[:200]}"
+
+            status, body = await ask(
+                "POST", keys_url, {"device_keys": {application: []}}
+            )
+            if status == 200:
+                devices = len(
+                    (json.loads(body).get("device_keys") or {}).get(application)
+                    or {}
+                )
+                held = f"{devices} device(s)"
+            else:
+                held = f"{status}: {body[:200]}"
+
+            seen = f"members: {room}; {application}: {held}"
+            if departed and devices == 0:
+                print(f"PASS: {application} left {room_id} and has no device left")
+                return 0
+
+            if clock.time() > deadline:
+                print(
+                    f"FAIL: {application} is not deleted as seen from here "
+                    f"within {WITNESS_DEADLINE_SECONDS}s.\n"
+                    f"      Last read: {seen}",
+                    file=sys.stderr,
+                )
+                return 1
+            await asyncio.sleep(2)
+
+
 def main() -> int:
     # `claim-place` MANQUAIT ICI, ET C'EST LE DÉFAUT QUI REVIENT DANS CE DÉPÔT.
     #
@@ -1252,6 +1348,7 @@ def main() -> int:
         "claim-place": claim_place,
         "collect": collect,
         "witness-eviction": witness_eviction,
+        "witness-deletion": witness_deletion,
     }
     if len(sys.argv) != 2 or sys.argv[1] not in phases:
         print(

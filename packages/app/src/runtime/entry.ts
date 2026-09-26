@@ -66,6 +66,14 @@ export interface EntryDeps {
    */
   readonly recovery: SecretStore
   /**
+   * Where this device writes down that the account it holds was deleted
+   * (#382): its user id, by `deleteAccount` once its server has deactivated
+   * it, and by nothing else. Read first at every entry. A held session marked
+   * deleted is forgotten here, without a question, because the deletion
+   * itself could not: the crypto library does not release a running machine.
+   */
+  readonly deletionMark: SecretStore
+  /**
    * Awaited between claim attempts. Absent in tests, which should not sleep.
    *
    * A claim is two calls with somebody else's application in between: see
@@ -332,8 +340,21 @@ export type EntryResult =
        * whenever that server answers -- the launch does not wait.
        */
       readonly left?: { readonly closing: Promise<Closed> }
+      /**
+       * Present only when this launch first forgot an account deleted from
+       * this device (#382), then entered through a link with a new one.
+       */
+      readonly deletedForgotten?: true
     }
-  | { readonly entered: false; readonly reason: string }
+  | {
+      readonly entered: false
+      readonly reason: string
+      /**
+       * Present only when this launch forgot an account deleted from this
+       * device (#382), and has no other to enter with.
+       */
+      readonly deletedForgotten?: true
+    }
 
 /**
  * Enters, and records the invitation a spent link leaves this device waiting
@@ -393,6 +414,15 @@ function spentALink(result: EntryResult): boolean {
 export const DECLINED = 'this invitation was refused before anything was sent'
 
 /**
+ * An account deleted from this device (#382), found by an entry that cannot
+ * forget it yet because a crypto machine still runs: a link handed to the
+ * application still showing that the account is deleted, say. The next cold
+ * launch forgets it, and the screen says the account is deleted.
+ */
+export const ACCOUNT_DELETED =
+  'this account was deleted, and is forgotten at the next launch'
+
+/**
  * §13.3's screen, if there is one to put it on, and what it answers.
  *
  * `join` when there is none. See `EntryDeps.describe`.
@@ -412,9 +442,18 @@ async function decided(
 
 /** The entry itself: a session already kept, a link to spend, or neither. */
 async function entryWith(deps: EntryDeps): Promise<EntryResult> {
-  const { secrets, poster, link, wait } = deps
+  const { poster, link, wait } = deps
 
-  const held = await loadSession(secrets)
+  const held = await heldUnlessDeleted(deps)
+  if (held === 'running') {
+    return { entered: false, reason: ACCOUNT_DELETED }
+  }
+  // SAID, BECAUSE THE LAUNCH OPENED THAT ACCOUNT'S NOTEBOOK BEFORE ENTRY, and
+  // forgetting has just erased it: the caller binds a new one, as it does for
+  // an account left for a link.
+  if (held === 'forgotten') {
+    return { ...(await enterWithoutAccount(deps)), deletedForgotten: true }
+  }
   if (held !== null) {
     // WHETHER THIS DEVICE CAN STILL USE THE ACCOUNT IT HOLDS, read before the
     // link is taken (#307). Read after it, these reads would come between
@@ -491,7 +530,12 @@ async function entryWith(deps: EntryDeps): Promise<EntryResult> {
     }
   }
 
-  const raw = await link()
+  return enterWithoutAccount(deps)
+}
+
+/** The road of a device that holds no account: a link, or no way in. */
+async function enterWithoutAccount(deps: EntryDeps): Promise<EntryResult> {
+  const raw = await deps.link()
   if (raw === null) {
     return {
       entered: false,
@@ -515,6 +559,43 @@ async function entryWith(deps: EntryDeps): Promise<EntryResult> {
   }
 
   return claimWithoutAccount(deps, invitation)
+}
+
+/**
+ * The session this device holds, unless it was deleted from here (#382).
+ *
+ * A deleted account is forgotten without a question -- its server has already
+ * deactivated it, so nothing is sent and nothing is lost -- by the same
+ * forgetting leaving an account uses, sparing nothing. The entry then goes on
+ * as a device with no account, a link included: `'forgotten'`. `'running'`
+ * when a crypto machine still holds the store, which only the next cold
+ * launch can take.
+ */
+async function heldUnlessDeleted(
+  deps: EntryDeps,
+): Promise<RestoreCredentials | null | 'forgotten' | 'running'> {
+  const held = await loadSession(deps.secrets)
+  if (held === null || !(await markedDeleted(deps.deletionMark, held))) {
+    return held
+  }
+  if (deps.leaving.aMachineIsRunning()) return 'running'
+  await deps.leaving.departure.forget(held, [])
+  return 'forgotten'
+}
+
+/**
+ * Whether the mark names `held`. A mark that cannot be read is no mark: the
+ * worst it costs is a launch on an account the server has already let go.
+ */
+async function markedDeleted(
+  mark: SecretStore,
+  held: RestoreCredentials,
+): Promise<boolean> {
+  try {
+    return (await mark.read()) === held.userId
+  } catch {
+    return false
+  }
 }
 
 /**

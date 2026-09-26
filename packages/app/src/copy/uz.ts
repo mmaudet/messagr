@@ -258,6 +258,24 @@ export const uz: Readonly<Record<CopyKey, string>> = {
   leave_confirm: 'Ha, bu hisobdan chiqish',
   leave_cancel: 'Hisobimni saqlash',
   leave_working: 'Bajarilmoqda…',
+  settings_delete_account: 'Hisobimni oʻchirish',
+  delete_title: 'Hisobimni oʻchirish',
+  delete_lead:
+    'Hisobingiz hamma uchun mavjud boʻlmay qoladi. Qaror qilishdan oldin, nima yoʻqolishi va nima qolishi quyida.',
+  delete_fact_gone: 'Nima yoʻqoladi',
+  delete_gone_body:
+    'Hisobingiz, butunlay: uning identifikatori boshqa hech qachon ishlatilmaydi. Bu qurilma suhbatlaringizni va ularni ochadigan kalitlarni unutadi, va bu hisob orqali sizga endi hech kim yozolmaydi.',
+  delete_fact_stays: 'Nima qoladi',
+  delete_stays_body:
+    'Siz yuborgan xabarlar boshqalarning suhbatlarida shifrlangan holda qoladi: server ularni na oʻqiy oladi, na qaytarib ola oladi. Suhbatdoshlaringiz oʻz qurilmalaridagi nusxalarni saqlab qoladi.',
+  delete_final: 'Oʻchirish darhol amalga oshadi va uni bekor qilib boʻlmaydi.',
+  delete_confirm: 'Ha, hisobimni oʻchirish',
+  delete_cancel: 'Hisobimni saqlab qolish',
+  delete_working: 'Oʻchirilmoqda…',
+  delete_failed:
+    'Hech narsa oʻchirilmadi, hisobingiz avvalgidek. Qayta urinib koʻrishingiz mumkin.',
+  deleted_title: 'Hisobingiz oʻchirildi.',
+  deleted_body: 'Messagrni butunlay yoping: u noldan qayta boshlanadi.',
   promise_thesis: 'Sizdan hech narsa soʻramaydigan messenjer.',
   promise_subtitle:
     'Raqam yoʻq, hisob yoʻq, parol yoʻq. Kimdir sizni taklif qiladi — siz yozasiz.',
@@ -397,8 +415,8 @@ export const uz: Readonly<Record<CopyKey, string>> = {
     'Messagr — hosting xizmati, onlayn platforma emas: DSA ning 14-bandi shaxslararo xabar almashish xizmatlarini bundan chiqaradi. Demak 20- va 21-moddalar qoʻllanmaydi va bu matn ularni taklif qilayotgani yoʻq.',
   legal_delete_title: 'Hisobingizni oʻchirish',
   legal_delete_body:
-    'Oʻchirish conformite@messagr.eu manziliga elektron xat orqali soʻraladi: ilovaning oʻzida bunday amal hali yoʻq. Shundan keyin hisob oʻchiriladi va uning maʼlumotlari tozalanadi; allaqachon yuborilgan xabarlar esa yozilgan xonalarning hodisasi boʻlib qoladi, va server ularni qaytarib ololmaydi, chunki ularni oʻqiy olmaydi.',
-  legal_delete_link: 'Oʻchirishni soʻrash: messagr.eu/aide',
+    'Oʻchirish ilovaning oʻzida amalga oshiriladi: Sozlamalar, keyin «Hisobimni oʻchirish». Shunda hisob darhol oʻchiriladi va uning maʼlumotlari tozalanadi; allaqachon yuborilgan xabarlar ular yozilgan xonalarning hodisalari boʻlib qoladi, server ularni oʻqiy olmagani uchun olib tashlay olmaydi. Bu qurilmasiz yoki ilova shuni soʻraganda, oʻchirish conformite@messagr.eu manziliga elektron xat orqali soʻraladi.',
+  legal_delete_link: 'Bu qurilmasiz: messagr.eu/aide',
   legal_full_terms: 'Toʻliq foydalanish shartlari: messagr.eu',
   trust_action: 'Bu odam haqida nima maʼlum',
   trust_title: 'Bu odam haqida nima maʼlum',

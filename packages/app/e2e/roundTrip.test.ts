@@ -96,7 +96,12 @@ const hasCounterparty =
   INVITATION !== undefined
 
 function runCounterparty(
-  phase: 'send' | 'send-file' | 'claim-place' | 'witness-eviction',
+  phase:
+    | 'send'
+    | 'send-file'
+    | 'claim-place'
+    | 'witness-eviction'
+    | 'witness-deletion',
   extra: Record<string, string> = {},
 ): void {
   execFileSync('python3', [COUNTERPARTY, phase], {
@@ -778,4 +783,76 @@ describeRoundTrip('encrypted round trip', () => {
     // que ce test faisait déjà, et un budget dépassé tue le test sur le temps
     // plutôt que sur ce qu'il mesure -- ce qui ne dit rien de l'éviction.
   }, 600000)
+
+  it('deletes its account from Settings, and an independent client finds it deactivated', async () => {
+    // LE DERNIER DE LA SUITE, ET IL DOIT LE RESTER : il supprime le compte que
+    // tous les autres utilisent (#382).
+    //
+    // Relancé d'abord : l'éviction laisse l'application dans une
+    // conversation, et la liste est le seul point de départ connu.
+    forgetTheLog()
+    await device.launchApp({
+      newInstance: true,
+      launchArgs: IGNORING_THE_LIVE_POLL,
+    })
+    await waitFor(element(by.id('tab-settings')))
+      .toBeVisible()
+      .withTimeout(60000)
+    await element(by.id('tab-settings')).tap()
+
+    // LA DERNIÈRE LIGNE DES RÉGLAGES, que Detox ne va pas chercher seul.
+    //
+    // PUIS TOUT EN BAS, ET PAS SEULEMENT « VISIBLE ». Detox compte une vue
+    // visible dès que les trois quarts sont dans la fenêtre, sans voir ce qui
+    // la recouvre ; or la fenêtre passe sous la barre d'onglets et sous la
+    // barre de navigation d'Android, que l'application dessine bord à bord. La
+    // première position « visible » de la dernière ligne est donc tout en bas
+    // de l'écran, et son centre sous le bouton Accueil : le premier passage
+    // sur le banc l'a touché, et l'application est partie en arrière-plan
+    // (`onUserLeaveHint`, 26 septembre 2026). Au bout du défilement, le
+    // contenu réserve la hauteur de la barre d'onglets, qui inclut celle de la
+    // navigation : c'est là qu'une personne touche la ligne.
+    await waitFor(element(by.id('settings-delete-account')))
+      .toBeVisible()
+      .whileElement(by.id('screen-scroll'))
+      .scroll(300, 'down')
+    await element(by.id('screen-scroll')).scrollTo('bottom')
+    await element(by.id('settings-delete-account')).tap()
+    await waitFor(element(by.id('delete-account-confirm')))
+      .toBeVisible()
+      .whileElement(by.id('screen-scroll'))
+      .scroll(300, 'down')
+    await element(by.id('screen-scroll')).scrollTo('bottom')
+    await device.takeScreenshot('suppression-1-les-faits')
+    await element(by.id('delete-account-confirm')).tap()
+
+    // LE SERVEUR D'ABORD : l'écran qui dit le compte supprimé ne vient qu'une
+    // fois le compte désactivé, et rien d'autre n'est dessiné à côté.
+    await waitFor(element(by.id('account-deleted')))
+      .toBeVisible()
+      .withTimeout(60000)
+    await device.takeScreenshot('suppression-2-le-compte-supprime')
+
+    // LE JUGE, ET IL N'EST PAS CETTE APPLICATION. Il ne connaît pas le mot de
+    // passe du compte, que seule l'application a reçu ; il constate ce que le
+    // serveur fait d'un compte désactivé : parti de la conversation qu'ils
+    // partagent, ce qui a été mesuré le 26 septembre 2026 (commentaire de
+    // #381), et plus aucun appareil, ce que ce test est le premier à mesurer.
+    // `witness_deletion` dit pourquoi il faut les deux.
+    runCounterparty('witness-deletion')
+
+    // LE LANCEMENT À FROID SUIVANT OUBLIE LE COMPTE : l'écran d'un appareil
+    // sans compte, et un lancement qui le dit.
+    forgetTheLog()
+    await device.launchApp({
+      newInstance: true,
+      launchArgs: IGNORING_THE_LIVE_POLL,
+    })
+    await waitFor(element(by.id('paste-link-field')))
+      .toExist()
+      .withTimeout(60000)
+    const after = await whatItReported(60000)
+    expect(after.entry.entered).toBe(false)
+    await device.takeScreenshot('suppression-3-un-appareil-sans-compte')
+  }, 300000)
 })

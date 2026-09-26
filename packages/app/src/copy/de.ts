@@ -248,6 +248,26 @@ export const de: Readonly<Record<CopyKey, string>> = {
   leave_confirm: 'Ja, dieses Konto verlassen',
   leave_cancel: 'Mein Konto behalten',
   leave_working: 'Läuft …',
+  settings_delete_account: 'Mein Konto löschen',
+  delete_title: 'Mein Konto löschen',
+  delete_lead:
+    'Ihr Konto hört für alle auf zu bestehen. Hier steht, was verschwindet und was bleibt, bevor Sie entscheiden.',
+  delete_fact_gone: 'Was verschwindet',
+  delete_gone_body:
+    'Ihr Konto, für immer: Seine Kennung wird nie wieder verwendet. Dieses Gerät vergisst Ihre Unterhaltungen und die Schlüssel, die sie öffnen, und niemand kann Sie über dieses Konto mehr erreichen.',
+  delete_fact_stays: 'Was bleibt',
+  delete_stays_body:
+    'Die Nachrichten, die Sie gesendet haben, bleiben verschlüsselt in den Unterhaltungen der anderen: Der Server kann sie weder lesen noch zurücknehmen. Ihre Gesprächspartner behalten die Kopien auf ihren eigenen Geräten.',
+  delete_final:
+    'Die Löschung erfolgt sofort und lässt sich nicht rückgängig machen.',
+  delete_confirm: 'Ja, mein Konto löschen',
+  delete_cancel: 'Mein Konto behalten',
+  delete_working: 'Wird gelöscht…',
+  delete_failed:
+    'Es wurde nichts gelöscht, und Ihr Konto ist unverändert. Sie können es erneut versuchen.',
+  deleted_title: 'Ihr Konto ist gelöscht.',
+  deleted_body:
+    'Schließen Sie Messagr vollständig: Es beginnt dann wieder von vorn.',
   promise_thesis: 'Der Messenger, der nichts von Ihnen verlangt.',
   promise_subtitle:
     'Keine Nummer, kein Konto, kein Passwort. Jemand lädt Sie ein, Sie schreiben.',
@@ -389,8 +409,8 @@ export const de: Readonly<Record<CopyKey, string>> = {
     'Messagr ist ein Hostingdienst und keine Online-Plattform; Erwägungsgrund 14 des DSA nimmt interpersonelle Kommunikationsdienste aus. Die Artikel 20 und 21 gelten daher nicht, und dieser Text beansprucht nicht, sie zu bieten.',
   legal_delete_title: 'Ihr Konto löschen',
   legal_delete_body:
-    'Die Löschung wird per E-Mail an conformite@messagr.eu beantragt: In der Anwendung selbst gibt es diesen Schritt noch nicht. Das Konto wird dann deaktiviert und seine Daten werden gelöscht; bereits gesendete Nachrichten bleiben Ereignisse der Räume, in denen sie geschrieben wurden, und der Server kann sie nicht zurücknehmen, da er sie nicht lesen kann.',
-  legal_delete_link: 'Löschung beantragen: messagr.eu/aide',
+    'Die Löschung erfolgt in der Anwendung: Einstellungen, dann „Mein Konto löschen“. Das Konto wird dann sofort deaktiviert und seine Daten werden gelöscht; bereits gesendete Nachrichten bleiben Ereignisse der Räume, in denen sie geschrieben wurden, und der Server kann sie nicht entfernen, da er sie nicht lesen kann. Ohne dieses Gerät, oder wenn die Anwendung Sie darum bittet, wird die Löschung per E-Mail an conformite@messagr.eu beantragt.',
+  legal_delete_link: 'Ohne dieses Gerät: messagr.eu/aide',
   legal_full_terms: 'Vollständige Bedingungen: messagr.eu',
   trust_action: 'Was über diese Person bekannt ist',
   trust_title: 'Was über diese Person bekannt ist',

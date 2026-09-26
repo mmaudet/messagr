@@ -5,6 +5,7 @@ import { afterReinstall } from './afterReinstall'
 import { theAwaitedInvitations } from './awaitedInvitations'
 import type { ServicePoster } from './claimInvitation'
 import {
+  ACCOUNT_DELETED,
   DECLINED,
   enterWithASession,
   type EntryDeps,
@@ -82,38 +83,41 @@ function markerStore() {
  * did, is exactly what these tests are for noticing. Its device keeps its
  * crypto store, as every device these tests are not about does (#307).
  */
-const nobodyAsked: Pick<EntryDeps, 'storeExists' | 'leaving'> = {
-  storeExists: async () => true,
-  leaving: {
-    ask: async () => {
-      throw new Error('this entry was not supposed to ask anybody anything')
-    },
-    aMachineIsRunning: () => {
-      throw new Error('this entry was not supposed to look for a machine')
-    },
-    holdInQuestion: () => {
-      throw new Error('this entry was not supposed to hold an account')
-    },
-    after: async () => {
-      throw new Error('this entry was not supposed to time a claim')
-    },
-    departure: {
-      pusher: async () => null,
-      stopWaking: async () => {
-        throw new Error('this entry was not supposed to leave its account')
+const nobodyAsked: Pick<EntryDeps, 'storeExists' | 'leaving' | 'deletionMark'> =
+  {
+    storeExists: async () => true,
+    // Nothing deleted from this device: no mark, and nothing writes one.
+    deletionMark: store(),
+    leaving: {
+      ask: async () => {
+        throw new Error('this entry was not supposed to ask anybody anything')
       },
-      logOut: async () => {
-        throw new Error('this entry was not supposed to leave its account')
+      aMachineIsRunning: () => {
+        throw new Error('this entry was not supposed to look for a machine')
       },
-      forgetPassword: async () => {
-        throw new Error('this entry was not supposed to forget a password')
+      holdInQuestion: () => {
+        throw new Error('this entry was not supposed to hold an account')
       },
-      forget: async () => {
-        throw new Error('this entry was not supposed to forget an account')
+      after: async () => {
+        throw new Error('this entry was not supposed to time a claim')
+      },
+      departure: {
+        pusher: async () => null,
+        stopWaking: async () => {
+          throw new Error('this entry was not supposed to leave its account')
+        },
+        logOut: async () => {
+          throw new Error('this entry was not supposed to leave its account')
+        },
+        forgetPassword: async () => {
+          throw new Error('this entry was not supposed to forget a password')
+        },
+        forget: async () => {
+          throw new Error('this entry was not supposed to forget an account')
+        },
       },
     },
-  },
-}
+  }
 
 /** An invitation into a server the held account does not live on. */
 const ELSEWHERE = 'https://other.example/i/abc123'
@@ -220,6 +224,8 @@ function device(
     readonly store?: 'gone'
     /** `null` for an account claimed before its password was kept (#190). */
     readonly password?: null
+    /** Whose deletion this device wrote down (#382): a user id, or nothing. */
+    readonly deletionMark?: string
   } = {},
 ) {
   const calls: Call[] = []
@@ -228,6 +234,7 @@ function device(
   // old account began to be forgotten.
   const passwordWhenSessionKept: Array<string | null> = []
   const passwordWhenForgetting: Array<string | null> = []
+  const keptWhenForgetting: Array<readonly SecretStore[]> = []
   // The session this device held each time the invitation service was asked.
   const sessionWhenClaiming: unknown[] = []
   let session: string | null = JSON.stringify(SESSION)
@@ -236,6 +243,7 @@ function device(
     options.password === null ? null : 'old-password'
   let pushkey: string | null = 'pushkey-of-this-device'
   let rest: string | null = 'the-rest-of-the-old-account'
+  let mark: string | null = options.deletionMark ?? null
 
   const secrets: SecretStore = {
     read: async () => session,
@@ -255,6 +263,12 @@ function device(
     read: async () => password,
     write: async value => {
       password = value
+    },
+  }
+  const deletionMark: SecretStore = {
+    read: async () => mark,
+    write: async value => {
+      mark = value
     },
   }
   const poster: ServicePoster = {
@@ -298,19 +312,24 @@ function device(
     forget: async (account, keeping) => {
       forgotten.push(account.userId)
       passwordWhenForgetting.push(password)
+      keptWhenForgetting.push(keeping)
       if (!keeping.includes(secrets)) session = null
       if (!keeping.includes(signUp)) marker = null
       if (!keeping.includes(recovery)) password = null
+      if (!keeping.includes(deletionMark)) mark = null
       pushkey = null
       rest = null
     },
   }
 
   return {
+    deletionMark,
+    markHeld: () => mark,
     calls,
     forgotten,
     passwordWhenSessionKept,
     passwordWhenForgetting,
+    keptWhenForgetting,
     sessionWhenClaiming,
     secrets,
     signUp,
@@ -380,6 +399,7 @@ function entering(
     link: async () => link,
     signUp: here.signUp,
     recovery: here.recovery,
+    deletionMark: here.deletionMark,
     ...(wait === undefined ? {} : { wait }),
     storeExists: here.storeExists,
     leaving,
@@ -1378,6 +1398,81 @@ describe('a session this device can no longer use (#307)', () => {
   })
 })
 
+describe('an account deleted from this device (#382)', () => {
+  it('forgets the account without a question, sending nothing, and goes on as a device with no account', async () => {
+    // Its server has already deactivated it: this launch only finishes what
+    // the deletion could not do while a crypto machine ran. Nothing is sent,
+    // so it does the same with no network at all.
+    const here = device({ deletionMark: SESSION.userId, claim: 'unreachable' })
+    const { asked, leaving } = answering('stay', here)
+    expect(await entering(here, leaving, null)).toEqual({
+      entered: false,
+      reason:
+        'this device has no session and was not opened with an invitation',
+      deletedForgotten: true,
+    })
+    expect(asked).toEqual([])
+    expect(here.calls).toEqual([])
+    expect(here.forgotten).toEqual([SESSION.userId])
+    // NOTHING OF THE ACCOUNT IS SPARED. What belongs to the device -- its
+    // language, its switches, the promise it has shown -- is out of reach of
+    // this forgetting by construction: `forgetAccountSecrets` takes only the
+    // entries `deviceSecrets.ts` declares the account's.
+    expect(here.keptWhenForgetting).toEqual([[]])
+    expect(here.held()).toEqual({
+      session: null,
+      marker: null,
+      password: null,
+      pushkey: null,
+      rest: null,
+    })
+    expect(here.markHeld()).toBeNull()
+  })
+
+  it('forgets it, then enters with a new account through the link it was opened with', async () => {
+    const here = device({ deletionMark: SESSION.userId, claim: GRANTED_HERE })
+    const { asked, leaving } = answering('stay', here)
+    const result = await entering(here, leaving, HERE)
+    expect(result).toEqual({
+      entered: true,
+      session: ENTERED_HERE,
+      claimed: true,
+      passwordKept: true,
+      deletedForgotten: true,
+    })
+    expect(asked).toEqual([])
+    expect(here.forgotten).toEqual([SESSION.userId])
+    // The claim carries nothing of the deleted account.
+    expect(here.sessionWhenClaiming).toEqual([null])
+  })
+
+  it('forgets nothing while a crypto machine runs, and says the account is deleted', async () => {
+    // A link handed to the application that is still showing that the account is
+    // deleted, say. The store cannot go while its machine holds it, and the
+    // next cold launch forgets it.
+    const here = device({ deletionMark: SESSION.userId })
+    const { leaving } = answering('stay', here, () => true)
+    expect(await entering(here, leaving, HERE)).toEqual({
+      entered: false,
+      reason: ACCOUNT_DELETED,
+    })
+    expect(here.forgotten).toEqual([])
+    expect(here.calls).toEqual([])
+    expect(here.markHeld()).toBe(SESSION.userId)
+  })
+
+  it('forgets nothing when the mark names another account', async () => {
+    const here = device({ deletionMark: '@somebody-else:messagr.eu' })
+    const { leaving } = answering('stay', here)
+    expect(await entering(here, leaving, null)).toEqual({
+      entered: true,
+      session: SESSION,
+      claimed: false,
+    })
+    expect(here.forgotten).toEqual([])
+  })
+})
+
 describe('the rule of #279, whichever the answer', () => {
   // AN ACCOUNT'S CREDENTIALS GO TO ITS OWN SERVER AND TO NO OTHER. #304 turned
   // the refusal into a question, and this is the part that must not move with
@@ -1604,6 +1699,7 @@ describe('the link described before it is spent', () => {
       link: async () => `${HERE}#n=Nadia`,
       signUp: here.signUp,
       recovery: here.recovery,
+      deletionMark: here.deletionMark,
       storeExists: here.storeExists,
       leaving: nobodyAsked.leaving,
       describe: screen.describe,
@@ -1625,6 +1721,7 @@ describe('the link described before it is spent', () => {
       link: async () => HERE,
       signUp: here.signUp,
       recovery: here.recovery,
+      deletionMark: here.deletionMark,
       storeExists: here.storeExists,
       leaving: nobodyAsked.leaving,
       describe: async () => 'refuse',
@@ -1648,6 +1745,7 @@ describe('the link described before it is spent', () => {
       link: async () => `${ELSEWHERE}#n=Nadia`,
       signUp: here.signUp,
       recovery: here.recovery,
+      deletionMark: here.deletionMark,
       storeExists: here.storeExists,
       leaving,
       describe: screen.describe,

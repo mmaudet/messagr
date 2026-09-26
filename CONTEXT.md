@@ -37,6 +37,13 @@ primary key. This is an invariant, not a default.
 A Messagr user's stable internal identity.
 _Avoid_: Matrix ID, MXID, username when speaking about the product
 
+**Account deletion**:
+A human user ending their own account for everyone: it stops at once, its
+identifier is never used again, and what the server keeps of it is purged.
+What the account already sent stays in other people's conversations.
+_Avoid_: Deactivation (the Matrix mechanism, not the gesture), closing an
+account, leaving an account
+
 **Strong suffix**:
 The four characters after `#` in `@prefix#SUFFIX`, drawn from an alphabet that
 excludes `0`, `O`, `1` and `I`. Two accounts sharing a prefix stay two distinct
@@ -261,6 +268,11 @@ participant; the `:server` suffix is never imposed on screen.
 A secondary device attached to an account, desktop companions included. A
 device never appears quietly: whoever has verified the account sees it
 arrive.
+
+**Leaving an account**:
+A device forgetting an account it held, while the account goes on existing.
+Following an invitation into another server asks it of a device.
+_Avoid_: Logging out, signing out, deleting
 
 **Recovery key**:
 The generated 256-bit secret that opens a key backup, shown once in Matrix's

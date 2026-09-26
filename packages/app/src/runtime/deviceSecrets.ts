@@ -116,6 +116,20 @@ export const signUpSecrets = keychainStore('eu.messagr.sign-up', 'account')
 export const recoverySecrets = keychainStore('eu.messagr.recovery', 'account')
 
 /**
+ * The account deleted from this device (#382): its user id, written once its
+ * server has deactivated it, and read by the next cold launch, which forgets
+ * what the account left here. `deleteAccount.ts` says why the forgetting waits
+ * for that launch.
+ *
+ * The account's, so forgetting the account takes the mark with it: left
+ * behind, it would be a mark naming an account nobody on this device holds.
+ */
+export const deletionMarkSecrets = keychainStore(
+  'eu.messagr.deletion-mark',
+  'account',
+)
+
+/**
  * The pushkey this device last registered a pusher under.
  *
  * WITHOUT IT, A GHOST IS PUSHED TO FOR EVER. A pusher is keyed by its token,
