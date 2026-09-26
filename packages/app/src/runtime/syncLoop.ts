@@ -4,6 +4,7 @@
 // functions are bound by the caller.
 import type { SyncDelta } from 'react-native-matrix-crypto'
 
+import { errcodeOf } from './errors'
 import {
   drainOutgoingRequests,
   type CryptoMachine,
@@ -48,8 +49,15 @@ import {
  * the loop is trying again. `stopped` is emitted whatever ends the loop,
  * including a fault nothing here anticipated, so that a screen can never look
  * live over a loop that is gone.
+ *
+ * `refused` is the one failure not retried (#391): the homeserver says it does
+ * not know this device's token. Deleted by e-mail, revoked, or this telephone
+ * taken off the account -- whichever it is, no retry will ever be answered,
+ * and a loop that kept `reconnecting` would look alive over a device that
+ * receives nothing. The loop says so, then stops.
  */
-export type SyncLoopState = 'starting' | 'running' | 'reconnecting' | 'stopped'
+export type SyncLoopState =
+  'starting' | 'running' | 'reconnecting' | 'refused' | 'stopped'
 
 /** What one completed poll observed. */
 export interface SyncTick {
@@ -144,6 +152,20 @@ function isRefusedRequest(cause: unknown): boolean {
 }
 
 /**
+ * Whether the homeserver says it does not know this device's token (#391).
+ *
+ * The code and not the status alone: a proxy in the way can answer 401 too,
+ * and says nothing about the token. Duck-typed like `isRefusedRequest`, on
+ * the `errcode` `pump.ts`'s adapter carries over from the SDK's error.
+ */
+function isRefusedToken(cause: unknown): boolean {
+  return (
+    (cause as { status?: unknown } | null)?.status === 401 &&
+    errcodeOf(cause) === 'M_UNKNOWN_TOKEN'
+  )
+}
+
+/**
  * Starts polling. Returns immediately; the loop runs until `stop`.
  *
  * THE ORDER IS THE CORRECTNESS. Each poll feeds the machine, sends whatever
@@ -205,6 +227,10 @@ export function startSyncLoop(deps: SyncLoopDeps): RunningSyncLoop {
           })
         } catch (cause: unknown) {
           if (stopping) break
+          if (isRefusedToken(cause)) {
+            onState('refused')
+            break
+          }
           onState('reconnecting')
 
           // A CURSOR THE HOMESERVER WILL NEVER ACCEPT.

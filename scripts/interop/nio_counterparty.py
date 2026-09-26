@@ -1330,6 +1330,58 @@ async def witness_deletion(session_file: Path, store: Path) -> int:
             await asyncio.sleep(2)
 
 
+async def revoke_invitation(session_file: Path, store: Path) -> int:
+    """L'inviteur révoque une invitation, ce qui désactive le compte entré par elle (#391).
+
+    La révocation est destructive (§8.2) : le service désactive aussitôt les
+    comptes que l'invitation a fait entrer. Le banc s'en sert pour faire à
+    une suite ce qu'une suppression par courriel, une révocation ou un
+    téléphone retiré lui font tous : un jeton que le serveur refuse désormais,
+    sans que l'application le sache.
+
+    Ce témoin-ci agit, il ne constate pas : il échoue si le service ne dit
+    pas avoir désactivé au moins un compte, pour qu'un test qui attend ensuite
+    l'écran de l'application n'attende pas une désactivation qui n'a pas eu
+    lieu.
+    """
+    homeserver = env("MESSAGR_INTEROP_HOMESERVER")
+    service = os.environ.get("MESSAGR_INTEROP_SERVICE") or f"{homeserver}/_messagr"
+    invitation_id = env("MESSAGR_REVOKE_INVITATION_ID")
+    session = json.loads(session_file.read_text())
+
+    try:
+        async with aiohttp.ClientSession() as http:
+            async with http.delete(
+                f"{service}/invitations/{quote(invitation_id, safe='')}",
+                headers={"Authorization": f"Bearer {session['access_token']}"},
+                # The service deactivates before it answers, and a
+                # deactivation is a round trip to the homeserver of its own.
+                timeout=aiohttp.ClientTimeout(total=HOMESERVER_REQUEST_SECONDS * 6),
+            ) as response:
+                status, body = response.status, await response.text()
+    except (aiohttp.ClientError, asyncio.TimeoutError) as error:
+        print(f"FAIL: the service did not answer: {error}", file=sys.stderr)
+        return 1
+
+    if status != 200:
+        print(f"FAIL: revoking answered {status}: {body[:300]}", file=sys.stderr)
+        return 1
+    answer = json.loads(body)
+    deactivated = answer.get("deactivated_accounts") or 0
+    if not answer.get("revoked") or deactivated < 1:
+        print(
+            f"FAIL: the invitation was not revoked with an account deactivated: "
+            f"{body[:300]}",
+            file=sys.stderr,
+        )
+        return 1
+    print(
+        f"PASS: invitation {invitation_id} revoked, "
+        f"{deactivated} account(s) deactivated"
+    )
+    return 0
+
+
 def main() -> int:
     # `claim-place` MANQUAIT ICI, ET C'EST LE DÉFAUT QUI REVIENT DANS CE DÉPÔT.
     #
@@ -1351,6 +1403,7 @@ def main() -> int:
         "collect": collect,
         "witness-eviction": witness_eviction,
         "witness-deletion": witness_deletion,
+        "revoke-invitation": revoke_invitation,
     }
     if len(sys.argv) != 2 or sys.argv[1] not in phases:
         print(

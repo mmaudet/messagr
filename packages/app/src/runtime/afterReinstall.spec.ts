@@ -17,6 +17,47 @@ describe('what a launch does about a store that is gone', () => {
     ).toEqual({ kind: 'ordinary' })
   })
 
+  it('says it came back on the first launch of the device a lost access came back as (#391)', () => {
+    // « Revenir sur ce compte » kept a new session while the old device's
+    // machine still ran: its store is not there yet, and a launch that took
+    // that for a reinstall would log in a second time and make another device.
+    expect(
+      afterReinstall({ ...LAUNCH, storeExists: false, newDevice: true }),
+    ).toEqual({ kind: 'came-back' })
+  })
+
+  it('is an ordinary launch once the device that came back has its store', () => {
+    expect(afterReinstall({ ...LAUNCH, newDevice: true })).toEqual({
+      kind: 'ordinary',
+    })
+  })
+
+  it('does not come back by itself when its server refused the token (#391)', () => {
+    // Taken off the account, or the account gone: coming back is the
+    // person's to ask for, never a reinstall's to do.
+    expect(
+      afterReinstall({ ...LAUNCH, storeExists: false, refused: true }),
+    ).toEqual({ kind: 'lost' })
+  })
+
+  it('is lost rather than stranded when its server refused the token', () => {
+    expect(
+      afterReinstall({
+        ...LAUNCH,
+        storeExists: false,
+        password: null,
+        refused: true,
+      }),
+    ).toEqual({ kind: 'lost' })
+  })
+
+  it('leaves a refused token to the first sync when the store is there', () => {
+    // An ordinary launch does not ask: its first sync hears the refusal.
+    expect(afterReinstall({ ...LAUNCH, refused: true })).toEqual({
+      kind: 'ordinary',
+    })
+  })
+
   it('comes back as a new device when a password was kept', () => {
     expect(afterReinstall({ ...LAUNCH, storeExists: false })).toEqual({
       kind: 'reenter',

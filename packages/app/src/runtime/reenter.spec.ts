@@ -80,6 +80,21 @@ describe('coming back after a reinstall', () => {
     expect(answer.reentered).toBe(false)
   })
 
+  it("carries the homeserver's code, which tells a deleted account apart (#391)", async () => {
+    const { deps } = reentering({
+      post: async () => ({
+        status: 403,
+        body: { errcode: 'M_USER_DEACTIVATED' },
+      }),
+    })
+    const answer = await reenterWithPassword(deps, ACCOUNT)
+    expect(answer).toEqual({
+      reentered: false,
+      reason: 'the homeserver refused to log in',
+      errcode: 'M_USER_DEACTIVATED',
+    })
+  })
+
   it('refuses a half-session rather than storing one', async () => {
     const { deps } = reentering({
       post: async () => ({ status: 200, body: { user_id: '@her:h.test' } }),

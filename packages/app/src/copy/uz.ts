@@ -283,6 +283,21 @@ export const uz: Readonly<Record<CopyKey, string>> = {
   delete_mail_subject: 'Hisobimni oʻchirish',
   'delete_mail_body %@':
     'Assalomu alaykum,\n\nMessagr hisobimni oʻchirishni soʻrayman. Telefonim ushbu hisob parolini saqlamaydi.\n\nHisob identifikatori: %@\n',
+  lost_title: 'Bu telefon endi ushbu hisobga kira olmaydi.',
+  lost_body:
+    'Uning serveri endi bu telefonni qabul qilmaydi. Hisob oʻchirilgan yoki bu telefon hisobdan olib tashlangan boʻlishi mumkin.',
+  lost_come_back: 'Bu hisobga qaytish',
+  lost_forget: 'Bu hisobni unutish',
+  lost_working: 'Bir lahza…',
+  lost_refused:
+    'Bu telefon ushbu hisobga qayta olmaydi. Faqat uni unutish qoladi.',
+  lost_unreachable:
+    'Bu telefon hozircha ushbu hisobga qayta olmadi. Qayta urinib koʻrishingiz mumkin.',
+  lost_back_title: 'Bu telefon ushbu hisobga qaytmoqda.',
+  lost_back_body:
+    'Messagrni butunlay yoping: u yangi qurilma sifatida qaytadi.',
+  lost_forgotten_title: 'Bu telefon ushbu hisobni unutadi.',
+  lost_forgotten_body: 'Messagrni butunlay yoping: u noldan qayta boshlanadi.',
   deleted_title: 'Hisobingiz oʻchirildi.',
   deleted_body: 'Messagrni butunlay yoping: u noldan qayta boshlanadi.',
   promise_thesis: 'Sizdan hech narsa soʻramaydigan messenjer.',

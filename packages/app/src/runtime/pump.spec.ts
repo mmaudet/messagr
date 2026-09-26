@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest'
 
 import {
+  makePumpHttp,
   PumpHttpError,
   drainOutgoingRequests,
   sendOutgoingRequest,
@@ -347,5 +348,31 @@ describe('drainOutgoingRequests', () => {
       sentKinds: [],
       failures: [],
     })
+  })
+})
+
+describe('makePumpHttp, the one adapter onto the SDK (#391)', () => {
+  it("carries the homeserver's error code, so a refused token can be told from a proxy's 401", async () => {
+    // The SDK throws its own error, with `httpStatus` and `errcode`. The sync
+    // loop recognises a token the homeserver has forgotten by that code, and
+    // without it every 401 would read the same.
+    const client = {
+      http: {
+        authedRequest: async () => {
+          throw Object.assign(new Error('Unknown access token'), {
+            httpStatus: 401,
+            errcode: 'M_UNKNOWN_TOKEN',
+          })
+        },
+      },
+    } as unknown as Parameters<typeof makePumpHttp>[0]
+    const refusal = await makePumpHttp(client)
+      .authedRequest('GET', '/_matrix/client/v3/sync', {}, undefined)
+      .then(
+        () => null,
+        (cause: unknown) => cause,
+      )
+    expect(refusal).toBeInstanceOf(PumpHttpError)
+    expect(refusal).toMatchObject({ status: 401, errcode: 'M_UNKNOWN_TOKEN' })
   })
 })

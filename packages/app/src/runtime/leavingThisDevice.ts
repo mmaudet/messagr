@@ -100,13 +100,15 @@ async function forgetWhatTheAccountLeft(
 /**
  * `true` when the store is gone, including when it was already: a reinstalled
  * iPhone has no store left to erase, and that is the state being asked for.
+ * Exported for the store a lost access leaves behind when it comes back as a
+ * new device (#391, `regainingThisDevice.ts`).
  *
  * NO UNLINK OUTSIDE THIS APPLICATION'S DIRECTORY. ADR-0006, with
  * `pickedLitter.ts`'s guard as the precedent: `cryptoStorePath` refuses a
  * device id that would climb out of `crypto/`, and the path is checked again
  * against the directory here, because this is the line that deletes.
  */
-async function forgetCryptoStore(
+export async function forgetCryptoStore(
   storeDir: string,
   deviceId: string,
 ): Promise<boolean> {

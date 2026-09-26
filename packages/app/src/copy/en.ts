@@ -270,6 +270,22 @@ export const en: Readonly<Record<CopyKey, string>> = {
   delete_mail_subject: 'Delete my account',
   'delete_mail_body %@':
     'Hello,\n\nI am asking for my Messagr account to be deleted. My phone does not keep this account’s password.\n\nAccount identifier: %@\n',
+  lost_title: 'This phone no longer has access to this account.',
+  lost_body:
+    'Its server no longer accepts this phone. The account may have been deleted, or this phone removed from it.',
+  lost_come_back: 'Come back to this account',
+  lost_forget: 'Forget this account',
+  lost_working: 'One moment…',
+  lost_refused:
+    'This phone cannot come back to this account. All that is left is to forget it.',
+  lost_unreachable:
+    'This phone could not come back to this account for now. You can try again.',
+  lost_back_title: 'This phone is coming back to this account.',
+  lost_back_body:
+    'Close Messagr completely: it will come back as a new device.',
+  lost_forgotten_title: 'This phone will forget this account.',
+  lost_forgotten_body:
+    'Close Messagr completely: it will start again from scratch.',
   deleted_title: 'Your account is deleted.',
   deleted_body: 'Close Messagr completely: it will start again from scratch.',
   promise_thesis: 'The messenger that asks you for nothing.',

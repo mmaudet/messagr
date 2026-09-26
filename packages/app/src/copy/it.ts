@@ -264,6 +264,21 @@ export const it: Readonly<Record<CopyKey, string>> = {
   delete_mail_subject: 'Eliminare il mio account',
   'delete_mail_body %@':
     'Buongiorno,\n\nchiedo l’eliminazione del mio account Messagr. Il mio telefono non conserva la password di questo account.\n\nIdentificativo dell’account: %@\n',
+  lost_title: 'Questo telefono non ha più accesso a questo account.',
+  lost_body:
+    'Il suo server non accetta più questo telefono. L’account potrebbe essere stato eliminato, o questo telefono rimosso dall’account.',
+  lost_come_back: 'Tornare su questo account',
+  lost_forget: 'Dimenticare questo account',
+  lost_working: 'Un momento…',
+  lost_refused:
+    'Questo telefono non può tornare su questo account. Non resta che dimenticarlo.',
+  lost_unreachable:
+    'Questo telefono per ora non è riuscito a tornare su questo account. Puoi riprovare.',
+  lost_back_title: 'Questo telefono torna su questo account.',
+  lost_back_body:
+    'Chiudi completamente Messagr: tornerà come un nuovo dispositivo.',
+  lost_forgotten_title: 'Questo telefono dimenticherà questo account.',
+  lost_forgotten_body: 'Chiudi completamente Messagr: ripartirà da zero.',
   deleted_title: 'Il tuo account è eliminato.',
   deleted_body: 'Chiudi completamente Messagr: ripartirà da zero.',
   promise_thesis: 'La messaggistica che non le chiede nulla.',

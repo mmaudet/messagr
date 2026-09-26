@@ -288,6 +288,30 @@ describe('startSyncLoop', () => {
     expect(harness.waits).toEqual([])
   })
 
+  it('stops, and says the token is refused, rather than reconnecting for good (#391)', async () => {
+    // Deleted by e-mail, revoked, or this telephone taken off the account:
+    // the homeserver will never take this token again, and a loop that kept
+    // trying would look alive over a device that receives nothing.
+    const refused = Object.assign(new Error('Unknown access token'), {
+      status: 401,
+      errcode: 'M_UNKNOWN_TOKEN',
+    })
+    const harness = drive({ responses: [refused, '{}', '{}'] })
+    await harness.loop.stopped
+    expect(harness.states).toEqual(['starting', 'refused', 'stopped'])
+    expect(harness.requests).toHaveLength(1)
+    expect(harness.waits).toEqual([])
+  })
+
+  it('takes a 401 without that code for an ordinary failure', async () => {
+    // A proxy in the way can answer 401 too, and says nothing about the token.
+    const refused = Object.assign(new Error('Unauthorized'), { status: 401 })
+    const harness = drive({ responses: [refused, '{}', '{}'] })
+    await harness.loop.stopped
+    expect(harness.states).not.toContain('refused')
+    expect(harness.waits).toEqual([1_000])
+  })
+
   it('drops a cursor the homeserver refuses, rather than retrying it for good', async () => {
     const refused = Object.assign(new Error('unknown token'), { status: 400 })
     const harness = drive({

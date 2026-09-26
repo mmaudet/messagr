@@ -1,3 +1,4 @@
+import { errcodeOf } from './errors'
 import type { RestoreCredentials } from './sessionCredentials'
 
 /**
@@ -78,7 +79,16 @@ export interface Reentering {
 
 export type Reentered =
   | { readonly reentered: true; readonly session: RestoreCredentials }
-  | { readonly reentered: false; readonly reason: string }
+  | {
+      readonly reentered: false
+      readonly reason: string
+      /**
+       * The homeserver's `errcode`, when it gave one. `M_USER_DEACTIVATED`
+       * says the account is gone, which is what a device that lost access
+       * needs to know (#391).
+       */
+      readonly errcode?: string
+    }
 
 /** The local part of `@somebody:server`, which is what `/login` wants. */
 function localpartOf(userId: string): string {
@@ -106,7 +116,12 @@ export async function reenterWithPassword(
     password: account.password,
   })
   if (answer.status !== 200) {
-    return { reentered: false, reason: `the homeserver refused to log in` }
+    const errcode = errcodeOf(answer.body)
+    return {
+      reentered: false,
+      reason: `the homeserver refused to log in`,
+      ...(errcode !== null ? { errcode } : {}),
+    }
   }
   const read = answer.body as Record<string, unknown>
   const { user_id: userId, device_id: deviceId, access_token: token } = read
