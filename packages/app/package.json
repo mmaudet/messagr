@@ -16,6 +16,7 @@
   "dependencies": {
     "@bam.tech/react-native-image-resizer": "3.0.11",
     "@dr.pogodin/react-native-fs": "2.40.2",
+    "@noble/hashes": "2.4.0",
     "@notifee/react-native": "^9.1.8",
     "@op-engineering/op-sqlite": "18.2.0",
     "@react-native-camera-roll/camera-roll": "7.10.2",

@@ -829,6 +829,7 @@ export const de: Readonly<Record<CopyKey, string>> = {
   find_looking:
     'Messagr maskiert die Nummern in Ihrem Adressbuch und vergleicht sie auf diesem Telefon.',
   find_on_messagr: 'Bereits auf Messagr',
+  find_holder_changed: 'Diese Nummer hat den Inhaber gewechselt.',
   find_others: 'Ihre anderen Kontakte',
   find_nobody: 'Noch keiner Ihrer Kontakte ist auf Messagr auffindbar.',
   find_no_access:

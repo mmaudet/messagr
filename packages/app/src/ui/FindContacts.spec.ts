@@ -122,8 +122,8 @@ describe('« Retrouver mes contacts »', () => {
     const drawn = show({
       stage: 'found',
       matches: [
-        { contact: contact('Anne'), reference: 'r-anne' },
-        { contact: contact('Paul'), reference: 'r-paul' },
+        { contact: contact('Anne'), reference: 'r-anne', holderChanged: false },
+        { contact: contact('Paul'), reference: 'r-paul', holderChanged: false },
       ],
       others: [contact('Zoé')],
       waiting: null,
@@ -139,10 +139,32 @@ describe('« Retrouver mes contacts »', () => {
     expect(found).not.toContain('r-anne')
   })
 
+  it('says a number changed hands under the name of its card', () => {
+    const drawn = show({
+      stage: 'found',
+      matches: [
+        { contact: contact('Anne'), reference: 'r-anne', holderChanged: true },
+        { contact: contact('Paul'), reference: 'r-paul', holderChanged: false },
+      ],
+      others: [],
+      waiting: null,
+    })
+
+    expect(all(drawn, 'find-contacts-holder-changed').map(textIn)).toEqual([
+      t('find_holder_changed'),
+    ])
+    const found = textIn(withId(drawn, 'find-contacts-found'))
+    const line = found.indexOf(t('find_holder_changed'))
+    expect(line).toBeGreaterThan(found.indexOf('Anne'))
+    expect(line).toBeLessThan(found.indexOf('Paul'))
+  })
+
   it('puts no gesture on a contact', () => {
     const drawn = show({
       stage: 'found',
-      matches: [{ contact: contact('Anne'), reference: 'r-anne' }],
+      matches: [
+        { contact: contact('Anne'), reference: 'r-anne', holderChanged: false },
+      ],
       others: [contact('Zoé')],
       waiting: null,
     })
@@ -201,7 +223,9 @@ describe('« Retrouver mes contacts »', () => {
     )
     const some = show({
       stage: 'found',
-      matches: [{ contact: contact('Anne'), reference: 'r-anne' }],
+      matches: [
+        { contact: contact('Anne'), reference: 'r-anne', holderChanged: false },
+      ],
       others: [],
       waiting,
     })

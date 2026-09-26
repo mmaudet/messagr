@@ -811,6 +811,7 @@ export const nl: Readonly<Record<CopyKey, string>> = {
   find_looking:
     'Messagr maskeert de nummers in uw adresboek en vergelijkt ze op deze telefoon.',
   find_on_messagr: 'Al op Messagr',
+  find_holder_changed: 'Dit nummer is van houder veranderd.',
   find_others: 'Uw andere contacten',
   find_nobody: 'Nog geen van uw contacten is vindbaar op Messagr.',
   find_no_access:

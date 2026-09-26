@@ -7,6 +7,10 @@ import { exists, unlink } from '@dr.pogodin/react-native-fs'
 import { open, type DB } from '@op-engineering/op-sqlite'
 
 import { givenNamesSecrets } from './deviceSecrets'
+import {
+  forgetfulDiscoveryResults,
+  openDiscoveryResults,
+} from './discoveryResultsStore'
 import { getErrorMessage } from './errors'
 import type { GivenNames } from './givenName'
 import { forgetfulGivenNames, openGivenNames } from './givenNameStore'
@@ -32,7 +36,9 @@ import {
   openFavourites,
   type Favourites,
 } from './favouriteStore'
+import type { DiscoveryResults } from './findContacts'
 import { forgetfulHidden, openHidden, type Hidden } from './hiddenStore'
+import { numberFingerprint } from './numberFingerprint'
 import { forgetfulReadBy, openReadBy, type ReadBy } from './readByStore'
 import { openStorePassphrase } from './storePassphrase'
 
@@ -66,6 +72,11 @@ export interface NotebookOpening {
    * relaunch. `readByStore.ts` argues it.
    */
   readonly readBy: ReadBy
+  /**
+   * What looking for contacts found, by a fingerprint of each number and
+   * never the number: the next search masks only the new ones (#402).
+   */
+  readonly discoveryResults: DiscoveryResults
   readonly opened: boolean
   /** Why it did not open, when it did not. */
   readonly reason?: string
@@ -131,6 +142,7 @@ export async function openNotebook(storeDir: string): Promise<NotebookOpening> {
       hidden: forgetfulHidden(),
       favourites: forgetfulFavourites(),
       readBy: forgetfulReadBy(),
+      discoveryResults: forgetfulDiscoveryResults(),
       opened: false,
       reason: 'no writable directory was supplied at launch',
     }
@@ -150,6 +162,7 @@ export async function openNotebook(storeDir: string): Promise<NotebookOpening> {
       hidden: forgetfulHidden(),
       favourites: forgetfulFavourites(),
       readBy: forgetfulReadBy(),
+      discoveryResults: forgetfulDiscoveryResults(),
       opened: false,
       reason: passphrase.reason,
     }
@@ -179,6 +192,7 @@ export async function openNotebook(storeDir: string): Promise<NotebookOpening> {
       hidden: await openHidden(page),
       favourites: await openFavourites(page),
       readBy: await openReadBy(page),
+      discoveryResults: await openDiscoveryResults(page, numberFingerprint),
       opened: true,
       minted: passphrase.minted,
     }
@@ -196,6 +210,7 @@ export async function openNotebook(storeDir: string): Promise<NotebookOpening> {
       hidden: forgetfulHidden(),
       favourites: forgetfulFavourites(),
       readBy: forgetfulReadBy(),
+      discoveryResults: forgetfulDiscoveryResults(),
       opened: false,
       reason: getErrorMessage(cause),
       minted: passphrase.minted,

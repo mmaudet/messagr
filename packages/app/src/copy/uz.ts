@@ -820,6 +820,7 @@ export const uz: Readonly<Record<CopyKey, string>> = {
   find_looking:
     'Messagr manzillar kitobingizdagi raqamlarni niqoblab, shu telefonda solishtirmoqda.',
   find_on_messagr: 'Allaqachon Messagrda',
+  find_holder_changed: 'Bu raqamning egasi oʻzgargan.',
   find_others: 'Boshqa kontaktlaringiz',
   find_nobody: 'Hozircha kontaktlaringizdan hech biri Messagrda topilmaydi.',
   find_no_access:

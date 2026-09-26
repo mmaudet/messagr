@@ -67,7 +67,10 @@ export function FindContacts({
       )}
       {stage.stage === 'found' && (
         <Found
-          matches={stage.matches.map(m => m.contact.name)}
+          matches={stage.matches.map(m => ({
+            name: m.contact.name,
+            holderChanged: m.holderChanged,
+          }))}
           others={stage.others.map(c => c.name)}
           waiting={stage.waiting}
           onDone={onClose}
@@ -107,7 +110,11 @@ function Found({
   waiting,
   onDone,
 }: {
-  readonly matches: readonly string[]
+  readonly matches: readonly {
+    readonly name: string
+    /** The number led to another account before (#402). */
+    readonly holderChanged: boolean
+  }[]
   readonly others: readonly string[]
   /** What the limit on masking left for later (#401). */
   readonly waiting: Waiting | null
@@ -139,10 +146,17 @@ function Found({
               {t('find_nobody')}
             </Text>
           )
-        : matches.map((name, i) => (
-            <Text key={`m${i}`} style={styles.row} testID="find-contacts-match">
-              {name}
-            </Text>
+        : matches.map(({ name, holderChanged }, i) => (
+            <View key={`m${i}`}>
+              <Text style={styles.row} testID="find-contacts-match">
+                {name}
+              </Text>
+              {holderChanged && (
+                <Text style={styles.hint} testID="find-contacts-holder-changed">
+                  {t('find_holder_changed')}
+                </Text>
+              )}
+            </View>
           ))}
       {others.length > 0 && (
         <>
