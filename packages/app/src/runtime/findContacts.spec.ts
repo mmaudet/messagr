@@ -2,9 +2,11 @@ import { describe, expect, it } from 'vitest'
 
 import {
   findContacts,
+  findingJourney,
   type Blinding,
   type Contact,
   type FindingDeps,
+  type FindingStage,
   type Masking,
 } from './findContacts'
 
@@ -244,5 +246,97 @@ describe('looking for contacts', () => {
       others: [{ name: 'Sans numéro', numbers: [] }],
     })
     expect(asked).toEqual([])
+  })
+})
+
+describe('the journey of looking for contacts', () => {
+  function journey(
+    access: 'all' | 'some' | 'none',
+    contacts: readonly Contact[],
+    proven: Record<string, string>,
+  ) {
+    const { deps: d, asked } = deps(contacts, proven)
+    const shown: FindingStage[] = []
+    const asks = { system: 0 }
+    const j = findingJourney(
+      {
+        ...d,
+        askForTheAddressBook: async () => {
+          asks.system += 1
+          return access
+        },
+      },
+      stage => shown.push(stage),
+    )
+    return { j, shown, asked, asks }
+  }
+
+  it('opens on a reminder, and asks the system nothing before « Continuer »', () => {
+    const { j, shown, asks } = journey('all', [PAUL], {})
+
+    j.open()
+
+    expect(shown).toEqual([{ stage: 'reminder' }])
+    expect(asks.system).toBe(0)
+  })
+
+  it('asks the system, looks, and shows what it found', async () => {
+    const { j, shown } = journey('all', [PAUL, ZOE], {
+      '+33612345678': 'ref-paul',
+    })
+
+    j.open()
+    await j.go()
+
+    expect(shown.map(s => s.stage)).toEqual(['reminder', 'looking', 'found'])
+    expect(shown.at(-1)).toEqual({
+      stage: 'found',
+      matches: [{ contact: PAUL, reference: 'ref-paul' }],
+      others: [ZOE],
+    })
+  })
+
+  it('looks at the cards the person shared when the system shares some', async () => {
+    const { j, shown } = journey('some', [PAUL], { '+33612345678': 'ref-paul' })
+
+    j.open()
+    await j.go()
+
+    expect(shown.at(-1)?.stage).toBe('found')
+  })
+
+  it('reads nothing and sends nothing when the system refuses', async () => {
+    const { j, shown, asked } = journey('none', [PAUL], {})
+
+    j.open()
+    await j.go()
+
+    expect(shown.at(-1)).toEqual({ stage: 'refused', why: 'no-access' })
+    expect(asked).toEqual([])
+  })
+
+  it('says why nothing was found when the search stopped', async () => {
+    const { deps: d } = deps([PAUL], {}, { verifies: false })
+    const shown: FindingStage[] = []
+    const j = findingJourney(
+      { ...d, askForTheAddressBook: async () => 'all' },
+      stage => shown.push(stage),
+    )
+
+    j.open()
+    await j.go()
+
+    expect(shown.at(-1)).toEqual({ stage: 'refused', why: 'proof-rejected' })
+  })
+
+  it('drops the answer of a search somebody left', async () => {
+    const { j, shown } = journey('all', [PAUL], {})
+
+    j.open()
+    const going = j.go()
+    j.close()
+    await going
+
+    expect(shown.at(-1)).toEqual({ stage: 'shut' })
   })
 })

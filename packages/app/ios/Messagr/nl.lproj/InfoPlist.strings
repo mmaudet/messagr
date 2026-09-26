@@ -17,3 +17,5 @@
 "NSPhotoLibraryUsageDescription" = "Om een afbeelding te kiezen om in een gesprek te versturen. De afbeelding wordt op dit toestel versleuteld voordat ze verstuurd wordt: noch de server noch Messagr kan ze lezen.";
 
 "NSPhotoLibraryAddUsageDescription" = "Om een in een gesprek ontvangen foto in uw fotobibliotheek te bewaren, wanneer u daarom vraagt. Een bewaarde afbeelding verlaat Messagr: ze volgt daarna de back-ups en de rechten van uw fotobibliotheek.";
+
+"NSContactsUsageDescription" = "De nummers in uw adresboek worden op uw telefoon gemaskeerd. De dienst weet nooit wie er in uw adresboek staat, en de namen verlaten het toestel niet.";

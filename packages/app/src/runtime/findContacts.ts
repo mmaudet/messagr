@@ -310,3 +310,90 @@ function kindOf(e: unknown): unknown {
 function byName<T extends Contact>(contacts: readonly T[]): T[] {
   return [...contacts].sort((a, b) => a.name.localeCompare(b.name))
 }
+
+/**
+ * What the screen of « Retrouver mes contacts » shows.
+ *
+ * - `reminder`: one line and one button, before the system's own question,
+ *   which Apple wants on a screen of its own;
+ * - `looking`: masking and comparing;
+ * - `found`: the contacts on Messagr under the name of their card, then the
+ *   others;
+ * - `refused`: why nothing is shown, `no-access` when the system refused the
+ *   address book.
+ */
+export type FindingStage =
+  | { readonly stage: 'shut' }
+  | { readonly stage: 'reminder' }
+  | { readonly stage: 'looking' }
+  | {
+      readonly stage: 'found'
+      readonly matches: readonly Match[]
+      readonly others: readonly Contact[]
+    }
+  | {
+      readonly stage: 'refused'
+      readonly why: 'no-access' | FindingRefusal
+    }
+
+export interface FindingJourney {
+  /** « Retrouver mes contacts », for a findable account: the reminder. */
+  readonly open: () => void
+  /** « Continuer »: the system's question, then the search. */
+  readonly go: () => Promise<void>
+  /** Every way back. A search still running is dropped. */
+  readonly close: () => void
+}
+
+/**
+ * The journey of looking for one's contacts: nothing is read and nothing is
+ * sent before the person continues from the reminder, and nothing at all
+ * when the system refuses the address book.
+ */
+export function findingJourney(
+  deps: FindingDeps & {
+    /** The system's question: see `addressBook.ts`. */
+    readonly askForTheAddressBook: () => Promise<'all' | 'some' | 'none'>
+  },
+  show: (stage: FindingStage) => void,
+): FindingJourney {
+  // Which opening an answer belongs to: closing moves it on, and a search
+  // that ends after its screen was left shows nothing.
+  let opening = 0
+  return {
+    open: () => {
+      opening += 1
+      show({ stage: 'reminder' })
+    },
+    go: async () => {
+      const mine = opening
+      const access = await deps.askForTheAddressBook()
+      if (mine !== opening) return
+      if (access === 'none') {
+        show({ stage: 'refused', why: 'no-access' })
+        return
+      }
+      show({ stage: 'looking' })
+      let findings: Findings
+      try {
+        findings = await findContacts(deps)
+      } catch {
+        findings = { found: false, refusal: 'unreachable' }
+      }
+      if (mine !== opening) return
+      show(
+        findings.found
+          ? {
+              stage: 'found',
+              matches: findings.matches,
+              others: findings.others,
+            }
+          : { stage: 'refused', why: findings.refusal },
+      )
+    },
+    close: () => {
+      opening += 1
+      show({ stage: 'shut' })
+    },
+  }
+}

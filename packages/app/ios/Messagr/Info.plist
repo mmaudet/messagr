@@ -123,6 +123,16 @@
 	     pas besoin. -->
 	<key>NSPhotoLibraryAddUsageDescription</key>
 	<string>To save a photograph received in a conversation to your photo library, when you ask for it. A saved picture leaves Messagr: it then follows the backups and the permissions of your photo library.</string>
+	<!-- LE CARNET, POUR RETROUVER SES CONTACTS ET RIEN D'AUTRE (#400).
+	     Demande seulement quand la personne lance « Retrouver mes contacts »,
+	     apres un rappel d'une ligne, et jamais tant que le service ne sert pas
+	     la decouverte : la ligne n'apparait qu'a cette condition. Le texte
+	     reprend le point 1 du consentement (`findable_contacts` dans les
+	     catalogues), comme #392 le demande : les numeros sont masques sur le
+	     telephone, et les noms ne le quittent pas. `react-native-contacts`
+	     lit le carnet, `src/runtime/findContacts.ts` dit ce qui en part. -->
+	<key>NSContactsUsageDescription</key>
+	<string>The numbers in your address book are masked on your phone. The service never knows who is in your address book, and the names do not leave the device.</string>
 	<key>RCTNewArchEnabled</key>
 	<true/>
 	<!-- L'EXPORT, DECLARE EXEMPTE, ET C'EST LE COMPTE QUI LE DIT.

@@ -15,3 +15,5 @@
 "NSPhotoLibraryUsageDescription" = "Per scegliere un’immagine da inviare in una conversazione. L’immagine viene cifrata su questo dispositivo prima di essere inviata: né il server né Messagr possono leggerla.";
 
 "NSPhotoLibraryAddUsageDescription" = "Per salvare nella sua fototeca una fotografia ricevuta in una conversazione, quando lo chiede. Un’immagine salvata esce da Messagr: segue poi i backup e i permessi della sua fototeca.";
+
+"NSContactsUsageDescription" = "I numeri della Sua rubrica vengono mascherati sul Suo telefono. Il servizio non sa mai chi c’è nella Sua rubrica, e i nomi non lasciano il dispositivo.";
