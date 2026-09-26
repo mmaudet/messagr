@@ -1,4 +1,4 @@
--- 010 : LES SUPPRESSIONS DE COMPTE, ANNONCÉES PAR L'APPLICATION (#385).
+-- 011 : LES SUPPRESSIONS DE COMPTE, ANNONCÉES PAR L'APPLICATION (#385).
 --
 -- Juste avant de désactiver un compte, l'application le dit au service, avec
 -- le jeton de ce compte (`handlers::deletion`). Une ligne par compte, avec
