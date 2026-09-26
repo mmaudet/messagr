@@ -663,7 +663,14 @@ describeRoundTrip('encrypted round trip', () => {
       .withTimeout(60000)
     await device.takeScreenshot('eviction-1-liste')
 
+    // LE « + » OUVRE UNE FEUILLE (#394), dont « Inviter quelqu'un » mène au
+    // formulaire que le cercle ouvrait directement.
     await element(by.id('invite-open')).tap()
+    await waitFor(element(by.id('plus-invite')))
+      .toBeVisible()
+      .withTimeout(10000)
+    await device.takeScreenshot('eviction-1b-feuille-du-plus')
+    await element(by.id('plus-invite')).tap()
     await waitFor(element(by.id('invite-name')))
       .toBeVisible()
       .withTimeout(30000)

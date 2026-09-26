@@ -604,6 +604,8 @@ export const uz: Readonly<Record<CopyKey, string>> = {
   list_nobody_else: 'Bu yerda boshqa hech kim yoʻq',
   list_nobody_joined: 'Bu suhbatga hech kim qoʻshilmadi',
   invite_open: 'Odam taklif qilish',
+  plus_invite: 'Odam taklif qilish',
+  plus_close: 'Yopish',
   settings_backup: 'Xabarlar zaxirasi',
   backup_settings_on:
     'Xabarlaringiz serverda saqlanadi, tiklash kalitingiz bilan yopilgan holda.',

@@ -12,7 +12,8 @@ import {
 } from '../design/tokens'
 
 /**
- * The green circle above the tab bar, and the only way to invite somebody.
+ * The green circle above the tab bar, where inviting somebody starts: it opens
+ * `PlusSheet`, whose first line leads to the invitation form (#394).
  *
  * # Why the inline button had to go rather than gain a friend
  *

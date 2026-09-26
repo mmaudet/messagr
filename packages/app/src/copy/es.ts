@@ -586,6 +586,8 @@ export const es: Readonly<Record<CopyKey, string>> = {
   list_nobody_else: 'Nadie más aquí',
   list_nobody_joined: 'Nadie se ha unido a esta conversación',
   invite_open: 'Invitar a alguien',
+  plus_invite: 'Invitar a alguien',
+  plus_close: 'Cerrar',
   settings_backup: 'Copia de los mensajes',
   backup_settings_on:
     'Sus mensajes se guardan en el servidor, cerrados con su clave de recuperación.',
