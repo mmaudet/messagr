@@ -9,6 +9,7 @@ mod error;
 mod extract;
 mod handlers;
 mod masking;
+mod masking_quota;
 mod matrix;
 mod named_deactivation;
 mod sms;
