@@ -51,6 +51,14 @@ export interface ConversationSummary {
    */
   readonly others: number | null
   /**
+   * The one other participant who was in this conversation and is not any
+   * more -- deleted, evicted or gone -- when this account is now alone in it.
+   * Absent otherwise, and for a conversation somebody was only invited to.
+   * #388: without it, the row lost the name it was given and said nobody had
+   * ever joined.
+   */
+  readonly departed?: string
+  /**
    * The opening of the last message this device could read, or `null`.
    *
    * Not truncated here. How many words fit is the screen's question, and a
@@ -139,6 +147,17 @@ async function summarise(
     // Left null. A conversation whose membership could not be read is still a
     // conversation, and the row shows what it can.
   }
+  // WHO WAS HERE, asked only of a conversation this account is alone in: one
+  // more request, and only where the answer changes the row.
+  let departed: string | undefined
+  if (others === 0) {
+    try {
+      departed = await whoWasHereAndLeft(deps.http, scope, selfUserId)
+    } catch {
+      // Left absent: the row says what it said before, nothing false.
+    }
+  }
+  const gone = departed === undefined ? {} : { departed }
 
   try {
     // Only the entries: a row shows the last thing said, and a reaction is
@@ -165,6 +184,7 @@ async function summarise(
       scope,
       other,
       others,
+      ...gone,
       preview: readable?.body ?? null,
       // Named separately from a missing preview, because "nothing has been
       // said" and "this device cannot read what was said" look identical on a
@@ -195,6 +215,7 @@ async function summarise(
       scope,
       other,
       others,
+      ...gone,
       preview: null,
       reason: getErrorMessage(cause),
       lastAt: 0,
@@ -204,4 +225,51 @@ async function summarise(
       unread: 0,
     }
   }
+}
+
+/**
+ * The one other participant who was in this conversation and is not any
+ * more, or `undefined`. #388.
+ *
+ * `/joined_members` has forgotten them; `/members` has not. Its last word on
+ * each person is a membership event, and `unsigned.prev_content` says what
+ * they were before it -- measured on Continuwuity, 26 September 2026. A leave
+ * or a ban after a join is somebody who was here: deleted, evicted or gone.
+ * After an invite, somebody who never came in, which is the invitation nobody
+ * took up and keeps its own sentence.
+ *
+ * Only one: a conversation that has lost two people is not a direct one, and
+ * naming either would be a guess.
+ */
+async function whoWasHereAndLeft(
+  http: HttpRequester,
+  scope: string,
+  selfUserId: string,
+): Promise<string | undefined> {
+  const answer = JSON.parse(
+    await http.authedRequest(
+      'GET',
+      `/_matrix/client/v3/rooms/${encodeURIComponent(scope)}/members`,
+      {},
+      undefined,
+    ),
+  ) as { readonly chunk?: unknown }
+  const gone = new Set<string>()
+  for (const event of Array.isArray(answer.chunk) ? answer.chunk : []) {
+    const member = event as {
+      readonly state_key?: unknown
+      readonly content?: { readonly membership?: unknown }
+      readonly unsigned?: {
+        readonly prev_content?: { readonly membership?: unknown }
+      }
+    }
+    if (typeof member.state_key !== 'string') continue
+    if (member.state_key === selfUserId) continue
+    const now = member.content?.membership
+    const before = member.unsigned?.prev_content?.membership
+    if ((now === 'leave' || now === 'ban') && before === 'join') {
+      gone.add(member.state_key)
+    }
+  }
+  return gone.size === 1 ? [...gone][0] : undefined
 }

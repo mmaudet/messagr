@@ -573,6 +573,7 @@ export const it: Readonly<Record<CopyKey, string>> = {
   conversation_attaching: 'Cifratura e invio della foto…',
   'list_unread %1$d': '%1$d messaggi non letti',
   list_nobody_else: 'Nessun altro qui',
+  list_participant_left: 'non è più in questa conversazione',
   list_nobody_joined: 'Nessuno si è unito a questa conversazione',
   invite_open: 'Invitare qualcuno',
   settings_backup: 'Copia dei messaggi',

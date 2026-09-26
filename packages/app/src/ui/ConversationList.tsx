@@ -262,9 +262,7 @@ export function ConversationList({
             {index > 0 && <Separator />}
             <Row
               summary={summary}
-              name={
-                summary.other === null ? undefined : names.get(summary.other)
-              }
+              name={names.get(personOf(summary) ?? '')}
               onOpen={onOpen}
               now={now}
               opening={summary.scope === opening}
@@ -358,15 +356,20 @@ function Row({
   //
   // The sentence is true whichever way it happened -- never opened, expired,
   // or declined because the two of them already had a conversation.
+  // AND SOMEBODY WHO WAS HERE KEEPS THEIR NAME (#388). Deleted, evicted or
+  // gone: the row said nobody had ever joined, which was false, and lost the
+  // name this device had given them, which was the one thing that made the
+  // row readable. The second line says they are not here any more.
+  const person = personOf(summary)
   const shown =
-    summary.other !== null
-      ? displayNameFor(summary.other, name)
+    person !== null
+      ? displayNameFor(person, name)
       : summary.others === 0
         ? summary.lastAt === 0 && summary.preview === null
           ? t('list_nobody_joined')
           : t('list_nobody_else')
         : summary.scope
-  const named = summary.other !== null && name !== undefined
+  const named = person !== null && name !== undefined
   return (
     <Pressable
       // TWO IDENTIFIERS, AND THE SECOND IS FOR THE SUITE.
@@ -404,7 +407,7 @@ function Row({
           same way: `shown` already is the scope for a conversation of
           three. */}
       <Avatar
-        shown={summary.other === null ? summary.scope : shown}
+        shown={person === null ? summary.scope : shown}
         testID={`avatar-${summary.scope}`}
       />
       <View style={styles.said}>
@@ -462,6 +465,7 @@ function Row({
  * acting on.
  */
 function previewOf(summary: ConversationSummary): string {
+  if (summary.departed !== undefined) return t('list_participant_left')
   if (summary.preview !== null) return summary.preview
   if (summary.reason === 'nothing has been said yet') {
     return t('list_nothing_said')
@@ -470,6 +474,14 @@ function previewOf(summary: ConversationSummary): string {
     return t('conversation_removed')
   }
   return summary.lastAt === 0 ? t('list_unreachable') : t('list_unreadable')
+}
+
+/**
+ * Who the row is about: the other participant, or the one who was here and
+ * is not any more (#388). `null` when it is about nobody in particular.
+ */
+function personOf(summary: ConversationSummary): string | null {
+  return summary.other ?? summary.departed ?? null
 }
 
 function Separator() {
