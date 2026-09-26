@@ -245,6 +245,24 @@ export const en: Readonly<Record<CopyKey, string>> = {
   leave_confirm: 'Yes, leave this account',
   leave_cancel: 'Keep my account',
   leave_working: 'Working…',
+  settings_delete_account: 'Delete my account',
+  delete_title: 'Delete my account',
+  delete_lead:
+    'Your account stops existing for everyone. Here is what goes and what stays, before you decide.',
+  delete_fact_gone: 'What goes',
+  delete_gone_body:
+    'Your account, for good: its identifier will never be used again. This device forgets your conversations and the keys that open them, and nobody can reach you on this account any more.',
+  delete_fact_stays: 'What stays',
+  delete_stays_body:
+    'The messages you sent stay, encrypted, in other people’s conversations: the server can neither read them nor take them back. The people you talked with keep the copies on their own devices.',
+  delete_final: 'Deletion is immediate and cannot be undone.',
+  delete_confirm: 'Yes, delete my account',
+  delete_cancel: 'Keep my account',
+  delete_working: 'Deleting…',
+  delete_failed:
+    'Nothing was deleted, and your account is as it was. You can try again.',
+  deleted_title: 'Your account is deleted.',
+  deleted_body: 'Close Messagr completely: it will start again from scratch.',
   promise_thesis: 'The messenger that asks you for nothing.',
   promise_subtitle:
     'No number, no account, no password. Someone invites you, you write.',
@@ -385,8 +403,8 @@ export const en: Readonly<Record<CopyKey, string>> = {
     'Messagr is a hosting service and not an online platform, recital 14 of the DSA excluding interpersonal messaging services. Articles 20 and 21 therefore do not apply, and this text does not claim to offer them.',
   legal_delete_title: 'Delete your account',
   legal_delete_body:
-    'Deletion is requested by e-mail at conformite@messagr.eu: the gesture from inside the application does not exist yet. The account is then deactivated and its data purged; messages already sent remain events of the rooms they were written in, and the server cannot take them back, since it cannot read them.',
-  legal_delete_link: 'Request deletion: messagr.eu/aide',
+    'Deletion is done from inside the application: Settings, then “Delete my account”. The account is then deactivated at once and its data purged; messages already sent remain events of the rooms they were written in, and the server cannot take them back, since it cannot read them. Without this device, deletion is requested by e-mail at conformite@messagr.eu.',
+  legal_delete_link: 'Without this device: messagr.eu/aide',
   legal_full_terms: 'Full terms and conditions: messagr.eu',
   trust_action: 'What is known about this person',
   trust_title: 'What is known about this person',

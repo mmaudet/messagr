@@ -40,6 +40,7 @@ import { LanguagePicker } from './LanguagePicker'
 export function Settings({
   onBack,
   onLegal,
+  onDeleteAccount,
   onBackup,
   onVault,
   onFavourites,
@@ -60,6 +61,8 @@ export function Settings({
 }: {
   readonly onBack: () => void
   readonly onLegal: () => void
+  /** The way to deleting the account this device holds (#382). */
+  readonly onDeleteAccount: () => void
   /**
    * The way to the state of the key backup.
    *
@@ -320,6 +323,19 @@ export function Settings({
           <Text style={styles.hint}>{t('settings_disturb_hint')}</Text>
         </View>
       )}
+
+      {/* THE LAST ROW, AND THE ONLY DOOR TO DELETING THE ACCOUNT (#382).
+          Apple asks that it be easy to find, and the legal screen points
+          here rather than opening a second way. Not red: `DeleteAccount.tsx`
+          says why deleting one's own account is not a measure. */}
+      <Pressable
+        testID="settings-delete-account"
+        onPress={onDeleteAccount}
+        accessibilityRole="button"
+        accessibilityLabel={t('settings_delete_account')}
+        style={[styles.rowLayout, styles.divider]}>
+        <Text style={styles.rowLabel}>{t('settings_delete_account')}</Text>
+      </Pressable>
 
       <Text style={styles.nothingElse}>{t('settings_nothing_else')}</Text>
     </View>

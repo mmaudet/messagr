@@ -240,6 +240,26 @@ export const nl: Readonly<Record<CopyKey, string>> = {
   leave_confirm: 'Ja, dit account verlaten',
   leave_cancel: 'Mijn account houden',
   leave_working: 'Bezig…',
+  settings_delete_account: 'Mijn account verwijderen',
+  delete_title: 'Mijn account verwijderen',
+  delete_lead:
+    'Uw account houdt voor iedereen op te bestaan. Dit verdwijnt en dit blijft, voordat u beslist.',
+  delete_fact_gone: 'Wat verdwijnt',
+  delete_gone_body:
+    'Uw account, voorgoed: de identificatie wordt nooit meer gebruikt. Dit apparaat vergeet uw gesprekken en de sleutels die ze openen, en niemand kan u nog via dit account bereiken.',
+  delete_fact_stays: 'Wat blijft',
+  delete_stays_body:
+    'De berichten die u verstuurde blijven, versleuteld, in de gesprekken van anderen: de server kan ze niet lezen en niet terugnemen. Uw gesprekspartners houden de kopieën op hun eigen apparaten.',
+  delete_final:
+    'Verwijderen gebeurt meteen en kan niet ongedaan worden gemaakt.',
+  delete_confirm: 'Ja, mijn account verwijderen',
+  delete_cancel: 'Mijn account houden',
+  delete_working: 'Bezig met verwijderen…',
+  delete_failed:
+    'Er is niets verwijderd en uw account is zoals het was. U kunt het opnieuw proberen.',
+  deleted_title: 'Uw account is verwijderd.',
+  deleted_body:
+    'Sluit Messagr volledig af: het begint dan weer van voren af aan.',
   promise_thesis: 'De berichtendienst die niets van u vraagt.',
   promise_subtitle:
     'Geen nummer, geen account, geen wachtwoord. Iemand nodigt u uit, u schrijft.',
@@ -380,8 +400,8 @@ export const nl: Readonly<Record<CopyKey, string>> = {
     'Messagr is een hostingdienst en geen onlineplatform; overweging 14 van de DSA sluit interpersoonlijke communicatiediensten uit. De artikelen 20 en 21 zijn dus niet van toepassing, en deze tekst beweert niet ze te bieden.',
   legal_delete_title: 'Uw account verwijderen',
   legal_delete_body:
-    'Verwijdering wordt per e-mail aangevraagd bij conformite@messagr.eu: vanuit de applicatie bestaat dat gebaar nog niet. Het account wordt dan gedeactiveerd en zijn gegevens worden gewist; reeds verzonden berichten blijven gebeurtenissen van de ruimtes waarin ze zijn geschreven, en de server kan ze niet terugnemen, omdat hij ze niet kan lezen.',
-  legal_delete_link: 'Verwijdering aanvragen: messagr.eu/aide',
+    'Verwijderen gebeurt in de applicatie: Instellingen, dan „Mijn account verwijderen”. Het account wordt dan meteen gedeactiveerd en zijn gegevens worden gewist; reeds verstuurde berichten blijven gebeurtenissen van de ruimtes waarin ze zijn geschreven, en de server kan ze niet weghalen omdat hij ze niet kan lezen. Zonder dit apparaat vraagt u de verwijdering per e-mail aan bij conformite@messagr.eu.',
+  legal_delete_link: 'Zonder dit apparaat: messagr.eu/aide',
   legal_full_terms: 'Volledige algemene voorwaarden: messagr.eu',
   trust_action: 'Wat er van deze persoon bekend is',
   trust_title: 'Wat er van deze persoon bekend is',

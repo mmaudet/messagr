@@ -1232,6 +1232,67 @@ async def witness_eviction(session_file: Path, store: Path) -> int:
     return 0
 
 
+async def witness_departure(session_file: Path, store: Path) -> int:
+    """Le compte de l'application a quitté la conversation, vu d'ici (#382).
+
+    Supprimer son compte le désactive, et Continuwuity le fait alors sortir de
+    ses salons : mesuré en production le 26 septembre 2026 (commentaire de
+    #381). Ce témoin ne connaît pas le mot de passe du compte, que seule
+    l'application a reçu ; ce départ est ce qu'un client indépendant peut
+    constater, depuis la conversation qu'il partage avec lui.
+    """
+    homeserver = env("MESSAGR_INTEROP_HOMESERVER")
+    room_id = env("MESSAGR_INTEROP_ROOM")
+    application = env("MESSAGR_INTEROP_SENDER")
+
+    session = json.loads(session_file.read_text())
+    bearer = {"Authorization": f"Bearer {session['access_token']}"}
+    members_url = (
+        f"{homeserver}/_matrix/client/v3/rooms/{quote(room_id, safe='!')}/members"
+    )
+
+    clock = asyncio.get_running_loop()
+    deadline = clock.time() + WITNESS_DEADLINE_SECONDS
+    # Ce qui a été lu en dernier, pour qu'un échec dise ce qu'il a vu plutôt
+    # que « rien ne sort » : c'est la leçon d'`inventory`.
+    seen = "nothing was read"
+
+    async with aiohttp.ClientSession() as http:
+        while True:
+            try:
+                async with http.get(
+                    members_url,
+                    headers=bearer,
+                    timeout=aiohttp.ClientTimeout(total=HOMESERVER_REQUEST_SECONDS),
+                ) as response:
+                    status, body = response.status, await response.text()
+            except (aiohttp.ClientError, asyncio.TimeoutError) as error:
+                status, body = None, f"{type(error).__name__}: {error}"
+
+            if status == 200:
+                members = json.loads(body).get("chunk") or []
+                seen = ", ".join(
+                    f"{event.get('state_key')}="
+                    f"{(event.get('content') or {}).get('membership')}"
+                    for event in members
+                ) or "no member at all"
+                if departure_of(members, application) is not None:
+                    print(f"PASS: {application} left {room_id}")
+                    return 0
+            else:
+                seen = f"{status}: {body[:200]}"
+
+            if clock.time() > deadline:
+                print(
+                    f"FAIL: {application} never left {room_id} within "
+                    f"{WITNESS_DEADLINE_SECONDS}s.\n"
+                    f"      Last read: {seen}",
+                    file=sys.stderr,
+                )
+                return 1
+            await asyncio.sleep(2)
+
+
 def main() -> int:
     # `claim-place` MANQUAIT ICI, ET C'EST LE DÉFAUT QUI REVIENT DANS CE DÉPÔT.
     #
@@ -1252,6 +1313,7 @@ def main() -> int:
         "claim-place": claim_place,
         "collect": collect,
         "witness-eviction": witness_eviction,
+        "witness-departure": witness_departure,
     }
     if len(sys.argv) != 2 or sys.argv[1] not in phases:
         print(
