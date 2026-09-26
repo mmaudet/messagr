@@ -1227,6 +1227,9 @@ export const fr = {
   find_off: 'La découverte des contacts n’est pas proposée ici.',
   find_not_findable:
     'Pour retrouver vos contacts, prouvez d’abord votre numéro.',
+  // LA LIMITE DE MASQUAGE (#401): how many cards wait, and from when.
+  'find_waiting %1$@ %2$@':
+    'Fiches encore à traiter : %1$@. Messagr pourra les masquer à partir du %2$@.',
 } as const
 
 /** Every key any screen may ask for. A typo is a compile error, not a blank. */

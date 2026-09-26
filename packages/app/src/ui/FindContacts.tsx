@@ -3,8 +3,9 @@ import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native'
 
 import { t, type CopyKey } from '../copy'
 import { color, floors, layout, space, stroke, type } from '../design/tokens'
-import type { FindingStage } from '../runtime/findContacts'
+import type { FindingStage, Waiting } from '../runtime/findContacts'
 import { NotchedButton } from './NotchedButton'
+import { dayOf } from './whenLabel'
 
 /**
  * « Retrouver mes contacts » (#400, #392): the reminder, then the contacts
@@ -68,6 +69,7 @@ export function FindContacts({
         <Found
           matches={stage.matches.map(m => m.contact.name)}
           others={stage.others.map(c => c.name)}
+          waiting={stage.waiting}
           onDone={onClose}
         />
       )}
@@ -102,16 +104,30 @@ const REFUSED: Readonly<
 function Found({
   matches,
   others,
+  waiting,
   onDone,
 }: {
   readonly matches: readonly string[]
   readonly others: readonly string[]
+  /** What the limit on masking left for later (#401). */
+  readonly waiting: Waiting | null
   readonly onDone: () => void
 }) {
   return (
     <ScrollView
       contentContainerStyle={styles.body}
       testID="find-contacts-found">
+      {waiting !== null && (
+        <View style={styles.refusal} testID="find-contacts-waiting">
+          <Text style={styles.refusalText}>
+            {t(
+              'find_waiting %1$@ %2$@',
+              String(waiting.contacts),
+              dayOf(waiting.freesAt),
+            )}
+          </Text>
+        </View>
+      )}
       <Text style={styles.heading}>{t('find_on_messagr')}</Text>
       {matches.length === 0 ? (
         <Text style={styles.hint} testID="find-contacts-nobody">

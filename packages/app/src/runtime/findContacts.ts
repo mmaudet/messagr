@@ -114,8 +114,23 @@ export type Findings =
       readonly matches: readonly Match[]
       /** The contacts not on Messagr, or not findable, by name. */
       readonly others: readonly Contact[]
+      /**
+       * The contacts the limit on masking left for later (#401), and when it
+       * frees, in milliseconds; `null` when every number was masked.
+       */
+      readonly waiting: Waiting | null
     }
   | { readonly found: false; readonly refusal: FindingRefusal }
+
+/**
+ * What the limit on masking left for later (#401): how many contacts hold a
+ * number not masked yet, and when the service masks again.
+ */
+export interface Waiting {
+  readonly contacts: number
+  /** Milliseconds since the epoch. */
+  readonly freesAt: number
+}
 
 /**
  * Why the contacts could not be looked for:
@@ -153,7 +168,7 @@ export async function findContacts(deps: FindingDeps): Promise<Findings> {
   const contacts = await deps.readAddressBook()
   const holders = numbersOf(contacts, deps.region())
   if (holders.size === 0) {
-    return { found: true, matches: [], others: byName(contacts) }
+    return { found: true, matches: [], others: byName(contacts), waiting: null }
   }
 
   const key = await currentKey(deps.service)
@@ -161,14 +176,36 @@ export async function findContacts(deps: FindingDeps): Promise<Findings> {
 
   const numbers = [...holders.keys()]
   const masks = new Map<string, string>()
-  for (let at = 0; at < numbers.length; at += BATCH) {
+  // THE LIMIT OF #401: a batch over it is refused with how many numbers are
+  // still allowed. Those are sent again, the first of the batch, and the
+  // rest wait for the window to free. Nothing here depends on a comparison:
+  // what is sent follows the address book and the limit, never the matches.
+  let freesAt: number | null = null
+  for (let at = 0; at < numbers.length && freesAt === null; at += BATCH) {
     const batch = numbers.slice(at, at + BATCH)
     const masked = await haveMasked(deps, key, batch)
     if (typeof masked === 'string') return { found: false, refusal: masked }
-    batch.forEach((number, i) => masks.set(number, masked[i]!))
+    if ('limit' in masked) {
+      freesAt = masked.limit.freesAt
+      const allowed = batch.slice(0, masked.limit.remaining)
+      if (allowed.length === 0) break
+      const retried = await haveMasked(deps, key, allowed)
+      if (typeof retried === 'string') return { found: false, refusal: retried }
+      // Refused again: another device of this number spent the rest in the
+      // meantime, and these wait too.
+      if (!('limit' in retried)) {
+        allowed.forEach((number, i) => masks.set(number, retried.masks[i]!))
+      }
+      break
+    }
+    batch.forEach((number, i) => masks.set(number, masked.masks[i]!))
   }
 
-  const listed = await directoryOf(deps.service, key.keyNumber)
+  // WITH NOTHING MASKED, the directory has nothing to be compared with.
+  const listed =
+    masks.size === 0
+      ? new Map<string, string>()
+      : await directoryOf(deps.service, key.keyNumber)
   if (typeof listed === 'string') return { found: false, refusal: listed }
 
   const matched = new Map<Contact, string>()
@@ -179,6 +216,13 @@ export async function findContacts(deps: FindingDeps): Promise<Findings> {
       if (!matched.has(contact)) matched.set(contact, reference)
     }
   }
+  const waitingContacts = contacts.filter(
+    contact =>
+      !matched.has(contact) &&
+      [...holders]
+        .filter(([, held]) => held.includes(contact))
+        .some(([number]) => !masks.has(number)),
+  ).length
   return {
     found: true,
     matches: byName([...matched.keys()]).map(contact => ({
@@ -186,6 +230,10 @@ export async function findContacts(deps: FindingDeps): Promise<Findings> {
       reference: matched.get(contact)!,
     })),
     others: byName(contacts.filter(contact => !matched.has(contact))),
+    waiting:
+      freesAt !== null && waitingContacts > 0
+        ? { contacts: waitingContacts, freesAt }
+        : null,
   }
 }
 
@@ -239,13 +287,18 @@ async function currentKey(
 
 /**
  * One batch blinded, masked by the service, and unblinded: each number's
- * mask, in base64, in the same order.
+ * mask, in base64, in the same order; or the limit of #401, when the batch is
+ * over it.
  */
 async function haveMasked(
   deps: FindingDeps,
   key: Key,
   numbers: readonly string[],
-): Promise<string[] | FindingRefusal> {
+): Promise<
+  | { readonly masks: string[] }
+  | { readonly limit: { readonly remaining: number; readonly freesAt: number } }
+  | FindingRefusal
+> {
   const blinding = await deps.masking.blind(
     numbers.map(number => Uint8Array.from(number, c => c.charCodeAt(0))),
   )
@@ -258,6 +311,12 @@ async function haveMasked(
     ),
   )
   if (typeof answer === 'string') return answer
+  if (answer.errcode === 'MESSAGR_MASKING_QUOTA') {
+    const { remaining, frees_at: freesAt } = answer
+    return typeof remaining === 'number' && typeof freesAt === 'number'
+      ? { limit: { remaining, freesAt: freesAt * 1000 } }
+      : 'unreachable'
+  }
   const { evaluated, batch_proof: batchProof } = answer
   if (
     answer.key_number !== key.keyNumber ||
@@ -279,7 +338,9 @@ async function haveMasked(
   } catch {
     return 'unreachable'
   }
-  return masks === 'not-the-published-key' ? masks : masks.map(base64Of)
+  return masks === 'not-the-published-key'
+    ? masks
+    : { masks: masks.map(base64Of) }
 }
 
 /** The directory, as the masks under the key and the reference of each. */
@@ -315,6 +376,11 @@ async function asked(
   }
   const body = parsed(answer.body)
   if (answer.status === 200 && body !== null) return body
+  // The limit of #401 is not a refusal of the search: its body says how many
+  // numbers are still allowed, which `maskBatch` reads.
+  if (answer.status === 429 && body?.errcode === 'MESSAGR_MASKING_QUOTA') {
+    return body
+  }
   if (answer.status === 403 && body?.errcode === 'MESSAGR_NOT_FINDABLE') {
     return 'not-findable'
   }
@@ -347,6 +413,7 @@ export type FindingStage =
       readonly stage: 'found'
       readonly matches: readonly Match[]
       readonly others: readonly Contact[]
+      readonly waiting: Waiting | null
     }
   | {
       readonly stage: 'refused'
@@ -421,6 +488,7 @@ export function findingJourney(
               stage: 'found',
               matches: findings.matches,
               others: findings.others,
+              waiting: findings.waiting,
             }
           : { stage: 'refused', why: findings.refusal },
       )

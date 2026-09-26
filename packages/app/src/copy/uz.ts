@@ -831,4 +831,6 @@ export const uz: Readonly<Record<CopyKey, string>> = {
   find_off: 'Kontaktlarni topish bu yerda taklif qilinmaydi.',
   find_not_findable:
     'Kontaktlaringizni topish uchun avval raqamingizni isbotlang.',
+  'find_waiting %1$@ %2$@':
+    'Hali koʻrib chiqilmagan kontaktlar: %1$@. Messagr ularni %2$@ dan boshlab niqoblay oladi.',
 }
