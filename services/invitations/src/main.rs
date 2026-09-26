@@ -224,23 +224,9 @@ mod tests {
                 "http://127.0.0.1:1".into(),
                 "token".into(),
             )),
-            cfg: config::Config {
-                database_url: String::new(),
-                homeserver_url: "http://127.0.0.1:1".into(),
-                registration_token: "token".into(),
-                encryption_key: [0u8; 32],
-                edge_retention_days: 30,
-                bind_addr: String::new(),
-                // Field brought in by the "ceiling" fix; inert here. The seven
-                // cases below are produced BEFORE any handler, so none of them
-                // reaches the ceiling check: the conservative default is fine
-                // and commits nothing.
-                max_reserved_accounts_per_inviter: config::DEFAULT_RESERVED_ACCOUNTS_CEILING,
-                // No gateway here, and that is the honest value: this state
-                // is inert on purpose, and a URL would invite a test to
-                // depend on something reachable.
-                push_gateway_url: None,
-            },
+            // The cases below are produced before any handler: the test
+            // defaults commit nothing.
+            cfg: config::Config::for_tests(),
         });
         let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
         let base = format!("http://{}", listener.local_addr().unwrap());
