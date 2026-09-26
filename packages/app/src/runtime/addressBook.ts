@@ -3,15 +3,22 @@
  * contacts (#400): the system's permission, then each card's name and
  * numbers, and nothing else of it.
  *
- * `react-native-contacts` reads the cards. Its Android manifest declares no
- * permission, so this application's manifest is the only place
- * `READ_CONTACTS` can come from, and it does not yet: the owner holds that
- * line for the declarations of the version that carries discovery (#414).
- * Until then the system refuses on Android, and the screen says so.
+ * `react-native-contacts` reads the cards, and asks iOS. It does not ask
+ * Android: its request there never answers, since the callback that would
+ * carry the answer is commented out in the library, and its README says to
+ * ask with `PermissionsAndroid`. So Android is asked here, the second file
+ * allowed to name it after `callPermissions.ts`.
+ *
+ * The library's Android manifest declares no permission, so this
+ * application's manifest is the only place `READ_CONTACTS` can come from, and
+ * it does not yet: the owner holds that line for the declarations of the
+ * version that carries discovery (#414). Until then Android answers « no » at
+ * once, without asking the person, and the screen says so.
  *
  * What leaves this module is a name and numbers as written in each card.
  * `findContacts.ts` says what leaves the telephone: masks, and never a name.
  */
+import { PermissionsAndroid, Platform } from 'react-native'
 import Contacts from 'react-native-contacts'
 
 import type { Contact } from './findContacts'
@@ -24,6 +31,12 @@ export type AddressBookAccess = 'all' | 'some' | 'none'
 
 /** Asks the system, which asks the person the first time only. */
 export async function askForTheAddressBook(): Promise<AddressBookAccess> {
+  if (Platform.OS === 'android') {
+    const answer = await PermissionsAndroid.request(
+      PermissionsAndroid.PERMISSIONS.READ_CONTACTS,
+    )
+    return answer === PermissionsAndroid.RESULTS.GRANTED ? 'all' : 'none'
+  }
   const answer = await Contacts.requestPermission()
   return answer === 'authorized'
     ? 'all'

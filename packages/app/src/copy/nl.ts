@@ -815,8 +815,8 @@ export const nl: Readonly<Record<CopyKey, string>> = {
   find_nobody: 'Nog geen van uw contacten is vindbaar op Messagr.',
   find_no_access:
     'Messagr heeft geen toegang tot uw adresboek. U kunt het toestaan in de instellingen van de telefoon en intussen via een link uitnodigen.',
-  find_proof_rejected:
-    'Het antwoord van de dienst levert niet het verwachte bewijs: er wordt niets getoond. Probeer het later opnieuw.',
+  find_not_the_published_key:
+    'Het antwoord van de dienst komt niet van zijn gepubliceerde sleutel: er wordt niets getoond. Probeer het later opnieuw.',
   find_unreachable: 'De dienst antwoordt niet. Probeer het zo meteen opnieuw.',
   find_off: 'Contacten vinden wordt hier niet aangeboden.',
   find_not_findable: 'Om uw contacten te vinden, bewijst u eerst uw nummer.',

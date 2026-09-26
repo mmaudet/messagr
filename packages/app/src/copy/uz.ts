@@ -824,8 +824,8 @@ export const uz: Readonly<Record<CopyKey, string>> = {
   find_nobody: 'Hozircha kontaktlaringizdan hech biri Messagrda topilmaydi.',
   find_no_access:
     'Messagr manzillar kitobingizni ocha olmaydi. Buni telefon sozlamalarida ruxsat berishingiz va shu orada havola orqali taklif qilishingiz mumkin.',
-  find_proof_rejected:
-    'Xizmat javobi kutilgan isbotni bermadi: hech narsa koʻrsatilmaydi. Keyinroq qayta urinib koʻring.',
+  find_not_the_published_key:
+    'Xizmat javobi uning eʼlon qilingan kalitidan kelmadi: hech narsa koʻrsatilmaydi. Keyinroq qayta urinib koʻring.',
   find_unreachable:
     'Xizmat javob bermayapti. Birozdan soʻng qayta urinib koʻring.',
   find_off: 'Kontaktlarni topish bu yerda taklif qilinmaydi.',

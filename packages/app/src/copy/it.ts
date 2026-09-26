@@ -806,8 +806,8 @@ export const it: Readonly<Record<CopyKey, string>> = {
   find_nobody: 'Per ora nessuno dei Suoi contatti è trovabile su Messagr.',
   find_no_access:
     'Messagr non ha accesso alla Sua rubrica. Può consentirlo nelle impostazioni del telefono e, nel frattempo, invitare con un link.',
-  find_proof_rejected:
-    'La risposta del servizio non porta la prova attesa: non viene mostrato nulla. Riprovi più tardi.',
+  find_not_the_published_key:
+    'La risposta del servizio non viene dalla sua chiave pubblicata: non viene mostrato nulla. Riprovi più tardi.',
   find_unreachable: 'Il servizio non risponde. Riprovi tra un momento.',
   find_off: 'Ritrovare i contatti non è offerto qui.',
   find_not_findable:

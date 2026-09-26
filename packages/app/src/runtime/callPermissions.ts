@@ -3,7 +3,9 @@ import { PermissionsAndroid, Platform, type Permission } from 'react-native'
 import type { CallPermission, PermissionPorts } from '../calls/permissions'
 
 /**
- * The one file allowed to name `PermissionsAndroid`.
+ * One of the two files allowed to name `PermissionsAndroid`: this one for the
+ * microphone and the camera of a call, `addressBook.ts` for the address book
+ * (#400), which its library cannot ask Android for.
  *
  * `calls/permissions.ts` decides when a call asks and what a refusal does to
  * it; this says only how Android is asked. It has no tests for the reason

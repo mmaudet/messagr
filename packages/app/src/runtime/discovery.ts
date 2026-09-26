@@ -433,10 +433,7 @@ export function proofJourney(
   return {
     open: (reading, number) => {
       begin(reading, number)
-      if (
-        reading.findableUntil !== null &&
-        reading.findableUntil > deps.now()
-      ) {
+      if (isFindable(reading, deps.now())) {
         go({
           stage: 'proven',
           findableUntil: reading.findableUntil,
@@ -635,7 +632,19 @@ function errcodeOf(body: Record<string, unknown> | null): string {
   return typeof body?.errcode === 'string' ? body.errcode : ''
 }
 
-function parsed(text: string): Record<string, unknown> | null {
+/** Whether the account a reading describes is findable at `now`. */
+export function isFindable(
+  reading: DiscoveryReading & { readonly read: true },
+  now: number,
+): reading is DiscoveryReading & {
+  readonly read: true
+  readonly findableUntil: number
+} {
+  return reading.findableUntil !== null && reading.findableUntil > now
+}
+
+/** A JSON object, or `null` for anything else a body may hold. */
+export function parsed(text: string): Record<string, unknown> | null {
   try {
     const value: unknown = JSON.parse(text)
     return typeof value === 'object' && value !== null && !Array.isArray(value)

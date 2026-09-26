@@ -833,8 +833,8 @@ export const de: Readonly<Record<CopyKey, string>> = {
   find_nobody: 'Noch keiner Ihrer Kontakte ist auf Messagr auffindbar.',
   find_no_access:
     'Messagr hat keinen Zugriff auf Ihr Adressbuch. Sie können ihn in den Einstellungen des Telefons erlauben und bis dahin per Link einladen.',
-  find_proof_rejected:
-    'Die Antwort des Dienstes bringt nicht den erwarteten Nachweis: Es wird nichts angezeigt. Versuchen Sie es später erneut.',
+  find_not_the_published_key:
+    'Die Antwort des Dienstes stammt nicht von seinem veröffentlichten Schlüssel: Es wird nichts angezeigt. Versuchen Sie es später erneut.',
   find_unreachable:
     'Der Dienst antwortet nicht. Versuchen Sie es gleich noch einmal.',
   find_off: 'Das Finden von Kontakten wird hier nicht angeboten.',

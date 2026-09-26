@@ -22,7 +22,7 @@ import { GestureHandlerRootView } from 'react-native-gesture-handler'
 import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context'
 import { createClient } from 'matrix-js-sdk'
 
-import { blindOprf, finalizeOprf, runProbe } from 'react-native-matrix-crypto'
+import { runProbe } from 'react-native-matrix-crypto'
 
 import { fetchBridgeStatus } from './src/runtime/cryptoBridge'
 import {
@@ -225,7 +225,9 @@ import {
   askForTheAddressBook,
   readAddressBook,
 } from './src/runtime/addressBook'
+import { bridgeMasking } from './src/runtime/bridgeMasking'
 import {
+  findContactsEntry,
   findingJourney,
   regionOf,
   type FindingStage,
@@ -1222,6 +1224,28 @@ export function App({
     service: discoveryService(() => credentialsRef.current),
     now: () => Date.now(),
   }).current
+  // LOOKING FOR ONE'S CONTACTS (#400), from the « + » sheet, for a findable
+  // account: the address book through the system, each number masked by the
+  // crypto bridge's OPRF client, and the comparison made on this telephone.
+  // Nothing runs before the person continues from the reminder.
+  const findingRef = useRef(
+    findingJourney(
+      {
+        service: discoveryDeps.service,
+        readAddressBook,
+        askForTheAddressBook,
+        masking: bridgeMasking,
+        region: () => regionOf(deviceLocale()),
+      },
+      setFinding,
+    ),
+  )
+  // « RETROUVER MES CONTACTS » FROM AN ACCOUNT THAT IS NOT FINDABLE leads to
+  // the consent and the proof first (#392), and once the number is proven, on
+  // to the reminder: the person asked to look for their contacts, not to
+  // stay on the proof. Set by the « + » sheet, dropped by every way out of
+  // the proof.
+  const findAfterProofRef = useRef(false)
   // A PROOF JUST MADE IS WRITTEN INTO THE ROW FROM ITS OWN ANSWER, rather
   // than read again: closing the journey, « Pas maintenant » included, sends
   // nothing (#392). So is a number just withdrawn (#398): `readingAfter`.
@@ -1248,6 +1272,15 @@ export function App({
       stage => {
         setProof(stage)
         setDiscovery(reading => readingAfter(reading, stage))
+        if (!findAfterProofRef.current) return
+        if (stage.stage === 'proven') {
+          findAfterProofRef.current = false
+          proofRef.current.close()
+          setTab('chat')
+          findingRef.current.open()
+        } else if (stage.stage === 'shut') {
+          findAfterProofRef.current = false
+        }
       },
     ),
   )
@@ -1257,22 +1290,6 @@ export function App({
       () => setKeptNumber(null),
     )
   }, [])
-  // LOOKING FOR ONE'S CONTACTS (#400), from the « + » sheet, for a findable
-  // account: the address book through the system, each number masked by the
-  // crypto bridge's OPRF client, and the comparison made on this telephone.
-  // Nothing runs before the person continues from the reminder.
-  const findingRef = useRef(
-    findingJourney(
-      {
-        service: discoveryDeps.service,
-        readAddressBook,
-        askForTheAddressBook,
-        masking: { blind: blindOprf, finalize: finalizeOprf },
-        region: regionOf(deviceLocale()),
-      },
-      setFinding,
-    ),
-  )
   // DELETING THE ACCOUNT THIS DEVICE HOLDS, FROM SETTINGS (#382).
   //
   // The server first, then this device: `deleteAccount.ts` holds that order.
@@ -4563,6 +4580,12 @@ export function App({
         proofRef.current.close()
         return true
       }
+      // « RETROUVER MES CONTACTS »: back is the way back to the list, at every
+      // stage. What is still running is dropped by the journey.
+      if (finding.stage !== 'shut') {
+        findingRef.current.close()
+        return true
+      }
       if (invite.stage !== 'shut') {
         setInvite({ stage: 'shut' })
         setAdmission(null)
@@ -4586,6 +4609,7 @@ export function App({
     legalOpen,
     deletion,
     proof.stage,
+    finding.stage,
     invite.stage,
     tab,
     backupPrompt,
@@ -5999,17 +6023,18 @@ export function App({
                 // ONLY WHERE THIS SERVICE SERVES DISCOVERY (#400), as « Être
                 // trouvable » in Settings. An account that is not findable
                 // proves its number first: the consent, in Settings, as the
-                // row there would open it (#392).
+                // row there would open it (#392), then the reminder.
                 onFindContacts={
-                  discovery.read && discovery.on
+                  discovery.read &&
+                  findContactsEntry(discovery, Date.now()) !== 'hidden'
                     ? () => {
                         setPlusOpen(false)
                         if (
-                          discovery.findableUntil !== null &&
-                          discovery.findableUntil > Date.now()
+                          findContactsEntry(discovery, Date.now()) === 'look'
                         ) {
                           findingRef.current.open()
                         } else {
+                          findAfterProofRef.current = true
                           setTab('settings')
                           proofRef.current.open(discovery, keptNumber)
                         }

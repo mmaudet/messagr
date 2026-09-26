@@ -7,8 +7,8 @@ import type { FindingStage } from '../runtime/findContacts'
 import { NotchedButton } from './NotchedButton'
 
 /**
- * « Retrouver mes contacts » (#400, #392): the reminder, then what the
- * search found.
+ * « Retrouver mes contacts » (#400, #392): the reminder, then the contacts
+ * found on Messagr and the others.
  *
  * Every stage is `findContacts.ts`'s, and every gesture is handed back to it:
  * this file draws and decides nothing.
@@ -94,7 +94,7 @@ const REFUSED: Readonly<
 > = {
   'no-access': 'find_no_access',
   'not-findable': 'find_not_findable',
-  'proof-rejected': 'find_proof_rejected',
+  'not-the-published-key': 'find_not_the_published_key',
   off: 'find_off',
   unreachable: 'find_unreachable',
 }

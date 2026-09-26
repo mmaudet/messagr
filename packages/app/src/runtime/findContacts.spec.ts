@@ -1,7 +1,9 @@
 import { describe, expect, it } from 'vitest'
 
+import { whereTheNumberGoes } from './discovery'
 import {
   findContacts,
+  findContactsEntry,
   findingJourney,
   regionOf,
   type Blinding,
@@ -36,17 +38,22 @@ const unb64 = (s: string) => bytes(atob(s))
 const maskOf = (number: string) => b64(bytes(`mask(${number})#${KEY}`))
 
 function theMasking(verifies = true) {
-  const calls: { finalized: number } = { finalized: 0 }
+  const calls: { finalized: number; blinded: string[] } = {
+    finalized: 0,
+    blinded: [],
+  }
   const masking: Masking = {
-    blind: async inputs => ({
-      blindedElements: inputs.map(input => bytes(`blinded(${text(input)})`)),
-    }),
+    blind: async inputs => {
+      const blindedElements = inputs.map(input =>
+        bytes(`blinded(${text(input)})`),
+      )
+      calls.blinded.push(...blindedElements.map(b64))
+      return { blindedElements }
+    },
     finalize: async (blinding: Blinding, evaluated, _proof, publicKey) => {
       calls.finalized += 1
       if (!verifies || b64(publicKey) !== PUBLIC_KEY) {
-        const refused = new Error('proof')
-        Object.assign(refused, { kind: 'proof_rejected' })
-        throw refused
+        return 'not-the-published-key'
       }
       expect(evaluated).toHaveLength(blinding.blindedElements.length)
       return evaluated.map(e =>
@@ -123,7 +130,7 @@ function deps(
     readAddressBook: async () => contacts,
     masking,
     service,
-    region: 'FR',
+    region: () => 'FR',
   }
   return { deps: all, asked, calls }
 }
@@ -172,33 +179,87 @@ describe('looking for contacts', () => {
     expect(sent).toEqual(['blinded(+33612345678)'])
   })
 
-  it('sends the numbers masked, never in clear', async () => {
-    const { deps: d, asked } = deps([PAUL, ANNE, ZOE], {})
+  it('sends the blinded elements and nothing else: no number, no name', async () => {
+    const { deps: d, asked, calls } = deps([PAUL, ANNE, ZOE], {})
 
     await findContacts(d)
 
-    const everything = JSON.stringify(asked)
-    for (const digits of ['612345678', '7911123456', '698765432']) {
-      expect(everything).not.toContain(digits)
+    const sent = asked.flatMap(a => a.body?.blinded ?? [])
+    expect(sent).toEqual(calls.blinded)
+    const everything = [
+      JSON.stringify(asked),
+      ...sent.map(e => text(unb64(e))),
+    ].join('\n')
+    for (const secret of ['Paul', 'Anne', 'Zoé']) {
+      expect(everything).not.toContain(secret)
     }
+    // What the double blinded is the number itself, so the check above is
+    // what stands between a number and the service: every element sent is
+    // one the masking made.
+    expect(sent.every(e => text(unb64(e)).startsWith('blinded('))).toBe(true)
   })
 
-  it('sends the same requests whether it finds somebody or nobody', async () => {
-    const finds = deps([PAUL, ZOE], { '+33612345678': 'ref-paul' })
-    const findsNobody = deps([PAUL, ZOE], {})
+  it('sends the same requests for an address book that finds somebody and one that finds nobody', async () => {
+    const proven = { '+33612345678': 'ref-paul' }
+    const findsPaul = deps([PAUL, ZOE], proven)
+    const findsNobody = deps([ANNE, ZOE], proven)
 
-    const one = await findContacts(finds.deps)
+    const one = await findContacts(findsPaul.deps)
     const none = await findContacts(findsNobody.deps)
 
     expect(one.found && one.matches).toHaveLength(1)
     expect(none.found && none.matches).toHaveLength(0)
     const shape = (asked: Asked[]) =>
-      asked.map(a => (a.body ? `${a.route}:${a.body.blinded.length}` : a.route))
-    expect(shape(finds.asked)).toEqual(shape(findsNobody.asked))
-    expect(shape(finds.asked)).toEqual(['keys', 'maskBatch:2', 'directory'])
+      asked.map(a =>
+        a.body
+          ? `${a.route}:${a.body.key_number}:${a.body.blinded.length}`
+          : a.route,
+      )
+    expect(shape(findsPaul.asked)).toEqual(shape(findsNobody.asked))
+    expect(shape(findsPaul.asked)).toEqual([
+      'keys',
+      `maskBatch:${KEY}:2`,
+      'directory',
+    ])
   })
 
-  it('stops at a proof that does not verify, and says so', async () => {
+  it('writes each number of an open country as the proof writes it, or the masks would never meet', async () => {
+    // National and international forms of a number of each of eight open
+    // countries: what `whereTheNumberGoes` sends for a number typed on the
+    // proof screen, and what the address book's number becomes here.
+    const written: readonly [string, string, string][] = [
+      ['FR', '06 12 34 56 78', '+33 6 12 34 56 78'],
+      ['DE', '0151 23456789', '+49 151 23456789'],
+      ['ES', '612 34 56 78', '+34 612 34 56 78'],
+      ['GB', '07911 123456', '+44 7911 123456'],
+      ['CH', '078 123 45 67', '+41 78 123 45 67'],
+      ['NL', '06 12345678', '+31 6 12345678'],
+      ['BE', '0470 12 34 56', '+32 470 12 34 56'],
+      ['AT', '0664 1234567', '+43 664 1234567'],
+    ]
+    const countries = written.map(([code, , international]) => ({
+      code,
+      prefix: international.slice(1).split(' ')[0]!,
+      provider: 'OVHcloud',
+    }))
+    for (const [region, national, international] of written) {
+      const proved = whereTheNumberGoes(international, countries)
+      expect(proved.verdict, international).toBe('open')
+      const { deps: d, asked } = deps(
+        [{ name: 'Carte', numbers: [national] }],
+        {},
+      )
+      await findContacts({ ...d, region: () => region })
+      const sent = asked
+        .filter(a => a.route === 'maskBatch')
+        .flatMap(a => a.body!.blinded.map(e => text(unb64(e))))
+      expect(sent, national).toEqual([
+        `blinded(${proved.verdict === 'open' ? proved.number : ''})`,
+      ])
+    }
+  })
+
+  it('stops at an answer that did not come from the published key, and says so', async () => {
     const { deps: d, asked } = deps(
       [PAUL],
       { '+33612345678': 'ref-paul' },
@@ -209,7 +270,7 @@ describe('looking for contacts', () => {
 
     const found = await findContacts(d)
 
-    expect(found).toEqual({ found: false, refusal: 'proof-rejected' })
+    expect(found).toEqual({ found: false, refusal: 'not-the-published-key' })
     expect(asked.map(a => a.route)).not.toContain('directory')
   })
 
@@ -316,7 +377,7 @@ describe('the journey of looking for contacts', () => {
     expect(asked).toEqual([])
   })
 
-  it('says why nothing was found when the search stopped', async () => {
+  it('says why nothing was found when looking stopped', async () => {
     const { deps: d } = deps([PAUL], {}, { verifies: false })
     const shown: FindingStage[] = []
     const j = findingJourney(
@@ -327,10 +388,13 @@ describe('the journey of looking for contacts', () => {
     j.open()
     await j.go()
 
-    expect(shown.at(-1)).toEqual({ stage: 'refused', why: 'proof-rejected' })
+    expect(shown.at(-1)).toEqual({
+      stage: 'refused',
+      why: 'not-the-published-key',
+    })
   })
 
-  it('drops the answer of a search somebody left', async () => {
+  it('drops what ends after its screen was left', async () => {
     const { j, shown } = journey('all', [PAUL], {})
 
     j.open()
@@ -361,12 +425,75 @@ describe("the telephone's region", () => {
       {},
     )
 
-    await findContacts({ ...d, region: undefined })
+    await findContacts({ ...d, region: () => undefined })
 
     expect(
       asked
         .filter(a => a.route === 'maskBatch')
         .flatMap(a => a.body!.blinded.map(e => text(unb64(e)))),
     ).toEqual(['blinded(+33698765432)'])
+  })
+})
+
+describe('the journey, pressed twice or refused by the system', () => {
+  it('masks the address book once for two presses on « Continuer »', async () => {
+    const { deps: d, asked } = deps([PAUL, ZOE], {})
+    const shown: FindingStage[] = []
+    const j = findingJourney(
+      { ...d, askForTheAddressBook: async () => 'all' },
+      stage => shown.push(stage),
+    )
+
+    j.open()
+    await Promise.all([j.go(), j.go()])
+
+    expect(asked.filter(a => a.route === 'maskBatch')).toHaveLength(1)
+    expect(shown.at(-1)?.stage).toBe('found')
+  })
+
+  it('reads a question the system could not ask as a refusal', async () => {
+    const { deps: d, asked } = deps([PAUL], {})
+    const shown: FindingStage[] = []
+    const j = findingJourney(
+      {
+        ...d,
+        askForTheAddressBook: async () => {
+          throw new Error('no activity')
+        },
+      },
+      stage => shown.push(stage),
+    )
+
+    j.open()
+    await j.go()
+
+    expect(shown.at(-1)).toEqual({ stage: 'refused', why: 'no-access' })
+    expect(asked).toEqual([])
+  })
+})
+
+describe('where « Retrouver mes contacts » leads', () => {
+  const NOW = 1_790_000_000_000
+  const reading = (on: boolean, findableUntil: number | null) =>
+    ({
+      read: true,
+      on,
+      findableUntil,
+      ended: null,
+      countries: [],
+    }) as const
+
+  it('nowhere while this service does not serve discovery', () => {
+    expect(findContactsEntry({ read: false }, NOW)).toBe('hidden')
+    expect(findContactsEntry(reading(false, NOW + 1), NOW)).toBe('hidden')
+  })
+
+  it('to the consent and the proof for an account that is not findable', () => {
+    expect(findContactsEntry(reading(true, null), NOW)).toBe('prove-first')
+    expect(findContactsEntry(reading(true, NOW), NOW)).toBe('prove-first')
+  })
+
+  it('to the reminder for a findable account', () => {
+    expect(findContactsEntry(reading(true, NOW + 1), NOW)).toBe('look')
   })
 })

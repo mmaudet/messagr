@@ -1209,7 +1209,7 @@ export const fr = {
   findable_later:
     'Trop de codes sont demandés en ce moment. Réessayez plus tard.',
   // RETROUVER SES CONTACTS (#400): the line of the « + » sheet, the
-  // reminder before the system's question, and what the search shows.
+  // reminder before the system's question, and what comes of it.
   plus_find_contacts: 'Retrouver mes contacts',
   find_reminder:
     'Messagr va lire les numéros de votre carnet pour les masquer sur ce téléphone. Les noms n’en sortent pas.',
@@ -1221,8 +1221,8 @@ export const fr = {
     'Aucun de vos contacts n’est trouvable sur Messagr pour l’instant.',
   find_no_access:
     'Messagr n’a pas accès à votre carnet. Vous pouvez l’autoriser dans les réglages du téléphone, et inviter par un lien en attendant.',
-  find_proof_rejected:
-    'La réponse du service n’apporte pas la preuve attendue : rien n’est affiché. Réessayez plus tard.',
+  find_not_the_published_key:
+    'La réponse du service ne vient pas de sa clé publiée : rien n’est affiché. Réessayez plus tard.',
   find_unreachable: 'Le service ne répond pas. Réessayez dans un moment.',
   find_off: 'La découverte des contacts n’est pas proposée ici.',
   find_not_findable:

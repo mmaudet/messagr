@@ -808,8 +808,8 @@ export const en: Readonly<Record<CopyKey, string>> = {
   find_nobody: 'None of your contacts can be found on Messagr yet.',
   find_no_access:
     "Messagr cannot open your address book. You can allow it in the phone's settings, and invite by link in the meantime.",
-  find_proof_rejected:
-    "The service's answer does not bring the expected proof: nothing is shown. Try again later.",
+  find_not_the_published_key:
+    "The service's answer did not come from its published key: nothing is shown. Try again later.",
   find_unreachable: 'The service is not answering. Try again in a moment.',
   find_off: 'Finding contacts is not offered here.',
   find_not_findable: 'To find your contacts, prove your number first.',

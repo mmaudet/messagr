@@ -1,6 +1,10 @@
 import { describe, expect, it, vi } from 'vitest'
 
 vi.mock('react-native-contacts', () => ({ default: {} }))
+vi.mock('react-native', () => ({
+  PermissionsAndroid: {},
+  Platform: { OS: 'ios' },
+}))
 
 import { contactOf, type Card } from './addressBook'
 

@@ -48,6 +48,11 @@ OBLIGES = {
         'NSPhotoLibraryUsageDescription',
         'NSCameraUsageDescription',
     ],
+    # Reads the address book through CNContactStore, for « Retrouver mes
+    # contacts » (#400).
+    'react-native-contacts': [
+        'NSContactsUsageDescription',
+    ],
 }
 
 manifest = json.load(open(f'{root}/packages/app/package.json'))

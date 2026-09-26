@@ -165,7 +165,7 @@ describe('« Retrouver mes contacts »', () => {
   it('says why nothing is shown, and leads back', () => {
     for (const [why, key] of [
       ['no-access', 'find_no_access'],
-      ['proof-rejected', 'find_proof_rejected'],
+      ['not-the-published-key', 'find_not_the_published_key'],
       ['unreachable', 'find_unreachable'],
       ['off', 'find_off'],
       ['not-findable', 'find_not_findable'],

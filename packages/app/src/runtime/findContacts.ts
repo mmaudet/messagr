@@ -31,12 +31,18 @@
  * code. The tests stand them in and record every request.
  */
 import {
+  isSupportedCountry,
   parsePhoneNumberFromString,
-  type CountryCode,
 } from 'libphonenumber-js/min'
 
+import type { AddressBookAccess } from './addressBook'
 import { bytesOf } from './base64'
-import type { Answer } from './discovery'
+import {
+  isFindable,
+  parsed,
+  type Answer,
+  type DiscoveryReading,
+} from './discovery'
 import { base64Of } from './receiveImage'
 
 /** An entry of the address book, as the system gives it. */
@@ -58,15 +64,17 @@ export interface Blinding {
 export interface Masking {
   readonly blind: (inputs: readonly Uint8Array[]) => Promise<Blinding>
   /**
-   * Checks the batch proof against `publicKey`, then unblinds: rejects with
-   * the kind `proof_rejected` when the proof does not verify.
+   * Checks the answer's batch proof against `publicKey`, then unblinds; or
+   * says the answer did not come from that key (`bridgeMasking.ts`). The
+   * batch proof is RFC 9497's, the service's proof about a batch it masked,
+   * and nothing to do with the proof of a number.
    */
   readonly finalize: (
     blinding: Blinding,
     evaluationElements: readonly Uint8Array[],
     batchProof: Uint8Array,
     publicKey: Uint8Array,
-  ) => Promise<Uint8Array[]>
+  ) => Promise<Uint8Array[] | 'not-the-published-key'>
 }
 
 /** The routes of the service a findable account looks for its contacts with. */
@@ -86,9 +94,10 @@ export interface FindingDeps {
   /**
    * The telephone's region, ISO 3166-1 alpha-2, such as `FR`, for a number
    * written without its country code; `undefined` when the telephone names
-   * none, and such a number is then left aside rather than guessed at.
+   * none, and such a number is then left aside rather than guessed at. Read
+   * when the person looks, not when the application starts.
    */
-  readonly region: string | undefined
+  readonly region: () => string | undefined
 }
 
 /** A contact whose number a findable account proved, and that account. */
@@ -112,14 +121,27 @@ export type Findings =
  * Why the contacts could not be looked for:
  * - `not-findable`: this account has no current proof, and proves its
  *   number first;
- * - `proof-rejected`: an answer did not prove it came from the published
- *   key. Nothing is shown, and the search says so;
+ * - `not-the-published-key`: an answer did not come from the published key.
+ *   Nothing is shown, and the screen says so;
  * - `off`: this service does not serve discovery;
  * - `unreachable`: the service could not be reached, or answered something
  *   else than it should.
  */
 export type FindingRefusal =
-  'not-findable' | 'proof-rejected' | 'off' | 'unreachable'
+  'not-findable' | 'not-the-published-key' | 'off' | 'unreachable'
+
+/**
+ * Where « Retrouver mes contacts » leads from a reading of discovery: nowhere
+ * while this service does not serve it, to the consent and the proof for an
+ * account that is not findable (#392), to the reminder for one that is.
+ */
+export function findContactsEntry(
+  reading: DiscoveryReading,
+  now: number,
+): 'hidden' | 'prove-first' | 'look' {
+  if (!reading.read || !reading.on) return 'hidden'
+  return isFindable(reading, now) ? 'look' : 'prove-first'
+}
 
 /**
  * The most numbers one request carries: what the service accepts in one
@@ -129,7 +151,7 @@ const BATCH = 5_000
 
 export async function findContacts(deps: FindingDeps): Promise<Findings> {
   const contacts = await deps.readAddressBook()
-  const holders = numbersOf(contacts, deps.region)
+  const holders = numbersOf(contacts, deps.region())
   if (holders.size === 0) {
     return { found: true, matches: [], others: byName(contacts) }
   }
@@ -141,12 +163,12 @@ export async function findContacts(deps: FindingDeps): Promise<Findings> {
   const masks = new Map<string, string>()
   for (let at = 0; at < numbers.length; at += BATCH) {
     const batch = numbers.slice(at, at + BATCH)
-    const masked = await maskBatch(deps, key, batch)
+    const masked = await haveMasked(deps, key, batch)
     if (typeof masked === 'string') return { found: false, refusal: masked }
     batch.forEach((number, i) => masks.set(number, masked[i]!))
   }
 
-  const listed = await directoryOf(deps.service, key.number)
+  const listed = await directoryOf(deps.service, key.keyNumber)
   if (typeof listed === 'string') return { found: false, refusal: listed }
 
   const matched = new Map<Contact, string>()
@@ -175,13 +197,14 @@ function numbersOf(
   contacts: readonly Contact[],
   region: string | undefined,
 ): Map<string, Contact[]> {
+  // A region the library does not know is no region: numbers written without
+  // their country code are then left aside, as without one.
+  const known =
+    region !== undefined && isSupportedCountry(region) ? region : undefined
   const holders = new Map<string, Contact[]>()
   for (const contact of contacts) {
     for (const written of contact.numbers) {
-      const number = parsePhoneNumberFromString(
-        written,
-        region as CountryCode | undefined,
-      )
+      const number = parsePhoneNumberFromString(written, known)
       if (number === undefined || !number.isValid()) continue
       const held = holders.get(number.number) ?? []
       if (!held.includes(contact)) held.push(contact)
@@ -192,7 +215,7 @@ function numbersOf(
 }
 
 interface Key {
-  readonly number: number
+  readonly keyNumber: number
   readonly publicKey: Uint8Array
 }
 
@@ -211,11 +234,14 @@ async function currentKey(
   ) {
     return 'unreachable'
   }
-  return { number: last.key_number, publicKey: bytesOf(last.public_key) }
+  return { keyNumber: last.key_number, publicKey: bytesOf(last.public_key) }
 }
 
-/** One batch, masked: each number's mask, in base64, in the same order. */
-async function maskBatch(
+/**
+ * One batch blinded, masked by the service, and unblinded: each number's
+ * mask, in base64, in the same order.
+ */
+async function haveMasked(
   deps: FindingDeps,
   key: Key,
   numbers: readonly string[],
@@ -226,7 +252,7 @@ async function maskBatch(
   const answer = await asked(() =>
     deps.service.maskBatch(
       JSON.stringify({
-        key_number: key.number,
+        key_number: key.keyNumber,
         blinded: blinding.blindedElements.map(base64Of),
       }),
     ),
@@ -234,7 +260,7 @@ async function maskBatch(
   if (typeof answer === 'string') return answer
   const { evaluated, batch_proof: batchProof } = answer
   if (
-    answer.key_number !== key.number ||
+    answer.key_number !== key.keyNumber ||
     !Array.isArray(evaluated) ||
     evaluated.length !== numbers.length ||
     !evaluated.every(e => typeof e === 'string') ||
@@ -242,17 +268,18 @@ async function maskBatch(
   ) {
     return 'unreachable'
   }
+  let masks: Uint8Array[] | 'not-the-published-key'
   try {
-    const masks = await deps.masking.finalize(
+    masks = await deps.masking.finalize(
       blinding,
       (evaluated as string[]).map(bytesOf),
       bytesOf(batchProof),
       key.publicKey,
     )
-    return masks.map(base64Of)
-  } catch (e) {
-    return kindOf(e) === 'proof_rejected' ? 'proof-rejected' : 'unreachable'
+  } catch {
+    return 'unreachable'
   }
+  return masks === 'not-the-published-key' ? masks : masks.map(base64Of)
 }
 
 /** The directory, as the masks under the key and the reference of each. */
@@ -297,23 +324,6 @@ async function asked(
   return 'unreachable'
 }
 
-function parsed(text: string): Record<string, unknown> | null {
-  try {
-    const value: unknown = JSON.parse(text)
-    return typeof value === 'object' && value !== null
-      ? (value as Record<string, unknown>)
-      : null
-  } catch {
-    return null
-  }
-}
-
-function kindOf(e: unknown): unknown {
-  return typeof e === 'object' && e !== null
-    ? (e as { kind?: unknown }).kind
-    : undefined
-}
-
 function byName<T extends Contact>(contacts: readonly T[]): T[] {
   return [...contacts].sort((a, b) => a.name.localeCompare(b.name))
 }
@@ -346,9 +356,13 @@ export type FindingStage =
 export interface FindingJourney {
   /** « Retrouver mes contacts », for a findable account: the reminder. */
   readonly open: () => void
-  /** « Continuer »: the system's question, then the search. */
+  /**
+   * « Continuer », from the reminder only: the system's question, then the
+   * masking and the comparison. A second press, or one from any other stage,
+   * does nothing, so the address book is never masked twice for one press.
+   */
   readonly go: () => Promise<void>
-  /** Every way back. A search still running is dropped. */
+  /** Every way back. What is still running is dropped. */
   readonly close: () => void
 }
 
@@ -360,27 +374,40 @@ export interface FindingJourney {
 export function findingJourney(
   deps: FindingDeps & {
     /** The system's question: see `addressBook.ts`. */
-    readonly askForTheAddressBook: () => Promise<'all' | 'some' | 'none'>
+    readonly askForTheAddressBook: () => Promise<AddressBookAccess>
   },
   show: (stage: FindingStage) => void,
 ): FindingJourney {
-  // Which opening an answer belongs to: closing moves it on, and a search
-  // that ends after its screen was left shows nothing.
+  let stage: FindingStage = { stage: 'shut' }
+  const move = (next: FindingStage) => {
+    stage = next
+    show(next)
+  }
+  // Which opening an answer belongs to: closing moves it on, and what ends
+  // after its screen was left shows nothing.
   let opening = 0
   return {
     open: () => {
       opening += 1
-      show({ stage: 'reminder' })
+      move({ stage: 'reminder' })
     },
     go: async () => {
+      if (stage.stage !== 'reminder') return
       const mine = opening
-      const access = await deps.askForTheAddressBook()
+      // Leaving the reminder at once, so that a second press finds another
+      // stage and does nothing.
+      move({ stage: 'looking' })
+      let access: AddressBookAccess
+      try {
+        access = await deps.askForTheAddressBook()
+      } catch {
+        access = 'none'
+      }
       if (mine !== opening) return
       if (access === 'none') {
-        show({ stage: 'refused', why: 'no-access' })
+        move({ stage: 'refused', why: 'no-access' })
         return
       }
-      show({ stage: 'looking' })
       let findings: Findings
       try {
         findings = await findContacts(deps)
@@ -388,7 +415,7 @@ export function findingJourney(
         findings = { found: false, refusal: 'unreachable' }
       }
       if (mine !== opening) return
-      show(
+      move(
         findings.found
           ? {
               stage: 'found',
@@ -400,7 +427,7 @@ export function findingJourney(
     },
     close: () => {
       opening += 1
-      show({ stage: 'shut' })
+      move({ stage: 'shut' })
     },
   }
 }
