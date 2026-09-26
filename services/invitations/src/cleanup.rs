@@ -41,6 +41,21 @@ pub async fn purge_invitation_requests(pool: &SqlitePool, now: i64) -> Result<u6
     Ok(r.rows_affected())
 }
 
+/// Les preuves abandonnées, oubliées quand leur code a expiré (#397).
+///
+/// Une preuve en cours garde le masque du numéro et l'empreinte du code, le
+/// temps de la validité du code : dix minutes. Terminée, refusée ou expirée
+/// sous les yeux de la personne, elle s'efface d'elle-même ; abandonnée, elle
+/// resterait jusqu'à la prochaine demande du même compte. Le ménage horaire
+/// l'efface dans l'heure qui suit son expiration.
+pub async fn purge_spent_proofs(pool: &SqlitePool, now: i64) -> Result<u64> {
+    let r = sqlx::query("DELETE FROM pending_proofs WHERE expires_at <= ?")
+        .bind(now)
+        .execute(pool)
+        .await?;
+    Ok(r.rows_affected())
+}
+
 /// Qui a fait entrer qui, oublié trente jours après que l'invitation a été
 /// dépensée (#416).
 ///
@@ -457,13 +472,14 @@ pub(crate) async fn sweep_once(st: &Arc<AppState>, now: i64) -> bool {
         purge_invitation_requests(&st.pool, now).await,
         purge_invitation_graph(&st.pool, now, st.cfg.edge_retention_days).await,
         purge_inviter_counters(&st.pool).await,
+        purge_spent_proofs(&st.pool, now).await,
     ) {
-        (Ok(a), Ok(b), Ok(c), Ok(d), Ok(e), Ok(f), Ok(g), Ok(h)) => {
+        (Ok(a), Ok(b), Ok(c), Ok(d), Ok(e), Ok(f), Ok(g), Ok(h), Ok(i)) => {
             tracing::info!(
                 "cleanup: {a} edges, {b} invitations, {c} accounts, \
                                 {d} rows repaired, {e} claimed rows purged, \
                                 {f} requests purged, {g} graph rows purged, \
-                                {h} inviter counters purged"
+                                {h} inviter counters purged, {i} spent proofs purged"
             );
             true
         }
@@ -484,6 +500,31 @@ pub async fn run_forever(st: Arc<AppState>) {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[sqlx::test(migrations = "./migrations")]
+    async fn an_abandoned_proof_is_forgotten_once_its_code_has_run_out(pool: sqlx::SqlitePool) {
+        for (user, expires_at) in [("@abandon:h", 1_000_i64), ("@en-cours:h", 4_000_000_000)] {
+            sqlx::query(
+                "INSERT INTO pending_proofs \
+                 (user_id, key_id, mask, code_digest, attempts, expires_at) \
+                 VALUES (?, 1, ?, ?, 0, ?)",
+            )
+            .bind(user)
+            .bind(vec![1u8; 64])
+            .bind(vec![2u8; 32])
+            .bind(expires_at)
+            .execute(&pool)
+            .await
+            .unwrap();
+        }
+
+        assert_eq!(purge_spent_proofs(&pool, 1_000).await.unwrap(), 1);
+        let left: Vec<String> = sqlx::query_scalar("SELECT user_id FROM pending_proofs")
+            .fetch_all(&pool)
+            .await
+            .unwrap();
+        assert_eq!(left, ["@en-cours:h"]);
+    }
 
     #[sqlx::test(migrations = "./migrations")]
     async fn the_purge_forgets_a_request_and_spares_the_one_still_in_its_window(

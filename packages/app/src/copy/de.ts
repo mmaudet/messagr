@@ -95,9 +95,6 @@ export const de: Readonly<Record<CopyKey, string>> = {
   settings_row_ephemeral_label: 'Verschwindende Nachrichten',
   settings_row_ephemeral_hint:
     'Einstellung je Unterhaltung · im Jugendmodus 24 Stunden voreingestellt',
-  settings_row_discovery_label: 'Private Kontaktsuche',
-  settings_row_discovery_hint:
-    'V1.1 · lokal, optional · Gegenseitigkeit nicht entschieden',
   settings_section_moderation_title: 'Gruppen und Moderation',
   settings_section_moderation_note:
     'Werkzeuge für Freiwillige, nicht für Systemadministratoren.',
@@ -736,4 +733,57 @@ export const de: Readonly<Record<CopyKey, string>> = {
     'Eine Datei, für wen nichts auf einem Server lassen will.',
   restore_done_close: 'Schließen',
   back_to_newest: 'Zurück zur neuesten Nachricht',
+  findable_row: 'Auffindbar sein',
+  'findable_row_until %@': 'Nummer nachgewiesen, bis %@.',
+  findable_row_not: 'Niemand kann Sie über Ihre Nummer finden.',
+  findable_title: 'Auffindbar sein',
+  findable_contacts_title: 'Ihre Kontakte',
+  findable_contacts:
+    'Die Nummern in Ihrem Adressbuch werden auf Ihrem Telefon maskiert. Der Dienst erfährt nie, wer in Ihrem Adressbuch steht, und die Namen verlassen das Gerät nicht.',
+  findable_number_point_title: 'Ihre Nummer',
+  findable_number_point:
+    'Um zu suchen, werden Sie auffindbar. Sie weisen nach, dass diese Nummer Ihnen gehört, mit einer SMS, die OVHcloud versendet und dabei sieht.',
+  findable_others_title: 'Was andere tun können',
+  findable_others:
+    'Wer Ihre Nummer hat, kann sehen, dass Sie bei Messagr sind, und Sie einladen. Sie nehmen jede Einladung an oder lehnen sie ab.',
+  findable_change_title: 'Was sich ändert',
+  findable_change:
+    'Messagr fragt nach keiner Nummer. Wenn Sie fortfahren, heben Sie dieses Versprechen nur für sich selbst auf.',
+  findable_withdraw_title: 'Der Rückzug',
+  findable_withdraw:
+    'Jederzeit, in den Einstellungen, und Ihre Nummer verschwindet sofort aus der Entdeckung. Der Nachweis wird alle 28 Tage erneuert.',
+  findable_continue: 'Weiter',
+  findable_not_now: 'Nicht jetzt',
+  findable_number_title: 'Ihre Nummer',
+  findable_number_lead:
+    'Erhalten Sie einen Code per SMS, um nachzuweisen, dass diese Nummer Ihnen gehört.',
+  findable_number_placeholder: '+49 151 23456789',
+  'findable_number_provider %@': 'Die SMS wird von %@ versendet.',
+  findable_number_closed:
+    'Die Entdeckung ist für Nummern aus diesem Land noch nicht geöffnet.',
+  findable_number_country_code:
+    'Beginnen Sie mit der Landesvorwahl, zum Beispiel +49.',
+  findable_number_not_a_number: 'Das ist keine Telefonnummer.',
+  findable_send: 'Code erhalten',
+  findable_sending: 'Code wird gesendet…',
+  findable_not_sent:
+    'Die SMS wurde nicht versendet. Versuchen Sie es gleich noch einmal.',
+  findable_off: 'Die Entdeckung ist auf diesem Server nicht geöffnet.',
+  findable_unreachable:
+    'Der Dienst antwortet nicht. Versuchen Sie es gleich noch einmal.',
+  findable_code_title: 'Der Code',
+  'findable_code_lead %@':
+    'Geben Sie den sechsstelligen Code ein, der an %@ gesendet wurde.',
+  'findable_code_wrong %d':
+    'Das ist nicht der richtige Code. Verbleibende Versuche: %d.',
+  findable_code_spent:
+    'Dieser Code ist nicht mehr gültig. Fordern Sie einen neuen an.',
+  findable_code_expired:
+    'Dieser Code ist abgelaufen. Fordern Sie einen neuen an.',
+  findable_prove: 'Nummer nachweisen',
+  findable_proving: 'Nachweis läuft…',
+  findable_another: 'Neuen Code erhalten',
+  findable_proven_title: 'Nummer nachgewiesen',
+  'findable_proven_until %@': 'Sie sind bis %@ auffindbar.',
+  findable_done: 'Fertig',
 }

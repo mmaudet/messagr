@@ -13,6 +13,20 @@ import type { Stamp } from '../timeline/whenShown'
  * needed it, and two copies of a date format are two chances for two lists
  * to disagree about what "yesterday" looks like.
  */
+/**
+ * A day in the reader's own words, « 24 octobre 2026 ». The day separators of
+ * a conversation and the dates of « Être trouvable » say it with this one key.
+ */
+export function dateLabel(day: number, month: number, year: number): string {
+  return t('date_separator', day, t(`month_${month}` as CopyKey), year)
+}
+
+/** The day a moment falls on, in the telephone's time, as `dateLabel` says it. */
+export function dayOf(milliseconds: number): string {
+  const day = new Date(milliseconds)
+  return dateLabel(day.getDate(), day.getMonth() + 1, day.getFullYear())
+}
+
 export function whenLabel(stamp: Stamp): string {
   switch (stamp.kind) {
     case 'time':

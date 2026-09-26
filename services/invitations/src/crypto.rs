@@ -36,6 +36,34 @@ pub fn generate_localpart() -> String {
     generate_token()[..12].to_lowercase()
 }
 
+/// The six digits that prove a number (#397), drawn like the tokens above.
+pub fn proof_code() -> String {
+    format!(
+        "{:06}",
+        rand::Rng::gen_range(&mut rand::thread_rng(), 0..1_000_000u32)
+    )
+}
+
+/// What the service keeps of a proof's code: a digest bound to the account
+/// and keyed by the service's own key, so that a copy of the database alone
+/// cannot be searched through the million possible codes.
+pub fn proof_code_digest(key: &[u8; 32], user: &str, code: &str) -> [u8; 32] {
+    Sha256::new()
+        .chain_update(key)
+        .chain_update(user.as_bytes())
+        .chain_update([0u8])
+        .chain_update(code.as_bytes())
+        .finalize()
+        .into()
+}
+
+/// Whether two digests are equal, in a time that does not depend on where
+/// they differ: a code compared byte by byte would say how much of it was
+/// right.
+pub fn equal_in_constant_time(a: &[u8], b: &[u8]) -> bool {
+    a.len() == b.len() && a.iter().zip(b).fold(0u8, |acc, (x, y)| acc | (x ^ y)) == 0
+}
+
 /// Bare SHA-256, no stretching: the token is 160-bit random, a dictionary
 /// attack is pointless.
 pub fn token_hash(token: &str) -> Vec<u8> {

@@ -114,9 +114,6 @@ export const fr = {
   settings_row_ephemeral_label: 'Messages éphémères',
   settings_row_ephemeral_hint:
     'Réglage par conversation · 24 heures par défaut en mode ado',
-  settings_row_discovery_label: 'Découverte privée de contacts',
-  settings_row_discovery_hint:
-    'V1.1 · locale, optionnelle · réciprocité non tranchée',
   settings_section_moderation_title: 'Groupes et modération',
   settings_section_moderation_note:
     'Outils pensés pour un bénévole, pas pour un administrateur système.',
@@ -1120,6 +1117,55 @@ export const fr = {
     'Un fichier, pour qui ne veut rien laisser sur un serveur.',
   restore_done_close: 'Fermer',
   back_to_newest: 'Revenir au dernier message',
+  // ÊTRE TROUVABLE (#397, #392): the row of Settings, the consent, the
+  // number, the code and the proof.
+  findable_row: 'Être trouvable',
+  'findable_row_until %@': 'Numéro prouvé, jusqu’au %@.',
+  findable_row_not: 'Personne ne peut vous trouver par votre numéro.',
+  findable_title: 'Être trouvable',
+  findable_contacts_title: 'Vos contacts',
+  findable_contacts:
+    'Les numéros de votre carnet sont masqués sur votre téléphone. Le service ne sait jamais qui est dans votre carnet, et les noms ne quittent pas l’appareil.',
+  findable_number_point_title: 'Votre numéro',
+  findable_number_point:
+    'Pour chercher, vous devenez trouvable. Vous prouvez que ce numéro est à vous par un SMS qu’OVHcloud envoie et voit passer.',
+  findable_others_title: 'Ce que les autres peuvent faire',
+  findable_others:
+    'Quiconque a votre numéro peut voir que vous êtes sur Messagr et vous inviter. Vous acceptez ou refusez chaque invitation.',
+  findable_change_title: 'Ce que cela change',
+  findable_change:
+    'Messagr ne demande aucun numéro. En continuant, vous levez cette promesse pour vous seul.',
+  findable_withdraw_title: 'Le retrait',
+  findable_withdraw:
+    'À tout moment, dans les Réglages, et votre numéro disparaît aussitôt de la découverte. La preuve se renouvelle tous les 28 jours.',
+  findable_continue: 'Continuer',
+  findable_not_now: 'Pas maintenant',
+  findable_number_title: 'Votre numéro',
+  findable_number_lead:
+    'Recevez un code par SMS pour prouver que ce numéro est à vous.',
+  findable_number_placeholder: '+33 6 12 34 56 78',
+  'findable_number_provider %@': 'Le SMS sera envoyé par %@.',
+  findable_number_closed:
+    'La découverte n’est pas encore ouverte aux numéros de ce pays.',
+  findable_number_country_code:
+    'Commencez par l’indicatif du pays, par exemple +33.',
+  findable_number_not_a_number: 'Ce n’est pas un numéro de téléphone.',
+  findable_send: 'Recevoir un code',
+  findable_sending: 'Envoi du code…',
+  findable_not_sent: 'Le SMS n’est pas parti. Réessayez dans un moment.',
+  findable_off: 'La découverte n’est pas ouverte sur ce serveur.',
+  findable_unreachable: 'Le service ne répond pas. Réessayez dans un moment.',
+  findable_code_title: 'Le code',
+  'findable_code_lead %@': 'Entrez le code à six chiffres envoyé au %@.',
+  'findable_code_wrong %d': 'Ce n’est pas le bon code. Essais restants : %d.',
+  findable_code_spent: 'Ce code ne peut plus servir. Demandez-en un autre.',
+  findable_code_expired: 'Ce code a expiré. Demandez-en un autre.',
+  findable_prove: 'Prouver ce numéro',
+  findable_proving: 'Preuve en cours…',
+  findable_another: 'Recevoir un autre code',
+  findable_proven_title: 'Numéro prouvé',
+  'findable_proven_until %@': 'Vous êtes trouvable jusqu’au %@.',
+  findable_done: 'Terminé',
 } as const
 
 /** Every key any screen may ask for. A typo is a compile error, not a blank. */

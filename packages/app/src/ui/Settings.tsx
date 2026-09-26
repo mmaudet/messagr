@@ -12,6 +12,7 @@ import { t } from '../copy'
 import type { Language } from '../copy/languages'
 import { color, floors, layout, space, stroke, type } from '../design/tokens'
 import { LanguagePicker } from './LanguagePicker'
+import { dayOf } from './whenLabel'
 
 /**
  * Settings.
@@ -44,6 +45,8 @@ export function Settings({
   onBackup,
   onVault,
   onFavourites,
+  findable,
+  onFindable,
   receipts,
   onReceipts,
   receiptsNotKept,
@@ -82,6 +85,15 @@ export function Settings({
    * something that crosses them. See `Favourites.tsx`.
    */
   readonly onFavourites: () => void
+  /**
+   * « Être trouvable » (#397): whether this account is findable, and until
+   * when. `null` while this service does not serve discovery, which is every
+   * deployment before it ships -- and then the row is absent rather than
+   * present and refused, for the reason the header gives.
+   */
+  readonly findable: { readonly until: number | null } | null
+  /** The consent for an account that is not findable, its proof otherwise. */
+  readonly onFindable: () => void
   readonly receipts: boolean
   readonly onReceipts: (on: boolean) => void
   /** `true` when the last change could not be kept. */
@@ -153,6 +165,29 @@ export function Settings({
         style={[styles.rowLayout, styles.divider]}>
         <Text style={styles.rowLabel}>{t('settings_vault')}</Text>
       </Pressable>
+
+      {/* BESIDE THE KEYS, because both are about what this account lets
+          others reach: a findable number is the one thing here that makes
+          somebody easier to find, and it says so under its name. */}
+      {findable !== null && (
+        <View
+          style={[styles.setting, styles.divider]}
+          testID="setting-findable">
+          <Pressable
+            testID="settings-findable"
+            onPress={onFindable}
+            accessibilityRole="button"
+            accessibilityLabel={t('findable_row')}
+            style={styles.rowLayout}>
+            <Text style={styles.rowLabel}>{t('findable_row')}</Text>
+          </Pressable>
+          <Text style={styles.hint}>
+            {findable.until === null
+              ? t('findable_row_not')
+              : t('findable_row_until %@', dayOf(findable.until))}
+          </Text>
+        </View>
+      )}
 
       <Pressable
         testID="settings-legal"

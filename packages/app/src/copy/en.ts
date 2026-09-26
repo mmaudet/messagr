@@ -99,8 +99,6 @@ export const en: Readonly<Record<CopyKey, string>> = {
   settings_row_ephemeral_label: 'Disappearing messages',
   settings_row_ephemeral_hint:
     'Per conversation · 24 hours by default in teen mode',
-  settings_row_discovery_label: 'Private contact discovery',
-  settings_row_discovery_hint: 'V1.1 · local, optional · reciprocity undecided',
   settings_section_moderation_title: 'Groups and moderation',
   settings_section_moderation_note:
     'Tools meant for a volunteer, not for a system administrator.',
@@ -720,4 +718,49 @@ export const en: Readonly<Record<CopyKey, string>> = {
     'A file, for somebody who wants nothing left on a server.',
   restore_done_close: 'Close',
   back_to_newest: 'Back to the latest message',
+  findable_row: 'Be findable',
+  'findable_row_until %@': 'Number proved, until %@.',
+  findable_row_not: 'Nobody can find you by your number.',
+  findable_title: 'Be findable',
+  findable_contacts_title: 'Your contacts',
+  findable_contacts:
+    'The numbers in your address book are masked on your phone. The service never knows who is in your address book, and the names do not leave the device.',
+  findable_number_point_title: 'Your number',
+  findable_number_point:
+    'To look for people, you become findable. You prove this number is yours with an SMS that OVHcloud sends and sees pass.',
+  findable_others_title: 'What others can do',
+  findable_others:
+    'Anyone who has your number can see that you are on Messagr and invite you. You accept or decline each invitation.',
+  findable_change_title: 'What this changes',
+  findable_change:
+    'Messagr asks for no number. By continuing, you lift that promise for yourself alone.',
+  findable_withdraw_title: 'Withdrawing',
+  findable_withdraw:
+    'At any time, in Settings, and your number leaves discovery at once. The proof is renewed every 28 days.',
+  findable_continue: 'Continue',
+  findable_not_now: 'Not now',
+  findable_number_title: 'Your number',
+  findable_number_lead: 'Get a code by SMS to prove that this number is yours.',
+  findable_number_placeholder: '+44 7700 900123',
+  'findable_number_provider %@': 'The SMS will be sent by %@.',
+  findable_number_closed:
+    'Discovery is not yet open to numbers from this country.',
+  findable_number_country_code: 'Start with the country code, for example +44.',
+  findable_number_not_a_number: 'This is not a phone number.',
+  findable_send: 'Get a code',
+  findable_sending: 'Sending the code…',
+  findable_not_sent: 'The SMS did not go out. Try again in a moment.',
+  findable_off: 'Discovery is not open on this server.',
+  findable_unreachable: 'The service is not answering. Try again in a moment.',
+  findable_code_title: 'The code',
+  'findable_code_lead %@': 'Enter the six-digit code sent to %@.',
+  'findable_code_wrong %d': 'That is not the right code. Attempts left: %d.',
+  findable_code_spent: 'This code can no longer be used. Ask for another one.',
+  findable_code_expired: 'This code has expired. Ask for another one.',
+  findable_prove: 'Prove this number',
+  findable_proving: 'Proving…',
+  findable_another: 'Get another code',
+  findable_proven_title: 'Number proved',
+  'findable_proven_until %@': 'You are findable until %@.',
+  findable_done: 'Done',
 }

@@ -23,6 +23,12 @@ use axum::{
 // What would mislead is silence: a reader finding no construction site for
 // `DiscoveryQuotaReached` and no explanation would reasonably conclude the
 // enum had rotted.
+//
+// THE DISCOVERY THAT CAME BACK IS ANOTHER ONE (#392, ADR 0014). Its refusals
+// are the variants from `DiscoveryOff` on, and none of the three above. Where
+// their documentation names `handlers::discovery`, it means the prototype's
+// module of that name, gone with the blind directory; the module of that name
+// today proves numbers (#397).
 #[allow(dead_code)]
 pub enum AppError {
     /// THE SILENT RESPONSE — and its imprecision is the function, not a
@@ -372,6 +378,32 @@ pub enum AppError {
          intact and no invitation was created: retry, and if it persists, report this text"
     )]
     InviteRightUnreadable(&'static str),
+    /// Address-book discovery is not served by this deployment: it has not
+    /// been given its masking keys or its SMS provider (#397). Not a failure
+    /// of the request, and nothing about the number was looked at.
+    #[error("address-book discovery is not offered here")]
+    DiscoveryOff,
+    /// What was sent is not a number in international form, `+` then 8 to 15
+    /// digits. The device normalises what the person types before sending it.
+    #[error("this is not a phone number in international form")]
+    NotANumber,
+    /// A number of a country not open to discovery yet. Said before any SMS is
+    /// sent, so that nobody waits for a code that will not come.
+    #[error("numbers of this country cannot be proved yet")]
+    CountryClosed,
+    /// The provider could not send the SMS. The proof that was about to start
+    /// is withdrawn: nobody holds a code for it.
+    #[error("the code could not be sent: try again in a moment")]
+    SmsNotSent,
+    /// There is no proof in progress for this account, or it ended.
+    #[error("no proof is in progress for this account: ask for a new code")]
+    NoProofPending,
+    /// The code was sent more than ten minutes ago.
+    #[error("this code has expired: ask for a new one")]
+    CodeExpired,
+    /// Not the code that was sent. After the fifth, the proof ends.
+    #[error("this is not the code that was sent ({attempts_left} attempts left)")]
+    CodeWrong { attempts_left: u32 },
     #[error(transparent)]
     Internal(#[from] anyhow::Error),
 }
@@ -503,6 +535,15 @@ impl IntoResponse for AppError {
             AppError::InviteRightUnreadable(_) => {
                 (StatusCode::SERVICE_UNAVAILABLE, "MESSAGR_ROOM_UNREADABLE")
             }
+            AppError::DiscoveryOff => (StatusCode::SERVICE_UNAVAILABLE, "MESSAGR_DISCOVERY_OFF"),
+            AppError::NotANumber => (StatusCode::BAD_REQUEST, "MESSAGR_NOT_A_NUMBER"),
+            // 422 and not 400: the number is well formed, it is its country
+            // that is not open yet.
+            AppError::CountryClosed => (StatusCode::UNPROCESSABLE_ENTITY, "MESSAGR_COUNTRY_CLOSED"),
+            AppError::SmsNotSent => (StatusCode::SERVICE_UNAVAILABLE, "MESSAGR_SMS_NOT_SENT"),
+            AppError::NoProofPending => (StatusCode::NOT_FOUND, "MESSAGR_NO_PROOF_PENDING"),
+            AppError::CodeExpired => (StatusCode::GONE, "MESSAGR_CODE_EXPIRED"),
+            AppError::CodeWrong { .. } => (StatusCode::BAD_REQUEST, "MESSAGR_CODE_WRONG"),
             AppError::Internal(_) => (StatusCode::INTERNAL_SERVER_ERROR, "M_UNKNOWN"),
         };
         let message = match &self {
@@ -513,11 +554,13 @@ impl IntoResponse for AppError {
             // The other variants carry a text written for the caller.
             other => other.to_string(),
         };
-        (
-            code,
-            Json(serde_json::json!({"errcode": errcode, "error": message})),
-        )
-            .into_response()
+        let mut body = serde_json::json!({"errcode": errcode, "error": message});
+        // The one refusal whose number the application shows in its own
+        // language, so it travels as a number and not only inside the text.
+        if let AppError::CodeWrong { attempts_left } = &self {
+            body["attempts_left"] = serde_json::json!(attempts_left);
+        }
+        (code, Json(body)).into_response()
     }
 }
 
@@ -757,6 +800,32 @@ mod tests {
                 .contains("no invitation"),
             "and it must say that nothing was created: {unreadable_body}"
         );
+    }
+
+    /// THE REFUSALS OF A PROOF, as the application reads them: each its own
+    /// `errcode`, and a wrong code says how many attempts it leaves, in a field
+    /// of its own rather than in a sentence.
+    #[tokio::test]
+    async fn the_refusals_of_a_proof_each_say_their_own_name() {
+        for (refusal, status, errcode) in [
+            (AppError::DiscoveryOff, 503, "MESSAGR_DISCOVERY_OFF"),
+            (AppError::NotANumber, 400, "MESSAGR_NOT_A_NUMBER"),
+            (AppError::CountryClosed, 422, "MESSAGR_COUNTRY_CLOSED"),
+            (AppError::SmsNotSent, 503, "MESSAGR_SMS_NOT_SENT"),
+            (AppError::NoProofPending, 404, "MESSAGR_NO_PROOF_PENDING"),
+            (AppError::CodeExpired, 410, "MESSAGR_CODE_EXPIRED"),
+        ] {
+            let (got, body) = render(refusal).await;
+            assert_eq!(
+                (got.as_u16(), body["errcode"].as_str()),
+                (status, Some(errcode))
+            );
+            assert!(body.get("attempts_left").is_none(), "{errcode}: {body}");
+        }
+        let (got, body) = render(AppError::CodeWrong { attempts_left: 3 }).await;
+        assert_eq!(got, StatusCode::BAD_REQUEST);
+        assert_eq!(body["errcode"], "MESSAGR_CODE_WRONG");
+        assert_eq!(body["attempts_left"], 3);
     }
 
     /// Renders an error and extracts (status, JSON body) from it.

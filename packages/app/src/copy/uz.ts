@@ -108,9 +108,6 @@ export const uz: Readonly<Record<CopyKey, string>> = {
   settings_row_ephemeral_label: 'Oʻchib ketuvchi xabarlar',
   settings_row_ephemeral_hint:
     'Har bir suhbat uchun · oʻsmir rejimida sukut boʻyicha 24 soat',
-  settings_row_discovery_label: 'Kontaktlarni maxfiy topish',
-  settings_row_discovery_hint:
-    'V1.1 · mahalliy, ixtiyoriy · oʻzaromalik hal qilinmagan',
   settings_section_moderation_title: 'Guruhlar va moderatsiya',
   settings_section_moderation_note:
     'Tizim maʼmuri uchun emas, koʻngilli uchun moʻljallangan vositalar.',
@@ -734,4 +731,52 @@ export const uz: Readonly<Record<CopyKey, string>> = {
     'Fayl — serverda hech nima qoldirishni istamaganlar uchun.',
   restore_done_close: 'Yopish',
   back_to_newest: 'Oxirgi xabarga qaytish',
+  findable_row: 'Topiladigan boʻlish',
+  'findable_row_until %@': 'Raqam isbotlangan, %@ gacha.',
+  findable_row_not: 'Hech kim sizni raqamingiz orqali topa olmaydi.',
+  findable_title: 'Topiladigan boʻlish',
+  findable_contacts_title: 'Kontaktlaringiz',
+  findable_contacts:
+    'Manzillar kitobingizdagi raqamlar telefoningizda niqoblanadi. Xizmat manzillar kitobingizda kim borligini hech qachon bilmaydi, ismlar esa qurilmadan chiqmaydi.',
+  findable_number_point_title: 'Raqamingiz',
+  findable_number_point:
+    'Qidirish uchun siz topiladigan boʻlasiz. Bu raqam sizniki ekanini OVHcloud yuboradigan va koʻradigan SMS orqali isbotlaysiz.',
+  findable_others_title: 'Boshqalar nima qila oladi',
+  findable_others:
+    'Raqamingiz bor har kim Messagrda ekaningizni koʻrishi va sizni taklif qilishi mumkin. Har bir taklifni siz qabul qilasiz yoki rad etasiz.',
+  findable_change_title: 'Bu nimani oʻzgartiradi',
+  findable_change:
+    'Messagr hech qanday raqam soʻramaydi. Davom etsangiz, bu vaʼdani faqat oʻzingiz uchun bekor qilasiz.',
+  findable_withdraw_title: 'Bekor qilish',
+  findable_withdraw:
+    'Istalgan vaqtda, Sozlamalarda, va raqamingiz darhol kontaktlarni topishdan yoʻqoladi. Isbot har 28 kunda yangilanadi.',
+  findable_continue: 'Davom etish',
+  findable_not_now: 'Hozir emas',
+  findable_number_title: 'Raqamingiz',
+  findable_number_lead:
+    'Bu raqam sizniki ekanini isbotlash uchun SMS orqali kod oling.',
+  findable_number_placeholder: '+49 151 23456789',
+  'findable_number_provider %@': 'SMS %@ tomonidan yuboriladi.',
+  findable_number_closed:
+    'Kontaktlarni topish bu mamlakat raqamlari uchun hali ochilmagan.',
+  findable_number_country_code: 'Mamlakat kodidan boshlang, masalan +49.',
+  findable_number_not_a_number: 'Bu telefon raqami emas.',
+  findable_send: 'Kod olish',
+  findable_sending: 'Kod yuborilmoqda…',
+  findable_not_sent: 'SMS yuborilmadi. Bir ozdan keyin qayta urinib koʻring.',
+  findable_off: 'Kontaktlarni topish bu serverda ochilmagan.',
+  findable_unreachable:
+    'Xizmat javob bermayapti. Bir ozdan keyin qayta urinib koʻring.',
+  findable_code_title: 'Kod',
+  'findable_code_lead %@': '%@ raqamiga yuborilgan olti xonali kodni kiriting.',
+  'findable_code_wrong %d': 'Bu toʻgʻri kod emas. Qolgan urinishlar: %d.',
+  findable_code_spent:
+    'Bu koddan endi foydalanib boʻlmaydi. Boshqasini soʻrang.',
+  findable_code_expired: 'Bu kodning muddati tugadi. Boshqasini soʻrang.',
+  findable_prove: 'Bu raqamni isbotlash',
+  findable_proving: 'Isbotlanmoqda…',
+  findable_another: 'Boshqa kod olish',
+  findable_proven_title: 'Raqam isbotlandi',
+  'findable_proven_until %@': 'Siz %@ gacha topiladigan boʻlasiz.',
+  findable_done: 'Tayyor',
 }

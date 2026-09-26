@@ -1,7 +1,7 @@
 import React, { useState } from 'react'
 import { Pressable, StyleSheet, Text, View } from 'react-native'
 
-import { t, type CopyKey } from '../copy'
+import { t } from '../copy'
 import {
   color,
   elevation,
@@ -23,6 +23,7 @@ import { EmojiPicker } from './EmojiPicker'
 import { Document } from './Document'
 import { Photograph } from './Photograph'
 import { Plate } from './Plate'
+import { dateLabel } from './whenLabel'
 
 /**
  * The 1:1 conversation, reduced to its bones.
@@ -344,17 +345,10 @@ function dayLabel(mark: DayMark): string {
     case 'yesterday':
       return t('yesterday')
     case 'date':
-      // The key is `date_separator`, and its placeholders live in the value
-      // rather than in the name -- unlike most of this catalogue, which
-      // carries them in the key. Inherited from the previous product, kept
-      // rather than renamed: the shape is what makes the other catalogues
-      // drop in unmodified.
-      return t(
-        'date_separator',
-        mark.day,
-        t(`month_${mark.month}` as CopyKey),
-        mark.year,
-      )
+      // `date_separator` carries its placeholders in its value rather than
+      // in its name, unlike most of this catalogue: inherited from the
+      // previous product, and said once, in `dateLabel`.
+      return dateLabel(mark.day, mark.month, mark.year)
   }
 }
 

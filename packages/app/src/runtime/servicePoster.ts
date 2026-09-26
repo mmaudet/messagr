@@ -1,4 +1,5 @@
 import type { ServicePoster } from './claimInvitation'
+import type { DiscoveryService } from './discovery'
 import type { InvitationService } from './issueInvitation'
 
 /**
@@ -54,16 +55,12 @@ export function invitationService(
   baseUrl: string,
   accessToken: string,
 ): InvitationService {
-  const answer = async (response: Response) => ({
-    status: response.status,
-    body: await response.text(),
-  })
   const authorised = { Authorization: `Bearer ${accessToken}` }
 
   return {
     issue: async (body, idempotencyKey) =>
-      answer(
-        await fetch(`${baseUrl}/_messagr/invitations`, {
+      answered(
+        await fetch(`${serviceAt(baseUrl)}/invitations`, {
           method: 'POST',
           headers: {
             ...authorised,
@@ -76,11 +73,63 @@ export function invitationService(
         }),
       ),
     status: async invitationId =>
-      answer(
+      answered(
         await fetch(
-          `${baseUrl}/_messagr/invitations/${encodeURIComponent(invitationId)}`,
+          `${serviceAt(baseUrl)}/invitations/${encodeURIComponent(invitationId)}`,
           { headers: authorised },
         ),
       ),
   }
+}
+
+/**
+ * The discovery routes of the same service (#397), reached as the account
+ * this launch holds.
+ *
+ * The account is read at each request rather than handed over once: the
+ * journey that uses this is made when the screen mounts, before a launch has
+ * bound any account, and a request made without one fails like a service
+ * that cannot be reached.
+ */
+export function discoveryService(
+  account: () => {
+    readonly baseUrl: string
+    readonly accessToken: string
+  } | null,
+): DiscoveryService {
+  const call = async (path: string, body?: string) => {
+    const held = account()
+    if (held === null) throw new Error('this launch holds no account')
+    const authorised = { Authorization: `Bearer ${held.accessToken}` }
+    return answered(
+      await fetch(
+        `${serviceAt(held.baseUrl)}${path}`,
+        body === undefined
+          ? { headers: authorised }
+          : {
+              method: 'POST',
+              headers: { ...authorised, 'Content-Type': 'application/json' },
+              body,
+            },
+      ),
+    )
+  }
+  return {
+    state: () => call('/discovery/state'),
+    startProof: body => call('/discovery/proofs', body),
+    finishProof: body => call('/discovery/proofs/finish', body),
+  }
+}
+
+/**
+ * The invitation service of an account: nginx hands `/_messagr/` on the
+ * account's homeserver to it.
+ */
+export function serviceAt(baseUrl: string): string {
+  return `${baseUrl.replace(/\/+$/, '')}/_messagr`
+}
+
+/** An answer read whole, whatever its status: a refusal is an answer too. */
+async function answered(response: Response) {
+  return { status: response.status, body: await response.text() }
 }

@@ -92,9 +92,6 @@ export const es: Readonly<Record<CopyKey, string>> = {
   settings_row_ephemeral_label: 'Mensajes efímeros',
   settings_row_ephemeral_hint:
     'Ajuste por conversación · 24 horas por defecto en modo adolescente',
-  settings_row_discovery_label: 'Descubrimiento privado de contactos',
-  settings_row_discovery_hint:
-    'V1.1 · local, opcional · reciprocidad sin decidir',
   settings_section_moderation_title: 'Grupos y moderación',
   settings_section_moderation_note:
     'Herramientas pensadas para una persona voluntaria, no para administrar sistemas.',
@@ -715,4 +712,53 @@ export const es: Readonly<Record<CopyKey, string>> = {
     'Un archivo, para quien no quiere dejar nada en un servidor.',
   restore_done_close: 'Cerrar',
   back_to_newest: 'Volver al último mensaje',
+  findable_row: 'Ser localizable',
+  'findable_row_until %@': 'Número probado, hasta el %@.',
+  findable_row_not: 'Nadie puede encontrarle por su número.',
+  findable_title: 'Ser localizable',
+  findable_contacts_title: 'Sus contactos',
+  findable_contacts:
+    'Los números de su agenda se enmascaran en su teléfono. El servicio nunca sabe quién está en su agenda, y los nombres no salen del dispositivo.',
+  findable_number_point_title: 'Su número',
+  findable_number_point:
+    'Para buscar, usted pasa a ser localizable. Prueba que este número es suyo con un SMS que OVHcloud envía y ve pasar.',
+  findable_others_title: 'Lo que pueden hacer los demás',
+  findable_others:
+    'Quien tenga su número puede ver que está en Messagr e invitarle. Usted acepta o rechaza cada invitación.',
+  findable_change_title: 'Lo que esto cambia',
+  findable_change:
+    'Messagr no pide ningún número. Al continuar, levanta esa promesa solo para usted.',
+  findable_withdraw_title: 'La retirada',
+  findable_withdraw:
+    'En cualquier momento, en Ajustes, y su número desaparece de inmediato del descubrimiento. La prueba se renueva cada 28 días.',
+  findable_continue: 'Continuar',
+  findable_not_now: 'Ahora no',
+  findable_number_title: 'Su número',
+  findable_number_lead:
+    'Reciba un código por SMS para probar que este número es suyo.',
+  findable_number_placeholder: '+34 612 34 56 78',
+  'findable_number_provider %@': 'El SMS lo enviará %@.',
+  findable_number_closed:
+    'El descubrimiento aún no está abierto a los números de este país.',
+  findable_number_country_code:
+    'Empiece por el prefijo del país, por ejemplo +34.',
+  findable_number_not_a_number: 'Esto no es un número de teléfono.',
+  findable_send: 'Recibir un código',
+  findable_sending: 'Enviando el código…',
+  findable_not_sent:
+    'El SMS no ha salido. Inténtelo de nuevo dentro de un momento.',
+  findable_off: 'El descubrimiento no está abierto en este servidor.',
+  findable_unreachable:
+    'El servicio no responde. Inténtelo de nuevo dentro de un momento.',
+  findable_code_title: 'El código',
+  'findable_code_lead %@': 'Introduzca el código de seis cifras enviado al %@.',
+  'findable_code_wrong %d': 'No es el código correcto. Intentos restantes: %d.',
+  findable_code_spent: 'Este código ya no sirve. Pida otro.',
+  findable_code_expired: 'Este código ha caducado. Pida otro.',
+  findable_prove: 'Probar este número',
+  findable_proving: 'Probando…',
+  findable_another: 'Recibir otro código',
+  findable_proven_title: 'Número probado',
+  'findable_proven_until %@': 'Es localizable hasta el %@.',
+  findable_done: 'Hecho',
 }

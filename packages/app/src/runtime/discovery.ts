@@ -1,0 +1,443 @@
+/**
+ * Address-book discovery, as far as proving one's number (#397, #392,
+ * ADR 0014).
+ *
+ * The person proves a number by a code the service sends it by SMS, and is
+ * then findable for 28 days by the people who already have that number. This
+ * module holds that journey: the consent, the number, the code, and the proof
+ * with its date. The screens draw the stage it shows and hand it what was
+ * typed; they decide nothing.
+ *
+ * # THE NUMBER LEAVES THE TELEPHONE ONCE, AND ONLY FOR THIS
+ *
+ * One request carries it, the one that asks for the code. Nothing before it
+ * does: the consent sends nothing, « Pas maintenant » sends nothing, and a
+ * number whose country is not open is refused here, before anything leaves,
+ * with the sentence #392 gives it. The service keeps its mask, never the
+ * number (`services/invitations/src/handlers/discovery.rs`).
+ *
+ * # WHAT IS INJECTED
+ *
+ * The transport to the service and the clock, which is all this part of
+ * discovery needs. The tests stand both in and record every request, which is
+ * the seam #392 agreed for the application.
+ */
+
+/** An answer of the service: its status and its body, read as text. */
+export interface Answer {
+  readonly status: number
+  readonly body: string
+}
+
+/**
+ * The discovery routes of the invitation service, each authenticated by the
+ * account's Matrix token (`servicePoster.ts`).
+ */
+export interface DiscoveryService {
+  /** `GET /discovery/state`. */
+  readonly state: () => Promise<Answer>
+  /** `POST /discovery/proofs`, with the number and the language of the SMS. */
+  readonly startProof: (body: string) => Promise<Answer>
+  /** `POST /discovery/proofs/finish`, with the code. */
+  readonly finishProof: (body: string) => Promise<Answer>
+}
+
+export interface DiscoveryDeps {
+  readonly service: DiscoveryService
+  /** Milliseconds since the epoch. */
+  readonly now: () => number
+}
+
+/** A country whose numbers can be proved, and who sends their SMS. */
+export interface OpenCountry {
+  /** ISO 3166-1 alpha-2. */
+  readonly code: string
+  /** The calling code, without the `+`. */
+  readonly prefix: string
+  readonly provider: string
+}
+
+/**
+ * What the service says of discovery for this account.
+ *
+ * `on` is whether this service holds its masking keys and its SMS provider:
+ * without them, nothing about discovery is offered, rather than offered and
+ * refused later.
+ */
+export type DiscoveryReading =
+  | { readonly read: false }
+  | {
+      readonly read: true
+      readonly on: boolean
+      /** Milliseconds, or `null` for an account that is not findable. */
+      readonly findableUntil: number | null
+      readonly countries: readonly OpenCountry[]
+    }
+
+export async function readDiscovery(
+  deps: DiscoveryDeps,
+): Promise<DiscoveryReading> {
+  let answer: Answer
+  try {
+    answer = await deps.service.state()
+  } catch {
+    return { read: false }
+  }
+  const body = answer.status === 200 ? parsed(answer.body) : null
+  if (
+    body === null ||
+    typeof body.on !== 'boolean' ||
+    !(
+      body.findable_until === null || typeof body.findable_until === 'number'
+    ) ||
+    !Array.isArray(body.countries) ||
+    !body.countries.every(isOpenCountry)
+  ) {
+    return { read: false }
+  }
+  return {
+    read: true,
+    on: body.on,
+    findableUntil:
+      body.findable_until === null ? null : body.findable_until * 1000,
+    countries: body.countries,
+  }
+}
+
+/**
+ * Where a typed number would go, said on the number screen before anything is
+ * sent.
+ *
+ * The number must carry its calling code, and none is guessed: a region taken
+ * from the telephone's settings is not the country of the number somebody
+ * types, and a wrong guess would send a code to a stranger.
+ */
+export type NumberVerdict =
+  | { readonly verdict: 'incomplete' }
+  | { readonly verdict: 'no-country-code' }
+  | { readonly verdict: 'not-a-number' }
+  | { readonly verdict: 'closed' }
+  | {
+      readonly verdict: 'open'
+      /** In international form, as the service wants it: `+33612345678`. */
+      readonly number: string
+      readonly country: OpenCountry
+      /** Whether it is long enough to be a whole number. */
+      readonly complete: boolean
+    }
+
+export function whereTheNumberGoes(
+  typed: string,
+  countries: readonly OpenCountry[],
+): NumberVerdict {
+  // « (0) » is how a number written for abroad shows the trunk prefix that
+  // is not dialled from abroad: dropped, before the brackets go.
+  const bare = typed.replace(/\(0\)/g, '').replace(/[\s.\-()/]/g, '')
+  const international = bare.startsWith('00') ? `+${bare.slice(2)}` : bare
+  if (international === '' || international === '+') {
+    return { verdict: 'incomplete' }
+  }
+  if (!international.startsWith('+')) {
+    return /^\d+$/.test(international)
+      ? { verdict: 'no-country-code' }
+      : { verdict: 'not-a-number' }
+  }
+  const digits = international.slice(1)
+  if (!/^\d+$/.test(digits) || digits.startsWith('0')) {
+    return { verdict: 'not-a-number' }
+  }
+  // Calling codes are prefix-free, so at most one open country matches, and
+  // a country is known to be closed once no open calling code can still.
+  const country = countries.find(c => digits.startsWith(c.prefix))
+  if (country !== undefined) {
+    // A trunk zero typed after the calling code, « +33 06… », is dropped: no
+    // open country has a national number that starts with one.
+    const national = digits.slice(country.prefix.length).replace(/^0/, '')
+    const whole = `${country.prefix}${national}`
+    return {
+      verdict: 'open',
+      number: `+${whole}`,
+      country,
+      complete: whole.length >= 8 && whole.length <= 15,
+    }
+  }
+  return countries.some(c => c.prefix.startsWith(digits))
+    ? { verdict: 'incomplete' }
+    : { verdict: 'closed' }
+}
+
+/** Why no code left for the number. */
+export type StartRefusal =
+  | 'closed'
+  | 'no-country-code'
+  | 'not-a-number'
+  | 'off'
+  | 'not-sent'
+  | 'unreachable'
+
+/**
+ * What the number screen says of a number before anything is sent, or
+ * nothing while there is nothing to say yet: the same refusal the journey
+ * gives if it is sent anyway.
+ */
+export function numberRefusal(where: NumberVerdict): StartRefusal | null {
+  switch (where.verdict) {
+    case 'closed':
+    case 'no-country-code':
+    case 'not-a-number':
+      return where.verdict
+    case 'incomplete':
+    case 'open':
+      return null
+  }
+}
+
+/** Why a code did not prove the number. */
+export type FinishRefusal =
+  | { readonly why: 'wrong'; readonly attemptsLeft: number }
+  | { readonly why: 'expired' | 'no-proof' | 'off' | 'unreachable' }
+
+/**
+ * Whether the code in hand can prove nothing more, so that only another one
+ * can: its last attempt spent, run out, or its proof gone.
+ */
+export function codeIsSpent(refused: FinishRefusal | null): boolean {
+  if (refused === null) return false
+  if (refused.why === 'wrong') return refused.attemptsLeft === 0
+  return refused.why === 'expired' || refused.why === 'no-proof'
+}
+
+/**
+ * Where the journey stands, one stage at a time, so that no two can be true
+ * together.
+ */
+export type ProofStage =
+  | { readonly stage: 'shut' }
+  | { readonly stage: 'consent' }
+  | {
+      readonly stage: 'number'
+      readonly countries: readonly OpenCountry[]
+      /** What the field starts with: empty, or the number asked for before. */
+      readonly number: string
+      readonly refused: StartRefusal | null
+    }
+  | {
+      readonly stage: 'sending'
+      readonly countries: readonly OpenCountry[]
+      readonly number: string
+    }
+  | {
+      readonly stage: 'code'
+      /** Where the code went, as it was sent. */
+      readonly number: string
+      readonly refused: FinishRefusal | null
+    }
+  | { readonly stage: 'proving'; readonly number: string }
+  | { readonly stage: 'proven'; readonly findableUntil: number }
+
+export interface ProofJourney {
+  /**
+   * The row « Être trouvable »: the consent for an account that is not
+   * findable, the proof and its date for one that is.
+   */
+  readonly open: (reading: DiscoveryReading & { readonly read: true }) => void
+  /** « Continuer », from the consent to the number. */
+  readonly consent: () => void
+  /** « Pas maintenant », and every way back: nothing is sent. */
+  readonly close: () => void
+  /** Asks for a code by SMS, for the number typed. */
+  readonly send: (typed: string) => Promise<void>
+  /** Hands the code over. */
+  readonly prove: (code: string) => Promise<void>
+  /** Back to the number, kept, to ask for another code. */
+  readonly another: () => void
+}
+
+export function proofJourney(
+  deps: DiscoveryDeps & {
+    /** The application's language, for the SMS. */
+    readonly language: () => string
+  },
+  show: (stage: ProofStage) => void,
+): ProofJourney {
+  let stage: ProofStage = { stage: 'shut' }
+  let countries: readonly OpenCountry[] = []
+  // Which opening of the journey an answer belongs to. Closing or opening
+  // again moves it on, and an answer for an earlier one is dropped: a code
+  // asked for and abandoned must not reopen a screen somebody left.
+  let opening = 0
+
+  const go = (next: ProofStage) => {
+    stage = next
+    show(next)
+  }
+
+  return {
+    open: reading => {
+      opening += 1
+      countries = reading.countries
+      if (
+        reading.findableUntil !== null &&
+        reading.findableUntil > deps.now()
+      ) {
+        go({ stage: 'proven', findableUntil: reading.findableUntil })
+      } else {
+        go({ stage: 'consent' })
+      }
+    },
+
+    consent: () => {
+      if (stage.stage !== 'consent') return
+      go({ stage: 'number', countries, number: '', refused: null })
+    },
+
+    close: () => {
+      opening += 1
+      go({ stage: 'shut' })
+    },
+
+    send: async typed => {
+      if (stage.stage !== 'number') return
+      const where = whereTheNumberGoes(typed, countries)
+      if (where.verdict !== 'open' || !where.complete) {
+        go({
+          stage: 'number',
+          countries,
+          number: typed,
+          refused: numberRefusal(where) ?? 'not-a-number',
+        })
+        return
+      }
+      const mine = opening
+      go({ stage: 'sending', countries, number: where.number })
+      const started = await startProof(deps, where.number, deps.language())
+      if (mine !== opening) return
+      if (started.started) {
+        go({ stage: 'code', number: where.number, refused: null })
+      } else {
+        // AS IT WAS TYPED, not as it was sent: the screen says why nothing
+        // came for as long as the field still holds that number.
+        go({ stage: 'number', countries, number: typed, refused: started.why })
+      }
+    },
+
+    prove: async code => {
+      if (stage.stage !== 'code') return
+      const { number } = stage
+      const mine = opening
+      go({ stage: 'proving', number })
+      const finished = await finishProof(deps, code.trim())
+      if (mine !== opening) return
+      if (finished.proven) {
+        go({ stage: 'proven', findableUntil: finished.findableUntil })
+      } else {
+        go({ stage: 'code', number, refused: finished.refused })
+      }
+    },
+
+    another: () => {
+      if (stage.stage !== 'code') return
+      go({ stage: 'number', countries, number: stage.number, refused: null })
+    },
+  }
+}
+
+type Started =
+  | { readonly started: true }
+  | { readonly started: false; readonly why: StartRefusal }
+
+async function startProof(
+  deps: Pick<DiscoveryDeps, 'service'>,
+  number: string,
+  language: string,
+): Promise<Started> {
+  let answer: Answer
+  try {
+    answer = await deps.service.startProof(JSON.stringify({ number, language }))
+  } catch {
+    return { started: false, why: 'unreachable' }
+  }
+  if (answer.status === 200) return { started: true }
+  const errcode = errcodeOf(answer.body)
+  return { started: false, why: START_REFUSED[errcode] ?? 'unreachable' }
+}
+
+/** What the service's refusals of a start mean here. */
+const START_REFUSED: Readonly<Record<string, StartRefusal>> = {
+  MESSAGR_COUNTRY_CLOSED: 'closed',
+  MESSAGR_NOT_A_NUMBER: 'not-a-number',
+  MESSAGR_DISCOVERY_OFF: 'off',
+  MESSAGR_SMS_NOT_SENT: 'not-sent',
+}
+
+/**
+ * And of a finish, but for a wrong code, whose refusal carries how many
+ * attempts it leaves.
+ */
+const FINISH_REFUSED: Readonly<Record<string, FinishRefusal>> = {
+  MESSAGR_CODE_EXPIRED: { why: 'expired' },
+  MESSAGR_NO_PROOF_PENDING: { why: 'no-proof' },
+  MESSAGR_DISCOVERY_OFF: { why: 'off' },
+}
+
+type Finished =
+  | { readonly proven: true; readonly findableUntil: number }
+  | { readonly proven: false; readonly refused: FinishRefusal }
+
+async function finishProof(
+  deps: DiscoveryDeps,
+  code: string,
+): Promise<Finished> {
+  let answer: Answer
+  try {
+    answer = await deps.service.finishProof(JSON.stringify({ code }))
+  } catch {
+    return { proven: false, refused: { why: 'unreachable' } }
+  }
+  const body = parsed(answer.body)
+  if (answer.status === 200) {
+    return body !== null && typeof body.findable_until === 'number'
+      ? { proven: true, findableUntil: body.findable_until * 1000 }
+      : { proven: false, refused: { why: 'unreachable' } }
+  }
+  if (
+    body?.errcode === 'MESSAGR_CODE_WRONG' &&
+    typeof body.attempts_left === 'number'
+  ) {
+    return {
+      proven: false,
+      refused: { why: 'wrong', attemptsLeft: body.attempts_left },
+    }
+  }
+  const errcode = typeof body?.errcode === 'string' ? body.errcode : ''
+  return {
+    proven: false,
+    refused: FINISH_REFUSED[errcode] ?? { why: 'unreachable' },
+  }
+}
+
+function errcodeOf(text: string): string {
+  const errcode = parsed(text)?.errcode
+  return typeof errcode === 'string' ? errcode : ''
+}
+
+function parsed(text: string): Record<string, unknown> | null {
+  try {
+    const value: unknown = JSON.parse(text)
+    return typeof value === 'object' && value !== null && !Array.isArray(value)
+      ? (value as Record<string, unknown>)
+      : null
+  } catch {
+    return null
+  }
+}
+
+function isOpenCountry(value: unknown): value is OpenCountry {
+  if (typeof value !== 'object' || value === null) return false
+  const { code, prefix, provider } = value as Record<string, unknown>
+  return (
+    typeof code === 'string' &&
+    typeof prefix === 'string' &&
+    typeof provider === 'string'
+  )
+}

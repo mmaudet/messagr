@@ -269,11 +269,12 @@ import {
   isDeletionLeavable,
   isDeletionShown,
 } from './src/ui/DeleteAccount'
+import { Findable } from './src/ui/Findable'
 import { AccountDeleted } from './src/ui/AccountDeleted'
 import { deletionMail } from './src/ui/deletionMail'
 import { Evict } from './src/ui/Evict'
 import { Vouch } from './src/ui/Vouch'
-import { setCatalogue, t } from './src/copy'
+import { currentLanguage, setCatalogue, t } from './src/copy'
 import type { Language } from './src/copy/languages'
 import {
   ACCOUNT_DELETED,
@@ -281,6 +282,12 @@ import {
   type InvitationOutcome,
 } from './src/runtime/entry'
 import { deleteAccount, wayToDelete } from './src/runtime/deleteAccount'
+import {
+  proofJourney,
+  readDiscovery,
+  type DiscoveryReading,
+  type ProofStage,
+} from './src/runtime/discovery'
 import { endingOnThisDevice } from './src/runtime/deletingThisDevice'
 import type { RestoreCredentials } from './src/runtime/sessionCredentials'
 import { initialLink, watchLinks } from './src/runtime/incomingLink'
@@ -325,7 +332,7 @@ import {
 } from './src/runtime/sessionStore'
 import { reenterWithPassword, retireDevice } from './src/runtime/reenter'
 import { photoLibrary } from './src/runtime/photoLibrary'
-import { servicePoster } from './src/runtime/servicePoster'
+import { discoveryService, servicePoster } from './src/runtime/servicePoster'
 import {
   fetchSessionSyncStatus,
   makeSyncClient,
@@ -557,6 +564,10 @@ export function App({
   const [legalOpen, setLegalOpen] = useState(false)
   // DELETING THE ACCOUNT (#382), one stage at a time. See `DeletionStage`.
   const [deletion, setDeletion] = useState<DeletionStage>({ stage: 'shut' })
+  // « ÊTRE TROUVABLE » (#397): what the service says of discovery for this
+  // account, read when Settings shows, and where a proof stands.
+  const [discovery, setDiscovery] = useState<DiscoveryReading>({ read: false })
+  const [proof, setProof] = useState<ProofStage>({ stage: 'shut' })
   const [favouritesOpen, setFavouritesOpen] = useState(false)
   const [backupOpen, setBackupOpen] = useState(false)
   /** Whether the key vault screen is showing. ADR-0013's second route. */
@@ -1169,6 +1180,39 @@ export function App({
   const sessionClientRef = useRef<ReturnType<typeof createClient> | null>(null)
   // THE WHOLE SESSION, since #382: deleting the account needs whose it is.
   const credentialsRef = useRef<RestoreCredentials | null>(null)
+  // THE SERVICE AS THIS ACCOUNT, read at each request: see
+  // `discoveryService`. Made once per mount, like the journey that uses it.
+  const discoveryDeps = useRef({
+    service: discoveryService(() => credentialsRef.current),
+    now: () => Date.now(),
+  }).current
+  // A PROOF JUST MADE IS WRITTEN INTO THE ROW FROM ITS OWN ANSWER, rather
+  // than read again: closing the journey, « Pas maintenant » included, sends
+  // nothing (#392).
+  const proofRef = useRef(
+    proofJourney({ ...discoveryDeps, language: currentLanguage }, stage => {
+      setProof(stage)
+      if (stage.stage === 'proven') {
+        setDiscovery(reading =>
+          reading.read
+            ? { ...reading, findableUntil: stage.findableUntil }
+            : reading,
+        )
+      }
+    }),
+  )
+  // READ WHEN SETTINGS SHOWS, and only then: the row says whether this
+  // account is findable and until when.
+  useEffect(() => {
+    if (tab !== 'settings') return
+    let current = true
+    readDiscovery(discoveryDeps).then(reading => {
+      if (current) setDiscovery(reading)
+    })
+    return () => {
+      current = false
+    }
+  }, [tab, discoveryDeps])
   // DELETING THE ACCOUNT THIS DEVICE HOLDS, FROM SETTINGS (#382).
   //
   // The server first, then this device: `deleteAccount.ts` holds that order.
@@ -4325,6 +4369,13 @@ export function App({
         if (isDeletionLeavable(deletion)) setDeletion({ stage: 'shut' })
         return true
       }
+      // « ÊTRE TROUVABLE »: back is « Pas maintenant », at every stage. An
+      // answer still on its way is dropped by the journey, and nothing more
+      // is sent.
+      if (tab === 'settings' && proof.stage !== 'shut') {
+        proofRef.current.close()
+        return true
+      }
       if (invite.stage !== 'shut') {
         setInvite({ stage: 'shut' })
         setAdmission(null)
@@ -4347,6 +4398,7 @@ export function App({
     openScope,
     legalOpen,
     deletion,
+    proof.stage,
     invite.stage,
     tab,
     backupPrompt,
@@ -5073,6 +5125,7 @@ export function App({
               tab === 'settings' &&
               !legalOpen &&
               deletion.stage === 'shut' &&
+              proof.stage === 'shut' &&
               !favouritesOpen &&
               !backupOpen && (
                 <View style={styles.block}>
@@ -5134,6 +5187,14 @@ export function App({
                       ).catch(() => {
                         Linking.openSettings().catch(() => {})
                       })
+                    }}
+                    findable={
+                      discovery.read && discovery.on
+                        ? { until: discovery.findableUntil }
+                        : null
+                    }
+                    onFindable={() => {
+                      if (discovery.read) proofRef.current.open(discovery)
                     }}
                     receipts={receipts}
                     receiptsNotKept={receiptsNotKept}
@@ -5204,6 +5265,23 @@ export function App({
                     onDelete={deleteThisAccount}
                     onWrite={writeForDeletion}
                     onKeep={() => setDeletion({ stage: 'shut' })}
+                  />
+                </View>
+              )}
+
+            {openScope === null &&
+              tab === 'settings' &&
+              proof.stage !== 'shut' && (
+                <View style={styles.block}>
+                  <Findable
+                    stage={proof}
+                    onContinue={() => proofRef.current.consent()}
+                    onClose={() => proofRef.current.close()}
+                    // Neither can fail: the journey says every refusal as a
+                    // stage, so nothing is left to catch here.
+                    onSend={typed => proofRef.current.send(typed)}
+                    onProve={code => proofRef.current.prove(code)}
+                    onAnother={() => proofRef.current.another()}
                   />
                 </View>
               )}
