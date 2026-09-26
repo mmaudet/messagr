@@ -159,7 +159,10 @@ describe('boot', () => {
 
   it('loads the crypto bridge across the JSI boundary', () => {
     expect(report.bridge.loaded).toBe(true)
-    expect(report.bridge.coreVersion).toBe('0.1.0+emit.f6ddf39b')
+    // The suffix is the bridge's `observer::EMIT_BUILD`, an FNV-1a of its
+    // observer.rs and runtime.rs: it moves when either does, as runtime.rs
+    // did in 0.8.0 for the OPRF client's blocking pool (#395).
+    expect(report.bridge.coreVersion).toBe('0.1.0+emit.09389e3e')
   })
 
   it('restores a session and syncs against a real homeserver', () => {
