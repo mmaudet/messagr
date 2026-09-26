@@ -578,6 +578,8 @@ export const nl: Readonly<Record<CopyKey, string>> = {
   list_nobody_else: 'Verder niemand hier',
   list_nobody_joined: 'Niemand heeft aan dit gesprek deelgenomen',
   invite_open: 'Iemand uitnodigen',
+  plus_invite: 'Iemand uitnodigen',
+  plus_close: 'Sluiten',
   settings_backup: 'Reservekopie van berichten',
   backup_settings_on:
     'Uw berichten staan op de server, gesloten met uw herstelsleutel.',

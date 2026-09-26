@@ -931,6 +931,8 @@ export const fr = {
   // them already had a conversation.
   list_nobody_joined: 'Personne n’a rejoint cette conversation',
   invite_open: 'Inviter quelqu’un',
+  plus_invite: 'Inviter quelqu’un',
+  plus_close: 'Fermer',
   // --- La sauvegarde des clés (ADR-0013) ------------------------------------
   //
   // Aucune de ces phrases ne parle de chiffrement, et c'est délibéré. La

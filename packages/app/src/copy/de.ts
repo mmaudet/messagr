@@ -588,6 +588,8 @@ export const de: Readonly<Record<CopyKey, string>> = {
   list_nobody_else: 'Sonst niemand hier',
   list_nobody_joined: 'Niemand ist diesem Gespräch beigetreten',
   invite_open: 'Jemanden einladen',
+  plus_invite: 'Jemanden einladen',
+  plus_close: 'Schließen',
   settings_backup: 'Nachrichtensicherung',
   backup_settings_on:
     'Ihre Nachrichten liegen auf dem Server, verschlossen mit Ihrem Wiederherstellungsschlüssel.',

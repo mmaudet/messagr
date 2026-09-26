@@ -669,6 +669,7 @@ describeRoundTrip('encrypted round trip', () => {
     await waitFor(element(by.id('plus-invite')))
       .toBeVisible()
       .withTimeout(10000)
+    await device.takeScreenshot('eviction-1b-feuille-du-plus')
     await element(by.id('plus-invite')).tap()
     await waitFor(element(by.id('invite-name')))
       .toBeVisible()

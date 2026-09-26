@@ -1857,6 +1857,7 @@ export function App({
     // `tab` suffit à replier les favoris, qui ne vivent que sous Réglages.
     setTab('chat')
     setInvite({ stage: 'shut' })
+    setPlusOpen(false)
     setAdmission(null)
     setShareRefused(why)
   }, [])
@@ -4349,10 +4350,35 @@ export function App({
   // Not a leak on the ordinary opening: `bind` lets go before it opens, so by
   // the time `openScope` sends this round there is nothing left to release.
   useEffect(() => {
-    if (openScope !== null || tab !== 'chat' || invite.stage !== 'shut') {
+    if (
+      openScope !== null ||
+      tab !== 'chat' ||
+      invite.stage !== 'shut' ||
+      plusOpen
+    ) {
       waitingRef.current.letGo()
     }
-  }, [openScope, tab, invite.stage])
+  }, [openScope, tab, invite.stage, plusOpen])
+
+  // THE SHEET THE "+" OPENS BELONGS TO THE LIST, AND GOES WITH IT (#394).
+  //
+  // It is drawn under the conditions the "+" is drawn under. Whatever takes
+  // the list away closes it, rather than leaving it to come back over
+  // another screen: a conversation opened from a notification, another tab,
+  // the invitation panel, an account going, one of the full-screen link
+  // questions. A conversation opened under the sheet would also turn
+  // « Inviter quelqu'un » into a line that does nothing, since the panel is
+  // only drawn over the list.
+  const listUnderThePlus =
+    openScope === null &&
+    tab === 'chat' &&
+    inYet === true &&
+    invite.stage === 'shut' &&
+    otherServerQuestion === null &&
+    linkDescribed === null
+  useEffect(() => {
+    if (!listUnderThePlus) setPlusOpen(false)
+  }, [listUnderThePlus])
 
   // STABLE ACROSS RENDERS, AND THAT IS THE WHOLE POINT.
   //
@@ -5599,11 +5625,10 @@ export function App({
                 />
               )}
 
-            {/* THE "+" OPENS A SHEET RATHER THAN THE FORM (#394). Inviting is
-              its only line today; address-book discovery adds the second.
-              Choosing to invite closes the sheet and opens the same form the
-              circle used to open directly. */}
-            {plusOpen && (
+            {/* THE "+" OPENS A SHEET RATHER THAN THE FORM (#394). Choosing to
+              invite closes it and opens the form the circle used to open
+              directly. `listUnderThePlus` closes it with the list. */}
+            {plusOpen && listUnderThePlus && (
               <PlusSheet
                 onInvite={() => {
                   setPlusOpen(false)

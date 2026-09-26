@@ -81,10 +81,10 @@ function press(drawn: readonly Drawn[], testID: string) {
 }
 
 describe('the sheet the "+" opens', () => {
-  it('offers to invite somebody, and nothing else yet', () => {
+  it('offers to invite somebody, and a way to close, nothing else', () => {
     const { drawn } = sheet()
 
-    expect(said(drawn)).toContain(t('invite_action'))
+    expect(said(drawn)).toEqual([t('plus_invite'), t('plus_close')])
     expect(find(drawn, 'plus-invite')).toBeDefined()
   })
 

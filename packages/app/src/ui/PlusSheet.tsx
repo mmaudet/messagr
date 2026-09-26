@@ -38,7 +38,7 @@ export function PlusSheet({
           testID="plus-scrim"
           style={styles.scrim}
           accessibilityRole="button"
-          accessibilityLabel={t('invite_close')}
+          accessibilityLabel={t('plus_close')}
           onPress={onClose}
         />
         <View style={styles.sheet}>
@@ -47,7 +47,7 @@ export function PlusSheet({
             onPress={onInvite}
             accessibilityRole="button"
             style={({ pressed }) => [styles.choice, pressed && styles.pressed]}>
-            <Text style={styles.choiceLabel}>{t('invite_action')}</Text>
+            <Text style={styles.choiceLabel}>{t('plus_invite')}</Text>
           </Pressable>
 
           <Pressable
@@ -55,7 +55,7 @@ export function PlusSheet({
             onPress={onClose}
             accessibilityRole="button"
             style={({ pressed }) => [styles.choice, pressed && styles.pressed]}>
-            <Text style={styles.choiceLabel}>{t('invite_close')}</Text>
+            <Text style={styles.choiceLabel}>{t('plus_close')}</Text>
           </Pressable>
         </View>
       </View>
