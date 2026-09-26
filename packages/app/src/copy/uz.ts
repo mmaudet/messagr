@@ -274,6 +274,14 @@ export const uz: Readonly<Record<CopyKey, string>> = {
   delete_working: 'Oʻchirilmoqda…',
   delete_failed:
     'Oʻchirish oxiriga yetmadi, hisobingiz hali ham mavjud. Qayta urinib koʻrishingiz mumkin.',
+  delete_email_why:
+    'Bu qurilma ushbu hisob parolini saqlamaydi, server esa uni oʻchirish uchun parolni soʻraydi. Shuning uchun oʻchirish conformite@messagr.eu manziliga xat orqali amalga oshiriladi.',
+  delete_email_write: 'conformite@messagr.eu manziliga yozish',
+  delete_email_by_hand:
+    'Bu telefonda pochta ilovasi boʻlmasa, conformite@messagr.eu manziliga hisobingizni oʻchirishni soʻrab yozing va suhbatlaringizdagi ismingizni hamda sizni taklif qilgan kishining ismini qoʻshing.',
+  delete_mail_subject: 'Messagr hisobimni oʻchirish',
+  'delete_mail_body %@':
+    'Assalomu alaykum,\n\nMessagr hisobimni oʻchirishni soʻrayman. Telefonim uning parolini saqlamaydi.\n\nHisob identifikatori: %@\n',
   deleted_title: 'Hisobingiz oʻchirildi.',
   deleted_body: 'Messagrni butunlay yoping: u noldan qayta boshlanadi.',
   promise_thesis: 'Sizdan hech narsa soʻramaydigan messenjer.',

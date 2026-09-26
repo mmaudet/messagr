@@ -87,12 +87,6 @@ export interface Ending extends ThisDevicesPusher {
 }
 
 /**
- * Without the password the server refuses, so nothing is sent. #384 says what
- * the screen offers instead.
- */
-const NO_PASSWORD = 'this device kept no password for this account'
-
-/**
  * A refusal and an unreachable server say the same thing to the person: the
  * account is still there, and trying again takes up what this attempt began.
  * The one case where the account may already be gone is a lost answer
@@ -106,28 +100,45 @@ export interface TakenAway {
   readonly backup: 'deleted' | 'failed' | 'none'
 }
 
+/** The three ways a deletion ends. */
 export type Deletion =
+  /** Its server deactivated the account. */
   | {
-      readonly deleted: true
+      readonly outcome: 'deleted'
       /** Whether this device could write the deletion down. */
       readonly marked: boolean
       readonly takenAway: TakenAway
     }
+  /** Its server did not: see `NOT_DEACTIVATED`. */
   | {
-      readonly deleted: false
+      readonly outcome: 'failed'
       readonly reason: string
-      /** Absent when nothing was attempted. */
-      readonly takenAway?: TakenAway
+      readonly takenAway: TakenAway
     }
+  /**
+   * This device kept no password, which the server asks for, so nothing was
+   * sent: the way is e-mail (#384).
+   */
+  | { readonly outcome: 'by-email' }
+
+/**
+ * Whether this device can delete its account itself, or the way is e-mail.
+ * Asked before the screen offers anything, so that nobody decides to delete
+ * and only then learns that the server would refuse. Nothing is sent to find
+ * out. #384.
+ */
+export async function wayToDelete(
+  ending: Pick<Ending, 'password'>,
+): Promise<'here' | 'by-email'> {
+  return (await ending.password()) === null ? 'by-email' : 'here'
+}
 
 export async function deleteAccount(
   ending: Ending,
   account: RestoreCredentials,
 ): Promise<Deletion> {
   const password = await ending.password()
-  if (password === null) {
-    return { deleted: false, reason: NO_PASSWORD }
-  }
+  if (password === null) return { outcome: 'by-email' }
   const takenAway = await takeAwayWhatOnlyTheTokenCan(ending, account)
   try {
     await ending.deactivate(account, password)
@@ -138,7 +149,7 @@ export async function deleteAccount(
     // could never get out of. A server that no longer knows this session is
     // the answer that was lost. Anything else is an account still there.
     if ((await ending.stillKnown(account)) !== false) {
-      return { deleted: false, reason: NOT_DEACTIVATED, takenAway }
+      return { outcome: 'failed', reason: NOT_DEACTIVATED, takenAway }
     }
   }
   // THE SERVER HAS SPOKEN, and that is the fact the screen reports. A mark
@@ -146,9 +157,9 @@ export async function deleteAccount(
   // the account its deletion.
   try {
     await ending.markDeleted(account)
-    return { deleted: true, marked: true, takenAway }
+    return { outcome: 'deleted', marked: true, takenAway }
   } catch {
-    return { deleted: true, marked: false, takenAway }
+    return { outcome: 'deleted', marked: false, takenAway }
   }
 }
 

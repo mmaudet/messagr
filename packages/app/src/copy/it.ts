@@ -256,6 +256,14 @@ export const it: Readonly<Record<CopyKey, string>> = {
   delete_working: 'Eliminazione…',
   delete_failed:
     'L’eliminazione non è andata a buon fine e il tuo account esiste ancora. Puoi riprovare.',
+  delete_email_why:
+    'Questo dispositivo non conserva la password di questo account, che il server richiede per eliminarlo. L’eliminazione passa quindi da un’email a conformite@messagr.eu.',
+  delete_email_write: 'Scrivi a conformite@messagr.eu',
+  delete_email_by_hand:
+    'Senza un’app di posta su questo telefono, scrivi a conformite@messagr.eu che chiedi l’eliminazione del tuo account, con il nome che porti nelle tue conversazioni e quello della persona che ti ha invitato.',
+  delete_mail_subject: 'Elimina il mio account Messagr',
+  'delete_mail_body %@':
+    'Ciao,\n\nchiedo l’eliminazione del mio account Messagr. Il mio telefono non ne conserva la password.\n\nIdentificativo dell’account: %@\n',
   deleted_title: 'Il tuo account è eliminato.',
   deleted_body: 'Chiudi completamente Messagr: ripartirà da zero.',
   promise_thesis: 'La messaggistica che non le chiede nulla.',

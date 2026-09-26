@@ -257,6 +257,14 @@ export const nl: Readonly<Record<CopyKey, string>> = {
   delete_working: 'Bezig met verwijderen…',
   delete_failed:
     'Het verwijderen is niet voltooid en uw account bestaat nog. U kunt het opnieuw proberen.',
+  delete_email_why:
+    'Dit apparaat bewaart het wachtwoord van dit account niet, dat de server vraagt om het te verwijderen. Verwijderen gaat daarom via een e-mail aan conformite@messagr.eu.',
+  delete_email_write: 'Schrijf naar conformite@messagr.eu',
+  delete_email_by_hand:
+    'Zonder e-mailapp op deze telefoon schrijft u naar conformite@messagr.eu dat u vraagt om uw account te verwijderen, met de naam die u in uw gesprekken draagt en die van de persoon die u heeft uitgenodigd.',
+  delete_mail_subject: 'Mijn Messagr-account verwijderen',
+  'delete_mail_body %@':
+    'Hallo,\n\nIk vraag om mijn Messagr-account te verwijderen. Mijn telefoon bewaart het wachtwoord niet.\n\nAccount-ID: %@\n',
   deleted_title: 'Uw account is verwijderd.',
   deleted_body:
     'Sluit Messagr volledig af: het begint dan weer van voren af aan.',

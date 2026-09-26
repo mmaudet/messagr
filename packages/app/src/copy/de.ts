@@ -265,6 +265,14 @@ export const de: Readonly<Record<CopyKey, string>> = {
   delete_working: 'Wird gelöscht…',
   delete_failed:
     'Die Löschung wurde nicht abgeschlossen, und Ihr Konto besteht weiterhin. Sie können es erneut versuchen.',
+  delete_email_why:
+    'Dieses Gerät bewahrt das Passwort dieses Kontos nicht auf, das der Server zum Löschen verlangt. Die Löschung erfolgt daher per E-Mail an conformite@messagr.eu.',
+  delete_email_write: 'An conformite@messagr.eu schreiben',
+  delete_email_by_hand:
+    'Ohne E-Mail-App auf diesem Telefon schreiben Sie an conformite@messagr.eu, dass Sie die Löschung Ihres Kontos beantragen, mit dem Namen, den Sie in Ihren Unterhaltungen tragen, und dem Namen der Person, die Sie eingeladen hat.',
+  delete_mail_subject: 'Mein Messagr-Konto löschen',
+  'delete_mail_body %@':
+    'Guten Tag,\n\nich beantrage die Löschung meines Messagr-Kontos. Mein Telefon bewahrt sein Passwort nicht auf.\n\nKontokennung: %@\n',
   deleted_title: 'Ihr Konto ist gelöscht.',
   deleted_body:
     'Schließen Sie Messagr vollständig: Es beginnt dann wieder von vorn.',

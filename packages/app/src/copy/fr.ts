@@ -373,10 +373,24 @@ export const fr = {
   // compte existe, et un nouvel essai reprend là où celui-ci s'est arrêté.
   // Une seule exception : une réponse perdue, puis la question suivante restée
   // sans réponse ; le compte a peut-être disparu, et le nouvel essai le dira.
-  // Sans mot de passe gardé, réessayer ne sert à rien : #384 dira quoi
-  // proposer à la place.
+  // Sans mot de passe gardé, cet écran n'est jamais montré : la voie est le
+  // courriel, et l'écran le dit avant que personne ne décide (#384).
   delete_failed:
     'La suppression n’est pas allée au bout, et votre compte existe toujours. Vous pouvez réessayer.',
+  // PAR COURRIEL, QUAND CET APPAREIL NE GARDE PAS LE MOT DE PASSE (#384).
+  // Les mêmes faits, puis pourquoi, et une seule action : écrire. Le courriel
+  // prérempli porte l'identifiant du compte, que l'écran ne montre pas
+  // (`deletionMail.ts`). Ce qu'il faut écrire à la main reprend la page
+  // d'aide : le nom qu'on porte dans ses conversations, et celui de la
+  // personne qui vous a invité.
+  delete_email_why:
+    'Cet appareil ne garde pas le mot de passe de ce compte, que le serveur demande pour le supprimer. La suppression passe donc par un courriel à conformite@messagr.eu.',
+  delete_email_write: 'Écrire à conformite@messagr.eu',
+  delete_email_by_hand:
+    'Sans messagerie sur ce téléphone, écrivez à conformite@messagr.eu que vous demandez la suppression de votre compte, avec le nom que vous portez dans vos conversations et celui de la personne qui vous a invité.',
+  delete_mail_subject: 'Supprimer mon compte Messagr',
+  'delete_mail_body %@':
+    'Bonjour,\n\nJe demande la suppression de mon compte Messagr. Mon téléphone ne garde pas son mot de passe.\n\nIdentifiant du compte : %@\n',
   deleted_title: 'Votre compte est supprimé.',
   deleted_body: 'Fermez complètement Messagr : il repartira de zéro.',
 
