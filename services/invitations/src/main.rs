@@ -1,4 +1,5 @@
 mod auth;
+mod ceilings;
 mod cleanup;
 mod config;
 mod countries;
@@ -11,6 +12,7 @@ mod masking;
 mod matrix;
 mod named_deactivation;
 mod sms;
+mod sms_history;
 mod util;
 
 use axum::{
@@ -72,11 +74,11 @@ async fn main() -> anyhow::Result<()> {
     tokio::spawn(cleanup::run_forever(state.clone()));
 
     let discovery = match state.cfg.discovery() {
-        Ok((keys, provider)) => Ok(format!(
+        Ok(served) => Ok(format!(
             "address-book discovery is on: {} masking keys, the current one is #{}; proofs by {:?}",
-            keys.len(),
-            keys.current().id(),
-            provider
+            served.keys.len(),
+            served.keys.current().id(),
+            served.provider
         )),
         Err(missing) => Err(format!("{missing}: address-book discovery stays off")),
     };

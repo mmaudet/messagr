@@ -794,4 +794,8 @@ export const en: Readonly<Record<CopyKey, string>> = {
   list_findable_replaced: 'Your number now makes another account findable.',
   list_findable_renew_action: 'Renew the proof',
   list_findable_prove_action: 'Prove my number',
+  'findable_too_many %1$@ %2$@':
+    'You have asked for too many codes. Try again on %1$@ at %2$@.',
+  findable_later:
+    'Too many codes are being asked for right now. Try again later.',
 }

@@ -3,9 +3,13 @@ import * as ReactNamespace from 'react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { t } from '../copy'
-import type { OpenCountry, ProofStage } from '../runtime/discovery'
+import type {
+  OpenCountry,
+  ProofStage,
+  StartRefusal,
+} from '../runtime/discovery'
 import { Findable } from './Findable'
-import { dayOf } from './whenLabel'
+import { dayOf, timeOf } from './whenLabel'
 
 /**
  * « Être trouvable », walked rather than rendered, for the reason
@@ -166,7 +170,7 @@ describe('the consent', () => {
 })
 
 describe('the number', () => {
-  const number = (refused: null | 'not-sent' = null) =>
+  const number = (refused: StartRefusal | null = null) =>
     show({ stage: 'number', countries: COUNTRIES, number: typed, refused })
 
   it('names who will send the SMS before anything is sent', () => {
@@ -204,9 +208,26 @@ describe('the number', () => {
 
   it('says why the service sent no code', () => {
     typed = '+33612345678'
-    expect(textIn(withId(number('not-sent'), 'findable-number-refused'))).toBe(
-      t('findable_not_sent'),
-    )
+    expect(
+      textIn(withId(number({ why: 'not-sent' }), 'findable-number-refused')),
+    ).toBe(t('findable_not_sent'))
+    expect(
+      textIn(withId(number({ why: 'later' }), 'findable-number-refused')),
+    ).toBe(t('findable_later'))
+  })
+
+  it('says when this account may ask for a code again (#399)', () => {
+    typed = '+33612345678'
+    const at = new Date(2026, 8, 27, 14, 5).getTime()
+    expect(
+      textIn(
+        withId(
+          number({ why: 'too-many', retryAt: at }),
+          'findable-number-refused',
+        ),
+      ),
+    ).toBe(t('findable_too_many %1$@ %2$@', dayOf(at), timeOf(at)))
+    expect(timeOf(at)).toBe(t('when_time %1$d %2$d', 14, '05'))
   })
 
   it('is a telephone number field, and nothing is asked of the SMS', () => {

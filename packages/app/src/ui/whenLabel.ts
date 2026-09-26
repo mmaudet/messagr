@@ -21,6 +21,21 @@ export function dateLabel(day: number, month: number, year: number): string {
   return t('date_separator', day, t(`month_${month}` as CopyKey), year)
 }
 
+/** The time of day a moment falls on, in the telephone's time: « 14:05 ». */
+export function timeOf(milliseconds: number): string {
+  const moment = new Date(milliseconds)
+  return hourLabel(moment.getHours(), moment.getMinutes())
+}
+
+/**
+ * An hour and its minutes, « 14:05 ». Minutes are padded here rather than in
+ * a copy template, because two digits is not a question of language while
+ * the separator between them is.
+ */
+function hourLabel(hours: number, minutes: number): string {
+  return t('when_time %1$d %2$d', hours, String(minutes).padStart(2, '0'))
+}
+
 /** The day a moment falls on, in the telephone's time, as `dateLabel` says it. */
 export function dayOf(milliseconds: number): string {
   const day = new Date(milliseconds)
@@ -30,11 +45,7 @@ export function dayOf(milliseconds: number): string {
 export function whenLabel(stamp: Stamp): string {
   switch (stamp.kind) {
     case 'time':
-      return t(
-        'when_time %1$d %2$d',
-        stamp.hours,
-        String(stamp.minutes).padStart(2, '0'),
-      )
+      return hourLabel(stamp.hours, stamp.minutes)
     case 'yesterday':
       return t('yesterday')
     case 'weekday':

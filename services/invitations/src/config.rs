@@ -16,6 +16,8 @@ pub enum ConfigError {
     SmsProviderNotOvhcloud,
     #[error("DISCOVERY_COUNTRIES is unusable: {0}")]
     InvalidCountries(&'static str),
+    #[error("ALERT_SMS_TO is not a number in international form (+ then 8 to 15 digits)")]
+    InvalidAlertNumber,
 }
 
 /// Default ceiling on accounts reserved simultaneously in the charge of a
@@ -58,6 +60,69 @@ pub struct Config {
     pub countries: Vec<crate::countries::Country>,
     /// The time discovery's routes read (#398): the system's, but in tests.
     pub clock: crate::util::Clock,
+    /// How many SMS may prove numbers (#399). See `SmsCeilings`.
+    pub sms_ceilings: SmsCeilings,
+    /// Who is told by SMS when a country's ceiling or the budget is reached
+    /// (#399): the operator's own number, or nobody but the log.
+    pub alert_sms_to: Option<String>,
+}
+
+/// The ceilings on the SMS that prove numbers (#399, Q37 of #38).
+///
+/// An account's are written here, not set: three a day and ten in thirty
+/// days, whatever the deployment. A country's in a calendar day, the budget
+/// over thirty calendar days, and the prepaid balance under which the
+/// operator is told, are set: `SMS_CEILING_PER_COUNTRY_PER_DAY`,
+/// `SMS_BUDGET_PER_MONTH` and `SMS_CREDITS_ALERT_BELOW`. They keep the
+/// posture of the reserved accounts' ceiling: an unusable value falls back to
+/// the default rather than to no ceiling, and zero holds every new proof back.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct SmsCeilings {
+    pub per_account_day: i64,
+    pub per_account_month: i64,
+    pub per_country_day: i64,
+    /// Every SMS of the last thirty days, renewals included.
+    pub budget: i64,
+    /// The prepaid credits at OVHcloud under which the operator is told.
+    pub credits_alert_below: i64,
+}
+
+impl Default for SmsCeilings {
+    fn default() -> Self {
+        SmsCeilings {
+            per_account_day: 3,
+            per_account_month: 10,
+            per_country_day: 50,
+            budget: 500,
+            credits_alert_below: 100,
+        }
+    }
+}
+
+/// The ceilings, from the three settings a deployment may give.
+pub fn sms_ceilings(
+    per_country_day: Option<String>,
+    budget: Option<String>,
+    credits_alert_below: Option<String>,
+) -> SmsCeilings {
+    let default = SmsCeilings::default();
+    SmsCeilings {
+        per_country_day: ceiling_or(per_country_day, default.per_country_day),
+        budget: ceiling_or(budget, default.budget),
+        credits_alert_below: ceiling_or(credits_alert_below, default.credits_alert_below),
+        ..default
+    }
+}
+
+/// The operator's number for the ceilings' alerts, or nobody. A malformed one
+/// stops the start: an alert that cannot leave is not a choice to hear
+/// nothing.
+pub fn alert_sms_to(raw: Option<String>) -> Result<Option<String>, ConfigError> {
+    match raw.map(|v| v.trim().to_string()).filter(|v| !v.is_empty()) {
+        None => Ok(None),
+        Some(number) if crate::countries::is_international(&number) => Ok(Some(number)),
+        Some(_) => Err(ConfigError::InvalidAlertNumber),
+    }
 }
 
 /// Reads the ceiling, or falls back to the conservative default.
@@ -71,9 +136,15 @@ pub struct Config {
 /// Zero is still accepted as-is: it is an explicit circuit breaker, not a
 /// data-entry error.
 pub fn reserved_accounts_ceiling(raw: Option<String>) -> i64 {
+    ceiling_or(raw, DEFAULT_RESERVED_ACCOUNTS_CEILING)
+}
+
+/// A ceiling read from the environment, or `default` for any unusable value:
+/// absent, not a number, negative. Zero stays zero.
+fn ceiling_or(raw: Option<String>, default: i64) -> i64 {
     raw.and_then(|v| v.trim().parse::<i64>().ok())
         .filter(|n| *n >= 0)
-        .unwrap_or(DEFAULT_RESERVED_ACCOUNTS_CEILING)
+        .unwrap_or(default)
 }
 
 /// The masking keys, from `MASKING_KEYS`: `<key number>:<base64 seed>`,
@@ -255,6 +326,12 @@ impl Config {
             sms_provider: sms_provider(|key| std::env::var(key).ok())?,
             countries: discovery_countries(std::env::var("DISCOVERY_COUNTRIES").ok())?,
             clock: crate::util::Clock::system(),
+            sms_ceilings: sms_ceilings(
+                std::env::var("SMS_CEILING_PER_COUNTRY_PER_DAY").ok(),
+                std::env::var("SMS_BUDGET_PER_MONTH").ok(),
+                std::env::var("SMS_CREDITS_ALERT_BELOW").ok(),
+            ),
+            alert_sms_to: alert_sms_to(std::env::var("ALERT_SMS_TO").ok())?,
         })
     }
 
@@ -281,22 +358,37 @@ impl Config {
             sms_provider: None,
             countries: crate::countries::launch_list(),
             clock: crate::util::Clock::system(),
+            sms_ceilings: SmsCeilings::default(),
+            alert_sms_to: None,
         }
     }
 
-    /// The keys and the SMS provider of address-book discovery, or what is
-    /// missing. Discovery serves with both or not at all: one without the
-    /// other would mask numbers nobody can prove, or prove numbers nobody can
-    /// mask. The one place that rule is written.
-    pub fn discovery(
-        &self,
-    ) -> Result<(&crate::masking::MaskingKeys, &crate::sms::Ovhcloud), &'static str> {
-        match (&self.masking_keys, &self.sms_provider) {
-            (Some(keys), Some(provider)) => Ok((keys, provider)),
-            (None, _) => Err("MASKING_KEYS absent"),
-            (_, None) => Err("no SMS provider"),
+    /// What address-book discovery serves with, or what is missing. It
+    /// serves with its keys, its SMS provider and an operator to alert, or not
+    /// at all: keys without a provider would mask numbers nobody can prove, a
+    /// provider without keys would prove numbers nobody can mask, and either
+    /// without an operator would spend SMS with nobody told when a ceiling is
+    /// reached (#399). The one place that rule is written.
+    pub fn discovery(&self) -> Result<Discovery<'_>, &'static str> {
+        match (&self.masking_keys, &self.sms_provider, &self.alert_sms_to) {
+            (Some(keys), Some(provider), Some(operator)) => Ok(Discovery {
+                keys,
+                provider,
+                operator,
+            }),
+            (None, _, _) => Err("MASKING_KEYS absent"),
+            (_, None, _) => Err("no SMS provider"),
+            (_, _, None) => Err("ALERT_SMS_TO absent"),
         }
     }
+}
+
+/// What discovery serves with: see `Config::discovery`.
+pub struct Discovery<'a> {
+    pub keys: &'a crate::masking::MaskingKeys,
+    pub provider: &'a crate::sms::Ovhcloud,
+    /// The operator's number, told when a ceiling is reached.
+    pub operator: &'a str,
 }
 
 #[cfg(test)]
@@ -385,6 +477,52 @@ mod tests {
             .to_string();
         assert!(said.contains("MASKING_KEYS"), "{said}");
         assert!(!said.contains("not-a-seed"), "{said}");
+    }
+
+    #[test]
+    fn the_ceilings_a_deployment_sets_and_those_it_cannot() {
+        assert_eq!(sms_ceilings(None, None, None), SmsCeilings::default());
+        let set = sms_ceilings(Some("20".into()), Some("0".into()), Some("30".into()));
+        assert_eq!(
+            (set.per_country_day, set.budget, set.credits_alert_below),
+            (20, 0, 30)
+        );
+        assert_eq!((set.per_account_day, set.per_account_month), (3, 10));
+        // A typo falls back to the default, never to no ceiling.
+        let typo = sms_ceilings(Some("vingt".into()), Some("-5".into()), Some("".into()));
+        assert_eq!(typo, SmsCeilings::default());
+    }
+
+    #[test]
+    fn without_an_operator_to_alert_discovery_is_off() {
+        let keys = crate::masking::MaskingKeys::new(vec![crate::masking::MaskingKey::from_seed(
+            1, &[1; 32],
+        )
+        .unwrap()])
+        .unwrap();
+        let provider = sms_provider(env(OVH)).unwrap();
+        let served = Config {
+            masking_keys: Some(std::sync::Arc::new(keys)),
+            sms_provider: provider,
+            ..Config::for_tests()
+        };
+        assert_eq!(served.discovery().err(), Some("ALERT_SMS_TO absent"));
+        let told = Config {
+            alert_sms_to: Some("+33600000000".into()),
+            ..served
+        };
+        assert!(told.discovery().is_ok());
+    }
+
+    #[test]
+    fn a_malformed_alert_number_stops_the_start() {
+        assert_eq!(alert_sms_to(None).unwrap(), None);
+        assert_eq!(alert_sms_to(Some("  ".into())).unwrap(), None);
+        assert_eq!(
+            alert_sms_to(Some("+33600000000".into())).unwrap(),
+            Some("+33600000000".into())
+        );
+        assert!(alert_sms_to(Some("06 00 00 00 00".into())).is_err());
     }
 
     #[test]

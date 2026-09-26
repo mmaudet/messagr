@@ -25,7 +25,7 @@ preserved than rewritten from memory.
 ## Running it
 
 ```
-cargo test          # 274 tests, no network, about a second
+cargo test          # 290 tests, no network, about a second
 cargo clippy --all-targets -- -D warnings
 cargo fmt --check
 ```
@@ -36,13 +36,16 @@ rather than on every commit.
 
 ## Configuration
 
-Seventeen variables, four of them mandatory: `DATABASE_URL`, `HOMESERVER_URL`,
+Twenty-one variables, four of them mandatory: `DATABASE_URL`, `HOMESERVER_URL`,
 `REGISTRATION_TOKEN`, `ENCRYPTION_KEY`, plus optional `EDGE_RETENTION_DAYS`,
 `BIND_ADDR`, `MAX_RESERVED_ACCOUNTS_PER_INVITER`, `PUSH_GATEWAY_URL`,
 `MASKING_KEYS`, and the SMS provider's: `OVH_APPLICATION_KEY`,
 `OVH_APPLICATION_SECRET`, `OVH_CONSUMER_KEY`, `OVH_SMS_SERVICE`, `SMS_SENDER`,
-`OVH_API_URL` and `SMS_PROVIDER_FOR_TESTS`, and the countries open to
-discovery, `DISCOVERY_COUNTRIES`.
+`OVH_API_URL` and `SMS_PROVIDER_FOR_TESTS`, the countries open to discovery,
+`DISCOVERY_COUNTRIES`, and the ceilings on its SMS,
+`SMS_CEILING_PER_COUNTRY_PER_DAY`, `SMS_BUDGET_PER_MONTH`,
+`SMS_CREDITS_ALERT_BELOW` and `ALERT_SMS_TO`, without which discovery stays
+off.
 
 `MASKING_KEYS` holds the keys that mask the phone numbers of address-book
 discovery (`masking`, RFC 9497, ADR 0014), each under its key number. Absent,

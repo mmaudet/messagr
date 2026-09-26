@@ -276,7 +276,7 @@ describe('the journey of a proof', () => {
     expect(asked).toEqual([])
     expect(last()).toMatchObject({
       stage: 'number',
-      refused: 'no-country-code',
+      refused: { why: 'no-country-code' },
     })
   })
 
@@ -288,7 +288,10 @@ describe('the journey of a proof', () => {
     await journey.send('+39 312 345 6789')
 
     expect(asked).toEqual([])
-    expect(last()).toMatchObject({ stage: 'number', refused: 'closed' })
+    expect(last()).toMatchObject({
+      stage: 'number',
+      refused: { why: 'closed' },
+    })
   })
 
   it('says a wrong code leaves attempts, and asks for another code after the last', async () => {
@@ -339,10 +342,15 @@ describe('the journey of a proof', () => {
 
   it('says why no code was sent, and stays on the number', async () => {
     for (const [answer, why] of [
-      [refused(503, 'MESSAGR_SMS_NOT_SENT'), 'not-sent'],
-      [refused(503, 'MESSAGR_DISCOVERY_OFF'), 'off'],
-      [refused(422, 'MESSAGR_COUNTRY_CLOSED'), 'closed'],
-      [new Error('offline'), 'unreachable'],
+      [refused(503, 'MESSAGR_SMS_NOT_SENT'), { why: 'not-sent' }],
+      [refused(503, 'MESSAGR_DISCOVERY_OFF'), { why: 'off' }],
+      [refused(422, 'MESSAGR_COUNTRY_CLOSED'), { why: 'closed' }],
+      [refused(503, 'MESSAGR_SMS_LATER'), { why: 'later' }],
+      [
+        refused(429, 'MESSAGR_TOO_MANY_CODES', { retry_at: 1_790_086_400 }),
+        { why: 'too-many', retryAt: 1_790_086_400_000 },
+      ],
+      [new Error('offline'), { why: 'unreachable' }],
     ] as const) {
       const { journey, last } = journeyWith({ startProof: [answer] })
       journey.open(NOT_FINDABLE, null)
@@ -369,7 +377,7 @@ describe('the journey of a proof', () => {
     expect(last()).toMatchObject({
       stage: 'number',
       number: '+33 6 12 34 56 78',
-      refused: 'not-sent',
+      refused: { why: 'not-sent' },
     })
   })
 

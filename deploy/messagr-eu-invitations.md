@@ -23,7 +23,9 @@ production stopped building the prototype (#289).
   - optional, all four or none: `OVH_APPLICATION_KEY`,
     `OVH_APPLICATION_SECRET`, `OVH_CONSUMER_KEY`, `OVH_SMS_SERVICE`, with
     `SMS_SENDER` beside them;
-  - optional: `DISCOVERY_COUNTRIES`.
+  - for discovery, `ALERT_SMS_TO`, without which it stays off;
+  - optional: `DISCOVERY_COUNTRIES`, `SMS_CEILING_PER_COUNTRY_PER_DAY`,
+    `SMS_BUDGET_PER_MONTH`, `SMS_CREDITS_ALERT_BELOW`.
 - **The networks.** `default`, and `sygnal` (the external network
   `messagr-sygnal_default`), because the push gateway forwards to
   `http://messagr-sygnal:5000/_matrix/push/v1/notify`.
@@ -72,8 +74,12 @@ service keeps its mask, and OVHcloud sees it pass, as the consent screen says.
 
 - `OVH_APPLICATION_KEY`, `OVH_APPLICATION_SECRET`, `OVH_CONSUMER_KEY`: an API
   application of the OVHcloud account and its consumer key, created at
-  `https://eu.api.ovh.com/createToken/` with the one right a proof uses,
-  `POST /sms/<service>/jobs`.
+  `https://eu.api.ovh.com/createToken/` with three rights on this SMS account
+  and nothing else: `GET /sms/<service>` (the prepaid balance),
+  `POST /sms/<service>/jobs` (sending) and `DELETE /sms/<service>/outgoing/*`
+  (erasing from the history). **Never a right to read the history**
+  (`GET /sms/<service>/outgoing`): keys that leaked could then read the
+  numbers and the codes sent, which the erasure is there to shorten.
 - `OVH_SMS_SERVICE`: the SMS account, `sms-xx00000-1`.
 - `SMS_SENDER`: the sender the SMS carries, `Messagr` unless said otherwise.
   It must be a sender the SMS account has had validated.
@@ -92,6 +98,68 @@ What the service does with them:
   a container's name on a Docker network.
 - **The secret and the consumer key are never printed.** The log names the
   endpoint, the SMS account and the sender, nothing else.
+
+## The ceilings on the SMS that prove numbers
+
+Every proof costs an SMS, and the service bounds what they cost (#399):
+
+- **An account**: three codes a day and ten in thirty days, renewals
+  included. Written in the service, not set. Beyond them, the request is
+  refused and the application says when to ask again.
+- **A country**: `SMS_CEILING_PER_COUNTRY_PER_DAY` codes in a calendar day
+  (50 unless set).
+- **The whole service**: `SMS_BUDGET_PER_MONTH` codes over thirty calendar
+  days (500 unless set).
+
+Beyond a country's ceiling or the budget, **new proofs wait and renewals go
+through**. A renewal is the proof of a number an account proves now, under
+any masking key in service; renewals still count toward the budget.
+An unusable value falls back to its default, never to no ceiling; `0` holds
+every new proof back. A code is counted in the same step that checks the
+ceilings, so requests sent together cannot get past them, and uncounted if
+its SMS does not leave.
+
+- **The budget counts every SMS, renewals included.** Every findable account
+  renews about once in 28 days, so set `SMS_BUDGET_PER_MONTH` above the number
+  of findable accounts, with room for the new proofs of a month. Otherwise
+  renewals alone hold every new proof back.
+- **The operator is told by SMS**, through the same OVHcloud account, at
+  `ALERT_SMS_TO` (international form): once a day for each ceiling reached,
+  and once a day while the prepaid balance is under
+  `SMS_CREDITS_ALERT_BELOW` credits (100 unless set), which the hourly sweep
+  reads. **Discovery stays off without `ALERT_SMS_TO`**, and a malformed one
+  stops the start.
+- **The credits are prepaid, with automatic re-crediting off**, so that a
+  swollen traffic can cost nothing beyond them. OVHcloud bills credits, not
+  SMS, and a number abroad can cost more than one: the balance alert is what
+  says when to buy more, before proofs and renewals stop.
+- **The service keeps counters, never the number, and no link between an
+  account and a country**: the codes an account asked for, by time, without
+  a country; the SMS sent to each country, by calendar day, without an
+  account. The sweep forgets both after thirty days.
+- **Every SMS is erased from OVHcloud's history** once it can no longer be
+  of use: a proof's ten minutes after it left, an alert's a day after. The
+  hourly sweep deletes it by the id OVHcloud gave it. A failure is tried
+  again at each pass and said in the log after a day; an id the history does
+  not know is tried for a day and then given up, with a warning. **The day
+  Q38 of #38 promises is kept only while OVHcloud answers.**
+- **What the erasure really does at OVHcloud, observed on 26 September
+  2026** on the real account, with a test SMS to the operator's own number:
+  - the id `POST /jobs` answers is the history's own: `DELETE
+/sms/<service>/outgoing/<id>` answered 200 once the SMS had arrived, then
+    404 (« Outgoing sms not found ») when asked again;
+  - once erased, the SMS no longer appears in the history of sent SMS in the
+    control panel either;
+  - it stays, as it must, in the messages of the telephone that received it:
+    nothing a provider does reaches a delivered SMS. The policy (#412) says
+    that the code stays on the person's own telephone;
+  - what OVHcloud keeps as an operator (traffic data) is seen neither by the
+    API nor in the control panel: the policy says it too (#392).
+
+  The test left from OVHcloud's short number: the sender « Messagr » was
+  still pending validation, and until it is validated OVHcloud refuses every
+  SMS sent with it (« Sms sender Messagr is pending validation »), proofs
+  included.
 
 ## The countries open to discovery
 
