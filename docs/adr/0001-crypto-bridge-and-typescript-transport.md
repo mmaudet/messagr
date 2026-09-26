@@ -142,3 +142,17 @@ verified keeps reporting what it reported then. The application names the
 field `claimedSender` and prints it as unauthenticated for that reason. This
 is a property of the design, not a gap in it, and a product surface that
 implies otherwise would be the first place it is lost.
+
+**Amended on 26 September 2026 (masking for address-book discovery).** The
+bridge was Matrix cryptography and nothing else, and ADR 0014's masking was
+first planned in TypeScript, on `@noble/curves`. Measured under Hermes, that
+took 65 s for 2,000 numbers against a budget of ten, so the device's half of
+RFC 9497's oblivious pseudorandom function moves into the bridge (#395):
+`blindOprf` and `finalizeOprf`, the client of the verifiable mode over
+ristretto255-SHA512, from the same `voprf` 0.5.0 crate the service evaluates
+with. Both halves are one implementation, checked against the RFC's vectors
+on each side. The scope opens to that client and no further: no masking key,
+no directory and no request enter the bridge, and the calls need no crypto
+machine. On a Pixel 10 Pro Fold, 2,000 numbers take under half a second to
+blind and finalise, proof checked. Shipped in `react-native-matrix-crypto`
+0.8.0 (linagora/react-native-matrix-crypto#66).
