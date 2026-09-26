@@ -414,15 +414,6 @@ pub async fn create(
         Err(e) => return Err(anyhow::Error::from(e).into()),
     }
 
-    sqlx::query(
-        "INSERT INTO inviter_counters (inviter_user_id, issued_count) VALUES (?,1) \
-         ON CONFLICT(inviter_user_id) DO UPDATE SET issued_count = issued_count + 1",
-    )
-    .bind(&inviter)
-    .execute(&st.pool)
-    .await
-    .map_err(anyhow::Error::from)?;
-
     // COMPLETION MARKER, written last. A non-null `token_enc` means exactly
     // "this response was produced", and it is the replay's only material:
     // `token_sha256` is irreversible, the plaintext token exists nowhere
@@ -1716,5 +1707,25 @@ mod tests {
                 );
             }
         }
+    }
+
+    /// **AN EMISSION WRITES NO PER-INVITER COUNTER** (#416).
+    ///
+    /// The count of invitations issued per account was read by nothing and
+    /// never emptied: a per-account usage measure the privacy page does not
+    /// promise. An emission now leaves only the invitation.
+    #[sqlx::test(migrations = "./migrations")]
+    async fn an_emission_writes_no_per_inviter_counter(pool: SqlitePool) {
+        let (st, _fake) = mount(pool.clone(), 100).await;
+
+        create_one(&st, "alice", Some("key-of-the-counter"), 1)
+            .await
+            .expect("the creation must succeed");
+
+        assert_eq!(invitations(&pool).await, 1);
+        assert_eq!(
+            count(&pool, "SELECT COUNT(*) FROM inviter_counters").await,
+            0
+        );
     }
 }

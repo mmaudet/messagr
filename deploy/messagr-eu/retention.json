@@ -19,8 +19,10 @@
     "jours": 30,
     "applique_par": [
       "services/invitations : EDGE_RETENTION_DAYS, défaut 30",
-      "purge_after IS NULL = gelé par un signalement, jamais purgé"
-    ]
+      "purge_after IS NULL = gelé par un signalement, jamais purgé",
+      "services/invitations : cleanup::purge_invitation_graph, même durée, pour les invitations, les comptes réservés et les attentes de comptes existants, qui portent le même lien (#416)"
+    ],
+    "$manque": "Les copies de la base de production gardées sur l'hôte portent encore ces lignes, et des arêtes de plus de trente jours, qu'aucun ménage ne touche : à purger ou supprimer avec l'accord du porteur (#416)."
   },
   "demandes_dinvitation": {
     "$note": "Une demande ne porte ni adresse, ni nom, ni texte libre, ni adresse IP : une empreinte de code, deux horodatages, et un sceau que le service ne peut pas ouvrir. Elle est purgée quand même — une file qui ne se vide jamais finit par dire combien de gens ont demandé et quand, ce qui est une mesure d'audience, et la page n'en promet aucune.",
