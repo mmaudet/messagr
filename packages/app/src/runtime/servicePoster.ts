@@ -133,3 +133,25 @@ export function serviceAt(baseUrl: string): string {
 async function answered(response: Response) {
   return { status: response.status, body: await response.text() }
 }
+
+/**
+ * Tells the invitation service this account is about to be deleted (#385).
+ *
+ * No body: the token says whose account, as on every authenticated route of
+ * the service, and nobody announces somebody else's deletion. Anything but a
+ * success is thrown -- an unknown route included, which is what a service
+ * not yet deployed answers -- so that the deletion notes the service was not
+ * told, and goes on.
+ */
+export async function announceDeletion(
+  baseUrl: string,
+  accessToken: string,
+): Promise<void> {
+  const response = await fetch(`${baseUrl}/_messagr/account-deletions`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${accessToken}` },
+  })
+  if (!response.ok) {
+    throw new Error(`the invitation service answered ${response.status}`)
+  }
+}

@@ -24,10 +24,12 @@ import type { RestoreCredentials } from './sessionCredentials'
  * this device keeps of the account is forgotten at the next cold launch, the
  * way leaving an account already is. The mark is what that launch reads.
  *
- * # BEFORE THE DEACTIVATION, WHAT ONLY THE TOKEN CAN TAKE AWAY
+ * # BEFORE THE DEACTIVATION, WHAT ONLY THE TOKEN CAN DO
  *
- * #383. Once the account is deactivated its token opens nothing, so it is
- * before or never. This device's pusher goes, so that nothing wakes this
+ * #383, #385. Once the account is deactivated its token opens nothing, so it
+ * is before or never. The invitation service is told first: it records the
+ * deletion for the purge and ends the invitations still open. Then this
+ * device's pusher goes, so that nothing wakes this
  * telephone for an account that is gone; then the key backup, so that its
  * server keeps nothing of its keys. What the deactivation itself does with
  * either was never measured. Neither decides anything: what became of each
@@ -53,6 +55,12 @@ export interface Ending extends ThisDevicesPusher {
    * kept none. The server asks for it: the token alone does not deactivate.
    */
   readonly password: () => Promise<string | null>
+  /**
+   * Tells the invitation service the account is about to be deleted (#385),
+   * with its own token. A throw -- an unknown route before the service is
+   * deployed, a service nobody reaches -- stops nothing.
+   */
+  readonly announce: (account: RestoreCredentials) => Promise<void>
   /**
    * The latest key backup version the account's own server holds, or `null`
    * when it holds none. A throw is a server that did not say.
@@ -107,12 +115,15 @@ export type Deletion =
       readonly outcome: 'deleted'
       /** Whether this device could write the deletion down. */
       readonly marked: boolean
+      /** Whether the invitation service heard about it (#385). */
+      readonly serviceTold: boolean
       readonly takenAway: TakenAway
     }
   /** Its server did not: see `NOT_DEACTIVATED`. */
   | {
       readonly outcome: 'failed'
       readonly reason: string
+      readonly serviceTold: boolean
       readonly takenAway: TakenAway
     }
   /**
@@ -141,6 +152,7 @@ export async function deleteAccount(
 ): Promise<Deletion> {
   const password = await ending.password()
   if (password === null) return { outcome: 'by-email' }
+  const serviceTold = await tellTheService(ending, account)
   const takenAway = await takeAwayWhatOnlyTheTokenCan(ending, account)
   try {
     await ending.deactivate(account, password)
@@ -151,7 +163,12 @@ export async function deleteAccount(
     // could never get out of. A server that no longer knows this session is
     // the answer that was lost. Anything else is an account still there.
     if ((await ending.stillKnown(account)) !== false) {
-      return { outcome: 'failed', reason: NOT_DEACTIVATED, takenAway }
+      return {
+        outcome: 'failed',
+        reason: NOT_DEACTIVATED,
+        serviceTold,
+        takenAway,
+      }
     }
   }
   // THE SERVER HAS SPOKEN, and that is the fact the screen reports. A mark
@@ -159,9 +176,22 @@ export async function deleteAccount(
   // the account its deletion.
   try {
     await ending.markDeleted(account)
-    return { outcome: 'deleted', marked: true, takenAway }
+    return { outcome: 'deleted', marked: true, serviceTold, takenAway }
   } catch {
-    return { outcome: 'deleted', marked: false, takenAway }
+    return { outcome: 'deleted', marked: false, serviceTold, takenAway }
+  }
+}
+
+/** Whether the invitation service heard. Either way, the deletion goes on. */
+async function tellTheService(
+  ending: Ending,
+  account: RestoreCredentials,
+): Promise<boolean> {
+  try {
+    await ending.announce(account)
+    return true
+  } catch {
+    return false
   }
 }
 
