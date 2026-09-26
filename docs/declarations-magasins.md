@@ -286,28 +286,7 @@ Apple ne demande ni si la donnée est partagée, ni si elle est facultative. Son
 
 À coller dans « App Review Information > Notes » à chaque soumission, décidé au point 4. Elle est en anglais, la langue dans laquelle le relecteur lit.
 
-> Messagr is an end-to-end encrypted messenger. Photos, files and message
-> text are encrypted on the device before they are uploaded. The server
-> stores ciphertext only and never holds the key, so it cannot render any
-> of it.
->
-> We therefore do not declare "Photos or Videos" or "Other User Content"
-> under App Privacy. We follow Apple's own definition of collection as
-> retaining data "in a readable form" (App privacy details on the App
-> Store). We are aware of the guidance that an app which lets users upload
-> a media type should disclose that type, and we read it against that
-> definition: there is no readable form of this data on our side to
-> disclose.
->
-> We do declare "Emails or Text Messages", linked to the user, no tracking,
-> App Functionality. The server reads who sends to whom and when, which is
-> what that type covers here, and Apple's guidance on messaging apps asks
-> for it.
->
-> Our full answers, question by question, each quoting the sentence of our
-> privacy policy it rests on, are public at
-> https://github.com/mmaudet/messagr/blob/master/docs/declarations-magasins.md
-> Our privacy policy is at https://messagr.eu/confidentialite
+**Son texte est la section PRIVACY de `deploy/messagr-eu/app-store-listing/review-notes.txt`**, depuis le 26 septembre 2026 (#377). Le champ Notes porte aussi l'entrée du relecteur, qui la précède, et un seul fichier pour un seul champ empêche qu'une copie ici dérive de ce qui est collé : celle qui était citée ici avait déjà réuni en un paragraphe les deux dernières phrases, que la console séparait. `check.py` tient la limite d'Apple sur le champ entier : « The Notes field can contain up to 4000 bytes. »
 
 ### Le manifeste `PrivacyInfo.xcprivacy`
 

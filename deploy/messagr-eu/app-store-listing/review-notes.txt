@@ -1,0 +1,27 @@
+HOW TO ENTER MESSAGR
+
+Messagr can only be joined by invitation: there is no sign-up form, no user name and no password, so there are no demo credentials to give. An account is created on the device when an invitation link is opened. This one was created for the review, valid until <DEADLINE>, for <USES> uses:
+
+<LINK>
+
+1. Open Messagr, tick "I accept Messagr's terms and conditions of use.", scroll down if needed and tap "Begin".
+2. On "You are not in yet", paste the link in the field "Paste the invitation link" and tap "Enter" (if you type it, keep the capital letters). Scanning the QR code the page shows on a computer, or tapping the link in Notes or Mail, works too. Typing it into Safari's address bar only shows the web page.
+3. After about twenty seconds, a conversation named "@mmaudet" appears. If "You are not in yet" comes back, open the link once more.
+
+"@mmaudet" is the developer's account, used only to issue invitations: nobody reads it, so messages keep a single check mark and calls are not answered. To test a conversation between two people, tap "+" (Invite someone) on a first device and scan the QR code with a second one; keep the first device on that screen until it says "Done: this person can come in."
+
+HOW PEOPLE GET AN INVITATION
+
+From someone who already uses Messagr: any user can tap "Invite someone" and pass the link, or its QR code, however they like. A link created in the app is valid for one hour and for a single use; the one above was created for the review, with the same mechanism. Invitations are free and cannot be bought. Messagr is free, with no in-app purchases and no subscriptions.
+
+PRIVACY
+
+Messagr is an end-to-end encrypted messenger. Photos, files and message text are encrypted on the device before they are uploaded. The server stores ciphertext only and never holds the key, so it cannot render any of it.
+
+We therefore do not declare "Photos or Videos" or "Other User Content" under App Privacy. We follow Apple's own definition of collection as retaining data "in a readable form" (App privacy details on the App Store). We are aware of the guidance that an app which lets users upload a media type should disclose that type, and we read it against that definition: there is no readable form of this data on our side to disclose.
+
+We do declare "Emails or Text Messages", linked to the user, no tracking, App Functionality. The server reads who sends to whom and when, which is what that type covers here, and Apple's guidance on messaging apps asks for it.
+
+Our full answers, question by question, each quoting the sentence of our privacy policy it rests on, are public at https://github.com/mmaudet/messagr/blob/master/docs/declarations-magasins.md
+
+Our privacy policy is at https://messagr.eu/confidentialite

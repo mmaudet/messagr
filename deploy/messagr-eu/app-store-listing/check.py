@@ -28,6 +28,15 @@ information ». Une adresse qui répond 404 est un refus en revue, et rien
 ailleurs ne relie la fiche aux pages de `site/`. Le contrôle est hors ligne et
 ne juge que l'existence : il lit l'arbre committé, pas le serveur.
 
+# LA NOTE AU RELECTEUR, QUI N'EST PAS DANS LA FICHE
+
+`review-notes.txt` est le champ « Notes » des informations de vérification :
+l'entrée du relecteur, puis la note de confidentialité (#377). Apple le
+plafonne en octets, et il porte trois trous que `scripts/fiche-app-store.sh`
+remplit au moment de coller. La limite se tient donc sur la note remplie au
+plus long, et un lien d'invitation réel y est refusé : il ferait entrer
+quiconque lit ce dépôt public.
+
 # LE CONTRÔLEUR EST LUI-MÊME ÉPROUVÉ
 
 `--self-test` reprend la fiche réelle, la casse d'une quinzaine de façons — une
@@ -115,8 +124,70 @@ ADRESSE = re.compile(r"https?://[^\s<>\"»]+")
 FIN_DE_PHRASE = ".,;:!?)»"
 
 
+# ── La note au relecteur ──────────────────────────────────────────────────
+NOTE = HERE / "review-notes.txt"
+NOTE_PLAFOND = 4000
+NOTE_PHRASE = "The Notes field can contain up to 4000 bytes."
+NOTE_CONTENU = (
+    "Include information that may be needed to test your app, such as "
+    "app-specific settings and test registration or account details."
+)
+
+# Chaque trou, et la valeur la plus longue qu'il puisse recevoir.
+TROUS = {
+    # `generate_token` : 20 octets en base32 sans remplissage, 32 caractères.
+    "<LINK>": "https://messagr.eu/i/" + "A" * 32,
+    # Le mois au nom le plus long, et le jour à deux chiffres.
+    "<DEADLINE>": "September 30, 2026, 23:59 UTC",
+    # `MAX_USES` du service, `handlers/create.rs`.
+    "<USES>": "10",
+}
+
+# Un chemin `/i/` suivi d'un jeton : ce que le gabarit ne doit jamais porter.
+LIEN_REEL = re.compile(r"https?://[^\s/]+/i/[A-Za-z2-7]{16,}")
+
+
 def mesure(unite, valeur):
     return len(valeur) if unite == "caractères" else len(valeur.encode("utf-8"))
+
+
+def remplir_au_plus_long(texte):
+    for trou, valeur in TROUS.items():
+        texte = texte.replace(trou, valeur)
+    return texte
+
+
+def verifier_note(nom, texte):
+    """Les refus que cette note mérite, en clair. Vide si elle passe."""
+    refus = []
+
+    def refuser(dit, raison):
+        refus.append(f"{nom}: note {dit}\n     {raison}")
+
+    for trou in TROUS:
+        if trou not in texte:
+            refuser(
+                f"ne porte pas {trou}, que l'assistant remplit : le relecteur "
+                "n'aurait pas de quoi entrer",
+                f"Apple : « {NOTE_CONTENU} »\n     {VERSION}",
+            )
+
+    combien = len(remplir_au_plus_long(texte).encode("utf-8"))
+    if combien > NOTE_PLAFOND:
+        refuser(
+            f"fait {combien} octets remplie au plus long, et Apple en autorise "
+            f"{NOTE_PLAFOND}",
+            f"Apple : « {NOTE_PHRASE} »\n     {VERSION}",
+        )
+
+    if LIEN_REEL.search(texte):
+        refuser(
+            "porte un lien d'invitation réel",
+            "Un lien fait entrer quiconque le lit, et ce dépôt est public : le "
+            "gabarit ne porte que <LINK>.",
+        )
+
+    return refus
 
 
 def page_servie(url):
@@ -260,6 +331,15 @@ def controler():
         refus = verifier(nom, fiche)
         raconter(nom, fiche, refus)
         echoue = echoue or bool(refus)
+
+    texte = NOTE.read_text(encoding="utf-8")
+    refus = verifier_note(NOTE.name, texte)
+    for ligne in refus:
+        print(f"FAIL {ligne}", file=sys.stderr)
+    if not refus:
+        octets = len(remplir_au_plus_long(texte).encode("utf-8"))
+        print(f"OK   {NOTE.name}: note {octets}/{NOTE_PLAFOND} octets, remplie au plus long")
+    echoue = echoue or bool(refus)
     return 1 if echoue else 0
 
 
@@ -371,6 +451,68 @@ def self_test():
         echoue = True
     else:
         print(f"OK   accepté : {nom}, tel qu'il est écrit")
+
+    # ── La note au relecteur, cassée à son tour ────────────────────────────
+    #
+    # Chaque refus attendu est nommé par un mot de son texte, et pas seulement
+    # par le champ : une note sans <LINK> et avec un lien réel serait refusée
+    # pour le trou manquant même si le contrôle du lien réel était cassé.
+    note = NOTE.read_text(encoding="utf-8")
+    remplie = remplir_au_plus_long(note)
+
+    def attendre_note(quoi, cassee, marque):
+        nonlocal echoue
+        refus = verifier_note("mutant.txt", cassee)
+        if any(marque in r for r in refus):
+            print(f"OK   refusé : {quoi}")
+        else:
+            print(f"FAIL non refusé : {quoi} (refus obtenus : {refus})", file=sys.stderr)
+            echoue = True
+
+    # SOUS la limite en caractères, AU-DESSUS en octets : le cas qu'un
+    # contrôle en caractères laisserait passer, comme pour les mots-clés.
+    lourde = note + "é" * (NOTE_PLAFOND - len(remplie))
+    assert (
+        len(remplir_au_plus_long(lourde))
+        <= NOTE_PLAFOND
+        < len(remplir_au_plus_long(lourde).encode("utf-8"))
+    )
+
+    reel = "https://messagr.eu/i/ABCDEFGHIJKLMNOPQRSTUVWXYZ234567"
+    cas_note = [
+        (
+            "une note de 4001 octets remplie au plus long",
+            note + "a" * (NOTE_PLAFOND + 1 - len(remplie.encode("utf-8"))),
+            "octets",
+        ),
+        (
+            "une note accentuée, sous 4000 caractères et au-dessus en octets",
+            lourde,
+            "octets",
+        ),
+        ("une note sans <LINK>", note.replace("<LINK>", ""), "<LINK>"),
+        ("une note sans <DEADLINE>", note.replace("<DEADLINE>", ""), "<DEADLINE>"),
+        ("une note sans <USES>", note.replace("<USES>", ""), "<USES>"),
+        (
+            "une note qui porte un lien d'invitation réel",
+            note + reel + "\n",
+            "lien d'invitation réel",
+        ),
+        (
+            "un lien réel tapé en minuscules",
+            note + reel.lower() + "\n",
+            "lien d'invitation réel",
+        ),
+    ]
+    for quoi, cassee, marque in cas_note:
+        attendre_note(quoi, cassee, marque)
+
+    refus = verifier_note(NOTE.name, note)
+    if refus:
+        print(f"FAIL la note réelle est refusée : {refus}", file=sys.stderr)
+        echoue = True
+    else:
+        print(f"OK   accepté : {NOTE.name}, tel qu'il est écrit")
 
     return 1 if echoue else 0
 
