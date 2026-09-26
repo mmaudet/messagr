@@ -56,6 +56,27 @@ pub async fn purge_spent_proofs(pool: &SqlitePool, now: i64) -> Result<u64> {
     Ok(r.rows_affected())
 }
 
+/// Combien de temps le service garde ce qu'une découverte finie laisse.
+pub const ENDED_PROOFS_KEPT_SECONDS: i64 = 30 * 86_400;
+
+/// Ce qu'une découverte finie laisse, oublié trente jours plus tard (#398).
+///
+/// Un numéro retiré ou une preuve expirée garde son masque trente jours au
+/// service, et l'avis au compte qu'une preuve plus récente a remplacé vit
+/// autant. Au-delà, les deux s'effacent.
+pub async fn purge_ended_proofs(pool: &SqlitePool, now: i64) -> Result<u64> {
+    let horizon = now - ENDED_PROOFS_KEPT_SECONDS;
+    let masks = sqlx::query("DELETE FROM findable_numbers WHERE expires_at <= ?")
+        .bind(horizon)
+        .execute(pool)
+        .await?;
+    let notices = sqlx::query("DELETE FROM replaced_proofs WHERE replaced_at <= ?")
+        .bind(horizon)
+        .execute(pool)
+        .await?;
+    Ok(masks.rows_affected() + notices.rows_affected())
+}
+
 /// Qui a fait entrer qui, oublié trente jours après que l'invitation a été
 /// dépensée (#416).
 ///
@@ -487,14 +508,15 @@ pub(crate) async fn sweep_once(st: &Arc<AppState>, now: i64) -> bool {
         purge_inviter_counters(&st.pool).await,
         purge_spent_proofs(&st.pool, now).await,
         purge_account_deletions(&st.pool, now).await,
+        purge_ended_proofs(&st.pool, now).await,
     ) {
-        (Ok(a), Ok(b), Ok(c), Ok(d), Ok(e), Ok(f), Ok(g), Ok(h), Ok(i), Ok(j)) => {
+        (Ok(a), Ok(b), Ok(c), Ok(d), Ok(e), Ok(f), Ok(g), Ok(h), Ok(i), Ok(j), Ok(k)) => {
             tracing::info!(
                 "cleanup: {a} edges, {b} invitations, {c} accounts, \
                                 {d} rows repaired, {e} claimed rows purged, \
                                 {f} requests purged, {g} graph rows purged, \
                                 {h} inviter counters purged, {i} spent proofs purged, \
-                                {j} deletion announcements purged"
+                                {j} deletion announcements purged, {k} ended proofs purged"
             );
             true
         }
@@ -515,6 +537,58 @@ pub async fn run_forever(st: Arc<AppState>) {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[sqlx::test(migrations = "./migrations")]
+    async fn what_an_ended_proof_leaves_is_forgotten_thirty_days_later(pool: sqlx::SqlitePool) {
+        let ended_at = 1_000_000_i64;
+        for (user, mask) in [("@retire:h", 1u8), ("@encore:h", 2)] {
+            sqlx::query(
+                "INSERT INTO findable_numbers \
+                 (key_id, mask, user_id, reference, proven_at, expires_at, withdrawn_at) \
+                 VALUES (1, ?, ?, ?, 0, ?, ?)",
+            )
+            .bind(vec![mask; 64])
+            .bind(user)
+            .bind(format!("ref-{mask}"))
+            .bind(if mask == 1 {
+                ended_at
+            } else {
+                ended_at + 10 * 86_400
+            })
+            .bind(if mask == 1 { Some(ended_at) } else { None })
+            .execute(&pool)
+            .await
+            .unwrap();
+        }
+        sqlx::query("INSERT INTO replaced_proofs (user_id, replaced_at) VALUES ('@remplace:h', ?)")
+            .bind(ended_at)
+            .execute(&pool)
+            .await
+            .unwrap();
+        let left = || async {
+            let masks: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM findable_numbers")
+                .fetch_one(&pool)
+                .await
+                .unwrap();
+            let notices: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM replaced_proofs")
+                .fetch_one(&pool)
+                .await
+                .unwrap();
+            (masks, notices)
+        };
+
+        let before = ended_at + ENDED_PROOFS_KEPT_SECONDS - 1;
+        assert_eq!(purge_ended_proofs(&pool, before).await.unwrap(), 0);
+        assert_eq!(left().await, (2, 1), "kept for thirty days");
+
+        let after = ended_at + ENDED_PROOFS_KEPT_SECONDS;
+        assert_eq!(purge_ended_proofs(&pool, after).await.unwrap(), 2);
+        assert_eq!(
+            left().await,
+            (1, 0),
+            "the mask of a proof still running stays"
+        );
+    }
 
     #[sqlx::test(migrations = "./migrations")]
     async fn an_abandoned_proof_is_forgotten_once_its_code_has_run_out(pool: sqlx::SqlitePool) {

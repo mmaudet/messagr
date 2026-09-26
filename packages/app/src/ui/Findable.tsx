@@ -14,11 +14,13 @@ import {
 import {
   codeIsSpent,
   numberRefusal,
+  isDueForRenewal,
   whereTheNumberGoes,
   type FinishRefusal,
   type OpenCountry,
   type ProofStage,
   type StartRefusal,
+  type WithdrawRefusal,
 } from '../runtime/discovery'
 import { NotchedButton } from './NotchedButton'
 import { dayOf } from './whenLabel'
@@ -53,6 +55,9 @@ export function Findable({
   onSend,
   onProve,
   onAnother,
+  onRenew,
+  onWithdraw,
+  now = Date.now(),
 }: {
   readonly stage: Exclude<ProofStage, { readonly stage: 'shut' }>
   /** « Continuer », on the consent. */
@@ -62,6 +67,12 @@ export function Findable({
   readonly onSend: (typed: string) => void
   readonly onProve: (code: string) => void
   readonly onAnother: () => void
+  /** « Renouveler la preuve » (#398). */
+  readonly onRenew: () => void
+  /** « Retirer mon numéro » (#398). */
+  readonly onWithdraw: () => void
+  /** The clock, injectable, as `ConversationList`'s is. */
+  readonly now?: number
 }) {
   return (
     <View style={styles.screen} testID="findable">
@@ -93,9 +104,19 @@ export function Findable({
           onAnother={onAnother}
         />
       )}
-      {stage.stage === 'proven' && (
-        <Proven findableUntil={stage.findableUntil} onDone={onClose} />
+      {(stage.stage === 'proven' || stage.stage === 'withdrawing') && (
+        <Proven
+          findableUntil={stage.findableUntil}
+          number={stage.number}
+          refused={stage.stage === 'proven' ? stage.refused : null}
+          withdrawing={stage.stage === 'withdrawing'}
+          now={now}
+          onRenew={onRenew}
+          onWithdraw={onWithdraw}
+          onDone={onClose}
+        />
       )}
+      {stage.stage === 'withdrawn' && <Withdrawn onDone={onClose} />}
     </View>
   )
 }
@@ -299,19 +320,98 @@ function TheCode({
   )
 }
 
+/**
+ * The proof, its number and its date, and what can be done with it (#398).
+ *
+ * THE ACTION OF THE MOMENT LEADS. From its 21st day a proof is to renew, and
+ * « Renouveler la preuve » takes the principal place; before that, the
+ * person has just proved it or come to look, and « Terminé » does.
+ * « Retirer mon numéro » keeps the quiet tone: it ends nothing that cannot be
+ * proved again, and a warning colour would say otherwise.
+ */
 function Proven({
   findableUntil,
+  number,
+  refused,
+  withdrawing,
+  now,
+  onRenew,
+  onWithdraw,
   onDone,
 }: {
   readonly findableUntil: number
+  readonly number: string | null
+  readonly refused: WithdrawRefusal | null
+  readonly withdrawing: boolean
+  readonly now: number
+  readonly onRenew: () => void
+  readonly onWithdraw: () => void
   readonly onDone: () => void
 }) {
+  const renewing = isDueForRenewal(findableUntil, now)
+  const renew = (
+    <NotchedButton
+      key="renew"
+      testID="findable-renew"
+      label={t('findable_renew')}
+      tone={renewing ? undefined : 'quiet'}
+      onPress={onRenew}
+      wide
+    />
+  )
+  const done = (
+    <NotchedButton
+      key="done"
+      testID="findable-done"
+      label={t('findable_done')}
+      tone={renewing ? 'quiet' : undefined}
+      onPress={onDone}
+      wide
+    />
+  )
   return (
     <View style={styles.body} testID="findable-proven">
       <Text style={styles.title}>{t('findable_proven_title')}</Text>
+      {number !== null && (
+        <Text style={styles.number} testID="findable-proven-number">
+          {number}
+        </Text>
+      )}
       <Text style={styles.text} testID="findable-proven-until">
-        {t('findable_proven_until %@', dayOf(findableUntil))}
+        {renewing
+          ? t('findable_proven_renew %@', dayOf(findableUntil))
+          : t('findable_proven_until %@', dayOf(findableUntil))}
       </Text>
+      {refused !== null && (
+        <View style={styles.refusal} testID="findable-withdraw-refused">
+          <Text style={styles.refusalText}>{t('findable_unreachable')}</Text>
+        </View>
+      )}
+      {withdrawing ? (
+        <Text style={styles.hint} testID="findable-withdrawing">
+          {t('findable_withdrawing')}
+        </Text>
+      ) : (
+        <View style={styles.actions}>
+          {renewing ? [renew, done] : [done, renew]}
+          <NotchedButton
+            testID="findable-withdraw"
+            label={t('findable_withdraw_number')}
+            tone="quiet"
+            onPress={onWithdraw}
+            wide
+          />
+        </View>
+      )}
+    </View>
+  )
+}
+
+function Withdrawn({ onDone }: { readonly onDone: () => void }) {
+  return (
+    <View style={styles.body} testID="findable-withdrawn">
+      <Text style={styles.title}>{t('findable_withdrawn_title')}</Text>
+      <Text style={styles.text}>{t('findable_withdrawn')}</Text>
       <NotchedButton
         testID="findable-done"
         label={t('findable_done')}
@@ -343,6 +443,7 @@ const styles = StyleSheet.create({
     color: color.neutral['900'],
   },
   text: { ...type.body, color: color.neutral['900'] },
+  number: { ...type.titleMd, color: color.neutral['900'] },
   point: { gap: space.xs },
   pointLead: { ...type.titleMd, color: color.neutral['900'] },
   actions: { gap: space.s, marginTop: space.m },

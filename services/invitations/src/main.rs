@@ -166,6 +166,10 @@ fn router(state: Arc<AppState>) -> Router {
         .route("/discovery/state", get(handlers::discovery::state))
         .route("/discovery/proofs", post(handlers::discovery::start_proof))
         .route(
+            "/discovery/number",
+            delete(handlers::discovery::withdraw_number),
+        )
+        .route(
             "/discovery/proofs/finish",
             post(handlers::discovery::finish_proof),
         )
@@ -428,6 +432,10 @@ mod tests {
                 "finish a proof",
                 http.post(format!("{base}/discovery/proofs/finish"))
                     .json(&serde_json::json!({"code": "123456"})),
+            ),
+            (
+                "withdraw a number",
+                http.delete(format!("{base}/discovery/number")),
             ),
         ];
         for (name, request) in routes {

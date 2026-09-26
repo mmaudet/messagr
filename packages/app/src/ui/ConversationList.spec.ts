@@ -5,6 +5,7 @@ import { describe, expect, it, vi } from 'vitest'
 import { t } from '../copy'
 import type { ConversationSummary } from '../runtime/conversationList'
 import { ConversationList } from './ConversationList'
+import { dayOf } from './whenLabel'
 
 /**
  * The list, walked rather than rendered, for the reason `BackupOffer.spec.ts`
@@ -240,5 +241,49 @@ describe('somewhere to paste the link, before the entry (#367)', () => {
     })
 
     expect(withId(drawn, 'paste-link-refused')).toBeDefined()
+  })
+})
+
+describe('the sentence about being findable (#398)', () => {
+  const DAY = 86_400_000
+
+  it('proposes renewing, with the day the proof ends and the gesture that does it', () => {
+    let pressed = 0
+    const drawn = list({
+      findableNotice: { notice: 'renew', until: NOW + 3 * DAY },
+      onProveAgain: () => (pressed += 1),
+    })
+
+    expect(words(drawn)).toContain(
+      t('list_findable_renew %@', dayOf(NOW + 3 * DAY)),
+    )
+    const action = withId(drawn, 'list-findable-action')
+    expect(action?.props.label).toBe(t('list_findable_renew_action'))
+    ;(action?.props.onPress as () => void)()
+    expect(pressed).toBe(1)
+  })
+
+  it('says a proof ran out, and offers to prove the number again', () => {
+    const drawn = list({
+      findableNotice: { notice: 'expired' },
+      onProveAgain: () => undefined,
+    })
+    expect(words(drawn)).toContain(t('list_findable_expired'))
+    expect(withId(drawn, 'list-findable-action')?.props.label).toBe(
+      t('list_findable_prove_action'),
+    )
+  })
+
+  it('says the number now makes another account findable, and offers nothing to press', () => {
+    const drawn = list({
+      findableNotice: { notice: 'replaced' },
+      onProveAgain: () => undefined,
+    })
+    expect(words(drawn)).toContain(t('list_findable_replaced'))
+    expect(withId(drawn, 'list-findable-action')).toBeUndefined()
+  })
+
+  it('says nothing when there is nothing to say', () => {
+    expect(withId(list(), 'list-findable')).toBeUndefined()
   })
 })

@@ -13,12 +13,15 @@ import {
   type,
 } from '../design/tokens'
 import type { ConversationSummary } from '../runtime/conversationList'
+import type { ListNotice } from '../runtime/discovery'
 import { displayNameFor } from '../runtime/givenName'
 import type { PasteSaid } from '../runtime/pastedLink'
 import type { ShareRefusal } from '../runtime/sharedIn'
 import { stampFor, type Stamp } from '../timeline/whenShown'
 import { Avatar } from './Avatar'
+import { NotchedButton } from './NotchedButton'
 import { PasteLink } from './PasteLink'
+import { dayOf } from './whenLabel'
 
 /**
  * The list of conversations.
@@ -117,6 +120,14 @@ export interface ConversationListProps {
    * nothing can screenshot twice and get the same answer from.
    */
   readonly now?: number
+  /**
+   * What is to be said of being findable, when anything is (#398): a proof to
+   * renew, with the day it ends; one that ran out; a number that now makes
+   * another account findable. See `listNotice` in `discovery.ts`.
+   */
+  readonly findableNotice?: ListNotice | null
+  /** Renewing the proof, or proving the number again. */
+  readonly onProveAgain?: (() => void) | null
 }
 
 export function ConversationList({
@@ -131,9 +142,41 @@ export function ConversationList({
   shareRefused = null,
   opening = null,
   now = Date.now(),
+  findableNotice = null,
+  onProveAgain = null,
 }: ConversationListProps) {
   return (
     <View style={styles.screen} testID="conversation-list">
+      {/* BEING FINDABLE, WHEN IT IS ABOUT TO END OR HAS ENDED (#398). A proof
+          to renew is said at every opening from its 21st day, with the
+          gesture that renews it; one that ran out, with the gesture that
+          proves the number again. A number another account proved since is
+          said without a gesture: proving it back would take it from whoever
+          holds it now, and that is a decision for Settings, not for a tap on
+          the list. */}
+      {findableNotice !== null && (
+        <View style={styles.findable} testID="list-findable">
+          <Text style={styles.findableSaid}>
+            {findableNotice.notice === 'renew'
+              ? t('list_findable_renew %@', dayOf(findableNotice.until))
+              : findableNotice.notice === 'replaced'
+                ? t('list_findable_replaced')
+                : t('list_findable_expired')}
+          </Text>
+          {findableNotice.notice !== 'replaced' && onProveAgain !== null && (
+            <NotchedButton
+              testID="list-findable-action"
+              label={
+                findableNotice.notice === 'renew'
+                  ? t('list_findable_renew_action')
+                  : t('list_findable_prove_action')
+              }
+              tone="quiet"
+              onPress={onProveAgain}
+            />
+          )}
+        </View>
+      )}
       {/* AN INVITATION THAT ARRIVED ON A PHONE THAT ALREADY HAS AN ACCOUNT.
           The account is never replaced -- `entry.ts` says why at length --
           but the link is no longer thrown away either: it is spent for the
@@ -524,6 +567,17 @@ const styles = StyleSheet.create({
     color: color.neutral['600'],
     paddingHorizontal: layout.screenGutter,
     paddingBottom: space.s,
+  },
+  // The sentence and its gesture, one under the other, in the list's gutter.
+  findable: {
+    gap: space.s,
+    paddingHorizontal: layout.screenGutter,
+    paddingBottom: space.s,
+    alignItems: 'flex-start',
+  },
+  findableSaid: {
+    ...type.caption,
+    color: color.neutral['600'],
   },
   screen: {
     flex: 1,

@@ -90,17 +90,25 @@ const said = {
   sent: [] as string[],
   proved: [] as string[],
   another: 0,
+  renewed: 0,
+  withdrawn: 0,
 }
+
+const NOW = new Date(2026, 9, 1, 12).getTime()
+const DAY = 86_400_000
 
 function show(stage: Exclude<ProofStage, { readonly stage: 'shut' }>) {
   return draw(
     createElement(Findable, {
       stage,
+      now: NOW,
       onContinue: () => (said.continued += 1),
       onClose: () => (said.closed += 1),
       onSend: typedNumber => said.sent.push(typedNumber),
       onProve: code => said.proved.push(code),
       onAnother: () => (said.another += 1),
+      onRenew: () => (said.renewed += 1),
+      onWithdraw: () => (said.withdrawn += 1),
     }),
   )
 }
@@ -112,6 +120,8 @@ beforeEach(() => {
   said.sent = []
   said.proved = []
   said.another = 0
+  said.renewed = 0
+  said.withdrawn = 0
 })
 
 describe('the consent', () => {
@@ -262,7 +272,12 @@ describe('the code', () => {
 describe('the proof', () => {
   it('reads « Numéro prouvé », and until when', () => {
     const until = new Date(2026, 9, 24, 12).getTime()
-    const drawn = show({ stage: 'proven', findableUntil: until })
+    const drawn = show({
+      stage: 'proven',
+      findableUntil: until,
+      number: null,
+      refused: null,
+    })
 
     expect(textIn(withId(drawn, 'findable-proven'))).toContain(
       t('findable_proven_title'),
@@ -271,5 +286,72 @@ describe('the proof', () => {
       t('findable_proven_until %@', dayOf(until)),
     )
     expect(dayOf(until)).toBe('24 octobre 2026')
+  })
+})
+
+describe('keeping the proof, or ending it (#398)', () => {
+  const proven = (
+    over: Partial<Extract<ProofStage, { stage: 'proven' }>> = {},
+  ) =>
+    show({
+      stage: 'proven',
+      findableUntil: NOW + 20 * DAY,
+      number: '+33612345678',
+      refused: null,
+      ...over,
+    })
+
+  it('shows the number kept, and offers to renew the proof or withdraw the number', () => {
+    const drawn = proven()
+    expect(textIn(withId(drawn, 'findable-proven-number'))).toBe('+33612345678')
+    ;(withId(drawn, 'findable-renew')?.props.onPress as () => void)()
+    ;(withId(drawn, 'findable-withdraw')?.props.onPress as () => void)()
+    expect(said).toMatchObject({ renewed: 1, withdrawn: 1 })
+    expect(withId(drawn, 'findable-renew')?.props.label).toBe(
+      t('findable_renew'),
+    )
+    expect(withId(drawn, 'findable-withdraw')?.props.label).toBe(
+      t('findable_withdraw_number'),
+    )
+  })
+
+  it('says the proof is to renew from its 21st day', () => {
+    const until = NOW + 7 * DAY
+    expect(
+      textIn(withId(proven({ findableUntil: until }), 'findable-proven-until')),
+    ).toBe(t('findable_proven_renew %@', dayOf(until)))
+    expect(
+      textIn(
+        withId(proven({ findableUntil: until + 1 }), 'findable-proven-until'),
+      ),
+    ).toBe(t('findable_proven_until %@', dayOf(until + 1)))
+  })
+
+  it('says when withdrawing the number did not go through', () => {
+    expect(
+      textIn(
+        withId(proven({ refused: 'unreachable' }), 'findable-withdraw-refused'),
+      ),
+    ).toBe(t('findable_unreachable'))
+  })
+
+  it('offers nothing to press while the number is being withdrawn', () => {
+    const drawn = show({
+      stage: 'withdrawing',
+      findableUntil: NOW + 20 * DAY,
+      number: '+33612345678',
+    })
+    expect(withId(drawn, 'findable-withdrawing')).toBeDefined()
+    expect(withId(drawn, 'findable-renew')).toBeUndefined()
+    expect(withId(drawn, 'findable-withdraw')).toBeUndefined()
+  })
+
+  it('says the number is withdrawn, and goes back to Settings', () => {
+    const drawn = show({ stage: 'withdrawn' })
+    expect(textIn(withId(drawn, 'findable-withdrawn'))).toContain(
+      t('findable_withdrawn'),
+    )
+    ;(withId(drawn, 'findable-done')?.props.onPress as () => void)()
+    expect(said.closed).toBe(1)
   })
 })

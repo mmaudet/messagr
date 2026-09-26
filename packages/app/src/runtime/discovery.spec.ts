@@ -2,8 +2,10 @@ import { describe, expect, it } from 'vitest'
 
 import {
   codeIsSpent,
+  listNotice,
   proofJourney,
   readDiscovery,
+  readingAfter,
   whereTheNumberGoes,
   type DiscoveryReading,
   type DiscoveryService,
@@ -19,7 +21,7 @@ import {
  * screens are told is read back from the stages the journey shows.
  */
 
-type Route = 'state' | 'startProof' | 'finishProof'
+type Route = 'state' | 'startProof' | 'finishProof' | 'withdraw'
 
 interface Answer {
   readonly status: number
@@ -50,6 +52,7 @@ function theService(answers: Partial<Record<Route, (Answer | Error)[]>>) {
     state: () => answer('state'),
     startProof: body => answer('startProof', body),
     finishProof: body => answer('finishProof', body),
+    withdraw: () => answer('withdraw'),
   }
   return { service, asked }
 }
@@ -68,22 +71,33 @@ const refused = (
   body: JSON.stringify({ errcode, error: 'said by the service', ...more }),
 })
 
-const NOT_FINDABLE: DiscoveryReading = {
+const NOT_FINDABLE: Extract<DiscoveryReading, { read: true }> = {
   read: true,
   on: true,
   findableUntil: null,
+  ended: null,
   countries: COUNTRIES,
 }
+
+const DAY = 86_400_000
 
 function journeyWith(answers: Partial<Record<Route, (Answer | Error)[]>>) {
   const { service, asked } = theService(answers)
   const shown: ProofStage[] = []
+  const kept: (string | null)[] = []
   const journey = proofJourney(
-    { service, now: () => NOW, language: () => 'fr' },
+    {
+      service,
+      now: () => NOW,
+      language: () => 'fr',
+      keepNumber: async number => {
+        kept.push(number)
+      },
+    },
     stage => shown.push(stage),
   )
   const last = () => shown[shown.length - 1]
-  return { journey, asked, shown, last }
+  return { journey, asked, shown, last, kept }
 }
 
 describe('reading the state of discovery', () => {
@@ -93,6 +107,7 @@ describe('reading the state of discovery', () => {
         ok({
           on: true,
           findable_until: 1_792_419_200,
+          ended: null,
           countries: [{ code: 'FR', prefix: '33', provider: 'OVHcloud' }],
         }),
       ],
@@ -105,6 +120,7 @@ describe('reading the state of discovery', () => {
       read: true,
       on: true,
       findableUntil: 1_792_419_200_000,
+      ended: null,
       countries: [{ code: 'FR', prefix: '33', provider: 'OVHcloud' }],
     })
   })
@@ -185,7 +201,7 @@ describe('the journey of a proof', () => {
   it('« Pas maintenant » sends nothing and goes back to Settings', () => {
     const { journey, asked, shown } = journeyWith({})
 
-    journey.open(NOT_FINDABLE)
+    journey.open(NOT_FINDABLE, null)
     journey.close()
 
     expect(shown.map(s => s.stage)).toEqual(['consent', 'shut'])
@@ -198,7 +214,7 @@ describe('the journey of a proof', () => {
       finishProof: [ok({ findable_until: 1_792_419_200 })],
     })
 
-    journey.open(NOT_FINDABLE)
+    journey.open(NOT_FINDABLE, null)
     journey.consent()
     expect(asked).toEqual([])
 
@@ -220,6 +236,8 @@ describe('the journey of a proof', () => {
     expect(last()).toEqual({
       stage: 'proven',
       findableUntil: 1_792_419_200_000,
+      number: '+33612345678',
+      refused: null,
     })
     expect(shown.map(s => s.stage)).toEqual([
       'consent',
@@ -234,18 +252,23 @@ describe('the journey of a proof', () => {
   it('opens on the proof, not the consent, for an account already findable', () => {
     const { journey, asked, last } = journeyWith({})
 
-    journey.open({ ...NOT_FINDABLE, findableUntil: 1_792_419_200_000 })
+    journey.open(
+      { ...NOT_FINDABLE, findableUntil: 1_792_419_200_000 },
+      '+33612345678',
+    )
 
     expect(last()).toEqual({
       stage: 'proven',
       findableUntil: 1_792_419_200_000,
+      number: '+33612345678',
+      refused: null,
     })
     expect(asked).toEqual([])
   })
 
   it('asks for the calling code of a number typed without one, without asking the service', async () => {
     const { journey, asked, last } = journeyWith({})
-    journey.open(NOT_FINDABLE)
+    journey.open(NOT_FINDABLE, null)
     journey.consent()
 
     await journey.send('06 12 34 56 78')
@@ -259,7 +282,7 @@ describe('the journey of a proof', () => {
 
   it('refuses a number of a country not open without asking the service', async () => {
     const { journey, asked, last } = journeyWith({})
-    journey.open(NOT_FINDABLE)
+    journey.open(NOT_FINDABLE, null)
     journey.consent()
 
     await journey.send('+39 312 345 6789')
@@ -276,7 +299,7 @@ describe('the journey of a proof', () => {
         refused(400, 'MESSAGR_CODE_WRONG', { attempts_left: 0 }),
       ],
     })
-    journey.open(NOT_FINDABLE)
+    journey.open(NOT_FINDABLE, null)
     journey.consent()
     await journey.send('+33612345678')
 
@@ -297,7 +320,7 @@ describe('the journey of a proof', () => {
       startProof: [ok({ provider: 'OVHcloud', expires_in: 600 })],
       finishProof: [refused(410, 'MESSAGR_CODE_EXPIRED')],
     })
-    journey.open(NOT_FINDABLE)
+    journey.open(NOT_FINDABLE, null)
     journey.consent()
     await journey.send('+33612345678')
     await journey.prove('123456')
@@ -322,7 +345,7 @@ describe('the journey of a proof', () => {
       [new Error('offline'), 'unreachable'],
     ] as const) {
       const { journey, last } = journeyWith({ startProof: [answer] })
-      journey.open(NOT_FINDABLE)
+      journey.open(NOT_FINDABLE, null)
       journey.consent()
       await journey.send('+33612345678')
       expect(last()).toEqual({
@@ -338,7 +361,7 @@ describe('the journey of a proof', () => {
     const { journey, last } = journeyWith({
       startProof: [refused(503, 'MESSAGR_SMS_NOT_SENT')],
     })
-    journey.open(NOT_FINDABLE)
+    journey.open(NOT_FINDABLE, null)
     journey.consent()
 
     await journey.send('+33 6 12 34 56 78')
@@ -359,13 +382,15 @@ describe('the journey of a proof', () => {
           state: () => Promise.reject(new Error('not asked')),
           startProof: () => new Promise(resolve => (answer = resolve)),
           finishProof: () => Promise.reject(new Error('not asked')),
+          withdraw: () => Promise.reject(new Error('not asked')),
         },
         now: () => NOW,
         language: () => 'fr',
+        keepNumber: async () => undefined,
       },
       stage => shown.push(stage),
     )
-    journey.open(NOT_FINDABLE)
+    journey.open(NOT_FINDABLE, null)
     journey.consent()
 
     const sending = journey.send('+33612345678')
@@ -380,7 +405,7 @@ describe('the journey of a proof', () => {
     const { journey, asked } = journeyWith({
       startProof: [ok({ provider: 'OVHcloud', expires_in: 600 })],
     })
-    journey.open(NOT_FINDABLE)
+    journey.open(NOT_FINDABLE, null)
     journey.consent()
 
     await Promise.all([
@@ -401,5 +426,171 @@ describe('a code that can prove nothing more', () => {
     expect(codeIsSpent({ why: 'no-proof' })).toBe(true)
     // The service did not answer: the same code may still prove the number.
     expect(codeIsSpent({ why: 'unreachable' })).toBe(false)
+  })
+})
+
+describe('keeping the proof, or ending it (#398)', () => {
+  const FINDABLE = { ...NOT_FINDABLE, findableUntil: NOW + 10 * DAY }
+
+  it('keeps the proven number on the telephone, to show it and renew it', async () => {
+    const { journey, kept } = journeyWith({
+      startProof: [ok({ provider: 'OVHcloud', expires_in: 600 })],
+      finishProof: [ok({ findable_until: 1_792_419_200 })],
+    })
+    journey.open(NOT_FINDABLE, null)
+    journey.consent()
+    await journey.send('+33 6 12 34 56 78')
+    await journey.prove('123456')
+
+    expect(kept).toEqual(['+33612345678'])
+  })
+
+  it('renews without the consent or the number screen: the SMS goes to the number kept', async () => {
+    const { journey, asked, shown } = journeyWith({
+      startProof: [ok({ provider: 'OVHcloud', expires_in: 600 })],
+    })
+
+    await journey.renew(FINDABLE, '+33612345678')
+
+    expect(shown.map(s => s.stage)).toEqual(['sending', 'code'])
+    expect(asked).toEqual([
+      {
+        route: 'startProof',
+        body: { number: '+33612345678', language: 'fr' },
+      },
+    ])
+  })
+
+  it('asks for the number when none was kept', async () => {
+    const { journey, asked, last } = journeyWith({})
+    await journey.renew(FINDABLE, null)
+    expect(last()).toMatchObject({ stage: 'consent' })
+    expect(asked).toEqual([])
+  })
+
+  it('withdraws the number at once, and forgets it on the telephone', async () => {
+    const { journey, asked, shown, kept } = journeyWith({
+      withdraw: [{ status: 204, body: '' }],
+    })
+    journey.open(FINDABLE, '+33612345678')
+
+    await journey.withdraw()
+
+    expect(asked).toEqual([{ route: 'withdraw' }])
+    expect(shown.map(s => s.stage)).toEqual([
+      'proven',
+      'withdrawing',
+      'withdrawn',
+    ])
+    expect(kept).toEqual([null])
+  })
+
+  it('drops a withdrawal that ends after the journey was closed', async () => {
+    let answer: (a: Answer) => void = () => undefined
+    const shown: ProofStage[] = []
+    const journey = proofJourney(
+      {
+        service: {
+          state: () => Promise.reject(new Error('not asked')),
+          startProof: () => Promise.reject(new Error('not asked')),
+          finishProof: () => Promise.reject(new Error('not asked')),
+          withdraw: () => new Promise(resolve => (answer = resolve)),
+        },
+        now: () => NOW,
+        language: () => 'fr',
+        keepNumber: async () => undefined,
+      },
+      stage => shown.push(stage),
+    )
+    journey.open(
+      { ...NOT_FINDABLE, findableUntil: NOW + 10 * DAY },
+      '+33612345678',
+    )
+
+    const withdrawing = journey.withdraw()
+    journey.close()
+    answer({ status: 204, body: '' })
+    await withdrawing
+
+    expect(shown[shown.length - 1]).toEqual({ stage: 'shut' })
+  })
+
+  it('keeps the proof on screen, and says so, when the withdrawal did not go through', async () => {
+    const { journey, last, kept } = journeyWith({
+      withdraw: [new Error('offline')],
+    })
+    journey.open(FINDABLE, '+33612345678')
+
+    await journey.withdraw()
+
+    expect(last()).toEqual({
+      stage: 'proven',
+      findableUntil: NOW + 10 * DAY,
+      number: '+33612345678',
+      refused: 'unreachable',
+    })
+    expect(kept).toEqual([])
+  })
+})
+
+describe('the sentence above the list (#398)', () => {
+  const at = (reading: Partial<typeof NOT_FINDABLE>) =>
+    listNotice({ ...NOT_FINDABLE, ...reading }, NOW)
+
+  it('proposes renewing from the 21st day of 28, and not before, with the day it ends', () => {
+    expect(at({ findableUntil: NOW + 7 * DAY + 1 })).toBe(null)
+    expect(at({ findableUntil: NOW + 7 * DAY })).toEqual({
+      notice: 'renew',
+      until: NOW + 7 * DAY,
+    })
+    expect(at({ findableUntil: NOW + 1 })).toEqual({
+      notice: 'renew',
+      until: NOW + 1,
+    })
+  })
+
+  it('says a proof ran out once its day has passed, even before the service is read again', () => {
+    expect(at({ findableUntil: NOW })).toEqual({ notice: 'expired' })
+    expect(at({ ended: 'expired' })).toEqual({ notice: 'expired' })
+  })
+
+  it('says a number now makes another account findable', () => {
+    expect(at({ ended: 'replaced' })).toEqual({ notice: 'replaced' })
+  })
+
+  it('says nothing of a number withdrawn, nor when discovery is off or unread', () => {
+    expect(at({ ended: 'withdrawn' })).toBe(null)
+    expect(at({ on: false, ended: 'expired' })).toBe(null)
+    expect(listNotice({ read: false }, NOW)).toBe(null)
+  })
+})
+
+describe('what a stage of the journey changes in the reading (#398)', () => {
+  it('writes a proof just made, and forgets how an earlier one ended', () => {
+    const after = readingAfter(
+      { ...NOT_FINDABLE, ended: 'replaced' },
+      {
+        stage: 'proven',
+        findableUntil: NOW + 28 * DAY,
+        number: null,
+        refused: null,
+      },
+    )
+    expect(after).toMatchObject({ findableUntil: NOW + 28 * DAY, ended: null })
+  })
+
+  it('writes a number just withdrawn', () => {
+    const after = readingAfter(
+      { ...NOT_FINDABLE, findableUntil: NOW + DAY },
+      { stage: 'withdrawn' },
+    )
+    expect(after).toMatchObject({ findableUntil: null, ended: 'withdrawn' })
+  })
+
+  it('leaves the reading alone for every other stage, and an unread reading unread', () => {
+    expect(readingAfter(NOT_FINDABLE, { stage: 'consent' })).toBe(NOT_FINDABLE)
+    expect(readingAfter({ read: false }, { stage: 'withdrawn' })).toEqual({
+      read: false,
+    })
   })
 })

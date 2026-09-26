@@ -779,4 +779,20 @@ export const uz: Readonly<Record<CopyKey, string>> = {
   findable_proven_title: 'Raqam isbotlandi',
   'findable_proven_until %@': 'Siz %@ gacha topiladigan boʻlasiz.',
   findable_done: 'Tayyor',
+  findable_row_renew: 'Isbotni yangilash kerak',
+  findable_renew: 'Isbotni yangilash',
+  findable_withdraw_number: 'Raqamimni olib tashlash',
+  findable_withdrawing: 'Raqam olib tashlanmoqda…',
+  findable_withdrawn_title: 'Raqam olib tashlandi',
+  findable_withdrawn:
+    'Endi hech kim sizni bu raqam orqali topa olmaydi. Uni istalgan vaqtda qayta isbotlashingiz mumkin.',
+  'findable_proven_renew %@':
+    'Isbotingiz %@ kuni tugaydi: topiladigan boʻlib qolish uchun uni yangilang.',
+  'list_findable_renew %@':
+    'Isbotingiz %@ kuni tugaydi: topiladigan boʻlib qolish uchun uni yangilang.',
+  list_findable_expired:
+    'Isbotingiz muddati tugadi: siz endi topiladigan emassiz va kontaktlaringizni topa olmaysiz.',
+  list_findable_replaced: 'Raqamingiz endi boshqa hisobni topiladigan qiladi.',
+  list_findable_renew_action: 'Isbotni yangilash',
+  list_findable_prove_action: 'Raqamimni isbotlash',
 }

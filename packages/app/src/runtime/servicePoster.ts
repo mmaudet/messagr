@@ -97,7 +97,11 @@ export function discoveryService(
     readonly accessToken: string
   } | null,
 ): DiscoveryService {
-  const call = async (path: string, body?: string) => {
+  const call = async (
+    path: string,
+    body?: string,
+    method: 'GET' | 'POST' | 'DELETE' = body === undefined ? 'GET' : 'POST',
+  ) => {
     const held = account()
     if (held === null) throw new Error('this launch holds no account')
     const authorised = { Authorization: `Bearer ${held.accessToken}` }
@@ -105,9 +109,9 @@ export function discoveryService(
       await fetch(
         `${serviceAt(held.baseUrl)}${path}`,
         body === undefined
-          ? { headers: authorised }
+          ? { method, headers: authorised }
           : {
-              method: 'POST',
+              method,
               headers: { ...authorised, 'Content-Type': 'application/json' },
               body,
             },
@@ -118,6 +122,7 @@ export function discoveryService(
     state: () => call('/discovery/state'),
     startProof: body => call('/discovery/proofs', body),
     finishProof: body => call('/discovery/proofs/finish', body),
+    withdraw: () => call('/discovery/number', undefined, 'DELETE'),
   }
 }
 
