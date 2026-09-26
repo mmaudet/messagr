@@ -25,7 +25,7 @@ preserved than rewritten from memory.
 ## Running it
 
 ```
-cargo test          # 214 tests, no network, about a second
+cargo test          # 225 tests, no network, about a second
 cargo clippy --all-targets -- -D warnings
 cargo fmt --check
 ```
@@ -36,9 +36,15 @@ rather than on every commit.
 
 ## Configuration
 
-Eight variables, four of them mandatory: `DATABASE_URL`, `HOMESERVER_URL`,
+Nine variables, four of them mandatory: `DATABASE_URL`, `HOMESERVER_URL`,
 `REGISTRATION_TOKEN`, `ENCRYPTION_KEY`, plus optional `EDGE_RETENTION_DAYS`,
-`BIND_ADDR`, `MAX_RESERVED_ACCOUNTS_PER_INVITER` and `PUSH_GATEWAY_URL`.
+`BIND_ADDR`, `MAX_RESERVED_ACCOUNTS_PER_INVITER`, `PUSH_GATEWAY_URL` and
+`MASKING_KEYS`.
+
+`MASKING_KEYS` masks the phone numbers of address-book discovery (`masking`,
+RFC 9497, ADR 0014). Absent, discovery stays off and the service starts;
+malformed, it refuses to start without showing the value. Its format and where
+it lives are in `deploy/messagr-eu-invitations.md`.
 
 `PUSH_GATEWAY_URL` was missing from this list. It is where a stripped push
 notification is forwarded, and a deployment without it accepts every

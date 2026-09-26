@@ -6,6 +6,7 @@ mod db;
 mod error;
 mod extract;
 mod handlers;
+mod masking;
 mod matrix;
 mod named_deactivation;
 mod util;
@@ -30,6 +31,14 @@ pub struct AppState {
 async fn main() -> anyhow::Result<()> {
     tracing_subscriber::fmt::init();
     let cfg = config::Config::from_env()?;
+    match &cfg.masking_keys {
+        Some(keys) => tracing::info!(
+            "masking keys: {} in service, the current one is #{}",
+            keys.len(),
+            keys.current().id()
+        ),
+        None => tracing::warn!("MASKING_KEYS absent: address-book discovery stays off"),
+    }
     let pool = db::connect(&cfg.database_url).await?;
     let mx = Arc::new(matrix::MatrixClient::new(
         cfg.homeserver_url.clone(),

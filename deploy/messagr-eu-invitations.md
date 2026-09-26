@@ -19,7 +19,31 @@ production stopped building the prototype (#289).
   - required, or the service refuses to start: `DATABASE_URL`, `HOMESERVER_URL`,
     `REGISTRATION_TOKEN`, `ENCRYPTION_KEY`;
   - optional: `EDGE_RETENTION_DAYS`, `BIND_ADDR`,
-    `MAX_RESERVED_ACCOUNTS_PER_INVITER`, `PUSH_GATEWAY_URL`.
+    `MAX_RESERVED_ACCOUNTS_PER_INVITER`, `PUSH_GATEWAY_URL`, `MASKING_KEYS`.
+
+## The masking keys of address-book discovery
+
+`MASKING_KEYS` holds the keys that mask phone numbers for address-book
+discovery (#392, ADR 0014): `<number>:<base64 seed>`, several separated by
+commas, `1:…,2:…`. The highest number is the key new masks are made with; two
+serve together while one replaces the other. A seed is 32 random bytes:
+
+    openssl rand -base64 32
+
+- **Absent, discovery stays off.** The service starts, serves invitations as
+  before, and its first log lines say `MASKING_KEYS absent: address-book
+discovery stays off`. Every deployment before discovery ships is in this case.
+- **Malformed, the service refuses to start.** The refusal names the variable
+  and the shape it expects, never a piece of the value.
+- **Never in the database, never off the host.** The keys live in this
+  environment file only. A copy of the database without them reveals neither
+  the numbers nor which accounts are findable; a copy of the keys elsewhere is
+  one more place to steal them from, and a lost key costs at most one SMS per
+  findable account. Whatever backs this host up must leave the environment
+  file out.
+- **Changing a key is a gesture of its own**, described with the key change of
+  discovery (#409). Removing a number from the list makes every mask made with
+  it useless.
 - **The networks.** `default`, and `sygnal` (the external network
   `messagr-sygnal_default`), because the push gateway forwards to
   `http://messagr-sygnal:5000/_matrix/push/v1/notify`.

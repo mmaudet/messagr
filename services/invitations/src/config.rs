@@ -6,6 +6,8 @@ pub enum ConfigError {
     Missing(&'static str),
     #[error("the encryption key must be exactly 32 bytes once decoded")]
     InvalidKey,
+    #[error("MASKING_KEYS is unusable: {0}")]
+    InvalidMaskingKeys(crate::masking::MaskingError),
 }
 
 /// Default ceiling on accounts reserved simultaneously in the charge of a
@@ -35,6 +37,10 @@ pub struct Config {
     /// deployment that carries no push gateway, which is not an error --
     /// `handlers::wake` says what it answers then and why.
     pub push_gateway_url: Option<String>,
+    /// The keys that mask the numbers of address-book discovery (#396).
+    /// `None` while a deployment has not been given them: discovery stays off
+    /// and the log says so. See `masking_keys`.
+    pub masking_keys: Option<std::sync::Arc<crate::masking::MaskingKeys>>,
 }
 
 /// Reads the ceiling, or falls back to the conservative default.
@@ -51,6 +57,26 @@ pub fn reserved_accounts_ceiling(raw: Option<String>) -> i64 {
     raw.and_then(|v| v.trim().parse::<i64>().ok())
         .filter(|n| *n >= 0)
         .unwrap_or(DEFAULT_RESERVED_ACCOUNTS_CEILING)
+}
+
+/// The masking keys, or nothing, with two answers of different weight.
+///
+/// Absent or blank, discovery stays off and the service starts: a deployment
+/// that has not been given the keys yet goes on serving invitations, and every
+/// deployment of this service before discovery ships is one. Present but
+/// malformed, the service refuses to start: a typo in a key is not a choice to
+/// leave discovery off, and serving with a key other than the one meant would
+/// make every mask already kept unreadable. The refusal names the variable and
+/// the shape it expects, never a piece of the value.
+pub fn masking_keys(
+    raw: Option<String>,
+) -> Result<Option<std::sync::Arc<crate::masking::MaskingKeys>>, ConfigError> {
+    let Some(value) = raw.filter(|v| !v.trim().is_empty()) else {
+        return Ok(None);
+    };
+    crate::masking::MaskingKeys::parse(&value)
+        .map(|keys| Some(std::sync::Arc::new(keys)))
+        .map_err(ConfigError::InvalidMaskingKeys)
 }
 
 /// The forward address, or nothing, with the same posture as the ceiling
@@ -113,6 +139,7 @@ impl Config {
             // somewhere, and the somewhere a push gateway forwards to is not
             // a thing to guess.
             push_gateway_url: usable_gateway(std::env::var("PUSH_GATEWAY_URL").ok()),
+            masking_keys: masking_keys(std::env::var("MASKING_KEYS").ok())?,
         })
     }
 
@@ -135,6 +162,7 @@ impl Config {
             bind_addr: String::new(),
             max_reserved_accounts_per_inviter: DEFAULT_RESERVED_ACCOUNTS_CEILING,
             push_gateway_url: None,
+            masking_keys: None,
         }
     }
 }
@@ -142,6 +170,34 @@ impl Config {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    const ONE_SEED: &str = "AQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQE=";
+
+    #[test]
+    fn absent_masking_keys_leave_discovery_off() {
+        // Not a refusal to start: a deployment that has not given the keys
+        // yet serves invitations as before, and the log says discovery is off.
+        assert!(masking_keys(None).unwrap().is_none());
+        assert!(masking_keys(Some("   ".into())).unwrap().is_none());
+    }
+
+    #[test]
+    fn malformed_masking_keys_stop_the_start_without_showing_them() {
+        let refused = masking_keys(Some("1:not-a-seed".into()));
+        let said = refused
+            .expect_err("a malformed setting is refused")
+            .to_string();
+        assert!(said.contains("MASKING_KEYS"), "{said}");
+        assert!(!said.contains("not-a-seed"), "{said}");
+    }
+
+    #[test]
+    fn well_formed_masking_keys_are_loaded() {
+        let keys = masking_keys(Some(format!("3:{ONE_SEED}")))
+            .unwrap()
+            .expect("the keys are loaded");
+        assert_eq!(keys.current().id(), 3);
+    }
 
     #[test]
     fn a_gateway_over_tls_is_kept() {
