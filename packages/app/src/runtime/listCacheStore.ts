@@ -110,8 +110,8 @@ export async function openListCache(
   database: EncryptedDatabase,
 ): Promise<ListCache> {
   await database.execute(SCHEMA)
-  // Fails on a notebook that already has the column, which is the state it
-  // wants. See `ADD_OTHERS`.
+  // Each fails on a notebook that already has its column, which is the state
+  // it wants. See `ADD_OTHERS`.
   await database.execute(ADD_OTHERS).catch(() => undefined)
   await database.execute(ADD_DEPARTED).catch(() => undefined)
 

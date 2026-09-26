@@ -63,10 +63,19 @@ export function mergeSummaries(
   const remembered = new Map(shown.map(row => [row.scope, row]))
 
   const merged = derived.map(row => {
-    if (!failed(row)) return row
     const before = remembered.get(row.scope)
-    if (before === undefined || before.lastAt === 0) return row
-    return before
+    if (failed(row)) {
+      if (before === undefined || before.lastAt === 0) return row
+      return before
+    }
+    // WHO WAS HERE, KEPT THROUGH A HISTORY THAT COULD NOT BE READ (#388). A
+    // moment of bad signal must not take a name away that the row already
+    // had: the fresh row knows nothing about it, which is not the same as
+    // knowing there was nobody.
+    if (row.membershipsUnread === true && before?.departed !== undefined) {
+      return { ...row, departed: before.departed }
+    }
+    return row
   })
 
   // SORTED AGAIN, because a kept row brings its own timestamp back with it

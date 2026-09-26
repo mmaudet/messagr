@@ -924,17 +924,16 @@ export const fr = {
   // identifier on a screen a person reads is the diagnostic string §13.27
   // refuses, and this is a fact with a true sentence.
   list_nobody_else: 'Personne d’autre ici',
+  // QUELQU'UN QUI ÉTAIT LÀ ET N'Y EST PLUS (#388), sous le nom qu'on lui a
+  // donné : supprimé, évincé ou parti, la même phrase pour les trois, puisque
+  // la ligne ne sait pas lequel. Seconde ligne, sous le nom : elle commence
+  // donc par le verbe.
+  list_participant_left: 'n’est plus dans cette conversation',
   // The other shape of being alone: an invitation nobody took up. A
   // conversation is created the moment a link is minted, so every unclaimed
   // invitation leaves one of these on the issuer's list. True whichever way
   // it happened -- never opened, expired, or declined because the two of
   // them already had a conversation.
-  // QUELQU'UN QUI ÉTAIT LÀ ET N'Y EST PLUS (#388), sous son nom : supprimé,
-  // évincé ou parti, la même phrase pour les trois, puisque la ligne ne sait
-  // pas lequel. « Personne n'a rejoint » ne sert plus qu'aux invitations
-  // qu'aucun lien n'a ouvertes, et aux conversations dont l'historique des
-  // membres n'a pas pu être lu.
-  list_participant_left: 'n’est plus dans cette conversation',
   list_nobody_joined: 'Personne n’a rejoint cette conversation',
   invite_open: 'Inviter quelqu’un',
   // --- La sauvegarde des clés (ADR-0013) ------------------------------------

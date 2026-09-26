@@ -22,11 +22,16 @@ function fakeHomeserver(
        * one before it: what `/members` answers, `unsigned.prev_content`
        * included (measured on Continuwuity, 26 September 2026).
        */
-      history?:
+      memberships?:
         | readonly {
             user: string
             membership: 'join' | 'leave' | 'ban' | 'invite'
             before?: 'join' | 'invite'
+            /** Who sent this event; the person themself when absent. */
+            by?: string
+            /** Who sent the one before it. */
+            beforeBy?: string
+            ts?: number
           }[]
         | 'unreadable'
       events?:
@@ -54,15 +59,24 @@ function fakeHomeserver(
 
       if (path.endsWith('/members')) {
         asked.push(path)
-        if (room.history === 'unreadable') throw new Error('history refused')
+        if (room.memberships === 'unreadable') {
+          throw new Error('memberships refused')
+        }
         return JSON.stringify({
-          chunk: (room.history ?? []).map(m => ({
+          chunk: (room.memberships ?? []).map(m => ({
             type: 'm.room.member',
             state_key: m.user,
+            sender: m.by ?? m.user,
+            origin_server_ts: m.ts ?? 0,
             content: { membership: m.membership },
             ...(m.before === undefined
               ? {}
-              : { unsigned: { prev_content: { membership: m.before } } }),
+              : {
+                  unsigned: {
+                    prev_content: { membership: m.before },
+                    prev_sender: m.beforeBy ?? m.user,
+                  },
+                }),
           })),
         })
       }
@@ -349,7 +363,7 @@ describe('a participant who was here and is not any more (#388)', () => {
         fakeHomeserver({
           '!a:x': {
             members: [ME],
-            history: [
+            memberships: [
               { user: ME, membership: 'join' },
               { user: HER, membership, before: 'join' },
             ],
@@ -370,7 +384,7 @@ describe('a participant who was here and is not any more (#388)', () => {
       fakeHomeserver({
         '!a:x': {
           members: [ME],
-          history: [
+          memberships: [
             { user: ME, membership: 'join' },
             { user: HER, membership: 'leave', before: 'invite' },
           ],
@@ -382,15 +396,21 @@ describe('a participant who was here and is not any more (#388)', () => {
     expect(summary?.departed).toBeUndefined()
   })
 
-  it('names nobody when more than one participant has left', async () => {
+  // THE ACCOUNT THE SERVICE DREW, WHEN THE LINK WAS OPENED BY SOMEBODY WHO
+  // ALREADY HAD ONE. It joins, invites that person's account, then leaves and
+  // is deactivated (`claim.rs`): a leave after a join, like a departure, from
+  // an account nobody here ever talked to.
+  const DRAWN = '@drawn:example.org'
+
+  it('does not take the drawn account for a participant while the person it let in is invited', async () => {
     const [summary] = await fetchConversationSummaries(
       fakeHomeserver({
         '!a:x': {
           members: [ME],
-          history: [
+          memberships: [
             { user: ME, membership: 'join' },
-            { user: HER, membership: 'leave', before: 'join' },
-            { user: '@him:example.org', membership: 'leave', before: 'join' },
+            { user: DRAWN, membership: 'leave', before: 'join', ts: 1 },
+            { user: HER, membership: 'invite', by: DRAWN, ts: 1 },
           ],
         },
       }),
@@ -400,13 +420,68 @@ describe('a participant who was here and is not any more (#388)', () => {
     expect(summary?.departed).toBeUndefined()
   })
 
-  it('asks for the history only when nobody else is left', async () => {
+  it('does not take it for one either when that person declined', async () => {
+    const [summary] = await fetchConversationSummaries(
+      fakeHomeserver({
+        '!a:x': {
+          members: [ME],
+          memberships: [
+            { user: ME, membership: 'join' },
+            { user: DRAWN, membership: 'leave', before: 'join', ts: 1 },
+            {
+              user: HER,
+              membership: 'leave',
+              before: 'invite',
+              beforeBy: DRAWN,
+              ts: 2,
+            },
+          ],
+        },
+      }),
+      ME,
+      NOTHING_READ,
+    )
+    expect(summary?.departed).toBeUndefined()
+  })
+
+  it('names the person who came in through it, once they have left too', async () => {
+    // Their invitation is two events back by then, and `/members` shows only
+    // the last one and the one before: the drawn account left first, so the
+    // most recent departure is theirs.
+    const [summary] = await fetchConversationSummaries(
+      fakeHomeserver({
+        '!a:x': {
+          members: [ME],
+          memberships: [
+            { user: ME, membership: 'join' },
+            { user: DRAWN, membership: 'leave', before: 'join', ts: 1 },
+            { user: HER, membership: 'leave', before: 'join', ts: 2 },
+          ],
+        },
+      }),
+      ME,
+      NOTHING_READ,
+    )
+    expect(summary?.departed).toBe(HER)
+  })
+
+  it('says it could not read who was here, rather than that nobody ever came', async () => {
+    const [summary] = await fetchConversationSummaries(
+      fakeHomeserver({ '!a:x': { members: [ME], memberships: 'unreadable' } }),
+      ME,
+      NOTHING_READ,
+    )
+    expect(summary?.departed).toBeUndefined()
+    expect(summary?.membershipsUnread).toBe(true)
+  })
+
+  it('asks who was here only when nobody else is left', async () => {
     // One more request per conversation, and only for the ones that need it.
     const homeserver = fakeHomeserver({
       '!a:x': { members: [ME, HER] },
       '!b:x': {
         members: [ME],
-        history: [{ user: HER, membership: 'leave', before: 'join' }],
+        memberships: [{ user: HER, membership: 'leave', before: 'join' }],
       },
     })
     await fetchConversationSummaries(homeserver, ME, NOTHING_READ)

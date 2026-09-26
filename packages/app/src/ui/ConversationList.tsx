@@ -262,7 +262,7 @@ export function ConversationList({
             {index > 0 && <Separator />}
             <Row
               summary={summary}
-              name={names.get(personOf(summary) ?? '')}
+              name={nameOf(summary, names)}
               onOpen={onOpen}
               now={now}
               opening={summary.scope === opening}
@@ -343,8 +343,10 @@ function Row({
   // read. That one keeps the identifier, because nothing truthful is known.
   // AND BEING ALONE HAS TWO SHAPES, which are two different things to say.
   //
-  // Alone after somebody was removed or left: there is a past, and « personne
-  // d'autre ici » is the whole of it.
+  // Alone after somebody was removed or left, when who it was cannot be
+  // known -- their memberships unreadable, or more than the drawn account of
+  // `whoWasHereAndLeft` to go on: there is a past, and « personne d'autre
+  // ici » is the whole of what can be said.
   //
   // Alone with nothing ever said: this is an invitation nobody took up. The
   // conversation is created the moment the link is minted -- it has to be,
@@ -359,13 +361,17 @@ function Row({
   // AND SOMEBODY WHO WAS HERE KEEPS THEIR NAME (#388). Deleted, evicted or
   // gone: the row said nobody had ever joined, which was false, and lost the
   // name this device had given them, which was the one thing that made the
-  // row readable. The second line says they are not here any more.
+  // row readable. The second line says they are not here any more. And when
+  // who was here could not be read, nothing says nobody came: « personne
+  // d'autre ici » is true either way.
   const person = personOf(summary)
   const shown =
     person !== null
       ? displayNameFor(person, name)
       : summary.others === 0
-        ? summary.lastAt === 0 && summary.preview === null
+        ? summary.lastAt === 0 &&
+          summary.preview === null &&
+          summary.membershipsUnread !== true
           ? t('list_nobody_joined')
           : t('list_nobody_else')
         : summary.scope
@@ -390,7 +396,13 @@ function Row({
       // name -- so somebody who cannot see « Ouverture… » would get exactly
       // the silence #280 is about. `busy` is the state that says it.
       accessibilityState={{ busy: opening }}
-      accessibilityLabel={shown}>
+      // AND THAT THEY ARE NOT HERE ANY MORE (#388), which is the second line
+      // too, and the one thing about this row that changes what a tap does.
+      accessibilityLabel={
+        summary.departed === undefined || summary.other !== null
+          ? shown
+          : `${shown}, ${t('list_participant_left')}`
+      }>
       {/* An identifier is set in the mono role, a name is not. That is the
           one thing distinguishing "somebody I named" from "somebody I have
           not", and it is a typographic answer rather than a badge -- a badge
@@ -459,7 +471,10 @@ function Row({
 /**
  * What the second line says.
  *
- * Three different silences, and they are not the same: nothing was ever said,
+ * That somebody who was here is not any more, first (#388): it replaces the
+ * last thing said, because it is what the row is now about.
+ *
+ * Then three different silences, and they are not the same: nothing was ever said,
  * something was said this device cannot read, and the conversation could not
  * be reached at all. A single "…" for all three would hide the only one worth
  * acting on.
@@ -482,6 +497,15 @@ function previewOf(summary: ConversationSummary): string {
  */
 function personOf(summary: ConversationSummary): string | null {
   return summary.other ?? summary.departed ?? null
+}
+
+/** The name this device gave the person the row is about, if it gave one. */
+function nameOf(
+  summary: ConversationSummary,
+  names: ReadonlyMap<string, string>,
+): string | undefined {
+  const person = personOf(summary)
+  return person === null ? undefined : names.get(person)
 }
 
 function Separator() {
