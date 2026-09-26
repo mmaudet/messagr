@@ -4,12 +4,13 @@ import { Pressable, StyleSheet, Text, View } from 'react-native'
 import { t } from '../copy'
 import { color, floors, layout, space, type } from '../design/tokens'
 import { Consequences } from './Consequences'
+import { DELETION_ADDRESS } from './deletionMail'
 import { NotchedButton } from './NotchedButton'
 
 /**
  * Where deleting the account stands (#382), one stage at a time, so that no
  * two of them can be true together: shut; the screen of facts, with whether
- * the last attempt failed; the same facts with the e-mail way, for a device
+ * the last attempt failed; the same screen with the e-mail way, for a device
  * that kept no password (#384); the request under way; and the account gone,
  * after which nothing else is drawn.
  */
@@ -19,6 +20,30 @@ export type DeletionStage =
   | { readonly stage: 'by-email' }
   | { readonly stage: 'working' }
   | { readonly stage: 'deleted' }
+
+/** The stages in which the screen of facts is drawn. */
+export type ShownDeletion = Extract<
+  DeletionStage,
+  { readonly stage: 'asking' | 'by-email' | 'working' }
+>
+
+/** Whether the screen of facts is drawn in this stage. */
+export function isDeletionShown(stage: DeletionStage): stage is ShownDeletion {
+  return (
+    stage.stage === 'asking' ||
+    stage.stage === 'by-email' ||
+    stage.stage === 'working'
+  )
+}
+
+/**
+ * Whether the person can leave the screen, by the back gesture or another
+ * tab. Not while the server is being asked: its answer would come back to a
+ * screen that has gone, and the person would not learn it.
+ */
+export function isDeletionLeavable(stage: DeletionStage): boolean {
+  return stage.stage === 'asking' || stage.stage === 'by-email'
+}
 
 /**
  * Deleting the account this device holds, from the last row of Settings.
@@ -33,40 +58,43 @@ export type DeletionStage =
  * somebody in the token's own words, and deleting one's own account is not
  * that; `LeaveAccount.tsx` settled the same question the same way.
  *
- * BY E-MAIL, THE SAME FACTS AND NO « OUI » (#384). A device that kept no
- * password cannot delete: the server asks for it. The screen says so before
- * anybody decides, and its one action writes to the address, with what finds
- * the account already in the mail (`deletionMail.ts`). What to write by hand
- * stays on the screen, for a telephone with no mail application.
+ * BY E-MAIL, NO « OUI », AND ONE FACT THAT CHANGES (#384). A device that kept
+ * no password cannot delete: the server asks for it. The screen says so
+ * before anybody decides, and its one action writes to the address, with
+ * what finds the account already in the mail (`deletionMail.ts`). What to
+ * write by hand stays on the screen, for a telephone with no mail
+ * application. And this device forgets nothing that way: only the gesture
+ * here writes the mark the next launch reads, so the fact about what goes
+ * says what stays on the device instead.
  */
 export function DeleteAccount({
-  way,
-  working,
-  failed,
+  stage,
   onDelete,
   onWrite,
   onKeep,
 }: {
-  /** Whether this device can delete its account itself, or the way is e-mail. */
-  readonly way: 'here' | 'by-email'
-  /** While the server is being asked: the buttons give way to a line. */
-  readonly working: boolean
-  /**
-   * Whether the last attempt failed. Not « as it was »: its pusher and its
-   * key backup may already be gone (#383).
-   */
-  readonly failed: boolean
+  readonly stage: ShownDeletion
   readonly onDelete: () => void
   /** Opens a mail to the address, for the e-mail way. */
   readonly onWrite: () => void
   readonly onKeep: () => void
 }) {
+  const byEmail = stage.stage === 'by-email'
+  const keep = (
+    <NotchedButton
+      testID="delete-account-keep"
+      label={t('delete_cancel')}
+      tone="quiet"
+      onPress={onKeep}
+      wide
+    />
+  )
   return (
     <View style={styles.screen} testID="delete-account">
       <Pressable
         testID="delete-account-back"
         onPress={onKeep}
-        disabled={working}
+        disabled={stage.stage === 'working'}
         accessibilityRole="button"
         style={styles.back}>
         <Text style={styles.backLabel}>{`← ${t('settings_title')}`}</Text>
@@ -80,7 +108,7 @@ export function DeleteAccount({
           {
             tone: 'weigh',
             said: t('delete_fact_gone'),
-            body: t('delete_gone_body'),
+            body: byEmail ? t('delete_email_gone_body') : t('delete_gone_body'),
             testID: 'delete-account-gone',
           },
           {
@@ -90,36 +118,33 @@ export function DeleteAccount({
             testID: 'delete-account-stays',
           },
         ]}
-        finally={
-          way === 'by-email' ? t('delete_email_why') : t('delete_final')
-        }>
-        {way === 'by-email' ? (
+        finally={byEmail ? t('delete_email_final') : t('delete_final')}>
+        {stage.stage === 'by-email' ? (
           <>
+            <Text testID="delete-account-why-email" style={styles.why}>
+              {t('delete_email_why %@', DELETION_ADDRESS)}
+            </Text>
             <NotchedButton
               testID="delete-account-write"
-              label={t('delete_email_write')}
+              label={t('delete_email_write %@', DELETION_ADDRESS)}
               onPress={onWrite}
               wide
             />
             <Text testID="delete-account-by-hand" style={styles.byHand}>
-              {t('delete_email_by_hand')}
+              {t('delete_email_by_hand %@', DELETION_ADDRESS)}
             </Text>
-            <NotchedButton
-              testID="delete-account-keep"
-              label={t('delete_cancel')}
-              tone="quiet"
-              onPress={onKeep}
-              wide
-            />
+            {keep}
           </>
         ) : (
           <>
-            {failed ? (
+            {/* Not « as it was »: its pusher and its key backup may already
+                be gone (#383). */}
+            {stage.stage === 'asking' && stage.failed ? (
               <Text testID="delete-account-failed" style={styles.failed}>
                 {t('delete_failed')}
               </Text>
             ) : null}
-            {working ? (
+            {stage.stage === 'working' ? (
               <Text testID="delete-account-working" style={styles.working}>
                 {t('delete_working')}
               </Text>
@@ -131,13 +156,7 @@ export function DeleteAccount({
                   onPress={onDelete}
                   wide
                 />
-                <NotchedButton
-                  testID="delete-account-keep"
-                  label={t('delete_cancel')}
-                  tone="quiet"
-                  onPress={onKeep}
-                  wide
-                />
+                {keep}
               </>
             )}
           </>
@@ -164,5 +183,6 @@ const styles = StyleSheet.create({
   },
   working: { ...type.bodySm, color: color.neutral['600'] },
   failed: { ...type.bodySm, color: color.neutral['900'] },
+  why: { ...type.bodySm, color: color.neutral['900'] },
   byHand: { ...type.bodySm, color: color.neutral['600'] },
 })

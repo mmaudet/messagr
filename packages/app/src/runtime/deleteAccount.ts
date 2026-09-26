@@ -121,15 +121,17 @@ export type Deletion =
    */
   | { readonly outcome: 'by-email' }
 
+/** Whether this device can delete its account itself, or the way is e-mail. */
+export type DeletionWay = 'here' | 'by-email'
+
 /**
- * Whether this device can delete its account itself, or the way is e-mail.
  * Asked before the screen offers anything, so that nobody decides to delete
  * and only then learns that the server would refuse. Nothing is sent to find
  * out. #384.
  */
 export async function wayToDelete(
   ending: Pick<Ending, 'password'>,
-): Promise<'here' | 'by-email'> {
+): Promise<DeletionWay> {
   return (await ending.password()) === null ? 'by-email' : 'here'
 }
 

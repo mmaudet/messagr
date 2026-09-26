@@ -18,10 +18,20 @@ describe('the mail that asks for a deletion (#384)', () => {
   })
 
   it('encodes everything a mail application would otherwise cut or misread', () => {
-    // A raw space, line break, ampersand or question mark in the query would
-    // end the body early or start a parameter nobody wrote.
-    const query = deletionMail(accountId).split('?')[1] ?? ''
-    expect(query).not.toMatch(/[\s?#]/)
-    expect(query.split('&')).toHaveLength(2)
+    // A raw space, line break, ampersand, question mark or hash would end the
+    // body early or start a parameter nobody wrote. Read on the whole link:
+    // splitting at the first question mark would hide a second one.
+    const mail = deletionMail(accountId)
+    expect(mail.split('?')).toHaveLength(2)
+    expect(mail).not.toMatch(/[\s#]/)
+    expect(mail.split('&')).toHaveLength(2)
+  })
+
+  it('breaks lines as the mailto standard wants them', () => {
+    // RFC 6068: `%0D%0A`. A bare `%0A` would run the identifier into the
+    // sentence before it in the applications that follow the letter.
+    const mail = deletionMail(accountId)
+    expect(mail).toContain('%0D%0A')
+    expect(mail.replaceAll('%0D%0A', '')).not.toContain('%0A')
   })
 })

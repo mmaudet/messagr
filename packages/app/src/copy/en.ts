@@ -261,14 +261,17 @@ export const en: Readonly<Record<CopyKey, string>> = {
   delete_working: 'Deleting…',
   delete_failed:
     'The deletion did not go through, and your account still exists. You can try again.',
-  delete_email_why:
-    'This device does not keep this account’s password, which the server asks for to delete it. Deletion therefore goes through an email to conformite@messagr.eu.',
-  delete_email_write: 'Write to conformite@messagr.eu',
-  delete_email_by_hand:
-    'With no email app on this phone, write to conformite@messagr.eu that you are asking for your account to be deleted, with the name you go by in your conversations and the name of the person who invited you.',
-  delete_mail_subject: 'Delete my Messagr account',
+  delete_email_gone_body:
+    'Your account, for good: its identifier will never be used again, and nobody can reach you on this account any more. What this device keeps of your conversations stays on it for as long as Messagr is installed.',
+  delete_email_final: 'Once done, the deletion cannot be undone.',
+  'delete_email_why %@':
+    'This device does not keep this account’s password, which the server asks for to delete it. Deletion therefore goes through an email to %@.',
+  'delete_email_write %@': 'Write to %@',
+  'delete_email_by_hand %@':
+    'With no email app on this phone, write to %@ that you are asking for your account to be deleted, with the name you go by in your conversations and the name of the person who invited you.',
+  delete_mail_subject: 'Delete my account',
   'delete_mail_body %@':
-    'Hello,\n\nI am asking for my Messagr account to be deleted. My phone does not keep its password.\n\nAccount identifier: %@\n',
+    'Hello,\n\nI am asking for my Messagr account to be deleted. My phone does not keep this account’s password.\n\nAccount identifier: %@\n',
   deleted_title: 'Your account is deleted.',
   deleted_body: 'Close Messagr completely: it will start again from scratch.',
   promise_thesis: 'The messenger that asks you for nothing.',

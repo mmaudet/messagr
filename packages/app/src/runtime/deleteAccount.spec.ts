@@ -278,7 +278,8 @@ describe('deleting the account this device holds', () => {
 
   it('sends nothing at all when this device kept no password', async () => {
     // The server refuses a deactivation without it, so asking would only
-    // spend a request to be told no. #384 says what the screen offers then.
+    // spend a request to be told no. The screen shows the e-mail way instead,
+    // and has asked `wayToDelete` before offering anything.
     // Nor is anything taken away first: this device has a pusher written down
     // and its account a backup, and neither is touched for a deletion that
     // cannot happen.

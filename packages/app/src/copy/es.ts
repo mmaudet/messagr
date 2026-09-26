@@ -259,14 +259,17 @@ export const es: Readonly<Record<CopyKey, string>> = {
   delete_working: 'Eliminando…',
   delete_failed:
     'La eliminación no se ha completado y su cuenta sigue existiendo. Puede volver a intentarlo.',
-  delete_email_why:
-    'Este dispositivo no guarda la contraseña de esta cuenta, que el servidor pide para eliminarla. Por eso la eliminación se hace por correo a conformite@messagr.eu.',
-  delete_email_write: 'Escribir a conformite@messagr.eu',
-  delete_email_by_hand:
-    'Sin aplicación de correo en este teléfono, escriba a conformite@messagr.eu que solicita la eliminación de su cuenta, con el nombre que lleva en sus conversaciones y el de la persona que le invitó.',
-  delete_mail_subject: 'Eliminar mi cuenta de Messagr',
+  delete_email_gone_body:
+    'Su cuenta, para siempre: su identificador no volverá a usarse, y nadie podrá contactarle ya en esta cuenta. Lo que este dispositivo guarda de sus conversaciones permanece en él mientras Messagr esté instalado.',
+  delete_email_final: 'Una vez hecha, la eliminación no se puede deshacer.',
+  'delete_email_why %@':
+    'Este dispositivo no guarda la contraseña de esta cuenta, que el servidor pide para eliminarla. Por eso la eliminación se hace por correo a %@.',
+  'delete_email_write %@': 'Escribir a %@',
+  'delete_email_by_hand %@':
+    'Sin aplicación de correo en este teléfono, escriba a %@ que solicita la eliminación de su cuenta, con el nombre que lleva en sus conversaciones y el de la persona que le invitó.',
+  delete_mail_subject: 'Eliminar mi cuenta',
   'delete_mail_body %@':
-    'Hola:\n\nSolicito la eliminación de mi cuenta de Messagr. Mi teléfono no guarda su contraseña.\n\nIdentificador de la cuenta: %@\n',
+    'Hola:\n\nSolicito la eliminación de mi cuenta de Messagr. Mi teléfono no guarda la contraseña de esta cuenta.\n\nIdentificador de la cuenta: %@\n',
   deleted_title: 'Su cuenta está eliminada.',
   deleted_body: 'Cierre Messagr por completo: volverá a empezar desde cero.',
   promise_thesis: 'La mensajería que no le pide nada.',
