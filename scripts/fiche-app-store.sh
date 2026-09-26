@@ -209,14 +209,22 @@ montrer() {
   printf '\n%s\n\n' "$v"
 }
 
-# note_remplie — le champ Notes tel qu'il se colle : le gabarit du dépôt, avec
-# le lien, l'échéance et les usages lus dans l'état de l'invitation. Refuse
-# une invitation qui ne vient pas du compte que la note nomme.
+# note_remplie PORTE_LE_GESTE — le champ Notes tel qu'il se colle : le gabarit
+# du dépôt, avec le lien, l'échéance et les usages lus dans l'état de
+# l'invitation. Refuse une invitation qui ne vient pas du compte que la note
+# nomme. Sans le geste de suppression dans la build soumise (« non »), la
+# section « DELETING THE ACCOUNT » est retirée ici, pas à la main (#386).
 note_remplie() {
-  python3 - "$NOTE_RELECTEUR" "$ETAT_RELECTEUR" <<'PY'
+  python3 - "$NOTE_RELECTEUR" "$ETAT_RELECTEUR" "$1" <<'PY'
 import datetime, json, sys
 
 gabarit = open(sys.argv[1], encoding="utf-8").read()
+if sys.argv[3] != "oui":
+    debut = gabarit.find("DELETING THE ACCOUNT\n")
+    fin = gabarit.find("\nPRIVACY\n")
+    if debut < 0 or fin < debut:
+        sys.exit("la section de la suppression est introuvable dans la note")
+    gabarit = gabarit[:debut] + gabarit[fin + 1:]
 try:
     etat = json.load(open(sys.argv[2], encoding="utf-8"))
 except (OSError, ValueError):
@@ -348,21 +356,22 @@ pause "On passe à la note ?"
 
 stage "La note au relecteur"
 say "Un seul texte pour tout le champ, dans $NOTE_RELECTEUR :"
-say "l'entrée du relecteur et le chemin de la suppression du compte, la façon dont"
-say "on obtient une invitation, puis la confidentialité. Il répond d'avance aux trois"
+say "l'entrée du relecteur, la façon dont on obtient une invitation, le chemin de"
+say "la suppression du compte, puis la confidentialité. Il répond d'avance aux trois"
 say "questions d'Apple du 22 septembre."
 note "check.py en tient la limite, 4000 OCTETS, avec le lien le plus long possible."
 printf '\n'
-if remplie=$(note_remplie); then
+# LA SUPPRESSION N'EXISTE QU'À PARTIR DE LA BUILD 28 (#380). Une note qui la
+# décrirait pour une build antérieure dirait un chemin que la build n'a pas.
+ask GESTE "La build soumise porte-t-elle « Supprimer mon compte » (28 ou après) ? (oui / non)"
+printf '\n'
+if remplie=$(note_remplie "$GESTE"); then
   printf '%s  ────────%s\n%s\n%s  ────────%s\n\n' "$DIM" "$RESET" "$remplie" "$DIM" "$RESET"
 else
   warn "La note ne se remplit pas : revenez à l'étape précédente."
 fi
 step "Dans la console : « Informations de vérification » → « Notes »."
 step "Remplacer tout le contenu par ce bloc, sans le raccourcir."
-warn "« To delete the account: Settings, then Delete my account. » ne vaut qu'à partir"
-warn "de la build 28, qui porte le geste (#380). Pour une build antérieure, retirer"
-warn "cette ligne du bloc : la note dirait un chemin que la build n'a pas."
 note "Le lien fait entrer : ce bloc ne se colle nulle part ailleurs."
 printf '\n'
 warn "« Connexion requise » doit rester DÉCOCHÉE."

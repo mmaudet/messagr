@@ -10,11 +10,13 @@ Messagr can only be joined by invitation: there is no sign-up form, no user name
 
 "@mmaudet" is the developer's account, used only to issue invitations: nobody reads it, so messages keep a single check mark and calls are not answered. To test a conversation between two people, tap "+" (Invite someone) on a first device and scan the QR code with a second one; keep the first device on that screen until it says "Done: this person can come in."
 
-To delete the account: Settings, then Delete my account. Messagr then asks to be closed completely; opened again, it starts from the beginning, and the link above enters with a new account.
-
 HOW PEOPLE GET AN INVITATION
 
 From someone who already uses Messagr: any user can tap "Invite someone" and pass the link, or its QR code, however they like. A link created in the app is valid for one hour and for a single use; the one above was created for the review, with the same mechanism. Invitations are free and cannot be bought. Messagr is free, with no in-app purchases and no subscriptions.
+
+DELETING THE ACCOUNT
+
+To delete the account: "Settings", then "Delete my account".
 
 PRIVACY
 
