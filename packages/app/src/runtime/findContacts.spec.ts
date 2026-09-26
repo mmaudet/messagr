@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest'
 import {
   findContacts,
   findingJourney,
+  regionOf,
   type Blinding,
   type Contact,
   type FindingDeps,
@@ -338,5 +339,34 @@ describe('the journey of looking for contacts', () => {
     await going
 
     expect(shown.at(-1)).toEqual({ stage: 'shut' })
+  })
+})
+
+describe("the telephone's region", () => {
+  it('is the region of its locale, in either shape a platform writes it', () => {
+    expect(regionOf('fr-FR')).toBe('FR')
+    expect(regionOf('de_CH')).toBe('CH')
+    expect(regionOf('en-gb')).toBe('GB')
+    expect(regionOf('zh-Hant-TW')).toBe('TW')
+  })
+
+  it('is nothing when the locale names none: no calling code is guessed', () => {
+    expect(regionOf('fr')).toBeUndefined()
+    expect(regionOf('')).toBeUndefined()
+  })
+
+  it('leaves a national number aside when there is no region', async () => {
+    const { deps: d, asked } = deps(
+      [{ name: 'Paul', numbers: ['06 12 34 56 78', '+33 6 98 76 54 32'] }],
+      {},
+    )
+
+    await findContacts({ ...d, region: undefined })
+
+    expect(
+      asked
+        .filter(a => a.route === 'maskBatch')
+        .flatMap(a => a.body!.blinded.map(e => text(unb64(e)))),
+    ).toEqual(['blinded(+33698765432)'])
   })
 })

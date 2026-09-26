@@ -83,8 +83,12 @@ export interface FindingDeps {
   readonly readAddressBook: () => Promise<readonly Contact[]>
   readonly masking: Masking
   readonly service: FindingService
-  /** The telephone's region, ISO 3166-1 alpha-2, such as `FR`. */
-  readonly region: string
+  /**
+   * The telephone's region, ISO 3166-1 alpha-2, such as `FR`, for a number
+   * written without its country code; `undefined` when the telephone names
+   * none, and such a number is then left aside rather than guessed at.
+   */
+  readonly region: string | undefined
 }
 
 /** A contact whose number a findable account proved, and that account. */
@@ -169,12 +173,15 @@ export async function findContacts(deps: FindingDeps): Promise<Findings> {
  */
 function numbersOf(
   contacts: readonly Contact[],
-  region: string,
+  region: string | undefined,
 ): Map<string, Contact[]> {
   const holders = new Map<string, Contact[]>()
   for (const contact of contacts) {
     for (const written of contact.numbers) {
-      const number = parsePhoneNumberFromString(written, region as CountryCode)
+      const number = parsePhoneNumberFromString(
+        written,
+        region as CountryCode | undefined,
+      )
       if (number === undefined || !number.isValid()) continue
       const held = holders.get(number.number) ?? []
       if (!held.includes(contact)) held.push(contact)
@@ -396,4 +403,16 @@ export function findingJourney(
       show({ stage: 'shut' })
     },
   }
+}
+
+/**
+ * The region a locale tag names, such as `FR` in `fr-FR` or `CH` in `de_CH`,
+ * or `undefined` when it names none (`deviceLocale.ts` gives the tag).
+ */
+export function regionOf(locale: string): string | undefined {
+  const region = locale
+    .split(/[-_]/)
+    .slice(1)
+    .find(part => /^[A-Za-z]{2}$/.test(part))
+  return region?.toUpperCase()
 }
