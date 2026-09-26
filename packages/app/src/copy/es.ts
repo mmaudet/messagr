@@ -804,10 +804,12 @@ export const es: Readonly<Record<CopyKey, string>> = {
     'Messagr está enmascarando los números de su agenda y comparándolos en este teléfono.',
   find_on_messagr: 'Ya en Messagr',
   find_holder_changed: 'Este número ha cambiado de titular.',
+  find_limited: 'Messagr solo mira los contactos que ha decidido compartir.',
+  find_share_more: 'Compartir más contactos',
   find_others: 'Sus otros contactos',
   find_nobody: 'Por ahora, ninguno de sus contactos es localizable en Messagr.',
   find_no_access:
-    'Messagr no tiene acceso a su agenda. Puede permitirlo en los ajustes del teléfono e invitar con un enlace mientras tanto.',
+    'Messagr no tiene acceso a su agenda. Para permitirlo más adelante, abra los ajustes del teléfono, luego la página de Messagr, y permita el acceso a los contactos. Mientras tanto, puede invitar a alguien con un enlace.',
   find_not_the_published_key:
     'La respuesta del servicio no viene de su clave publicada: no se muestra nada. Inténtelo más tarde.',
   find_unreachable:

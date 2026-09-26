@@ -78,13 +78,15 @@ function all(drawn: readonly Drawn[], testID: string): Drawn[] {
   return [...everything(drawn)].filter(node => node.props.testID === testID)
 }
 
-const said = { continued: 0, closed: 0 }
+const said = { continued: 0, sharedMore: 0, invited: 0, closed: 0 }
 
 function show(stage: Exclude<FindingStage, { readonly stage: 'shut' }>) {
   return draw(
     createElement(FindContacts, {
       stage,
       onContinue: () => (said.continued += 1),
+      onShareMore: () => (said.sharedMore += 1),
+      onInvite: () => (said.invited += 1),
       onClose: () => (said.closed += 1),
     }),
   )
@@ -97,6 +99,8 @@ const contact = (name: string): Contact => ({ name, numbers: [] })
 
 beforeEach(() => {
   said.continued = 0
+  said.sharedMore = 0
+  said.invited = 0
   said.closed = 0
 })
 
@@ -121,6 +125,7 @@ describe('« Retrouver mes contacts »', () => {
   it('shows the contacts on Messagr first, under the name of their card, then the others', () => {
     const drawn = show({
       stage: 'found',
+      limited: false,
       matches: [
         { contact: contact('Anne'), reference: 'r-anne', holderChanged: false },
         { contact: contact('Paul'), reference: 'r-paul', holderChanged: false },
@@ -142,6 +147,7 @@ describe('« Retrouver mes contacts »', () => {
   it('says a number changed hands under the name of its card', () => {
     const drawn = show({
       stage: 'found',
+      limited: false,
       matches: [
         { contact: contact('Anne'), reference: 'r-anne', holderChanged: true },
         { contact: contact('Paul'), reference: 'r-paul', holderChanged: false },
@@ -162,6 +168,7 @@ describe('« Retrouver mes contacts »', () => {
   it('puts no gesture on a contact', () => {
     const drawn = show({
       stage: 'found',
+      limited: false,
       matches: [
         { contact: contact('Anne'), reference: 'r-anne', holderChanged: false },
       ],
@@ -180,6 +187,7 @@ describe('« Retrouver mes contacts »', () => {
   it('says so when no contact is on Messagr', () => {
     const drawn = show({
       stage: 'found',
+      limited: false,
       matches: [],
       others: [contact('Zoé')],
       waiting: null,
@@ -192,6 +200,7 @@ describe('« Retrouver mes contacts »', () => {
     const freesAt = new Date(2026, 9, 26, 12).getTime()
     const drawn = show({
       stage: 'found',
+      limited: false,
       matches: [],
       others: [contact('Zoé')],
       waiting: { count: 12, freesAt },
@@ -202,7 +211,13 @@ describe('« Retrouver mes contacts »', () => {
     )
     expect(
       withId(
-        show({ stage: 'found', matches: [], others: [], waiting: null }),
+        show({
+          stage: 'found',
+          limited: false,
+          matches: [],
+          others: [],
+          waiting: null,
+        }),
         'find-contacts-waiting',
       ),
     ).toBeUndefined()
@@ -212,6 +227,7 @@ describe('« Retrouver mes contacts »', () => {
     const waiting = { count: 12, freesAt: new Date(2026, 9, 26, 12).getTime() }
     const noneYet = show({
       stage: 'found',
+      limited: false,
       matches: [],
       others: [contact('Zoé')],
       waiting,
@@ -223,6 +239,7 @@ describe('« Retrouver mes contacts »', () => {
     )
     const some = show({
       stage: 'found',
+      limited: false,
       matches: [
         { contact: contact('Anne'), reference: 'r-anne', holderChanged: false },
       ],
@@ -233,6 +250,43 @@ describe('« Retrouver mes contacts »', () => {
       t('find_on_messagr'),
     )
     expect(all(some, 'find-contacts-match').map(textIn)).toEqual(['Anne'])
+  })
+
+  it('says the look covered the shared contacts only, and offers the system choice for more (#403)', () => {
+    const found = {
+      stage: 'found',
+      matches: [],
+      others: [contact('Zoé')],
+      waiting: null,
+    } as const
+    const limited = show({ ...found, limited: true })
+
+    expect(textIn(withId(limited, 'find-contacts-limited'))).toContain(
+      t('find_limited'),
+    )
+    press(withId(limited, 'find-contacts-share-more'))
+    expect(said.sharedMore).toBe(1)
+    const full = show({ ...found, limited: false })
+    expect(withId(full, 'find-contacts-limited')).toBeUndefined()
+    expect(withId(full, 'find-contacts-share-more')).toBeUndefined()
+  })
+
+  it('offers to invite somebody when the address book was refused, and only then (#403)', () => {
+    const refused = show({ stage: 'refused', why: 'no-access' })
+
+    expect(textIn(withId(refused, 'find-contacts-refused'))).toBe(
+      t('find_no_access'),
+    )
+    press(withId(refused, 'find-contacts-invite'))
+    expect(said.invited).toBe(1)
+    press(withId(refused, 'find-contacts-done'))
+    expect(said.closed).toBe(1)
+    expect(
+      withId(
+        show({ stage: 'refused', why: 'unreachable' }),
+        'find-contacts-invite',
+      ),
+    ).toBeUndefined()
   })
 
   it('says why nothing is shown, and leads back', () => {

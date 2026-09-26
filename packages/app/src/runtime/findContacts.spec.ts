@@ -373,20 +373,30 @@ describe('looking for contacts', () => {
 })
 
 describe('the journey of looking for contacts', () => {
+  /**
+   * The journey over an address book the system's choice can grow: the cards
+   * in `added` are shared when the person asks to share more (#403).
+   */
   function journey(
     access: 'all' | 'some' | 'none',
     contacts: readonly Contact[],
     proven: Record<string, string>,
+    added: readonly Contact[] = [],
   ) {
-    const { deps: d, asked } = deps(contacts, proven)
+    const book = [...contacts]
+    const { deps: d, asked } = deps(book, proven)
     const shown: FindingStage[] = []
-    const asks = { system: 0 }
+    const asks = { system: 0, choice: 0 }
     const j = findingJourney(
       {
         ...d,
         askForTheAddressBook: async () => {
           asks.system += 1
           return access
+        },
+        shareMoreCards: async () => {
+          asks.choice += 1
+          book.push(...added)
         },
       },
       stage => shown.push(stage),
@@ -417,16 +427,52 @@ describe('the journey of looking for contacts', () => {
       matches: [{ contact: PAUL, reference: 'ref-paul', holderChanged: false }],
       others: [ZOE],
       waiting: null,
+      limited: false,
     })
   })
 
-  it('looks at the cards the person shared when the system shares some', async () => {
+  it('looks at the cards the person shared when the system shares some, and says so', async () => {
     const { j, shown } = journey('some', [PAUL], { '+33612345678': 'ref-paul' })
 
     j.open()
     await j.go()
 
-    expect(shown.at(-1)?.stage).toBe('found')
+    expect(shown.at(-1)).toMatchObject({ stage: 'found', limited: true })
+  })
+
+  it('opens the system choice from a limited access, then looks at the cards added', async () => {
+    const { j, shown, asks } = journey(
+      'some',
+      [PAUL],
+      { '+33698765432': 'ref-zoe' },
+      [ZOE],
+    )
+    j.open()
+    await j.go()
+
+    await j.shareMore()
+
+    expect(asks.choice).toBe(1)
+    expect(shown.slice(-2).map(s => s.stage)).toEqual(['looking', 'found'])
+    expect(shown.at(-1)).toMatchObject({
+      stage: 'found',
+      matches: [{ contact: ZOE, reference: 'ref-zoe', holderChanged: false }],
+      others: [PAUL],
+      limited: true,
+    })
+  })
+
+  it('opens no choice from a full access, nor before the results', async () => {
+    const { j, shown, asks } = journey('all', [PAUL], {})
+    j.open()
+    await j.shareMore()
+    await j.go()
+    const before = shown.length
+
+    await j.shareMore()
+
+    expect(asks.choice).toBe(0)
+    expect(shown).toHaveLength(before)
   })
 
   it('reads nothing and sends nothing when the system refuses', async () => {
@@ -443,7 +489,11 @@ describe('the journey of looking for contacts', () => {
     const { deps: d } = deps([PAUL], {}, { verifies: false })
     const shown: FindingStage[] = []
     const j = findingJourney(
-      { ...d, askForTheAddressBook: async () => 'all' },
+      {
+        ...d,
+        askForTheAddressBook: async () => 'all',
+        shareMoreCards: async () => undefined,
+      },
       stage => shown.push(stage),
     )
 
@@ -502,7 +552,11 @@ describe('the journey, pressed twice or refused by the system', () => {
     const { deps: d, asked } = deps([PAUL, ZOE], {})
     const shown: FindingStage[] = []
     const j = findingJourney(
-      { ...d, askForTheAddressBook: async () => 'all' },
+      {
+        ...d,
+        askForTheAddressBook: async () => 'all',
+        shareMoreCards: async () => undefined,
+      },
       stage => shown.push(stage),
     )
 
@@ -522,6 +576,7 @@ describe('the journey, pressed twice or refused by the system', () => {
         askForTheAddressBook: async () => {
           throw new Error('no activity')
         },
+        shareMoreCards: async () => undefined,
       },
       stage => shown.push(stage),
     )

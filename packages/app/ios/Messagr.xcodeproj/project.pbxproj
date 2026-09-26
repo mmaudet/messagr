@@ -17,6 +17,8 @@
 		81AB9BB82411601600AC10FF /* LaunchScreen.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = 81AB9BB72411601600AC10FF /* LaunchScreen.storyboard */; };
 		A1F0C0DE000400000000BEEF /* MessagrApplePush.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1F0C0DE000300000000BEEF /* MessagrApplePush.swift */; };
 		A1F0C0DE000600000000BEEF /* MessagrApplePush.m in Sources */ = {isa = PBXBuildFile; fileRef = A1F0C0DE000500000000BEEF /* MessagrApplePush.m */; };
+		A1F0C0DE000800000000BEEF /* MessagrContactAccess.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1F0C0DE000700000000BEEF /* MessagrContactAccess.swift */; };
+		A1F0C0DE000A00000000BEEF /* MessagrContactAccess.m in Sources */ = {isa = PBXBuildFile; fileRef = A1F0C0DE000900000000BEEF /* MessagrContactAccess.m */; };
 		FE1C0320000000000000000B /* InfoPlist.strings in Resources */ = {isa = PBXBuildFile; fileRef = FE1C0320000000000000000A /* InfoPlist.strings */; };
 /* End PBXBuildFile section */
 
@@ -59,6 +61,8 @@
 		8905B54FD298C63D4910B429 /* MessagrShare.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = MessagrShare.appex; sourceTree = BUILT_PRODUCTS_DIR; };
 		A1F0C0DE000300000000BEEF /* MessagrApplePush.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = MessagrApplePush.swift; path = Messagr/MessagrApplePush.swift; sourceTree = "<group>"; };
 		A1F0C0DE000500000000BEEF /* MessagrApplePush.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; name = MessagrApplePush.m; path = Messagr/MessagrApplePush.m; sourceTree = "<group>"; };
+		A1F0C0DE000700000000BEEF /* MessagrContactAccess.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = MessagrContactAccess.swift; path = Messagr/MessagrContactAccess.swift; sourceTree = "<group>"; };
+		A1F0C0DE000900000000BEEF /* MessagrContactAccess.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; name = MessagrContactAccess.m; path = Messagr/MessagrContactAccess.m; sourceTree = "<group>"; };
 		DD68D2F849669B19E84A6F31 /* Foundation.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Foundation.framework; path = Platforms/iPhoneOS.platform/Developer/SDKs/iPhoneOS26.0.sdk/System/Library/Frameworks/Foundation.framework; sourceTree = DEVELOPER_DIR; };
 		ED297162215061F000B7C4FE /* JavaScriptCore.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = JavaScriptCore.framework; path = System/Library/Frameworks/JavaScriptCore.framework; sourceTree = SDKROOT; };
 		F541820BD2DD06E2A4515018 /* Info.plist */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
@@ -106,6 +110,8 @@
 				761780EC2CA45674006654EE /* AppDelegate.swift */,
 				A1F0C0DE000300000000BEEF /* MessagrApplePush.swift */,
 				A1F0C0DE000500000000BEEF /* MessagrApplePush.m */,
+				A1F0C0DE000700000000BEEF /* MessagrContactAccess.swift */,
+				A1F0C0DE000900000000BEEF /* MessagrContactAccess.m */,
 				13B07FB61A68108700A75B9A /* Info.plist */,
 				81AB9BB72411601600AC10FF /* LaunchScreen.storyboard */,
 				13B07FB81A68108700A75B9A /* PrivacyInfo.xcprivacy */,
@@ -360,6 +366,8 @@
 				761780ED2CA45674006654EE /* AppDelegate.swift in Sources */,
 				A1F0C0DE000400000000BEEF /* MessagrApplePush.swift in Sources */,
 				A1F0C0DE000600000000BEEF /* MessagrApplePush.m in Sources */,
+				A1F0C0DE000800000000BEEF /* MessagrContactAccess.swift in Sources */,
+				A1F0C0DE000A00000000BEEF /* MessagrContactAccess.m in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

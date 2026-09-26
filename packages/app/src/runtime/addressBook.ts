@@ -15,10 +15,14 @@
  * version that carries discovery (#414). Until then Android answers « no » at
  * once, without asking the person, and the screen says so.
  *
+ * Since iOS 18 a person may share some cards rather than all of them: the
+ * system answers « limited », what is read is those cards, and
+ * `shareMoreCards` opens Apple's own choice to add more (#403).
+ *
  * What leaves this module is a name and numbers as written in each card.
  * `findContacts.ts` says what leaves the telephone: masks, and never a name.
  */
-import { PermissionsAndroid, Platform } from 'react-native'
+import { PermissionsAndroid, Platform, TurboModuleRegistry } from 'react-native'
 import Contacts from 'react-native-contacts'
 
 import type { Contact } from './findContacts'
@@ -43,6 +47,27 @@ export async function askForTheAddressBook(): Promise<AddressBookAccess> {
     : answer === 'limited'
       ? 'some'
       : 'none'
+}
+
+/** The native half of `shareMoreCards`: `MessagrContactAccess.swift`. */
+interface ContactAccess {
+  /** Opens Apple's picker, and answers once it has closed. */
+  readonly shareMore: () => Promise<unknown>
+}
+
+/**
+ * Apple's choice of the cards Messagr may read, for a person who shared only
+ * some (#403). Answers once the choice is closed; at once where there is no
+ * such choice, on Android or before iOS 18.
+ *
+ * Looked up as `applePushToken.ts` looks up its own module, untyped and read
+ * afterwards, for the reason given there.
+ */
+export async function shareMoreCards(): Promise<void> {
+  if (Platform.OS !== 'ios') return
+  const found = TurboModuleRegistry.get('MessagrContactAccess')
+  if (found == null) return
+  await (found as ContactAccess).shareMore()
 }
 
 /** The cards the system shares, each as a name and its numbers. */

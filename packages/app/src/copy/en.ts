@@ -805,10 +805,12 @@ export const en: Readonly<Record<CopyKey, string>> = {
     'Messagr is masking the numbers in your address book and comparing them on this phone.',
   find_on_messagr: 'Already on Messagr',
   find_holder_changed: 'This number has changed hands.',
+  find_limited: 'Messagr only looks at the contacts you chose to share.',
+  find_share_more: 'Share more contacts',
   find_others: 'Your other contacts',
   find_nobody: 'None of your contacts can be found on Messagr yet.',
   find_no_access:
-    "Messagr cannot open your address book. You can allow it in the phone's settings, and invite by link in the meantime.",
+    "Messagr cannot open your address book. To allow it later, open the phone's settings, then Messagr's page, and allow access to contacts. In the meantime, you can invite someone by link.",
   find_not_the_published_key:
     "The service's answer did not come from its published key: nothing is shown. Try again later.",
   find_unreachable: 'The service is not answering. Try again in a moment.',

@@ -1,12 +1,23 @@
-import { describe, expect, it, vi } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
+
+/** The platform and the native module, as each test sets them. */
+const native = vi.hoisted(() => ({
+  os: 'ios' as 'ios' | 'android',
+  module: null as { shareMore: () => Promise<unknown> } | null,
+}))
 
 vi.mock('react-native-contacts', () => ({ default: {} }))
 vi.mock('react-native', () => ({
   PermissionsAndroid: {},
-  Platform: { OS: 'ios' },
+  Platform: {
+    get OS() {
+      return native.os
+    },
+  },
+  TurboModuleRegistry: { get: () => native.module },
 }))
 
-import { contactOf, type Card } from './addressBook'
+import { contactOf, shareMoreCards, type Card } from './addressBook'
 
 const card = (over: Partial<Card>): Card => ({
   displayName: null,
@@ -46,5 +57,35 @@ describe('a card read as a contact', () => {
     ).toBe('Anne Durand')
     expect(contactOf(card({ company: 'Boulangerie' })).name).toBe('Boulangerie')
     expect(contactOf(card({})).name).toBe('')
+  })
+})
+
+describe('the system choice of the cards shared (#403)', () => {
+  beforeEach(() => {
+    native.os = 'ios'
+    native.module = null
+  })
+
+  it('opens Apple’s picker, and answers once it has closed', async () => {
+    const opened = vi.fn(async () => undefined)
+    native.module = { shareMore: opened }
+
+    await shareMoreCards()
+
+    expect(opened).toHaveBeenCalledTimes(1)
+  })
+
+  it('opens nothing on Android, which shares all cards or none', async () => {
+    const opened = vi.fn(async () => undefined)
+    native.module = { shareMore: opened }
+    native.os = 'android'
+
+    await shareMoreCards()
+
+    expect(opened).not.toHaveBeenCalled()
+  })
+
+  it('answers all the same in a build without the native half', async () => {
+    await expect(shareMoreCards()).resolves.toBeUndefined()
   })
 })

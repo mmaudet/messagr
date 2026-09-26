@@ -1217,11 +1217,14 @@ export const fr = {
     'Messagr masque les numéros de votre carnet et les compare sur ce téléphone.',
   find_on_messagr: 'Déjà sur Messagr',
   find_holder_changed: 'Ce numéro a changé de titulaire.',
+  find_limited:
+    'Messagr ne regarde que les contacts que vous avez choisi de partager.',
+  find_share_more: 'Partager d’autres contacts',
   find_others: 'Vos autres contacts',
   find_nobody:
     'Aucun de vos contacts n’est trouvable sur Messagr pour l’instant.',
   find_no_access:
-    'Messagr n’a pas accès à votre carnet. Vous pouvez l’autoriser dans les réglages du téléphone, et inviter par un lien en attendant.',
+    'Messagr n’a pas accès à votre carnet. Pour l’autoriser plus tard, ouvrez les réglages du téléphone, puis la page de Messagr, et permettez l’accès aux contacts. En attendant, vous pouvez inviter quelqu’un par un lien.',
   find_not_the_published_key:
     'La réponse du service ne vient pas de sa clé publiée : rien n’est affiché. Réessayez plus tard.',
   find_unreachable: 'Le service ne répond pas. Réessayez dans un moment.',

@@ -224,6 +224,7 @@ import { deviceLocale } from './src/runtime/deviceLocale'
 import {
   askForTheAddressBook,
   readAddressBook,
+  shareMoreCards,
 } from './src/runtime/addressBook'
 import { bridgeMasking } from './src/runtime/bridgeMasking'
 import { forgetfulDiscoveryResults } from './src/runtime/discoveryResultsStore'
@@ -1243,6 +1244,7 @@ export function App({
         service: discoveryDeps.service,
         readAddressBook,
         askForTheAddressBook,
+        shareMoreCards,
         masking: bridgeMasking,
         region: () => regionOf(deviceLocale()),
         // THROUGH THE REF, since the journey is made once and the notebook
@@ -5725,6 +5727,13 @@ export function App({
                     // Cannot fail: the journey says every refusal as a
                     // stage.
                     onContinue={() => findingRef.current.go()}
+                    onShareMore={() => findingRef.current.shareMore()}
+                    // THE INVITATION FORM, AS FROM THE « + » SHEET: the
+                    // address book was refused, and a link needs none (#403).
+                    onInvite={() => {
+                      findingRef.current.close()
+                      setInvite({ stage: 'resting' })
+                    }}
                     onClose={() => findingRef.current.close()}
                   />
                 </View>
