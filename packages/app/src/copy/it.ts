@@ -255,7 +255,7 @@ export const it: Readonly<Record<CopyKey, string>> = {
   delete_cancel: 'Tieni il mio account',
   delete_working: 'Eliminazione…',
   delete_failed:
-    'Non è stato eliminato nulla e il tuo account è com’era. Puoi riprovare.',
+    'L’eliminazione non è andata a buon fine e il tuo account esiste ancora. Puoi riprovare.',
   deleted_title: 'Il tuo account è eliminato.',
   deleted_body: 'Chiudi completamente Messagr: ripartirà da zero.',
   promise_thesis: 'La messaggistica che non le chiede nulla.',

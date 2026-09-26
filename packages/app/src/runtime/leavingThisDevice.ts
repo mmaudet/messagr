@@ -20,7 +20,23 @@ import type { Departure } from './leaveAccount'
 import { logEvent } from './log'
 import { forgetNotebook } from './notebook'
 import { isOurs } from './pickedLitter'
+import type { Road } from './pusher'
 import type { SecretStore } from './sessionStore'
+
+/**
+ * The pusher this device last registered, and the road it went by, or `null`
+ * when it never wrote one down. Leaving an account takes it away, and so does
+ * deleting one (#383).
+ */
+export async function thisDevicesPusher(): Promise<{
+  readonly token: string
+  readonly road: Road
+} | null> {
+  const token = await readLastPushkey(pushkeySecrets)
+  return token === null
+    ? null
+    : { token, road: Platform.OS === 'ios' ? 'ios' : 'android' }
+}
 
 /**
  * What leaving an account does on this device, bound to the directory it
@@ -48,12 +64,7 @@ import type { SecretStore } from './sessionStore'
  */
 export function departureFrom(storeDir: string): Departure {
   return {
-    pusher: async () => {
-      const token = await readLastPushkey(pushkeySecrets)
-      return token === null
-        ? null
-        : { token, road: Platform.OS === 'ios' ? 'ios' : 'android' }
-    },
+    pusher: thisDevicesPusher,
     stopWaking: (account, pusher) =>
       stopWakingThisDevice(createClient(account), pusher.token, pusher.road),
     logOut: async account => {

@@ -1247,11 +1247,13 @@ async def witness_deletion(session_file: Path, store: Path) -> int:
     rien. Ce témoin est le premier à le mesurer, sur un compte qui a publié
     les siens.
 
-    LES DEUX, ET CHACUN POUR SA RAISON. Quitter la conversation ne prouvera
-    plus rien le jour où l'application le fera d'elle-même avant de désactiver
-    (#383) ; et n'avoir aucun appareil ne prouve rien d'un compte qui n'en a
-    jamais publié. Ensemble, sur le compte de l'application, qui publie les
-    siens dès son premier lancement, ils disent qu'il est désactivé.
+    LES DEUX, ET CHACUN POUR SA RAISON. Le départ prouve la désactivation :
+    l'application ne quitte pas elle-même ses conversations, #383 l'a décidé
+    le 26 septembre 2026, et seul le serveur fait partir un compte qu'il
+    désactive. L'absence d'appareil prouve ce que les correspondants en
+    attendent : leurs clients ne partagent plus de clé avec un appareil de ce
+    compte. Elle ne prouverait rien d'un compte qui n'en a jamais publié ;
+    celui de l'application publie les siens dès son premier lancement.
     """
     homeserver = env("MESSAGR_INTEROP_HOMESERVER")
     room_id = env("MESSAGR_INTEROP_ROOM")

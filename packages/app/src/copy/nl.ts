@@ -256,7 +256,7 @@ export const nl: Readonly<Record<CopyKey, string>> = {
   delete_cancel: 'Mijn account houden',
   delete_working: 'Bezig met verwijderen…',
   delete_failed:
-    'Er is niets verwijderd en uw account is zoals het was. U kunt het opnieuw proberen.',
+    'Het verwijderen is niet voltooid en uw account bestaat nog. U kunt het opnieuw proberen.',
   deleted_title: 'Uw account is verwijderd.',
   deleted_body:
     'Sluit Messagr volledig af: het begint dan weer van voren af aan.',

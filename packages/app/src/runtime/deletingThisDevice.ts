@@ -5,22 +5,37 @@
 
 import { createClient } from 'matrix-js-sdk'
 
+import {
+  deleteBackupOnAccount,
+  findBackupOnAccount,
+  stopWakingThisDevice,
+} from './cryptoPump'
 import type { Ending } from './deleteAccount'
 import { deletionMarkSecrets, recoverySecrets } from './deviceSecrets'
+import { thisDevicesPusher } from './leavingThisDevice'
 import { readRecoverySecret } from './recoverySecret'
 
 /**
- * What deleting an account does on the wire and on this device. #382.
+ * What deleting an account does on the wire and on this device. #382, #383.
  *
- * # ONE REQUEST, THE ONE THE INVITATION SERVICE ALREADY MAKES
+ * # NOTHING NEW ON THE WIRE
  *
- * `POST /account/deactivate` with `m.login.password`, as the service
+ * First what only the token can undo (#383): the pusher, taken away by
+ * `stopWakingThisDevice`, as leaving an account and the notifications switch
+ * already take it; then the key backup, read by `findBackupOnAccount` and
+ * deleted by `retireVersion`, as a replaced restore key already deletes one.
+ *
+ * Then `POST /account/deactivate` with `m.login.password`, as the service
  * deactivates an account it revokes. Measured on messagr.eu on 5 August 2026,
  * where the token alone does not deactivate, and again on 26 September 2026:
  * the server then refuses the account's token (`M_UNKNOWN_TOKEN`) and its
- * password (`M_USER_DEACTIVATED`), removes its devices, and takes it out of
- * its conversations. The request goes through a client restored from the
- * account's credentials, which carries them to its own server and to no other.
+ * password (`M_USER_DEACTIVATED`), and takes it out of its conversations.
+ * Whether it also withdraws its devices was not measured: the account
+ * measured had published none. The end-to-end suite's `witness-deletion` is
+ * the first to measure it.
+ *
+ * Every request goes through a client restored from the account's
+ * credentials, which carries them to its own server and to no other.
  *
  * # NOT `erase`
  *
@@ -31,6 +46,13 @@ import { readRecoverySecret } from './recoverySecret'
 export function endingOnThisDevice(): Ending {
   return {
     password: () => readRecoverySecret(recoverySecrets),
+    pusher: thisDevicesPusher,
+    stopWaking: (account, pusher) =>
+      stopWakingThisDevice(createClient(account), pusher.token, pusher.road),
+    backup: async account =>
+      (await findBackupOnAccount(createClient(account)))?.version ?? null,
+    deleteBackup: (account, version) =>
+      deleteBackupOnAccount(createClient(account), version),
     deactivate: async (account, password) => {
       await createClient(account).deactivateAccount({
         type: 'm.login.password',

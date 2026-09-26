@@ -1473,6 +1473,18 @@ export async function findBackupOnAccount(
   )
 }
 
+/**
+ * Deletes a backup version on the account's homeserver: `retireVersion`, as a
+ * replaced restore key already uses it. #383: deleting the account takes its
+ * backup away first, while its token still opens it.
+ */
+export async function deleteBackupOnAccount(
+  sessionClient: ReturnType<typeof createClient>,
+  version: string,
+): Promise<void> {
+  await retireVersion(makePumpHttp(sessionClient), version)
+}
+
 /** What a restore did, or why it could not run. */
 export type RestoreOutcome =
   | { readonly restored: true; readonly imported: number }
