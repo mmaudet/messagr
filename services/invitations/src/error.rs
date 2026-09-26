@@ -28,7 +28,8 @@ use axum::{
 // are the variants from `DiscoveryOff` on, and none of the three above. Where
 // their documentation names `handlers::discovery`, it means the prototype's
 // module of that name, gone with the blind directory; the module of that name
-// today proves numbers (#397).
+// today proves numbers (#397) and serves a findable account looking for its
+// contacts (#400).
 #[allow(dead_code)]
 pub enum AppError {
     /// THE SILENT RESPONSE — and its imprecision is the function, not a
@@ -412,6 +413,18 @@ pub enum AppError {
     /// proofs wait, and renewals go through.
     #[error("no new code can be sent for now: try again later")]
     SmsLater,
+    /// Masking a batch and downloading the directory are for findable
+    /// accounts (#400): this account has no current proof.
+    #[error("only a findable account may look for its contacts: prove a number first")]
+    NotFindable,
+    /// The batch names a masking key this service does not hold, one retired
+    /// since the device read the keys. Reading them again is the remedy.
+    #[error("this masking key is not in service: read the keys again")]
+    UnknownMaskingKey,
+    /// What was sent to be masked is not a batch: empty, larger than one
+    /// request may be, or holding something other than a blinded element.
+    #[error("this is not a batch of blinded elements")]
+    NotABatch,
     #[error(transparent)]
     Internal(#[from] anyhow::Error),
 }
@@ -556,6 +569,9 @@ impl IntoResponse for AppError {
                 (StatusCode::TOO_MANY_REQUESTS, "MESSAGR_TOO_MANY_CODES")
             }
             AppError::SmsLater => (StatusCode::SERVICE_UNAVAILABLE, "MESSAGR_SMS_LATER"),
+            AppError::NotFindable => (StatusCode::FORBIDDEN, "MESSAGR_NOT_FINDABLE"),
+            AppError::UnknownMaskingKey => (StatusCode::NOT_FOUND, "MESSAGR_UNKNOWN_MASKING_KEY"),
+            AppError::NotABatch => (StatusCode::BAD_REQUEST, "MESSAGR_NOT_A_BATCH"),
             AppError::Internal(_) => (StatusCode::INTERNAL_SERVER_ERROR, "M_UNKNOWN"),
         };
         let message = match &self {
@@ -857,6 +873,24 @@ mod tests {
         assert_eq!(got, StatusCode::SERVICE_UNAVAILABLE);
         assert_eq!(body["errcode"], "MESSAGR_SMS_LATER");
         assert!(body.get("retry_at").is_none(), "{body}");
+
+        // LOOKING FOR ONE'S CONTACTS (#400): not findable, a key retired since
+        // the device read the keys, and a batch that is not one.
+        for (refusal, status, errcode) in [
+            (AppError::NotFindable, 403, "MESSAGR_NOT_FINDABLE"),
+            (
+                AppError::UnknownMaskingKey,
+                404,
+                "MESSAGR_UNKNOWN_MASKING_KEY",
+            ),
+            (AppError::NotABatch, 400, "MESSAGR_NOT_A_BATCH"),
+        ] {
+            let (got, body) = render(refusal).await;
+            assert_eq!(
+                (got.as_u16(), body["errcode"].as_str()),
+                (status, Some(errcode))
+            );
+        }
     }
 
     /// Renders an error and extracts (status, JSON body) from it.

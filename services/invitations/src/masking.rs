@@ -93,8 +93,6 @@ impl MaskingKey {
     /// Masks a batch of blinded elements a device sent, with one batch proof
     /// for all of them. Any element that is not a point of the group refuses
     /// the batch: nothing is evaluated.
-    // Its caller is a device looking for its own contacts (#400).
-    #[allow(dead_code)]
     pub fn mask_blinded<R: RngCore + CryptoRng>(
         &self,
         rng: &mut R,
@@ -165,6 +163,12 @@ impl MaskingKeys {
 
     pub fn len(&self) -> usize {
         self.keys.len()
+    }
+
+    /// Every key in service, by key number: what devices check masked
+    /// batches against.
+    pub fn iter(&self) -> impl Iterator<Item = &MaskingKey> {
+        self.keys.iter()
     }
 }
 
