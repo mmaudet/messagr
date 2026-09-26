@@ -66,11 +66,13 @@ export interface EntryDeps {
    */
   readonly recovery: SecretStore
   /**
-   * Where this device writes down that the account it holds was deleted
-   * (#382): its user id, by `deleteAccount` once its server has deactivated
-   * it, and by nothing else. Read first at every entry. A held session marked
-   * deleted is forgotten here, without a question, because the deletion
-   * itself could not: the crypto library does not release a running machine.
+   * Where this device writes down that the account it holds is to be
+   * forgotten: its user id, by `deleteAccount` once its server has
+   * deactivated it (#382), and by « Oublier ce compte » once its server no
+   * longer lets this device in (#391, `lostAccess.ts`), and by nothing else.
+   * Read first at every entry. A held session so marked is forgotten here,
+   * without a question, because neither gesture could do it: the crypto
+   * library does not release a running machine.
    */
   readonly deletionMark: SecretStore
   /**
@@ -562,10 +564,12 @@ async function enterWithoutAccount(deps: EntryDeps): Promise<EntryResult> {
 }
 
 /**
- * The session this device holds, unless it was deleted from here (#382).
+ * The session this device holds, unless it was deleted from here (#382), or
+ * forgotten after its server stopped letting this device in (#391).
  *
- * A deleted account is forgotten without a question -- its server has already
- * deactivated it, so nothing is sent and nothing is lost -- by the same
+ * A marked account is forgotten without a question -- its server has already
+ * deactivated it, or no longer answers its token, so nothing is sent and
+ * nothing is lost -- by the same
  * forgetting leaving an account uses, sparing nothing. The entry then goes on
  * as a device with no account, a link included: `'forgotten'`. `'running'`
  * when a crypto machine still holds the store, which only the next cold

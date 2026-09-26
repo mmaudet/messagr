@@ -1,6 +1,3 @@
-import { execFileSync } from 'child_process'
-import { resolve } from 'path'
-
 import { expect } from '@jest/globals'
 import { by, device, element, expect as detoxExpect, waitFor } from 'detox'
 
@@ -621,57 +618,6 @@ describe('boot', () => {
     // quatre d'après.
     await detoxExpect(element(by.id('conversation-input'))).toBeVisible()
   })
-
-  it('says this telephone no longer has access once its account is deactivated behind its back (#391)', async () => {
-    // LE DERNIER DE LA SUITE, ET IL DOIT LE RESTER : il désactive le compte que
-    // tous les autres utilisent.
-    //
-    // LE COMPTE DÉSACTIVÉ SANS QUE L'APPLICATION LE SACHE. L'inviteur révoque
-    // l'invitation par laquelle cette suite est entrée, et le service désactive
-    // le compte qu'elle a fait entrer (§8.2). Une suppression par courriel et
-    // un téléphone retiré du compte font la même chose à l'appareil : un
-    // jeton que son serveur refuse désormais.
-    execFileSync(
-      'python3',
-      [
-        resolve(__dirname, '../../../scripts/interop/nio_counterparty.py'),
-        'revoke-invitation',
-      ],
-      {
-        env: {
-          ...process.env,
-          MESSAGR_REVOKE_INVITATION_ID:
-            process.env.MESSAGR_BOOT_INVITATION_ID ?? '',
-        },
-        stdio: 'inherit',
-        timeout: 120_000,
-      },
-    )
-
-    // LA BOUCLE LE VOIT AU POLL SUIVANT, s'arrête, et l'écran remplace tout.
-    await waitFor(element(by.id('lost-access')))
-      .toBeVisible()
-      .withTimeout(120000)
-    await device.takeScreenshot('acces-perdu-1-l-ecran')
-
-    // REVENIR, AVEC LE MOT DE PASSE GARDÉ : le serveur répond que le compte
-    // est désactivé, et l'écran d'un compte supprimé le dit.
-    await element(by.id('lost-access-come-back')).tap()
-    await waitFor(element(by.id('account-deleted')))
-      .toBeVisible()
-      .withTimeout(60000)
-    await device.takeScreenshot('acces-perdu-2-le-compte-supprime')
-
-    // ET LE LANCEMENT À FROID SUIVANT L'OUBLIE : l'écran d'un appareil sans
-    // compte.
-    await device.launchApp({
-      newInstance: true,
-      launchArgs: IGNORING_THE_LIVE_POLL,
-    })
-    await waitFor(element(by.id('paste-link-field')))
-      .toExist()
-      .withTimeout(60000)
-  }, 300000)
 
   /** The pump, narrowed. A launch that never ran one is a failure to say so. */
   function ranPump() {

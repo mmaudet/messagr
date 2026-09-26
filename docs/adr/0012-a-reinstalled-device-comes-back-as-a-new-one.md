@@ -82,9 +82,10 @@ given one. Those accounts keep the previous behaviour until they enter again.
 
 ## Consequences
 
-`recoverySecret.ts` is the only module that keeps it, and `reenter.ts` and,
-since #382, account deletion are the only two that spend it; every other
-request in the application carries the access token. It is never shown, never sent anywhere but the account's own
+`recoverySecret.ts` is the only module that keeps it, and `reenter.ts`,
+since #382 account deletion, and since #391 « Revenir sur ce compte » are the
+only three that spend it; every other request in the application carries the
+access token. It is never shown, never sent anywhere but the account's own
 homeserver, and never used to authenticate an ordinary call.
 
 The detection is local: the store lives at `<storeDir>/crypto/<deviceId>`, so
@@ -112,3 +113,21 @@ invitation service, so that it could deactivate on the device's behalf. It was
 refused while framing #380: the service has never held that power. An account
 claimed before the password was kept (#190) therefore cannot delete itself
 from the application, and is sent to the e-mail route.
+
+## Amended on 26 September 2026: a third spender, and a reinstall that asks first (#391)
+
+A device whose homeserver no longer knows its token (`401 M_UNKNOWN_TOKEN`)
+says so: « Ce téléphone n'a plus accès à ce compte. » The device cannot tell
+why. The account may have been deleted by e-mail or revoked (§8.2), or this
+telephone taken off an account that lives on. When it kept the password, it
+offers « Revenir sur ce compte »: the same login as after a reinstall, spent
+once, at the person's request, and sent to the account's own homeserver only.
+A login refused as `M_USER_DEACTIVATED` means the account is gone.
+
+Decided with the product owner on 26 September 2026: never back on its own.
+A telephone taken off its account stays off until the person asks. So a
+launch that finds its store gone no longer comes back straight away. It first
+asks the account's own server whether it still knows the session (`whoami`).
+If the token is refused, the launch puts the same question to the person
+instead of logging in. The request is made only on a launch that has lost its
+store, and never on an ordinary one.

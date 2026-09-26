@@ -57,9 +57,22 @@ const Sequencer = require('@jest/test-sequencer').default
  */
 const ORDERED = ['boot.test.ts', 'roundTrip.test.ts']
 
+/**
+ * Celles qui passent après tout le reste, ce qui n'est pas listé compris.
+ *
+ * `lostAccess.test.ts` (#391) fait désactiver le compte qu'elle a fait entrer
+ * dans le salon du banc, et le serveur le fait sortir de ses salons. Une
+ * suite qui passerait après elle trouverait ce salon changé sans l'avoir
+ * voulu.
+ */
+const LAST = ['lostAccess.test.ts']
+
 const rankOf = test => {
-  const rank = ORDERED.indexOf(test.path.split('/').pop())
-  return rank === -1 ? ORDERED.length : rank
+  const name = test.path.split('/').pop()
+  const first = ORDERED.indexOf(name)
+  if (first !== -1) return first
+  const last = LAST.indexOf(name)
+  return last === -1 ? ORDERED.length : ORDERED.length + 1 + last
 }
 
 module.exports = class BenchSequencer extends Sequencer {

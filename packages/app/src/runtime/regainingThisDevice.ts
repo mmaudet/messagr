@@ -2,14 +2,18 @@
 // the reason `leavingThisDevice.ts` gives: every step here is a keystore
 // entry or a request, and what decides is `lostAccess.ts`, which the tests
 // drive with ordinary functions.
+import { aCryptoMachineIsRunning } from './cryptoPump'
 import {
   deletionMarkSecrets,
+  forgetSecrets,
   newDeviceSecrets,
   recoverySecrets,
   sessionSecrets,
 } from './deviceSecrets'
 import { homeserverCalls } from './homeserverCalls'
-import type { Regaining } from './lostAccess'
+import { forgetCryptoStore } from './leavingThisDevice'
+import { logEvent } from './log'
+import { newDeviceMark, type CameBack, type Regaining } from './lostAccess'
 import { readRecoverySecret } from './recoverySecret'
 import { reenterWithPassword, retireDevice } from './reenter'
 import { saveSession } from './sessionStore'
@@ -25,7 +29,7 @@ import { saveSession } from './sessionStore'
  * THE MARK BEFORE THE SESSION. Written the other way round, a session kept
  * and a mark lost would have the next launch take the new device for a
  * reinstall and log in again. This way, a mark kept and a session lost names
- * a device that is not the one the launch holds, and is ignored.
+ * a device that is not the one the launch holds, and the launch clears it.
  */
 export function regainingOnThisDevice(): Regaining {
   return {
@@ -36,8 +40,8 @@ export function regainingOnThisDevice(): Regaining {
         userId: account.userId,
         password,
       }),
-    keepNewDevice: async session => {
-      await newDeviceSecrets.write(session.deviceId)
+    keepNewDevice: async (session, old) => {
+      await newDeviceSecrets.write(newDeviceMark(session, old))
       await saveSession(sessionSecrets, session)
     },
     retire: (old, session, password) =>
@@ -48,5 +52,26 @@ export function regainingOnThisDevice(): Regaining {
         accessToken: session.accessToken,
       }),
     markForgotten: account => deletionMarkSecrets.write(account.userId),
+  }
+}
+
+/**
+ * What the launch after « Revenir sur ce compte » reads and erases on this
+ * device. #391. Neither failure stops a launch, and each is said in the log:
+ * a mark that will not clear, and an old store that will not go.
+ */
+export function cameBackOnThisDevice(storeDir: string): CameBack {
+  return {
+    mark: () => newDeviceSecrets.read(),
+    clearMark: async () => {
+      const { refused } = await forgetSecrets([newDeviceSecrets])
+      if (refused > 0) logEvent('warn', 'MESSAGR_CAME_BACK_MARK_KEPT', {})
+    },
+    eraseStore: async deviceId => {
+      if (!(await forgetCryptoStore(storeDir, deviceId))) {
+        logEvent('warn', 'MESSAGR_OLD_STORE_KEPT', {})
+      }
+    },
+    aMachineIsRunning: aCryptoMachineIsRunning,
   }
 }

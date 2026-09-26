@@ -3,7 +3,7 @@
 // `sessionSync.ts` keeps for `SyncClient`.
 import type { createClient } from 'matrix-js-sdk'
 
-import { getErrorMessage } from './errors'
+import { errcodeOf, getErrorMessage } from './errors'
 
 /**
  * The pump: the crypto machine hands out requests it needs sent, this module
@@ -331,11 +331,10 @@ export function makePumpHttp(
           'number'
             ? (cause as { httpStatus: number }).httpStatus
             : 0
-        const errcode = (cause as { errcode?: unknown } | null)?.errcode
         throw new PumpHttpError(
           getErrorMessage(cause),
           status,
-          typeof errcode === 'string' ? errcode : undefined,
+          errcodeOf(cause) ?? undefined,
         )
       }
     },

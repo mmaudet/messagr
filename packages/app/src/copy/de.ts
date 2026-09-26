@@ -283,11 +283,13 @@ export const de: Readonly<Record<CopyKey, string>> = {
   lost_refused:
     'Dieses Telefon kann nicht zu diesem Konto zurückkehren. Es bleibt nur, es zu vergessen.',
   lost_unreachable:
-    'Der Server hat nicht geantwortet. Sie können es erneut versuchen.',
+    'Dieses Telefon konnte vorerst nicht zu diesem Konto zurückkehren. Sie können es erneut versuchen.',
   lost_back_title: 'Dieses Telefon kehrt zu diesem Konto zurück.',
   lost_back_body:
     'Schließen Sie Messagr vollständig: Es kehrt als neues Gerät zurück.',
   lost_forgotten_title: 'Dieses Telefon wird dieses Konto vergessen.',
+  lost_forgotten_body:
+    'Schließen Sie Messagr vollständig: Es beginnt dann wieder von vorn.',
   deleted_title: 'Ihr Konto ist gelöscht.',
   deleted_body:
     'Schließen Sie Messagr vollständig: Es beginnt dann wieder von vorn.',

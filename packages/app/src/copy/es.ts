@@ -275,11 +275,14 @@ export const es: Readonly<Record<CopyKey, string>> = {
   lost_working: 'Un momento…',
   lost_refused:
     'Este teléfono no puede volver a esta cuenta. Solo queda olvidarla.',
-  lost_unreachable: 'El servidor no ha respondido. Puede volver a intentarlo.',
+  lost_unreachable:
+    'Este teléfono no ha podido volver a esta cuenta por ahora. Puede volver a intentarlo.',
   lost_back_title: 'Este teléfono vuelve a esta cuenta.',
   lost_back_body:
     'Cierre Messagr por completo: volverá como un dispositivo nuevo.',
   lost_forgotten_title: 'Este teléfono olvidará esta cuenta.',
+  lost_forgotten_body:
+    'Cierre Messagr por completo: volverá a empezar desde cero.',
   deleted_title: 'Su cuenta está eliminada.',
   deleted_body: 'Cierre Messagr por completo: volverá a empezar desde cero.',
   promise_thesis: 'La mensajería que no le pide nada.',

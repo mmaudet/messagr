@@ -10,6 +10,7 @@ import type { Ending } from './deleteAccount'
 import { deletionMarkSecrets, recoverySecrets } from './deviceSecrets'
 import { readRecoverySecret } from './recoverySecret'
 import { announceDeletion } from './servicePoster'
+import { stillKnown } from './sessionKnown'
 import { thisDevicesPusher } from './thisDevicesPusher'
 
 /**
@@ -61,24 +62,8 @@ export function endingOnThisDevice(): Ending {
         password,
       })
     },
-    // WHETHER THE SERVER STILL KNOWS THIS SESSION, asked after a deactivation
-    // that looked failed. Measured on 26 September 2026: once an account is
-    // deactivated, `whoami` answers `401 M_UNKNOWN_TOKEN`.
-    stillKnown: async account => {
-      try {
-        await createClient(account).whoami()
-        return true
-      } catch (error) {
-        return errcodeOf(error) === 'M_UNKNOWN_TOKEN' ? false : null
-      }
-    },
+    // Asked after a deactivation that looked failed. See `sessionKnown.ts`.
+    stillKnown,
     markDeleted: account => deletionMarkSecrets.write(account.userId),
   }
-}
-
-/** The Matrix error code a failed request carried, if it carried one. */
-function errcodeOf(error: unknown): string | null {
-  if (typeof error !== 'object' || error === null) return null
-  const code = (error as { readonly errcode?: unknown }).errcode
-  return typeof code === 'string' ? code : null
 }

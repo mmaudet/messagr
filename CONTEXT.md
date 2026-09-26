@@ -274,6 +274,14 @@ A device forgetting an account it held, while the account goes on existing.
 Following an invitation into another server asks it of a device.
 _Avoid_: Logging out, signing out, deleting
 
+**Lost access**:
+A device whose server no longer accepts it for the account it holds. The
+device cannot tell why: the account may be deleted, or this device taken off
+an account that goes on existing. It says so, and it offers to forget the
+account, or to come back as a new device when it kept the password. It never
+comes back on its own.
+_Avoid_: Logged out, recognised, revoked (one cause among several)
+
 **Recovery key**:
 The generated 256-bit secret that opens a key backup, shown once in Matrix's
 base58 form and never shown again. It can be replaced, which retires the old

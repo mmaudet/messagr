@@ -1,4 +1,3 @@
-import { execFileSync } from 'node:child_process'
 import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 
@@ -6,6 +5,7 @@ import { expect } from '@jest/globals'
 import { by, device, element, waitFor } from 'detox'
 
 import { openTheFirstConversation } from './conversation'
+import { runCounterparty } from './counterparty'
 import { demandTheRotation, type OutcomeScreen } from './eviction'
 import { IGNORING_THE_LIVE_POLL } from './longPoll'
 import { joinTheInvitation } from './invitation'
@@ -78,10 +78,6 @@ import { forgetTheLog, whatItReported } from './reported'
  * about their change.
  */
 
-const COUNTERPARTY = resolve(
-  __dirname,
-  '../../../scripts/interop/nio_counterparty.py',
-)
 const COUNTERPARTY_BODY = 'encrypted by matrix-nio, for the application to read'
 // Le nom EST le corps d'un `m.file`, et c'est ce que l'écran affiche. Il doit
 // s'accorder au caractère près avec `nio_counterparty.py`, qui l'écrit.
@@ -94,24 +90,6 @@ const hasCounterparty =
   process.env.MESSAGR_INTEROP_ROOM !== undefined &&
   process.env.MESSAGR_INTEROP_WORKDIR !== undefined &&
   INVITATION !== undefined
-
-function runCounterparty(
-  phase:
-    | 'send'
-    | 'send-file'
-    | 'claim-place'
-    | 'witness-eviction'
-    | 'witness-deletion',
-  extra: Record<string, string> = {},
-): void {
-  execFileSync('python3', [COUNTERPARTY, phase], {
-    env: { ...process.env, ...extra },
-    stdio: 'inherit',
-    // Long, because this phase queries keys and shares a group session
-    // against a real homeserver before it sends anything.
-    timeout: 120_000,
-  })
-}
 
 /**
  * Le salon que `claim-place` a rejoint, tel qu'il l'a écrit.

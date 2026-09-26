@@ -8,3 +8,14 @@
 export function getErrorMessage(cause: unknown): string {
   return cause instanceof Error ? cause.message : String(cause)
 }
+
+/**
+ * The Matrix error code something thrown or answered carried, if it carried
+ * one: matrix-js-sdk's `MatrixError`, the pump's own error, or a response
+ * body. Duck-typed, because each of those is its own shape.
+ */
+export function errcodeOf(cause: unknown): string | null {
+  if (typeof cause !== 'object' || cause === null) return null
+  const code = (cause as { readonly errcode?: unknown }).errcode
+  return typeof code === 'string' ? code : null
+}

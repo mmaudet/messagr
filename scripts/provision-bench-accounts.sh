@@ -250,14 +250,16 @@ mint_claimable_invitation() {
 # the subshell's exit status is not the one `set -e` looks at.
 boot_pair="$(mint_claimable_invitation "the boot suite")"
 trip_pair="$(mint_claimable_invitation "the round-trip suite")"
-read -r boot_token boot_entrant boot_invitation <<<"$boot_pair"
-read -r trip_token trip_entrant trip_invitation <<<"$trip_pair"
+lost_pair="$(mint_claimable_invitation "the lost-access suite")"
+read -r boot_token boot_entrant _ <<<"$boot_pair"
+read -r trip_token trip_entrant _ <<<"$trip_pair"
+read -r lost_token _ lost_invitation <<<"$lost_pair"
 
 as_link() { printf 'messagr://%s/i/%s\n' "${MESSAGR_BENCH_HOMESERVER#https://}" "$1"; }
 
 python3 -c "
 import json, sys
-inviter, room, entrant, link, trip_entrant, trip_link, boot_invitation = sys.argv[1:8]
+inviter, room, entrant, link, trip_entrant, trip_link, lost_link, lost_invitation = sys.argv[1:9]
 out = {
     'homeserver': '$MESSAGR_BENCH_HOMESERVER',
     # TRANSMIS PLUTÔT QUE REDÉRIVÉ, ET C'EST UN DÉFAUT MESURÉ.
@@ -276,14 +278,18 @@ out = {
     'inviter': json.loads(inviter),
     'entrant_user_id': entrant,
     'invitation_link': link,
-    # Not a secret: revoking it takes the inviter's own token (#391).
-    'invitation_id': boot_invitation,
     'roundtrip_entrant_user_id': trip_entrant,
     'roundtrip_invitation_link': trip_link,
+    # The lost-access suite's, which revokes it by its id (#391) to deactivate
+    # its own account behind the application's back. The id is not a secret:
+    # revoking takes the inviter's own token.
+    'lost_access_invitation_link': lost_link,
+    'lost_access_invitation_id': lost_invitation,
 }
 print(json.dumps(out, indent=2))
 " "$inviter" "$room_id" "$boot_entrant" "$(as_link "$boot_token")" \
-  "$trip_entrant" "$(as_link "$trip_token")" "$boot_invitation" > "$OUT"
+  "$trip_entrant" "$(as_link "$trip_token")" "$(as_link "$lost_token")" \
+  "$lost_invitation" > "$OUT"
 
 chmod 600 "$OUT"
 echo "wrote the invitation to $OUT" >&2
@@ -294,5 +300,5 @@ print('inviter :', d['inviter']['user_id'], '(registered)')
 print('entrant :', d['entrant_user_id'], '(drawn, invited, not yet claimed)')
 print('entrant2:', d['roundtrip_entrant_user_id'], '(drawn, invited, not yet claimed)')
 print('room    :', d['room_id'])
-print('both links are in the file; the application claims one per suite')
+print('the three links are in the file; the application claims one per suite')
 "

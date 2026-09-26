@@ -4,7 +4,7 @@
 // own .d.ts happens to re-export the class itself from.
 import type { createClient } from 'matrix-js-sdk'
 
-import { getErrorMessage } from './errors'
+import { errcodeOf, getErrorMessage } from './errors'
 
 /**
  * Restores a session on an already-constructed client and waits for the
@@ -38,9 +38,15 @@ export interface SyncClient {
   // `once` is generic over its full event-name union, and a literal type
   // here does not structurally satisfy that generic's constraint, only a
   // parameter this permissive does.
+  // `data.error` is what the loop stopped on, when it stopped on an error:
+  // how a refused token is told apart from any other failure (#391).
   once: (
     event: string,
-    handler: (state: string, prevState: string | null) => void,
+    handler: (
+      state: string,
+      prevState: string | null,
+      data?: { readonly error?: unknown },
+    ) => void,
   ) => void
 }
 
@@ -50,7 +56,17 @@ export type SessionSyncStatus =
       readonly roomCount: number
       readonly durationMs: number
     }
-  | { readonly synced: false; readonly reason: string }
+  | {
+      readonly synced: false
+      readonly reason: string
+      /**
+       * Present when the homeserver said it does not know this session's
+       * token (#391): deleted, revoked, or this telephone taken off the
+       * account. No later launch will sync either, so the launch says so
+       * rather than drawing a list that will never move.
+       */
+      readonly refused?: true
+    }
 
 const DEFAULT_TIMEOUT_MS = 30_000
 
@@ -87,7 +103,14 @@ export async function fetchSessionSyncStatus(
     await firstSync
   } catch (cause: unknown) {
     client.stopClient()
-    return { synced: false, reason: getErrorMessage(cause) }
+    return {
+      synced: false,
+      reason: getErrorMessage(cause),
+      ...(cause instanceof FirstSyncFailed &&
+      errcodeOf(cause.error) === 'M_UNKNOWN_TOKEN'
+        ? { refused: true as const }
+        : {}),
+    }
   }
 
   const status: SessionSyncStatus = {
@@ -99,6 +122,21 @@ export async function fetchSessionSyncStatus(
   return status
 }
 
+/**
+ * A first sync that landed anywhere but where it should, with what the loop
+ * stopped on. The message stays the state's, as it always was: the error is
+ * carried for the one question asked of it, whether the token was refused.
+ */
+class FirstSyncFailed extends Error {
+  constructor(
+    state: string,
+    readonly error: unknown,
+  ) {
+    super(`sync entered state ${state}`)
+    this.name = 'FirstSyncFailed'
+  }
+}
+
 function waitForFirstSync(
   client: SyncClient,
   timeoutMs: number,
@@ -108,12 +146,12 @@ function waitForFirstSync(
       reject(new Error(`sync did not complete within ${timeoutMs}ms`))
     }, timeoutMs)
 
-    client.once('sync', state => {
+    client.once('sync', (state, _prevState, data) => {
       clearTimeout(timer)
       if (state === 'PREPARED' || state === 'SYNCING') {
         resolve()
       } else {
-        reject(new Error(`sync entered state ${state}`))
+        reject(new FirstSyncFailed(state, data?.error))
       }
     })
   })

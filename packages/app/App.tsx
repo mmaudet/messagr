@@ -127,8 +127,6 @@ import {
   receiptSecrets,
   recoverySecrets,
   deletionMarkSecrets,
-  forgetSecrets,
-  newDeviceSecrets,
   sessionSecrets,
   signUpSecrets,
   keepEverySecrets,
@@ -275,8 +273,17 @@ import {
 import { Findable } from './src/ui/Findable'
 import { AccountDeleted } from './src/ui/AccountDeleted'
 import { LostAccess, type LostAccessStage } from './src/ui/LostAccess'
-import { comeBack, forgetIt, waysOut } from './src/runtime/lostAccess'
-import { regainingOnThisDevice } from './src/runtime/regainingThisDevice'
+import {
+  cameBackAs,
+  comeBack,
+  forgetTheAccount,
+  waysOut,
+} from './src/runtime/lostAccess'
+import {
+  cameBackOnThisDevice,
+  regainingOnThisDevice,
+} from './src/runtime/regainingThisDevice'
+import { stillKnown } from './src/runtime/sessionKnown'
 import { deletionMail } from './src/ui/deletionMail'
 import { Evict } from './src/ui/Evict'
 import { Vouch } from './src/ui/Vouch'
@@ -1306,6 +1313,21 @@ export function App({
     if (account === null) return
     Linking.openURL(deletionMail(account.userId)).catch(() => {})
   }, [])
+  // THE CHOICE, PUT ONCE THE SERVER NO LONGER KNOWS THIS SESSION (#391).
+  // Heard by the live loop, by a launch's first sync, or by a launch that
+  // found its store gone and asked. Whichever hears it first draws the
+  // screen; the others leave it as it is.
+  const offerWaysOut = useCallback(
+    () =>
+      waysOut(regainingOnThisDevice()).then(ways =>
+        setLostAccess(current =>
+          current.stage === 'none'
+            ? { stage: 'asking', comeBack: ways.comeBack, said: null }
+            : current,
+        ),
+      ),
+    [],
+  )
   // « REVENIR SUR CE COMPTE » (#391), only ever because the person asked.
   // `lostAccess.ts` says what each ending means; a deactivated account ends
   // on the screen of a deleted one, which says the same thing.
@@ -1338,7 +1360,7 @@ export function App({
   const forgetLostAccount = useCallback(() => {
     const account = credentialsRef.current
     if (account === null) return
-    forgetIt(regainingOnThisDevice(), account).then(marked => {
+    forgetTheAccount(regainingOnThisDevice(), account).then(marked => {
       logEvent(marked ? 'info' : 'warn', 'MESSAGR_LOST_ACCOUNT_FORGOTTEN', {
         marked,
       })
@@ -2519,28 +2541,50 @@ export function App({
       // than anywhere more convenient: the pump is what publishes.
       let session = entered.entered ? entered.session : null
       let lostStore: 'reentered' | 'stranded' | null = null
+      // A SESSION ITS SERVER NO LONGER KNOWS, found without its store (#391):
+      // kept for « Revenir » and « Oublier », and handed to nothing else.
+      let lostAccount: RestoreCredentials | null = null
       if (session !== null) {
-        // THE DEVICE A LOST ACCESS CAME BACK AS (#391): its store is not
-        // there yet, like after a reinstall, and like after a claim that is a
-        // device beginning. Read once, then cleared, and told the way a
-        // reinstall that came back is told: the past stays unreadable here.
-        const newDevice =
-          (await newDeviceSecrets.read().catch(() => null)) === session.deviceId
-        if (newDevice) {
-          await forgetSecrets([newDeviceSecrets])
-          lostStore = 'reentered'
-          logEvent('info', 'MESSAGR_CAME_BACK', {})
-        }
-        const what = afterReinstall({
+        const storeExists = await cryptoStoreExists(storeDir, session.deviceId)
+        const launch = {
           claimed: entered.entered && entered.claimed,
-          storeExists: await cryptoStoreExists(storeDir, session.deviceId),
+          storeExists,
           password: await readRecoverySecret(recoverySecrets),
-          newDevice,
-        })
-        if (what.kind !== 'ordinary') {
-          logEvent('warn', 'MESSAGR_REINSTALLED', { answer: what.kind })
+          // THE DEVICE A LOST ACCESS CAME BACK AS (#391). See `cameBackAs`.
+          newDevice: await cameBackAs(
+            cameBackOnThisDevice(storeDir),
+            session,
+            storeExists,
+          ),
         }
-        if (what.kind === 'reenter') {
+        // NEVER BACK ON ITS OWN (#391). A store that is gone has this launch
+        // log in again with the kept password, which on a telephone taken off
+        // its account would undo what somebody did on purpose. So a launch
+        // that would come back, or be stranded, first asks whether its server
+        // still knows the session: one request, on a launch that lost its
+        // store, and none on any other.
+        const alone = afterReinstall(launch)
+        const what =
+          alone.kind === 'reenter' || alone.kind === 'stranded'
+            ? afterReinstall({
+                ...launch,
+                refused: (await stillKnown(session)) === false,
+              })
+            : alone
+        if (what.kind !== 'ordinary') {
+          logEvent(
+            what.kind === 'came-back' ? 'info' : 'warn',
+            'MESSAGR_REINSTALLED',
+            { answer: what.kind },
+          )
+        }
+        if (what.kind === 'came-back') {
+          // Told the way a reinstall that came back is told: the past stays
+          // unreadable here.
+          lostStore = 'reentered'
+        } else if (what.kind === 'lost') {
+          lostAccount = session
+        } else if (what.kind === 'reenter') {
           const dead = session
           const asking = homeserverCalls(dead.baseUrl)
           const back = await reenterWithPassword(asking, {
@@ -2580,7 +2624,12 @@ export function App({
         }
       }
       setReinstalled(lostStore)
-      const credentials = lostStore === 'stranded' ? null : session
+      const credentials =
+        lostStore === 'stranded' || lostAccount !== null ? null : session
+      if (lostAccount !== null) {
+        credentialsRef.current = lostAccount
+        await offerWaysOut()
+      }
       // THE STATE THAT EXISTED AND WAS NEVER SET.
       //
       // `inYet` was declared, the list had its `notInYet` branch and the copy
@@ -2652,6 +2701,12 @@ export function App({
           sessionStatus = await fetchSessionSyncStatus(
             makeSyncClient(sessionClient),
           )
+          // A TOKEN ITS SERVER NO LONGER KNOWS, heard at the first sync
+          // (#391): no later sync would be answered either. Nothing below
+          // starts the loop, and the screen says what can be done.
+          if (!sessionStatus.synced && sessionStatus.refused === true) {
+            await offerWaysOut()
+          }
 
           if (start.started) {
             passphrase = start.passphraseMinted ? 'minted' : 'reused'
@@ -4177,19 +4232,7 @@ export function App({
                   if (state === 'refused') {
                     resumeSyncRef.current = null
                     runningSyncRef.current = null
-                    waysOut(regainingOnThisDevice())
-                      .catch(() => ({ comeBack: false }))
-                      .then(ways =>
-                        setLostAccess(current =>
-                          current.stage === 'none'
-                            ? {
-                                stage: 'asking',
-                                comeBack: ways.comeBack,
-                                said: null,
-                              }
-                            : current,
-                        ),
-                      )
+                    offerWaysOut().catch(() => {})
                   }
                 },
               )

@@ -4,6 +4,7 @@
 // functions are bound by the caller.
 import type { SyncDelta } from 'react-native-matrix-crypto'
 
+import { errcodeOf } from './errors'
 import {
   drainOutgoingRequests,
   type CryptoMachine,
@@ -158,8 +159,10 @@ function isRefusedRequest(cause: unknown): boolean {
  * the `errcode` `pump.ts`'s adapter carries over from the SDK's error.
  */
 function isRefusedToken(cause: unknown): boolean {
-  const refused = cause as { status?: unknown; errcode?: unknown } | null
-  return refused?.status === 401 && refused?.errcode === 'M_UNKNOWN_TOKEN'
+  return (
+    (cause as { status?: unknown } | null)?.status === 401 &&
+    errcodeOf(cause) === 'M_UNKNOWN_TOKEN'
+  )
 }
 
 /**

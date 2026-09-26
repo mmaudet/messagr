@@ -1,3 +1,4 @@
+import { errcodeOf } from './errors'
 import type { RestoreCredentials } from './sessionCredentials'
 
 /**
@@ -115,11 +116,11 @@ export async function reenterWithPassword(
     password: account.password,
   })
   if (answer.status !== 200) {
-    const errcode = (answer.body as { errcode?: unknown } | null)?.errcode
+    const errcode = errcodeOf(answer.body)
     return {
       reentered: false,
       reason: `the homeserver refused to log in`,
-      ...(typeof errcode === 'string' ? { errcode } : {}),
+      ...(errcode !== null ? { errcode } : {}),
     }
   }
   const read = answer.body as Record<string, unknown>

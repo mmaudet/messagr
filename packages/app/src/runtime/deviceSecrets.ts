@@ -119,7 +119,9 @@ export const recoverySecrets = keychainStore('eu.messagr.recovery', 'account')
  * The account deleted from this device (#382): its user id, written once its
  * server has deactivated it, and read by the next cold launch, which forgets
  * what the account left here. `deleteAccount.ts` says why the forgetting waits
- * for that launch.
+ * for that launch. « Oublier ce compte » writes it too (#391), for an account
+ * whose server no longer lets this device in: `lostAccess.ts` says why the
+ * same mark.
  *
  * The account's, so forgetting the account takes the mark with it: left
  * behind, it would be a mark naming an account nobody on this device holds.
@@ -130,14 +132,19 @@ export const deletionMarkSecrets = keychainStore(
 )
 
 /**
- * The device a lost access came back as (#391), written with its session.
+ * The device a lost access came back as, and the one it was (#391), written
+ * before its session.
  *
  * « Revenir sur ce compte » logs in while the old device's crypto machine
  * still runs, and keeps the new session for the next cold launch. That launch
  * finds a session whose store does not exist yet -- which is what a reinstall
  * looks like, and a reinstall logs in again. This says the store is missing
- * because the device is new, the way a claim says it (`afterReinstall.ts`).
- * The account's, because it goes when the account does.
+ * because the device is new, the way a claim says it, and names the old
+ * store to erase (`lostAccess.ts`'s `cameBackAs`).
+ *
+ * The account's, so forgetting the account takes the mark with it: left
+ * behind, it would name the devices of an account nobody on this device
+ * holds.
  */
 export const newDeviceSecrets = keychainStore(
   'eu.messagr.new-device',

@@ -41,6 +41,20 @@ export type AfterReinstall =
    * nothing may be published under the old device identifier meanwhile.
    */
   | { readonly kind: 'stranded' }
+  /**
+   * The device « Revenir sur ce compte » came back as, on its first launch
+   * (#391): its store is not there yet because it is new, the way a claim's
+   * is not. Nothing to do, and told as a reinstall that came back is told:
+   * what came before stays unreadable here.
+   */
+  | { readonly kind: 'came-back' }
+  /**
+   * The store is gone and the homeserver no longer knows the session (#391):
+   * deleted, revoked, or this telephone taken off the account. Coming back
+   * would be the device undoing on its own what somebody did on purpose, so
+   * the launch asks the person instead, as `lostAccess.ts` does.
+   */
+  | { readonly kind: 'lost' }
 
 export function afterReinstall(launch: {
   /** Whether this launch spent an invitation, rather than restoring. */
@@ -51,14 +65,21 @@ export function afterReinstall(launch: {
   readonly password: string | null
   /**
    * Whether this session is the new device a lost access came back as
-   * (#391, `lostAccess.ts`): its store does not exist yet either, and like a
-   * claim it is a device beginning rather than one returning.
+   * (#391, `lostAccess.ts`'s `cameBackAs`): its store does not exist yet
+   * either, and like a claim it is a device beginning rather than one
+   * returning.
    */
   readonly newDevice?: boolean
+  /**
+   * Whether the homeserver said it does not know this session's token.
+   * Asked only of a launch whose store is gone (#391): an ordinary launch
+   * hears it from its first sync.
+   */
+  readonly refused?: boolean
 }): AfterReinstall {
-  if (launch.claimed || launch.newDevice === true || launch.storeExists) {
-    return { kind: 'ordinary' }
-  }
+  if (launch.claimed || launch.storeExists) return { kind: 'ordinary' }
+  if (launch.newDevice === true) return { kind: 'came-back' }
+  if (launch.refused === true) return { kind: 'lost' }
   return launch.password === null
     ? { kind: 'stranded' }
     : { kind: 'reenter', password: launch.password }

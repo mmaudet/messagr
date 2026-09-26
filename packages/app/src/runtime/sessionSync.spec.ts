@@ -2,7 +2,11 @@ import { describe, expect, it, vi } from 'vitest'
 
 import { fetchSessionSyncStatus, type SyncClient } from './sessionSync'
 
-type SyncHandler = (state: string, prevState: string | null) => void
+type SyncHandler = (
+  state: string,
+  prevState: string | null,
+  data?: { readonly error?: unknown },
+) => void
 
 function fakeClient(
   overrides: Partial<SyncClient> & { emit?: (h: SyncHandler) => void } = {},
@@ -80,6 +84,41 @@ describe('fetchSessionSyncStatus', () => {
       reason: 'sync entered state ERROR',
     })
     expect(stopClient).toHaveBeenCalledOnce()
+  })
+
+  it('says its server refused the token when the first sync stops on M_UNKNOWN_TOKEN (#391)', async () => {
+    // What matrix-js-sdk hands the `sync` listener when the token is refused:
+    // `ERROR`, with the error it stopped on (`shouldAbortSync`). A launch that
+    // could not tell this from any other failure drew the old list over a
+    // device that would never receive anything again.
+    const status = await fetchSessionSyncStatus(
+      fakeClient({
+        emit: handler =>
+          handler('ERROR', null, {
+            error: { httpStatus: 401, errcode: 'M_UNKNOWN_TOKEN' },
+          }),
+      }),
+    )
+    expect(status).toEqual({
+      synced: false,
+      reason: 'sync entered state ERROR',
+      refused: true,
+    })
+  })
+
+  it('does not take any other failed first sync for a refused token', async () => {
+    const status = await fetchSessionSyncStatus(
+      fakeClient({
+        emit: handler =>
+          handler('ERROR', null, {
+            error: { httpStatus: 502, errcode: 'M_UNKNOWN' },
+          }),
+      }),
+    )
+    expect(status).toEqual({
+      synced: false,
+      reason: 'sync entered state ERROR',
+    })
   })
 
   it('carries the reason when startClient itself throws, without stopping a loop that never started', async () => {

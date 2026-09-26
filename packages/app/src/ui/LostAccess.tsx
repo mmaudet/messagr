@@ -19,7 +19,10 @@ export type LostAccessStage =
   | { readonly stage: 'none' }
   | {
       readonly stage: 'asking'
-      /** Whether « Revenir sur ce compte » is offered: a password was kept. */
+      /**
+       * Whether « Revenir sur ce compte » is offered: a password was kept,
+       * and the last attempt did not have it refused.
+       */
       readonly comeBack: boolean
       /** What the last attempt to come back ran into, if one was made. */
       readonly said: 'refused' | 'unreachable' | null
@@ -61,7 +64,9 @@ export function LostAccess({
               : t('lost_forgotten_title')}
           </Text>
           <Text style={styles.body}>
-            {stage.stage === 'back' ? t('lost_back_body') : t('deleted_body')}
+            {stage.stage === 'back'
+              ? t('lost_back_body')
+              : t('lost_forgotten_body')}
           </Text>
         </View>
       </SafeAreaView>
@@ -85,7 +90,7 @@ export function LostAccess({
           </Text>
         ) : (
           <View style={styles.actions}>
-            {stage.comeBack && stage.said !== 'refused' ? (
+            {stage.comeBack ? (
               <NotchedButton
                 testID="lost-access-come-back"
                 label={t('lost_come_back')}
@@ -96,9 +101,7 @@ export function LostAccess({
             <NotchedButton
               testID="lost-access-forget"
               label={t('lost_forget')}
-              tone={
-                stage.comeBack && stage.said !== 'refused' ? 'quiet' : undefined
-              }
+              tone={stage.comeBack ? 'quiet' : undefined}
               onPress={onForget}
               wide
             />

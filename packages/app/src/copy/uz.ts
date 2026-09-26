@@ -291,11 +291,13 @@ export const uz: Readonly<Record<CopyKey, string>> = {
   lost_working: 'Bir lahza…',
   lost_refused:
     'Bu telefon ushbu hisobga qayta olmaydi. Faqat uni unutish qoladi.',
-  lost_unreachable: 'Server javob bermadi. Qayta urinib koʻrishingiz mumkin.',
+  lost_unreachable:
+    'Bu telefon hozircha ushbu hisobga qayta olmadi. Qayta urinib koʻrishingiz mumkin.',
   lost_back_title: 'Bu telefon ushbu hisobga qaytmoqda.',
   lost_back_body:
     'Messagrni butunlay yoping: u yangi qurilma sifatida qaytadi.',
   lost_forgotten_title: 'Bu telefon ushbu hisobni unutadi.',
+  lost_forgotten_body: 'Messagrni butunlay yoping: u noldan qayta boshlanadi.',
   deleted_title: 'Hisobingiz oʻchirildi.',
   deleted_body: 'Messagrni butunlay yoping: u noldan qayta boshlanadi.',
   promise_thesis: 'Sizdan hech narsa soʻramaydigan messenjer.',

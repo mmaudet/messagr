@@ -278,11 +278,14 @@ export const en: Readonly<Record<CopyKey, string>> = {
   lost_working: 'One moment…',
   lost_refused:
     'This phone cannot come back to this account. All that is left is to forget it.',
-  lost_unreachable: 'The server did not answer. You can try again.',
+  lost_unreachable:
+    'This phone could not come back to this account for now. You can try again.',
   lost_back_title: 'This phone is coming back to this account.',
   lost_back_body:
     'Close Messagr completely: it will come back as a new device.',
   lost_forgotten_title: 'This phone will forget this account.',
+  lost_forgotten_body:
+    'Close Messagr completely: it will start again from scratch.',
   deleted_title: 'Your account is deleted.',
   deleted_body: 'Close Messagr completely: it will start again from scratch.',
   promise_thesis: 'The messenger that asks you for nothing.',

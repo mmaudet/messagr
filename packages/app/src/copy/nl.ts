@@ -273,13 +273,15 @@ export const nl: Readonly<Record<CopyKey, string>> = {
   lost_forget: 'Dit account vergeten',
   lost_working: 'Een ogenblik…',
   lost_refused:
-    'Deze telefoon kan niet terugkeren naar dit account. Er rest alleen het te vergeten.',
+    'Deze telefoon kan niet terugkeren naar dit account. U kunt het alleen nog vergeten.',
   lost_unreachable:
-    'De server heeft niet geantwoord. U kunt het opnieuw proberen.',
+    'Deze telefoon kon voorlopig niet terugkeren naar dit account. U kunt het opnieuw proberen.',
   lost_back_title: 'Deze telefoon keert terug naar dit account.',
   lost_back_body:
-    'Sluit Messagr helemaal af: het komt terug als een nieuw apparaat.',
-  lost_forgotten_title: 'Deze telefoon vergeet dit account.',
+    'Sluit Messagr volledig af: het komt terug als een nieuw apparaat.',
+  lost_forgotten_title: 'Deze telefoon zal dit account vergeten.',
+  lost_forgotten_body:
+    'Sluit Messagr volledig af: het begint dan weer van voren af aan.',
   deleted_title: 'Uw account is verwijderd.',
   deleted_body:
     'Sluit Messagr volledig af: het begint dan weer van voren af aan.',

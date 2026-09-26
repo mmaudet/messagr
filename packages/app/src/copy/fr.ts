@@ -405,11 +405,13 @@ export const fr = {
   lost_working: 'Un instant…',
   lost_refused:
     'Ce téléphone ne peut pas revenir sur ce compte. Il ne reste qu’à l’oublier.',
-  lost_unreachable: 'Le serveur n’a pas répondu. Vous pouvez réessayer.',
+  lost_unreachable:
+    'Ce téléphone n’a pas pu revenir sur ce compte pour l’instant. Vous pouvez réessayer.',
   lost_back_title: 'Ce téléphone revient sur ce compte.',
   lost_back_body:
     'Fermez complètement Messagr : il reviendra comme un nouvel appareil.',
   lost_forgotten_title: 'Ce téléphone oubliera ce compte.',
+  lost_forgotten_body: 'Fermez complètement Messagr : il repartira de zéro.',
   deleted_title: 'Votre compte est supprimé.',
   deleted_body: 'Fermez complètement Messagr : il repartira de zéro.',
 
