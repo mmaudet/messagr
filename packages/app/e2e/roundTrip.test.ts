@@ -801,15 +801,28 @@ describeRoundTrip('encrypted round trip', () => {
     await element(by.id('tab-settings')).tap()
 
     // LA DERNIÈRE LIGNE DES RÉGLAGES, que Detox ne va pas chercher seul.
+    //
+    // PUIS TOUT EN BAS, ET PAS SEULEMENT « VISIBLE ». Detox compte une vue
+    // visible dès que les trois quarts sont dans la fenêtre, sans voir ce qui
+    // la recouvre ; or la fenêtre passe sous la barre d'onglets et sous la
+    // barre de navigation d'Android, que l'application dessine bord à bord. La
+    // première position « visible » de la dernière ligne est donc tout en bas
+    // de l'écran, et son centre sous le bouton Accueil : le premier passage
+    // sur le banc l'a touché, et l'application est partie en arrière-plan
+    // (`onUserLeaveHint`, 26 septembre 2026). Au bout du défilement, le
+    // contenu réserve la hauteur de la barre d'onglets, qui inclut celle de la
+    // navigation : c'est là qu'une personne touche la ligne.
     await waitFor(element(by.id('settings-delete-account')))
       .toBeVisible()
       .whileElement(by.id('screen-scroll'))
       .scroll(300, 'down')
+    await element(by.id('screen-scroll')).scrollTo('bottom')
     await element(by.id('settings-delete-account')).tap()
     await waitFor(element(by.id('delete-account-confirm')))
       .toBeVisible()
       .whileElement(by.id('screen-scroll'))
       .scroll(300, 'down')
+    await element(by.id('screen-scroll')).scrollTo('bottom')
     await device.takeScreenshot('suppression-1-les-faits')
     await element(by.id('delete-account-confirm')).tap()
 
