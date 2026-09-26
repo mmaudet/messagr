@@ -7,6 +7,18 @@ import { Consequences } from './Consequences'
 import { NotchedButton } from './NotchedButton'
 
 /**
+ * Where deleting the account stands (#382), one stage at a time, so that no
+ * two of them can be true together: shut; the screen of facts, with whether
+ * the last attempt left the account as it was; the request under way; and
+ * the account gone, after which nothing else is drawn.
+ */
+export type DeletionStage =
+  | { readonly stage: 'shut' }
+  | { readonly stage: 'asking'; readonly failed: boolean }
+  | { readonly stage: 'working' }
+  | { readonly stage: 'deleted' }
+
+/**
  * Deleting the account this device holds, from the last row of Settings.
  * #382.
  *
@@ -62,7 +74,7 @@ export function DeleteAccount({
           },
         ]}
         finally={t('delete_final')}>
-        {failed && !working ? (
+        {failed ? (
           <Text testID="delete-account-failed" style={styles.failed}>
             {t('delete_failed')}
           </Text>

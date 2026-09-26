@@ -101,7 +101,7 @@ function runCounterparty(
     | 'send-file'
     | 'claim-place'
     | 'witness-eviction'
-    | 'witness-departure',
+    | 'witness-deletion',
   extra: Record<string, string> = {},
 ): void {
   execFileSync('python3', [COUNTERPARTY, phase], {
@@ -784,7 +784,7 @@ describeRoundTrip('encrypted round trip', () => {
     // plutôt que sur ce qu'il mesure -- ce qui ne dit rien de l'éviction.
   }, 600000)
 
-  it('deletes its account from Settings, and an independent client sees it leave', async () => {
+  it('deletes its account from Settings, and an independent client finds it deactivated', async () => {
     // LE DERNIER DE LA SUITE, ET IL DOIT LE RESTER : il supprime le compte que
     // tous les autres utilisent (#382).
     //
@@ -813,18 +813,19 @@ describeRoundTrip('encrypted round trip', () => {
     await device.takeScreenshot('suppression-1-les-faits')
     await element(by.id('delete-account-confirm')).tap()
 
-    // LE SERVEUR D'ABORD : l'écran de clôture ne vient qu'une fois le compte
-    // désactivé, et rien d'autre n'est dessiné à côté.
+    // LE SERVEUR D'ABORD : l'écran qui dit le compte supprimé ne vient qu'une
+    // fois le compte désactivé, et rien d'autre n'est dessiné à côté.
     await waitFor(element(by.id('account-deleted')))
       .toBeVisible()
       .withTimeout(60000)
     await device.takeScreenshot('suppression-2-la-cloture')
 
     // LE JUGE, ET IL N'EST PAS CETTE APPLICATION. Il ne connaît pas le mot de
-    // passe du compte, que seule l'application a reçu ; il voit le compte
-    // quitter la conversation qu'ils partagent, ce que le serveur fait d'un
-    // compte désactivé (mesuré le 26 septembre 2026, commentaire de #381).
-    runCounterparty('witness-departure')
+    // passe du compte, que seule l'application a reçu ; il constate ce que le
+    // serveur fait d'un compte désactivé (mesuré le 26 septembre 2026,
+    // commentaire de #381) : plus aucun appareil, et parti de la conversation
+    // qu'ils partagent. `witness_deletion` dit pourquoi il faut les deux.
+    runCounterparty('witness-deletion')
 
     // LE LANCEMENT À FROID SUIVANT OUBLIE LE COMPTE : l'écran d'un appareil
     // sans compte, et un lancement qui le dit.

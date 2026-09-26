@@ -6,7 +6,7 @@
 import { createClient } from 'matrix-js-sdk'
 
 import type { Ending } from './deleteAccount'
-import { deletedSecrets, recoverySecrets } from './deviceSecrets'
+import { deletionMarkSecrets, recoverySecrets } from './deviceSecrets'
 import { readRecoverySecret } from './recoverySecret'
 
 /**
@@ -28,7 +28,7 @@ import { readRecoverySecret } from './recoverySecret'
  * policy says what stays: the events an account produced remain events of
  * the rooms they were written in.
  */
-export function endingFrom(): Ending {
+export function endingOnThisDevice(): Ending {
   return {
     password: () => readRecoverySecret(recoverySecrets),
     deactivate: async (account, password) => {
@@ -38,6 +38,24 @@ export function endingFrom(): Ending {
         password,
       })
     },
-    markDeleted: account => deletedSecrets.write(account.userId),
+    // WHETHER THE SERVER STILL KNOWS THIS SESSION, asked after a deactivation
+    // that looked failed. Measured on 26 September 2026: once an account is
+    // deactivated, `whoami` answers `401 M_UNKNOWN_TOKEN`.
+    stillKnown: async account => {
+      try {
+        await createClient(account).whoami()
+        return true
+      } catch (error) {
+        return errcodeOf(error) === 'M_UNKNOWN_TOKEN' ? false : null
+      }
+    },
+    markDeleted: account => deletionMarkSecrets.write(account.userId),
   }
+}
+
+/** The Matrix error code a failed request carried, if it carried one. */
+function errcodeOf(error: unknown): string | null {
+  if (typeof error !== 'object' || error === null) return null
+  const code = (error as { readonly errcode?: unknown }).errcode
+  return typeof code === 'string' ? code : null
 }

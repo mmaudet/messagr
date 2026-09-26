@@ -642,9 +642,14 @@ export const fr = {
   // déjà promis un geste que le code ne portait pas. Aucun délai n'est affiché
   // ici : la page d'aide porte celui que la politique engage, et dit dans la
   // même phrase que la purge est faite à la main (#71).
+  //
+  // UN ÉCART DE PASSAGE, ET IL EST SUIVI. Depuis #382, cet écran dit que la
+  // suppression se fait dans les Réglages ; la page d'aide le dira avec #386,
+  // publiée seulement quand une build porte le geste. #387, la build 28, en
+  // dépend : aucune build qui affiche ce texte ne sort avant la page.
   legal_delete_title: 'Supprimer votre compte',
   legal_delete_body:
-    'La suppression se fait depuis l’application : Réglages, puis « Supprimer mon compte ». Le compte est alors désactivé aussitôt et ses données sont purgées ; les messages déjà envoyés restent des événements des salons où ils ont été écrits, et le serveur ne peut pas les en retirer puisqu’il ne peut pas les lire. Sans cet appareil, la suppression se demande par courriel à conformite@messagr.eu.',
+    'La suppression se fait depuis l’application : Réglages, puis « Supprimer mon compte ». Le compte est alors désactivé aussitôt et ses données sont purgées ; les messages déjà envoyés restent des événements des salons où ils ont été écrits, et le serveur ne peut pas les en retirer puisqu’il ne peut pas les lire. Sans cet appareil, ou quand l’application le demande, la suppression se demande par courriel à conformite@messagr.eu.',
   legal_delete_link: 'Sans cet appareil : messagr.eu/aide',
   legal_full_terms: 'Conditions générales complètes : messagr.eu',
 

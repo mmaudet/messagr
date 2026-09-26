@@ -19,6 +19,12 @@ function device(
     /** `null` for an account claimed before its password was kept (#190). */
     readonly password?: null
     readonly server?: 'refuses' | 'unreachable'
+    /**
+     * What the server says when asked, after a failed deactivation, whether
+     * it still knows this session: `false` when it says the token is unknown,
+     * `null` when it does not answer.
+     */
+    readonly known?: boolean | null
     readonly keystore?: 'refuses'
   } = {},
 ) {
@@ -34,6 +40,12 @@ function device(
       if (options.server === 'unreachable') {
         throw new Error('network is unreachable')
       }
+    },
+    stillKnown: async account => {
+      happened.push(
+        `ask whether ${account.baseUrl} still knows ${account.userId}`,
+      )
+      return options.known === undefined ? true : options.known
     },
     markDeleted: async account => {
       happened.push(`mark ${account.userId} deleted on this device`)
@@ -70,8 +82,35 @@ describe('deleting the account this device holds', () => {
       })
       expect(here.happened).toEqual([
         'deactivate @gone:bench.example on https://bench.example with the-kept-password',
+        'ask whether https://bench.example still knows @gone:bench.example',
       ])
     }
+  })
+
+  it('counts the account deleted when, after an answer that got lost, its server no longer knows it', async () => {
+    // The server deactivated the account and the answer never came back, so
+    // the attempt looks failed -- and every later one would meet a token the
+    // server has forgotten. Asked whether it still knows this session, the
+    // server says no: that is the answer that was lost, and the device marks
+    // the account deleted rather than leaving it half undone.
+    const here = device({ server: 'unreachable', known: false })
+    expect(await deleteAccount(here.ending, ACCOUNT)).toEqual({
+      deleted: true,
+      marked: true,
+    })
+    expect(here.happened).toEqual([
+      'deactivate @gone:bench.example on https://bench.example with the-kept-password',
+      'ask whether https://bench.example still knows @gone:bench.example',
+      'mark @gone:bench.example deleted on this device',
+    ])
+  })
+
+  it('says nothing was deleted when the server does not answer that question either', async () => {
+    const here = device({ server: 'unreachable', known: null })
+    expect(await deleteAccount(here.ending, ACCOUNT)).toEqual({
+      deleted: false,
+      reason: 'the server did not deactivate this account',
+    })
   })
 
   it('sends nothing at all when this device kept no password', async () => {

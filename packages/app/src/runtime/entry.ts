@@ -72,7 +72,7 @@ export interface EntryDeps {
    * deleted is forgotten here, without a question, because the deletion
    * itself could not: the crypto library does not release a running machine.
    */
-  readonly deleted: SecretStore
+  readonly deletionMark: SecretStore
   /**
    * Awaited between claim attempts. Absent in tests, which should not sleep.
    *
@@ -416,7 +416,7 @@ export const DECLINED = 'this invitation was refused before anything was sent'
 /**
  * An account deleted from this device (#382), found by an entry that cannot
  * forget it yet because a crypto machine still runs: a link handed to the
- * application that is still showing the closing screen, say. The next cold
+ * application still showing that the account is deleted, say. The next cold
  * launch forgets it, and the screen says the account is deleted.
  */
 export const ACCOUNT_DELETED =
@@ -575,7 +575,9 @@ async function heldUnlessDeleted(
   deps: EntryDeps,
 ): Promise<RestoreCredentials | null | 'forgotten' | 'running'> {
   const held = await loadSession(deps.secrets)
-  if (held === null || !(await markedDeleted(deps.deleted, held))) return held
+  if (held === null || !(await markedDeleted(deps.deletionMark, held))) {
+    return held
+  }
   if (deps.leaving.aMachineIsRunning()) return 'running'
   await deps.leaving.departure.forget(held, [])
   return 'forgotten'

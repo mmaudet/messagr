@@ -82,9 +82,9 @@ given one. Those accounts keep the previous behaviour until they enter again.
 
 ## Consequences
 
-`recoverySecret.ts` is the only module that keeps it and `reenter.ts` the
-only one that spends it; every other request in the application carries the
-access token. It is never shown, never sent anywhere but the account's own
+`recoverySecret.ts` is the only module that keeps it, and `reenter.ts` and,
+since #382, account deletion are the only two that spend it; every other
+request in the application carries the access token. It is never shown, never sent anywhere but the account's own
 homeserver, and never used to authenticate an ordinary call.
 
 The detection is local: the store lives at `<storeDir>/crypto/<deviceId>`, so
@@ -96,3 +96,19 @@ device over a read that failed.
 §4.6's stance is untouched. This is not universal invisible recovery: it
 recovers an _account_, never its history, and only on a device that still
 holds its own keystore.
+
+## Amended on 26 September 2026: a second spender, account deletion (#382)
+
+Deleting the account from the application spends the password as well, once
+and at the person's request. The homeserver deactivates an account only on
+`m.login.password`: the access token alone does not suffice, measured on
+messagr.eu on 5 August 2026 and again on 26 September 2026. And Apple's rule
+5.1.1(v) asks that deletion begin inside the application. The password goes
+to the account's own homeserver, in the one request that deactivates the
+account, and nowhere else.
+
+The alternative was an administration right on the homeserver for the
+invitation service, so that it could deactivate on the device's behalf. It was
+refused while framing #380: the service has never held that power. An account
+claimed before the password was kept (#190) therefore cannot delete itself
+from the application, and is sent to the e-mail route.

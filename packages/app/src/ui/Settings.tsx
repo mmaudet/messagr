@@ -326,15 +326,19 @@ export function Settings({
 
       {/* THE LAST ROW, AND THE ONLY DOOR TO DELETING THE ACCOUNT (#382).
           Apple asks that it be easy to find, and the legal screen points
-          here rather than opening a second way. Not red: `DeleteAccount.tsx`
-          says why deleting one's own account is not a measure. */}
+          here rather than opening a second way. Marked destructive, as
+          `RemoveSheet.tsx` marks deleting a message: the row is what warns.
+          The button on the screen of facts keeps the default tone, and
+          `DeleteAccount.tsx` says why. */}
       <Pressable
         testID="settings-delete-account"
         onPress={onDeleteAccount}
         accessibilityRole="button"
         accessibilityLabel={t('settings_delete_account')}
         style={[styles.rowLayout, styles.divider]}>
-        <Text style={styles.rowLabel}>{t('settings_delete_account')}</Text>
+        <Text style={[styles.rowLabel, styles.destructive]}>
+          {t('settings_delete_account')}
+        </Text>
       </Pressable>
 
       <Text style={styles.nothingElse}>{t('settings_nothing_else')}</Text>
@@ -444,6 +448,7 @@ const styles = StyleSheet.create({
     ...type.caption,
     color: color.deny['700'],
   },
+  destructive: { color: color.deny['700'] },
   nothingElse: {
     ...type.caption,
     color: color.neutral['600'],

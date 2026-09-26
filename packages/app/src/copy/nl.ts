@@ -400,7 +400,7 @@ export const nl: Readonly<Record<CopyKey, string>> = {
     'Messagr is een hostingdienst en geen onlineplatform; overweging 14 van de DSA sluit interpersoonlijke communicatiediensten uit. De artikelen 20 en 21 zijn dus niet van toepassing, en deze tekst beweert niet ze te bieden.',
   legal_delete_title: 'Uw account verwijderen',
   legal_delete_body:
-    'Verwijderen gebeurt in de applicatie: Instellingen, dan „Mijn account verwijderen”. Het account wordt dan meteen gedeactiveerd en zijn gegevens worden gewist; reeds verstuurde berichten blijven gebeurtenissen van de ruimtes waarin ze zijn geschreven, en de server kan ze niet weghalen omdat hij ze niet kan lezen. Zonder dit apparaat vraagt u de verwijdering per e-mail aan bij conformite@messagr.eu.',
+    'Verwijderen gebeurt in de applicatie: Instellingen, dan „Mijn account verwijderen”. Het account wordt dan meteen gedeactiveerd en zijn gegevens worden gewist; reeds verstuurde berichten blijven gebeurtenissen van de ruimtes waarin ze zijn geschreven, en de server kan ze niet weghalen omdat hij ze niet kan lezen. Zonder dit apparaat, of wanneer de applicatie daarom vraagt, vraagt u de verwijdering per e-mail aan bij conformite@messagr.eu.',
   legal_delete_link: 'Zonder dit apparaat: messagr.eu/aide',
   legal_full_terms: 'Volledige algemene voorwaarden: messagr.eu',
   trust_action: 'Wat er van deze persoon bekend is',

@@ -124,7 +124,10 @@ export const recoverySecrets = keychainStore('eu.messagr.recovery', 'account')
  * The account's, so forgetting the account takes the mark with it: left
  * behind, it would be a mark naming an account nobody on this device holds.
  */
-export const deletedSecrets = keychainStore('eu.messagr.deleted', 'account')
+export const deletionMarkSecrets = keychainStore(
+  'eu.messagr.deletion-mark',
+  'account',
+)
 
 /**
  * The pushkey this device last registered a pusher under.

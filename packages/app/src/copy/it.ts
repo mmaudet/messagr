@@ -396,7 +396,7 @@ export const it: Readonly<Record<CopyKey, string>> = {
     'Messagr è un servizio di hosting e non una piattaforma online, poiché il considerando 14 del DSA esclude i servizi di comunicazione interpersonale. Gli articoli 20 e 21 non si applicano quindi, e questo testo non pretende di offrirli.',
   legal_delete_title: 'Eliminare il tuo account',
   legal_delete_body:
-    'L’eliminazione si fa dall’applicazione: Impostazioni, poi «Eliminare il mio account». L’account viene allora disattivato subito e i suoi dati cancellati; i messaggi già inviati restano eventi delle stanze in cui sono stati scritti, e il server non può toglierli perché non può leggerli. Senza questo dispositivo, l’eliminazione si chiede per posta elettronica a conformite@messagr.eu.',
+    'L’eliminazione si fa dall’applicazione: Impostazioni, poi «Eliminare il mio account». L’account viene allora disattivato subito e i suoi dati cancellati; i messaggi già inviati restano eventi delle stanze in cui sono stati scritti, e il server non può toglierli perché non può leggerli. Senza questo dispositivo, o quando l’applicazione te lo chiede, l’eliminazione si chiede per posta elettronica a conformite@messagr.eu.',
   legal_delete_link: 'Senza questo dispositivo: messagr.eu/aide',
   legal_full_terms: 'Condizioni generali complete: messagr.eu',
   trust_action: 'Ciò che si sa di questa persona',

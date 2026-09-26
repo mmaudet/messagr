@@ -39,6 +39,12 @@ export interface Ending {
     account: RestoreCredentials,
     password: string,
   ) => Promise<void>
+  /**
+   * Whether the account's server still knows this session, asked after a
+   * deactivation that looked failed: `false` only when it says the token is
+   * unknown, `null` when it does not answer.
+   */
+  readonly stillKnown: (account: RestoreCredentials) => Promise<boolean | null>
   /** Writes down, on this device, that `account` is deleted. */
   readonly markDeleted: (account: RestoreCredentials) => Promise<void>
 }
@@ -47,13 +53,13 @@ export interface Ending {
  * Without the password the server refuses, so nothing is sent. #384 says what
  * the screen offers instead.
  */
-export const NO_PASSWORD = 'this device kept no password for this account'
+const NO_PASSWORD = 'this device kept no password for this account'
 
 /**
  * A refusal and an unreachable server say the same thing to the person: the
  * account is still there, and trying again is safe.
  */
-export const NOT_DEACTIVATED = 'the server did not deactivate this account'
+const NOT_DEACTIVATED = 'the server did not deactivate this account'
 
 export type Deletion =
   | {
@@ -74,7 +80,14 @@ export async function deleteAccount(
   try {
     await ending.deactivate(account, password)
   } catch {
-    return { deleted: false, reason: NOT_DEACTIVATED }
+    // AN ANSWER CAN BE LOST AFTER THE SERVER HAS ACTED. The account is then
+    // gone, the attempt looks failed, and every later one would meet a token
+    // the server has forgotten: a device left half undone, which the person
+    // could never get out of. A server that no longer knows this session is
+    // the answer that was lost. Anything else is an account still there.
+    if ((await ending.stillKnown(account)) !== false) {
+      return { deleted: false, reason: NOT_DEACTIVATED }
+    }
   }
   // THE SERVER HAS SPOKEN, and that is the fact the screen reports. A mark
   // that cannot be written costs the next launch its reason to forget, not

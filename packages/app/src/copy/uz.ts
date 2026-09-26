@@ -415,7 +415,7 @@ export const uz: Readonly<Record<CopyKey, string>> = {
     'Messagr — hosting xizmati, onlayn platforma emas: DSA ning 14-bandi shaxslararo xabar almashish xizmatlarini bundan chiqaradi. Demak 20- va 21-moddalar qoʻllanmaydi va bu matn ularni taklif qilayotgani yoʻq.',
   legal_delete_title: 'Hisobingizni oʻchirish',
   legal_delete_body:
-    'Oʻchirish ilovaning oʻzida amalga oshiriladi: Sozlamalar, keyin «Hisobimni oʻchirish». Shunda hisob darhol oʻchiriladi va uning maʼlumotlari tozalanadi; allaqachon yuborilgan xabarlar ular yozilgan xonalarning hodisalari boʻlib qoladi, server ularni oʻqiy olmagani uchun olib tashlay olmaydi. Bu qurilmasiz oʻchirish conformite@messagr.eu manziliga elektron xat orqali soʻraladi.',
+    'Oʻchirish ilovaning oʻzida amalga oshiriladi: Sozlamalar, keyin «Hisobimni oʻchirish». Shunda hisob darhol oʻchiriladi va uning maʼlumotlari tozalanadi; allaqachon yuborilgan xabarlar ular yozilgan xonalarning hodisalari boʻlib qoladi, server ularni oʻqiy olmagani uchun olib tashlay olmaydi. Bu qurilmasiz yoki ilova shuni soʻraganda, oʻchirish conformite@messagr.eu manziliga elektron xat orqali soʻraladi.',
   legal_delete_link: 'Bu qurilmasiz: messagr.eu/aide',
   legal_full_terms: 'Toʻliq foydalanish shartlari: messagr.eu',
   trust_action: 'Bu odam haqida nima maʼlum',
