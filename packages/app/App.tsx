@@ -262,8 +262,14 @@ import { Trust } from './src/ui/Trust'
 import { GiveName } from './src/ui/GiveName'
 import { FirstLaunch } from './src/ui/FirstLaunch'
 import { LeaveAccount } from './src/ui/LeaveAccount'
-import { DeleteAccount, type DeletionStage } from './src/ui/DeleteAccount'
+import {
+  DeleteAccount,
+  type DeletionStage,
+  isDeletionLeavable,
+  isDeletionShown,
+} from './src/ui/DeleteAccount'
 import { AccountDeleted } from './src/ui/AccountDeleted'
+import { deletionMail } from './src/ui/deletionMail'
 import { Evict } from './src/ui/Evict'
 import { Vouch } from './src/ui/Vouch'
 import { setCatalogue, t } from './src/copy'
@@ -273,7 +279,7 @@ import {
   enterWithASession,
   type InvitationOutcome,
 } from './src/runtime/entry'
-import { deleteAccount } from './src/runtime/deleteAccount'
+import { deleteAccount, wayToDelete } from './src/runtime/deleteAccount'
 import { endingOnThisDevice } from './src/runtime/deletingThisDevice'
 import type { RestoreCredentials } from './src/runtime/sessionCredentials'
 import { initialLink, watchLinks } from './src/runtime/incomingLink'
@@ -1174,7 +1180,7 @@ export function App({
     setDeletion({ stage: 'working' })
     deleteAccount(endingOnThisDevice(), account)
       .then(outcome => {
-        if (outcome.deleted) {
+        if (outcome.outcome === 'deleted') {
           logEvent(
             outcome.marked ? 'info' : 'warn',
             'MESSAGR_ACCOUNT_DELETED',
@@ -1184,17 +1190,50 @@ export function App({
           runningSyncRef.current?.stop()
           runningSyncRef.current = null
           setDeletion({ stage: 'deleted' })
-        } else {
+        } else if (outcome.outcome === 'failed') {
           logEvent('warn', 'MESSAGR_ACCOUNT_NOT_DELETED', {
             reason: outcome.reason,
-            ...(outcome.takenAway === undefined
-              ? {}
-              : { takenAway: outcome.takenAway }),
+            takenAway: outcome.takenAway,
           })
           setDeletion({ stage: 'asking', failed: true })
+        } else {
+          // The password went between opening the screen and confirming,
+          // which `openDeletion` asked about first. Nothing was sent.
+          setDeletion({ stage: 'by-email' })
         }
       })
       .catch(() => setDeletion({ stage: 'asking', failed: true }))
+  }, [])
+  // WHICH WAY THE SCREEN OFFERS, ASKED BEFORE IT OPENS (#384). A device that
+  // kept no password is shown the e-mail way and no « Oui, supprimer mon
+  // compte »: the server would refuse, and the person would learn it only
+  // after deciding. Nothing is sent to find out.
+  //
+  // The answer is applied only to a screen still shut: a second tap on the row
+  // starts a second reading, and one that settled after « Oui » would bring
+  // the button back while the server is being asked. And a reading that fails
+  // shows the e-mail way, not « Oui »: this device cannot say it holds the
+  // password, and the e-mail way is the one that cannot promise too much.
+  const openDeletion = useCallback(() => {
+    const opening = (next: DeletionStage) =>
+      setDeletion(current => (current.stage === 'shut' ? next : current))
+    wayToDelete(endingOnThisDevice())
+      .then(way =>
+        opening(
+          way === 'here'
+            ? { stage: 'asking', failed: false }
+            : { stage: 'by-email' },
+        ),
+      )
+      .catch(() => opening({ stage: 'by-email' }))
+  }, [])
+  // THE E-MAIL WAY (#384): a mail ready to send, with what finds the account
+  // already written in it. Failure is ordinary -- no mail application on this
+  // telephone -- and the screen says what to write by hand.
+  const writeForDeletion = useCallback(() => {
+    const account = credentialsRef.current
+    if (account === null) return
+    Linking.openURL(deletionMail(account.userId)).catch(() => {})
   }, [])
   /**
    * What is on screen now, for an acceptance that settles later (#284).
@@ -4279,7 +4318,7 @@ export function App({
       // only on Settings, where that screen is drawn: from another tab, back
       // neither waits on it nor clears an answer nobody has read yet.
       if (tab === 'settings' && deletion.stage !== 'shut') {
-        if (deletion.stage === 'asking') setDeletion({ stage: 'shut' })
+        if (isDeletionLeavable(deletion)) setDeletion({ stage: 'shut' })
         return true
       }
       if (invite.stage !== 'shut') {
@@ -4303,7 +4342,7 @@ export function App({
     personOpen,
     openScope,
     legalOpen,
-    deletion.stage,
+    deletion,
     invite.stage,
     tab,
     backupPrompt,
@@ -5011,9 +5050,7 @@ export function App({
                   <Settings
                     onBack={() => setTab('chat')}
                     onLegal={() => setLegalOpen(true)}
-                    onDeleteAccount={() =>
-                      setDeletion({ stage: 'asking', failed: false })
-                    }
+                    onDeleteAccount={openDeletion}
                     onBackup={() => setBackupOpen(true)}
                     onVault={() => setVaultOpen(true)}
                     onFavourites={() => {
@@ -5131,12 +5168,12 @@ export function App({
 
             {openScope === null &&
               tab === 'settings' &&
-              (deletion.stage === 'asking' || deletion.stage === 'working') && (
+              isDeletionShown(deletion) && (
                 <View style={styles.block}>
                   <DeleteAccount
-                    working={deletion.stage === 'working'}
-                    failed={deletion.stage === 'asking' && deletion.failed}
+                    stage={deletion}
                     onDelete={deleteThisAccount}
+                    onWrite={writeForDeletion}
                     onKeep={() => setDeletion({ stage: 'shut' })}
                   />
                 </View>
@@ -5710,7 +5747,7 @@ export function App({
                   // NOT WHILE THE SERVER IS BEING ASKED (#382), as on the back
                   // gesture: a failure must come back to a screen that is
                   // there when the person returns to Settings.
-                  if (deletion.stage === 'asking') {
+                  if (isDeletionLeavable(deletion)) {
                     setDeletion({ stage: 'shut' })
                   }
                   setInvite({ stage: 'shut' })

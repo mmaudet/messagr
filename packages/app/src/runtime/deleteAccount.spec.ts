@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import { deleteAccount, type Ending } from './deleteAccount'
+import { deleteAccount, type Ending, wayToDelete } from './deleteAccount'
 
 const ACCOUNT = {
   baseUrl: 'https://bench.example',
@@ -103,7 +103,7 @@ describe('deleting the account this device holds', () => {
     // failed.
     const here = device()
     expect(await deleteAccount(here.ending, ACCOUNT)).toEqual({
-      deleted: true,
+      outcome: 'deleted',
       marked: true,
       takenAway: { pusher: 'removed', backup: 'deleted' },
     })
@@ -125,7 +125,7 @@ describe('deleting the account this device holds', () => {
     // left is whether there is a backup, which only the server can answer.
     const here = device({ pusher: null, backups: [] })
     expect(await deleteAccount(here.ending, ACCOUNT)).toEqual({
-      deleted: true,
+      outcome: 'deleted',
       marked: true,
       takenAway: { pusher: 'none', backup: 'none' },
     })
@@ -143,7 +143,7 @@ describe('deleting the account this device holds', () => {
     // the server names the next one, until it has none.
     const here = device({ backups: ['4712', '4711'] })
     expect(await deleteAccount(here.ending, ACCOUNT)).toEqual({
-      deleted: true,
+      outcome: 'deleted',
       marked: true,
       takenAway: { pusher: 'removed', backup: 'deleted' },
     })
@@ -164,7 +164,7 @@ describe('deleting the account this device holds', () => {
     // gone, and the deactivation is not held up by it.
     const here = device({ backupDeletion: 'ignored' })
     expect(await deleteAccount(here.ending, ACCOUNT)).toEqual({
-      deleted: true,
+      outcome: 'deleted',
       marked: true,
       takenAway: { pusher: 'removed', backup: 'failed' },
     })
@@ -183,7 +183,7 @@ describe('deleting the account this device holds', () => {
     // leave everything that could make it fire. It is noted, not waited on.
     const here = device({ waking: 'refuses' })
     expect(await deleteAccount(here.ending, ACCOUNT)).toEqual({
-      deleted: true,
+      outcome: 'deleted',
       marked: true,
       takenAway: { pusher: 'failed', backup: 'deleted' },
     })
@@ -200,7 +200,7 @@ describe('deleting the account this device holds', () => {
   it('goes on to the deactivation when the server does not say whether there is a backup', async () => {
     const here = device({ backups: 'unanswered' })
     expect(await deleteAccount(here.ending, ACCOUNT)).toEqual({
-      deleted: true,
+      outcome: 'deleted',
       marked: true,
       takenAway: { pusher: 'removed', backup: 'failed' },
     })
@@ -215,7 +215,7 @@ describe('deleting the account this device holds', () => {
   it('goes on to the deactivation when the backup will not be deleted', async () => {
     const here = device({ backupDeletion: 'refuses' })
     expect(await deleteAccount(here.ending, ACCOUNT)).toEqual({
-      deleted: true,
+      outcome: 'deleted',
       marked: true,
       takenAway: { pusher: 'removed', backup: 'failed' },
     })
@@ -233,7 +233,7 @@ describe('deleting the account this device holds', () => {
     for (const server of ['refuses', 'unreachable'] as const) {
       const here = device({ server })
       expect(await deleteAccount(here.ending, ACCOUNT)).toEqual({
-        deleted: false,
+        outcome: 'failed',
         reason: 'the server did not deactivate this account',
         takenAway: { pusher: 'removed', backup: 'deleted' },
       })
@@ -256,7 +256,7 @@ describe('deleting the account this device holds', () => {
     // the account deleted rather than leaving it half undone.
     const here = device({ server: 'unreachable', known: false })
     expect(await deleteAccount(here.ending, ACCOUNT)).toEqual({
-      deleted: true,
+      outcome: 'deleted',
       marked: true,
       takenAway: { pusher: 'removed', backup: 'deleted' },
     })
@@ -270,7 +270,7 @@ describe('deleting the account this device holds', () => {
   it('counts nothing deleted when the server does not answer that question either', async () => {
     const here = device({ server: 'unreachable', known: null })
     expect(await deleteAccount(here.ending, ACCOUNT)).toEqual({
-      deleted: false,
+      outcome: 'failed',
       reason: 'the server did not deactivate this account',
       takenAway: { pusher: 'removed', backup: 'deleted' },
     })
@@ -278,14 +278,14 @@ describe('deleting the account this device holds', () => {
 
   it('sends nothing at all when this device kept no password', async () => {
     // The server refuses a deactivation without it, so asking would only
-    // spend a request to be told no. #384 says what the screen offers then.
+    // spend a request to be told no. The screen shows the e-mail way instead,
+    // and has asked `wayToDelete` before offering anything.
     // Nor is anything taken away first: this device has a pusher written down
     // and its account a backup, and neither is touched for a deletion that
     // cannot happen.
     const here = device({ password: null })
     expect(await deleteAccount(here.ending, ACCOUNT)).toEqual({
-      deleted: false,
-      reason: 'this device kept no password for this account',
+      outcome: 'by-email',
     })
     expect(here.happened).toEqual([])
   })
@@ -296,9 +296,26 @@ describe('deleting the account this device holds', () => {
     // is still there when it is not.
     const here = device({ keystore: 'refuses' })
     expect(await deleteAccount(here.ending, ACCOUNT)).toEqual({
-      deleted: true,
+      outcome: 'deleted',
       marked: false,
       takenAway: { pusher: 'removed', backup: 'deleted' },
     })
+  })
+})
+
+describe('the way to delete, known before the screen offers anything (#384)', () => {
+  it('is e-mail for a device that kept no password, and nothing is sent to find out', async () => {
+    // The screen of facts then offers no « Oui, supprimer mon compte »: the
+    // server would refuse the deactivation, and the person would learn it
+    // only after deciding.
+    const here = device({ password: null })
+    expect(await wayToDelete(here.ending)).toBe('by-email')
+    expect(here.happened).toEqual([])
+  })
+
+  it('is this device for one that kept it, and nothing is sent either', async () => {
+    const here = device()
+    expect(await wayToDelete(here.ending)).toBe('here')
+    expect(here.happened).toEqual([])
   })
 })

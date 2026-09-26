@@ -265,6 +265,18 @@ export const de: Readonly<Record<CopyKey, string>> = {
   delete_working: 'Wird gelöscht…',
   delete_failed:
     'Die Löschung wurde nicht abgeschlossen, und Ihr Konto besteht weiterhin. Sie können es erneut versuchen.',
+  delete_email_gone_body:
+    'Ihr Konto, für immer: Seine Kennung wird nie wieder verwendet, und niemand kann Sie über dieses Konto mehr erreichen. Was dieses Gerät von Ihren Unterhaltungen aufbewahrt, bleibt darauf, solange Messagr installiert ist.',
+  delete_email_final:
+    'Einmal erfolgt, lässt sich die Löschung nicht rückgängig machen.',
+  'delete_email_why %@':
+    'Dieses Gerät bewahrt das Passwort dieses Kontos nicht auf, das der Server zum Löschen verlangt. Die Löschung erfolgt daher per E-Mail an %@.',
+  'delete_email_write %@': 'An %@ schreiben',
+  'delete_email_by_hand %@':
+    'Ohne E-Mail-App auf diesem Telefon schreiben Sie an %@, dass Sie die Löschung Ihres Kontos beantragen, mit dem Namen, den Sie in Ihren Unterhaltungen tragen, und dem Namen der Person, die Sie eingeladen hat.',
+  delete_mail_subject: 'Mein Konto löschen',
+  'delete_mail_body %@':
+    'Guten Tag,\n\nich beantrage die Löschung meines Messagr-Kontos. Mein Telefon bewahrt das Passwort dieses Kontos nicht auf.\n\nKontokennung: %@\n',
   deleted_title: 'Ihr Konto ist gelöscht.',
   deleted_body:
     'Schließen Sie Messagr vollständig: Es beginnt dann wieder von vorn.',
