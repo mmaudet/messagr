@@ -251,16 +251,7 @@ mod tests {
                 "http://127.0.0.1:1".into(),
                 "token".into(),
             )),
-            cfg: config::Config {
-                database_url: String::new(),
-                homeserver_url: "http://127.0.0.1:1".into(),
-                registration_token: "token".into(),
-                encryption_key: [0u8; 32],
-                edge_retention_days: 30,
-                bind_addr: String::new(),
-                max_reserved_accounts_per_inviter: config::DEFAULT_RESERVED_ACCOUNTS_CEILING,
-                push_gateway_url: None,
-            },
+            cfg: config::Config::for_tests(),
         });
         let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
         let base = format!("http://{}", listener.local_addr().unwrap());
