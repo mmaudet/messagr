@@ -1,4 +1,4 @@
-import type { Road } from './pusher'
+import type { PushToken, PusherTakenAway, ThisDevicesPusher } from './pusher'
 import type { RestoreCredentials } from './sessionCredentials'
 import type { SecretStore } from './sessionStore'
 
@@ -35,26 +35,11 @@ import type { SecretStore } from './sessionStore'
  * entries the next account has already written.
  */
 
-/** What leaving needs, so the whole of it is testable without a device. */
-export interface Departure {
-  /**
-   * The pusher this device last registered, and the road it went by. `null`
-   * when it never wrote one down; it answers rather than throws, the way
-   * `lastPushkey.ts` does.
-   */
-  readonly pusher: () => Promise<{
-    readonly token: string
-    readonly road: Road
-  } | null>
-  /**
-   * Takes that pusher away on the account's own server: the removal
-   * `cryptoPump.ts` already makes for the notifications switch, bound to this
-   * account. A throw is a pusher that did not go.
-   */
-  readonly stopWaking: (
-    account: RestoreCredentials,
-    pusher: { readonly token: string; readonly road: Road },
-  ) => Promise<void>
+/**
+ * What leaving needs, so the whole of it is testable without a device. The
+ * pusher first, read and taken away as `ThisDevicesPusher` says.
+ */
+export interface Departure extends ThisDevicesPusher {
   /** Ends the account's session on its own server, which retires this device there. */
   readonly logOut: (account: RestoreCredentials) => Promise<void>
   /**
@@ -75,7 +60,7 @@ export interface Departure {
 
 /** What became of the account on its own server. For the log, never a screen. */
 export interface Closed {
-  readonly pusher: 'removed' | 'failed' | 'none'
+  readonly pusher: PusherTakenAway
   readonly loggedOut: boolean
 }
 
@@ -97,9 +82,9 @@ export async function leaveAccount(
 async function closeOnItsOwnServer(
   departure: Departure,
   account: RestoreCredentials,
-  pusher: { readonly token: string; readonly road: Road } | null,
+  pusher: PushToken | null,
 ): Promise<Closed> {
-  let removed: Closed['pusher'] = 'none'
+  let removed: PusherTakenAway = 'none'
   if (pusher !== null) {
     try {
       await departure.stopWaking(account, pusher)

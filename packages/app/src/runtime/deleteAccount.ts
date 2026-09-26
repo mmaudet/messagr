@@ -1,4 +1,4 @@
-import type { Road } from './pusher'
+import type { PusherTakenAway, ThisDevicesPusher } from './pusher'
 import type { RestoreCredentials } from './sessionCredentials'
 
 /**
@@ -24,14 +24,14 @@ import type { RestoreCredentials } from './sessionCredentials'
  * this device keeps of the account is forgotten at the next cold launch, the
  * way leaving an account already is. The mark is what that launch reads.
  *
- * # BEFORE THE DEACTIVATION, WHAT ONLY THE TOKEN CAN UNDO
+ * # BEFORE THE DEACTIVATION, WHAT ONLY THE TOKEN CAN TAKE AWAY
  *
  * #383. Once the account is deactivated its token opens nothing, so it is
  * before or never. This device's pusher goes, so that nothing wakes this
  * telephone for an account that is gone; then the key backup, so that its
  * server keeps nothing of its keys. What the deactivation itself does with
- * either was never measured. Neither decides anything: a failure is noted,
- * and the deletion goes on.
+ * either was never measured. Neither decides anything: what became of each
+ * goes back with the answer, for the log, and the deletion goes on.
  *
  * THE CONVERSATIONS ARE NOT LEFT HERE, and #381 had said they would be.
  * Decided on 26 September 2026: the server makes a deactivated account leave
@@ -43,34 +43,23 @@ import type { RestoreCredentials } from './sessionCredentials'
  * says it still exists.
  */
 
-/** What deleting needs, so the whole of it is testable without a device. */
-export interface Ending {
+/**
+ * What deleting needs, so the whole of it is testable without a device. The
+ * pusher first, read and taken away as `ThisDevicesPusher` says.
+ */
+export interface Ending extends ThisDevicesPusher {
   /**
    * The password the account came with (#190), or `null` when this device
    * kept none. The server asks for it: the token alone does not deactivate.
    */
   readonly password: () => Promise<string | null>
   /**
-   * The pusher this device last registered, and the road it went by, or
-   * `null` when it never wrote one down: the reading `Departure.pusher` makes.
+   * The latest key backup version the account's own server holds, or `null`
+   * when it holds none. A throw is a server that did not say.
    */
-  readonly pusher: () => Promise<{
-    readonly token: string
-    readonly road: Road
-  } | null>
-  /**
-   * Takes that pusher away on the account's own server. A throw is a pusher
-   * that did not go.
-   */
-  readonly stopWaking: (
+  readonly backupVersion: (
     account: RestoreCredentials,
-    pusher: { readonly token: string; readonly road: Road },
-  ) => Promise<void>
-  /**
-   * The version of the key backup the account has on its own server, or
-   * `null` when it has none. A throw is a server that did not say.
-   */
-  readonly backup: (account: RestoreCredentials) => Promise<string | null>
+  ) => Promise<string | null>
   /**
    * Deletes that version on the account's own server. A throw is a backup
    * still there.
@@ -105,13 +94,15 @@ const NO_PASSWORD = 'this device kept no password for this account'
 
 /**
  * A refusal and an unreachable server say the same thing to the person: the
- * account is still there, and trying again is safe.
+ * account is still there, and trying again takes up what this attempt began.
+ * The one case where the account may already be gone is a lost answer
+ * followed by a question nobody answered, and trying again settles it.
  */
 const NOT_DEACTIVATED = 'the server did not deactivate this account'
 
 /** What was taken away before the deactivation. For the log, never a screen. */
-export interface Undone {
-  readonly pusher: 'removed' | 'failed' | 'none'
+export interface TakenAway {
+  readonly pusher: PusherTakenAway
   readonly backup: 'deleted' | 'failed' | 'none'
 }
 
@@ -120,13 +111,13 @@ export type Deletion =
       readonly deleted: true
       /** Whether this device could write the deletion down. */
       readonly marked: boolean
-      readonly undone: Undone
+      readonly takenAway: TakenAway
     }
   | {
       readonly deleted: false
       readonly reason: string
       /** Absent when nothing was attempted. */
-      readonly undone?: Undone
+      readonly takenAway?: TakenAway
     }
 
 export async function deleteAccount(
@@ -137,7 +128,7 @@ export async function deleteAccount(
   if (password === null) {
     return { deleted: false, reason: NO_PASSWORD }
   }
-  const undone = await undoWhatOnlyTheTokenCan(ending, account)
+  const takenAway = await takeAwayWhatOnlyTheTokenCan(ending, account)
   try {
     await ending.deactivate(account, password)
   } catch {
@@ -147,7 +138,7 @@ export async function deleteAccount(
     // could never get out of. A server that no longer knows this session is
     // the answer that was lost. Anything else is an account still there.
     if ((await ending.stillKnown(account)) !== false) {
-      return { deleted: false, reason: NOT_DEACTIVATED, undone }
+      return { deleted: false, reason: NOT_DEACTIVATED, takenAway }
     }
   }
   // THE SERVER HAS SPOKEN, and that is the fact the screen reports. A mark
@@ -155,17 +146,17 @@ export async function deleteAccount(
   // the account its deletion.
   try {
     await ending.markDeleted(account)
-    return { deleted: true, marked: true, undone }
+    return { deleted: true, marked: true, takenAway }
   } catch {
-    return { deleted: true, marked: false, undone }
+    return { deleted: true, marked: false, takenAway }
   }
 }
 
 /** The pusher, then the key backup. Neither stops the deletion. */
-async function undoWhatOnlyTheTokenCan(
+async function takeAwayWhatOnlyTheTokenCan(
   ending: Ending,
   account: RestoreCredentials,
-): Promise<Undone> {
+): Promise<TakenAway> {
   const pusher = await takeThePusherAway(ending, account)
   const backup = await deleteTheBackup(ending, account)
   return { pusher, backup }
@@ -174,7 +165,7 @@ async function undoWhatOnlyTheTokenCan(
 async function takeThePusherAway(
   ending: Ending,
   account: RestoreCredentials,
-): Promise<Undone['pusher']> {
+): Promise<PusherTakenAway> {
   try {
     const pusher = await ending.pusher()
     if (pusher === null) return 'none'
@@ -185,15 +176,33 @@ async function takeThePusherAway(
   }
 }
 
+/**
+ * How many backup versions one deletion takes away at most. An account has
+ * one, and two when a replaced restore key's old version would not go
+ * (`replaceBackup.ts`); the bound is for a server that keeps answering.
+ */
+const MOST_BACKUP_VERSIONS = 5
+
+/**
+ * Every version the server still holds, newest first. It answers with the
+ * latest version, so once that one is gone it answers with the one before. A
+ * version it names again after being told to delete it is one it keeps, and
+ * asking more would not change that.
+ */
 async function deleteTheBackup(
   ending: Ending,
   account: RestoreCredentials,
-): Promise<Undone['backup']> {
+): Promise<TakenAway['backup']> {
+  let deleted: string | null = null
   try {
-    const version = await ending.backup(account)
-    if (version === null) return 'none'
-    await ending.deleteBackup(account, version)
-    return 'deleted'
+    for (let round = 0; round < MOST_BACKUP_VERSIONS; round++) {
+      const version = await ending.backupVersion(account)
+      if (version === null) return deleted === null ? 'none' : 'deleted'
+      if (version === deleted) return 'failed'
+      await ending.deleteBackup(account, version)
+      deleted = version
+    }
+    return 'failed'
   } catch {
     return 'failed'
   }

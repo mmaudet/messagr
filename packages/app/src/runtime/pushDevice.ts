@@ -9,7 +9,7 @@ import { PermissionsAndroid, Platform } from 'react-native'
 
 import { applePushToken, type Unread } from './applePushToken'
 import { getErrorMessage } from './errors'
-import type { Road } from './pusher'
+import type { PushToken } from './pusher'
 
 /**
  * This device's push token, and the permission that has to come first.
@@ -90,8 +90,7 @@ import type { Road } from './pusher'
  * This is a product that should run on a phone with no Google on it.
  */
 export async function pushTokenForThisDevice(): Promise<
-  | { readonly token: string; readonly road: Road }
-  | { readonly token: null; readonly reason: string }
+  PushToken | { readonly token: null; readonly reason: string }
 > {
   try {
     if (Platform.OS === 'android' && Platform.Version >= 33) {

@@ -1178,7 +1178,7 @@ export function App({
           logEvent(
             outcome.marked ? 'info' : 'warn',
             'MESSAGR_ACCOUNT_DELETED',
-            { marked: outcome.marked, undone: outcome.undone },
+            { marked: outcome.marked, takenAway: outcome.takenAway },
           )
           resumeSyncRef.current = null
           runningSyncRef.current?.stop()
@@ -1187,7 +1187,9 @@ export function App({
         } else {
           logEvent('warn', 'MESSAGR_ACCOUNT_NOT_DELETED', {
             reason: outcome.reason,
-            ...(outcome.undone === undefined ? {} : { undone: outcome.undone }),
+            ...(outcome.takenAway === undefined
+              ? {}
+              : { takenAway: outcome.takenAway }),
           })
           setDeletion({ stage: 'asking', failed: true })
         }

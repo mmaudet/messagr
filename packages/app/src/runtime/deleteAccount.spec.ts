@@ -29,12 +29,20 @@ function device(
     /** `null` when this device never wrote a pushkey down. */
     readonly pusher?: null
     readonly waking?: 'refuses'
-    /** `null` for an account with no key backup. */
-    readonly backup?: null | 'unanswered'
-    readonly backupDeletion?: 'refuses'
+    /**
+     * The key backup versions the account's server holds, newest first: `[]`
+     * for none, `'unanswered'` for a server that does not say.
+     */
+    readonly backups?: readonly string[] | 'unanswered'
+    /** `'ignored'`: the server answers the deletion and keeps the version. */
+    readonly backupDeletion?: 'refuses' | 'ignored'
   } = {},
 ) {
   const happened: string[] = []
+  const held =
+    options.backups === 'unanswered'
+      ? 'unanswered'
+      : [...(options.backups ?? ['4711'])]
   const ending: Ending = {
     password: async () =>
       options.password === null ? null : 'the-kept-password',
@@ -48,20 +56,20 @@ function device(
       )
       if (options.waking === 'refuses') throw new Error('500')
     },
-    backup: async account => {
+    backupVersion: async account => {
       happened.push(
         `ask ${account.baseUrl} for the key backup of ${account.userId}`,
       )
-      if (options.backup === 'unanswered') {
-        throw new Error('network is unreachable')
-      }
-      return options.backup === null ? null : '4711'
+      if (held === 'unanswered') throw new Error('network is unreachable')
+      return held[0] ?? null
     },
     deleteBackup: async (account, version) => {
       happened.push(
         `delete key backup ${version} of ${account.userId} on ${account.baseUrl}`,
       )
       if (options.backupDeletion === 'refuses') throw new Error('500')
+      if (options.backupDeletion === 'ignored' || held === 'unanswered') return
+      held.splice(held.indexOf(version), 1)
     },
     deactivate: async (account, password) => {
       happened.push(
@@ -97,12 +105,13 @@ describe('deleting the account this device holds', () => {
     expect(await deleteAccount(here.ending, ACCOUNT)).toEqual({
       deleted: true,
       marked: true,
-      undone: { pusher: 'removed', backup: 'deleted' },
+      takenAway: { pusher: 'removed', backup: 'deleted' },
     })
     expect(here.happened).toEqual([
       'stop waking this device (the-pushkey by android) on https://bench.example',
       'ask https://bench.example for the key backup of @gone:bench.example',
       'delete key backup 4711 of @gone:bench.example on https://bench.example',
+      'ask https://bench.example for the key backup of @gone:bench.example',
       'deactivate @gone:bench.example on https://bench.example with the-kept-password',
       'mark @gone:bench.example deleted on this device',
     ])
@@ -114,13 +123,55 @@ describe('deleting the account this device holds', () => {
     // first would have the next launch forget an account that still exists.
     // No pushkey written down and no backup on the account: the one question
     // left is whether there is a backup, which only the server can answer.
-    const here = device({ pusher: null, backup: null })
+    const here = device({ pusher: null, backups: [] })
     expect(await deleteAccount(here.ending, ACCOUNT)).toEqual({
       deleted: true,
       marked: true,
-      undone: { pusher: 'none', backup: 'none' },
+      takenAway: { pusher: 'none', backup: 'none' },
     })
     expect(here.happened).toEqual([
+      'ask https://bench.example for the key backup of @gone:bench.example',
+      'deactivate @gone:bench.example on https://bench.example with the-kept-password',
+      'mark @gone:bench.example deleted on this device',
+    ])
+  })
+
+  it('deletes every backup version its server still holds, newest first', async () => {
+    // `GET /room_keys/version` names only the newest. A replaced restore key
+    // whose old version would not go (`replaceBackup.ts`) leaves an older one
+    // behind, and the server would keep it: asked again after each deletion,
+    // the server names the next one, until it has none.
+    const here = device({ backups: ['4712', '4711'] })
+    expect(await deleteAccount(here.ending, ACCOUNT)).toEqual({
+      deleted: true,
+      marked: true,
+      takenAway: { pusher: 'removed', backup: 'deleted' },
+    })
+    expect(here.happened).toEqual([
+      'stop waking this device (the-pushkey by android) on https://bench.example',
+      'ask https://bench.example for the key backup of @gone:bench.example',
+      'delete key backup 4712 of @gone:bench.example on https://bench.example',
+      'ask https://bench.example for the key backup of @gone:bench.example',
+      'delete key backup 4711 of @gone:bench.example on https://bench.example',
+      'ask https://bench.example for the key backup of @gone:bench.example',
+      'deactivate @gone:bench.example on https://bench.example with the-kept-password',
+      'mark @gone:bench.example deleted on this device',
+    ])
+  })
+
+  it('stops asking, and goes on, when the server keeps a version it was told to delete', async () => {
+    // Asking again would get the same answer: the version is noted as not
+    // gone, and the deactivation is not held up by it.
+    const here = device({ backupDeletion: 'ignored' })
+    expect(await deleteAccount(here.ending, ACCOUNT)).toEqual({
+      deleted: true,
+      marked: true,
+      takenAway: { pusher: 'removed', backup: 'failed' },
+    })
+    expect(here.happened).toEqual([
+      'stop waking this device (the-pushkey by android) on https://bench.example',
+      'ask https://bench.example for the key backup of @gone:bench.example',
+      'delete key backup 4711 of @gone:bench.example on https://bench.example',
       'ask https://bench.example for the key backup of @gone:bench.example',
       'deactivate @gone:bench.example on https://bench.example with the-kept-password',
       'mark @gone:bench.example deleted on this device',
@@ -134,23 +185,24 @@ describe('deleting the account this device holds', () => {
     expect(await deleteAccount(here.ending, ACCOUNT)).toEqual({
       deleted: true,
       marked: true,
-      undone: { pusher: 'failed', backup: 'deleted' },
+      takenAway: { pusher: 'failed', backup: 'deleted' },
     })
     expect(here.happened).toEqual([
       'stop waking this device (the-pushkey by android) on https://bench.example',
       'ask https://bench.example for the key backup of @gone:bench.example',
       'delete key backup 4711 of @gone:bench.example on https://bench.example',
+      'ask https://bench.example for the key backup of @gone:bench.example',
       'deactivate @gone:bench.example on https://bench.example with the-kept-password',
       'mark @gone:bench.example deleted on this device',
     ])
   })
 
   it('goes on to the deactivation when the server does not say whether there is a backup', async () => {
-    const here = device({ backup: 'unanswered' })
+    const here = device({ backups: 'unanswered' })
     expect(await deleteAccount(here.ending, ACCOUNT)).toEqual({
       deleted: true,
       marked: true,
-      undone: { pusher: 'removed', backup: 'failed' },
+      takenAway: { pusher: 'removed', backup: 'failed' },
     })
     expect(here.happened).toEqual([
       'stop waking this device (the-pushkey by android) on https://bench.example',
@@ -165,7 +217,7 @@ describe('deleting the account this device holds', () => {
     expect(await deleteAccount(here.ending, ACCOUNT)).toEqual({
       deleted: true,
       marked: true,
-      undone: { pusher: 'removed', backup: 'failed' },
+      takenAway: { pusher: 'removed', backup: 'failed' },
     })
     expect(here.happened.slice(3)).toEqual([
       'deactivate @gone:bench.example on https://bench.example with the-kept-password',
@@ -183,12 +235,13 @@ describe('deleting the account this device holds', () => {
       expect(await deleteAccount(here.ending, ACCOUNT)).toEqual({
         deleted: false,
         reason: 'the server did not deactivate this account',
-        undone: { pusher: 'removed', backup: 'deleted' },
+        takenAway: { pusher: 'removed', backup: 'deleted' },
       })
       expect(here.happened).toEqual([
         'stop waking this device (the-pushkey by android) on https://bench.example',
         'ask https://bench.example for the key backup of @gone:bench.example',
         'delete key backup 4711 of @gone:bench.example on https://bench.example',
+        'ask https://bench.example for the key backup of @gone:bench.example',
         'deactivate @gone:bench.example on https://bench.example with the-kept-password',
         'ask whether https://bench.example still knows @gone:bench.example',
       ])
@@ -205,21 +258,21 @@ describe('deleting the account this device holds', () => {
     expect(await deleteAccount(here.ending, ACCOUNT)).toEqual({
       deleted: true,
       marked: true,
-      undone: { pusher: 'removed', backup: 'deleted' },
+      takenAway: { pusher: 'removed', backup: 'deleted' },
     })
-    expect(here.happened.slice(3)).toEqual([
+    expect(here.happened.slice(4)).toEqual([
       'deactivate @gone:bench.example on https://bench.example with the-kept-password',
       'ask whether https://bench.example still knows @gone:bench.example',
       'mark @gone:bench.example deleted on this device',
     ])
   })
 
-  it('says nothing was deleted when the server does not answer that question either', async () => {
+  it('counts nothing deleted when the server does not answer that question either', async () => {
     const here = device({ server: 'unreachable', known: null })
     expect(await deleteAccount(here.ending, ACCOUNT)).toEqual({
       deleted: false,
       reason: 'the server did not deactivate this account',
-      undone: { pusher: 'removed', backup: 'deleted' },
+      takenAway: { pusher: 'removed', backup: 'deleted' },
     })
   })
 
@@ -245,7 +298,7 @@ describe('deleting the account this device holds', () => {
     expect(await deleteAccount(here.ending, ACCOUNT)).toEqual({
       deleted: true,
       marked: false,
-      undone: { pusher: 'removed', backup: 'deleted' },
+      takenAway: { pusher: 'removed', backup: 'deleted' },
     })
   })
 })

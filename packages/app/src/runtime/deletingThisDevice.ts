@@ -5,25 +5,21 @@
 
 import { createClient } from 'matrix-js-sdk'
 
-import {
-  deleteBackupOnAccount,
-  findBackupOnAccount,
-  stopWakingThisDevice,
-} from './cryptoPump'
+import { deleteBackupOnAccount, findBackupOnAccount } from './cryptoPump'
 import type { Ending } from './deleteAccount'
 import { deletionMarkSecrets, recoverySecrets } from './deviceSecrets'
-import { thisDevicesPusher } from './leavingThisDevice'
 import { readRecoverySecret } from './recoverySecret'
+import { thisDevicesPusher } from './thisDevicesPusher'
 
 /**
  * What deleting an account does on the wire and on this device. #382, #383.
  *
  * # NOTHING NEW ON THE WIRE
  *
- * First what only the token can undo (#383): the pusher, taken away by
- * `stopWakingThisDevice`, as leaving an account and the notifications switch
- * already take it; then the key backup, read by `findBackupOnAccount` and
- * deleted by `retireVersion`, as a replaced restore key already deletes one.
+ * First what only the token can take away (#383): the pusher, as leaving an
+ * account and the notifications switch already take it (`thisDevicesPusher.ts`);
+ * then the key backup, read by `findBackupOnAccount` and deleted by
+ * `retireVersion`, as a replaced restore key already deletes one.
  *
  * Then `POST /account/deactivate` with `m.login.password`, as the service
  * deactivates an account it revokes. Measured on messagr.eu on 5 August 2026,
@@ -45,11 +41,9 @@ import { readRecoverySecret } from './recoverySecret'
  */
 export function endingOnThisDevice(): Ending {
   return {
+    ...thisDevicesPusher,
     password: () => readRecoverySecret(recoverySecrets),
-    pusher: thisDevicesPusher,
-    stopWaking: (account, pusher) =>
-      stopWakingThisDevice(createClient(account), pusher.token, pusher.road),
-    backup: async account =>
+    backupVersion: async account =>
       (await findBackupOnAccount(createClient(account)))?.version ?? null,
     deleteBackup: (account, version) =>
       deleteBackupOnAccount(createClient(account), version),
