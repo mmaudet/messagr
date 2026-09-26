@@ -4,12 +4,16 @@
 //! # WHAT THE SERVICE DOES WITH IT
 //!
 //! Two things, in one transaction. It records the account and the instant,
-//! once, whatever the number of calls: the list the manual purge within
-//! thirty days goes through, which the privacy policy promises and #71 will
-//! automate. And it expires, at once, the caller's invitations that could
-//! still let somebody in: an invitee holding one reads « this invitation
-//! cannot be used » rather than waiting for an inviter who will never let
-//! them in.
+//! once, whatever the number of calls: what the manual purge within thirty
+//! days needs, which the privacy policy promises and #423 will automate --
+//! not the whole list, since a deletion made by e-mail is never announced. And
+//! it expires, at once, the caller's invitations that could still let
+//! somebody in, a partly used one included (decided on 26 September 2026): an
+//! invitee holding one is refused at once, rather than left waiting for an
+//! inviter who can no longer let anybody in.
+//!
+//! The row itself goes after thirty days (`PURGE_AFTER_SECONDS`): it names a
+//! deleted account, and the promise holds for it too.
 //!
 //! # WHAT IT DOES NOT DO
 //!
@@ -24,7 +28,7 @@
 //!
 //! # WHY THE CALLER'S OWN TOKEN
 //!
-//! Like every route here but the two public ones: the caller is who the
+//! Like every route here that acts for an account: the caller is who the
 //! homeserver says the token belongs to, and nobody announces somebody
 //! else's deletion. It has to come BEFORE the deactivation, which makes the
 //! token worthless -- and the application treats its failure, an unknown
@@ -36,6 +40,11 @@ use axum::{extract::State, http::HeaderMap, Json};
 use serde::Serialize;
 
 use crate::{auth, error::AppError, util::now, AppState};
+
+/// How long the row that announces a deletion is kept: the thirty days of
+/// `compte_supprime` in `deploy/messagr-eu/retention.json`, within which the
+/// privacy policy promises the account's data is purged.
+pub const PURGE_AFTER_SECONDS: i64 = 30 * 86_400;
 
 #[derive(Serialize)]
 pub struct DeletionResponse {
@@ -54,11 +63,12 @@ pub async fn announce(
     let mut tx = st.pool.begin().await.map_err(anyhow::Error::from)?;
 
     sqlx::query(
-        "INSERT INTO account_deletions (user_id, announced_at) VALUES (?, ?) \
-         ON CONFLICT(user_id) DO NOTHING",
+        "INSERT INTO account_deletions (user_id, announced_at, purge_after) \
+         VALUES (?, ?, ?) ON CONFLICT(user_id) DO NOTHING",
     )
     .bind(&user_id)
     .bind(at)
+    .bind(at + PURGE_AFTER_SECONDS)
     .execute(&mut *tx)
     .await
     .map_err(anyhow::Error::from)?;
@@ -174,6 +184,15 @@ mod tests {
                 .unwrap();
         assert_eq!(rows, 1);
         assert_eq!(again.announced_at, first.announced_at);
+
+        // And it goes after thirty days, counted from the first announcement.
+        let purge_after: i64 = sqlx::query_scalar(
+            "SELECT purge_after FROM account_deletions WHERE user_id = '@alice:h'",
+        )
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+        assert_eq!(purge_after, first.announced_at + 30 * 86_400);
     }
 
     #[sqlx::test(migrations = "./migrations")]

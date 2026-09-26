@@ -29,11 +29,11 @@ import type { RestoreCredentials } from './sessionCredentials'
  * #383, #385. Once the account is deactivated its token opens nothing, so it
  * is before or never. The invitation service is told first: it records the
  * deletion for the purge and ends the invitations still open. Then this
- * device's pusher goes, so that nothing wakes this
- * telephone for an account that is gone; then the key backup, so that its
- * server keeps nothing of its keys. What the deactivation itself does with
- * either was never measured. Neither decides anything: what became of each
- * goes back with the answer, for the log, and the deletion goes on.
+ * device's pusher goes, so that nothing wakes this telephone for an account
+ * that is gone; then the key backup, so that its server keeps nothing of its
+ * keys. What the deactivation itself does with those two was never measured.
+ * None of the three decides anything: what became of each goes back with the
+ * answer (`Beforehand`), for the log, and the deletion goes on.
  *
  * THE CONVERSATIONS ARE NOT LEFT HERE, and #381 had said they would be.
  * Decided on 26 September 2026: the server makes a deactivated account leave
@@ -56,11 +56,14 @@ export interface Ending extends ThisDevicesPusher {
    */
   readonly password: () => Promise<string | null>
   /**
-   * Tells the invitation service the account is about to be deleted (#385),
-   * with its own token. A throw -- an unknown route before the service is
-   * deployed, a service nobody reaches -- stops nothing.
+   * Announces to the invitation service that the account is about to be
+   * deleted (#385), with its own token, and answers the HTTP status. A throw
+   * is a service nobody reached; like any status but a success -- an unknown
+   * route, before the service is deployed -- it stops nothing.
    */
-  readonly announce: (account: RestoreCredentials) => Promise<void>
+  readonly announceDeletion: (account: RestoreCredentials) => Promise<number>
+  /** Resolves after `ms`: the deadline the invitation service is given. */
+  readonly after: (ms: number) => Promise<void>
   /**
    * The latest key backup version the account's own server holds, or `null`
    * when it holds none. A throw is a server that did not say.
@@ -102,8 +105,18 @@ export interface Ending extends ThisDevicesPusher {
  */
 const NOT_DEACTIVATED = 'the server did not deactivate this account'
 
-/** What was taken away before the deactivation. For the log, never a screen. */
-export interface TakenAway {
+/**
+ * How long the invitation service is given to answer. It is a courtesy before
+ * the gesture that counts: a service that takes the connection and never
+ * answers must not hold « Suppression… » on the screen. Given up, not
+ * cancelled: an answer that comes later records the deletion all the same.
+ */
+const ANNOUNCE_DEADLINE_MS = 10_000
+
+/** What happened before the deactivation. For the log, never a screen. */
+export interface Beforehand {
+  /** Whether the invitation service heard about the deletion (#385). */
+  readonly invitationService: 'told' | 'not told'
   readonly pusher: PusherTakenAway
   readonly backup: 'deleted' | 'failed' | 'none'
 }
@@ -115,16 +128,13 @@ export type Deletion =
       readonly outcome: 'deleted'
       /** Whether this device could write the deletion down. */
       readonly marked: boolean
-      /** Whether the invitation service heard about it (#385). */
-      readonly serviceTold: boolean
-      readonly takenAway: TakenAway
+      readonly beforehand: Beforehand
     }
   /** Its server did not: see `NOT_DEACTIVATED`. */
   | {
       readonly outcome: 'failed'
       readonly reason: string
-      readonly serviceTold: boolean
-      readonly takenAway: TakenAway
+      readonly beforehand: Beforehand
     }
   /**
    * This device kept no password, which the server asks for, so nothing was
@@ -152,8 +162,7 @@ export async function deleteAccount(
 ): Promise<Deletion> {
   const password = await ending.password()
   if (password === null) return { outcome: 'by-email' }
-  const serviceTold = await tellTheService(ending, account)
-  const takenAway = await takeAwayWhatOnlyTheTokenCan(ending, account)
+  const beforehand = await whatOnlyTheTokenCanDo(ending, account)
   try {
     await ending.deactivate(account, password)
   } catch {
@@ -163,12 +172,7 @@ export async function deleteAccount(
     // could never get out of. A server that no longer knows this session is
     // the answer that was lost. Anything else is an account still there.
     if ((await ending.stillKnown(account)) !== false) {
-      return {
-        outcome: 'failed',
-        reason: NOT_DEACTIVATED,
-        serviceTold,
-        takenAway,
-      }
+      return { outcome: 'failed', reason: NOT_DEACTIVATED, beforehand }
     }
   }
   // THE SERVER HAS SPOKEN, and that is the fact the screen reports. A mark
@@ -176,33 +180,39 @@ export async function deleteAccount(
   // the account its deletion.
   try {
     await ending.markDeleted(account)
-    return { outcome: 'deleted', marked: true, serviceTold, takenAway }
+    return { outcome: 'deleted', marked: true, beforehand }
   } catch {
-    return { outcome: 'deleted', marked: false, serviceTold, takenAway }
+    return { outcome: 'deleted', marked: false, beforehand }
   }
 }
 
-/** Whether the invitation service heard. Either way, the deletion goes on. */
-async function tellTheService(
+/**
+ * The invitation service, then the pusher, then the key backup. None of them
+ * stops the deletion.
+ */
+async function whatOnlyTheTokenCanDo(
   ending: Ending,
   account: RestoreCredentials,
-): Promise<boolean> {
-  try {
-    await ending.announce(account)
-    return true
-  } catch {
-    return false
-  }
-}
-
-/** The pusher, then the key backup. Neither stops the deletion. */
-async function takeAwayWhatOnlyTheTokenCan(
-  ending: Ending,
-  account: RestoreCredentials,
-): Promise<TakenAway> {
+): Promise<Beforehand> {
+  const invitationService = await tellTheInvitationService(ending, account)
   const pusher = await takeThePusherAway(ending, account)
   const backup = await deleteTheBackup(ending, account)
-  return { pusher, backup }
+  return { invitationService, pusher, backup }
+}
+
+async function tellTheInvitationService(
+  ending: Ending,
+  account: RestoreCredentials,
+): Promise<Beforehand['invitationService']> {
+  try {
+    const status = await Promise.race([
+      ending.announceDeletion(account),
+      ending.after(ANNOUNCE_DEADLINE_MS).then(() => 0),
+    ])
+    return status >= 200 && status < 300 ? 'told' : 'not told'
+  } catch {
+    return 'not told'
+  }
 }
 
 async function takeThePusherAway(
@@ -235,7 +245,7 @@ const MOST_BACKUP_VERSIONS = 5
 async function deleteTheBackup(
   ending: Ending,
   account: RestoreCredentials,
-): Promise<TakenAway['backup']> {
+): Promise<Beforehand['backup']> {
   let deleted: string | null = null
   try {
     for (let round = 0; round < MOST_BACKUP_VERSIONS; round++) {

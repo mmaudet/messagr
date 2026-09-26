@@ -15,7 +15,7 @@ import { thisDevicesPusher } from './thisDevicesPusher'
 /**
  * What deleting an account does on the wire and on this device. #382, #383.
  *
- * # NOTHING NEW ON THE WIRE
+ * # ONE NEW REQUEST, AND THE REST ALREADY SPELLED ELSEWHERE
  *
  * First the invitation service, told with the account's own token (#385),
  * the way `servicePoster.ts` reaches it for everything else. Then what only
@@ -47,7 +47,9 @@ export function endingOnThisDevice(): Ending {
   return {
     ...thisDevicesPusher,
     password: () => readRecoverySecret(recoverySecrets),
-    announce: account => announceDeletion(account.baseUrl, account.accessToken),
+    announceDeletion: account =>
+      announceDeletion(account.baseUrl, account.accessToken),
+    after: ms => new Promise(resolve => setTimeout(resolve, ms)),
     backupVersion: async account =>
       (await findBackupOnAccount(createClient(account)))?.version ?? null,
     deleteBackup: (account, version) =>

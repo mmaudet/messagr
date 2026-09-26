@@ -37,7 +37,7 @@
     "duree": "trente jours",
     "jours": 30,
     "applique_par": [],
-    "$manque": "Aucune purge automatique n'existe. À l'échelle de la bêta l'opération est manuelle ; elle doit être outillée avant la production. Voir #423."
+    "$manque": "Aucune purge automatique des données d'un compte supprimé n'existe. À l'échelle de la bêta l'opération est manuelle ; elle doit être outillée avant la production. Voir #423. Le service garde la ligne qui annonce une suppression faite depuis l'application (#385) et l'efface au bout de trente jours : cleanup::purge_account_deletions, colonne purge_after."
   },
   "journal_de_lappareil": {
     "$note": "Quelques lignes dans le journal du système de l'appareil (logcat sous Android, journal unifié sous iOS), limitées aux appels, aux réveils par notification, à l'enregistrement des notifications, à l'offre de sauvegarde et aux sauvegardes qui n'ont pas pu être activées, sans contenu ni identifiant. L'application ne les envoie nulle part. Aucune durée n'est déclarée, et ce n'est pas un oubli : c'est le système de l'appareil qui garde ces lignes et les efface, pas l'application ni le serveur. Ce que la page en dit est sous « dit », et scripts/assert-retention.sh le vérifie comme une durée.",

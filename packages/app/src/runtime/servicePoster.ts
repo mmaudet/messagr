@@ -135,23 +135,21 @@ async function answered(response: Response) {
 }
 
 /**
- * Tells the invitation service this account is about to be deleted (#385).
+ * Announces to the invitation service that this account is about to be
+ * deleted (#385), and answers the HTTP status.
  *
- * No body: the token says whose account, as on every authenticated route of
- * the service, and nobody announces somebody else's deletion. Anything but a
- * success is thrown -- an unknown route included, which is what a service
- * not yet deployed answers -- so that the deletion notes the service was not
- * told, and goes on.
+ * No body: the token says whose account, as on every route of the service
+ * that acts for one, and nobody announces somebody else's deletion. A status
+ * is returned rather than thrown, as everywhere in this file: what counts as
+ * told is `deleteAccount.ts`'s to decide, where it is tested.
  */
 export async function announceDeletion(
   baseUrl: string,
   accessToken: string,
-): Promise<void> {
-  const response = await fetch(`${baseUrl}/_messagr/account-deletions`, {
+): Promise<number> {
+  const response = await fetch(`${serviceAt(baseUrl)}/account-deletions`, {
     method: 'POST',
     headers: { Authorization: `Bearer ${accessToken}` },
   })
-  if (!response.ok) {
-    throw new Error(`the invitation service answered ${response.status}`)
-  }
+  return response.status
 }
