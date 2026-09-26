@@ -123,7 +123,7 @@ import {
   type Admission,
   type Issued,
 } from './issueInvitation'
-import { invitationService } from './servicePoster'
+import { invitationService, serviceAt } from './servicePoster'
 import {
   startSyncLoop,
   type RunningSyncLoop,
@@ -1247,7 +1247,7 @@ export async function registerThisDeviceForWaking(
       )
     },
     token,
-    `${credentials.baseUrl.replace(/\/+$/, '')}/_messagr`,
+    serviceAt(credentials.baseUrl),
     road,
   )
 }

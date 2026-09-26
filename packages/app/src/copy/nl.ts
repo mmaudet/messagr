@@ -89,9 +89,6 @@ export const nl: Readonly<Record<CopyKey, string>> = {
   settings_row_ephemeral_label: 'Verdwijnende berichten',
   settings_row_ephemeral_hint:
     'Instelling per gesprek · standaard 24 uur in tienermodus',
-  settings_row_discovery_label: 'Privé contacten ontdekken',
-  settings_row_discovery_hint:
-    'V1.1 · lokaal, optioneel · wederkerigheid niet beslist',
   settings_section_moderation_title: 'Groepen en moderatie',
   settings_section_moderation_note:
     'Gereedschap bedoeld voor een vrijwilliger, niet voor een systeembeheerder.',
@@ -720,4 +717,55 @@ export const nl: Readonly<Record<CopyKey, string>> = {
   settings_vault_hint: 'Een bestand, voor wie niets op een server wil laten.',
   restore_done_close: 'Sluiten',
   back_to_newest: 'Terug naar het nieuwste bericht',
+  findable_row: 'Vindbaar zijn',
+  'findable_row_until %@': 'Nummer bewezen, tot %@.',
+  findable_row_not: 'Niemand kan u vinden via uw nummer.',
+  findable_title: 'Vindbaar zijn',
+  findable_contacts_title: 'Uw contacten',
+  findable_contacts:
+    'De nummers in uw adresboek worden op uw telefoon gemaskeerd. De dienst weet nooit wie er in uw adresboek staat, en de namen verlaten het toestel niet.',
+  findable_number_point_title: 'Uw nummer',
+  findable_number_point:
+    'Om te zoeken, wordt u vindbaar. U bewijst dat dit nummer van u is met een sms die OVHcloud verstuurt en ziet passeren.',
+  findable_others_title: 'Wat anderen kunnen doen',
+  findable_others:
+    'Iedereen die uw nummer heeft, kan zien dat u op Messagr zit en u uitnodigen. U accepteert of weigert elke uitnodiging.',
+  findable_change_title: 'Wat dit verandert',
+  findable_change:
+    'Messagr vraagt geen nummer. Door verder te gaan, heft u die belofte alleen voor uzelf op.',
+  findable_withdraw_title: 'Intrekken',
+  findable_withdraw:
+    'Op elk moment, in de Instellingen, en uw nummer verdwijnt meteen uit het ontdekken van contacten. Het bewijs wordt elke 28 dagen vernieuwd.',
+  findable_continue: 'Doorgaan',
+  findable_not_now: 'Niet nu',
+  findable_number_title: 'Uw nummer',
+  findable_number_lead:
+    'Ontvang een code per sms om te bewijzen dat dit nummer van u is.',
+  findable_number_placeholder: '+31 6 12345678',
+  'findable_number_provider %@': 'De sms wordt verstuurd door %@.',
+  findable_number_closed:
+    'Contacten ontdekken staat nog niet open voor nummers uit dit land.',
+  findable_number_country_code: 'Begin met de landcode, bijvoorbeeld +31.',
+  findable_number_not_a_number: 'Dit is geen telefoonnummer.',
+  findable_send: 'Code ontvangen',
+  findable_sending: 'Code wordt verstuurd…',
+  findable_not_sent:
+    'De sms is niet vertrokken. Probeer het zo meteen opnieuw.',
+  findable_off: 'Contacten ontdekken staat niet open op deze server.',
+  findable_unreachable:
+    'De dienst antwoordt niet. Probeer het zo meteen opnieuw.',
+  findable_code_title: 'De code',
+  'findable_code_lead %@':
+    'Voer de code van zes cijfers in die naar %@ is gestuurd.',
+  'findable_code_wrong %d':
+    'Dat is niet de juiste code. Resterende pogingen: %d.',
+  findable_code_spent:
+    'Deze code kan niet meer worden gebruikt. Vraag een nieuwe aan.',
+  findable_code_expired: 'Deze code is verlopen. Vraag een nieuwe aan.',
+  findable_prove: 'Dit nummer bewijzen',
+  findable_proving: 'Bezig met bewijzen…',
+  findable_another: 'Een andere code ontvangen',
+  findable_proven_title: 'Nummer bewezen',
+  'findable_proven_until %@': 'U bent vindbaar tot %@.',
+  findable_done: 'Klaar',
 }

@@ -90,9 +90,6 @@ export const it: Readonly<Record<CopyKey, string>> = {
   settings_row_ephemeral_label: 'Messaggi effimeri',
   settings_row_ephemeral_hint:
     'Impostazione per conversazione · 24 ore per impostazione predefinita in modalità adolescenti',
-  settings_row_discovery_label: 'Scoperta privata dei contatti',
-  settings_row_discovery_hint:
-    'V1.1 · locale, facoltativa · reciprocità non decisa',
   settings_section_moderation_title: 'Gruppi e moderazione',
   settings_section_moderation_note:
     'Strumenti pensati per una persona volontaria, non per amministrare sistemi.',
@@ -716,4 +713,51 @@ export const it: Readonly<Record<CopyKey, string>> = {
     'Un file, per chi non vuole lasciare nulla su un server.',
   restore_done_close: 'Chiudere',
   back_to_newest: 'Torna all’ultimo messaggio',
+  findable_row: 'Essere trovabile',
+  'findable_row_until %@': 'Numero provato. Scadenza: %@.',
+  findable_row_not: 'Nessuno può trovarla tramite il Suo numero.',
+  findable_title: 'Essere trovabile',
+  findable_contacts_title: 'I Suoi contatti',
+  findable_contacts:
+    'I numeri della Sua rubrica vengono mascherati sul Suo telefono. Il servizio non sa mai chi c’è nella Sua rubrica, e i nomi non lasciano il dispositivo.',
+  findable_number_point_title: 'Il Suo numero',
+  findable_number_point:
+    'Per cercare, diventa trovabile. Prova che questo numero è Suo con un SMS che OVHcloud invia e vede passare.',
+  findable_others_title: 'Cosa possono fare gli altri',
+  findable_others:
+    'Chiunque abbia il Suo numero può vedere che è su Messagr e invitarla. Lei accetta o rifiuta ogni invito.',
+  findable_change_title: 'Cosa cambia',
+  findable_change:
+    'Messagr non chiede alcun numero. Continuando, rinuncia a questa promessa solo per sé.',
+  findable_withdraw_title: 'Il ritiro',
+  findable_withdraw:
+    'In qualsiasi momento, nelle Impostazioni, e il Suo numero scompare subito dalla scoperta. La prova si rinnova ogni 28 giorni.',
+  findable_continue: 'Continuare',
+  findable_not_now: 'Non ora',
+  findable_number_title: 'Il Suo numero',
+  findable_number_lead:
+    'Riceva un codice via SMS per provare che questo numero è Suo.',
+  findable_number_placeholder: '+41 79 123 45 67',
+  'findable_number_provider %@': 'L’SMS sarà inviato da %@.',
+  findable_number_closed:
+    'La scoperta non è ancora aperta ai numeri di questo paese.',
+  findable_number_country_code:
+    'Cominci con il prefisso del paese, per esempio +41.',
+  findable_number_not_a_number: 'Questo non è un numero di telefono.',
+  findable_send: 'Ricevere un codice',
+  findable_sending: 'Invio del codice…',
+  findable_not_sent: 'L’SMS non è partito. Riprovi tra un momento.',
+  findable_off: 'La scoperta non è aperta su questo server.',
+  findable_unreachable: 'Il servizio non risponde. Riprovi tra un momento.',
+  findable_code_title: 'Il codice',
+  'findable_code_lead %@': 'Inserisca il codice di sei cifre inviato al %@.',
+  'findable_code_wrong %d': 'Non è il codice giusto. Tentativi rimasti: %d.',
+  findable_code_spent: 'Questo codice non può più servire. Ne chieda un altro.',
+  findable_code_expired: 'Questo codice è scaduto. Ne chieda un altro.',
+  findable_prove: 'Provare questo numero',
+  findable_proving: 'Prova in corso…',
+  findable_another: 'Ricevere un altro codice',
+  findable_proven_title: 'Numero provato',
+  'findable_proven_until %@': 'È trovabile. Scadenza: %@.',
+  findable_done: 'Fatto',
 }

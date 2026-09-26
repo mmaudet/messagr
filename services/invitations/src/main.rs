@@ -1,6 +1,7 @@
 mod auth;
 mod cleanup;
 mod config;
+mod countries;
 mod crypto;
 mod db;
 mod error;
@@ -9,6 +10,7 @@ mod handlers;
 mod masking;
 mod matrix;
 mod named_deactivation;
+mod sms;
 mod util;
 
 use axum::{
@@ -32,6 +34,12 @@ async fn main() -> anyhow::Result<()> {
     tracing_subscriber::fmt::init();
     let cfg = config::Config::from_env()?;
     let pool = db::connect(&cfg.database_url).await?;
+    handlers::discovery::keys_of_live_masks_are_held(
+        &pool,
+        cfg.masking_keys.as_deref(),
+        util::now(),
+    )
+    .await?;
     let mx = Arc::new(matrix::MatrixClient::new(
         cfg.homeserver_url.clone(),
         cfg.registration_token.clone(),
@@ -63,7 +71,15 @@ async fn main() -> anyhow::Result<()> {
 
     tokio::spawn(cleanup::run_forever(state.clone()));
 
-    let masking_keys = state.cfg.masking_keys.clone();
+    let discovery = match state.cfg.discovery() {
+        Ok((keys, provider)) => Ok(format!(
+            "address-book discovery is on: {} masking keys, the current one is #{}; proofs by {:?}",
+            keys.len(),
+            keys.current().id(),
+            provider
+        )),
+        Err(missing) => Err(format!("{missing}: address-book discovery stays off")),
+    };
     let app = router(state);
 
     let listener = tokio::net::TcpListener::bind(&addr).await?;
@@ -73,13 +89,9 @@ async fn main() -> anyhow::Result<()> {
     );
     // AFTER THE VERSION, which an update reads as the first line (step 6 of
     // `deploy/messagr-eu-invitations.md`).
-    match &masking_keys {
-        Some(keys) => tracing::info!(
-            "masking keys: {} in service, the current one is #{}",
-            keys.len(),
-            keys.current().id()
-        ),
-        None => tracing::warn!("MASKING_KEYS absent: address-book discovery stays off"),
+    match discovery {
+        Ok(on) => tracing::info!("{on}"),
+        Err(off) => tracing::warn!("{off}"),
     }
     axum::serve(listener, app).await?;
     Ok(())
@@ -147,6 +159,15 @@ fn router(state: Arc<AppState>) -> Router {
         .route(
             "/invitation-requests/:id/grant",
             post(handlers::request::grant),
+        )
+        // THE DISCOVERY OF #392, proving a number to become findable. The
+        // number arrives once, at the start of a proof, and only its mask
+        // stays: `handlers::discovery` says what the service keeps.
+        .route("/discovery/state", get(handlers::discovery::state))
+        .route("/discovery/proofs", post(handlers::discovery::start_proof))
+        .route(
+            "/discovery/proofs/finish",
+            post(handlers::discovery::finish_proof),
         )
         .route("/invitations", post(handlers::create::create))
         .route("/invitations/claim", post(handlers::claim::claim))
@@ -334,5 +355,53 @@ mod tests {
         );
         // And the body stays EXACTLY `ok`: that is the probe's contract.
         assert_eq!(healthy.text().await.unwrap(), "ok");
+    }
+
+    /// THE DISCOVERY ROUTES ARE IN THE ROUTER. `handlers::discovery` tests its
+    /// handlers by calling them, which stays green with none of them routed:
+    /// this asks a real router, over HTTP, for each route of a proof, and must
+    /// reach the handler, whose first act is to refuse a request without a
+    /// token. A missing route answers `M_UNRECOGNIZED` instead.
+    #[sqlx::test(migrations = "./migrations")]
+    async fn every_route_of_a_proof_reaches_its_handler(pool: SqlitePool) {
+        let st = Arc::new(AppState {
+            pool,
+            mx: Arc::new(matrix::MatrixClient::new(
+                "http://127.0.0.1:1".into(),
+                "token".into(),
+            )),
+            cfg: config::Config::for_tests(),
+        });
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let base = format!("http://{}", listener.local_addr().unwrap());
+        tokio::spawn(async move { axum::serve(listener, router(st)).await.unwrap() });
+
+        let http = reqwest::Client::new();
+        let routes = [
+            (
+                "read the state",
+                http.get(format!("{base}/discovery/state")),
+            ),
+            (
+                "start a proof",
+                http.post(format!("{base}/discovery/proofs"))
+                    .json(&serde_json::json!({"number": "+33612345678", "language": "fr"})),
+            ),
+            (
+                "finish a proof",
+                http.post(format!("{base}/discovery/proofs/finish"))
+                    .json(&serde_json::json!({"code": "123456"})),
+            ),
+        ];
+        for (name, request) in routes {
+            let r = request.send().await.unwrap();
+            let status = r.status();
+            let body: serde_json::Value = r.json().await.unwrap();
+            assert_eq!(
+                (status, body["errcode"].as_str()),
+                (StatusCode::UNAUTHORIZED, Some("M_UNAUTHORIZED")),
+                "{name}: {body}"
+            );
+        }
     }
 }

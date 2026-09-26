@@ -82,8 +82,6 @@ impl MaskingKey {
 
     /// Masks a number the service holds in clear for a moment: RFC 9497's
     /// `Evaluate`. The same mask a device obtains by unblinding.
-    // Its caller is the proof of a number (#397).
-    #[allow(dead_code)]
     pub fn mask(&self, input: &[u8]) -> Result<[u8; 64], MaskingError> {
         let output = self
             .server
@@ -161,8 +159,6 @@ impl MaskingKeys {
         self.keys.last().expect("`new` refuses an empty set")
     }
 
-    // Its callers are the routes of discovery (#397, #400).
-    #[allow(dead_code)]
     pub fn get(&self, id: u32) -> Option<&MaskingKey> {
         self.keys.iter().find(|k| k.id == id)
     }

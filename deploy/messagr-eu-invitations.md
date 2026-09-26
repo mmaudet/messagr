@@ -19,7 +19,11 @@ production stopped building the prototype (#289).
   - required, or the service refuses to start: `DATABASE_URL`, `HOMESERVER_URL`,
     `REGISTRATION_TOKEN`, `ENCRYPTION_KEY`;
   - optional: `EDGE_RETENTION_DAYS`, `BIND_ADDR`,
-    `MAX_RESERVED_ACCOUNTS_PER_INVITER`, `PUSH_GATEWAY_URL`, `MASKING_KEYS`.
+    `MAX_RESERVED_ACCOUNTS_PER_INVITER`, `PUSH_GATEWAY_URL`, `MASKING_KEYS`;
+  - optional, all four or none: `OVH_APPLICATION_KEY`,
+    `OVH_APPLICATION_SECRET`, `OVH_CONSUMER_KEY`, `OVH_SMS_SERVICE`, with
+    `SMS_SENDER` beside them;
+  - optional: `DISCOVERY_COUNTRIES`.
 - **The networks.** `default`, and `sygnal` (the external network
   `messagr-sygnal_default`), because the push gateway forwards to
   `http://messagr-sygnal:5000/_matrix/push/v1/notify`.
@@ -41,20 +45,73 @@ two serve together while one replaces the other. A seed is 32 random bytes:
   before, and says so right after the line that names its version:
   `MASKING_KEYS absent: address-book discovery stays off`. Every deployment
   before discovery ships is in this case.
-- **Malformed, the service refuses to start.** The refusal names the variable
-  and the shape it expects, never a piece of the value.
-- **A key is its seed and its key number together.** The same seed under
-  another number is another key: renumbering one makes every mask made with it
-  useless, exactly as removing it would.
-- **Never in the database.** A copy of the database without the keys reveals
-  neither the numbers nor which accounts are findable.
-- **On this host, and only here, in three places.** The environment file; the
-  dated copy of it that step 4 of an update makes; and the container's own
-  configuration, which Docker keeps under `/var/lib/docker/containers` and
-  `docker inspect` prints. Whatever backs this host up leaves all three out,
-  and a key that is retired (#409) is removed from all three.
+- **Missing a key that masks are still made with, the service refuses to
+  start.** Once a number is proven, its mask is useless without the key it
+  was made with, so a key dropped or renumbered while this file is edited
+  stops the start, naming the key number, until it is back or until the masks
+  made with it have run out, 28 days after their proof.
+- **Retiring a key at once**, when it must stop serving before its masks run
+  out (the emergency of ADR 0014): delete what was made with it first, then
+  remove it from this file and restart. On the database, with the key number
+  for `N`:
+
+      DELETE FROM findable_numbers WHERE key_id = N;
+      DELETE FROM pending_proofs WHERE key_id = N;
+
+  Those accounts stop being findable until their next proof, which is what
+  ADR 0014 says of an emergency. #409 makes this a gesture of its own.
+
 - **Changing a key is a gesture of its own**, described with the key change of
   discovery (#409).
+
+## The SMS provider of address-book discovery
+
+A proof sends a code by SMS to the number being proved, through OVHcloud's
+European API (#397). The number leaves the service there, and only there: the
+service keeps its mask, and OVHcloud sees it pass, as the consent screen says.
+
+- `OVH_APPLICATION_KEY`, `OVH_APPLICATION_SECRET`, `OVH_CONSUMER_KEY`: an API
+  application of the OVHcloud account and its consumer key, created at
+  `https://eu.api.ovh.com/createToken/` with the one right a proof uses,
+  `POST /sms/<service>/jobs`.
+- `OVH_SMS_SERVICE`: the SMS account, `sms-xx00000-1`.
+- `SMS_SENDER`: the sender the SMS carries, `Messagr` unless said otherwise.
+  It must be a sender the SMS account has had validated.
+
+What the service does with them:
+
+- **None of the four, discovery stays off**, like without the masking keys:
+  discovery serves with both or not at all, and the line after the version
+  says which one is missing.
+- **Some of them, the service refuses to start**, naming the first one
+  missing: half an account is a mistake, not a choice.
+- **Only OVHcloud's European API.** `OVH_API_URL` is refused unless it is
+  `https://eu.api.ovh.com/1.0`. The bench alone may point it at its fake
+  provider, with `SMS_PROVIDER_FOR_TESTS=1`, which never goes in this file,
+  and even then only at an address that stays on its host: the loopback, or
+  a container's name on a Docker network.
+- **The secret and the consumer key are never printed.** The log names the
+  endpoint, the SMS account and the sender, nothing else.
+
+## The countries open to discovery
+
+`DISCOVERY_COUNTRIES` lists them, `<ISO code>:<calling code>:<provider>`,
+separated by commas: `FR:33:ovhcloud,DE:49:ovhcloud`. Absent, the launch list
+written in `services/invitations/src/countries.rs` serves: the European Union,
+the European Economic Area, Switzerland and the United Kingdom, all through
+OVHcloud, less Italy, Denmark, Finland, Norway, Romania and Sweden, which open
+when the steps OVHcloud asks for them succeed.
+
+- **A country opens after a review** (Q35 of #38): no sanctions, a sender
+  registered where the country asks for one, numbers that do not change hands
+  within 28 days, a price under a ceiling, and a message that arrives intact.
+  The line comes after the review, never before.
+- **The setting replaces the launch list whole**, it does not add to it: to
+  open Italy, write every country, Italy included.
+- **Malformed, the service refuses to start**, naming what is wrong: an entry
+  that is not three fields, a code that is not two capitals, a calling code
+  that is not one to three digits or is the start of another, a provider
+  other than `ovhcloud`, a country twice.
 
 ## Until 13 September 2026, production built the prototype
 
