@@ -576,8 +576,9 @@ n'a pas atteint le service pendant trois heures, et un relecteur arrivé à ce
 moment-là n'entrait pas.
 
 **La note vit dans `deploy/messagr-eu/app-store-listing/review-notes.txt`**,
-qui porte tout le champ : l'entrée, la façon dont on obtient une invitation et
-son prix, puis la confidentialité. Elle répond d'avance aux trois questions du
+qui porte tout le champ : l'entrée et le chemin de la suppression du compte,
+qui ne vaut qu'à partir de la build 28 (#386), la façon dont on obtient une
+invitation et son prix, puis la confidentialité. Elle répond d'avance aux trois questions du
 22 septembre. Ses trous, `<LINK>`, `<DEADLINE>` et `<USES>`, sont remplis par
 l'assistant avec l'état de l'invitation. `check.py` en tient la limite sur la
 note remplie au plus long, « The Notes field can contain up to 4000 bytes »,

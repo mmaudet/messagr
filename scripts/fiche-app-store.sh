@@ -348,8 +348,9 @@ pause "On passe à la note ?"
 
 stage "La note au relecteur"
 say "Un seul texte pour tout le champ, dans $NOTE_RELECTEUR :"
-say "l'entrée du relecteur, la façon dont on obtient une invitation, puis la"
-say "confidentialité. Il répond d'avance aux trois questions d'Apple du 22 septembre."
+say "l'entrée du relecteur et le chemin de la suppression du compte, la façon dont"
+say "on obtient une invitation, puis la confidentialité. Il répond d'avance aux trois"
+say "questions d'Apple du 22 septembre."
 note "check.py en tient la limite, 4000 OCTETS, avec le lien le plus long possible."
 printf '\n'
 if remplie=$(note_remplie); then
@@ -359,6 +360,9 @@ else
 fi
 step "Dans la console : « Informations de vérification » → « Notes »."
 step "Remplacer tout le contenu par ce bloc, sans le raccourcir."
+warn "« To delete the account: Settings, then Delete my account. » ne vaut qu'à partir"
+warn "de la build 28, qui porte le geste (#380). Pour une build antérieure, retirer"
+warn "cette ligne du bloc : la note dirait un chemin que la build n'a pas."
 note "Le lien fait entrer : ce bloc ne se colle nulle part ailleurs."
 printf '\n'
 warn "« Connexion requise » doit rester DÉCOCHÉE."

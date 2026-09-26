@@ -76,7 +76,7 @@ Six phrases de l'aide Play décident de presque tout.
 | ------------------------------------------------------------------------------------------------------------- | ---------------------------- |
 | L'application collecte-t-elle ou partage-t-elle « l'un des types de données utilisateur obligatoires » ?      | **Oui**                      |
 | « Les données utilisateur que collecte votre application sont-elles toutes chiffrées lors de leur transit ? » | **Oui**, tranché le 16/09, 6 |
-| « Proposez-vous aux utilisateurs un moyen de demander la suppression de leurs données ? »                     | **Oui**, à trancher, 7       |
+| « Proposez-vous aux utilisateurs un moyen de demander la suppression de leurs données ? »                     | **Oui**, 7                   |
 
 **Des données sont collectées**, et la page le dit en ouvrant sa liste : « Faire circuler un message suppose de savoir où l'envoyer, et le serveur conserve donc : ».
 
@@ -84,7 +84,7 @@ Six phrases de l'aide Play décident de presque tout.
 
 **Suppression sur demande.** « Vous disposez des droits d'accès, de rectification, d'effacement, de limitation, d'opposition et de portabilité. Écrivez à conformite@messagr.eu. » Une adresse suffit à Play, pour qui ce mécanisme « peut être, sans s'y limiter, une fonctionnalité intégrée à l'application, un formulaire de contact ou un alias d'adresse e-mail dédié. »
 
-**La suppression de compte demande davantage.** L'aide sur la suppression de compte fait répondre tous les développeurs à des questions de suppression dans ce même formulaire. Une application qui permet de créer un compte doit en plus « provide users with an in-app path to delete their app accounts and associated data », et « provide a web link resource where users can request app account deletion and associated data deletion ». Messagr crée le compte dans l'application, à l'ouverture d'une invitation. Aucune des deux conditions n'est remplie aujourd'hui : à trancher, 7.
+**La suppression de compte demande davantage.** L'aide sur la suppression de compte fait répondre tous les développeurs à des questions de suppression dans ce même formulaire. Une application qui permet de créer un compte doit en plus « provide users with an in-app path to delete their app accounts and associated data », et « provide a web link resource where users can request app account deletion and associated data deletion ». Messagr crée le compte dans l'application, à l'ouverture d'une invitation. Les deux conditions sont remplies à partir de la build 28 : la dernière ligne des Réglages supprime le compte, et la page d'aide présente ce geste puis le courriel, à une ancre qu'un lien peut viser. Voir 7.
 
 ### Étape « Types de données »
 
@@ -202,7 +202,7 @@ Le chiffrement en transit et la suppression se déclarent pour toute l'applicati
 ### Les liens
 
 - « Privacy Policy », obligatoire : <https://messagr.eu/confidentialite>.
-- « Privacy Choices », facultatif, qu'Apple décrit comme « a webpage where users can access their data, request deletion, or make changes ». À laisser vide tant que la page n'a pas de section de suppression qu'un lien peut viser : à trancher, 7.
+- « Privacy Choices », facultatif, qu'Apple décrit comme « a webpage where users can access their data, request deletion, or make changes » : <https://messagr.eu/aide/#supprimer-votre-compte>, à saisir avec la soumission de la build 28, quand la page présente le geste. Voir 7.
 
 Les deux se saisissent dans « App Privacy », à côté de « Privacy Policy », par « Edit ». L'aide prévient : « Any changes to the URLs releases with your next app version. »
 
@@ -432,20 +432,24 @@ Mettre `turns:` en premier ne suffisait pas, et le croire était l'erreur à dé
 
 ### 7. La suppression de compte
 
-**Les faits.**
+**Les faits, à partir de la build 28** (#380).
 
-- L'application n'offre aucun chemin de suppression de compte : ni écran, ni appel de désactivation, dans `packages/app/src` relu le 15 septembre 2026.
-- La page donne l'adresse et le délai : « Écrivez à conformite@messagr.eu. » ; « À la suppression d'un compte, il est désactivé immédiatement et ses données sont purgées sous trente jours. » Ses titres n'ont pas d'ancre, et aucun lien ne peut viser « Vos droits ».
-- La purge n'est pas outillée : « Aucune purge automatique n'existe. » (`deploy/messagr-eu/retention.json`, #71).
+- **Dans l'application.** La dernière ligne des Réglages, « Supprimer mon compte », ouvre un écran qui dit ce qui disparaît et ce qui reste, puis « Oui, supprimer mon compte ». L'application retire d'abord le pusher de l'appareil et la sauvegarde des clés (#383). Le serveur désactive ensuite le compte, avec le mot de passe que l'appareil garde (#382). Mesuré le 26 septembre 2026 : le serveur refuse ensuite le jeton et le mot de passe du compte et le fait quitter ses conversations (en production, commentaires de #381), et il retire ses appareils (sur le banc, bout-en-bout de #389). Le lancement suivant efface ce que l'appareil garde du compte.
+- **Par courriel, dans deux cas.** Un appareil qui ne garde pas le mot de passe du compte (entré avant le 10 septembre 2026, #190) voit le même écran, sans « Oui », et un courriel prérempli à conformite@messagr.eu (#384). Un téléphone perdu passe par la même adresse.
+- **La page d'aide** présente le geste d'abord, puis le courriel pour ces deux cas. Son ancre, <https://messagr.eu/aide/#supprimer-votre-compte>, est la ressource web que Play demande. Elle n'est publiée qu'avec la distribution de la build 28.
+- **La politique de confidentialité** promet : « À la suppression d'un compte, il est désactivé immédiatement et ses données sont purgées sous trente jours. » La désactivation est immédiate. La purge reste manuelle (« Aucune purge automatique n'existe. », `deploy/messagr-eu/retention.json`, #71) ; le service enregistre chaque suppression faite dans l'application, pour qu'elle soit faite (#385, déployé avant la build 28).
+- **Ce qui reste** : les messages déjà envoyés, chiffrés, dans les conversations des autres, et les copies sur leurs appareils.
 
-**Les règles.** Un compte Messagr est un compte au sens de Play : « a unique user identity that developers provide as a user-facing feature to serve the user across applications and/or devices ». Une application qui en crée doit « provide users with an in-app path to delete their app accounts and associated data », ce qui peut être un lien : « you can choose to provide a link within your app that takes users to your app account deletion web resource ». Elle doit aussi fournir une ressource web qui « reference the app or developer name », où « the pathway to request account deletion should be prominently featured and easily discoverable on the page ». Une adresse suffit comme moyen (« a customer service email »), et une politique de confidentialité peut servir si « the data deletion section should be highlighted and reasonably prominent (for example, through an anchor link) ».
+**Les règles.** Un compte Messagr est un compte au sens de Play : « a unique user identity that developers provide as a user-facing feature to serve the user across applications and/or devices ». Une application qui en crée doit « provide users with an in-app path to delete their app accounts and associated data », et fournir une ressource web qui « reference the app or developer name », où « the pathway to request account deletion should be prominently featured and easily discoverable on the page ». Chez Apple, la règle 5.1.1(v) : « If your app supports account creation, you must also offer account deletion within the app. » Hors des secteurs réglementés, elle ne doit pas exiger d'appel ni de courriel ; le courriel ne sert ici qu'aux deux cas où le geste est impossible.
 
-**Recommandation.**
+**Les réponses, à saisir avec la build 28** (#387).
 
-- Répondre **Oui** à « Proposez-vous aux utilisateurs un moyen de demander la suppression de leurs données ? » : conformite@messagr.eu en est un.
-- Savoir que l'exigence de suppression de compte n'est pas remplie pour autant, et que c'est **#333** : sur la page, une section consacrée à la suppression, avec une ancre, qui nomme Messagr et dit quoi écrire ; dans les réglages, un lien vers elle. L'adresse de cette section répond aussi à la question de Play sur le lien de suppression, et à « Privacy Choices » chez Apple.
-- Outiller la purge (#71) avant d'afficher « trente jours » dans un magasin.
-- Les « App Review Guidelines » d'Apple ont une règle comparable sur la suppression de compte. Elles n'ont pas été relues pour ce document : à vérifier avant la prochaine soumission.
+- **Play, « Sécurité des données »** : « Proposez-vous aux utilisateurs un moyen de demander la suppression de leurs données ? » → **Oui**. Le lien de suppression de compte : <https://messagr.eu/aide/#supprimer-votre-compte>.
+- **App Store Connect, « App Privacy »** : « Privacy Choices » → la même adresse. Elle part avec la version suivante de l'application.
+- **Nulle part dans un magasin**, « trente jours », tant que la purge n'est pas outillée (#71).
+- **La note au relecteur** dit le chemin : « To delete the account: Settings, then Delete my account. » (`app-store-listing/review-notes.txt`).
+
+**Ce que la suppression ne fait pas.** Supprimer depuis un autre appareil que celui qui tient le compte, autrement que par le courriel ; exporter ses données avant de supprimer.
 
 ## Ce que la page ne dit pas encore
 
