@@ -30,8 +30,13 @@ describe('the fingerprint of a number (#402)', () => {
     expect(numberFingerprint(new Uint8Array(32).fill(1), number)).toBe(one)
   })
 
-  it('holds no digit of the number', () => {
+  it('is the 32 bytes of the hash, and none of the number', () => {
     const fingerprint = numberFingerprint(new Uint8Array(32), '+33612345678')
-    expect(fingerprint).not.toContain('612345678')
+
+    expect(atob(fingerprint)).toHaveLength(32)
+    for (const trace of ['+33612345678', '0612345678', '612345678']) {
+      expect(fingerprint).not.toContain(trace)
+      expect(atob(fingerprint)).not.toContain(trace)
+    }
   })
 })

@@ -140,22 +140,31 @@ function theService(
   return { service, asked }
 }
 
+/** A row of the page (#402): a number, and what it led to under a key. */
+type Row = readonly [keyNumber: number, number: string, remembered: Remembered]
+
 /**
- * The page of the notebook (#402), as a map by number: what the store
- * keeps, where it keeps it by a fingerprint instead.
+ * The page of the notebook (#402), as a map by key and number: what the
+ * store keeps, where it keeps it by a fingerprint instead.
  */
-function thePage(remembered: ReadonlyMap<string, Remembered> = new Map()) {
-  const page = new Map(remembered)
+function thePage(rows: readonly Row[] = []) {
+  const page = new Map(rows.map(([k, n, r]) => [`${k}/${n}`, r] as const))
   const results: DiscoveryResults = {
-    recall: async numbers =>
+    recall: async (keyNumber, numbers) =>
       new Map(
         numbers.flatMap(number => {
-          const kept = page.get(number)
+          const kept = page.get(`${keyNumber}/${number}`)
           return kept === undefined ? [] : [[number, kept] as const]
         }),
       ),
-    keep: async kept => {
-      for (const [number, one] of kept) page.set(number, one)
+    keep: async (keyNumber, kept) => {
+      for (const [number, one] of kept) page.set(`${keyNumber}/${number}`, one)
+      return true
+    },
+    forgetAllBut: async numbers => {
+      for (const id of [...page.keys()]) {
+        if (!numbers.includes(id.slice(id.indexOf('/') + 1))) page.delete(id)
+      }
       return true
     },
   }
@@ -169,12 +178,12 @@ function deps(
     verifies?: boolean
     refuse?: number
     limit?: number
-    remembered?: ReadonlyMap<string, Remembered>
+    rows?: readonly Row[]
   } = {},
 ) {
   const { masking, calls } = theMasking(options.verifies)
   const { service, asked } = theService(proven, options.refuse, options.limit)
-  const { results, page } = thePage(options.remembered)
+  const { results, page } = thePage(options.rows)
   const all: FindingDeps = {
     readAddressBook: async () => contacts,
     masking,
@@ -620,7 +629,7 @@ describe('the limit on masking (#401)', () => {
   })
 })
 
-describe('a search after the first (#402)', () => {
+describe('looking again (#402)', () => {
   const PAUL_NUMBER = '+33612345678'
   const ZOE_NUMBER = '+33698765432'
   const ANNE_NUMBER = '+447911123456'
@@ -634,25 +643,29 @@ describe('a search after the first (#402)', () => {
     asked
       .filter(a => a.route === 'maskBatch')
       .flatMap(a => a.body!.blinded.map(e => text(unb64(e))))
-  const kept = (
+  const row = (
     number: string,
     reference: string | null,
     keyNumber = KEY,
-  ): [string, Remembered] => [
-    number,
-    { keyNumber, mask: maskOf(number), reference },
-  ]
+  ): Row => [keyNumber, number, { mask: maskOf(number), reference }]
 
   it('masks only the numbers the page does not hold, and still downloads the whole directory', async () => {
     const proven = { [PAUL_NUMBER]: 'ref-paul' }
     const first = deps([PAUL, ZOE], proven)
     await findContacts(first.deps)
-    expect([...first.page.values()]).toEqual([
-      { keyNumber: KEY, mask: maskOf(PAUL_NUMBER), reference: 'ref-paul' },
-      { keyNumber: KEY, mask: maskOf(ZOE_NUMBER), reference: null },
-    ])
+    expect(first.page).toEqual(
+      new Map([
+        [
+          `${KEY}/${PAUL_NUMBER}`,
+          { mask: maskOf(PAUL_NUMBER), reference: 'ref-paul' },
+        ],
+        [`${KEY}/${ZOE_NUMBER}`, { mask: maskOf(ZOE_NUMBER), reference: null }],
+      ]),
+    )
 
-    const second = deps([PAUL, ZOE, ANNE], proven, { remembered: first.page })
+    const second = deps([PAUL, ZOE, ANNE], proven, {
+      rows: [row(PAUL_NUMBER, 'ref-paul'), row(ZOE_NUMBER, null)],
+    })
     const found = await findContacts(second.deps)
 
     expect(shape(second.asked)).toEqual([
@@ -674,10 +687,7 @@ describe('a search after the first (#402)', () => {
       [PAUL, ZOE],
       { [PAUL_NUMBER]: 'ref-paul' },
       {
-        remembered: new Map([
-          kept(PAUL_NUMBER, 'ref-paul'),
-          kept(ZOE_NUMBER, null),
-        ]),
+        rows: [row(PAUL_NUMBER, 'ref-paul'), row(ZOE_NUMBER, null)],
       },
     )
 
@@ -689,30 +699,27 @@ describe('a search after the first (#402)', () => {
     ])
   })
 
-  it('masks again a number kept under another key', async () => {
-    const {
-      deps: d,
-      asked,
-      page,
-    } = deps(
-      [PAUL],
-      {},
-      {
-        remembered: new Map([kept(PAUL_NUMBER, null, KEY - 1)]),
-      },
-    )
+  it('masks again a number kept under another key, and leaves that row as it was', async () => {
+    const before = row(PAUL_NUMBER, 'ref-old-key', KEY - 1)
+    const { deps: d, asked, page } = deps([PAUL], {}, { rows: [before] })
 
     await findContacts(d)
 
     expect(sentNumbers(asked)).toEqual([`blinded(${PAUL_NUMBER})`])
-    expect(page.get(PAUL_NUMBER)?.keyNumber).toBe(KEY)
+    expect(page.get(`${KEY}/${PAUL_NUMBER}`)).toEqual({
+      mask: maskOf(PAUL_NUMBER),
+      reference: null,
+    })
+    expect(page.get(`${KEY - 1}/${PAUL_NUMBER}`)).toEqual(before[2])
   })
 
   it('says a number changed hands when it leads to another account than it first did, and keeps the first', async () => {
     const { deps: d, page } = deps(
       [PAUL],
       { [PAUL_NUMBER]: 'ref-new' },
-      { remembered: new Map([kept(PAUL_NUMBER, 'ref-first')]) },
+      {
+        rows: [row(PAUL_NUMBER, 'ref-first')],
+      },
     )
 
     const found = await findContacts(d)
@@ -720,14 +727,16 @@ describe('a search after the first (#402)', () => {
     expect(found.found && found.matches).toEqual([
       { contact: PAUL, reference: 'ref-new', holderChanged: true },
     ])
-    expect(page.get(PAUL_NUMBER)?.reference).toBe('ref-first')
+    expect(page.get(`${KEY}/${PAUL_NUMBER}`)?.reference).toBe('ref-first')
   })
 
   it('keeps the reference of a number found for the first time', async () => {
     const { deps: d, page } = deps(
       [PAUL],
       { [PAUL_NUMBER]: 'ref-paul' },
-      { remembered: new Map([kept(PAUL_NUMBER, null)]) },
+      {
+        rows: [row(PAUL_NUMBER, null)],
+      },
     )
 
     const found = await findContacts(d)
@@ -735,7 +744,7 @@ describe('a search after the first (#402)', () => {
     expect(found.found && found.matches).toEqual([
       { contact: PAUL, reference: 'ref-paul', holderChanged: false },
     ])
-    expect(page.get(PAUL_NUMBER)?.reference).toBe('ref-paul')
+    expect(page.get(`${KEY}/${PAUL_NUMBER}`)?.reference).toBe('ref-paul')
   })
 
   it('keeps the first reference of a number no longer found', async () => {
@@ -743,14 +752,32 @@ describe('a search after the first (#402)', () => {
       [PAUL],
       {},
       {
-        remembered: new Map([kept(PAUL_NUMBER, 'ref-paul')]),
+        rows: [row(PAUL_NUMBER, 'ref-paul')],
       },
     )
 
     const found = await findContacts(d)
 
     expect(found.found && found.others).toEqual([PAUL])
-    expect(page.get(PAUL_NUMBER)?.reference).toBe('ref-paul')
+    expect(page.get(`${KEY}/${PAUL_NUMBER}`)?.reference).toBe('ref-paul')
+  })
+
+  it('forgets the numbers that have left the address book', async () => {
+    const { deps: d, page } = deps(
+      [PAUL],
+      {},
+      {
+        rows: [
+          row(PAUL_NUMBER, null),
+          row(ZOE_NUMBER, 'ref-zoe'),
+          row(ZOE_NUMBER, null, KEY - 1),
+        ],
+      },
+    )
+
+    await findContacts(d)
+
+    expect([...page.keys()]).toEqual([`${KEY}/${PAUL_NUMBER}`])
   })
 
   it('shows a contact as found rather than changed when one of its numbers did not change hands', async () => {
@@ -761,12 +788,7 @@ describe('a search after the first (#402)', () => {
     const { deps: d } = deps(
       [both],
       { [PAUL_NUMBER]: 'ref-new', [ZOE_NUMBER]: 'ref-same' },
-      {
-        remembered: new Map([
-          kept(PAUL_NUMBER, 'ref-first'),
-          kept(ZOE_NUMBER, 'ref-same'),
-        ]),
-      },
+      { rows: [row(PAUL_NUMBER, 'ref-first'), row(ZOE_NUMBER, 'ref-same')] },
     )
 
     const found = await findContacts(d)
@@ -781,14 +803,14 @@ describe('a search after the first (#402)', () => {
       [PAUL, ZOE],
       { [PAUL_NUMBER]: 'ref-paul' },
       {
-        remembered: new Map([kept(PAUL_NUMBER, 'ref-paul')]),
+        rows: [row(PAUL_NUMBER, 'ref-paul')],
       },
     )
     const ledNowhere = deps(
       [PAUL, ZOE],
       {},
       {
-        remembered: new Map([kept(PAUL_NUMBER, null)]),
+        rows: [row(PAUL_NUMBER, null)],
       },
     )
 
@@ -802,7 +824,7 @@ describe('a search after the first (#402)', () => {
     const { deps: d, asked } = deps(
       [PAUL, ZOE, ANNE],
       { [PAUL_NUMBER]: 'ref-paul' },
-      { limit: 1, remembered: new Map([kept(PAUL_NUMBER, 'ref-paul')]) },
+      { limit: 1, rows: [row(PAUL_NUMBER, 'ref-paul')] },
     )
 
     const found = await findContacts(d)
@@ -821,13 +843,16 @@ describe('a search after the first (#402)', () => {
     })
   })
 
-  it('looks as on a first search when the page will not open, and shows what it found when the page will not keep it', async () => {
+  it('looks as the first time when the page will not open, and shows what it found when the page will not keep it', async () => {
     const { deps: d, asked } = deps([PAUL], { [PAUL_NUMBER]: 'ref-paul' })
     const broken: DiscoveryResults = {
       recall: async () => {
         throw new Error('the notebook is unreadable')
       },
       keep: async () => {
+        throw new Error('the notebook is read-only')
+      },
+      forgetAllBut: async () => {
         throw new Error('the notebook is read-only')
       },
     }

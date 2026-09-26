@@ -1008,7 +1008,7 @@ export function App({
   /** What this device has been told not to draw. `hiddenStore.ts` says why. */
   const hiddenRef = useRef<Hidden>(forgetfulHidden())
   /**
-   * What looking for contacts found, so that the next search masks only the
+   * What looking for contacts found, so that the next look masks only the
    * new numbers (#402). `discoveryResultsStore.ts` says what it keeps.
    */
   const discoveryResultsRef = useRef<DiscoveryResults>(
@@ -1248,8 +1248,12 @@ export function App({
         // THROUGH THE REF, since the journey is made once and the notebook
         // is opened after it, and opened again for another account (#304).
         results: {
-          recall: numbers => discoveryResultsRef.current.recall(numbers),
-          keep: kept => discoveryResultsRef.current.keep(kept),
+          recall: (keyNumber, numbers) =>
+            discoveryResultsRef.current.recall(keyNumber, numbers),
+          keep: (keyNumber, found) =>
+            discoveryResultsRef.current.keep(keyNumber, found),
+          forgetAllBut: numbers =>
+            discoveryResultsRef.current.forgetAllBut(numbers),
         },
       },
       setFinding,

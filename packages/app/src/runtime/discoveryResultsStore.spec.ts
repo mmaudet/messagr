@@ -3,7 +3,6 @@ import { describe, expect, it } from 'vitest'
 import {
   forgetfulDiscoveryResults,
   openDiscoveryResults,
-  type Fingerprint,
 } from './discoveryResultsStore'
 import type { Remembered } from './findContacts'
 import type { EncryptedDatabase } from './givenNameStore'
@@ -11,7 +10,8 @@ import type { EncryptedDatabase } from './givenNameStore'
 /**
  * A database that answers what SQLite would for the statements this page
  * runs, as `favouriteStore.spec.ts` does: not a SQLite, since what is tested
- * is what the page writes and reads back, and what it never writes.
+ * is what the page writes and reads back, and what it never writes. Rows are
+ * keyed by fingerprint and key number, as the table is.
  */
 function fake(refuse: 'none' | 'read' | 'write' = 'none') {
   const ran: { sql: string; params: readonly (string | number)[] }[] = []
@@ -24,7 +24,10 @@ function fake(refuse: 'none' | 'read' | 'write' = 'none') {
       if (refuse === 'read' && sql.startsWith('SELECT')) {
         throw new Error('the notebook is unreadable')
       }
-      if (refuse === 'write' && sql.startsWith('INSERT')) {
+      if (
+        refuse === 'write' &&
+        (sql.startsWith('INSERT') || sql.startsWith('DELETE'))
+      ) {
         throw new Error('the notebook is read-only')
       }
       if (sql.startsWith('SELECT key FROM discovery_fingerprint_key')) {
@@ -34,20 +37,38 @@ function fake(refuse: 'none' | 'read' | 'write' = 'none') {
         key ??= String(params[0])
         return { rows: [] }
       }
-      if (sql.startsWith('SELECT fingerprint'))
-        return { rows: [...rows.values()] }
+      if (sql.startsWith('SELECT fingerprint, mask, reference')) {
+        return {
+          rows: [...rows.values()].filter(row => row.key_number === params[0]),
+        }
+      }
+      if (sql.startsWith('SELECT DISTINCT fingerprint')) {
+        return {
+          rows: [
+            ...new Set([...rows.values()].map(row => row.fingerprint)),
+          ].map(fingerprint => ({ fingerprint })),
+        }
+      }
       if (sql.startsWith('INSERT OR REPLACE INTO discovery_results')) {
         for (let at = 0; at < params.length; at += 4) {
           const [fingerprint, key_number, mask, reference] = params.slice(
             at,
             at + 4,
           )
-          rows.set(String(fingerprint), {
+          rows.set(`${fingerprint}/${key_number}`, {
             fingerprint,
             key_number,
             mask,
             reference,
           })
+        }
+        return { rows: [] }
+      }
+      if (
+        sql.startsWith('DELETE FROM discovery_results WHERE fingerprint IN')
+      ) {
+        for (const [id, row] of rows) {
+          if (params.includes(row.fingerprint as string)) rows.delete(id)
         }
         return { rows: [] }
       }
@@ -57,13 +78,6 @@ function fake(refuse: 'none' | 'read' | 'write' = 'none') {
   return { database, ran, rows }
 }
 
-/**
- * A keyed stand-in for the hash, which is not what is tested here: it depends
- * on the key, and holds no digit of the number.
- */
-const fingerprint: Fingerprint = (key, number) =>
-  `fp${key[0]}-${[...number].map(c => 'abcdefghijk'[Number(c)] ?? 'x').join('')}`
-
 /** A generator that gives a new byte each time, so two devices differ. */
 function counting() {
   let next = 0
@@ -71,25 +85,19 @@ function counting() {
     Uint8Array.from({ length: byteLength }, () => (next += 1) % 256)
 }
 
+const KEY = 7
 const PAUL = '+33612345678'
 const ZOE = '+33698765432'
-const found: Remembered = {
-  keyNumber: 7,
-  mask: 'bWFzaw==',
-  reference: 'ref-paul',
-}
-const none: Remembered = { keyNumber: 7, mask: 'b3RoZXI=', reference: null }
+const found: Remembered = { mask: 'bWFzaw==', reference: 'ref-paul' }
+const none: Remembered = { mask: 'b3RoZXI=', reference: null }
 
 describe('what looking for contacts found (#402)', () => {
   it('recalls what it kept, by number', async () => {
-    const page = await openDiscoveryResults(
-      fake().database,
-      fingerprint,
-      counting(),
-    )
+    const page = await openDiscoveryResults(fake().database, counting())
 
     expect(
       await page.keep(
+        KEY,
         new Map([
           [PAUL, found],
           [ZOE, none],
@@ -97,7 +105,7 @@ describe('what looking for contacts found (#402)', () => {
       ),
     ).toBe(true)
 
-    expect(await page.recall([ZOE, PAUL, '+33700000000'])).toEqual(
+    expect(await page.recall(KEY, [ZOE, PAUL, '+33700000000'])).toEqual(
       new Map([
         [ZOE, none],
         [PAUL, found],
@@ -107,10 +115,11 @@ describe('what looking for contacts found (#402)', () => {
 
   it('writes no number, in any form it was given', async () => {
     const { database, ran } = fake()
-    const page = await openDiscoveryResults(database, fingerprint, counting())
+    const page = await openDiscoveryResults(database, counting())
 
-    await page.keep(new Map([[PAUL, found]]))
-    await page.recall([PAUL])
+    await page.keep(KEY, new Map([[PAUL, found]]))
+    await page.recall(KEY, [PAUL])
+    await page.forgetAllBut([PAUL])
 
     const written = JSON.stringify(ran)
     for (const trace of [PAUL, '612345678', '0612345678']) {
@@ -118,17 +127,17 @@ describe('what looking for contacts found (#402)', () => {
     }
   })
 
-  it('mints its key once, and fingerprints under it', async () => {
+  it('mints its key once', async () => {
     const { database, ran } = fake()
-    const page = await openDiscoveryResults(database, fingerprint, counting())
+    const page = await openDiscoveryResults(database, counting())
 
-    await page.keep(new Map([[PAUL, found]]))
-    await page.keep(new Map([[ZOE, none]]))
+    await page.keep(KEY, new Map([[PAUL, found]]))
+    await page.keep(KEY, new Map([[ZOE, none]]))
 
     expect(
       ran.filter(one => one.sql.includes('INTO discovery_fingerprint_key')),
     ).toHaveLength(1)
-    expect(await page.recall([PAUL, ZOE])).toHaveProperty('size', 2)
+    expect((await page.recall(KEY, [PAUL, ZOE])).size).toBe(2)
   })
 
   it('gives the same number another fingerprint on another device', async () => {
@@ -136,29 +145,59 @@ describe('what looking for contacts found (#402)', () => {
     const other = fake()
     const random = counting()
     await (
-      await openDiscoveryResults(one.database, fingerprint, random)
-    ).keep(new Map([[PAUL, found]]))
+      await openDiscoveryResults(one.database, random)
+    ).keep(KEY, new Map([[PAUL, found]]))
     await (
-      await openDiscoveryResults(other.database, fingerprint, random)
-    ).keep(new Map([[PAUL, found]]))
+      await openDiscoveryResults(other.database, random)
+    ).keep(KEY, new Map([[PAUL, found]]))
 
     expect([...one.rows.keys()]).not.toEqual([...other.rows.keys()])
   })
 
-  it('keeps a number once, with what it led to last', async () => {
+  it('keeps a number once under a key, with what it led to last', async () => {
     const { database, rows } = fake()
-    const page = await openDiscoveryResults(database, fingerprint, counting())
+    const page = await openDiscoveryResults(database, counting())
 
-    await page.keep(new Map([[PAUL, none]]))
-    await page.keep(new Map([[PAUL, found]]))
+    await page.keep(KEY, new Map([[PAUL, none]]))
+    await page.keep(KEY, new Map([[PAUL, found]]))
 
     expect(rows.size).toBe(1)
-    expect(await page.recall([PAUL])).toEqual(new Map([[PAUL, found]]))
+    expect(await page.recall(KEY, [PAUL])).toEqual(new Map([[PAUL, found]]))
+  })
+
+  it('keeps a number under each key apart, and recalls under the key asked', async () => {
+    const page = await openDiscoveryResults(fake().database, counting())
+    const underTheNext: Remembered = { mask: 'bmV4dA==', reference: null }
+
+    await page.keep(KEY, new Map([[PAUL, found]]))
+    await page.keep(KEY + 1, new Map([[PAUL, underTheNext]]))
+
+    expect(await page.recall(KEY, [PAUL])).toEqual(new Map([[PAUL, found]]))
+    expect(await page.recall(KEY + 1, [PAUL])).toEqual(
+      new Map([[PAUL, underTheNext]]),
+    )
+  })
+
+  it('forgets the numbers that left the address book, under every key', async () => {
+    const page = await openDiscoveryResults(fake().database, counting())
+    await page.keep(
+      KEY,
+      new Map([
+        [PAUL, found],
+        [ZOE, none],
+      ]),
+    )
+    await page.keep(KEY + 1, new Map([[ZOE, none]]))
+
+    expect(await page.forgetAllBut([PAUL])).toBe(true)
+
+    expect([...(await page.recall(KEY, [PAUL, ZOE])).keys()]).toEqual([PAUL])
+    expect((await page.recall(KEY + 1, [PAUL, ZOE])).size).toBe(0)
   })
 
   it('writes five thousand numbers in a few statements, not one each', async () => {
     const { database, ran } = fake()
-    const page = await openDiscoveryResults(database, fingerprint, counting())
+    const page = await openDiscoveryResults(database, counting())
     const many = new Map(
       Array.from({ length: 5_000 }, (_, i) => [
         `+336${String(i).padStart(8, '0')}`,
@@ -166,58 +205,66 @@ describe('what looking for contacts found (#402)', () => {
       ]),
     )
 
-    await page.keep(many)
+    await page.keep(KEY, many)
+    await page.forgetAllBut([])
 
     const writes = ran.filter(one => one.sql.startsWith('INSERT OR REPLACE'))
+    const forgets = ran.filter(one => one.sql.startsWith('DELETE'))
     expect(writes).toHaveLength(25)
-    expect(
-      Math.max(...writes.map(one => one.params.length)),
-    ).toBeLessThanOrEqual(999)
-    expect((await page.recall([...many.keys()])).size).toBe(5_000)
+    expect(forgets).toHaveLength(6)
+    for (const one of [...writes, ...forgets]) {
+      expect(one.params.length).toBeLessThanOrEqual(999)
+    }
+    expect((await page.recall(KEY, [...many.keys()])).size).toBe(0)
   })
 
-  it('recalls nothing before its first search, and without minting a key', async () => {
+  it('recalls nothing before its first look, and without minting a key', async () => {
     const { database, ran } = fake()
-    const page = await openDiscoveryResults(database, fingerprint, counting())
+    const page = await openDiscoveryResults(database, counting())
 
-    expect((await page.recall([PAUL])).size).toBe(0)
-    expect(ran.some(one => one.sql.startsWith('INSERT'))).toBe(false)
+    expect((await page.recall(KEY, [PAUL])).size).toBe(0)
+    expect(await page.forgetAllBut([])).toBe(true)
+    expect(
+      ran.some(
+        one => !one.sql.startsWith('CREATE') && !one.sql.startsWith('SELECT'),
+      ),
+    ).toBe(false)
   })
 
-  it('drops a row of the wrong shape rather than failing a search', async () => {
+  it('drops a row of the wrong shape rather than failing a look', async () => {
     const { database, rows } = fake()
-    const page = await openDiscoveryResults(database, fingerprint, counting())
+    const page = await openDiscoveryResults(database, counting())
     await page.keep(
+      KEY,
       new Map([
         [PAUL, found],
         [ZOE, none],
       ]),
     )
     const [first] = rows.keys()
-    rows.set(first!, { ...rows.get(first!), key_number: 'seven' })
+    rows.set(first!, { ...rows.get(first!), mask: 42 })
 
-    expect([...(await page.recall([PAUL, ZOE])).keys()]).toEqual([ZOE])
+    expect([...(await page.recall(KEY, [PAUL, ZOE])).keys()]).toEqual([ZOE])
   })
 
-  it('recalls nothing when the page will not open, and says a keep did not hold', async () => {
+  it('recalls nothing when the page will not open, and says a write did not hold', async () => {
     const unreadable = await openDiscoveryResults(
       fake('read').database,
-      fingerprint,
       counting(),
     )
-    expect((await unreadable.recall([PAUL])).size).toBe(0)
+    expect((await unreadable.recall(KEY, [PAUL])).size).toBe(0)
 
     const readOnly = await openDiscoveryResults(
       fake('write').database,
-      fingerprint,
       counting(),
     )
-    expect(await readOnly.keep(new Map([[PAUL, found]]))).toBe(false)
+    expect(await readOnly.keep(KEY, new Map([[PAUL, found]]))).toBe(false)
   })
 
   it('a device without a notebook recalls nothing and keeps nothing', async () => {
     const page = forgetfulDiscoveryResults()
-    expect(await page.keep(new Map([[PAUL, found]]))).toBe(false)
-    expect((await page.recall([PAUL])).size).toBe(0)
+    expect(await page.keep(KEY, new Map([[PAUL, found]]))).toBe(false)
+    expect(await page.forgetAllBut([PAUL])).toBe(false)
+    expect((await page.recall(KEY, [PAUL])).size).toBe(0)
   })
 })

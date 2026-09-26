@@ -24,11 +24,11 @@
  * service never learns who is in the address book, nor whether a contact was
  * found.
  *
- * # A SEARCH AFTER THE FIRST COSTS ONLY THE NEW NUMBERS (#402)
+ * # LOOKING AGAIN COSTS ONLY THE NEW NUMBERS (#402)
  *
- * What a search found is kept in a page of the notebook: for each number gone
+ * What looking found is kept in a page of the notebook: for each number gone
  * through, its mask, the key it was made under and the reference it led to.
- * The next search masks only the numbers the page does not hold under the
+ * The next look masks only the numbers the page does not hold under the
  * current key, and still downloads the whole directory, since what it asks
  * for must not depend on what it found.
  *
@@ -107,14 +107,12 @@ export interface FindingDeps {
    * when the person looks, not when the application starts.
    */
   readonly region: () => string | undefined
-  /** What the searches before this one found (#402). */
+  /** What the looks before this one found (#402). */
   readonly results: DiscoveryResults
 }
 
-/** What looking found for one number (#402), as the notebook keeps it. */
+/** What looking found for one number under one key (#402). */
 export interface Remembered {
-  /** The key the mask was made under. */
-  readonly keyNumber: number
   /** Base64, as the service lists it. */
   readonly mask: string
   /**
@@ -127,17 +125,25 @@ export interface Remembered {
 /**
  * The page of the notebook that keeps what looking found (#402). By number
  * here; in the notebook, by a fingerprint only this device can make, so the
- * page holds no number.
+ * page holds no number. A page degrades rather than failing, as every page
+ * of the notebook does; a look guards against one that throws all the same.
  */
 export interface DiscoveryResults {
-  /** What is kept for these numbers, for those that have anything kept. */
+  /** What is kept under this key for those of these numbers it holds. */
   readonly recall: (
+    keyNumber: number,
     numbers: readonly string[],
   ) => Promise<ReadonlyMap<string, Remembered>>
-  /** Keeps what these numbers led to. Whether it held. */
+  /** Keeps what these numbers led to under this key. Whether it held. */
   readonly keep: (
+    keyNumber: number,
     remembered: ReadonlyMap<string, Remembered>,
   ) => Promise<boolean>
+  /**
+   * Forgets every number but these, under every key: the address book as it
+   * stands. Whether it held.
+   */
+  readonly forgetAllBut: (numbers: readonly string[]) => Promise<boolean>
 }
 
 /** A contact whose number a findable account proved, and that account. */
@@ -146,9 +152,12 @@ export interface Match {
   /** What the service knows the account by, and nobody else can link to it. */
   readonly reference: string
   /**
-   * The number led to another account before, under the same key: this
-   * account inherits nothing of it, and the row says the number changed
-   * hands (#402).
+   * The number led to another reference before, under the same key (#402):
+   * this account inherits nothing of it, and the row says the number changed
+   * hands. The device cannot tell another person from the same one proving
+   * again more than thirty days after its proof ended, once the service has
+   * forgotten it (#398): either way the reference is new, and a month is how
+   * soon a number given up can change hands (#392, Q36).
    */
   readonly holderChanged: boolean
 }
@@ -230,14 +239,12 @@ export async function findContacts(deps: FindingDeps): Promise<Findings> {
   if (typeof key === 'string') return { found: false, refusal: key }
 
   const numbers = [...holders.keys()]
-  // WHAT THE SEARCHES BEFORE THIS ONE MASKED under the current key is not
+  // WHAT THE LOOKS BEFORE THIS ONE MASKED under the current key is not
   // masked again. A page that will not open recalls nothing, and every number
-  // is masked as on a first search.
-  const remembered = await recalled(deps.results, numbers)
+  // is masked as on the first look.
+  const remembered = await recalled(deps.results, key.keyNumber, numbers)
   const masks = new Map<string, string>()
-  for (const [number, before] of remembered) {
-    if (before.keyNumber === key.keyNumber) masks.set(number, before.mask)
-  }
+  for (const [number, before] of remembered) masks.set(number, before.mask)
   const fresh = numbers.filter(number => !masks.has(number))
   // THE LIMIT OF #401: a batch over it is refused with how many numbers are
   // still allowed. Those are sent again, the first of the batch, and the
@@ -275,15 +282,19 @@ export async function findContacts(deps: FindingDeps): Promise<Findings> {
   for (const [number, mask] of masks) {
     const reference = listed.get(mask) ?? null
     const before = remembered.get(number)
-    const sameKey = before?.keyNumber === key.keyNumber
     // THE FIRST REFERENCE A NUMBER LED TO IS THE ONE KEPT: another one since
     // is a number that changed hands, and the new account inherits nothing.
-    if (!sameKey || (before.reference === null && reference !== null)) {
-      toKeep.set(number, { keyNumber: key.keyNumber, mask, reference })
+    if (
+      before === undefined ||
+      (before.reference === null && reference !== null)
+    ) {
+      toKeep.set(number, { mask, reference })
     }
     if (reference === null) continue
     const holderChanged =
-      sameKey && before.reference !== null && before.reference !== reference
+      before !== undefined &&
+      before.reference !== null &&
+      before.reference !== reference
     for (const contact of holders.get(number)!) {
       // A contact's number that did not change hands wins over one that did.
       const already = matched.get(contact)
@@ -293,8 +304,10 @@ export async function findContacts(deps: FindingDeps): Promise<Findings> {
     }
   }
   // Kept or not, what was found is shown: a page that will not hold only
-  // costs the next search its numbers again.
-  if (toKeep.size > 0) await kept(deps.results, toKeep)
+  // costs the next look its numbers again. And a number that has left the
+  // address book leaves the page.
+  await quietly(() => deps.results.keep(key.keyNumber, toKeep))
+  await quietly(() => deps.results.forgetAllBut(numbers))
   // The contacts holding a number the limit left unmasked, gathered once for
   // every number rather than once for every contact.
   const unmasked = new Set<Contact>()
@@ -343,27 +356,28 @@ interface Key {
   readonly publicKey: Uint8Array
 }
 
-/** What the page keeps for these numbers; nothing when it cannot say. */
+/** What the page keeps under this key; nothing when it cannot say. */
 async function recalled(
   results: DiscoveryResults,
+  keyNumber: number,
   numbers: readonly string[],
 ): Promise<ReadonlyMap<string, Remembered>> {
   try {
-    return await results.recall(numbers)
+    return await results.recall(keyNumber, numbers)
   } catch {
     return new Map()
   }
 }
 
-/** Keeps what these numbers led to, and never fails a search for it. */
-async function kept(
-  results: DiscoveryResults,
-  remembered: ReadonlyMap<string, Remembered>,
-): Promise<void> {
+/**
+ * A write to the page, which never fails a look: what was found is shown
+ * whether the page kept it or not.
+ */
+async function quietly(write: () => Promise<boolean>): Promise<void> {
   try {
-    await results.keep(remembered)
+    await write()
   } catch {
-    // The next search masks these numbers again.
+    // The next look writes it again.
   }
 }
 
@@ -397,9 +411,7 @@ async function haveMasked(
 ): Promise<
   { readonly masks: string[] } | { readonly limit: Limit } | FindingRefusal
 > {
-  const blinding = await deps.masking.blind(
-    numbers.map(number => Uint8Array.from(number, c => c.charCodeAt(0))),
-  )
+  const blinding = await deps.masking.blind(numbers.map(numberBytes))
   let answer: Answer
   try {
     answer = await deps.service.maskBatch(
@@ -439,6 +451,15 @@ async function haveMasked(
   return masks === 'not-the-published-key'
     ? masks
     : { masks: masks.map(base64Of) }
+}
+
+/**
+ * A number in international form as the masking takes it, and the
+ * fingerprint of #402: a plus sign and digits, a byte each, which is how the
+ * service masks a number it proves.
+ */
+export function numberBytes(number: string): Uint8Array {
+  return Uint8Array.from(number, c => c.charCodeAt(0))
 }
 
 /** The directory, as the masks under the key and the reference of each. */
