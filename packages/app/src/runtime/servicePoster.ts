@@ -133,3 +133,23 @@ export function serviceAt(baseUrl: string): string {
 async function answered(response: Response) {
   return { status: response.status, body: await response.text() }
 }
+
+/**
+ * Announces to the invitation service that this account is about to be
+ * deleted (#385), and answers the HTTP status.
+ *
+ * No body: the token says whose account, as on every route of the service
+ * that acts for one, and nobody announces somebody else's deletion. A status
+ * is returned rather than thrown, as everywhere in this file: what counts as
+ * told is `deleteAccount.ts`'s to decide, where it is tested.
+ */
+export async function announceDeletion(
+  baseUrl: string,
+  accessToken: string,
+): Promise<number> {
+  const response = await fetch(`${serviceAt(baseUrl)}/account-deletions`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${accessToken}` },
+  })
+  return response.status
+}

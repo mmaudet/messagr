@@ -169,6 +169,11 @@ fn router(state: Arc<AppState>) -> Router {
             "/discovery/proofs/finish",
             post(handlers::discovery::finish_proof),
         )
+        // L'ANNONCE D'UNE SUPPRESSION DE COMPTE (#385), faite par le compte
+        // lui-même juste avant qu'il soit désactivé. Sans corps : le jeton dit
+        // qui. `handlers::deletion` dit ce qu'elle enregistre et ce qu'elle
+        // fait expirer.
+        .route("/account-deletions", post(handlers::deletion::announce))
         .route("/invitations", post(handlers::create::create))
         .route("/invitations/claim", post(handlers::claim::claim))
         .route(
@@ -230,6 +235,38 @@ async fn method_not_allowed() -> Response {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// The deletion announcement is a route, and an authenticated one (#385).
+    ///
+    /// Through the REAL router, because a route that is not wired answers a
+    /// client error too -- `404 M_UNRECOGNIZED` from the fallback -- and a
+    /// handler test calls the handler directly, so neither would notice. A
+    /// call with no token must come back `401 M_UNAUTHORIZED`: the handler
+    /// was reached, and it refused.
+    #[sqlx::test(migrations = "./migrations")]
+    async fn the_deletion_announcement_is_routed_and_asks_who_is_calling(pool: SqlitePool) {
+        let st = Arc::new(AppState {
+            pool,
+            mx: Arc::new(matrix::MatrixClient::new(
+                "http://127.0.0.1:1".into(),
+                "token".into(),
+            )),
+            cfg: config::Config::for_tests(),
+        });
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let base = format!("http://{}", listener.local_addr().unwrap());
+        let app = router(st);
+        tokio::spawn(async move { axum::serve(listener, app).await.unwrap() });
+
+        let r = reqwest::Client::new()
+            .post(format!("{base}/account-deletions"))
+            .send()
+            .await
+            .unwrap();
+        assert_eq!(r.status(), StatusCode::UNAUTHORIZED);
+        let body: serde_json::Value = r.json().await.unwrap();
+        assert_eq!(body["errcode"], "M_UNAUTHORIZED");
+    }
 
     /// **D2** — every error response must stay within the service envelope.
     ///

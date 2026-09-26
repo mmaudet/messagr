@@ -155,14 +155,27 @@ pub async fn purge_invitation_graph(
 const ENDED_BY: &str = "status <> 'pending' \
      AND MIN(expires_at, COALESCE(revoked_at, expires_at)) <= ?1";
 
+/// Les annonces de suppression de compte, effacées à trente jours (#385).
+///
+/// La ligne nomme un compte supprimé : la promesse de la page, « purgées sous
+/// trente jours », vaut pour elle aussi. La purge des données du compte, elle,
+/// reste manuelle (#423) ; celle-ci ne touche que la ligne qui l'annonçait.
+pub async fn purge_account_deletions(pool: &SqlitePool, now: i64) -> Result<u64> {
+    let r = sqlx::query("DELETE FROM account_deletions WHERE purge_after <= ?")
+        .bind(now)
+        .execute(pool)
+        .await?;
+    Ok(r.rows_affected())
+}
+
 /// Le compteur par inviteur, vidé (#416).
 ///
 /// Il comptait, pour chaque compte, les invitations émises et réclamées, sans
 /// jamais se vider ni être lu : une mesure d'usage par compte, que la page de
 /// confidentialité ne promet pas. Plus rien ne l'écrit ; ce qu'une image
 /// précédente y a laissé part ici. La table reste, vide, pour qu'un retour à
-/// cette image puisse encore émettre : la prochaine migration du service la
-/// supprimera.
+/// cette image puisse encore émettre : une migration à venir la supprimera, en
+/// même temps que ce ménage. Ni 010 (#385) ni la découverte ne le font.
 pub async fn purge_inviter_counters(pool: &SqlitePool) -> Result<u64> {
     let r = sqlx::query("DELETE FROM inviter_counters")
         .execute(pool)
@@ -473,13 +486,15 @@ pub(crate) async fn sweep_once(st: &Arc<AppState>, now: i64) -> bool {
         purge_invitation_graph(&st.pool, now, st.cfg.edge_retention_days).await,
         purge_inviter_counters(&st.pool).await,
         purge_spent_proofs(&st.pool, now).await,
+        purge_account_deletions(&st.pool, now).await,
     ) {
-        (Ok(a), Ok(b), Ok(c), Ok(d), Ok(e), Ok(f), Ok(g), Ok(h), Ok(i)) => {
+        (Ok(a), Ok(b), Ok(c), Ok(d), Ok(e), Ok(f), Ok(g), Ok(h), Ok(i), Ok(j)) => {
             tracing::info!(
                 "cleanup: {a} edges, {b} invitations, {c} accounts, \
                                 {d} rows repaired, {e} claimed rows purged, \
                                 {f} requests purged, {g} graph rows purged, \
-                                {h} inviter counters purged, {i} spent proofs purged"
+                                {h} inviter counters purged, {i} spent proofs purged, \
+                                {j} deletion announcements purged"
             );
             true
         }
@@ -524,6 +539,31 @@ mod tests {
             .await
             .unwrap();
         assert_eq!(left, ["@en-cours:h"]);
+    }
+
+    #[sqlx::test(migrations = "./migrations")]
+    async fn a_deletion_announcement_goes_after_its_thirty_days(pool: SqlitePool) {
+        // #385 : la ligne nomme un compte supprimé, et la promesse vaut pour elle.
+        for (user, purge_after) in [("@echue:h", 1_000), ("@fraiche:h", 1_001)] {
+            sqlx::query(
+                "INSERT INTO account_deletions (user_id, announced_at, purge_after) \
+                 VALUES (?, 0, ?)",
+            )
+            .bind(user)
+            .bind(purge_after)
+            .execute(&pool)
+            .await
+            .unwrap();
+        }
+
+        let gone = purge_account_deletions(&pool, 1_000).await.unwrap();
+        assert_eq!(gone, 1);
+
+        let left: String = sqlx::query_scalar("SELECT user_id FROM account_deletions")
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+        assert_eq!(left, "@fraiche:h");
     }
 
     #[sqlx::test(migrations = "./migrations")]
