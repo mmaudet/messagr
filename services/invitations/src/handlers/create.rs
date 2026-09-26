@@ -865,14 +865,10 @@ mod tests {
                 "token".into(),
             )),
             cfg: crate::config::Config {
-                database_url: String::new(),
                 homeserver_url: base,
-                registration_token: "token".into(),
                 encryption_key: ENCRYPTION_KEY,
-                edge_retention_days: 30,
-                bind_addr: String::new(),
                 max_reserved_accounts_per_inviter: ceiling,
-                push_gateway_url: None,
+                ..crate::config::Config::for_tests()
             },
         });
         (st, fake)

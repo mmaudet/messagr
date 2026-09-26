@@ -674,16 +674,7 @@ mod tests {
                 "http://127.0.0.1:1".into(),
                 "token".into(),
             )),
-            cfg: crate::config::Config {
-                database_url: String::new(),
-                homeserver_url: "http://127.0.0.1:1".into(),
-                registration_token: "token".into(),
-                encryption_key: [0u8; 32],
-                edge_retention_days: 30,
-                bind_addr: String::new(),
-                max_reserved_accounts_per_inviter: crate::config::DEFAULT_RESERVED_ACCOUNTS_CEILING,
-                push_gateway_url: None,
-            },
+            cfg: crate::config::Config::for_tests(),
         });
 
         assert_eq!(deactivate_orphans(&st).await.unwrap(), 1);
@@ -714,14 +705,8 @@ mod tests {
                 "token".into(),
             )),
             cfg: crate::config::Config {
-                database_url: String::new(),
                 homeserver_url: homeserver,
-                registration_token: "token".into(),
-                encryption_key: [0u8; 32],
-                edge_retention_days: 30,
-                bind_addr: String::new(),
-                max_reserved_accounts_per_inviter: crate::config::DEFAULT_RESERVED_ACCOUNTS_CEILING,
-                push_gateway_url: None,
+                ..crate::config::Config::for_tests()
             },
         })
     }

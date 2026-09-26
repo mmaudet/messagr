@@ -115,6 +115,28 @@ impl Config {
             push_gateway_url: usable_gateway(std::env::var("PUSH_GATEWAY_URL").ok()),
         })
     }
+
+    /// The configuration every test starts from, changing only what it needs
+    /// with `Config { push_gateway_url: gateway, ..Config::for_tests() }`
+    /// (#393). A new setting gets its test value here, once, rather than in
+    /// every test that builds a state.
+    ///
+    /// There is no push gateway, so a test that does not set one cannot come
+    /// to depend on something reachable. The homeserver a test talks to is the
+    /// `MatrixClient` it builds itself: the URL here is never read by a test.
+    #[cfg(test)]
+    pub fn for_tests() -> Self {
+        Config {
+            database_url: String::new(),
+            homeserver_url: "http://127.0.0.1:1".into(),
+            registration_token: "token".into(),
+            encryption_key: [0u8; 32],
+            edge_retention_days: 30,
+            bind_addr: String::new(),
+            max_reserved_accounts_per_inviter: DEFAULT_RESERVED_ACCOUNTS_CEILING,
+            push_gateway_url: None,
+        }
+    }
 }
 
 #[cfg(test)]
