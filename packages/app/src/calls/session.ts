@@ -123,6 +123,22 @@ export interface CallSession {
   readonly muted: () => boolean
   /** One sync's worth of raw room events. Throws nothing. */
   readonly receive: (rawEvents: readonly unknown[]) => void
+  /**
+   * Read the clock now, rather than waiting for the ticker to.
+   *
+   * THE TICKER IS A JAVASCRIPT TIMER, AND A TIMER IS SUSPENDED WITH ITS
+   * APPLICATION (#294). A caller who puts the application away while it
+   * rings takes the machine's only clock away with it: the invitation's
+   * ninety seconds are a number nothing compares against until something
+   * ticks again. This is the caller of `startCallSession` saying it has just
+   * become able to run -- coming back to the front is the moment -- and the
+   * deadline is settled against the wall clock there and then.
+   *
+   * Does nothing when no call has been started: there is no clock to read
+   * for one, and starting a transport to read it would start a second ticker
+   * nobody stops. Throws nothing, like `receive` and for the same reason.
+   */
+  readonly tick: () => void
   /** Tear everything down: ticker, media, microphone. */
   readonly stop: () => Promise<void>
 }
@@ -374,6 +390,9 @@ export function startCallSession(
     muted: () => media?.muted() ?? false,
 
     receive: rawEvents => transportOrStart().receive(rawEvents),
+
+    // `transport` and not `transportOrStart`: see the interface.
+    tick: () => transport?.tick(),
 
     stop: async () => {
       // Order matters, and it is the transport's own note that says why:

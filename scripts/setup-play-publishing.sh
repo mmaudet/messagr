@@ -409,7 +409,18 @@ step "Messagr → Testing → Internal testing → Create new release."
 step "Upload: $BUNDLE"
 step "Release name and notes: anything. This build is a diagnostic screen."
 step "Then work through the red items in 'Dashboard': store listing, content rating, data safety, target audience."
-warn "Data safety: this application sends no analytics and collects no data. Answer accordingly."
+# THE DATA SAFETY ANSWERS ARE WRITTEN DOWN, BECAUSE THE FIRST ONES WERE WRONG.
+#
+# This line used to say that the application collects no data, and the form
+# was filled in on that word. The privacy page says otherwise: the server
+# keeps metadata, and Google receives a device token to wake the phone (#321).
+# The answers now live in one document, question by question, each quoting
+# the sentence of the page it rests on, so the next revision starts from a
+# text rather than from a memory.
+warn "Data safety: this application does collect data. Do not answer 'no data collected'."
+note "Enter the answers written, question by question, in:"
+note "  $REPO_ROOT/docs/declarations-magasins.md"
+note "Its section 'À trancher par le porteur' lists the answers that are still a judgement."
 pause "Release rolled out to internal testing. Continue?"
 
 # ── 10 ─────────────────────────────────────────────────────────────────────

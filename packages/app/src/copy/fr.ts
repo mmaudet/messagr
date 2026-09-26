@@ -415,6 +415,33 @@ export const fr = {
     'Cette invitation a été utilisée, mais cet appareil n’a pas pu garder le nouveau compte. Votre compte reste sur cet appareil. Demandez une nouvelle invitation à la personne qui vous l’a envoyée.',
   list_not_in_yet:
     'Vous n’êtes pas encore entré. Ouvrez le lien d’invitation qu’on vous a envoyé : c’est la seule porte, et l’application ne peut rien faire avant.',
+  // LA SECONDE PORTE, ET ELLE N'EST QUE LA SECONDE. #367, sous la phrase
+  // ci-dessus et nulle part ailleurs. Sur iPhone, une invitation ouverte dans
+  // le navigateur intégré d'une autre messagerie n'atteint jamais Messagr :
+  // c'est une règle d'Apple, pas un défaut. La personne voit l'invitation, a
+  // l'application, et n'a aucune porte.
+  //
+  // CE QUE ÇA COÛTE EST DIT LÀ OÙ ON LE DEMANDE. Un jeton d'invitation est un
+  // porteur (ADR-0004) et un presse-papiers se lit depuis n'importe quelle
+  // autre application. L'application, elle, n'y écrit que : elle ne le lit
+  // jamais d'elle-même, et ce champ est le geste de la personne.
+  list_paste_lead:
+    'Si le lien ne s’ouvre pas tout seul, copiez-le et collez-le ici.',
+  list_paste_cost:
+    'Un lien copié peut être lu par les autres applications de ce téléphone. Celui-ci est valable une heure et ne sert qu’une fois.',
+  list_paste_field: 'Collez le lien d’invitation',
+  list_paste_confirm: 'Entrer',
+  list_paste_working: 'Ouverture de l’invitation…',
+  // TROIS REFUS, TROIS GESTES DIFFÉRENTS. Une adresse qui n'est pas une
+  // invitation n'a rien dépensé du tout, et le dire évite de chercher une
+  // panne là où il n'y en a pas. Un refus du service est définitif : seule une
+  // nouvelle invitation le remplace. Le reste peut passer au coup suivant.
+  list_paste_not_a_link:
+    'Ce n’est pas un lien d’invitation Messagr. Rien n’a été envoyé, et aucune invitation n’a été dépensée.',
+  list_paste_refused:
+    'Cette invitation ne peut pas être utilisée. Demandez-en une nouvelle à la personne qui vous l’a envoyée.',
+  list_paste_retry:
+    'Cette invitation n’a pas pu être suivie pour l’instant. Réessayez dans un moment : le lien, lui, reste bon.',
   // #190. Deux issues, deux phrases : revenir sous une identité neuve est la
   // bonne, et c'est quand même une perte ; rester dehors est l'autre, et là
   // la personne a quelque chose à faire. Ni l'une ni l'autre ne prétend que
@@ -428,6 +455,11 @@ export const fr = {
   list_nothing_said: 'Rien n’a encore été dit',
   list_unreadable: 'Cet appareil ne peut pas lire le dernier message',
   list_unreachable: 'Cette conversation n’a pas pu être relue',
+  // À la place de l'aperçu, sur la ligne qu'on vient de toucher, tant que le
+  // lancement n'est pas en état d'ouvrir une conversation (#280). La ligne
+  // n'est pas un aperçu de plus : elle répond au geste. Voir
+  // `waitingToOpen.ts`.
+  list_opening: 'Ouverture…',
   list_name_action: 'Donner un nom',
   list_name_title: 'Comment appelez-vous cette personne ?',
   list_name_hint:
@@ -444,6 +476,18 @@ export const fr = {
   // de côté et écrit quand on sait à qui il s'applique.
   invite_action: 'Inviter quelqu’un',
   invite_who: 'Qui invitez-vous ?',
+  // ET LE NOM QU'ON SE DONNE SOI-MÊME, qui est l'autre moitié et voyage,
+  // là où celui du dessus reste ici. #329, §13.26. Facultatif : rien ne se
+  // dessine sur l'écran d'en face quand il est vide, et une invitation sans
+  // nom reste une invitation.
+  //
+  // CE QU'IL DIT DU SERVICE EST VRAI PAR CONSTRUCTION. Le nom est écrit dans
+  // le fragment du lien, et un fragment n'est jamais transmis : ni au
+  // serveur, ni à son journal, ni à quoi que ce soit entre les deux. Voir
+  // `declaredName.ts`.
+  invite_declared: 'Comment vous présentez-vous ?',
+  invite_declared_hint:
+    'Facultatif. Ce nom voyage dans le lien, et nulle part ailleurs : le service ne le reçoit pas et n’en garde rien.',
   invite_working: 'Création de la conversation…',
   invite_ready:
     'Envoyez ce lien à cette personne. Il est valable une heure et ne sert qu’une fois.',
@@ -454,6 +498,57 @@ export const fr = {
   invite_failed: 'L’invitation n’a pas pu être créée.',
   invite_waiting: 'Personne n’a encore ouvert le lien.',
   invite_admitted: 'C’est fait : cette personne peut entrer.',
+  // L'INVITATION QUI ATTEND SUR LE SEUIL, et l'écran qui la décide. #329,
+  // §13.3 écran 1. C'est l'autre bout du bloc au-dessus : là on invite, ici
+  // on est invité.
+  //
+  // `invited_` et non `invitation_` : `copy.spec.ts` refuse ce préfixe, qui
+  // portait la copie d'une cérémonie ne gardant rien. C'est le préfixe qui
+  // est refusé, pas le mot : le produit n'en a pas d'autre.
+  //
+  // « Une conversation » et non « un salon », que dessine la maquette. Rien
+  // dans l'état transmis avec une invitation ne distingue les deux, et le
+  // produit ne crée aujourd'hui que des conversations à deux : écrire l'un
+  // ou l'autre serait deviner à l'endroit précis où quelqu'un décide.
+  invited_title: 'Invitation reçue',
+  invited_lead: 'Vous invite à rejoindre une conversation.',
+  // Quand l'état transmis par le serveur ne porte pas l'événement de
+  // création. Le dire vaut mieux qu'une ligne vide à la place d'un nom.
+  invited_who_unknown:
+    'Cette conversation ne dit pas qui l’a créée. Personne ne peut donc être nommé ici.',
+  // ET L'AUTRE ABSENCE, celle d'un lien : la personne qui l'a écrit n'a pas
+  // voulu se nommer. Deux faits différents sur deux choses différentes, donc
+  // deux phrases.
+  invited_who_undeclared:
+    'Ce lien ne dit pas qui vous invite : la personne ne s’est pas donné de nom.',
+  'invited_instance %@': 'Ce compte est hébergé par %@.',
+  'invited_instance_elsewhere %@':
+    'Ce compte est hébergé par %@, qui n’est pas votre serveur.',
+  // CE QUE CET APPAREIL NE PEUT PAS DIRE, dit plutôt que laissé en creux. La
+  // durée et les ouvertures restantes appartiennent au lien, et aucun lien
+  // n'a été ouvert ici pour cette invitation-là. Une absence muette se
+  // lirait comme une invitation sans limite.
+  invited_terms_unknown:
+    'Aucun lien n’a été ouvert ici pour cette invitation : sa durée et le nombre d’ouvertures qui lui restent ne se lisent pas depuis cet appareil.',
+  // LE MÊME FAIT, DIT AUTREMENT QUAND UN LIEN A ÉTÉ OUVERT ICI. « Aucun lien
+  // n'a été ouvert » serait faux sur ce chemin-là ; ce qui reste vrai, c'est
+  // que `status.rs` ne répond qu'au compte émetteur.
+  invited_terms_link:
+    'La durée de ce lien et le nombre d’ouvertures qui lui restent ne se lisent pas ici : seul le compte qui l’a émis peut les demander.',
+  invited_nothing_sent:
+    'Rien n’a encore été envoyé. Tant que vous n’avez pas répondu, cette invitation reste où elle est.',
+  // PLUS FORT QUE LA PHRASE AU-DESSUS, et c'est pour ça qu'elle est à part :
+  // sur le chemin par lien, non seulement rien n'est parti, mais le jeton
+  // n'a pas été dépensé. Le lien est encore bon après un refus.
+  invited_nothing_spent:
+    'Rien n’a encore été envoyé. Tant que vous n’avez pas répondu, ce lien n’est pas dépensé.',
+  'invited_behind %1$d':
+    '%1$d autre(s) invitation(s) attendent derrière celle-ci.',
+  invited_join: 'Rejoindre la conversation',
+  invited_refuse: 'Refuser l’invitation',
+  invited_working: 'Un instant…',
+  invited_failed:
+    'Rien n’a changé : cette invitation n’a été ni rejointe ni refusée. Vous pouvez réessayer.',
   list_name_not_kept:
     'Le nom n’a pas pu être conservé : il sera oublié au prochain démarrage.',
 
@@ -510,6 +605,22 @@ export const fr = {
   legal_report_scope:
     'Messagr est un service d’hébergement et non une plateforme en ligne, le considérant 14 du DSA écartant les services de messagerie interpersonnelle. Les articles 20 et 21 ne s’appliquent donc pas, et ce texte ne prétend pas les offrir.',
 
+  // #333 : LE CHEMIN DE SUPPRESSION, ET IL EST ICI PARCE QUE PLAY L'EXIGE.
+  //
+  // Une application qui crée un compte doit offrir « an in-app path to delete
+  // their app accounts », et Play accepte que ce chemin soit un lien vers la
+  // ressource web où la suppression se demande. Messagr crée un compte à
+  // l'ouverture d'une invitation, et ne portait ni l'un ni l'autre.
+  //
+  // CE QUE CET ÉCRAN DIT, LA PAGE LE DIT AUSSI, et c'est la règle de tout ce
+  // bloc : scripts/assert-legal-screen.sh existe parce qu'un texte publié a
+  // déjà promis un geste que le code ne portait pas. Aucun délai n'est affiché
+  // ici : la page d'aide porte celui que la politique engage, et dit dans la
+  // même phrase que la purge est faite à la main (#71).
+  legal_delete_title: 'Supprimer votre compte',
+  legal_delete_body:
+    'La suppression se demande par courriel à conformite@messagr.eu : le geste depuis l’application n’existe pas encore. Le compte est alors désactivé et ses données sont purgées ; les messages déjà envoyés restent des événements des salons où ils ont été écrits, et le serveur ne peut pas les en retirer puisqu’il ne peut pas les lire.',
+  legal_delete_link: 'Demander la suppression : messagr.eu/aide',
   legal_full_terms: 'Conditions générales complètes : messagr.eu',
 
   // LA CONFIANCE, EXPLIQUÉE PLUTÔT QUE SIGNALÉE.
@@ -802,14 +913,45 @@ export const fr = {
   'backup_settings_progress %1$d %2$d': '%1$d clés sauvegardées sur %2$d',
   backup_settings_catching_up:
     'Le reste part au fil des synchronisations. Rien n’est perdu en attendant.',
-  'backup_settings_count %1$d':
-    '%1$d clés sauvegardées : c’est ce que Messagr voit sur le serveur.',
+  // LE COMPTE DIT D'OÙ IL VIENT, ET IL VIENT D'ICI (#323). Il annonçait
+  // « c'est ce que Messagr voit sur le serveur » en affichant un compteur
+  // local, sur le seul écran dont toute la valeur est d'être cru.
+  'backup_settings_count %1$d': '%1$d clés envoyées depuis cet appareil.',
   backup_settings_reading: "Lecture de l'état de la sauvegarde…",
   backup_settings_unreadable:
     "L'état de la sauvegarde n'a pas pu être lu sur cet appareil.",
   backup_settings_unreadable_why:
     "Cela ne dit rien de la sauvegarde elle-même : si elle était active, elle l'est toujours, et rien n'a été modifié ici.",
   backup_settings_retry: 'Réessayer',
+  // LES CINQ ÉTATS DE #323, VALIDÉS PAR LE PORTEUR LE 15 SEPTEMBRE 2026.
+  // Repris mot pour mot : ce sont les phrases sur lesquelles la décision a
+  // été prise, et les réécrire ici reviendrait à la reprendre tout seul.
+  //
+  // « Une autre sauvegarde a remplacé celle de cet appareil » couvre aussi
+  // la version simplement disparue : ce que la personne peut en faire est le
+  // même dans les deux cas, et c'est ce que les deux actions disent.
+  backup_settings_superseded:
+    "Une autre sauvegarde a remplacé celle de cet appareil : plus rien ne part d'ici.",
+  backup_settings_dormant:
+    "Une sauvegarde existe sur le serveur, mais cet appareil ne l'alimente pas.",
+  // NI « PAS DE SAUVEGARDE » NI « SAUVEGARDÉS », qui sont les deux états
+  // que celui-ci ne doit jamais se faire prendre pour. La seconde phrase est
+  // ce qui empêche de lire la première comme une panne de l'appareil.
+  //
+  // « lu » et non « vérifié », tranché par le porteur le 16 septembre 2026 :
+  // c'est la requête qui n'a pas eu de réponse, et le catalogue français
+  // garde le mot « vérifier » pour ce qui se vérifie entre personnes (#34).
+  // Le voisin, `backup_settings_unreadable`, dit « sur cet appareil » : c'est
+  // ce qui sépare les deux silences.
+  backup_settings_unchecked:
+    "Le serveur n'a pas répondu : l'état de la sauvegarde n'a pas pu être lu.",
+  backup_settings_unchecked_why: "Rien n'a été modifié ici.",
+  backup_settings_enter_current: 'Entrer la clé actuelle',
+  backup_settings_enter_key: 'Entrer ma clé de récupération',
+  // Passe par l'écran de conséquences du remplacement : créer une nouvelle
+  // sauvegarde retire celle du serveur, et la clé d'avant cesse d'ouvrir
+  // quoi que ce soit.
+  backup_settings_new: 'Créer une nouvelle sauvegarde',
   backup_settings_enable: 'Sauvegarder mes messages',
   backup_settings_never_shown:
     'Votre clé actuelle ne peut pas être réaffichée, ici ni ailleurs.',
@@ -828,6 +970,8 @@ export const fr = {
   backup_offer_accept: 'Sauvegarder mes clés',
   backup_offer_refuse: 'Pas maintenant',
   backup_offer_later: 'Vous pourrez l’activer plus tard depuis Réglages.',
+  backup_accept_failed: 'La sauvegarde n’a pas pu être activée. Réessayez.',
+  backup_accept_working: 'Activation…',
   backup_replace_title: 'Remplacer votre clé de récupération',
   backup_replace_lead: 'Avant de décider, ce que ce geste emporte.',
   backup_replace_fact_old: "L'ancienne clé n'ouvrira plus rien",
@@ -911,8 +1055,6 @@ export const fr = {
   settings_vault_hint:
     'Un fichier, pour qui ne veut rien laisser sur un serveur.',
   restore_done_close: 'Fermer',
-  settings_restore: 'Retrouver mes anciens messages',
-  settings_restore_hint: 'Si vous avez votre clé de récupération.',
   back_to_newest: 'Revenir au dernier message',
 } as const
 

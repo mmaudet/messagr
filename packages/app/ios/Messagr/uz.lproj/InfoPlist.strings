@@ -1,0 +1,23 @@
+/* Uzbek, Latin script.
+
+   Translated from the English base. Why each string says what it says — and
+   what it is not allowed to promise — is written beside the keys in
+   Info.plist; `scripts/assert-ios-localisation.sh` refuses a language that is
+   missing one.
+
+   The vocabulary of `src/copy/uz.ts`: uchdan-uchgacha shifrlangan, server,
+   suratlar kutubxonasi, qoʻngʻiroq.
+
+   `oʻ` and `gʻ` are written with the modifier letter turned comma (U+02BB),
+   which is the standard form and not an apostrophe. No Cyrillic letter belongs
+   here: а е о р с х are drawn identically to the Latin ones, and
+   `copy.spec.ts` guards the catalogue for exactly that — the check script
+   guards these four strings the same way. */
+
+"NSMicrophoneUsageDescription" = "Qoʻngʻiroq paytida siz gaplashayotgan odam sizni eshitishi uchun. Ovoz uchdan-uchgacha shifrlangan: uni na server, na Messagr tinglay oladi va hech narsa yozib olinmaydi.";
+
+"NSCameraUsageDescription" = "Video qoʻngʻiroq paytida siz gaplashayotgan odam sizni koʻrishi uchun. Tasvir uchdan-uchgacha shifrlangan: uni na server, na Messagr koʻra oladi va hech narsa yozib olinmaydi.";
+
+"NSPhotoLibraryUsageDescription" = "Suhbatda yuborish uchun surat tanlashga. Surat yuborilishidan oldin shu qurilmada shifrlanadi: uni na server, na Messagr oʻqiy oladi.";
+
+"NSPhotoLibraryAddUsageDescription" = "Suhbatda olingan suratni, siz soʻraganingizda, suratlar kutubxonangizga saqlashga. Saqlangan surat Messagr dan chiqadi: keyin u suratlar kutubxonangizning zaxira nusxalari va ruxsatlariga boʻysunadi.";

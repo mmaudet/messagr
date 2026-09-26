@@ -273,10 +273,15 @@ const entete = (html, langue, page) => {
 
 // ── Le plan du site ────────────────────────────────────────────────────────
 //
-// Six adresses et les deux pages légales. La page d'invitation n'y est pas :
-// elle n'a pas de contenu propre à indexer, elle répond les mêmes octets pour
-// tout jeton, et l'inscrire reviendrait à proposer à un moteur de parcourir
-// des jetons.
+// Six adresses par page engendrée, les deux pages légales et la page d'aide.
+// La page d'invitation n'y est pas : elle n'a pas de contenu propre à
+// indexer, elle répond les mêmes octets pour tout jeton, et l'inscrire
+// reviendrait à proposer à un moteur de parcourir des jetons.
+//
+// LES TROIS PAGES ÉCRITES À LA MAIN SONT NOMMÉES ICI, ET C'EST LE PRIX DE LES
+// AVOIR ÉCRITES À LA MAIN. Elles ne passent pas par `PAGES`, donc rien ne les
+// ajoute au plan tout seul ; `/aide/` est la troisième, et la seule des trois
+// dont une adresse soit donnée à Apple et à Google (#333).
 // ── Ce que pèse le téléchargement ─────────────────────────────────────────
 //
 // MESURÉ, JAMAIS TAPÉ. Un chiffre écrit à la main est périmé au premier
@@ -446,7 +451,11 @@ const ecrireLesFaits = (html, langue, faits) => {
 const planDuSite = () => {
   const pages = PAGES.flatMap(page =>
     langues.map(l => `${ORIGINE}${cheminDe(page, l)}`),
-  ).concat([`${ORIGINE}/confidentialite/`, `${ORIGINE}/conditions-generales/`])
+  ).concat([
+    `${ORIGINE}/confidentialite/`,
+    `${ORIGINE}/conditions-generales/`,
+    `${ORIGINE}/aide/`,
+  ])
   const entrees = pages.map(u => `  <url><loc>${u}</loc></url>`).join('\n')
   return (
     '<?xml version="1.0" encoding="UTF-8"?>\n' +

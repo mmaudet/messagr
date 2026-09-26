@@ -50,6 +50,17 @@ export interface CallAudio {
    * loudest possible way of saying the application has lost track.
    */
   readonly stopRinging: () => void
+  /**
+   * Sound the ringback again, on a call that is still waiting on an answer.
+   *
+   * The pair of `stopRinging`, and it exists because the tone is now given
+   * up whenever the application leaves the front: the platform goes on
+   * looping it through a suspension that has frozen everything able to stop
+   * it, so it is stopped at the last moment anybody can (#294). Somebody who
+   * glances at something else and comes back has to hear what they heard
+   * before, and `calls/ringback.ts` decides when that is.
+   */
+  readonly ringAgain: () => void
   /** The call is over: give it back. */
   readonly end: () => void
   /**
@@ -97,6 +108,11 @@ export const deviceCallAudio: CallAudio = {
   },
 
   stopRinging: () => InCallManager.stopRingback(),
+
+  // `_DEFAULT_`, the same tone `begin` asked the session for: the library
+  // builds a new player each time, so stopping and starting is the whole of
+  // what it takes rather than a session to reopen.
+  ringAgain: () => InCallManager.startRingback('_DEFAULT_'),
 
   end: () => {
     // No busy tone, for the reason the ringback has none: the screen says

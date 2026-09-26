@@ -42,6 +42,16 @@ pub fn token_hash(token: &str) -> Vec<u8> {
     Sha256::digest(token.as_bytes()).to_vec()
 }
 
+/// The hash of a token as somebody presented it: typed, pasted, or read off
+/// a printed code (#375).
+///
+/// `generate_token` draws capitals, and a link typed on a telephone arrives
+/// in lowercase. Upper-casing before hashing costs no entropy: the base32
+/// alphabet, `A-Z2-7`, does not tell the two cases apart.
+pub fn presented_token_hash(presented: &str) -> Vec<u8> {
+    token_hash(&presented.to_ascii_uppercase())
+}
+
 pub fn seal(key: &[u8; 32], plaintext: &str) -> Result<Vec<u8>> {
     let cipher = ChaCha20Poly1305::new(key.into());
     let mut nonce = [0u8; 12];

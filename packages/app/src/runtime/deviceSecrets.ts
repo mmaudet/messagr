@@ -124,8 +124,11 @@ export const recoverySecrets = keychainStore('eu.messagr.recovery', 'account')
  * account and every message costs a failed push to a token nobody holds.
  *
  * Measured on the tester's telephone: sixteen `BadDeviceToken` in two hours,
- * all for one token minted by a build whose entitlement was still
- * `development`, months after that build was replaced.
+ * all for one token, read at the time as minted by a build whose entitlement
+ * was still `development`. On 15 September 2026 every iOS push turned out to
+ * be refused for another reason -- sygnal base64-decoding a hexadecimal token
+ * (#325) -- so what those sixteen were is not established. The ghost is real
+ * either way: a token that changes leaves its pusher behind.
  *
  * This device writing down its own key is the only thing that can say "that
  * one was mine, and it is not any more". A `SecretStore` because it is the
@@ -160,7 +163,8 @@ export const backupSecrets = keychainStore('eu.messagr.backup', 'account')
 /**
  * Whether this device has ever put the backup question. See backupPrompt.ts:
  * a refusal is recorded for good, so this is what stops the product asking
- * twice.
+ * twice. Every acceptance writes it too, Réglages included, since #291: see
+ * acceptBackup.ts.
  *
  * Its own entry rather than a field beside the commitment, because the two
  * are written at unrelated moments by unrelated code and either can be true

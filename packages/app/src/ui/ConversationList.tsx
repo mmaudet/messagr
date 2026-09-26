@@ -14,9 +14,11 @@ import {
 } from '../design/tokens'
 import type { ConversationSummary } from '../runtime/conversationList'
 import { displayNameFor } from '../runtime/givenName'
+import type { PasteSaid } from '../runtime/pastedLink'
 import type { ShareRefusal } from '../runtime/sharedIn'
 import { stampFor, type Stamp } from '../timeline/whenShown'
 import { Avatar } from './Avatar'
+import { PasteLink } from './PasteLink'
 
 /**
  * The list of conversations.
@@ -74,6 +76,21 @@ export interface ConversationListProps {
    */
   readonly notInYet?: boolean
   /**
+   * Prend le lien d'invitation que quelqu'un colle, quand il y a de quoi le
+   * dépenser. #367.
+   *
+   * `null` -- et donc pas de champ du tout -- quand rien n'est câblé pour le
+   * dépenser : un champ qui remet son lien à personne est un geste sans
+   * réponse, c'est-à-dire le défaut que ce ticket corrige en plus petit.
+   *
+   * Le texte est remis tel quel. Ce qu'est une invitation, c'est
+   * `invitationLink.ts` qui le dit, et il le dit à l'endroit où le lien est
+   * dépensé : voir `pastedLink.ts`.
+   */
+  readonly onPasteLink?: ((raw: string) => void) | null
+  /** Ce qu'est devenu le dernier lien collé, quand il y a une réponse. */
+  readonly pasting?: PasteSaid | null
+  /**
    * Pourquoi un partage venu d'une autre application n'a pas abouti.
    *
    * `null` la plupart du temps, c'est-à-dire chaque fois que personne n'a
@@ -84,6 +101,17 @@ export interface ConversationListProps {
    * laisser découvrir chez le destinataire. Voir `sharedIn.ts`.
    */
   readonly shareRefused?: ShareRefusal | null
+  /**
+   * La conversation qu'un toucher attend, quand il y en a une.
+   *
+   * La liste est dessinée depuis le carnet avant que le lancement soit en
+   * état d'ouvrir quoi que ce soit, et un toucher fait pendant ces quelques
+   * secondes était perdu sans un mot (#280). Il est gardé maintenant, et la
+   * ligne touchée le dit tant qu'elle attend : un geste sans réponse est un
+   * geste dont on croit qu'il n'a pas été pris, et on recommence ou on
+   * repose le téléphone. Voir `waitingToOpen.ts`.
+   */
+  readonly opening?: string | null
   /**
    * The clock, injectable. A list reading `Date.now()` inside itself is one
    * nothing can screenshot twice and get the same answer from.
@@ -98,7 +126,10 @@ export function ConversationList({
   invitation = null,
   reinstalled = null,
   notInYet = false,
+  onPasteLink = null,
+  pasting = null,
   shareRefused = null,
+  opening = null,
   now = Date.now(),
 }: ConversationListProps) {
   return (
@@ -202,9 +233,26 @@ export function ConversationList({
         // months ago and has just reinstalled would be telling them to do the
         // thing they already did.
         notInYet && reinstalled === null ? (
-          <Text style={styles.empty} testID="list-not-in-yet">
-            {t('list_not_in_yet')}
-          </Text>
+          // ET, JUSTE EN DESSOUS, DE QUOI COLLER CE LIEN. #367.
+          //
+          // La phrase au-dessus dit vrai : le lien est la seule porte. Le
+          // problème est le jour où cette porte ne s'ouvre pas -- sur iPhone,
+          // une invitation lue dans le navigateur intégré d'une autre
+          // messagerie n'atteint jamais Messagr, et c'est une règle d'Apple
+          // (#308). Le champ est la sortie de secours, et il est ici parce
+          // que c'est ici qu'on lit qu'il n'y a pas d'autre porte.
+          //
+          // JAMAIS PROPOSÉ AILLEURS. Le chemin normal reste le lien touché :
+          // la liste ne demande pas de copier un porteur à quelqu'un dont le
+          // lien s'ouvre tout seul.
+          <View>
+            <Text style={styles.empty} testID="list-not-in-yet">
+              {t('list_not_in_yet')}
+            </Text>
+            {onPasteLink !== null && (
+              <PasteLink onPaste={onPasteLink} said={pasting} />
+            )}
+          </View>
         ) : (
           <Empty />
         )
@@ -219,6 +267,7 @@ export function ConversationList({
               }
               onOpen={onOpen}
               now={now}
+              opening={summary.scope === opening}
               first={index === 0}
             />
           </View>
@@ -263,11 +312,14 @@ function Row({
   name,
   onOpen,
   now,
+  opening = false,
   first = false,
 }: {
   readonly summary: ConversationSummary
   readonly name: string | undefined
   readonly onOpen: (scope: string) => void
+  /** Whether this row's conversation is the one a touch is waiting on. */
+  readonly opening?: boolean
   /** Whether this is the top row. See the identifier below. */
   readonly first?: boolean
   /** Passed in rather than read here, so a row is a pure function of it. */
@@ -330,6 +382,11 @@ function Row({
       onPress={() => onOpen(summary.scope)}
       style={styles.row}
       accessibilityRole="button"
+      // WHAT THE SECOND LINE SAYS IS NOT SAID ALOUD BY ITSELF. A screen
+      // reader announces the label, and the row's label is the person's
+      // name -- so somebody who cannot see « Ouverture… » would get exactly
+      // the silence #280 is about. `busy` is the state that says it.
+      accessibilityState={{ busy: opening }}
       accessibilityLabel={shown}>
       {/* An identifier is set in the mono role, a name is not. That is the
           one thing distinguishing "somebody I named" from "somebody I have
@@ -354,8 +411,18 @@ function Row({
         <Text numberOfLines={1} style={named ? styles.name : styles.identifier}>
           {shown}
         </Text>
-        <Text numberOfLines={1} style={styles.preview}>
-          {previewOf(summary)}
+        {/* THE ANSWER TO THE TOUCH GOES WHERE THE PREVIEW WAS, and not
+            beside it. The row has one line for what is going on in the
+            conversation, and « Ouverture… » is what is going on in it right
+            now -- a second line appearing under the first would reflow the
+            list under somebody's finger, which is the one thing a list
+            must not do at the moment it is being touched. The preview comes
+            back by itself, because the conversation replaces the screen. */}
+        <Text
+          numberOfLines={1}
+          style={styles.preview}
+          testID={opening ? 'conversation-opening' : undefined}>
+          {opening ? t('list_opening') : previewOf(summary)}
         </Text>
       </View>
       {/* Nothing at all for a conversation that has never moved: `0` is not a

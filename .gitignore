@@ -1,4 +1,11 @@
-node_modules/
+# SANS BARRE FINALE, PARCE QU'UN LIEN N'EST PAS UN REPERTOIRE.
+# `node_modules/` ne vise que les repertoires. Un lien symbolique du meme nom
+# est un fichier (mode 120000), et `git add -A` l'emporte sans que rien ne le
+# signale ; la CI echoue plus tard sur `EEXIST: mkdir node_modules`, loin de
+# la cause. Constate le 16 septembre 2026 : un worktree n'a pas de
+# node_modules, on y lie ceux du checkout principal pour lancer les tests, et
+# le lien part dans le commit si on l'oublie.
+node_modules
 .DS_Store
 *.log
 

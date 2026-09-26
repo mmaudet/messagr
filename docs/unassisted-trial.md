@@ -17,8 +17,8 @@ to notice.
 for, read the history. **#91** widens it by two steps — issuing an invitation
 from inside the application, and taking a call — and it is #91 that closes the
 product lot. The path below is written once, with the two new steps marked, so
-the same document serves both: run steps 1 to 8 and #49 is answered; run all
-ten and #91 is.
+the same document serves both: run steps 1 to 9 and #49 is answered; run all
+eleven and #91 is.
 
 ## Before the day
 
@@ -28,7 +28,7 @@ ten and #91 is.
 - [ ] **That build can be woken.** #90 gives the application a pusher and
       `services/invitations` a push gateway; a build whose Firebase
       configuration is missing registers no pusher and fails silently, so
-      step 5 would measure the wrong thing. Confirm a notification arrives on
+      step 6 would measure the wrong thing. Confirm a notification arrives on
       the test device with the application closed _before_ the day.
 - [ ] **The invitation link opens the application _on a build from the
       track_.** The item most likely to be ticked wrongly. Android App Links
@@ -77,8 +77,8 @@ ten and #91 is.
       application has no sign-in screen, by design (_"No number, no account,
       no password"_, `promise_subtitle`); and `reenter.ts` only brings an
       account back after a reinstall. And the trial needs the inviter in an application, which
-      admits the entrant (`admitDrawnEntrant`), answers at step 6, vouches
-      at step 7 and calls at step 10.
+      admits the entrant (`admitDrawnEntrant`), answers at step 7, vouches
+      at step 8 and calls at step 11.
 - [ ] The observer has this document open and somewhere to write.
 
 ## The rule that makes it a trial
@@ -160,17 +160,28 @@ act. The number matters less than where the long ones are.
    in a way they notice; and do they tick the box or press the action first
    and learn about the box from its refusal? A gate somebody walks into is a
    gate that was not visible.
-4. **Entry.** The link is claimed. Do they know they are now _in_ something,
+4. **What the link says, before it is spent.** Since #329 the link is
+   described before anything is claimed: who claims to be inviting them
+   — _"Se présente comme Nadia"_, if the inviter gave themselves a name —
+   which instance it leads to, and what this telephone cannot state about its
+   validity. Two actions of the same rank, join and refuse. Watch three
+   things. Do they read it, or press the first button? Do they take
+   _"se présente comme"_ as a fact about who that person is, which is exactly
+   what it is not? And if the inviter declared no name, does the absence read
+   as something being broken? Refusing here spends nothing and the link stays
+   good, so a tester who refuses can simply open it again — if they do, write
+   down whether they expected that.
+5. **Entry.** The link is claimed. Do they know they are now _in_ something,
    and in something _with somebody_? That somebody shows as an identifier,
    `@2qcl4umxsia3` for the Pixel, until the person names them: an unnamed
    participant is shown by the localpart of their account
    (`packages/app/src/runtime/givenName.ts`). It is what every real invitee
    sees of an inviter who entered by invitation, so do not name it for them
    and do not explain it. Write down what they make of it.
-5. **Sending a message.** Do they find the composer? There is no send button
+6. **Sending a message.** Do they find the composer? There is no send button
    — the return key sends — so watch for a hand hunting for one. Does the
    message appear?
-6. **Reading a reply, with the application closed.** The inviter answers
+7. **Reading a reply, with the application closed.** The inviter answers
    while the person's phone is locked or the application is shut.
 
    **THIS IS THE STEP THAT CHANGED, AND THE CHANGE IS THE POINT.** This
@@ -195,34 +206,35 @@ act. The number matters less than where the long ones are.
    who locks the phone and watches it is telling you something different from
    somebody who opens the application to check.
 
-7. **Being vouched for.** The inviter performs the gesture. Nothing is asked
+8. **Being vouched for.** The inviter performs the gesture. Nothing is asked
    of the person. Do they notice anything changed? Does the line about
    history arriving mean anything to them?
-8. **Reading the history.** Do they scroll up? Do they realise there is a
+9. **Reading the history.** Do they scroll up? Do they realise there is a
    past they can now read, or does it simply look like a longer conversation?
 
-   _#49 is answered at the end of step 8. The two below are #91's._
+   _#49 is answered at the end of step 9. The two below are #91's._
 
-9. **Inviting somebody themselves (#83, #113).** Hand them a second person to
-   invite — someone in the room, with a phone. Do they find the action? The
-   invitation is a link _and_ a QR code shown side by side: which do they
-   reach for with somebody standing next to them, and do they understand
-   that the link is valid for an hour and works once? Watch for the person
-   who reads the link aloud rather than showing the code, and for the one who
-   shows the code to a phone that has no application yet — that is the
-   landing page's job (#106) and this is where it is tested.
+10. **Inviting somebody themselves (#83, #113).** Hand them a second person to
+    invite — someone in the room, with a phone. Do they find the action? The
+    invitation is a link _and_ a QR code shown side by side: which do they
+    reach for with somebody standing next to them, and do they understand
+    that the link is valid for an hour and works once? Watch for the person
+    who reads the link aloud rather than showing the code, and for the one who
+    shows the code to a phone that has no application yet — that is the
+    landing page's job (#106) and this is where it is tested.
 
-   And watch what they call it. "Invitation" is the whole entry model of this
-   product; somebody who says "I'll add you" has understood something else.
+    And watch what they call it. "Invitation" is the whole entry model of
+    this product; somebody who says "I'll add you" has understood something
+    else.
 
-10. **Taking a call (#88, #89).** The inviter calls. Does the phone ring when
+11. **Taking a call (#88, #89).** The inviter calls. Does the phone ring when
     it is locked? Do they know how to answer, and does the audio work in both
     directions?
 
     **THIS STEP CAN BE RUN.** It could not when it was written, and the
     paragraph saying so outlived its own truth: #88 and #89 both landed on
     9 September 2026, and the sentence stayed here until 12 September. A
-    trial run in between would have stopped at step 9 because these
+    trial run in between would have stopped at step 10 because these
     instructions told it to, which is the one failure a written protocol can
     cause by itself.
 
@@ -249,7 +261,7 @@ And then, at the end:
 measured nothing, and a trial nobody wrote up did not happen.
 
 - Confusion, hesitation, a question asked → a line in the trial's write-up,
-  filed as a comment on the ticket the run was for (#49 for steps 1 to 8,
+  filed as a comment on the ticket the run was for (#49 for steps 1 to 9,
   #91 for the whole path).
 - **Anything that blocked the path outright → its own ticket**, not a note.
   A blocker buried in a paragraph is a blocker nobody schedules.

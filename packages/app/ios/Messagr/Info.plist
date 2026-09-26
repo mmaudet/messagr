@@ -54,7 +54,33 @@
 		<key>NSAllowsLocalNetworking</key>
 		<true/>
 	</dict>
-	<!-- LES DEUX TEXTES QU'APPLE A RECLAMES, ET POURQUOI L'UN EST UN AVEU.
+	<!-- CES QUATRE TEXTES SONT EN ANGLAIS, ET C'EST LA BASE.
+
+	     CFBundleDevelopmentRegion vaut `en`. Un texte francais ici s'affichait
+	     donc sur tout iPhone, quelle que soit sa langue : la boite
+	     d'autorisation est dessinee par iOS, qui ne lit pas le catalogue de
+	     l'application mais ce fichier, et ce fichier n'avait aucune traduction
+	     a cote de lui (#320).
+
+	     Les sept langues vivent dans `Messagr/<langue>.lproj/InfoPlist.strings`,
+	     les memes sept que `src/copy/` : une autorisation demandee dans une
+	     langue que l'ecran ne parle pas ne veut rien dire.
+
+	     UN IPHONE REGLE SUR UNE HUITIEME LANGUE NE LIT PAS CE FICHIER POUR
+	     AUTANT. Il retombe sur le catalogue de la region de developpement, donc
+	     sur `en.lproj`. Ce qui est ecrit ici est le cran d'en dessous : ce qui
+	     reste si la ressource localisee n'arrive pas du tout, ce qui est
+	     exactement la panne que la lecture du pbxproj plus bas surveille. Les
+	     deux chemins doivent finir dans la meme langue, et c'est ce que le
+	     script compare, mot pour mot.
+
+	     `scripts/assert-ios-localisation.sh` tient les deux ensemble dans
+	     `checks` : une langue sans texte, un texte ajoute ici sans traduction,
+	     ou un fichier que le projet Xcode ne copie pas. Le dernier est le
+	     silencieux, et c'est pour lui que le script lit aussi le pbxproj : un
+	     `.lproj` qu'aucun groupe de variantes ne nomme ne casse aucune build,
+	     il n'arrive simplement jamais sur l'appareil. -->
+	<!-- LES DEUX TEXTES QU'APPLE A RECLAMES.
 
 	     ITMS-90683, sur la premiere livraison de #109 : le binaire reference des
 	     API sensibles, donc l'Info.plist doit porter le texte correspondant,
@@ -62,7 +88,7 @@
 	     construit, se signe, se televerse et se fait refuser au traitement,
 	     par courriel, une heure plus tard.
 
-	     `scripts/assert-ios-purpose-strings.sh` refuse desormais ca dans
+	     `scripts/assert-ios-info-plist.sh` refuse desormais ca dans
 	     `checks`, a partir des dependances declarees. -->
 	<!-- LE MOMENT DE LA DEMANDE NE CHANGE PAS SUR IOS.
 	     Android demande le micro, et la camera pour un appel video, avant que
@@ -73,17 +99,21 @@
 	     react-native-webrtc. iOS demande donc toujours a la capture, comme
 	     avant. `src/calls/permissions.ts` porte la regle. -->
 	<key>NSMicrophoneUsageDescription</key>
-	<string>Pour que votre correspondant vous entende pendant un appel. Le son est chiffré de bout en bout : ni le serveur ni Messagr ne peuvent l’écouter, et rien n’est enregistré.</string>
-	<!-- UN TEXTE POUR UNE AUTORISATION QUI NE SERA JAMAIS DEMANDEE.
-	     Messagr ne touche pas la camera : ce lot est audio, et la video n'est
-	     pas offerte (#88). C'est `react-native-webrtc` qui reference l'API, et
-	     Apple exige le texte de qui la reference, pas de qui l'appelle. Le
-	     texte dit donc la verite plutot que d'annoncer une fonction absente :
-	     si jamais il s'affichait, il ne mentirait pas. -->
+	<string>So the person you are speaking to can hear you during a call. The sound is end-to-end encrypted: neither the server nor Messagr can listen to it, and nothing is recorded.</string>
+	<!-- LA CAMERA, POUR UN APPEL VIDEO ET RIEN D'AUTRE.
+	     Ce texte promettait que l'autorisation ne serait jamais demandee.
+	     C'etait vrai tant que les appels etaient audio (#88) : la cle n'etait
+	     la que parce que `react-native-webrtc` reference la camera, et Apple
+	     exige le texte de qui reference l'API. Les appels video (#199) ont
+	     rendu la promesse fausse. La camera est ouverte par `captureVideo`,
+	     dans `src/runtime/callMedia.ts`, et seulement pour un appel : en
+	     placer un en video, en decrocher un en video, ou allumer la camera
+	     pendant un appel. `react-native-image-picker` ne sert qu'a la
+	     phototheque (`src/runtime/imageLibrary.ts`), jamais a la camera. -->
 	<key>NSCameraUsageDescription</key>
-	<string>Messagr n’utilise pas l’appareil photo. Ce texte est exigé par iOS parce que la bibliothèque d’appels référence cette API ; l’autorisation ne vous sera pas demandée.</string>
+	<string>So the person you are speaking to can see you during a video call. The picture is end-to-end encrypted: neither the server nor Messagr can see it, and nothing is recorded.</string>
 	<key>NSPhotoLibraryUsageDescription</key>
-	<string>Pour choisir une image à envoyer dans une conversation. L’image est chiffrée sur cet appareil avant d’être envoyée : ni le serveur ni Messagr ne peuvent la lire.</string>
+	<string>To choose a picture to send in a conversation. The picture is encrypted on this device before it is sent: neither the server nor Messagr can read it.</string>
 	<!-- DEUX CLES ET NON UNE, ET LA DIFFERENCE COMPTE.
 	     Celle du dessus est le droit de LIRE la photothèque, demande pour
 	     choisir une image a envoyer. Celle-ci est le droit d'y AJOUTER, et
@@ -92,7 +122,7 @@
 	     les deux usages demanderait un acces en lecture dont ce geste n'a
 	     pas besoin. -->
 	<key>NSPhotoLibraryAddUsageDescription</key>
-	<string>Pour enregistrer dans votre photothèque une photographie reçue dans une conversation, lorsque vous le demandez. Une image enregistrée quitte Messagr : elle suit ensuite les sauvegardes et les autorisations de votre photothèque.</string>
+	<string>To save a photograph received in a conversation to your photo library, when you ask for it. A saved picture leaves Messagr: it then follows the backups and the permissions of your photo library.</string>
 	<key>RCTNewArchEnabled</key>
 	<true/>
 	<!-- L'EXPORT, DECLARE EXEMPTE, ET C'EST LE COMPTE QUI LE DIT.

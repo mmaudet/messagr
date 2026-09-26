@@ -1,0 +1,17 @@
+/* Spanish.
+
+   Translated from the English base. Why each string says what it says — and
+   what it is not allowed to promise — is written beside the keys in
+   Info.plist; `scripts/assert-ios-localisation.sh` refuses a language that is
+   missing one.
+
+   `usted` and the vocabulary of `src/copy/es.ts`: cifrado de extremo a
+   extremo, servidor, fototeca, interlocutor. */
+
+"NSMicrophoneUsageDescription" = "Para que su interlocutor le oiga durante una llamada. El sonido está cifrado de extremo a extremo: ni el servidor ni Messagr pueden escucharlo, y no se graba nada.";
+
+"NSCameraUsageDescription" = "Para que su interlocutor le vea durante una videollamada. La imagen está cifrada de extremo a extremo: ni el servidor ni Messagr pueden verla, y no se graba nada.";
+
+"NSPhotoLibraryUsageDescription" = "Para elegir una imagen que enviar en una conversación. La imagen se cifra en este dispositivo antes de enviarse: ni el servidor ni Messagr pueden leerla.";
+
+"NSPhotoLibraryAddUsageDescription" = "Para guardar en su fototeca una fotografía recibida en una conversación, cuando usted lo pida. Una imagen guardada sale de Messagr: a partir de ahí sigue las copias de seguridad y los permisos de su fototeca.";

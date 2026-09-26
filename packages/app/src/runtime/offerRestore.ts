@@ -20,10 +20,23 @@ import type { SecretStore } from './sessionStore'
  *
  * Three facts, and all three have to be true at once.
  *
- * **A backup exists on the homeserver.** Read from `GET
- * /room_keys/version`, which is the product's request. Without one there is
- * nothing to restore and offering would be offering to open a door that was
- * never built.
+ * **A backup exists on the homeserver, and it holds something this device
+ * does not have.** Read from `GET /room_keys/version`, which is the product's
+ * request. Without one there is nothing to restore and offering would be
+ * offering to open a door that was never built.
+ *
+ * Two facts rather than one, since #328, and both came from the same defect.
+ * Accepting the backup on a telephone whose past is unreadable, and then
+ * dismissing the key screen, runs this decision again -- and what the
+ * homeserver holds is then the version THIS DEVICE made a moment ago: empty,
+ * sealed by the key just shown, and about to be offered as « vos anciens
+ * messages sont là ». So a version this device writes to is not offered, and
+ * neither is one the homeserver says holds no keys. The second catches it
+ * from the other side, on a device whose keystore lost its commitment.
+ *
+ * A homeserver that names no count is not an empty backup: silence is
+ * refused as a reason to withhold the offer, because the cost of being wrong
+ * that way is somebody with a key in their hand and no door.
  *
  * **This device cannot read its past.** Not "this device is new": a
  * reinstalled device that was never backed up is in exactly the same
@@ -67,9 +80,26 @@ export function offerRestore(state: {
   readonly unreadable: number
   /** Whether this device has already put the question and been refused. */
   readonly asked: boolean
+  /**
+   * Whether the version the homeserver holds is the one this device writes
+   * to, from the keystore commitment (#328).
+   *
+   * Its keys are the ones this device already has, by definition, so it can
+   * restore nothing -- and a device that has just accepted is in exactly
+   * that position, with an empty version and the offer about to fire.
+   */
+  readonly mine: boolean
+  /**
+   * How many keys the homeserver says the version holds, or `null` when it
+   * named none. See `backupCalls.ts`: `null` is unknown, never zero.
+   */
+  readonly keys: number | null
 }): RestoreOffer {
   if (!state.backupExists || state.asked) return { offer: false }
   if (state.unreadable <= 0) return { offer: false }
+  if (state.mine) return { offer: false }
+  // `<= 0` rather than `=== 0`, like the count above and for the same reason.
+  if (state.keys !== null && state.keys <= 0) return { offer: false }
   return { offer: true, unreadable: state.unreadable }
 }
 

@@ -1432,9 +1432,28 @@ async function selfTest() {
   )
   check(
     "le lien est celui que l'application fabrique",
-    app.includes('link: `https://${linkHost}/i/${minted.token}`') &&
+    app.includes('`https://${linkHost}/i/${minted.token}`') &&
       linkFor('https://messagr.eu', 'ABC'),
     'https://messagr.eu/i/ABC',
+  )
+  check(
+    "et le relecteur ne se donne aucun nom, donc rien n'est écrit après",
+    // #329 : l'application peut écrire le nom que l'inviteur se donne dans le
+    // fragment du lien, `#n=<nom>`. Elle rend le lien intact quand il n'y en a
+    // pas, et ce script n'en donne aucun -- il émet pour Apple, qui n'est
+    // invité par personne. Les deux moitiés sont relues ici parce que c'est
+    // cette absence qui fait que `linkFor` dit encore la vérité.
+    [
+      app.includes('linkWithDeclaredName('),
+      /if \(declared === null\) return link/.test(
+        readFileSync(
+          join(REPOSITORY, 'packages/app/src/runtime/declaredName.ts'),
+          'utf8',
+        ),
+      ),
+      linkFor('https://messagr.eu', 'ABC').includes('#'),
+    ],
+    [true, true, false],
   )
   check(
     'les bornes sont celles du service',

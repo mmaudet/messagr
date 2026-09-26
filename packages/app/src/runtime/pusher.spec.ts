@@ -1,5 +1,6 @@
-import { describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it } from 'vitest'
 
+import { setCatalogue } from '../copy'
 import {
   describePusher,
   forgetPusher,
@@ -8,6 +9,12 @@ import {
 } from './pusher'
 
 const TOKEN = 'fcm-token-abc'
+
+afterEach(() => {
+  // The catalogue is a module variable shared with every other suite. A test
+  // that switched it and walked away would leave the next file reading German.
+  setCatalogue('fr')
+})
 
 describe('describePusher', () => {
   it('points the homeserver at this deployment’s own gateway', () => {
@@ -40,6 +47,42 @@ describe('describePusher', () => {
       'default_payload' in
         describePusher(TOKEN, 'https://h/_m', 'android').data,
     ).toBe(false)
+  })
+
+  it('names the language the blind notification should be written in', () => {
+    // ADR-0009's visible fallback: the gateway holds the words in seven
+    // languages and cannot know which one this device reads. This tag is how
+    // it learns, and it is the only thing the gateway takes from `data`.
+    const body = describePusher(TOKEN, 'https://h/_m', 'ios', 'nl')
+    expect(body.data.lang).toBe('nl')
+  })
+
+  it('answers the same language in both places it is asked', () => {
+    // The protocol's `lang` is not what the gateway reads -- a homeserver
+    // forwards `data` and not `lang` -- but a pusher answering two different
+    // languages to one question is a thing somebody has to resolve later.
+    const body = describePusher(TOKEN, 'https://h/_m', 'ios', 'uz')
+    expect(body.lang).toBe('uz')
+    expect(body.data.lang).toBe('uz')
+  })
+
+  it('follows the language the application is speaking', () => {
+    // Not passed down from the caller: registering happens deep in the pump,
+    // which has no opinion about language. What the application is speaking
+    // is already a module variable, and this reads it rather than making one
+    // more parameter that every caller would have to be taught to fill.
+    setCatalogue('de')
+    expect(describePusher(TOKEN, 'https://h/_m', 'ios').data.lang).toBe('de')
+  })
+
+  it('still carries no sentence, only which of the seven to say', () => {
+    // The whole arrangement, as one assertion: a client that could send the
+    // words could send ANY words, and sygnal would merge them into the push.
+    // So what leaves here is a two-letter tag and nothing that reads as text.
+    const wire = JSON.stringify(describePusher(TOKEN, 'https://h/_m', 'ios'))
+    expect(wire).not.toContain('Something arrived')
+    expect(wire).not.toContain('Quelque chose')
+    expect(wire).not.toContain('aps')
   })
 
   it('appends the gateway path exactly once, whatever the base looks like', () => {

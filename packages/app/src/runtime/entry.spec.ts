@@ -2,8 +2,14 @@ import { describe, expect, it } from 'vitest'
 
 import { accountsInQuestion } from './accountInQuestion'
 import { afterReinstall } from './afterReinstall'
+import { theAwaitedInvitations } from './awaitedInvitations'
 import type { ServicePoster } from './claimInvitation'
-import { enterWithASession, type EntryDeps, type Leaving } from './entry'
+import {
+  DECLINED,
+  enterWithASession,
+  type EntryDeps,
+  type Leaving,
+} from './entry'
 import type { Departure } from './leaveAccount'
 import { questionOnScreen } from './questionOnScreen'
 import type { SecretStore } from './sessionStore'
@@ -1421,5 +1427,304 @@ describe('the rule of #279, whichever the answer', () => {
         'https://other.example/_messagr/invitations/claim',
       ]),
     )
+  })
+})
+
+describe('the invitation a spent link waits for (#329)', () => {
+  // ONE LINK SPENT, ONE INVITATION EXPECTED. Entry spends the link and the
+  // pump walks through the invitation it opens, in two modules that never
+  // meet; the register of `awaitedInvitations.ts` is what carries the fact
+  // from one to the other. Read here as a difference, because the register
+  // belongs to the process rather than to a test.
+
+  it('waits for the invitation the link that made this account was for', async () => {
+    const before = theAwaitedInvitations.count()
+    const result = await enterWithASession({
+      secrets: store(),
+      poster: granting,
+      link: async () => HERE,
+      ...nobodyAsked,
+      signUp: markerStore().secrets,
+      recovery: store(),
+    })
+    expect(result.entered && result.claimed).toBe(true)
+    expect(theAwaitedInvitations.count()).toBe(before + 1)
+  })
+
+  it('waits for the invitation a link spent for the account it holds was for', async () => {
+    const before = theAwaitedInvitations.count()
+    const result = await enterWithASession({
+      secrets: store(JSON.stringify(SESSION)),
+      poster: recordingPoster(),
+      link: async () => HERE,
+      ...nobodyAsked,
+      signUp: markerStore().secrets,
+      recovery: store(),
+    })
+    expect(result.entered && result.invitation).toEqual({ kind: 'used' })
+    expect(theAwaitedInvitations.count()).toBe(before + 1)
+  })
+
+  it('waits for the invitation the link it left its account for was for', async () => {
+    const here = device()
+    const { leaving } = answering('leave', here)
+    const before = theAwaitedInvitations.count()
+    const result = await entering(here, leaving)
+    expect(result.entered && result.claimed).toBe(true)
+    expect(theAwaitedInvitations.count()).toBe(before + 1)
+  })
+
+  it('waits for nothing when a session was merely restored', async () => {
+    // No link was spent, so no invitation is owed to this launch.
+    const before = theAwaitedInvitations.count()
+    await enterWithASession({
+      secrets: store(JSON.stringify(SESSION)),
+      poster: granting,
+      link: async () => null,
+      ...nobodyAsked,
+      signUp: markerStore().secrets,
+      recovery: store(),
+    })
+    expect(theAwaitedInvitations.count()).toBe(before)
+  })
+
+  it('waits for nothing when the link could not be used', async () => {
+    const before = theAwaitedInvitations.count()
+    const result = await enterWithASession({
+      secrets: store(JSON.stringify(SESSION)),
+      poster: refusing,
+      link: async () => HERE,
+      ...nobodyAsked,
+      signUp: markerStore().secrets,
+      recovery: store(),
+    })
+    expect(result.entered && result.invitation).toEqual({
+      kind: 'refused',
+      reason: 'this invitation cannot be used',
+    })
+    expect(theAwaitedInvitations.count()).toBe(before)
+  })
+
+  it('waits for nothing when the account the link made could not be kept', async () => {
+    // The claim went through and the keystore refused the new session, so
+    // this device stays on the account it held -- and the invitation the link
+    // opened is for an account it will never run.
+    const here = device({ sessionWrite: 'refused' })
+    const { leaving } = answering('leave', here)
+    const before = theAwaitedInvitations.count()
+    const result = await entering(here, leaving)
+    expect(result.entered && result.invitation).toEqual({
+      kind: 'spent',
+      reason: 'this device could not keep the new account',
+    })
+    expect(theAwaitedInvitations.count()).toBe(before)
+  })
+})
+
+/**
+ * §13.3's first screen, on the link path. #329.
+ *
+ * *« Toute invitation par lien ouvre l'écran 1 de §13.3 avant toute
+ * décision. »* The screen that shipped first decides an invitation NO link
+ * was spent for; this is the other half, and it comes before anything is
+ * sent rather than after.
+ */
+describe('the link described before it is spent', () => {
+  /** Records what the screen was handed, and answers `decision`. */
+  function describing(decision: 'join' | 'refuse') {
+    const shown: Array<{
+      instance: string
+      declared: string | null
+      elsewhere: boolean
+    }> = []
+    return {
+      shown,
+      describe: async (what: {
+        instance: string
+        declared: string | null
+        elsewhere: boolean
+      }) => {
+        shown.push(what)
+        return decision
+      },
+    }
+  }
+
+  it('describes the link to a device with no account, before any request', async () => {
+    const screen = describing('join')
+    const poster = recordingPoster(GRANTED_HERE)
+    await enterWithASession({
+      secrets: store(),
+      poster,
+      link: async () => `${HERE}#n=Nadia`,
+      ...nobodyAsked,
+      signUp: markerStore().secrets,
+      recovery: store(),
+      describe: async what => {
+        // NOTHING HAS BEEN SENT AT THE MOMENT THE SCREEN IS DRAWN, which is
+        // what makes the refusal below cost nothing at all.
+        expect(poster.calls).toEqual([])
+        return screen.describe(what)
+      },
+    })
+    expect(screen.shown).toEqual([
+      { instance: 'messagr.eu', declared: 'Nadia', elsewhere: false },
+    ])
+    expect(poster.calls.length).toBeGreaterThan(0)
+  })
+
+  it('spends nothing at all when the person refuses', async () => {
+    // A refusal is not an error and leaves no trace anywhere: the token is
+    // unspent, so the same link opened again is described again.
+    const poster = recordingPoster(GRANTED_HERE)
+    const secrets = store()
+    const result = await enterWithASession({
+      secrets,
+      poster,
+      link: async () => `${HERE}#n=Nadia`,
+      ...nobodyAsked,
+      signUp: markerStore().secrets,
+      recovery: store(),
+      describe: async () => 'refuse',
+    })
+    expect(poster.calls).toEqual([])
+    expect(await secrets.read()).toBeNull()
+    expect(result).toEqual({ entered: false, reason: DECLINED })
+  })
+
+  it('describes it to a device that already has an account too', async () => {
+    // « Toute invitation par lien », and this is the ordinary case on a
+    // second invitation: the link is spent FOR the account this device has,
+    // which is still something to be asked about first.
+    const here = device({ claim: { status: 200, body: '{}' } })
+    const screen = describing('join')
+    const result = await enterWithASession({
+      secrets: here.secrets,
+      poster: here.poster,
+      link: async () => `${HERE}#n=Nadia`,
+      signUp: here.signUp,
+      recovery: here.recovery,
+      storeExists: here.storeExists,
+      leaving: nobodyAsked.leaving,
+      describe: screen.describe,
+    })
+    expect(screen.shown).toEqual([
+      { instance: 'messagr.eu', declared: 'Nadia', elsewhere: false },
+    ])
+    expect(result.entered && result.invitation).toEqual({ kind: 'used' })
+  })
+
+  it('leaves that device exactly as it was when the person refuses', async () => {
+    // The account it holds is untouched and NOTHING is said on its list: the
+    // person refused an invitation on a full screen a second earlier, and a
+    // line telling them what they had just decided would be noise.
+    const here = device()
+    const result = await enterWithASession({
+      secrets: here.secrets,
+      poster: here.poster,
+      link: async () => HERE,
+      signUp: here.signUp,
+      recovery: here.recovery,
+      storeExists: here.storeExists,
+      leaving: nobodyAsked.leaving,
+      describe: async () => 'refuse',
+    })
+    expect(here.calls).toEqual([])
+    expect(here.held()).toEqual(UNTOUCHED)
+    expect(result).toEqual({ entered: true, session: SESSION, claimed: false })
+  })
+
+  it('says the link leads elsewhere, and asks before the heavier question', async () => {
+    // #304's question is « leave the account you have ». This one is « who is
+    // inviting you, and from where ». The order is describe, then the
+    // consequence of accepting -- and a refusal here means the heavier
+    // question is never put at all.
+    const here = device()
+    const { asked, leaving } = answering('leave', here)
+    const screen = describing('refuse')
+    const result = await enterWithASession({
+      secrets: here.secrets,
+      poster: here.poster,
+      link: async () => `${ELSEWHERE}#n=Nadia`,
+      signUp: here.signUp,
+      recovery: here.recovery,
+      storeExists: here.storeExists,
+      leaving,
+      describe: screen.describe,
+    })
+    expect(screen.shown).toEqual([
+      { instance: 'other.example', declared: 'Nadia', elsewhere: true },
+    ])
+    expect(asked).toEqual([])
+    expect(here.calls).toEqual([])
+    expect(result).toEqual({ entered: true, session: SESSION, claimed: false })
+  })
+
+  it('waits for no invitation after a refusal', async () => {
+    const before = theAwaitedInvitations.count()
+    await enterWithASession({
+      secrets: store(),
+      poster: granting,
+      link: async () => HERE,
+      ...nobodyAsked,
+      signUp: markerStore().secrets,
+      recovery: store(),
+      describe: async () => 'refuse',
+    })
+    expect(theAwaitedInvitations.count()).toBe(before)
+  })
+
+  it('describes nothing when there is no link to describe', async () => {
+    const shown: unknown[] = []
+    await enterWithASession({
+      secrets: store(JSON.stringify(SESSION)),
+      poster: granting,
+      link: async () => null,
+      ...nobodyAsked,
+      signUp: markerStore().secrets,
+      recovery: store(),
+      describe: async what => {
+        shown.push(what)
+        return 'join'
+      },
+    })
+    expect(shown).toEqual([])
+  })
+
+  it('describes nothing for an address that is not an invitation', async () => {
+    // Read before anything is drawn, so a stray link costs no screen either.
+    const shown: unknown[] = []
+    const result = await enterWithASession({
+      secrets: store(),
+      poster: granting,
+      link: async () => 'https://messagr.eu/about',
+      ...nobodyAsked,
+      signUp: markerStore().secrets,
+      recovery: store(),
+      describe: async what => {
+        shown.push(what)
+        return 'join'
+      },
+    })
+    expect(shown).toEqual([])
+    expect(result).toEqual({
+      entered: false,
+      reason: 'this link is not an invitation',
+    })
+  })
+
+  it('enters exactly as it always did when there is no screen to describe on', async () => {
+    // `describe` is absent for a context with nowhere to draw, as
+    // `leaving.ask` is null for one that cannot put its question. An entry
+    // with no screen goes on entering rather than refusing everything.
+    const result = await enterWithASession({
+      secrets: store(),
+      poster: granting,
+      link: async () => HERE,
+      ...nobodyAsked,
+      signUp: markerStore().secrets,
+      recovery: store(),
+    })
+    expect(result.entered).toBe(true)
   })
 })

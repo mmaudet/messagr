@@ -272,6 +272,23 @@ export const en: Readonly<Record<CopyKey, string>> = {
     'You already have a conversation with %@. That one carries on: the invitation did not open a second.',
   list_not_in_yet:
     'You are not in yet. Open the invitation link somebody sent you: it is the only door, and the application can do nothing before it.',
+  // THE SECOND DOOR, AND ONLY THE SECOND. #367. See the French catalogue for
+  // the whole of the reasoning, which is a product decision rather than a
+  // wording one: the application never reads the clipboard by itself, and
+  // what a copied link costs is said where it is asked for.
+  list_paste_lead:
+    'If the link will not open by itself, copy it and paste it here.',
+  list_paste_cost:
+    'A copied link can be read by the other applications on this telephone. This one is good for one hour and for a single use.',
+  list_paste_field: 'Paste the invitation link',
+  list_paste_confirm: 'Enter',
+  list_paste_working: 'Opening the invitation…',
+  list_paste_not_a_link:
+    'That is not a Messagr invitation link. Nothing was sent, and no invitation was spent.',
+  list_paste_refused:
+    'This invitation cannot be used. Ask the person who sent it to you for a new one.',
+  list_paste_retry:
+    'This invitation could not be followed for now. Try again in a moment: the link itself is still good.',
   list_reinstalled_back:
     'This device was reinstalled. It has come back under a new device identity, and messages received before the reinstall stay unreadable: their keys went with the old installation.',
   list_reinstalled_stranded:
@@ -280,6 +297,7 @@ export const en: Readonly<Record<CopyKey, string>> = {
   list_nothing_said: 'Nothing has been said yet',
   list_unreadable: 'This device cannot read the last message',
   list_unreachable: 'This conversation could not be read back',
+  list_opening: 'Opening…',
   list_name_action: 'Give a name',
   list_name_title: 'What do you call this person?',
   list_name_hint:
@@ -290,6 +308,9 @@ export const en: Readonly<Record<CopyKey, string>> = {
   list_back: 'Conversations',
   invite_action: 'Invite someone',
   invite_who: 'Who are you inviting?',
+  invite_declared: 'How do you introduce yourself?',
+  invite_declared_hint:
+    'Optional. This name travels in the link and nowhere else: the service does not receive it and keeps nothing of it.',
   invite_working: 'Creating the conversation…',
   invite_ready:
     'Send this link to them. It is valid for an hour and works once.',
@@ -300,6 +321,30 @@ export const en: Readonly<Record<CopyKey, string>> = {
   invite_failed: 'The invitation could not be created.',
   invite_waiting: 'Nobody has opened the link yet.',
   invite_admitted: 'Done: this person can come in.',
+  invited_title: 'Invitation received',
+  invited_lead: 'Invites you to join a conversation.',
+  invited_who_unknown:
+    'This conversation does not say who created it. Nobody can be named here.',
+  invited_who_undeclared:
+    'This link does not say who is inviting you: that person gave themselves no name.',
+  'invited_instance %@': 'This account is hosted by %@.',
+  'invited_instance_elsewhere %@':
+    'This account is hosted by %@, which is not your server.',
+  invited_terms_unknown:
+    'No link was opened here for this invitation: how long it lasts and how many uses it has left cannot be read from this device.',
+  invited_terms_link:
+    'How long this link lasts and how many uses it has left cannot be read here: only the account that issued it can ask.',
+  invited_nothing_sent:
+    'Nothing has been sent yet. Until you answer, this invitation stays where it is.',
+  invited_nothing_spent:
+    'Nothing has been sent yet. Until you answer, this link is not spent.',
+  'invited_behind %1$d':
+    '%1$d other invitation(s) are waiting behind this one.',
+  invited_join: 'Join the conversation',
+  invited_refuse: 'Refuse the invitation',
+  invited_working: 'One moment…',
+  invited_failed:
+    'Nothing has changed: this invitation was neither joined nor refused. You can try again.',
   list_name_not_kept:
     'The name could not be kept: it will be forgotten at the next launch.',
   settings_action: 'Settings',
@@ -338,6 +383,10 @@ export const en: Readonly<Record<CopyKey, string>> = {
     'A decision can be contested at conformite@messagr.eu, quoting the reference. It is re-examined by someone other than whoever took it whenever the organisation allows. On a service run by one or two people that condition cannot always be met, and writing this down is better than promising a separation that would not exist.',
   legal_report_scope:
     'Messagr is a hosting service and not an online platform, recital 14 of the DSA excluding interpersonal messaging services. Articles 20 and 21 therefore do not apply, and this text does not claim to offer them.',
+  legal_delete_title: 'Delete your account',
+  legal_delete_body:
+    'Deletion is requested by e-mail at conformite@messagr.eu: the gesture from inside the application does not exist yet. The account is then deactivated and its data purged; messages already sent remain events of the rooms they were written in, and the server cannot take them back, since it cannot read them.',
+  legal_delete_link: 'Request deletion: messagr.eu/aide',
   legal_full_terms: 'Full terms and conditions: messagr.eu',
   trust_action: 'What is known about this person',
   trust_title: 'What is known about this person',
@@ -519,14 +568,23 @@ export const en: Readonly<Record<CopyKey, string>> = {
   'backup_settings_progress %1$d %2$d': '%1$d keys backed up out of %2$d',
   backup_settings_catching_up:
     'The rest goes as the conversations sync. Nothing is lost in the meantime.',
-  'backup_settings_count %1$d':
-    '%1$d keys backed up: that is what Messagr sees on the server.',
+  'backup_settings_count %1$d': '%1$d keys sent from this device.',
   backup_settings_reading: 'Reading the state of the backup…',
   backup_settings_unreadable:
     'The state of the backup could not be read on this device.',
   backup_settings_unreadable_why:
     'That says nothing about the backup itself: if it was on, it still is, and nothing here was changed.',
   backup_settings_retry: 'Try again',
+  backup_settings_superseded:
+    'Another backup has replaced the one from this device: nothing leaves here any more.',
+  backup_settings_dormant:
+    'A backup exists on the server, but this device does not feed it.',
+  backup_settings_unchecked:
+    'The server did not answer: the state of the backup could not be read.',
+  backup_settings_unchecked_why: 'Nothing here was changed.',
+  backup_settings_enter_current: 'Enter the current key',
+  backup_settings_enter_key: 'Enter my recovery key',
+  backup_settings_new: 'Create a new backup',
   backup_settings_enable: 'Back up my messages',
   backup_settings_never_shown:
     'Your current key cannot be shown again, here or anywhere else.',
@@ -545,6 +603,8 @@ export const en: Readonly<Record<CopyKey, string>> = {
   backup_offer_accept: 'Back up my keys',
   backup_offer_refuse: 'Not now',
   backup_offer_later: 'You can turn it on later from Settings.',
+  backup_accept_failed: 'The backup could not be turned on. Try again.',
+  backup_accept_working: 'Turning on…',
   backup_replace_title: 'Replace your recovery key',
   backup_replace_lead: 'Before you decide, what this carries away.',
   backup_replace_fact_old: 'The old key will open nothing',
@@ -627,7 +687,5 @@ export const en: Readonly<Record<CopyKey, string>> = {
   settings_vault_hint:
     'A file, for somebody who wants nothing left on a server.',
   restore_done_close: 'Close',
-  settings_restore: 'Get my older messages back',
-  settings_restore_hint: 'If you have your recovery key.',
   back_to_newest: 'Back to the latest message',
 }

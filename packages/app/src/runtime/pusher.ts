@@ -1,3 +1,5 @@
+import { currentLanguage } from '../copy'
+import type { Language } from '../copy/languages'
 import { getErrorMessage } from './errors'
 
 /**
@@ -18,12 +20,27 @@ import { getErrorMessage } from './errors'
  * pusher points at a gateway somebody else runs, and it costs a string. A
  * homeserver that sends less has less that can leak.
  *
- * # No `default_payload`
+ * # No `default_payload`, and one language tag
  *
  * Sygnal merges `data.default_payload` into the push. It is the one leak the
- * gateway cannot prevent on anybody's behalf but its own — it drops the whole
- * `data` object precisely because a client could put content there. This
- * client does not, and its own test says so.
+ * gateway cannot prevent on anybody's behalf but its own — it writes the
+ * `data` that goes out rather than passing this one on, precisely because a
+ * client could put content there. This client does not, and its own test says
+ * so.
+ *
+ * What it does write is `data.lang`, and that is ADR-0009's visible fallback
+ * arriving from this end. Apple does not guarantee a silent wake, so something
+ * has to be shown when none happens — and it must say nothing: "Messagr", and
+ * that something arrived. The gateway holds those words in the seven languages
+ * this application speaks and cannot know which to send, because the server
+ * does not know what anybody reads and must not learn it from a message.
+ *
+ * So the device says it once, here, and the homeserver hands the tag back with
+ * every notification. **The choice is on the device and the words are on the
+ * server**, which is the only arrangement in which neither writes the other's
+ * half: a client that sent the sentence itself could send any sentence, and a
+ * server that chose the language would have to be told something about the
+ * person to do it.
  *
  * # Registering is not allowed to break a launch
  *
@@ -83,6 +100,13 @@ export interface PusherBody {
   readonly data: {
     readonly url: string
     readonly format: 'event_id_only'
+    /**
+     * Which of the seven the blind notification should be written in, and the
+     * only part of `data` the gateway reads. It matches the tag against a
+     * closed set and picks a sentence it already holds, so nothing written
+     * here is ever copied into a payload — this field included.
+     */
+    readonly lang: Language
   }
   /** Replace any pusher with the same key on other devices? No: this is ours. */
   readonly append: boolean
@@ -92,6 +116,14 @@ export function describePusher(
   token: string,
   gatewayBase: string,
   road: Road,
+  /**
+   * Defaulted rather than threaded through every caller: what the application
+   * is speaking right now is a module variable already (`copy/index.ts`), and
+   * the alternative is a parameter added to `registerPusher` and to its one
+   * caller for a value neither of them decides. Named all the same, so the
+   * tests can say which language they mean.
+   */
+  language: Language = currentLanguage(),
 ): PusherBody {
   return {
     app_id: APP_IDS[road],
@@ -100,14 +132,17 @@ export function describePusher(
     // somebody else, and "Michel's phone" is a sentence about a person.
     device_display_name: SHOWN_AS,
     kind: 'http',
-    // What language the homeserver would write a notification in. It writes
-    // none -- the device does that -- so this is a field the protocol
-    // requires rather than a choice with consequences.
-    lang: 'fr',
+    // The protocol's own field for this, and NOT the one the gateway reads: a
+    // homeserver forwards `data` in a notification and does not forward
+    // `lang`. It carries the same value all the same — a pusher answering
+    // `fr` while its own `data` answers `nl` is two answers to one question,
+    // and the next person here would have to work out which one matters.
+    lang: language,
     pushkey: token,
     data: {
       url: `${gatewayBase.replace(/\/+$/, '')}/${GATEWAY_PATH}`,
       format: 'event_id_only',
+      lang: language,
     },
     // `false`: registering this device's pusher must not disturb another
     // device of the same account, which is what `append: true` would risk if

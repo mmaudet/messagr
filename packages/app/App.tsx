@@ -1,5 +1,14 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import React, {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+  useSyncExternalStore,
+} from 'react'
 import {
+  AccessibilityInfo,
   AppState,
   BackHandler,
   Linking,
@@ -48,6 +57,8 @@ import {
   resumeKeyBackup,
   startCryptoMachine,
   enterAnyInvitations,
+  joinStandingInvitation,
+  declineStandingInvitation,
   sendDocument,
   openDocument,
   startLiveSync,
@@ -71,7 +82,24 @@ import {
   type CallRecord,
 } from './src/runtime/callLogStore'
 import { CallsList } from './src/ui/CallsList'
+import { acceptBackupFrom, type AcceptedFrom } from './src/runtime/acceptBackup'
+import { acceptance } from './src/runtime/acceptanceGate'
+import {
+  backupHoldsBack,
+  backupOnScreen,
+  type BackupOnScreen,
+} from './src/runtime/backupOnScreen'
+import {
+  failedReplacementSentence,
+  replaceBackupFrom,
+  type ReplaceFailure,
+} from './src/runtime/replaceBackup'
 import type { BackupVersionInfo } from './src/runtime/backupCalls'
+import { readBackupCommitment } from './src/runtime/backupCommitment'
+import {
+  backupStanding,
+  type BackupStanding,
+} from './src/runtime/backupStanding'
 import { getErrorMessage } from './src/runtime/errors'
 import {
   askedToRestore,
@@ -81,7 +109,7 @@ import {
 import { unreadableConversations } from './src/runtime/unreadableConversations'
 import { mergeSummaries } from './src/runtime/mergeSummaries'
 import { computeHermesReport } from './src/runtime/hermes'
-import { logEvent } from './src/runtime/log'
+import { logEvent, logWhenChanged } from './src/runtime/log'
 import { polyfillReport } from './src/runtime/bootstrap'
 import { computeRuntimeGapReport } from './src/runtime/runtimeGaps'
 import { computeNewArchitectureReport } from './src/runtime/newArchitecture'
@@ -129,7 +157,13 @@ import {
 } from './src/design/tokens'
 import { mergeTimeline, type TimelineEntry } from './src/timeline/mergeTimeline'
 import { makePumpHttp } from './src/runtime/pump'
-import { fetchJoinedMembers } from './src/runtime/encryptedSend'
+import {
+  fetchJoinedMembers,
+  type Invitation,
+} from './src/runtime/encryptedSend'
+import { whatALinkSays, whatIsKnown } from './src/runtime/invitationOnScreen'
+import { linkOnScreen, type Described } from './src/runtime/linkOnScreen'
+import { sameThreshold, stillStanding } from './src/runtime/standingInvitations'
 import { theOtherMember, type VouchOutcome } from './src/runtime/vouch'
 import type { ConversationSummary } from './src/runtime/conversationList'
 import type { GivenNames } from './src/runtime/givenName'
@@ -201,8 +235,9 @@ import type { HistoryClaim } from './src/runtime/claimHistory'
 import { Conversation } from './src/ui/Conversation'
 import { ConversationList } from './src/ui/ConversationList'
 import { Invite, type InviteStage } from './src/ui/Invite'
+import { Invited } from './src/ui/Invited'
 import { BackupOffer } from './src/ui/BackupOffer'
-import { BackupSettings, type BackupReading } from './src/ui/BackupSettings'
+import { BackupSettings } from './src/ui/BackupSettings'
 import { Favourites } from './src/ui/Favourites'
 import { RecoveryKeyEntry } from './src/ui/RecoveryKeyEntry'
 import { RecoveryKeyShown } from './src/ui/RecoveryKeyShown'
@@ -247,7 +282,13 @@ import { departureFrom } from './src/runtime/leavingThisDevice'
 import { theAccountsInQuestion } from './src/runtime/accountInQuestion'
 import { questionOnScreen, type Asked } from './src/runtime/questionOnScreen'
 import { whenToSay } from './src/runtime/whenToSay'
+import {
+  invitationPasted,
+  whatThePasteBecame,
+  type PasteSaid,
+} from './src/runtime/pastedLink'
 import { launchEntries } from './src/runtime/launchEntries'
+import { waitingToOpen } from './src/runtime/waitingToOpen'
 import {
   cryptoStoreExists,
   homeserverCalls,
@@ -312,6 +353,15 @@ type PumpStatus =
  * it should have read all along: a line of JSON cannot be scrolled off, and
  * it says the same thing whatever the screens become.
  */
+/**
+ * The acceptance of the backup, once for the whole JavaScript runtime rather
+ * than once per mount of App (#284). A mount that arrives mid-acceptance, after
+ * the Activity was finished or recreated, draws it running, cannot start a
+ * second one, and receives the key when it settles. `acceptanceGate.ts` says
+ * why.
+ */
+const backupAcceptance = acceptance()
+
 export function App({
   // Absent on any host that has not been updated to supply it (iOS has not
   // been, this ticket is Android-only): `computeCryptoMachineConfig` treats
@@ -423,7 +473,9 @@ export function App({
   const [admission, setAdmission] = useState<'waiting' | 'admitted' | null>(
     null,
   )
-  const inviteRef = useRef<((name: string | null) => void) | null>(null)
+  const inviteRef = useRef<
+    ((name: string | null, declared: string | null) => void) | null
+  >(null)
   const namesRef = useRef<GivenNames>(forgetfulGivenNames())
   // How far each conversation has been read here. Forgetful until the
   // notebook opens, and forgetful for good if it does not -- which shows
@@ -517,15 +569,6 @@ export function App({
   >(null)
   const restoreTargetRef = useRef<BackupVersionInfo | null>(null)
   /**
-   * Whether the backup screen may offer to bring a past back.
-   *
-   * Read only while that screen is open and only when it says the backup is
-   * off: a device already backing up has its keys, and one whose account has
-   * no backup would be shown a door onto nothing. One request, on a screen
-   * somebody opened on purpose.
-   */
-  const [restorableFromSettings, setRestorableFromSettings] = useState(false)
-  /**
    * Whether the replacement's confirmation is standing.
    *
    * Here rather than inside `BackupSettings`, because closing it is
@@ -563,6 +606,48 @@ export function App({
     | null
   >(null)
   /**
+   * Which screen's acceptance of the backup did not go through, so that
+   * screen can say so (#284).
+   *
+   * Beside `backupPrompt` rather than a fourth value of it. The offer stays
+   * `'offering'`, and a failure from Réglages covers nothing: held in
+   * `backupPrompt`, it would also have held back the reading of the backup
+   * screen, which waits for `null` before it asks.
+   *
+   * Cleared when an acceptance starts, when the offer is refused and when the
+   * backup screen is left: a failure is said where it happened, not the next
+   * time somebody comes back.
+   */
+  const [acceptFailed, setAcceptFailed] = useState<AcceptedFrom | null>(null)
+  /**
+   * The key replacement asked for on the Sauvegarde screen, when it did not go
+   * through, so that screen says so (#284). The step AND what it left behind,
+   * not a flag: what the screen may truthfully say depends on the second, and
+   * the log wants the first (#327). Kept and cleared beside `acceptFailed`,
+   * for the same reasons.
+   */
+  const [replaceFailure, setReplaceFailure] = useState<ReplaceFailure | null>(
+    null,
+  )
+  /**
+   * Which gesture on the backup is running, if any, read from
+   * `backupAcceptance` rather than held by this mount (#284): a mount that
+   * arrives mid-acceptance or mid-replacement draws it running too, and the
+   * two screens draw from this.
+   */
+  const backupWorking = useSyncExternalStore(
+    backupAcceptance.subscribe,
+    backupAcceptance.running,
+  )
+  // A CARD IS ABOUT ASKING JUST NOW (#284). The tab bar resets neither the
+  // backup screen nor its cards, so a card standing before going elsewhere was
+  // still there on coming back. `tab` is read by nothing inside: changing is
+  // the whole of what this listens for.
+  useEffect(() => {
+    setAcceptFailed(null)
+    setReplaceFailure(null)
+  }, [tab])
+  /**
    * Reads the backup's state whenever that screen is showing and nothing is
    * covering it.
    *
@@ -581,60 +666,92 @@ export function App({
   useEffect(() => {
     if (!backupOpen || backupPrompt !== null) return
     let stale = false
-    setBackupState({ reading: 'waiting' })
-    readKeyBackupState()
-      .then(async state => {
-        // SAID EVERY TIME, for the reason the offer's own line exists: a
-        // screen showing the wrong branch and a screen showing the right one
-        // are indistinguishable from outside, and this is the line that says
-        // which the bridge actually answered.
-        logEvent('info', 'MESSAGR_BACKUP_STATE', {
-          enabled: state.enabled,
-          total: state.total,
-          backedUp: state.backedUp,
-          stale,
-        })
-        if (!stale) setBackupState({ reading: 'read', ...state })
-        // ASKED ONLY WHEN THERE IS A REASON TO. A device that is backing up
-        // has its keys; a device with nothing it cannot read has nothing to
-        // bring back. Both skip the request entirely.
-        if (state.enabled) {
-          if (!stale) setRestorableFromSettings(false)
-          return
-        }
-        const session = sessionClientRef.current
-        if (session === null || unreadableConversations(summaries) === 0) {
-          if (!stale) setRestorableFromSettings(false)
-          return
-        }
-        const found = await findBackupOnAccount(session)
-        restoreTargetRef.current = found
-        if (!stale) setRestorableFromSettings(found !== null)
+    setBackupState({ standing: 'waiting' })
+    const look = async () => {
+      const device = await readKeyBackupState()
+      // SAID EVERY TIME, for the reason the offer's own line exists: a
+      // screen showing the wrong branch and a screen showing the right one
+      // are indistinguishable from outside, and this is the line that says
+      // which the bridge actually answered.
+      logEvent('info', 'MESSAGR_BACKUP_STATE', {
+        enabled: device.enabled,
+        total: device.total,
+        backedUp: device.backedUp,
+        stale,
       })
-      .catch((cause: unknown) => {
-        // THE CAUSE, WHICH THIS USED TO SWALLOW. An empty `catch` is how a
-        // blank page on somebody else's telephone became something nobody
-        // here could explain: the screen said nothing and so did the log.
-        logEvent('warn', 'MESSAGR_BACKUP_STATE_UNREADABLE', {
-          because: getErrorMessage(cause),
-          stale,
-        })
-        if (!stale) setBackupState({ reading: 'unreadable' })
+
+      // THE ACCOUNT, WHICH THIS SCREEN USED NEVER TO ASK (#323). One request
+      // on a screen somebody opened on purpose, and it is the only thing that
+      // can tell « la sauvegarde tourne » from « une autre l'a remplacée ».
+      // Asked whatever the bridge answered: a device that says off may have a
+      // backup on its account, and that is where an interrupted acceptance
+      // shows.
+      //
+      // A refusal is `unanswered` and never `null`: « aucune sauvegarde » is
+      // what a 404 means, and telling somebody their past is gone during an
+      // outage is the one mistake `backupCalls.ts` exists to prevent.
+      const session = sessionClientRef.current
+      let account: string | null | 'unanswered' = 'unanswered'
+      if (session !== null) {
+        try {
+          const found = await findBackupOnAccount(session)
+          // Kept for the key entry this screen opens, as it was when only a
+          // restore asked for it.
+          restoreTargetRef.current = found
+          account = found?.version ?? null
+        } catch (cause: unknown) {
+          logEvent('warn', 'MESSAGR_BACKUP_ACCOUNT_UNREADABLE', {
+            because: getErrorMessage(cause),
+            stale,
+          })
+        }
+      }
+
+      // WHICH VERSION THIS DEVICE WRITES TO, which the bridge does not hand
+      // back through `readKeyBackupState` and the keystore does. It is also
+      // what the next launch resumes, so it is the one worth comparing.
+      const commitment = await readBackupCommitment(backupSecrets)
+      const standing = backupStanding({
+        device,
+        account,
+        writesTo: commitment?.version ?? null,
       })
+      logEvent('info', 'MESSAGR_BACKUP_STANDING', {
+        standing: standing.standing,
+        stale,
+      })
+      if (!stale) setBackupState(standing)
+    }
+    look().catch((cause: unknown) => {
+      // THE CAUSE, WHICH THIS USED TO SWALLOW. An empty `catch` is how a
+      // blank page on somebody else's telephone became something nobody
+      // here could explain: the screen said nothing and so did the log.
+      logEvent('warn', 'MESSAGR_BACKUP_STATE_UNREADABLE', {
+        because: getErrorMessage(cause),
+        stale,
+      })
+      // The bridge, or the keystore: either way this device could not read
+      // its own state, which is a different sentence from the server's
+      // silence and is the one this branch is about.
+      if (!stale) setBackupState({ standing: 'unreadable' })
+    })
     return () => {
       stale = true
     }
     // `attempt` is here so the retry on the screen re-runs this effect. It
     // is otherwise unused, which is the point: nothing else has to know how
     // the reading is taken.
-    // `summaries` is here because the reading asks whether anything is
-    // unreadable. It costs nothing while the screen is closed -- the first
-    // line returns -- and while it is open the list rarely redraws.
-  }, [backupOpen, backupPrompt, attempt, summaries])
+    //
+    // `summaries` is gone with the condition that read it: the account is
+    // asked whatever this device can or cannot read, so the list redrawing
+    // no longer re-runs a reading that does not depend on it.
+  }, [backupOpen, backupPrompt, attempt])
   /**
-   * What the bridge says about the backup, while that screen is open.
+   * What the backup's state is, while that screen is open: the bridge, the
+   * account and the keystore read together (#323). `backupStanding.ts` names
+   * the states and argues them.
    *
-   * # THREE STATES, AND THE THIRD IS WHY THIS IS NOT A NULLABLE OBJECT
+   * # NOT A NULLABLE OBJECT, AND THAT IS WHY
    *
    * It was `{...} | null`, with `null` standing for both "not asked yet" and
    * "could not be read", and the screen was drawn only when it held an
@@ -648,13 +765,14 @@ export function App({
    * did not even log -- the `catch` swallowed the cause.
    *
    * So the screen is drawn from the moment it is opened, and it says which
-   * of the three it is. `waiting` is honest for the second the bridge takes.
-   * `unreadable` is honest for ever, and carries a way to ask again. Neither
-   * asserts anything about the backup, which was the whole point of the
-   * paragraph above.
+   * state it is in. `waiting` is honest for the second the readings take,
+   * `unreadable` is honest for ever and carries a way to ask again, and
+   * `unchecked` is the homeserver's silence rather than this telephone's.
+   * None of the three asserts anything about the backup, which was the whole
+   * point of the paragraph above.
    */
-  const [backupState, setBackupState] = useState<BackupReading>({
-    reading: 'waiting',
+  const [backupState, setBackupState] = useState<BackupStanding>({
+    standing: 'waiting',
   })
   /**
    * The kept messages, with their words, while that screen is open.
@@ -958,7 +1076,45 @@ export function App({
   const reactRef = useRef<
     ((target: string, key: string, own: string | null) => void) | null
   >(null)
-  const openConversationRef = useRef<((scope: string) => void) | null>(null)
+  /**
+   * The conversation a row asked for while the launch could not open one.
+   *
+   * THIS REPLACES THE REFERENCE THE ROWS USED TO CALL, and it replaces it
+   * rather than wrapping it because a reference that can be `null` is a
+   * gesture that can be dropped: `openConversationRef.current?.(scope)` did
+   * nothing, said nothing and returned, for the four to five seconds #280
+   * measured. `waitingToOpen.ts` argues the whole of it. Held per mount, like
+   * the question and the launch entries above.
+   */
+  const [waitingOn, setWaitingOn] = useState<string | null>(null)
+  const waitingRef = useRef(waitingToOpen(setWaitingOn))
+  /**
+   * What a row does when it is touched, wherever the row is.
+   *
+   * The conversation list, the recent calls and the kept messages all open a
+   * conversation, and all three were drawn before the launch had bound one.
+   * #280 was measured on the first; the other two are the same two lines of
+   * code and would have read the same way.
+   *
+   * NEITHER OF THE TWO LINES IT WRITES CARRIES THE CONVERSATION. A scope is a
+   * room identifier, and the log is what adb, a bug report and anything
+   * holding READ_LOGS can read -- `log.ts` and #319. What is worth having
+   * afterwards is that a touch was made too early at all, and the opening
+   * that follows already writes its own `MESSAGR_BACKUP_TRIGGER`.
+   */
+  const openConversation = (scope: string) => {
+    const took = waitingRef.current.touch(scope)
+    if (took === 'opened') return
+    if (took === 'held') {
+      logEvent('info', 'MESSAGR_OPEN_HELD', {})
+      return
+    }
+    // The launch ended without ever being able to open a conversation. This
+    // is the only case left where a touch really does nothing, and it says so
+    // here rather than being inferred from an absence -- which is exactly
+    // what made #280 take a device run and three launches to find.
+    logEvent('warn', 'MESSAGR_OPEN_REFUSED', {})
+  }
   const runningSyncRef = useRef<RunningSyncLoop | null>(null)
   // Set once by the launch effect, which is the only place that holds
   // everything a loop needs. Read by the foreground handler below, which
@@ -994,6 +1150,124 @@ export function App({
     readonly baseUrl: string
     readonly accessToken: string
   } | null>(null)
+  /**
+   * What is on screen now, for an acceptance that settles later (#284).
+   *
+   * Read when it settles and not when it started: somebody who leaves
+   * Sauvegarde and comes straight back is looking at the screen a failure is
+   * about, and somebody who has gone elsewhere is not. Kept in step after
+   * each drawing, so it is what was last drawn. `backupOnScreen` reads it, as
+   * it does for Android's back below.
+   *
+   * WRITTEN IN A LAYOUT EFFECT, found in review: a passive effect runs after
+   * the frame is painted, and a gesture that settled in between read the
+   * screen before the one somebody was already looking at.
+   */
+  const backupShowing = useRef<BackupOnScreen>({
+    offer: false,
+    key: false,
+    backupScreen: false,
+  })
+  useLayoutEffect(() => {
+    backupShowing.current = backupOnScreen({
+      backupPrompt,
+      openScope,
+      tab,
+      backupOpen,
+      restorePrompt,
+    })
+  })
+  // THIS MOUNT RECEIVES WHAT SETTLES, an acceptance's or a replacement's, a
+  // key included that settled while no mount was there to show it, or while
+  // the one it went to was going away (#284). A key is always shown: it opens
+  // a backup that now exists, and nothing can show it later. A failure is said
+  // only while the screen it is about is showing, and dropped otherwise.
+  useEffect(
+    () =>
+      backupAcceptance.receive(settled => {
+        if (settled.show === 'key') {
+          // A REPLACEMENT'S CONFIRMATION IS CLOSED HERE, and only here. The
+          // finger is long gone, and the key screen is about to cover
+          // everything, so what is behind the key is the row rather than the
+          // panel that produced it.
+          setReplaceConfirming(false)
+          setBackupPrompt({
+            restoreKey: settled.restoreKey,
+            // CARRIED, NOT DROPPED. A replacement whose retirement failed is
+            // a success with one true sentence attached: the old key still
+            // opens the old backup. Rounding that up to « c'est fait » would
+            // tell somebody their lost key is harmless when it is not.
+            oldStillOpens: settled.oldStillOpens,
+          })
+          return
+        }
+        if (settled.show === 'replacementFailure') {
+          setReplaceConfirming(false)
+          // THE READING TAKEN AGAIN, whatever is showing. It asks the
+          // account as well as the bridge since #323, so it is now the
+          // reading that SAYS what a failure left: a replacement stopped at
+          // `enabling` lands on « une sauvegarde existe sur le serveur, mais
+          // cet appareil ne l'alimente pas », which is exactly what happened
+          // and what the sentence below cannot say on its own.
+          setAttempt(n => n + 1)
+          // SAID ON SAUVEGARDE ONLY, IN THE SENTENCE WHAT IT LEFT ALLOWS:
+          // « rien n'a changé » when the publication went back, which since
+          // #327 a failure past the publish can manage, as
+          // `failedReplacementSentence` says.
+          if (!backupShowing.current.backupScreen) return
+          setReplaceFailure(settled.failure)
+          AccessibilityInfo.announceForAccessibility(
+            t(failedReplacementSentence(settled.failure)),
+          )
+          return
+        }
+        const where: AcceptedFrom | null = backupShowing.current.offer
+          ? 'offer'
+          : backupShowing.current.backupScreen
+            ? 'settings'
+            : null
+        if (where === null) return
+        setAcceptFailed(where)
+        // A CARD NOBODY SEES IS THE SILENCE THIS REPLACED. Somebody using a
+        // screen reader hears nothing when a card appears under a button, and
+        // would believe their keys were kept.
+        AccessibilityInfo.announceForAccessibility(t('backup_accept_failed'))
+      }),
+    [],
+  )
+  /**
+   * Accepts the backup from one of the two screens that offer it (#284).
+   *
+   * One function for both, because two handlers each settling the outcome on
+   * their own is how the failure went unsaid in both. What comes of it
+   * arrives through the receiver above, and `acceptBackupFrom` writes the
+   * line.
+   *
+   * A launch that holds no session answers a failure like any other. The tap
+   * used to do nothing at all, which is the silence this is here to end.
+   */
+  const acceptTheBackup = (from: AcceptedFrom) => {
+    const session = sessionClientRef.current
+    const started = backupAcceptance.start(() =>
+      acceptBackupFrom(from, () =>
+        session === null
+          ? Promise.reject(new Error('this launch holds no session'))
+          : acceptKeyBackup(session),
+      ),
+    )
+    // NOT STARTED: a gesture on the backup is running already, maybe from a
+    // mount before this one. The button is inert by the time the screen draws
+    // again, and a tap that got in before it did changes nothing.
+    if (started) {
+      setAcceptFailed(null)
+      setReplaceFailure(null)
+    }
+  }
+  /** A card is about asking just now: leaving its screen takes it down. */
+  const clearBackupCards = () => {
+    setAcceptFailed(null)
+    setReplaceFailure(null)
+  }
   const [claimed, setClaimed] = useState<HistoryClaim | null>(null)
   // Set once, at entry, and never cleared: the launch either was opened with
   // an unspent invitation or it was not, and a note that disappeared while
@@ -1001,6 +1275,91 @@ export function App({
   // What became of an invitation this launch was opened with. `null` when
   // there was none, which is almost every launch.
   const [linkOutcome, setLinkOutcome] = useState<InvitationOutcome | null>(null)
+  /**
+   * The invitations standing on the threshold. #329, §13.3's first screen.
+   *
+   * An invitation reaches this list when no link was spent for it on this
+   * telephone: `enterInvitations.ts` walks through one door per link spent
+   * and leaves every other invitation exactly as it arrived, neither joined
+   * nor declined. The pump reports them on the launch and on every sync
+   * tick, the first of them is what `Invited.tsx` draws, and the rest wait
+   * behind it.
+   *
+   * AND THIS IS WHAT CLOSES THE WINDOW #335 LEFT OPEN. The register of what
+   * a spent link entitles this device to enter lives for the life of the
+   * process, so an application killed between the claim and the sync tick
+   * that crosses the door relaunches owing nothing. The invitation then
+   * arrives unowed and stands -- and now it stands here, named, rather than
+   * waiting for a screen that did not exist.
+   */
+  const [threshold, setThreshold] = useState<readonly Invitation[]>([])
+  /**
+   * What has been answered on this run.
+   *
+   * A ref rather than state: it is read from inside the launch and from the
+   * sync loop's callback, neither of which may take a dependency on a value
+   * that changes. Nothing draws from it -- `stillStanding` is what turns it
+   * into what the screen sees -- and it exists because neither answer takes
+   * effect in the same instant: a join takes a tick to leave `rooms.invite`,
+   * and a refusal goes on being listed for a while after it lands.
+   */
+  const answeredRef = useRef<Set<string>>(new Set())
+  /** Which of the two actions is under way, if either. */
+  const [answering, setAnswering] = useState<'join' | 'refuse' | null>(null)
+  /**
+   * The conversation whose answer did not go through, if one did not.
+   *
+   * The conversation rather than a flag: a failure that outlived its own
+   * invitation would tell somebody the NEXT invitation had failed, before
+   * they had touched anything.
+   */
+  const [answerFailed, setAnswerFailed] = useState<string | null>(null)
+  /**
+   * Answers the invitation on screen, and takes it off the threshold only
+   * once the homeserver has accepted the answer.
+   *
+   * SENT FIRST, DRAWN AFTER. A screen that closed on the tap and failed
+   * afterwards would leave somebody believing they had joined a conversation
+   * they are still only invited to -- the same defect #284 found in the
+   * backup offer, which used to close on a failure and say nothing.
+   */
+  const answerTheInvitation = (kind: 'join' | 'refuse', scope: string) => {
+    const session = sessionClientRef.current
+    if (session === null) {
+      setAnswerFailed(scope)
+      return
+    }
+    setAnswering(kind)
+    setAnswerFailed(null)
+    const sent =
+      kind === 'join'
+        ? joinStandingInvitation(session, scope)
+        : declineStandingInvitation(session, scope)
+    sent
+      .then(() => {
+        answeredRef.current.add(scope)
+        setThreshold(before => before.filter(one => one.scope !== scope))
+        // A conversation joined is a row the list does not have yet. A
+        // refusal changes nothing it draws.
+        if (kind === 'join') refreshListRef.current?.().catch(() => {})
+      })
+      .catch((cause: unknown) => {
+        logEvent('warn', 'MESSAGR_INVITATION_ANSWER_FAILED', {
+          kind,
+          reason: getErrorMessage(cause),
+        })
+        setAnswerFailed(scope)
+      })
+      .finally(() => setAnswering(null))
+  }
+  /**
+   * The one invitation being decided, if there is one.
+   *
+   * ONE AT A TIME. Two decisions on one screen is one decision taken
+   * carelessly, and the rest are counted under the buttons so that nobody
+   * believes they have finished when the next one appears.
+   */
+  const deciding = threshold[0] ?? null
   /**
    * The question a link into another server puts, while it is being put.
    * #304, and `entry.ts` says why it is a question.
@@ -1018,6 +1377,22 @@ export function App({
    * mount, like the launch below.
    */
   const questionRef = useRef(questionOnScreen(setOtherServerQuestion))
+  /**
+   * The link being described before it is spent, while it is being described.
+   * #329, §13.3's first screen on the link path.
+   *
+   * `null` on every launch that was not opened with an invitation, which is
+   * almost every launch. While it is not, the screen is that description and
+   * nothing else: the launch is waiting inside entry for the answer, and
+   * nothing has been claimed yet.
+   */
+  const [linkDescribed, setLinkDescribed] = useState<Described | null>(null)
+  /**
+   * What puts that description and what answers it: its two buttons, the back
+   * gesture, and this screen going away. See `linkOnScreen.ts`. Held per
+   * mount, like the question above.
+   */
+  const describeRef = useRef(linkOnScreen(setLinkDescribed))
   /**
    * Which entries belong to the launch of this screen. See `launchEntries.ts`:
    * held per mount, since a screen mounted again reads its link the way a
@@ -1074,7 +1449,28 @@ export function App({
   const [warmLink, setWarmLink] = useState<{
     readonly url: string
     readonly count: number
+    /**
+     * Whether this link was pasted by hand rather than handed over by the
+     * operating system. #367.
+     *
+     * LE MÊME CANAL, PAS UN SECOND CHEMIN. Un lien collé est dépensé par
+     * `spentLinks` puis `entry.ts`, exactement comme celui que le système
+     * remet : deux chemins d'entrée finiraient par diverger, et c'est l'un
+     * des deux que personne ne mettrait à jour.
+     *
+     * Ce drapeau ne change rien à ce qui est fait du lien. Il dit seulement
+     * où la réponse doit être lue : sur le champ où le geste a été fait,
+     * puisque l'écran d'avant l'entrée ne dessine aucune des phrases que
+     * `entry.ts` destine à un appareil qui a déjà un compte.
+     */
+    readonly pasted?: boolean
   } | null>(null)
+  /**
+   * Ce qu'est devenu le lien collé sur l'écran d'avant l'entrée. #367.
+   *
+   * `null` tant que personne n'a rien collé, ce qui est presque toujours.
+   */
+  const [pasting, setPasting] = useState<PasteSaid | null>(null)
   // The links a launch is claiming right now. The same link handed over twice
   // for one opening -- getInitialURL and then a url event, or two events close
   // together -- runs the launch twice, and the two runs must agree that only
@@ -1099,6 +1495,13 @@ export function App({
   // It runs on every conversation that draws, which writes the same flag
   // again and costs a keystore write nobody notices. Reading first to avoid
   // it would be two operations where there is one.
+  //
+  // WHAT IT DECIDES IS NOT WRITTEN EACH TIME, which is #291's other half. A
+  // conversation draws again on every sync cycle that touches it, and during
+  // a call on build 135 that was the same `MESSAGR_BACKUP_OFFER` ten times in
+  // seventeen seconds, in a log buffer of 256 KiB. Held in a ref because what
+  // was last written has to outlive the effect that wrote it.
+  const backupOfferLog = useRef(logWhenChanged('MESSAGR_BACKUP_OFFER'))
   useEffect(() => {
     if (conversation === null || selfUserId === '') return
     const received = receivedFromSomebodyElse(conversation, selfUserId)
@@ -1132,7 +1535,12 @@ export function App({
       // are the feature working and one is the feature absent. The first
       // device run of this prompt showed nothing and there was no way to
       // tell which, which is why this line exists.
-      logEvent('info', 'MESSAGR_BACKUP_OFFER', {
+      //
+      // Once, and again only when it changes or a conversation is opened:
+      // `showConversation` forgets what was written, because the device
+      // suite reads the decision after its own tap (`e2e/conversation.ts`)
+      // and two openings can share a launch.
+      backupOfferLog.current.log('info', {
         offer: reading.decision.offer,
         backedUp: reading.backedUp,
         asked: reading.asked,
@@ -1185,10 +1593,23 @@ export function App({
     const look = async () => {
       if (await askedToRestore(restoreAskedSecrets)) return
       const found = await findBackupOnAccount(session)
+      // WHICH VERSION THIS DEVICE WRITES TO (#328). Read here rather than
+      // guessed from the bridge: this effect runs again when the key screen
+      // closes, and on a telephone whose past is unreadable that is the
+      // moment the account holds the empty version this device has just
+      // made. Offering it would be « vos anciens messages sont là » about a
+      // box that holds none of them.
+      const commitment = await readBackupCommitment(backupSecrets)
+      const mine =
+        found !== null &&
+        commitment !== null &&
+        commitment.version === found.version
       const decision = offerRestore({
         backupExists: found !== null,
         unreadable: stranded,
         asked: false,
+        mine,
+        keys: found?.count ?? null,
       })
       // SAID EVERY TIME, for the reason the backup offer's own line exists:
       // a refusal here has several causes and they look identical from
@@ -1197,6 +1618,10 @@ export function App({
         offer: decision.offer,
         backupExists: found !== null,
         unreadable: stranded,
+        mine,
+        // The homeserver's own count, or the word for having named none: a
+        // number would make silence look like a measurement.
+        keys: found?.count ?? 'unknown',
       })
       if (!decision.offer || stale) return
       // RECORDED BEFORE THE ANSWER. Same discipline as the backup's, same
@@ -1321,6 +1746,45 @@ export function App({
       }),
     [],
   )
+
+  /**
+   * LE LIEN QUE QUELQU'UN COLLE, remis au même chemin que celui du système.
+   * #367.
+   *
+   * # POURQUOI IL Y A UN CHAMP
+   *
+   * Sur iPhone, une invitation ouverte dans le navigateur intégré d'une autre
+   * messagerie n'atteint jamais Messagr, et le bouton « Ouvrir dans Messagr »
+   * de la page est un lien vers son propre domaine, qu'iOS ne remet pas à
+   * l'application qui le revendique. C'est une règle d'Apple. La personne voit
+   * l'invitation, a l'application, et n'a aucune porte (#308).
+   *
+   * # L'APPLICATION NE LIT JAMAIS LE PRESSE-PAPIERS
+   *
+   * Un jeton d'invitation est un porteur (ADR-0004) et un presse-papiers se
+   * lit depuis n'importe quelle autre application. Aujourd'hui Messagr y écrit
+   * et ne le lit jamais ; cette asymétrie est la protection, et elle ne se
+   * rompt que par le geste de la personne, dans un champ qu'elle remplit.
+   * Jamais au lancement, jamais en arrière-plan, jamais « pour proposer de
+   * coller ». `pastedLink.spec.ts` le tient comme un test.
+   *
+   * # CE QUI EST LU ICI, ET CE QUI NE L'EST PAS
+   *
+   * Une adresse qui n'est pas une invitation est écartée par le seul lecteur
+   * du produit et ne part nulle part : rien n'est envoyé, aucun jeton n'est
+   * dépensé, et le champ le dit. Tout le reste -- dépensé, expiré, révoqué,
+   * service injoignable -- est décidé par `entry.ts` comme pour n'importe quel
+   * lien, et la réponse revient plus bas.
+   */
+  const pasteTheLink = useCallback((raw: string) => {
+    const url = invitationPasted(raw)
+    if (url === null) {
+      setPasting('not-a-link')
+      return
+    }
+    setPasting('working')
+    setWarmLink(held => ({ url, count: (held?.count ?? 0) + 1, pasted: true }))
+  }, [])
 
   /**
    * Dire qu'un partage n'a pas abouti, là où la phrase se lit.
@@ -1620,6 +2084,10 @@ export function App({
       // What takes the question this run put off the screen, when it put one.
       // See `questionOnScreen.ts`.
       let settleTheQuestion: (() => void) | null = null
+      // And the same for §13.3's description of the link, which stays up --
+      // drawn as under way -- from the moment somebody joins until entry has
+      // finished claiming. See `linkOnScreen.ts`.
+      let settleTheDescription: (() => void) | null = null
       // ONE CLAIM PER LINK AT A TIME. A link another run of this launch is
       // still claiming is not handed over again, and the mark is lifted the
       // moment this entry answers -- so the same link opened again after a
@@ -1683,12 +2151,55 @@ export function App({
                 after: ms => new Promise(resolve => setTimeout(resolve, ms)),
                 departure: departureFrom(storeDir),
               },
+              // §13.3'S FIRST SCREEN, PUT BEFORE THE LINK IS SPENT, AND
+              // AWAITED. #329.
+              //
+              // Put on every entry rather than at a cold launch only, unlike
+              // the question above: describing a link sends nothing, spends
+              // nothing and touches no account, so there is no state it could
+              // find in the wrong order. A link touched while Messagr is
+              // already open is exactly the case somebody most needs to see
+              // described -- it arrives with no warning at all.
+              describe: what => {
+                const put = describeRef.current.put(what)
+                settleTheDescription = put.settle
+                return put.answer
+              },
             }),
         )
         .finally(() => {
           thisEntry.end()
           if (settleTheQuestion !== null) settleTheQuestion()
+          if (settleTheDescription !== null) settleTheDescription()
         })
+      // CE QU'EST DEVENU UN LIEN COLLÉ, DIT LÀ OÙ IL A ÉTÉ COLLÉ. #367.
+      //
+      // Dès que l'entrée a répondu, et pas après la pompe : sur l'écran
+      // d'avant l'entrée il n'y a pas de compte, donc aucune des phrases que
+      // `whenToSay.ts` arbitre ne s'y dessine. La personne vient de faire un
+      // geste ; ce qu'il est devenu se lit à l'endroit où elle l'a fait.
+      //
+      // `null` quand elle est entrée : l'écran qui portait le champ n'est
+      // plus dessiné une seconde plus tard, et une phrase de refus laissée là
+      // reviendrait sur la liste de quelqu'un qui est entré.
+      //
+      // ET RIEN NON PLUS QUAND LA PERSONNE A REFUSÉ (#329). Un lien collé
+      // ouvre maintenant l'écran de §13.3 avant d'être dépensé, et
+      // « Refuser l'invitation » en est une des deux actions. Aucune des deux
+      // phrases du champ n'est vraie de ce refus-là : le lien est bon et il
+      // n'y a rien à réessayer. Ce n'est pas non plus un avertissement.
+      if (warmLink?.pasted === true) {
+        const became = whatThePasteBecame(entered)
+        const answered = became === 'in' || became === 'declined'
+        setPasting(answered ? null : became)
+        // LA RAISON VA AU JOURNAL ET PAS À L'ÉCRAN, §13.27 : le service ne
+        // distingue pas inconnu, dépensé, révoqué et expiré, et l'écran ne
+        // fait pas semblant. C'est la ligne qu'il faut pour diagnostiquer.
+        logEvent(answered ? 'info' : 'warn', 'MESSAGR_LINK_PASTED', {
+          became,
+          ...(entered.entered ? {} : { reason: entered.reason }),
+        })
+      }
       // WHAT BECAME OF AN ACCOUNT THIS LAUNCH LEFT, ON ITS OWN SERVER. #304,
       // #307.
       // Logged whenever that server answers, which may be after this launch
@@ -1709,7 +2220,15 @@ export function App({
       // of its own before anything is drawn from it, and the rows remembered
       // for the old account go with it.
       const leftAnAccount = entered.entered && entered.left !== undefined
-      if (leftAnAccount) setSummaries([])
+      if (leftAnAccount) {
+        setSummaries([])
+        // AND A TOUCH MADE ON THOSE ROWS GOES WITH THEM. A conversation
+        // touched on the list of the account this launch has just left
+        // belongs to that account, and replaying it once the opener is bound
+        // would ask the account just entered for a room it is not in. The
+        // rows are gone from the screen; the gesture made on them goes too.
+        waitingRef.current.letGo()
+      }
       const opening = leftAnAccount ? await bindNotebook() : opened
       // A RUN THAT RESTORED THE ACCOUNT IN QUESTION WAITS FOR THE ANSWER, THEN
       // LOOKS AGAIN AT WHICH ACCOUNT THIS DEVICE HOLDS. #304.
@@ -1998,7 +2517,23 @@ export function App({
             // Before the list rather than after: a conversation joined a
             // moment later would be derived a moment too late and only appear
             // at the next tick.
-            await enterAnyInvitations(sessionClient, credentials.userId)
+            const walkedAtLaunch = await enterAnyInvitations(
+              sessionClient,
+              credentials.userId,
+            )
+            // WHAT STAYED ON THE THRESHOLD, PUT TO THE PERSON. #329, §13.3's
+            // first screen. An invitation this launch was owed nothing for
+            // is one nobody spent a link for -- or one whose link was spent
+            // by a run that was killed before the door opened, which is the
+            // window the first half of this ticket left open and named.
+            // Either way it is a decision, and this is where it is drawn.
+            setThreshold(before => {
+              const standing = stillStanding(
+                walkedAtLaunch.waiting,
+                answeredRef.current,
+              )
+              return sameThreshold(before, standing) ? before : standing
+            })
 
             // Attempted whether or not this run's own send worked: what is
             // being read was written by somebody else, and one direction
@@ -2075,6 +2610,12 @@ export function App({
               setOpenScope(scope)
               openScopeRef.current = scope
               setConversation(null)
+              // THE BACKUP DECISION IS WRITTEN AGAIN FOR THIS OPENING, even
+              // unchanged. The device suite reads it after its own tap
+              // (`e2e/conversation.ts`), and two openings can share a launch:
+              // held back because the opening before said the same, it would
+              // leave the second one waiting for a line that never comes.
+              backupOfferLog.current.forget()
               // A conversation opens at its newest message, so nothing is
               // away from it yet. `onContentSizeChange` says the same thing
               // when the frame lays out, but a frame away from the newest
@@ -2195,7 +2736,13 @@ export function App({
                 }),
               )
             }
-            openConversationRef.current = showConversation
+            // AND WHATEVER WAS TOUCHED WHILE THERE WAS NOTHING TO CALL OPENS
+            // HERE. Everything above this line is why the binding is late:
+            // the crypto machine, the pump and `enterAnyInvitations`. None of
+            // it can move -- a conversation opened before the machine has
+            // started draws messages this device cannot decrypt yet -- so the
+            // gesture waits instead of the person. See `waitingToOpen.ts`.
+            waitingRef.current.bind(showConversation)
 
             // THE WORDS BEHIND THE MARKS, bound where the client is.
             // `readFavourites.ts` says why they are derived rather than
@@ -2885,11 +3432,18 @@ export function App({
             // ordering the protocol allows, and the right one: the inviter
             // knows who they are inviting now and will not come back later
             // to say.
-            inviteRef.current = (name: string | null) => {
+            inviteRef.current = (
+              name: string | null,
+              declared: string | null,
+            ) => {
               setInvite({ stage: 'working' })
               setAdmission(null)
               const gesture = async () => {
-                const issued = await inviteSomebody(sessionClient, credentials)
+                const issued = await inviteSomebody(
+                  sessionClient,
+                  credentials,
+                  declared,
+                )
                 if (!issued.issued) {
                   setInvite({ stage: 'failed', reason: issued.reason })
                   return
@@ -3243,6 +3797,22 @@ export function App({
                       if (first !== undefined) {
                         setLinkOutcome({ kind: 'already', from: first.from })
                       }
+                      // AND ON EVERY TICK FOR THE SAME REASON ENTERING IS
+                      // ON EVERY TICK: an invitation arrives at a device that
+                      // has finished launching. Replaced only when the
+                      // threshold has actually changed -- almost every tick
+                      // reports the same invitations standing, and a new
+                      // array each time would redraw the application several
+                      // times a minute for nothing.
+                      setThreshold(before => {
+                        const standing = stillStanding(
+                          walked.waiting,
+                          answeredRef.current,
+                        )
+                        return sameThreshold(before, standing)
+                          ? before
+                          : standing
+                      })
                     })
                     .catch((cause: unknown) =>
                       logEvent('warn', 'MESSAGR_ENTER_FAILED', {
@@ -3503,19 +4073,42 @@ export function App({
       })
     }
 
-    probeAndReport().catch((cause: unknown) => {
-      // The stack, not only the message. A launch failure reported as
-      // "TypeError: cyclical structure in JSON object" names a symptom and
-      // no location, and the first real device run of #34 spent its
-      // diagnosis on exactly that. Reported through a second call so a
-      // stack that is itself unserialisable cannot swallow the first.
-      logEvent('error', 'MESSAGR_RUNTIME_FAILED', { reason: String(cause) })
-      if (cause instanceof Error && typeof cause.stack === 'string') {
-        logEvent('error', 'MESSAGR_RUNTIME_FAILED_WHERE', {
-          stack: cause.stack.split('\n').slice(0, 8).join(' | '),
-        })
-      }
-    })
+    probeAndReport()
+      .catch((cause: unknown) => {
+        // The stack, not only the message. A launch failure reported as
+        // "TypeError: cyclical structure in JSON object" names a symptom and
+        // no location, and the first real device run of #34 spent its
+        // diagnosis on exactly that. Reported through a second call so a
+        // stack that is itself unserialisable cannot swallow the first.
+        logEvent('error', 'MESSAGR_RUNTIME_FAILED', { reason: String(cause) })
+        if (cause instanceof Error && typeof cause.stack === 'string') {
+          logEvent('error', 'MESSAGR_RUNTIME_FAILED_WHERE', {
+            stack: cause.stack.split('\n').slice(0, 8).join(' | '),
+          })
+        }
+        // ET UN LIEN COLLÉ N'ATTEND PAS UNE RÉPONSE QUI NE VIENDRA PLUS.
+        // #367 : ce lancement s'est arrêté avant d'avoir dit ce que le lien
+        // était devenu, et « Ouverture de l'invitation… » laissé là pour la
+        // vie du processus est une promesse que rien ne tiendra -- avec, en
+        // plus, le bouton éteint. « Réessayez » est vrai : c'est le
+        // lancement qui a échoué, pas le lien.
+        setPasting(held => (held === 'working' ? 'retry' : held))
+      })
+      // A LAUNCH THAT IS OVER AND NEVER BOUND AN OPENER LETS THE TOUCH GO.
+      //
+      // There are several of those and none of them is exotic: no session at
+      // all, a crypto machine that would not start, a sync the homeserver
+      // refused, or the failure just above. The list is still drawn from the
+      // notebook on every one of them, so the row is still touchable -- and
+      // « Ouverture… » left on it for the life of the process would be a
+      // promise nothing is going to keep. `finally` rather than `catch`,
+      // because a launch that ends tidily without credentials ends the wait
+      // just as completely as one that throws.
+      //
+      // Harmless on the ordinary launch: the binding a few thousand lines
+      // above has already happened by here, and `giveUp` is a run saying it
+      // lost rather than the process saying it is finished.
+      .finally(() => waitingRef.current.giveUp())
     // THE DEPENDENCY LIST IS DELIBERATE, AND `warmLink` IS NOT IN IT.
     //
     // The object is rebuilt on every arrival, so watching it would re-run the
@@ -3550,10 +4143,38 @@ export function App({
   // which is a worse bug than the one it fixes.
   useEffect(() => {
     const back = () => {
+      // THE BACKUP, WHILE IT ASKS OR SHOWS A KEY, AND SAUVEGARDE WHILE A
+      // GESTURE RUNS: BACK DOES NOTHING (#284). On Android 7 to 11 a back that
+      // reaches the system finishes the root Activity while JavaScript runs
+      // on, and the buttons are the way out. Nowhere else, which a review
+      // found: held everywhere while an acceptance ran, back stayed dead in a
+      // conversation for as long as a keystore write never settled. See
+      // `backupHoldsBack`.
+      if (
+        backupHoldsBack(
+          backupOnScreen({
+            backupPrompt,
+            openScope,
+            tab,
+            backupOpen,
+            restorePrompt,
+          }),
+          backupWorking,
+        )
+      ) {
+        return true
+      }
       // THE QUESTION A LINK INTO ANOTHER SERVER PUTS, which is the whole
       // screen while it is there. Back answers it « stay » (#304): see
       // `questionOnScreen.ts`.
       if (questionRef.current.back()) return true
+      // AND §13.3'S DESCRIPTION OF A LINK, WHICH COMES BEFORE IT IN TIME AND
+      // AFTER IT HERE. The two are never on the screen together -- the
+      // description is answered before the question is put -- so the order is
+      // only a precaution; the question is the one entry is waiting on when
+      // both exist. Back refuses the invitation (#329), which sends nothing
+      // and leaves the link good: see `linkOnScreen.ts`.
+      if (describeRef.current.back()) return true
       if (trust !== null) {
         setTrust(null)
         return true
@@ -3613,6 +4234,10 @@ export function App({
     legalOpen,
     invite.stage,
     tab,
+    backupPrompt,
+    backupWorking,
+    backupOpen,
+    restorePrompt,
   ])
 
   // A SCREEN THAT GOES AWAY WITH THE QUESTION UNANSWERED ANSWERS IT « STAY »
@@ -3622,6 +4247,37 @@ export function App({
     const question = questionRef.current
     return () => question.unmounted()
   }, [])
+
+  // AND A SCREEN THAT GOES AWAY BEFORE §13.3'S DESCRIPTION IS DECIDED REFUSES
+  // IT (#329). Nobody is left to join, and the answer that sends nothing is
+  // the only one to give on somebody's behalf. The link is unspent, so the
+  // next launch describes it again.
+  useEffect(() => {
+    const described = describeRef.current
+    return () => described.unmounted()
+  }, [])
+
+  // WHATEVER TAKES THE LIST OFF THE SCREEN LETS GO OF A TOUCH IT WAS HOLDING.
+  //
+  // The touch is kept, not confiscated. Somebody who touches a row, sees
+  // « Ouverture… », changes their mind and goes to another tab, to the
+  // invitation screen or back out of the application must not be pulled into
+  // a conversation seconds later by a launch finally binding its opener.
+  //
+  // The condition is the one the list is drawn under, written once more
+  // rather than inferred: the thing being let go of is the gesture made on
+  // that screen, so it ends when that screen does. It is also why this is an
+  // effect and not a call inside the tab bar and the back handler and the
+  // floating action -- one of those three would have been forgotten, and the
+  // one forgotten is the one somebody uses.
+  //
+  // Not a leak on the ordinary opening: `bind` lets go before it opens, so by
+  // the time `openScope` sends this round there is nothing left to release.
+  useEffect(() => {
+    if (openScope !== null || tab !== 'chat' || invite.stage !== 'shut') {
+      waitingRef.current.letGo()
+    }
+  }, [openScope, tab, invite.stage])
 
   // STABLE ACROSS RENDERS, AND THAT IS THE WHOLE POINT.
   //
@@ -3743,6 +4399,48 @@ export function App({
             onLeave={() => questionRef.current.answer('leave')}
             onStay={() => questionRef.current.answer('stay')}
           />
+        </SafeAreaProvider>
+      </GestureHandlerRootView>
+    )
+  }
+
+  // §13.3'S FIRST SCREEN, ON THE LINK PATH, AND NOTHING BESIDE IT. #329.
+  //
+  // *« Toute invitation par lien ouvre l'écran 1 de §13.3 avant toute
+  // décision. »* The whole screen, like the question above and for the same
+  // reason: the launch is waiting inside entry for the answer, and there is
+  // nothing underneath to use -- either this device has no account at all, or
+  // the account it has is about to be asked to spend a link.
+  //
+  // THE CONDITIONS THE OTHER `Invited` CARRIES ARE ABSENT HERE, and that is
+  // the difference between the two paths rather than an oversight. An
+  // invitation standing on the threshold is unsolicited and waits for the
+  // list to be at rest; this is the direct answer to a link somebody just
+  // touched, scanned or pasted, one second ago.
+  if (linkDescribed !== null) {
+    return (
+      <GestureHandlerRootView style={styles.root}>
+        <SafeAreaProvider>
+          <SafeAreaView
+            testID="invited-link"
+            style={styles.root}
+            edges={['top', 'bottom', 'left', 'right']}>
+            <Invited
+              known={whatALinkSays(linkDescribed)}
+              // Nothing stands behind a link: it is one address, opened once.
+              behind={0}
+              // A claim is two calls with the issuer's application in between
+              // and can take half a minute. The screen stays and says so.
+              working={linkDescribed.answered ? 'join' : null}
+              // What became of a claim is said by `whenToSay.ts` on the list,
+              // or on the field a link was pasted into -- both of which are
+              // drawn after this screen has gone. Saying it twice would be
+              // two places to keep in agreement.
+              failed={false}
+              onJoin={() => describeRef.current.answer('join')}
+              onRefuse={() => describeRef.current.answer('refuse')}
+            />
+          </SafeAreaView>
         </SafeAreaProvider>
       </GestureHandlerRootView>
     )
@@ -4191,9 +4889,9 @@ export function App({
                   shownFor={who => displayNameFor(who, names.get(who))}
                   onOpen={scope => {
                     setTab('chat')
-                    // The launch effect binds it; a screen drawn before the
-                    // session exists has no conversation to open anyway.
-                    openConversationRef.current?.(scope)
+                    // Held when the launch has not bound an opener yet, like
+                    // every other row. See `waitingToOpen.ts`.
+                    openConversation(scope)
                   }}
                   onCall={(scope, peer) => {
                     // A call already up owns the microphone, and placing a
@@ -4350,9 +5048,11 @@ export function App({
             {openScope === null && tab === 'settings' && backupOpen && (
               <View style={styles.block}>
                 <BackupSettings
-                  reading={backupState}
+                  standing={backupState}
                   onRetry={() => setAttempt(attempt + 1)}
-                  restorable={restorableFromSettings}
+                  failed={acceptFailed === 'settings'}
+                  working={backupWorking}
+                  replaceFailure={replaceFailure}
                   onRestore={() => {
                     // The same surface the offer leads to, reached from the
                     // door instead. Nothing is closed here: the entry covers
@@ -4371,7 +5071,12 @@ export function App({
                     // Dropped rather than kept: the next opening asks
                     // again, and a value held between them would be the
                     // screen describing a backup as it was.
-                    setBackupState({ reading: 'waiting' })
+                    setBackupState({ standing: 'waiting' })
+                    // And the card with it, for the same reason: it was
+                    // about asking just now, not about coming back. A
+                    // failure that settles once this screen is gone is not
+                    // said: the receiver reads what is showing.
+                    clearBackupCards()
                   }}
                   onEnable={() => {
                     // THE DOOR A REFUSAL HONOURED FOR GOOD OWES SOMEBODY.
@@ -4380,11 +5085,11 @@ export function App({
                     // taken once and never revisitable.
                     //
                     // The same sequence the offer runs, and the same place
-                    // to show what it produced: this screen closes and the
-                    // key takes the whole surface, because it is shown
-                    // once and must not sit behind a settings row.
-                    const session = sessionClientRef.current
-                    if (session === null) return
+                    // to show what it produced: the key takes the whole
+                    // surface, because it is shown once and must not sit
+                    // behind a settings row. A failure stays on this screen,
+                    // under the button that was pressed.
+                    //
                     // NOTHING IS UNMOUNTED UNDER THE FINGER, and that is
                     // not caution -- it is a defect this had.
                     //
@@ -4400,15 +5105,7 @@ export function App({
                     // The key screen covers everything anyway, so there is
                     // nothing to close: `onDone` below does it, once the
                     // finger is long gone.
-                    acceptKeyBackup(session)
-                      .then(outcome => {
-                        setBackupPrompt(
-                          outcome.accepted
-                            ? { restoreKey: outcome.restoreKey }
-                            : null,
-                        )
-                      })
-                      .catch(() => setBackupPrompt(null))
+                    acceptTheBackup('settings')
                   }}
                   onReplace={() => {
                     // #220's third criterion, built. The confirmation is
@@ -4419,36 +5116,25 @@ export function App({
                     // `onEnable`: the key screen covers everything anyway,
                     // and unmounting under the finger sends the rest of the
                     // gesture to whatever React draws underneath.
+                    //
+                    // THROUGH THE STORE, LIKE AN ACCEPTANCE (#284). A second
+                    // tap on the confirmation started a second replacement:
+                    // the store starts nothing while a gesture on the backup
+                    // runs, and what comes of this one arrives through the
+                    // receiver above. `replaceBackupFrom` writes where a
+                    // failure stopped, and a launch that holds no session
+                    // answers a failure like any other.
                     const session = sessionClientRef.current
-                    if (session === null) return
-                    replaceKeyBackup(session)
-                      .then(outcome => {
-                        // CLOSED HERE, and only here. The finger is long
-                        // gone by the time this settles, and the key screen
-                        // is about to cover everything anyway -- so nothing
-                        // is unmounted under a gesture, and what is behind
-                        // the key is the row rather than the panel that
-                        // produced it.
-                        setReplaceConfirming(false)
-                        setBackupPrompt(
-                          outcome.replaced
-                            ? {
-                                restoreKey: outcome.restoreKey,
-                                // CARRIED, NOT DROPPED. A replacement whose
-                                // retirement failed is a success with one
-                                // true sentence attached: the old key still
-                                // opens the old backup. Rounding that up to
-                                // « c'est fait » would tell somebody their
-                                // lost key is harmless when it is not.
-                                oldStillOpens: !outcome.oldRetired,
-                              }
-                            : null,
-                        )
-                      })
-                      .catch(() => {
-                        setReplaceConfirming(false)
-                        setBackupPrompt(null)
-                      })
+                    const started = backupAcceptance.replace(() =>
+                      replaceBackupFrom(() =>
+                        session === null
+                          ? Promise.reject(
+                              new Error('this launch holds no session'),
+                            )
+                          : replaceKeyBackup(session),
+                      ),
+                    )
+                    if (started) clearBackupCards()
                   }}
                 />
               </View>
@@ -4478,7 +5164,7 @@ export function App({
                     setFavouritesOpen(false)
                     setKeptMessages(null)
                     setTab('chat')
-                    openConversationRef.current?.(scope)
+                    openConversation(scope)
                   }}
                 />
               </View>
@@ -4497,8 +5183,11 @@ export function App({
                     invitation={linkOutcome}
                     reinstalled={reinstalled}
                     notInYet={inYet === false}
+                    onPasteLink={pasteTheLink}
+                    pasting={pasting}
                     shareRefused={shareRefused}
-                    onOpen={scope => openConversationRef.current?.(scope)}
+                    opening={waitingOn}
+                    onOpen={openConversation}
                   />
                 </View>
               )}
@@ -4510,7 +5199,9 @@ export function App({
                   <Invite
                     stage={invite}
                     admission={admission}
-                    onInvite={name => inviteRef.current?.(name)}
+                    onInvite={(name, declared) =>
+                      inviteRef.current?.(name, declared)
+                    }
                     onClose={() => {
                       setInvite({ stage: 'shut' })
                       setAdmission(null)
@@ -4922,6 +5613,47 @@ export function App({
           </View>
         </SafeAreaView>
 
+        {/* THE INVITATION NOBODY SPENT A LINK FOR. §13.3's first screen,
+            and the OTHER half of it: the link path draws the same screen as
+            a whole screen, above, because entry is waiting inside a launch
+            for the answer. This one is unsolicited and waits.
+
+            OVER THE APPLICATION AND UNDER EVERYTHING BELOW, which is the
+            order the two rules here produce. It covers the list because a
+            decision is what it is asking for; every overlay after it -- the
+            backup offer, the vault, the recovery key, a call -- paints over
+            it, because each of those is either a secret shown once or
+            somebody already speaking.
+
+            AT REST, AND NOT IN THE MIDDLE OF A SENTENCE. `openScope === null
+            && tab === 'chat' && invite.stage === 'shut'` is the application's
+            own expression for the conversation list with nothing open on it,
+            and it is the condition the waiting-to-open guard already uses.
+            An invitation is not urgent: it has stood on the homeserver and
+            will still be standing in a minute. Covering somebody's composer
+            with a stranger's invitation, every sync tick until they answer,
+            would make this screen a nuisance surface rather than the
+            product's entry point -- and a decision taken to get a screen out
+            of the way is not the decision §13.3 is asking for. */}
+        {deciding !== null &&
+          openScope === null &&
+          tab === 'chat' &&
+          invite.stage === 'shut' && (
+            <SafeAreaView
+              testID="invited-overlay"
+              style={[StyleSheet.absoluteFill, styles.root]}
+              edges={['top', 'bottom', 'left', 'right']}>
+              <Invited
+                known={whatIsKnown(deciding, selfUserId, names)}
+                behind={threshold.length - 1}
+                working={answering}
+                failed={answerFailed === deciding.scope}
+                onJoin={() => answerTheInvitation('join', deciding.scope)}
+                onRefuse={() => answerTheInvitation('refuse', deciding.scope)}
+              />
+            </SafeAreaView>
+          )}
+
         {/* THE ONE TIME THIS PRODUCT ASKS SOMEBODY TO KEEP A SECRET, AND
             THE LAST CHILD OF THE ROOT SO THAT NOTHING CAN PAINT OVER IT.
             These two sat inside the conversation screen, beside the
@@ -4974,27 +5706,25 @@ export function App({
             style={[StyleSheet.absoluteFill, styles.root]}
             edges={['top', 'bottom', 'left', 'right']}>
             <BackupOffer
-              onAccept={() => {
-                const session = sessionClientRef.current
-                if (session === null) {
-                  setBackupPrompt(null)
-                  return
-                }
-                acceptKeyBackup(session)
-                  .then(outcome => {
-                    // The key exists for exactly as long as this state
-                    // holds it: nothing else has a copy, here or on the
-                    // homeserver. `acceptBackup.ts` hands it back precisely
-                    // once and never on a failure.
-                    setBackupPrompt(
-                      outcome.accepted
-                        ? { restoreKey: outcome.restoreKey }
-                        : null,
-                    )
-                  })
-                  .catch(() => setBackupPrompt(null))
+              failed={acceptFailed === 'offer'}
+              working={backupWorking !== null}
+              // The key exists for exactly as long as the key screen is up:
+              // `backupPrompt` holds it, and `backupAcceptance` beside it
+              // until `onDone`, and nothing else has a copy, here or on the
+              // homeserver. `acceptBackup.ts` hands it back precisely once and
+              // never on a failure, and a failure keeps this screen up to say
+              // so.
+              onAccept={() => acceptTheBackup('offer')}
+              onRefuse={() => {
+                // An acceptance still running goes on: its key is shown if
+                // it comes, and its failure, settling on a closed offer, is
+                // not said.
+                clearBackupCards()
+                // ONLY THE OFFER IS CLOSED. A success settling in the same
+                // frame has already put its key here, and a plain `null`
+                // would take the one sight of it away.
+                setBackupPrompt(p => (p === 'offering' ? null : p))
               }}
-              onRefuse={() => setBackupPrompt(null)}
             />
           </SafeAreaView>
         )}
@@ -5122,13 +5852,18 @@ export function App({
               onCopy={() => Clipboard.setString(backupPrompt.restoreKey)}
               // DROPPED HERE AND NOWHERE ELSE. Leaving this screen is the
               // moment the only copy of the key stops existing in this
-              // process, which is what « montrée une fois » means in code.
+              // process, which is what « montrée une fois » means in code:
+              // `backupAcceptance` keeps it until then, so that a mount going
+              // away cannot take the one sight of it with it (#284).
               //
               // And whatever is behind is put right here rather than when it
               // was left: a Réglages screen that said « vos messages ne sont
               // pas sauvegardés » before this key existed would be lying the
               // moment it came back into view.
-              onDone={() => setBackupPrompt(null)}
+              onDone={() => {
+                backupAcceptance.keyDone()
+                setBackupPrompt(null)
+              }}
             />
           </SafeAreaView>
         )}

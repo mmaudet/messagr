@@ -11,6 +11,21 @@
 # policy links to them, and a legal page whose own links are dead is worse
 # than one that does not link at all.
 #
+# AND THE HELP PAGE, SINCE #333. It is not decoration either: its address is
+# what the store listings carry as the support URL Apple visits, and its
+# `#supprimer-votre-compte` anchor is the account deletion resource Play
+# requires of any application that creates an account. A submission whose
+# deletion URL answers 404 is refused for a reason the console does not
+# spell out, exactly like the privacy policy, and the application's legal
+# screen links to that same anchor. So it answers before anything is
+# submitted, or nothing is submitted.
+#
+# THE ORDER THIS IMPOSES IS THE POINT. The page is committed in this
+# repository before it is served from messagr.eu, and until somebody runs
+# `deploy/messagr-eu/deploy.sh` this check fails on `/aide`. That failure is
+# the gate working: it says the site has not been deployed, not that the
+# page is wrong.
+#
 # Redirects are followed, and that is not a detail. A directory page served
 # by nginx answers 301 towards its trailing slash, so a check reading the
 # first status would fail on a site that is serving the page perfectly --
@@ -24,7 +39,7 @@
 set -euo pipefail
 
 BASE="${MESSAGR_SITE:-https://messagr.eu}"
-PAGES=(/confidentialite /conditions-generales)
+PAGES=(/confidentialite /conditions-generales /aide)
 
 failed=0
 for page in "${PAGES[@]}"; do
@@ -41,10 +56,12 @@ done
 
 if [ "$failed" -ne 0 ]; then
   echo >&2
-  echo "The legal pages are not being served." >&2
-  echo "  Publish them: see deploy/messagr-eu/site/LISEZ-MOI.md" >&2
+  echo "The pages the stores are given are not being served." >&2
+  echo "  Publish them: deploy/messagr-eu/deploy.sh sends the whole site." >&2
   echo "  Google follows the privacy policy link during review; a 404 fails it." >&2
+  echo "  It fetches the account deletion resource too, and Apple visits the" >&2
+  echo "  support URL: both are /aide." >&2
   exit 1
 fi
 
-echo "both legal pages answer"
+echo "the ${#PAGES[@]} pages the stores are given all answer"

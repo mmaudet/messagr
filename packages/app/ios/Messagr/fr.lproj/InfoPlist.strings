@@ -1,0 +1,21 @@
+/* French.
+
+   Translated from the English base. Why each string says what it says — and
+   what it is not allowed to promise — is written beside the keys in
+   Info.plist; `scripts/assert-ios-localisation.sh` refuses a language that is
+   missing one.
+
+   These four sentences were the plist's own until #320, so they are the
+   original wording and not a translation of a translation. The one edit is
+   typographic: the camera string carried a no-break space before its colon
+   and the three others a plain one. `src/copy/fr.ts` writes a plain space
+   before a colon sixty-four times and a no-break space never, so that is what
+   the four use here. */
+
+"NSMicrophoneUsageDescription" = "Pour que votre correspondant vous entende pendant un appel. Le son est chiffré de bout en bout : ni le serveur ni Messagr ne peuvent l’écouter, et rien n’est enregistré.";
+
+"NSCameraUsageDescription" = "Pour que votre correspondant vous voie pendant un appel vidéo. L’image est chiffrée de bout en bout : ni le serveur ni Messagr ne peuvent la voir, et rien n’est enregistré.";
+
+"NSPhotoLibraryUsageDescription" = "Pour choisir une image à envoyer dans une conversation. L’image est chiffrée sur cet appareil avant d’être envoyée : ni le serveur ni Messagr ne peuvent la lire.";
+
+"NSPhotoLibraryAddUsageDescription" = "Pour enregistrer dans votre photothèque une photographie reçue dans une conversation, lorsque vous le demandez. Une image enregistrée quitte Messagr : elle suit ensuite les sauvegardes et les autorisations de votre photothèque.";

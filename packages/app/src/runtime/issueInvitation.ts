@@ -1,3 +1,4 @@
+import { linkWithDeclaredName } from './declaredName'
 import { getErrorMessage } from './errors'
 import type { HttpRequester } from './pump'
 
@@ -181,6 +182,17 @@ const ROOM_VERSION = '11'
 export async function issueInvitation(
   deps: IssuingDeps,
   linkHost: string,
+  /**
+   * The name the inviter gave themselves, or `null`. #329, §13.26.
+   *
+   * NOT IN THE BODY ABOVE, AND THAT IS THE POINT. The request that mints an
+   * invitation carries `max_uses`, `ttl_seconds` and `room_id`, and this is
+   * none of them: it is written into the link after the service has answered,
+   * in the fragment, which no request ever carries. The service is not asked
+   * to store it and has nowhere to store it — there is no column for it in
+   * `migrations/001_init.sql`.
+   */
+  declared: string | null = null,
 ): Promise<Issued> {
   let scope: string
   try {
@@ -269,7 +281,16 @@ export async function issueInvitation(
       //
       // No scanner is needed, and that is the point: the camera everybody
       // already has is the scanner.
-      link: `https://${linkHost}/i/${minted.token}`,
+      //
+      // AND THE DECLARED NAME AFTER THE TOKEN, IN THE FRAGMENT. The host
+      // and the path are what nginx and its log see; the fragment is the one
+      // part of an address that stops at the device. `declaredName.ts` says
+      // why that is the only place this name may be written, and the link
+      // comes back untouched when nobody declared one.
+      link: linkWithDeclaredName(
+        `https://${linkHost}/i/${minted.token}`,
+        declared,
+      ),
     }
   } catch (cause: unknown) {
     return {
@@ -353,6 +374,68 @@ const ATTEMPTS = 30
 const BETWEEN_MS = 2000
 
 /**
+ * Admissions in flight, by invitation. #277.
+ *
+ * # THE LOOP THAT FED ITSELF
+ *
+ * The sync loop starts an admission on every tick and deliberately does not
+ * wait for it -- « the loop's tick must not wait on a poll of the invitation
+ * service », App.tsx -- while one admission lasts a minute. That alone piles
+ * ticks up; what made it a burst is that each invite is itself a membership
+ * event, so it ends the long poll, which makes the next tick, which starts
+ * another admission, which invites again. The artefacts of run
+ * 34738990621 counted fifteen `POST .../invite` for one entrant in under four
+ * seconds.
+ *
+ * Harmless to the homeserver, which answers 403 to the ones after the first.
+ * Not harmless to the telephone: fifteen round trips of radio, and fifteen
+ * more sync responses to decrypt, for a person who was already invited.
+ *
+ * # WHY THE REPETITION STAYS
+ *
+ * Asking thirty times over a minute is not the defect. A link is opened when
+ * whoever holds it opens it, and the interoperability client claims in a loop
+ * inside that same minute (`scripts/interop/nio_counterparty.py`, 45 seconds
+ * of `409 MESSAGR_NOT_YET_INVITED`). What was wrong is that the repetition
+ * was multiplied by the ticks instead of belonging to one run.
+ *
+ * So: an invitation already being admitted is not admitted again, and a claim
+ * that has not arrived yet is still served -- by the run in flight, which is
+ * still polling, and by the next one, which the tick after it ends starts.
+ *
+ * # WHY THE CALLER IS HANDED THE RUN RATHER THAN TURNED AWAY
+ *
+ * There are two callers, and one of them cannot be skipped: the gesture that
+ * issued the invitation awaits this to put the given name on whoever came in
+ * and to tell the screen they are in. It writes the invitation down before it
+ * calls (#118), so a tick can reach this first, and being told "somebody else
+ * is doing it" would cost that name with nobody able to say why. Every caller
+ * gets the same answer; only one of them makes the requests.
+ *
+ * # MODULE STATE, FOR THE LIFE OF THE PROCESS
+ *
+ * Like `awaitedInvitations.ts` and `accountInQuestion.ts`. A launch, a wake
+ * and the pump's ticks share one JavaScript context, and that is exactly the
+ * set of callers that can collide; nothing here needs to outlive the process,
+ * because a run that the process ended does not go on inviting.
+ */
+const running = new Map<string, Promise<Admission>>()
+
+/**
+ * Whether an admission is already going for `invitationId`.
+ *
+ * Asked for one thing: a caller that is about to join one can say so in its
+ * log line. The whole of #277 was counted in artefacts rather than seen on a
+ * screen, and after this a run and the ticks that shared it are the same
+ * `MESSAGR_ADMIT` line repeated -- which is how the count that mattered was
+ * read wrong in the first place. Read in the same turn as the call it
+ * describes, and true of that turn only.
+ */
+export function anAdmissionIsRunning(invitationId: string): boolean {
+  return running.has(invitationId)
+}
+
+/**
  * Waits for the service to name the account it drew, and invites it.
  *
  * The issuer's half of a two-party dance, and it runs without anybody asking
@@ -365,8 +448,46 @@ const BETWEEN_MS = 2000
  * ran until the application closed would spend a minute of radio on every
  * invitation ever issued. The link stays valid for its hour either way; what
  * stops is the watching, and issuing again is what resumes it.
+ *
+ * ONE RUN AT A TIME PER INVITATION, which is the whole of #277 and is done
+ * here rather than by whoever calls: see `running` above.
  */
-export async function admitDrawnEntrant(
+export function admitDrawnEntrant(
+  deps: IssuingDeps,
+  invitationId: string,
+  scope: string,
+): Promise<Admission> {
+  // The run already going is this call's answer too. Read and written in one
+  // turn, with nothing awaited between: a check in one turn and a record in
+  // the next is how #304 let two crypto machines be created, and the same
+  // hole here would let two ticks each start a minute of inviting.
+  const going = running.get(invitationId)
+  if (going !== undefined) return going
+
+  const run = admitWhoeverWasDrawn(deps, invitationId, scope)
+  running.set(invitationId, run)
+  const forget = () => {
+    // Only its own record: a run that has already been forgotten was
+    // replaced by the next tick's, and dropping that one would open the
+    // door this closes.
+    if (running.get(invitationId) === run) running.delete(invitationId)
+  }
+  // Both ways, and on a branch nobody returns: `admitWhoeverWasDrawn` catches
+  // its own polls and its own invites, so only an injected `wait` can reject
+  // here -- and a rejection with no handler is what Hermes turns into a
+  // warning nobody reads.
+  run.then(forget, forget)
+  return run
+}
+
+/**
+ * The minute of asking itself, which only `admitDrawnEntrant` starts.
+ *
+ * Not exported, and that is the point: one caller means the register above
+ * cannot be gone round. A guard that lived in the wiring instead would be
+ * the behaviour of no unit, and no unit test would have it.
+ */
+async function admitWhoeverWasDrawn(
   deps: IssuingDeps,
   invitationId: string,
   scope: string,

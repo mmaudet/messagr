@@ -1,4 +1,4 @@
-import { readBackupCommitment } from './backupCommitment'
+import { parseBackupCommitment } from './backupCommitment'
 import type { BackupOffer } from './offerBackup'
 import { offerBackup } from './offerBackup'
 import type { SecretStore } from './sessionStore'
@@ -28,8 +28,8 @@ import type { SecretStore } from './sessionStore'
  *
  * # WHICH WAY EACH FLAG FAILS, AND THEY FAIL IN OPPOSITE DIRECTIONS
  *
- * A store that cannot be read answers **`false` for `received`** and
- * **`true` for `asked`**. Neither is arbitrary:
+ * A store that cannot be read answers **`false` for `received`**, **`true`
+ * for `asked`** and **`true` for `backedUp`**. None is arbitrary:
  *
  * - `received: false` means no offer. A device that cannot read its own
  *   flags is a device having a bad day, and interrupting somebody to hand
@@ -39,9 +39,12 @@ import type { SecretStore } from './sessionStore'
  *   costs least is the one that stays quiet: an offer not made can be made
  *   from Réglages, and an offer made twice teaches somebody the product
  *   nags.
+ * - `backedUp: true` means no offer again. Until #291 a commitment that
+ *   could not be read counted as no backup at all, so a keystore that did
+ *   not answer offered the backup to a device that had accepted it.
  *
- * Both defaults therefore fall the same way, towards silence, and that is
- * the point rather than a coincidence: the only state this prompt must
+ * All three defaults therefore fall the same way, towards silence, and that
+ * is the point rather than a coincidence: the only state this prompt must
  * never reach is asking again somebody who already said no.
  */
 export interface BackupPromptStores {
@@ -92,7 +95,10 @@ async function flag(
  */
 export interface BackupOfferReading {
   readonly decision: BackupOffer
-  /** Whether a commitment was found. */
+  /**
+   * Whether a commitment was found, and `true` when its store could not be
+   * read at all: see which way each flag fails, above.
+   */
   readonly backedUp: boolean
   readonly asked: boolean
   readonly received: boolean
@@ -111,22 +117,25 @@ export async function shouldOfferBackup(
 ): Promise<BackupOfferReading> {
   const unreadable: ('commitment' | 'asked' | 'received')[] = []
 
-  const commitment = await readBackupCommitment(stores.commitment).catch(() => {
+  // READ HERE, AND NOT THROUGH `readBackupCommitment`. It answers null for a
+  // store that did not answer, so the `.catch` that was meant to name this one
+  // never ran: a keystore that did not answer read as a device that never
+  // accepted, the offer was made, and `unreadable` said nothing (#291).
+  let backedUp: boolean
+  try {
+    backedUp = parseBackupCommitment(await stores.commitment.read()) !== null
+  } catch {
     unreadable.push('commitment')
-    return null
-  })
+    backedUp = true
+  }
   const asked = await flag(stores.asked, true, () => unreadable.push('asked'))
   const received = await flag(stores.received, false, () =>
     unreadable.push('received'),
   )
 
   return {
-    decision: offerBackup({
-      backedUp: commitment !== null,
-      asked,
-      received,
-    }),
-    backedUp: commitment !== null,
+    decision: offerBackup({ backedUp, asked, received }),
+    backedUp,
     asked,
     received,
     unreadable,
@@ -135,6 +144,10 @@ export async function shouldOfferBackup(
 
 /**
  * Records that the question was put.
+ *
+ * By the offer when it is put, and by every acceptance before its first
+ * step: Réglages puts no question, and accepting there used to leave nothing
+ * behind (`acceptBackup.ts`, #291).
  *
  * **Called before the person answers, not after.** An offer interrupted —
  * the application killed, the screen turned, a call arriving — is an offer

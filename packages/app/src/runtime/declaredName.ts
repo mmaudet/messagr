@@ -1,0 +1,232 @@
+/**
+ * The name an inviter gives THEMSELVES, and the only place it ever lives.
+ * #329, §13.26.
+ *
+ * # TWO NAMES, AND THEY ARE NOT THE SAME THING
+ *
+ * `givenName.ts` holds the name one participant gives ANOTHER: it stays on
+ * the device that gave it, reaches nobody, and says who somebody is *to you*.
+ * This is the other one. It is what the person issuing an invitation calls
+ * themselves, and it is the only name in this product that is meant to
+ * travel -- because the person on the far end has never seen the account
+ * before and `@rabr642vve6v` tells them nothing about who is inviting them.
+ *
+ * §13.26 governs what may be said of it: a name somebody wrote about
+ * themselves is a CLAIM. « Se présente comme », never an established
+ * identity. Nothing here verifies anything and nothing here could.
+ *
+ * # IT TRAVELS IN THE FRAGMENT, AND THAT IS THE WHOLE DESIGN
+ *
+ * A URL fragment is never transmitted. Not by a browser, not by an operating
+ * system opening a universal link, not by anything between: RFC 3986 §3.5
+ * makes it the one part of an address that is resolved on the client and
+ * never sent. `nginx-messagr-eu.conf` says the same thing in its own words,
+ * beside a `location = /i` written in August in anticipation of a compact
+ * payload: *« A fragment NEVER reaches this server — not nginx, not its log,
+ * not an intermediary. »*
+ *
+ * So the name reaches the person invited and reaches nobody else. The
+ * invitation service is not asked to store it, is not asked to forward it,
+ * and could not read it if it wanted to: it never arrives. There is no
+ * column for it in `migrations/001_init.sql` and no field for it in
+ * `handlers/create.rs`, and that is not an omission to be filled in later --
+ * it is what the promise on the privacy page rests on.
+ *
+ * NEVER THE QUERY. `?n=` would reach nginx and its log. #313 took the token
+ * out of that log; nothing may put a name back into it. `invitationLink.ts`
+ * reads this key out of the fragment alone and treats a query as what it has
+ * always treated it as -- something a messenger attached, to be ignored.
+ *
+ * # AND IT IS KEPT NOWHERE, ON EITHER DEVICE
+ *
+ * The inviter's screen does not remember it between two invitations, and the
+ * invited device does not write it down. A declared name is a sentence in
+ * ONE invitation, read once, on the screen where somebody decides. That is
+ * what keeps it from becoming an attribute of an account -- which is the
+ * thing this product has never had and does not want.
+ *
+ * # WHAT COMES BACK IS SOMEBODY ELSE'S TEXT
+ *
+ * A name read here was written by whoever issued the link and is drawn on
+ * the screen where somebody decides whether to enter. It is cleaned on the
+ * way in exactly as on the way out, because nothing obliges the application
+ * that wrote it to have been this one.
+ */
+
+/**
+ * The longest declared name that travels, in UTF-8 BYTES.
+ *
+ * # WHY BYTES, WHERE `givenName.ts` COUNTS CHARACTERS
+ *
+ * A given name is a label on a row of a list. This one is drawn as a QR code
+ * on somebody's screen and read by a camera across a table, and what a camera
+ * has to resolve is bytes: §13.25 pins level M and versions 1 to 20, and each
+ * version is a denser grid than the last. A limit in characters would cost
+ * three times as much in Japanese as in French for the same-looking name, and
+ * the person holding the camera would be the one paying.
+ *
+ * Forty-eight is what keeps the worst allowed name inside version 10 of
+ * twenty, measured in `declaredName.spec.ts` rather than reasoned about. It
+ * is forty-eight letters of French, twenty-four Cyrillic or Greek ones,
+ * sixteen Chinese characters, twelve emoji.
+ */
+export const DECLARED_LIMIT = 48
+
+/**
+ * How many bytes a string costs once encoded, which is what a symbol has to
+ * carry.
+ *
+ * Arithmetic from the code point rather than `TextEncoder`, which
+ * `polyfills.ts` deliberately does not install, and rather than
+ * `encodeURIComponent`, which throws on a lone surrogate -- the one input
+ * this must be able to measure before removing it.
+ */
+export function utf8LengthOf(text: string): number {
+  let bytes = 0
+  for (const point of text) bytes += costOf(point)
+  return bytes
+}
+
+function costOf(point: string): number {
+  const code = point.codePointAt(0) ?? 0
+  if (code < 0x80) return 1
+  if (code < 0x800) return 2
+  if (code < 0x10000) return 3
+  return 4
+}
+
+/**
+ * Characters taken out of a declared name, and the list is short on purpose.
+ *
+ * The C0 and C1 controls, and the bidirectional formatting characters. The
+ * second group is the one that matters and the one nobody expects: a
+ * right-to-left override reorders everything drawn after it, so a name could
+ * be written to read as part of the sentence around it -- on the screen where
+ * somebody is deciding whether to walk into a conversation with the person
+ * who wrote it.
+ *
+ * The zero-width joiner and the variation selectors are format characters
+ * too, and they are NOT here: taking them out would break an emoji rather
+ * than protect anybody. This removes what reorders, not what composes.
+ *
+ * Written as explicit ranges rather than as `\p{Cc}`, so it does not depend
+ * on Unicode property escapes being compiled into the engine on a device.
+ *
+ * BUILT FROM ESCAPES RATHER THAN WRITTEN AS A LITERAL, and that is not a
+ * style choice. A pattern with these characters typed into it is a source
+ * file carrying an invisible right-to-left override: the line reordering
+ * itself in the reviewer's editor, saying nothing about it, in the module
+ * whose job is to remove exactly that. Escapes are readable; the characters
+ * are not.
+ */
+const REORDERING = new RegExp(
+  '^[' +
+    // The C0 and C1 controls.
+    '\\u0000-\\u001F\\u007F-\\u009F' +
+    // The bidirectional formatting characters, which are the ones that
+    // reorder what is drawn after them.
+    '\\u061C\\u200E\\u200F\\u202A-\\u202E\\u2066-\\u2069' +
+    ']$',
+)
+
+/**
+ * What to put in a link for what somebody typed, or `null` for nothing worth
+ * putting there.
+ *
+ * The same shape as `normaliseGivenName`: whitespace collapsed, ends
+ * trimmed, and `null` rather than an empty string -- declaring no name and
+ * declaring an empty one are one state, and two representations of one fact
+ * is how they come to disagree.
+ *
+ * Run on the way OUT and on the way IN. On the way out it keeps the symbol
+ * scannable; on the way in it is the only thing standing between somebody
+ * else's text and the screen where a decision is made.
+ *
+ * WALKED CODE POINT BY CODE POINT, not matched with one pattern. The half of
+ * a surrogate pair a truncated paste leaves behind is a lone UTF-16 unit, and
+ * telling one from a whole pair inside a regular expression takes a lookbehind
+ * -- which is exactly the kind of thing `invitationLink.ts` was bitten by: it
+ * compiles here and may not on a device, and no test run on Node would say
+ * so. Iteration answers it the same way in both places, and `for...of` yields
+ * a whole pair as one item.
+ */
+export function cleanDeclaredName(typed: string): string | null {
+  // WHITESPACE FIRST, AND THE ORDER IS A DEFECT THAT HAPPENED. A tab and a
+  // newline are C0 controls, so stripping controls before collapsing turned
+  // « Nadia\ndu\tclub » into « Nadiaduclub » -- two words welded together,
+  // silently, in the one place where the product prints somebody's name.
+  // Collapsed first, they become the space they were standing for; what is
+  // left for the walk below is zero-width or unprintable, and is dropped.
+  let kept = ''
+  for (const point of typed.replace(/\s+/g, ' ')) {
+    const code = point.codePointAt(0) ?? 0
+    if (code >= 0xd800 && code <= 0xdfff) continue
+    if (REORDERING.test(point)) continue
+    kept += point
+  }
+  const capped = cappedToBytes(kept.trim(), DECLARED_LIMIT)
+  return capped === '' ? null : capped
+}
+
+/**
+ * As much of `text` as fits in `limit` bytes, cut between characters.
+ *
+ * Never inside one: half of a character is a byte sequence no decoder will
+ * take, and `String.prototype.slice` counts UTF-16 units, which is neither
+ * bytes nor characters.
+ */
+function cappedToBytes(text: string, limit: number): string {
+  let out = ''
+  let bytes = 0
+  for (const point of text) {
+    const cost = costOf(point)
+    if (bytes + cost > limit) break
+    out += point
+    bytes += cost
+  }
+  return out
+}
+
+/**
+ * The link to hand over, with the name written into its fragment.
+ *
+ * The link is returned untouched when there is no name, so an inviter who
+ * declares nothing hands over exactly the address this product has always
+ * minted -- and the symbol stays exactly the size it has always been.
+ */
+export function linkWithDeclaredName(
+  link: string,
+  declared: string | null,
+): string {
+  if (declared === null) return link
+  return `${link}#n=${encodeURIComponent(declared)}`
+}
+
+/**
+ * The declared name inside a link's fragment, or `null` when there is none.
+ *
+ * `key=value` pairs separated by `&`, of which exactly one key is read.
+ * Everything else is ignored rather than refused, which is the tolerance
+ * `invitationLink.ts` already has and for the same reason: a link that
+ * travelled through a messenger may well come back with something attached.
+ * It is also what lets the payload grow later without this refusing the
+ * links written today.
+ *
+ * `null` for anything that did not survive the trip. A name is a courtesy on
+ * top of an invitation; the invitation is what gets somebody in, and a
+ * fragment that arrived mangled must never cost an entry.
+ */
+export function declaredNameInFragment(fragment: string): string | null {
+  for (const pair of fragment.split('&')) {
+    const equals = pair.indexOf('=')
+    if (equals < 0 || pair.slice(0, equals) !== 'n') continue
+    try {
+      return cleanDeclaredName(decodeURIComponent(pair.slice(equals + 1)))
+    } catch {
+      // `decodeURIComponent` throws on a percent sign with nothing usable
+      // after it. Nothing else in the link is affected by that.
+      return null
+    }
+  }
+  return null
+}

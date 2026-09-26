@@ -276,6 +276,23 @@ export const de: Readonly<Record<CopyKey, string>> = {
     'Sie haben bereits ein Gespräch mit %@. Dieses läuft weiter: die Einladung hat kein zweites eröffnet.',
   list_not_in_yet:
     'Sie sind noch nicht drin. Öffnen Sie den Einladungslink, den Ihnen jemand geschickt hat: er ist die einzige Tür, und davor kann die Anwendung nichts tun.',
+  // DIE ZWEITE TÜR, UND NUR DIE ZWEITE. #367. Die ganze Begründung steht im
+  // französischen Katalog: die Anwendung liest die Zwischenablage nie von
+  // sich aus, und was ein kopierter Link kostet, wird dort gesagt, wo er
+  // verlangt wird.
+  list_paste_lead:
+    'Wenn sich der Link nicht von selbst öffnet, kopieren Sie ihn und fügen Sie ihn hier ein.',
+  list_paste_cost:
+    'Ein kopierter Link ist für die anderen Anwendungen auf diesem Telefon lesbar. Dieser gilt eine Stunde und nur ein einziges Mal.',
+  list_paste_field: 'Einladungslink einfügen',
+  list_paste_confirm: 'Eintreten',
+  list_paste_working: 'Einladung wird geöffnet…',
+  list_paste_not_a_link:
+    'Das ist kein Messagr-Einladungslink. Es wurde nichts gesendet, und keine Einladung wurde verbraucht.',
+  list_paste_refused:
+    'Diese Einladung kann nicht verwendet werden. Bitten Sie die Person, die sie Ihnen geschickt hat, um eine neue.',
+  list_paste_retry:
+    'Dieser Einladung konnte vorerst nicht gefolgt werden. Versuchen Sie es gleich noch einmal: der Link selbst bleibt gültig.',
   list_reinstalled_back:
     'Dieses Gerät wurde neu installiert. Es ist mit einer neuen Geräteidentität zurück, und Nachrichten von vor der Neuinstallation bleiben unlesbar: ihre Schlüssel sind mit der alten Installation gegangen.',
   list_reinstalled_stranded:
@@ -285,6 +302,7 @@ export const de: Readonly<Record<CopyKey, string>> = {
   list_nothing_said: 'Es wurde noch nichts gesagt',
   list_unreadable: 'Dieses Gerät kann die letzte Nachricht nicht lesen',
   list_unreachable: 'Diese Unterhaltung konnte nicht erneut gelesen werden',
+  list_opening: 'Wird geöffnet …',
   list_name_action: 'Namen vergeben',
   list_name_title: 'Wie nennen Sie diese Person?',
   list_name_hint:
@@ -295,6 +313,9 @@ export const de: Readonly<Record<CopyKey, string>> = {
   list_back: 'Unterhaltungen',
   invite_action: 'Jemanden einladen',
   invite_who: 'Wen laden Sie ein?',
+  invite_declared: 'Wie stellen Sie sich vor?',
+  invite_declared_hint:
+    'Optional. Dieser Name reist im Link mit und sonst nirgends: der Dienst erhält ihn nicht und behält nichts davon.',
   invite_working: 'Unterhaltung wird erstellt …',
   invite_ready:
     'Senden Sie dieser Person diesen Link. Er gilt eine Stunde und funktioniert einmal.',
@@ -305,6 +326,29 @@ export const de: Readonly<Record<CopyKey, string>> = {
   invite_failed: 'Die Einladung konnte nicht erstellt werden.',
   invite_waiting: 'Noch niemand hat den Link geöffnet.',
   invite_admitted: 'Erledigt: diese Person kann hereinkommen.',
+  invited_title: 'Einladung erhalten',
+  invited_lead: 'Lädt Sie zu einem Gespräch ein.',
+  invited_who_unknown:
+    'Dieses Gespräch sagt nicht, wer es erstellt hat. Hier kann daher niemand genannt werden.',
+  invited_who_undeclared:
+    'Dieser Link sagt nicht, wer Sie einlädt: diese Person hat sich keinen Namen gegeben.',
+  'invited_instance %@': 'Dieses Konto wird von %@ gehostet.',
+  'invited_instance_elsewhere %@':
+    'Dieses Konto wird von %@ gehostet, und das ist nicht Ihr Server.',
+  invited_terms_unknown:
+    'Für diese Einladung wurde hier kein Link geöffnet: wie lange sie gilt und wie viele Öffnungen ihr bleiben, lässt sich von diesem Gerät nicht lesen.',
+  invited_terms_link:
+    'Wie lange dieser Link gilt und wie viele Öffnungen ihm bleiben, lässt sich hier nicht lesen: nur das Konto, das ihn ausgestellt hat, kann danach fragen.',
+  invited_nothing_sent:
+    'Es wurde noch nichts gesendet. Solange Sie nicht geantwortet haben, bleibt diese Einladung, wo sie ist.',
+  invited_nothing_spent:
+    'Es wurde noch nichts gesendet. Solange Sie nicht geantwortet haben, ist dieser Link nicht verbraucht.',
+  'invited_behind %1$d': '%1$d weitere Einladung(en) warten dahinter.',
+  invited_join: 'Dem Gespräch beitreten',
+  invited_refuse: 'Die Einladung ablehnen',
+  invited_working: 'Einen Moment…',
+  invited_failed:
+    'Nichts hat sich geändert: dieser Einladung wurde weder beigetreten noch wurde sie abgelehnt. Sie können es erneut versuchen.',
   list_name_not_kept:
     'Der Name konnte nicht behalten werden: beim nächsten Start ist er vergessen.',
   settings_action: 'Einstellungen',
@@ -343,6 +387,10 @@ export const de: Readonly<Record<CopyKey, string>> = {
     'Einer Entscheidung kann unter conformite@messagr.eu unter Angabe der Referenz widersprochen werden. Sie wird von einer anderen Person als der entscheidenden erneut geprüft, wann immer die Organisation das zulässt. Bei einem Dienst, den ein oder zwei Personen betreiben, lässt sich das nicht immer einhalten, und das aufzuschreiben ist besser, als eine Trennung zu versprechen, die es nicht gäbe.',
   legal_report_scope:
     'Messagr ist ein Hostingdienst und keine Online-Plattform; Erwägungsgrund 14 des DSA nimmt interpersonelle Kommunikationsdienste aus. Die Artikel 20 und 21 gelten daher nicht, und dieser Text beansprucht nicht, sie zu bieten.',
+  legal_delete_title: 'Ihr Konto löschen',
+  legal_delete_body:
+    'Die Löschung wird per E-Mail an conformite@messagr.eu beantragt: In der Anwendung selbst gibt es diesen Schritt noch nicht. Das Konto wird dann deaktiviert und seine Daten werden gelöscht; bereits gesendete Nachrichten bleiben Ereignisse der Räume, in denen sie geschrieben wurden, und der Server kann sie nicht zurücknehmen, da er sie nicht lesen kann.',
+  legal_delete_link: 'Löschung beantragen: messagr.eu/aide',
   legal_full_terms: 'Vollständige Bedingungen: messagr.eu',
   trust_action: 'Was über diese Person bekannt ist',
   trust_title: 'Was über diese Person bekannt ist',
@@ -528,14 +576,23 @@ export const de: Readonly<Record<CopyKey, string>> = {
   'backup_settings_progress %1$d %2$d': '%1$d von %2$d Schlüsseln gesichert',
   backup_settings_catching_up:
     'Der Rest geht mit den nächsten Abgleichen. Bis dahin geht nichts verloren.',
-  'backup_settings_count %1$d':
-    '%1$d Schlüssel gesichert: das ist, was Messagr auf dem Server sieht.',
+  'backup_settings_count %1$d': '%1$d Schlüssel von diesem Gerät gesendet.',
   backup_settings_reading: 'Der Zustand der Sicherung wird gelesen…',
   backup_settings_unreadable:
     'Der Zustand der Sicherung konnte auf diesem Gerät nicht gelesen werden.',
   backup_settings_unreadable_why:
     'Das sagt nichts über die Sicherung selbst: war sie an, ist sie es weiterhin, und hier wurde nichts geändert.',
   backup_settings_retry: 'Erneut versuchen',
+  backup_settings_superseded:
+    'Eine andere Sicherung hat die dieses Geräts ersetzt: von hier geht nichts mehr weg.',
+  backup_settings_dormant:
+    'Auf dem Server liegt eine Sicherung, aber dieses Gerät speist sie nicht.',
+  backup_settings_unchecked:
+    'Der Server hat nicht geantwortet: der Zustand der Sicherung konnte nicht gelesen werden.',
+  backup_settings_unchecked_why: 'Hier wurde nichts geändert.',
+  backup_settings_enter_current: 'Aktuellen Schlüssel eingeben',
+  backup_settings_enter_key: 'Meinen Wiederherstellungsschlüssel eingeben',
+  backup_settings_new: 'Neue Sicherung anlegen',
   backup_settings_enable: 'Meine Nachrichten sichern',
   backup_settings_never_shown:
     'Ihr aktueller Schlüssel kann nicht erneut angezeigt werden, hier so wenig wie anderswo.',
@@ -555,6 +612,9 @@ export const de: Readonly<Record<CopyKey, string>> = {
   backup_offer_accept: 'Meine Schlüssel sichern',
   backup_offer_refuse: 'Jetzt nicht',
   backup_offer_later: 'Sie können es später in den Einstellungen einschalten.',
+  backup_accept_failed:
+    'Die Sicherung konnte nicht eingeschaltet werden. Versuchen Sie es erneut.',
+  backup_accept_working: 'Wird eingeschaltet…',
   backup_replace_title: 'Ihren Wiederherstellungsschlüssel ersetzen',
   backup_replace_lead: 'Bevor Sie entscheiden: was dieser Schritt mitnimmt.',
   backup_replace_fact_old: 'Der alte Schlüssel öffnet nichts mehr',
@@ -640,7 +700,5 @@ export const de: Readonly<Record<CopyKey, string>> = {
   settings_vault_hint:
     'Eine Datei, für wen nichts auf einem Server lassen will.',
   restore_done_close: 'Schließen',
-  settings_restore: 'Meine älteren Nachrichten zurückholen',
-  settings_restore_hint: 'Wenn Sie Ihren Wiederherstellungsschlüssel haben.',
   back_to_newest: 'Zurück zur neuesten Nachricht',
 }

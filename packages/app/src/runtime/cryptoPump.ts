@@ -46,6 +46,7 @@ import {
 
 import { acceptBackup, type BackupAccepted } from './acceptBackup'
 import { theAccountsInQuestion } from './accountInQuestion'
+import { theAwaitedInvitations } from './awaitedInvitations'
 import { oneMachine } from './oneMachine'
 import type { EventCache } from './eventCacheStore'
 import { eventsToBuildFrom } from './eventsToBuildFrom'
@@ -66,9 +67,11 @@ import {
   readBackupCommitment,
   rememberBackupCommitment,
 } from './backupCommitment'
+import { rememberBackupAsked } from './backupPrompt'
 import type { IdentityEntitlement } from './crossSigningIdentity'
 import { computeCryptoMachineConfig } from './cryptoMachineConfig'
 import {
+  backupAskedSecrets,
   backupSecrets,
   cryptoStoreFormMarker,
   cryptoStoreSecrets,
@@ -115,6 +118,7 @@ import { enterInvitations, type Entered } from './enterInvitations'
 import { drainOutgoingRequests, makePumpHttp, PumpHttpError } from './pump'
 import {
   admitDrawnEntrant,
+  anAdmissionIsRunning,
   issueInvitation,
   type Admission,
   type Issued,
@@ -542,6 +546,15 @@ export async function loadConversation(
  */
 const declined = new Set<string>()
 
+/**
+ * The conversations already reported as waiting for a screen.
+ *
+ * An invitation this device spent no link for stands on every tick until
+ * something decides it, and a line per tick would bury the one that matters.
+ * Said once, like everything else here.
+ */
+const standing = new Set<string>()
+
 export async function enterAnyInvitations(
   sessionClient: ReturnType<typeof createClient>,
   selfUserId: string,
@@ -553,6 +566,9 @@ export async function enterAnyInvitations(
       (await fetchInvitations(asking)).filter(one => !declined.has(one.scope)),
     join: joinRoom,
     decline: declineRoom,
+    // ONE DOOR PER LINK SPENT. Entry records a claim in the same register on
+    // the other side of the launch; see `awaitedInvitations.ts`.
+    awaited: theAwaitedInvitations.count,
     // ONE CALL PER CONVERSATION, and `enterInvitations` is careful about
     // when it asks: never on a tick with no invitation on it, which is
     // almost every tick. Direct conversations only -- a room of three has
@@ -570,18 +586,70 @@ export async function enterAnyInvitations(
     },
   })
   for (const one of entered.collapsed) declined.add(one.scope)
+  // WHAT THIS WALK ANSWERED, back to the register. A door entered and a
+  // conversation declined each answer one invitation this device was waiting
+  // for; a join that failed answered nothing, so the next tick is owed it
+  // again.
+  theAwaitedInvitations.settled(
+    entered.joined.length + entered.collapsed.length,
+  )
+  const nowStanding = entered.waiting.filter(one => !standing.has(one.scope))
+  for (const one of nowStanding) standing.add(one.scope)
   // Only when something happened: this runs on every sync tick, and a line
   // per tick saying "nobody invited anybody" would bury the one that matters.
   if (
     entered.joined.length > 0 ||
     entered.refused.length > 0 ||
-    entered.collapsed.length > 0
+    entered.collapsed.length > 0 ||
+    nowStanding.length > 0
   ) {
     logEvent(entered.refused.length > 0 ? 'warn' : 'info', 'MESSAGR_ENTERED', {
       ...entered,
+      waiting: nowStanding,
     })
   }
   return entered
+}
+
+/**
+ * Phase twelve's other half: the answer somebody gives on screen 1 of §13.3.
+ *
+ * Pure glue, like everything else here. What reaches that screen and why is
+ * `Invited.tsx`; what this device can say about the invitation is
+ * `invitationOnScreen.ts`.
+ *
+ * NOT ONE OF THE DOORS THE REGISTER OWES. `awaitedInvitations.ts` counts
+ * invitations a spent link entitles this device to enter without asking. An
+ * invitation answered here was not owed to anybody -- the whole reason it
+ * reached a screen is that no link was spent for it -- so settling the
+ * register against it would pay off a debt that was never incurred, and the
+ * next invitation this device genuinely is waiting for would stand on the
+ * threshold instead of opening.
+ */
+export async function joinStandingInvitation(
+  sessionClient: ReturnType<typeof createClient>,
+  scope: string,
+): Promise<void> {
+  await joinRoom(makePumpHttp(sessionClient), scope)
+  logEvent('info', 'MESSAGR_INVITATION_JOINED', { scope })
+}
+
+/**
+ * The refusal, which is `/leave` on a room one has only been invited to.
+ *
+ * REMEMBERED HERE AS WELL AS SENT. The homeserver goes on listing a refused
+ * conversation in `rooms.invite` for a while after the refusal lands -- the
+ * same fact `declined` above exists for, measured on the bench in the minute
+ * after a collapse -- so without this the next sync tick would put the
+ * invitation somebody has just refused straight back on their screen.
+ */
+export async function declineStandingInvitation(
+  sessionClient: ReturnType<typeof createClient>,
+  scope: string,
+): Promise<void> {
+  await declineRoom(makePumpHttp(sessionClient), scope)
+  declined.add(scope)
+  logEvent('info', 'MESSAGR_INVITATION_REFUSED', { scope })
 }
 
 /**
@@ -799,6 +867,8 @@ export async function listConversations(
 export async function inviteSomebody(
   sessionClient: ReturnType<typeof createClient>,
   credentials: { readonly baseUrl: string; readonly accessToken: string },
+  /** The name the inviter gave themselves, or `null`. #329. */
+  declared: string | null = null,
 ): Promise<Issued> {
   return issueInvitation(
     {
@@ -809,6 +879,7 @@ export async function inviteSomebody(
       wait: ms => new Promise(resolve => setTimeout(resolve, ms)),
     },
     credentials.baseUrl.replace(/^https?:\/\//, ''),
+    declared,
   )
 }
 
@@ -824,6 +895,12 @@ export async function admitEntrant(
   invitationId: string,
   scope: string,
 ): Promise<Admission> {
+  // BEFORE THE CALL, because that is the only turn in which it is true.
+  // `issueInvitation.ts` runs one admission at a time per invitation and
+  // hands every other caller the same run (#277), so most ticks make no
+  // request at all -- and a log line per tick saying nothing of the sort is
+  // what made fifteen invites look like fifteen admissions.
+  const joined = anAdmissionIsRunning(invitationId)
   const admission = await admitDrawnEntrant(
     {
       http: makePumpHttp(sessionClient),
@@ -839,6 +916,7 @@ export async function admitEntrant(
   // not.
   logEvent(admission.admitted ? 'info' : 'warn', 'MESSAGR_ADMIT', {
     ...admission,
+    joined,
   })
   return admission
 }
@@ -1235,10 +1313,12 @@ export async function acceptKeyBackup(
 ): Promise<BackupAccepted> {
   const http = makePumpHttp(sessionClient)
   return acceptBackup({
+    rememberAsked: () => rememberBackupAsked(backupAskedSecrets),
     createKeyBackup,
     publishVersion: body => publishVersion(http, body),
     remember: commitment => rememberBackupCommitment(backupSecrets, commitment),
     enable: (sealingKey, version) => enableKeyBackup(sealingKey, version),
+    forget: () => forgetBackupCommitment(backupSecrets),
   })
 }
 
@@ -1258,10 +1338,12 @@ export async function replaceKeyBackup(
 ): Promise<BackupReplaced> {
   const http = makePumpHttp(sessionClient)
   return replaceBackup({
+    rememberAsked: () => rememberBackupAsked(backupAskedSecrets),
     createKeyBackup,
     publishVersion: body => publishVersion(http, body),
     remember: commitment => rememberBackupCommitment(backupSecrets, commitment),
     enable: (sealingKey, version) => enableKeyBackup(sealingKey, version),
+    forget: () => forgetBackupCommitment(backupSecrets),
     currentVersion: async () => {
       const found = await readVersion(
         http,
@@ -1269,6 +1351,13 @@ export async function replaceKeyBackup(
       )
       return found?.version ?? null
     },
+    // THE OTHER HALF OF WHAT A FAILURE PAST THE PUBLISH HAS TO PUT BACK
+    // (#327). `currentVersion` says which version to retire and this says
+    // which commitment to write again -- the sealing key included, which no
+    // request answers and which step three is about to overwrite. The same
+    // entry `resumeKeyBackup` reads on every launch, so putting it back is
+    // putting this device back to feeding the backup it fed.
+    commitment: () => readBackupCommitment(backupSecrets),
     retire: version => retireVersion(http, version),
   })
 }

@@ -268,6 +268,22 @@ export const nl: Readonly<Record<CopyKey, string>> = {
     'U hebt al een gesprek met %@. Dat loopt door: de uitnodiging heeft geen tweede geopend.',
   list_not_in_yet:
     'U bent er nog niet in. Open de uitnodigingslink die iemand u heeft gestuurd: dat is de enige deur, en daarvoor kan de applicatie niets doen.',
+  // DE TWEEDE DEUR, EN ALLEEN DE TWEEDE. #367. De hele redenering staat in de
+  // Franse catalogus: de applicatie leest het klembord nooit uit zichzelf, en
+  // wat een gekopieerde link kost wordt gezegd waar erom gevraagd wordt.
+  list_paste_lead:
+    'Als de link niet vanzelf opengaat, kopieer hem en plak hem hier.',
+  list_paste_cost:
+    'Een gekopieerde link kan door de andere applicaties op dit toestel gelezen worden. Deze is een uur geldig en werkt maar één keer.',
+  list_paste_field: 'Plak de uitnodigingslink',
+  list_paste_confirm: 'Binnenkomen',
+  list_paste_working: 'De uitnodiging wordt geopend…',
+  list_paste_not_a_link:
+    'Dit is geen uitnodigingslink van Messagr. Er is niets verstuurd, en er is geen uitnodiging verbruikt.',
+  list_paste_refused:
+    'Deze uitnodiging kan niet gebruikt worden. Vraag een nieuwe aan de persoon die hem u gestuurd heeft.',
+  list_paste_retry:
+    'Deze uitnodiging kon voorlopig niet gevolgd worden. Probeer het zo meteen opnieuw: de link zelf blijft goed.',
   list_reinstalled_back:
     'Dit toestel is opnieuw geïnstalleerd. Het is teruggekomen met een nieuwe toestelidentiteit, en berichten van vóór de herinstallatie blijven onleesbaar: hun sleutels zijn met de vorige installatie verdwenen.',
   list_reinstalled_stranded:
@@ -277,6 +293,7 @@ export const nl: Readonly<Record<CopyKey, string>> = {
   list_nothing_said: 'Er is nog niets gezegd',
   list_unreadable: 'Dit apparaat kan het laatste bericht niet lezen',
   list_unreachable: 'Dit gesprek kon niet worden herlezen',
+  list_opening: 'Wordt geopend…',
   list_name_action: 'Een naam geven',
   list_name_title: 'Hoe noemt u deze persoon?',
   list_name_hint:
@@ -287,6 +304,9 @@ export const nl: Readonly<Record<CopyKey, string>> = {
   list_back: 'Gesprekken',
   invite_action: 'Iemand uitnodigen',
   invite_who: 'Wie nodigt u uit?',
+  invite_declared: 'Hoe stelt u zich voor?',
+  invite_declared_hint:
+    'Optioneel. Deze naam reist mee in de link en nergens anders: de dienst ontvangt hem niet en bewaart er niets van.',
   invite_working: 'Het gesprek wordt aangemaakt…',
   invite_ready:
     'Stuur deze link naar die persoon. Hij is een uur geldig en werkt één keer.',
@@ -297,6 +317,29 @@ export const nl: Readonly<Record<CopyKey, string>> = {
   invite_failed: 'De uitnodiging kon niet worden aangemaakt.',
   invite_waiting: 'Nog niemand heeft de link geopend.',
   invite_admitted: 'Klaar: deze persoon kan binnenkomen.',
+  invited_title: 'Uitnodiging ontvangen',
+  invited_lead: 'Nodigt u uit voor een gesprek.',
+  invited_who_unknown:
+    'Dit gesprek zegt niet wie het heeft aangemaakt. Er kan hier dus niemand worden genoemd.',
+  invited_who_undeclared:
+    'Deze link zegt niet wie u uitnodigt: die persoon heeft zichzelf geen naam gegeven.',
+  'invited_instance %@': 'Dit account wordt gehost door %@.',
+  'invited_instance_elsewhere %@':
+    'Dit account wordt gehost door %@, en dat is niet uw server.',
+  invited_terms_unknown:
+    'Hier is geen link geopend voor deze uitnodiging: hoe lang ze geldig is en hoeveel keer ze nog geopend kan worden, is vanaf dit apparaat niet te lezen.',
+  invited_terms_link:
+    'Hoe lang deze link geldig is en hoeveel keer hij nog geopend kan worden, is hier niet te lezen: alleen het account dat hem heeft uitgegeven kan ernaar vragen.',
+  invited_nothing_sent:
+    'Er is nog niets verzonden. Zolang u niet antwoordt, blijft deze uitnodiging waar ze is.',
+  invited_nothing_spent:
+    'Er is nog niets verzonden. Zolang u niet antwoordt, is deze link niet verbruikt.',
+  'invited_behind %1$d': 'Er wachten nog %1$d uitnodiging(en) achter deze.',
+  invited_join: 'Deelnemen aan het gesprek',
+  invited_refuse: 'De uitnodiging weigeren',
+  invited_working: 'Een ogenblik…',
+  invited_failed:
+    'Er is niets veranderd: aan deze uitnodiging is niet deelgenomen en ze is niet geweigerd. U kunt het opnieuw proberen.',
   list_name_not_kept:
     'De naam kon niet worden bewaard: bij de volgende start is hij vergeten.',
   settings_action: 'Instellingen',
@@ -335,6 +378,10 @@ export const nl: Readonly<Record<CopyKey, string>> = {
     'Tegen een beslissing kan bezwaar worden gemaakt bij conformite@messagr.eu, met vermelding van de referentie. Zij wordt opnieuw beoordeeld door iemand anders dan degene die haar nam, telkens wanneer de organisatie dat toelaat. Bij een dienst die door één of twee mensen wordt geëxploiteerd kan aan die voorwaarde niet altijd worden voldaan, en dat opschrijven is beter dan een scheiding beloven die niet zou bestaan.',
   legal_report_scope:
     'Messagr is een hostingdienst en geen onlineplatform; overweging 14 van de DSA sluit interpersoonlijke communicatiediensten uit. De artikelen 20 en 21 zijn dus niet van toepassing, en deze tekst beweert niet ze te bieden.',
+  legal_delete_title: 'Uw account verwijderen',
+  legal_delete_body:
+    'Verwijdering wordt per e-mail aangevraagd bij conformite@messagr.eu: vanuit de applicatie bestaat dat gebaar nog niet. Het account wordt dan gedeactiveerd en zijn gegevens worden gewist; reeds verzonden berichten blijven gebeurtenissen van de ruimtes waarin ze zijn geschreven, en de server kan ze niet terugnemen, omdat hij ze niet kan lezen.',
+  legal_delete_link: 'Verwijdering aanvragen: messagr.eu/aide',
   legal_full_terms: 'Volledige algemene voorwaarden: messagr.eu',
   trust_action: 'Wat er van deze persoon bekend is',
   trust_title: 'Wat er van deze persoon bekend is',
@@ -519,14 +566,23 @@ export const nl: Readonly<Record<CopyKey, string>> = {
   'backup_settings_progress %1$d %2$d': '%1$d van %2$d sleutels bewaard',
   backup_settings_catching_up:
     'De rest gaat mee met de volgende synchronisaties. Ondertussen gaat er niets verloren.',
-  'backup_settings_count %1$d':
-    '%1$d sleutels bewaard: dat is wat Messagr op de server ziet.',
+  'backup_settings_count %1$d': '%1$d sleutels vanaf dit toestel verstuurd.',
   backup_settings_reading: 'De staat van de back-up wordt gelezen…',
   backup_settings_unreadable:
     'De staat van de back-up kon op dit apparaat niet gelezen worden.',
   backup_settings_unreadable_why:
     'Dat zegt niets over de back-up zelf: stond die aan, dan staat die nog aan, en hier is niets veranderd.',
   backup_settings_retry: 'Opnieuw proberen',
+  backup_settings_superseded:
+    'Een andere back-up heeft die van dit toestel vervangen: hiervandaan gaat niets meer weg.',
+  backup_settings_dormant:
+    'Er staat een back-up op de server, maar dit toestel voedt die niet.',
+  backup_settings_unchecked:
+    'De server heeft niet geantwoord: de staat van de back-up kon niet gelezen worden.',
+  backup_settings_unchecked_why: 'Hier is niets veranderd.',
+  backup_settings_enter_current: 'De huidige sleutel invoeren',
+  backup_settings_enter_key: 'Mijn herstelsleutel invoeren',
+  backup_settings_new: 'Een nieuwe back-up maken',
   backup_settings_enable: 'Mijn berichten bewaren',
   backup_settings_never_shown:
     'Uw huidige sleutel kan niet opnieuw worden getoond, hier niet en elders niet.',
@@ -545,6 +601,9 @@ export const nl: Readonly<Record<CopyKey, string>> = {
   backup_offer_accept: 'Mijn sleutels bewaren',
   backup_offer_refuse: 'Nu niet',
   backup_offer_later: 'U kunt het later inschakelen bij Instellingen.',
+  backup_accept_failed:
+    'De back-up kon niet worden ingeschakeld. Probeer opnieuw.',
+  backup_accept_working: 'Bezig met inschakelen…',
   backup_replace_title: 'Uw herstelsleutel vervangen',
   backup_replace_lead: 'Voordat u beslist: wat dit meeneemt.',
   backup_replace_fact_old: 'De oude sleutel opent niets meer',
@@ -626,7 +685,5 @@ export const nl: Readonly<Record<CopyKey, string>> = {
   settings_vault: 'Sleutelkluis',
   settings_vault_hint: 'Een bestand, voor wie niets op een server wil laten.',
   restore_done_close: 'Sluiten',
-  settings_restore: 'Mijn oudere berichten terughalen',
-  settings_restore_hint: 'Als u uw herstelsleutel hebt.',
   back_to_newest: 'Terug naar het nieuwste bericht',
 }

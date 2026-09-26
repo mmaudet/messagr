@@ -4,6 +4,7 @@ import { by, device, element, expect as detoxExpect, waitFor } from 'detox'
 import { openTheFirstConversation } from './conversation'
 import { IGNORING_THE_LIVE_POLL } from './longPoll'
 import { NOTIFICATIONS_GRANTED } from './permissions'
+import { joinTheInvitation } from './invitation'
 import { acceptThePromise } from './promise'
 import {
   forgetTheLog,
@@ -102,6 +103,12 @@ describe('boot', () => {
     // is a real `NotchedButton`, so accepting the promise is what makes the
     // shape observable.
     await acceptThePromise()
+    // AND THE INVITATION IS ANSWERED, because it is now asked about (#329).
+    // §13.3's first screen describes the link this launch was opened with
+    // and waits inside entry: nothing is claimed until « Rejoindre la
+    // conversation » is tapped, so `report.entry.claimed` below depends on
+    // this line. See invitation.ts.
+    await joinTheInvitation()
     shape = await whatItMeasured()
     report = await whatItReported()
     // Wide enough for the three waits inside it end to end: the promise

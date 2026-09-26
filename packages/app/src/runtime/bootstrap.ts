@@ -1,3 +1,6 @@
+import { logger } from 'matrix-js-sdk/lib/logger'
+
+import { keepTheSdkToWarnings } from './log'
 import { ensureRuntimeGapsClosed, REACT_NATIVE_PROVIDERS } from './polyfills'
 
 /**
@@ -11,3 +14,9 @@ export const polyfillReport = ensureRuntimeGapsClosed(
   globalThis,
   REACT_NATIVE_PROVIDERS,
 )
+
+// AHEAD OF THE LIBRARY FOR ITS LOGGER TOO. A logger matrix-js-sdk makes takes
+// its parent's factory when it is made, and the library makes one while its
+// modules load: kept to warnings any later, that one would still write every
+// line in a store build. See `keepTheSdkToWarnings`.
+keepTheSdkToWarnings(logger)

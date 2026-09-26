@@ -79,6 +79,18 @@ describe('the copy catalogue', () => {
     // is a human judgement that proves nothing cryptographically. A screen
     // that borrowed the word would be telling somebody they had done the
     // one when they had done the other.
+    //
+    // # NO EXCEPTION, AND ONE WAS PROPOSED
+    //
+    // #323's fifth state was validated saying « l'état de la sauvegarde n'a
+    // pas pu être vérifié », and shipped here behind an exception naming that
+    // key and that sentence. The account holder was asked, and answered by
+    // changing the word rather than the rule: the state now says « n'a pas pu
+    // être lu », which is what happened -- a request that got no answer -- and
+    // the line under it already says « Rien n'a été modifié ici ».
+    //
+    // So this stays whole. An exception here would have been a hole in the one
+    // rule #34 wrote as a test rather than as something somebody re-reads.
     const offending = Object.entries(fr).filter(([, value]) =>
       /vérifi|verifi/i.test(value),
     )

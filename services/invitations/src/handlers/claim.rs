@@ -780,7 +780,7 @@ pub async fn claim(
     headers: HeaderMap,
     Body(req): Body<ClaimRequest>,
 ) -> Result<Json<ClaimResponse>, AppError> {
-    let hash = crypto::token_hash(&req.token);
+    let hash = crypto::presented_token_hash(&req.token);
     let inv = sqlx::query(
         "SELECT id, inviter_user_id, status, expires_at, used_count, max_uses \
          FROM invitations WHERE token_sha256 = ?",
@@ -1931,6 +1931,22 @@ mod tests {
         .await
     }
 
+    /// Same claim as `perform_claim`, but with the token as somebody typed it.
+    async fn claim_with_token(
+        st: &Arc<AppState>,
+        token: &str,
+    ) -> Result<Json<ClaimResponse>, AppError> {
+        claim(
+            State(st.clone()),
+            HeaderMap::new(),
+            Body(ClaimRequest {
+                token: token.into(),
+                existing_user_id: None,
+            }),
+        )
+        .await
+    }
+
     /// How many of the pool's accounts are still really usable: reserved AND
     /// carrying their secrets. It is this quantity, and not `status` alone,
     /// that a retry consumes when it should consume nothing.
@@ -2525,6 +2541,39 @@ mod tests {
         assert_eq!(
             r.device_id, DEVICE,
             "without the device, the returned token opens no restorable session"
+        );
+    }
+
+    /// **A token typed in lowercase claims the same invitation** (#375).
+    ///
+    /// The token is base32, drawn in capitals and meant to be typed
+    /// (`crypto::generate_token`). The application's paste field does not
+    /// capitalise (`PasteLink.tsx`), so a link copied out by hand arrives in
+    /// lowercase, and used to meet `InvitationInvalid`: "This invitation
+    /// cannot be used", on a link that was good.
+    ///
+    /// **The control is the other half**: without it, a service that let any
+    /// token in would pass the first assertions.
+    #[sqlx::test(migrations = "./migrations")]
+    async fn a_token_typed_in_lowercase_claims_the_same_invitation(pool: SqlitePool) {
+        seed_invitation(&pool, 1).await;
+        seed_account(&pool, "@reserved:h", "old", None).await;
+        let (st, _f) = setup(pool.clone(), "@whoever:h", View::Invite(ROOM), "old").await;
+
+        let r = claim_with_token(&st, "token")
+            .await
+            .expect("the lowercase token is the invitation seeded as TOKEN");
+        assert_eq!(r.user_id, "@reserved:h");
+        assert_eq!(
+            count(&pool, "SELECT used_count FROM invitations WHERE id='inv1'").await,
+            1,
+            "it is the seeded invitation whose use is consumed"
+        );
+
+        let other = claim_with_token(&st, "tokem").await;
+        assert!(
+            matches!(other, Err(AppError::InvitationInvalid)),
+            "a token of other letters is still unknown, whatever its case"
         );
     }
 

@@ -90,7 +90,29 @@ describe('reading the backup on this account', () => {
     // The whole thing, because `restoreKeyMatches` reads `algorithm` and
     // `auth_data` out of it and a caller should not have to take it apart.
     expect(found?.info).toEqual(described)
+    // And the count on its own, which `offerRestore` reads (#328): a version
+    // holding nothing restores nothing, and offering it is offering somebody
+    // their past back out of an empty box.
+    expect(found?.count).toBe(1240)
     expect(transport.seen.method).toBe('GET')
+  })
+
+  it('says it does not know the count when the homeserver named none', async () => {
+    // Silence is not emptiness. A caller that read it as zero would withdraw
+    // an offer from somebody who has a real backup and a key in their hand.
+    const transport = http(async () =>
+      JSON.stringify({ version: '947281', algorithm: 'm.megolm_backup.v1' }),
+    )
+
+    expect((await readVersion(transport, isNotFound))?.count).toBeNull()
+  })
+
+  it('refuses a count that is not a number', async () => {
+    const transport = http(async () =>
+      JSON.stringify({ version: '947281', count: 'lots' }),
+    )
+
+    expect((await readVersion(transport, isNotFound))?.count).toBeNull()
   })
 
   it('says there is none when the homeserver says not found', async () => {

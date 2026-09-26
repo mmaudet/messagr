@@ -12,6 +12,7 @@ import {
   type,
 } from '../design/tokens'
 import { NotchedButton } from './NotchedButton'
+import { passphraseGiven } from './vaultPassphrase'
 
 /**
  * The second route of ADR-0013: a file, for somebody with a reason to want
@@ -92,10 +93,11 @@ export function KeyVault({
    * without one.
    */
   const [opened, setOpened] = useState<VaultOpening>(null)
+  const given = passphraseGiven(draft)
 
   const create = () => {
     const passphrase = draft
-    if (passphrase === '' || working) return
+    if (!passphraseGiven(passphrase) || working) return
     setWorking(true)
     setFailed(false)
     onCreate(passphrase)
@@ -111,7 +113,7 @@ export function KeyVault({
 
   const open = () => {
     const passphrase = draft
-    if (passphrase === '' || working) return
+    if (!passphraseGiven(passphrase) || working) return
     setWorking(true)
     setFailed(false)
     setOpened(null)
@@ -197,10 +199,15 @@ export function KeyVault({
       )}
 
       <View style={styles.actions}>
+        {/* INERT UNTIL A PASSPHRASE IS TYPED, both of them. Touched with the
+            field empty they returned without a word, and on 15 September 2026
+            an iPhone and the Pixel reported a button that did nothing. Drawn
+            inert, they show what they are waiting for. */}
         <NotchedButton
           testID="vault-create"
           label={working ? t('vault_working') : t('vault_create')}
           onPress={create}
+          disabled={!given}
           wide
         />
         {/* THE OTHER GESTURE, AND IT IS `quiet`. Making a vault is what
@@ -213,6 +220,7 @@ export function KeyVault({
           testID="vault-open"
           label={working ? t('vault_open_working') : t('vault_open_choose')}
           onPress={open}
+          disabled={!given}
           tone="quiet"
           wide
         />

@@ -385,6 +385,41 @@ describe('an invitation that runs out while it is being answered', () => {
   })
 })
 
+describe('an outgoing invitation whose ticker did not run', () => {
+  it('ends at its deadline the moment the session is asked to read the clock', async () => {
+    // #294: the ticker is a JavaScript timer, and a timer is suspended with
+    // the application that owns it. `repeat` never fires in these tests,
+    // which is the same thing happening on purpose -- so this is the caller
+    // who put the application away while it rang and came back much later.
+    const built = build()
+    await built.session.place()
+    expect(built.session.state().call).toBe('outgoingInvite')
+
+    built.advance(90_001)
+    // Nothing looked at the clock, so the call is still ringing.
+    expect(built.session.state().call).toBe('outgoingInvite')
+
+    built.session.tick()
+    // Ended for the reason the specification gives it, and the far end is
+    // told: an expiry on the caller's side is a hangup carrying
+    // `invite_timeout`, not a call that quietly stops being one here.
+    expect(built.session.state()).toEqual({
+      call: 'ended',
+      reason: { ended: 'hangup', reason: 'invite_timeout' },
+    })
+    await built.session.stop()
+    expect(built.sent.at(-1)).toMatchObject({
+      type: 'm.call.hangup',
+      content: { reason: 'invite_timeout' },
+    })
+  })
+
+  it('throws nothing when there is no call to read the clock for', () => {
+    const { session } = build()
+    expect(() => session.tick()).not.toThrow()
+  })
+})
+
 describe('mute', () => {
   it('answers what the microphone holds once there is one', async () => {
     const { session } = build()

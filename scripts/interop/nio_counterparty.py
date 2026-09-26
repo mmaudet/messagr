@@ -117,6 +117,21 @@ NOT_YET_INVITED = "MESSAGR_NOT_YET_INVITED"
 PLACE_DEADLINE_SECONDS = 100
 HOMESERVER_REQUEST_SECONDS = 10
 
+# COMBIEN DE TEMPS LE TÉMOIN ATTEND DE VOIR SON PROPRE RETRAIT.
+#
+# Le retrait est un changement d'état posé par l'application ; il est visible
+# dès que le homeserver l'a écrit. L'attente ne couvre donc pas une lenteur de
+# protocole, elle couvre le trajet entre le toucher de Detox et cette phase.
+# Bornée, parce qu'un retrait qui n'arrive pas est un défaut du produit et doit
+# se lire comme tel, pas comme une phase qui pend.
+WITNESS_DEADLINE_SECONDS = 60
+
+# Combien d'événements le témoin remonte pour trouver son propre retrait. La
+# conversation vient de naître : elle en compte une dizaine. Cent laisse de la
+# marge sans jamais paginer, et une pagination silencieuse est ce qui ferait
+# lire « rien après le retrait » sur une fenêtre trop courte pour le dire.
+WITNESS_EVENTS = 100
+
 # How long the send phase waits for the application's account to appear as a
 # joined member before it refuses to share a room key. Six syncs: the join has
 # already happened by then or something else is wrong, and waiting longer only
@@ -861,6 +876,362 @@ async def claim_place(session_file: Path, store: Path) -> int:
     return 0
 
 
+def departure_of(events: list, who: str):
+    """Le rang du dernier événement qui fait sortir `who`, ou None.
+
+    Le DERNIER, pas le premier : une contrepartie peut avoir été invitée,
+    entrée, sortie et réinvitée dans la même fenêtre, et c'est la sortie la
+    plus récente qui décide de l'état où le salon se trouve maintenant.
+    """
+    found = None
+    for rank, event in enumerate(events):
+        if (
+            event.get("type") == "m.room.member"
+            and event.get("state_key") == who
+            and (event.get("content") or {}).get("membership") == "leave"
+        ):
+            found = rank
+    return found
+
+
+def inventory(events: list) -> str:
+    """Ce qu'une liste d'événements contient, pour qu'un échec le nomme.
+
+    Un échec qui dit « rien ne t'en retire » sans dire ce qu'il a lu envoie
+    chercher un défaut du produit là où il y a une fenêtre mal demandée. C'est
+    ce qui a coûté le run 35094474747.
+    """
+    counted: dict = {}
+    for event in events:
+        key = f"{event.get('type')} from {event.get('sender')}"
+        counted[key] = counted.get(key, 0) + 1
+    return ", ".join(f"{n}x {key}" for key, n in sorted(counted.items())) or "nothing"
+
+
+async def witness_eviction(session_file: Path, store: Path) -> int:
+    """Constater son propre retrait, du dehors, et ce qu'il ferme.
+
+    # LE JUGE NE DOIT PAS ÊTRE LE JUGE
+
+    Après l'éviction, l'application affiche « la clé a tourné ». C'est son
+    propre témoignage, et #35 demande mieux : « prouvée avec un client
+    indépendant plutôt qu'avec le nôtre ». Cette phase est ce client-là. Elle
+    interroge le homeserver avec la session de la contrepartie, une
+    implémentation qui n'a rien de commun avec l'application, et ne croit rien
+    de ce que l'écran a dit.
+
+    # OÙ ELLE REGARDE, ET CE QUE LE VRAI HOMESERVER A APPRIS
+
+    **`from` n'est pas facultatif en pratique.** La spécification le dit
+    facultatif depuis la v1.3, et annonce qu'un serveur sans `from` repart du
+    dernier événement visible quand `dir=b`. Mesuré sur le banc, run Device
+    35094474747 : `/messages?dir=b&limit=100` sans `from` a rendu **un seul
+    événement**, vingt-trois fois de suite, sur un salon qui en comptait une
+    dizaine et où le retrait avait bel et bien eu lieu -- l'écran de
+    l'application montrait `evict-outcome-rotated`. Continuwuity repart donc
+    du PREMIER événement du salon, et remonter en arrière depuis le premier ne
+    rend que lui. La phase a conclu « la contrepartie est encore membre » sur
+    une fenêtre mal demandée, ce qui est le genre d'erreur que ce dépôt
+    collectionne : une mesure qui accuse le produit.
+
+    Le jeton vient donc d'un `/sync`, et n'est plus supposé. La même réponse
+    sert deux fois : elle dit l'appartenance -- le salon est dans `join`, dans
+    `leave` ou nulle part -- et elle donne le `next_batch` d'où `/messages`
+    repart en arrière. Les deux lectures sont tentées à chaque tour, et la
+    première qui porte le retrait l'emporte ; un homeserver qui n'honorerait
+    pas `include_leave` ne fait donc pas échouer la phase.
+
+    Et c'est de l'HTTP nu, sans nio : le magasin est partagé entre les phases
+    et `store_sync_tokens` fait avancer le jeton à chaque réponse, de sorte
+    qu'une synchronisation nio ici ferait passer derrière lui ce que `collect`
+    doit encore lire. Un `/sync` sans `since` sur le jeton d'accès n'avance
+    rien ; `claim_place` note la même chose.
+
+    # CE QU'ELLE ÉTABLIT
+
+    1. Le retrait a bien eu lieu, et c'est un RETRAIT : l'événement
+       d'appartenance de cette contrepartie dit `leave`, et il est posé par le
+       compte de l'application. Une contrepartie partie d'elle-même
+       ressemblerait à une éviction réussie et n'en serait pas une.
+    2. Ce que l'application a écrit dans ce salon avant l'éviction est arrivé
+       CHIFFRÉ, avec un identifiant de session Megolm. Un salon où elle
+       écrirait en clair passerait toutes les assertions de rotation du monde
+       sans que la rotation serve à rien.
+    3. Rien de l'application n'est visible après le retrait. Le test envoie un
+       message APRÈS l'éviction, exprès : sans lui, « la personne retirée ne
+       lit pas la suite » serait une garde qui fabrique son entrée, vraie
+       parce qu'il n'y a pas de suite. Il y en a une, et elle n'arrive pas
+       ici.
+
+    # CE QU'ELLE N'ÉTABLIT PAS, ET IL FAUT LE DIRE ICI
+
+    **Elle ne prouve pas la rotation de la clé.** Sur ce banc, elle ne le peut
+    pas, et l'écrire serait pire que de ne pas le faire.
+
+    L'application tient une identité signée et partage ses clés de salon par
+    identité (MSC4153) ; matrix-nio n'a aucune signature croisée, donc rien ne
+    répond pour cet appareil et l'application ne lui a JAMAIS donné de clé de
+    salon -- c'est ce que `collect` assert, sous
+    `MESSAGR_INTEROP_EXPECT=excluded`. « Un message envoyé après l'éviction
+    n'est plus lisible de son côté » est donc déjà vrai avant l'éviction :
+    l'assertion passerait sur une rotation qui n'a pas eu lieu, ce qui est
+    exactement le défaut de #276 déplacé d'un cran.
+
+    Et la rotation se lit dans l'identifiant de session Megolm du message
+    SUIVANT, que seul un membre du salon voit. Une partie retirée n'en est
+    plus un ; le salon ne compte que deux comptes, celui de l'application et
+    celui-ci ; et le jeton du banc est un jeton d'inscription, pas
+    d'administration. Il n'existe donc, aujourd'hui, aucun témoin qui reste
+    dans le salon après l'éviction.
+
+    Ce qu'il faudrait : une contrepartie qui fasse de la signature croisée et
+    qui ne soit pas bâtie sur `matrix-sdk-crypto`. La même qui manque pour
+    rendre l'autre moitié de l'aller-retour (voir `EXPECT_EXCLUDED`). Elle
+    tiendrait une clé de l'application, et « ce qui vient après ne s'ouvre
+    plus avec » deviendrait une assertion de deux lignes. C'est un ticket, pas
+    une ligne à écrire ici.
+
+    L'identifiant de session d'avant l'éviction est donc IMPRIMÉ plutôt
+    qu'asserté : le jour où ce témoin peut voir le message d'après, la
+    comparaison est écrite.
+    """
+    homeserver = env("MESSAGR_INTEROP_HOMESERVER")
+    application = env("MESSAGR_INTEROP_SENDER")
+
+    # Le salon que `claim-place` a rejoint. Personne d'autre ne le connaît : il
+    # naît avec l'invitation que l'application vient d'émettre.
+    room_file = session_file.with_name("claimed-room")
+    if not room_file.exists():
+        print(
+            "FAIL: no claimed-room beside the session file, so there is no "
+            "conversation to witness.\n"
+            "      `claim-place` writes it when it joins; this phase runs "
+            "after the eviction, in the same workdir.",
+            file=sys.stderr,
+        )
+        return 1
+    room_id = room_file.read_text().strip()
+    if not room_id:
+        print("FAIL: claimed-room is empty", file=sys.stderr)
+        return 1
+
+    session = json.loads(session_file.read_text())
+    user_id = session["user_id"]
+    bearer = {"Authorization": f"Bearer {session['access_token']}"}
+    sync_url = f"{homeserver}/_matrix/client/v3/sync"
+    messages_url = (
+        f"{homeserver}/_matrix/client/v3/rooms/"
+        f"{quote(room_id, safe='!')}/messages"
+    )
+    leaving = json.dumps(
+        {"room": {"include_leave": True, "timeline": {"limit": WITNESS_EVENTS}}}
+    )
+
+    clock = asyncio.get_running_loop()
+    started = clock.time()
+    deadline = started + WITNESS_DEADLINE_SECONDS
+    looks = 0
+    where = "nowhere"
+    counts: dict = {}
+    history: list = []
+    source = "nothing was read"
+    reading = "not asked"
+    kick_at = None
+
+    async with aiohttp.ClientSession() as http:
+
+        async def ask(url, params, what):
+            try:
+                async with http.get(
+                    url,
+                    params=params,
+                    headers=bearer,
+                    timeout=aiohttp.ClientTimeout(total=HOMESERVER_REQUEST_SECONDS),
+                ) as response:
+                    return response.status, await response.text()
+            except (aiohttp.ClientError, asyncio.TimeoutError) as error:
+                print(
+                    f"FAIL: {what} got no answer after {looks} look(s), "
+                    f"{clock.time() - started:.1f}s in "
+                    f"({type(error).__name__}: {error})",
+                    file=sys.stderr,
+                )
+                return None
+
+        while kick_at is None:
+            looks += 1
+
+            # LA SYNCHRONISATION SERT DEUX FOIS : l'appartenance, et le jeton.
+            answered = await ask(
+                sync_url, {"timeout": "0", "filter": leaving}, "the sync"
+            )
+            if answered is None:
+                return 1
+            status, body = answered
+            if status != 200:
+                print(
+                    f"FAIL: the sync was refused ({status}) for {user_id}: "
+                    f"{body}",
+                    file=sys.stderr,
+                )
+                return 1
+            payload = json.loads(body)
+            token = payload.get("next_batch")
+            rooms = payload.get("rooms") or {}
+            sections = {
+                name: (rooms.get(name) or {}) for name in ("join", "invite", "leave")
+            }
+            counts = {name: len(held) for name, held in sections.items()}
+            where = next(
+                (name for name, held in sections.items() if room_id in held),
+                "nowhere",
+            )
+
+            if where == "leave":
+                left = sections["leave"][room_id]
+                timeline = list((left.get("timeline") or {}).get("events") or [])
+                found = departure_of(timeline, user_id)
+                if found is not None:
+                    history, kick_at = timeline, found
+                    source = "the leave section of /sync"
+                    break
+                if timeline:
+                    history, source = timeline, "the leave section of /sync"
+
+            # PUIS L'HISTOIRE, REPRISE EN ARRIÈRE DEPUIS CE JETON. Sans
+            # `from`, ce homeserver repart du premier événement du salon et
+            # n'en rend qu'un : voir le docstring.
+            if isinstance(token, str) and token:
+                answered = await ask(
+                    messages_url,
+                    {"from": token, "dir": "b", "limit": str(WITNESS_EVENTS)},
+                    "the room history",
+                )
+                if answered is None:
+                    return 1
+                status, body = answered
+                reading = str(status)
+                if status == 200:
+                    # `dir=b` remonte le fil : remis dans l'ordre du salon.
+                    back = list(reversed(json.loads(body).get("chunk") or []))
+                    found = departure_of(back, user_id)
+                    if found is not None:
+                        history, kick_at = back, found
+                        source = "/messages, back from the sync token"
+                        break
+                    if len(back) > len(history):
+                        history = back
+                        source = "/messages, back from the sync token"
+
+            if clock.time() + CLAIM_PAUSE_SECONDS + HOMESERVER_REQUEST_SECONDS > deadline:
+                print(
+                    f"FAIL: nothing removes {user_id} from {room_id}, after "
+                    f"{looks} look(s) over {clock.time() - started:.1f}s.\n"
+                    f"      /sync puts that room in: {where} "
+                    f"(rooms seen: {counts}).\n"
+                    f"      /messages answered {reading}, and the best window "
+                    f"read was {len(history)} event(s) from {source}:\n"
+                    f"      {inventory(history)}\n"
+                    "      READ THAT INVENTORY BEFORE BLAMING THE EVICTION. A "
+                    "window carrying the room's FIRST events rather than\n"
+                    "      its last is a window asked for wrongly, not a "
+                    "removal that did not happen -- which is what cost run\n"
+                    "      35094474747, where `/messages` without `from` "
+                    "answered with one event, twenty-three times.\n"
+                    "      An eviction that genuinely did not happen reads "
+                    "differently: the room stays in `join`, and the window\n"
+                    "      carries the application's recent events with no "
+                    "departure of this account's among them.",
+                    file=sys.stderr,
+                )
+                return 1
+            await asyncio.sleep(CLAIM_PAUSE_SECONDS)
+
+    kick = history[kick_at]
+    remover = kick.get("sender")
+    if remover == user_id:
+        print(
+            f"FAIL: {user_id} left {room_id} by itself. Nobody removed it, so "
+            "there is no eviction to witness here.\n"
+            "      A counterparty that walked out looks exactly like one that "
+            "was put out, and only the sender tells them apart.",
+            file=sys.stderr,
+        )
+        return 1
+    if remover != application:
+        print(
+            f"FAIL: {user_id} was removed from {room_id} by {remover}, not by "
+            f"the application ({application}).",
+            file=sys.stderr,
+        )
+        return 1
+
+    # APRÈS LE RETRAIT : ce que l'application a envoyé ensuite, et qui ne doit
+    # pas être ici. Le test en envoie un exprès, sinon cette assertion serait
+    # vraie faute de matière.
+    after = [
+        event for event in history[kick_at + 1 :] if event.get("sender") == application
+    ]
+    if after:
+        kinds = sorted({str(event.get("type")) for event in after})
+        print(
+            f"FAIL: {len(after)} event(s) from the application are visible to "
+            f"{user_id} AFTER its removal from {room_id}: {kinds}.\n"
+            "      The removal did not close the conversation behind it.",
+            file=sys.stderr,
+        )
+        return 1
+
+    # AVANT LE RETRAIT : ce que l'application avait écrit, et sous quelle forme
+    # il est passé sur le fil.
+    before = [event for event in history[:kick_at] if event.get("sender") == application]
+    clear = [event for event in before if event.get("type") == "m.room.message"]
+    if clear:
+        print(
+            f"FAIL: the application put {len(clear)} message(s) in clear in "
+            f"{room_id}. Rotating a key behind somebody who could read the\n"
+            "      room without one proves nothing at all.",
+            file=sys.stderr,
+        )
+        return 1
+
+    sealed = [event for event in before if event.get("type") == "m.room.encrypted"]
+    if not sealed:
+        print(
+            "FAIL: the application wrote nothing this witness could see in "
+            f"{room_id} before the removal.\n"
+            f"      The window read was {len(history)} event(s) from "
+            f"{source}: {inventory(history)}\n"
+            "      Without an encrypted event of the application's, « the key "
+            "was rotated » has nothing to be about: no key of\n"
+            "      hers ever existed in this conversation, and the outcome "
+            "the screen owes is evict-outcome-no-key rather\n"
+            "      than evict-outcome-rotated. The end-to-end test sends one "
+            "before it evicts.",
+            file=sys.stderr,
+        )
+        return 1
+
+    seen = sorted(
+        {str((event.get("content") or {}).get("session_id")) for event in sealed}
+    )
+    print(
+        f"OK: {user_id} was removed from {room_id} by {application}, and "
+        f"nothing the application sent afterwards is visible to it.\n"
+        f"    Read from {source}, {len(history)} event(s), {looks} look(s) in "
+        f"{clock.time() - started:.1f}s.\n"
+        f"    Before the removal the application sent {len(sealed)} encrypted "
+        f"event(s), under Megolm session(s) {seen}.\n"
+        "    NOT PROVEN HERE, ON PURPOSE: that the room key rotated. This "
+        "device never held a key of the application's --\n"
+        "    identity-based sharing excludes it, which `collect` asserts -- "
+        "so « it can no longer read » would be true\n"
+        "    whether or not anything rotated. See this phase's docstring for "
+        "what a witness able to prove it would need."
+    )
+    return 0
+
+
 def main() -> int:
     # `claim-place` MANQUAIT ICI, ET C'EST LE DÉFAUT QUI REVIENT DANS CE DÉPÔT.
     #
@@ -880,6 +1251,7 @@ def main() -> int:
         "send-file": send_file,
         "claim-place": claim_place,
         "collect": collect,
+        "witness-eviction": witness_eviction,
     }
     if len(sys.argv) != 2 or sys.argv[1] not in phases:
         print(

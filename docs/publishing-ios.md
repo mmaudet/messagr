@@ -3,6 +3,11 @@
 Le pendant iOS de `publishing-android.md`, et il commence plus bas : l'Android
 avait déjà sa machinerie quand ce document a été écrit, l'iOS n'avait rien.
 
+**Il va maintenant jusqu'au magasin.** Le titre dit TestFlight parce que c'est
+par là qu'il a commencé ; la section « Soumettre une version à l'App Store »,
+en fin de document, tient ce que la console exige avant d'accepter une version,
+et les deux déclarations qu'on ne peut pas deviner.
+
 ## Pourquoi TestFlight et pas autre chose
 
 Un collègue à distance ne peut pas brancher son téléphone sur votre Mac. Les
@@ -26,6 +31,12 @@ ne se justifie pas.
   le seul travail iOS de la CI est une build simulateur, qui ne signe rien.
 - `aps-environment: production` dans les entitlements, et `platform: production`
   côté sygnal. **Les deux ensemble, et c'est le point le plus facile à rater.**
+- `convert_device_token_to_hex: false` côté sygnal, parce que l'application
+  enregistre le jeton APNs en hexadécimal. Ajouté le 15 septembre 2026 (#325).
+- **Aucun Firebase dans la cible iOS**, depuis le 16 septembre 2026 (#334) :
+  l'exclusion vit dans `packages/app/react-native.config.js`, le jeton d'Apple
+  est lu par `MessagrApplePush` à côté de l'AppDelegate, et l'autorisation est
+  demandée à notifee. Android est inchangé. Voir plus bas.
 
 ## Le piège, avant tout le reste
 
@@ -38,6 +49,15 @@ notification qui ne viendra jamais, et une conclusion fausse sur #109.
 
 `scripts/assert-ios-push.sh` refuse que l'entitlement et le `platform` de
 sygnal divergent, dans `checks`, en lisant les sources.
+
+**Un second piège a tenu jusqu'au 15 septembre 2026** (#325). L'application
+enregistre le jeton APNs tel que le module natif le donne, en hexadécimal
+majuscule — c'était `getAPNSToken` jusqu'au 16 septembre, c'est
+`MessagrApplePush` depuis, et la forme n'a pas bougé d'un caractère. Par
+défaut, sygnal décode un pushkey APNs en base64 : il envoyait donc à Apple
+48 octets sans rapport avec le jeton, et Apple répondait `BadDeviceToken`, avec
+une paire d'environnements parfaitement accordée. `convert_device_token_to_hex:
+false` sur `eu.messagr.apns` le règle, et `scripts/assert-ios-push.sh` le vérifie.
 `scripts/assert-ipa-push.sh` refuse le même désaccord dans le **binaire
 construit**, juste avant le téléversement — et c'est celui-là qui compte,
 parce que la signature peut changer l'entitlement sans que la source bouge.
@@ -47,6 +67,81 @@ Le prix de ce réglage est réel : **une build lancée depuis Xcode sur un
 téléphone branché ne peut plus être réveillée**, puisqu'elle réclamerait un
 jeton de production sans y avoir droit. Si vous voulez un jour tester en
 développement, il faut rebasculer les deux, ensemble.
+
+## Firebase a quitté l'iPhone, et par où passe le jeton maintenant
+
+Le réveil iOS passe par Apple seule, et la page de confidentialité le promet.
+Firebase était quand même embarqué, parce que `getAPNSToken` était la façon
+dont l'application lisait le jeton d'Apple. En lisant les sources de
+FirebaseMessaging 12.18.0, #334 a trouvé que le SDK s'enregistrait de lui-même
+auprès de Google au passage, et #361 que `FirebaseMessagingAutoInitEnabled`, le
+levier documenté, ne garde pas ce chemin-là : la demande qui porte le jeton
+APNs à Google part de `setAPNSToken:withUserInfo:`, qui ne lit cette clé à
+aucun moment.
+
+**Le 16 septembre 2026, les douze pods sont sortis de la cible iOS.** Trois
+morceaux remplacent ce que Firebase faisait :
+
+| Ce qu'il faisait                                | Ce qui le fait                                                                      |
+| ----------------------------------------------- | ----------------------------------------------------------------------------------- |
+| demander l'autorisation de notifier             | `notifee.requestPermission()`, déjà une dépendance                                  |
+| appeler `registerForRemoteNotifications`        | `MessagrApplePush.askApple`, dans `packages/app/ios/Messagr/MessagrApplePush.swift` |
+| recevoir la réponse d'Apple et garder le jeton  | les deux rappels d'`AppDelegate.swift`, qui remettent le jeton au même module       |
+| le rendre à JavaScript en hexadécimal majuscule | `MessagrApplePush.readApple`, lu par `packages/app/src/runtime/applePushToken.ts`   |
+
+**La casse est ce qu'il ne faut pas toucher.** `%02.2hhX`, majuscules, sans
+séparateur : c'est le `pushkey` que le compte porte, et sygnal l'envoie tel
+quel (`convert_device_token_to_hex: false`). Un jeton en minuscules
+enregistrerait un second pusher et refabriquerait #325 — tout vert jusqu'à
+Apple. `applePushToken.ts` le refuse au lieu de le corriger, et son test le
+prouve.
+
+**Ce que le retrait ne prouve pas encore.** Que rien ne partait vers Google
+reste une lecture, pas une mesure ; ce qui est établi est qu'aucun code de
+Google n'est plus dans le paquet iOS pour le faire. `scripts/assert-ios-push.sh`
+tient les quatre choses qui le gardent vrai — pas de `GoogleService-Info.plist`,
+aucun pod de la famille dans le verrou, aucun `FirebaseCore` dans l'AppDelegate,
+et **l'exclusion dans `packages/app/react-native.config.js`**. La quatrième est
+celle qui compte : sans elle, un `pod install` remet les douze pods, en
+silence, avec une CI verte.
+
+**Android ne bouge pas.** Les deux paquets npm restent, le greffon Gradle
+aussi, et `index.js` n'enregistre le gestionnaire d'arrière-plan de Firebase
+que sur Android. Sur iPhone il était déjà mort : le pont ne remet une poussée à
+JavaScript que si elle porte `gcm.message_id`, qu'une poussée venant de sygnal
+ne porte jamais (#341).
+
+### Vérifier sur un iPhone
+
+Sur un appareil **neuf ou effacé**, sinon la mesure ne dit rien : le jeton et
+l'identifiant d'installation de Firebase vivent dans le trousseau, qu'une
+désinstallation ne vide pas de façon fiable.
+
+1. Installer la build, ouvrir l'application, accepter les notifications.
+2. Sur le compte de test :
+   `curl -H "Authorization: Bearer <jeton>" https://messagr.eu/_matrix/client/v3/pushers`
+   — un `pushkey` de **64 caractères hexadécimaux MAJUSCULES** sous
+   `eu.messagr.apns`, postérieur à l'installation. La casse compte autant que
+   la longueur : c'est elle qui dit si le module natif tient son contrat.
+3. Envoyer un message depuis un autre compte, et lire sygnal : un `200` sans
+   `BadDeviceToken`.
+4. Le témoin de ce que ce ticket ferme : aucune requête vers
+   `firebaseinstallations.googleapis.com` ni `fcmtoken.googleapis.com` pendant
+   le lancement.
+
+**Ce qui ne peut pas servir de témoin** : l'absence d'erreur, une CI verte, et
+« la notification arrive sur un iPhone verrouillé » — d'après #341, aucune
+notification ne peut encore s'afficher sur iPhone, quel que soit l'état de
+l'application.
+
+**Et si aucun jeton n'arrive**, le journal le dit maintenant sous un mot par
+cause plutôt qu'une seule phrase de patience : `MESSAGR_APNS_TOKEN_UNREAD`
+avec `noModule` (le module natif n'est pas dans la build), `appleRefused`
+(Apple a dit non : entitlement ou profil), `notHex` (le jeton n'a pas la forme
+qu'on peut enregistrer), `noAnswer` (la seule vraie attente) ou `threw`. Sur
+l'appareil, `MESSAGR_APNS_REFUSED` porte en plus ce qu'Apple a répondu.
+
+La mesure se groupe avec celles de #308 et #341 sur le même appareil.
 
 ## Les gestes, dans l'ordre
 
@@ -140,6 +235,27 @@ carré blanc, et la CI reste verte : App Store Connect a été la première chos
 Réparé depuis `design/brand/messagr-icone-ios-1024.svg`, et
 `scripts/assert-ios-icon.sh` le vérifie maintenant dans `checks`.
 
+#### Les textes d'autorisation, et la langue où ils s'affichent
+
+Les quatre textes que réclame Apple (micro, caméra, photothèque en lecture,
+photothèque en écriture) étaient écrits en français dans `Info.plist`, dont la
+région de développement est `en`, et aucun `.lproj` ne vivait à côté. Tout
+iPhone les affichait donc en français, quelle que soit sa langue (#320).
+
+Ces boîtes sont dessinées par iOS. Il ne demande rien à l'application et ne lit
+jamais `src/copy/` : il lit le paquet. La base anglaise reste dans
+`Info.plist`, et les sept langues vivent dans
+`packages/app/ios/Messagr/<langue>.lproj/InfoPlist.strings`, les mêmes sept que
+`src/copy/`.
+
+Rien d'autre ne voyait ce défaut, et rien d'autre ne le verrait revenir : une
+traduction absente se compile, se signe, se téléverse, passe la revue d'Apple
+et s'installe. `scripts/assert-ios-localisation.sh` le refuse dans `checks`, et
+il lit aussi `project.pbxproj` : un `.lproj` qu'aucun groupe de variantes ne
+nomme, ou une langue absente de `knownRegions`, est un fichier que la build
+ignore sans rien dire. La même garde tient `Info.plist` sur l'anglais, en le
+comparant mot pour mot à `en.lproj`.
+
 #### La conformité à l'export
 
 Déclarée **exemptée**, dans le build comme dans le compte :
@@ -185,8 +301,72 @@ et elle se vérifie en une minute :
 
 Ce que #107 exige de la notification vaut pour iOS comme pour Android : elle
 nomme la conversation et ne nomme personne d'autre. S'il ne se passe rien, la
-première chose à regarder est le journal de sygnal — `BadDeviceToken` y
-désignerait la paire d'environnements, et non l'application.
+première chose à regarder est le journal de sygnal. `BadDeviceToken` y a deux
+causes connues : la paire d'environnements, ou l'encodage du jeton. Mesurer la
+longueur du jeton rejeté, sans l'afficher : 64 caractères hexadécimaux,
+l'encodage est juste ; 96, sygnal a décodé en base64 un jeton hexadécimal.
+
+## Les captures d'écran de la fiche
+
+App Store Connect refuse la soumission d'une version tant que la fiche n'a pas
+ses captures. **Une seule case pour cette application** : l'iPhone, qu'une
+capture de **6,5** ou de **6,9 pouces** remplit, la console mettant l'autre à
+l'échelle.
+
+**L'iPad n'en est plus, et ce n'est pas une case gagnée.** La règle d'Apple est
+« Required if app runs on iPad » : elle suivait `TARGETED_DEVICE_FAMILY`, qui
+valait `"1,2"`. Le 16 septembre 2026, le porteur a tranché que la V1 ne
+revendique pas l'iPad, et le réglage vaut `"1"`.
+
+Ce qui l'a décidé est la capture elle-même : l'écran de promesse y était
+dessiné à la mise en page d'un téléphone, avec deux grandes bandes vides de
+chaque côté. Elle était fidèle, et c'est ce qui comptait — une fiche qui promet
+un iPad doit tenir cette promesse. Le jour où la V1 la tiendra, il faut remettre
+`"1,2"` dans le pbxproj **et** la classe `ipad-13` dans les exigences de
+`scripts/assert-ios-captures.mjs`, qui la code en dur. La recette du simulateur
+iPad reste dans le script de capture : `MESSAGR_CAPTURE_CLASSES="ipad-13"` la
+produit encore.
+
+```
+./scripts/capture-ios-store-screenshots.sh [répertoire]
+```
+
+Le script ne construit rien. Il réutilise la build simulateur déjà posée à
+`packages/app/ios/build/Build/Products/Release-iphonesimulator/Messagr.app`,
+celle que `.detoxrc.js` nomme, et il refuse en redonnant la commande quand elle
+manque. Release et pas Debug : elle porte `main.jsbundle`, donc elle démarre
+sans serveur Metro.
+
+Pour chaque classe, il **fabrique** son simulateur, le démarre sans fenêtre,
+fige la barre d'état à 9:41, photographie l'écran d'accueil comme témoin,
+installe l'application, la lance, attend que l'écran soit immobile, tire la
+capture, puis supprime l'appareil. Compter cinq minutes et environ 1,9 Gio de
+disque pendant qu'un appareil tourne.
+
+**Il ne touche jamais à l'interface.** Ni frappe, ni appui à une coordonnée :
+une coordonnée se déplace avec la mise en page et photographie autre chose en
+silence, et une frappe destinée à un simulateur atterrit là où est le focus du
+clavier, ce qui a déjà été le terminal du porteur. Le simulateur est démarré
+sans fenêtre, donc il n'y a rien où frapper.
+
+**Ce qu'il atteint : un écran, la promesse.** C'est ce qu'affiche une
+installation neuve, et le reste est derrière « Commencer », donc derrière un
+geste. Le pendant Android en atteint deux parce que la suite Detox y laisse
+l'application dans une conversation ; la suite Detox iOS, elle, n'a jamais
+tourné. Le jour où elle tournera, ce script pourra photographier ce qu'elle
+laisse à l'écran.
+
+`scripts/assert-ios-captures.mjs` relit le répertoire et refuse une taille
+qu'Apple n'accepte pas, une classe exigée absente, un fichier qui n'est pas un
+PNG, une capture qui n'a rien rendu, et une capture identique à son témoin —
+c'est-à-dire une photographie de l'écran d'accueil du simulateur. Son
+`--self-test` tourne dans `checks`, parce qu'une taille fautive dans sa table
+se verrait sinon pour la première fois dans la console, après le téléversement.
+
+**Ce qui reste à faire à la main** : téléverser les fichiers dans App Store
+Connect, fiche par fiche et langue par langue. Il n'y a pas d'équivalent iOS de
+`store-listing.yml`, et ce document ne recommande pas d'en écrire un à coups de
+navigateur automatisé, pour la raison que ce fichier-là donne.
 
 ## Tests externes : faire entrer le relecteur d'Apple
 
@@ -248,13 +428,13 @@ Révoqué, le compte est désactivé. Laissé à l'échéance sans révocation, 
 
 Lu dans le code, pas supposé ; les phrases sont celles de l'interface anglaise.
 
-**Le lien.** Sur un ordinateur, la page d'invitation montre un code QR (« Open this link on your phone: Messagr is a mobile application. Scan this code: ») : l'appareil photo de l'iPhone l'ouvre, et le domaine associé `/i*` le remet à Messagr. Touché sur l'iPhone lui-même, depuis Notes ou Mail, le lien fait de même. **Tapé dans Safari, il ne mène qu'à la page** : son bouton « Open in Messagr » recharge la même adresse, et Safari n'ouvre pas une application pour un lien de son propre domaine. Le bouton « Copy the link » promet que l'application proposera de le coller ; elle ne lit jamais le presse-papiers, et aucun écran ne permet de saisir un lien.
+**Le lien.** Sur un ordinateur, la page d'invitation montre un code QR (« Open this link on your phone: Messagr is a mobile application. Scan this code: ») : l'appareil photo de l'iPhone l'ouvre, et le domaine associé `/i*` le remet à Messagr. Touché sur l'iPhone lui-même, depuis Notes ou Mail, le lien fait de même. **Tapé dans Safari, il ne mène qu'à la page** : son bouton « Open in Messagr » recharge la même adresse, et Safari n'ouvre pas une application pour un lien de son propre domaine. Le bouton « Copy the link » mène, depuis #370, au champ « Paste the invitation link » de l'écran d'avant l'entrée ; l'application, elle, ne lit jamais le presse-papiers d'elle-même.
 
-**Non vérifié sur iPhone, et c'est le risque principal.** `AppDelegate.swift` ne transmet ni `continueUserActivity` ni `openURL` à React Native. Un lien ouvert pendant que Messagr tourne n'arrive donc probablement pas au JavaScript ; un lancement à froid le lit par `getInitialURL`, ce qui reste à constater sur un appareil. D'où la consigne des notes : fermer complètement Messagr avant d'ouvrir le lien.
+**Un lien ouvert pendant que Messagr tourne arrive**, depuis #279 : `AppDelegate.swift` transmet `continueUserActivity` et `openURL` à `RCTLinkingManager`. Il n'y a plus à fermer Messagr avant d'ouvrir le lien.
 
 **Le premier écran**, un seul : « The messenger that asks you for nothing. », « Choose your language », la case « I accept Messagr’s terms and conditions of use. » et le bouton « Begin ». La réclamation ne part qu'après « Begin ».
 
-**Pendant la réclamation**, aucun indicateur : la liste dit « No conversations yet. Invite someone to start one. ». Si elle échoue, pour quelque raison que ce soit, y compris un compte qu'`admettre` n'a pas invité à temps : « You are not in yet. Open the invitation link somebody sent you: it is the only door, and the application can do nothing before it. », et rien ne réessaie. Rouvrir le lien suffit : le compte tiré attend, invité, et la seconde tentative aboutit.
+**Pendant la réclamation**, aucun indicateur : la liste dit « No conversations yet. Invite someone to start one. ». Si elle échoue, pour quelque raison que ce soit, y compris un compte qu'`admettre` n'a pas invité à temps : « You are not in yet. Open the invitation link somebody sent you: it is the only door, and the application can do nothing before it. », et rien ne réessaie. Rouvrir le lien suffit : le compte tiré attend, invité, et la seconde tentative aboutit. Collé dans le champ de #370, le lien fait dire « Opening the invitation… » au bouton pendant la réclamation : une vingtaine de secondes, essayé le 26 septembre 2026.
 
 **Juste après l'entrée**, iOS demande l'autorisation d'envoyer des notifications, sans explication préalable.
 
@@ -277,49 +457,203 @@ L'état est alors `~/.messagr-exploitation/mmaudet-pixel.json` : un par compte e
 
 Lancer `admettre`, puis ouvrir le lien sur le téléphone. Un téléphone qui porte déjà un compte prend l'autre chemin du service : deux invitations, le compte tiré puis le sien, que le suivi de deux secondes enchaîne. Ce chemin n'écrit pas `claimed`, donc `admettre` s'arrête cinq minutes après l'échéance, ou à ctrl-c, qui ne défait rien.
 
-### Les notes de revue, à coller dans App Store Connect
+### Les notes de revue bêta
 
-TestFlight, informations de test de la build, rubrique des notes pour la revue bêta. Remplacer `<LINK>` et `<DEADLINE>` par ce qu'affiche `etat`.
+TestFlight, informations de test de la build, rubrique des notes pour la revue bêta. **Le texte est celui de l'App Store** : la première section de `deploy/messagr-eu/app-store-listing/review-notes.txt`, « HOW TO ENTER MESSAGR », avec une invitation émise au nom de `@mmaudet` comme plus bas, dans « L'entrée du relecteur, à chaque soumission ». La note nomme ce compte.
+
+Celles qui étaient écrites ici faisaient fermer Messagr avant d'ouvrir le lien, ce que #279 a rendu inutile, et ignoraient le champ de collage de #370. Deux textes pour un même geste finissent par en décrire deux.
+
+## Soumettre une version à l'App Store
+
+Ce document s'arrêtait à TestFlight. Le 16 septembre 2026, la soumission de la
+1.0 a été refusée par App Store Connect avec **neuf blocages**, et aucun
+n'était écrit nulle part : ils auraient été redécouverts un par un, dans une
+console, à la version suivante. Voici ce que la console exige, et **pourquoi**
+là où ce n'est pas évident.
+
+| Ce que la console réclame                        | Où                            | État                                              |
+| ------------------------------------------------ | ----------------------------- | ------------------------------------------------- |
+| Tarification                                     | Tarification et disponibilité | Fait, 16 septembre 2026                           |
+| « Nom d'utilisateur — ce champ est obligatoire » | Informations de vérification  | Fait : la case « Connexion requise » est décochée |
+| Droits relatifs au contenu                       | Informations sur l'app        | Une déclaration à signer, voir plus bas           |
+| Informations de copyright                        | Version 1.0                   | `app-store-listing/fr-FR.json`, `copyright`       |
+| Description (français)                           | Version 1.0                   | `app-store-listing/fr-FR.json`, `description`     |
+| Mots-clés (français)                             | Version 1.0                   | `app-store-listing/fr-FR.json`, `keywords`        |
+| URL de l'assistance (français)                   | Version 1.0                   | `app-store-listing/fr-FR.json`, `supportUrl`      |
+| Une capture iPad 13 pouces                       | Version 1.0                   | 2064 × 2752 en portrait, de une à dix             |
+| Une capture iPhone 6,5 pouces                    | Version 1.0                   | 1284 × 2778 en portrait, de une à dix             |
+
+Les tailles de captures viennent de « Screenshot specifications », qui donne
+l'iPad 13 pouces « Required if app runs on iPad » et le 6,5 pouces « Required
+if app runs on iPhone and screenshots for 6.9" display aren't provided » :
+<https://developer.apple.com/help/app-store-connect/reference/screenshot-specifications/>.
+
+### La fiche vient du dépôt, et se recopie à la main
+
+Les quatre champs textuels sont écrits dans
+`deploy/messagr-eu/app-store-listing/fr-FR.json`, comme ceux de Play le sont
+dans `play-listing/`, et pour la raison que `store-listing.yml` donne en tête :
+une fiche dans le dépôt se relit en diff, une fiche tapée dans une console se
+relit dans le souvenir de celui qui l'a tapée. Les deux corrections #295 et
+#322 sont arrivées par ce chemin.
+
+`app-store-listing/check.py` tient les limites d'Apple, chacune avec la phrase
+qui l'établit, et la CI l'appelle sur chaque PR — avec `--self-test`, qui casse
+la fiche d'une quinzaine de façons et exige un refus à chaque fois.
+
+**Il n'y a pas de `publish.py`, et c'est ce qui rend ce contrôle nécessaire.**
+Play a une API et un compte de service dans les secrets Actions ; App Store
+Connect demanderait l'`issuer id` et la clé `.p8`, qui vivent dans
+`~/.appstoreconnect/` et n'ont aucune raison d'entrer dans un dépôt public. La
+fiche se recopie donc à la main, champ par champ, et **le dernier moment où
+quelque chose peut refuser est la PR**.
+
+Ce qu'il faudrait pour ouvrir ce chemin plus tard, si on le veut : les trois
+secrets que la section « Et la CI » nomme déjà pour le téléversement
+(`MESSAGR_ASC_KEY_ID`, `MESSAGR_ASC_ISSUER_ID`, `MESSAGR_ASC_KEY_BASE64`), sur
+la forme que `publish.yml` a pour Play ; une clé au rôle « App Manager » et non
+« Developer » ; et les points de terminaison
+`appStoreVersionLocalizations` et `appInfoLocalizations` de l'API App Store
+Connect — les deux, parce que le nom et le sous-titre ne vivent pas sur la
+même ressource que la description.
+
+### « Connexion requise » reste décochée
+
+App Store Connect refusait avec « **Nom d'utilisateur — ce champ est
+obligatoire** ». Ça se lit comme un champ à remplir. **Ça n'en est pas un** :
+c'est la case **« Connexion requise »** des informations de vérification qui
+était cochée, et la cocher rend obligatoires un nom d'utilisateur et un mot de
+passe. Décochée, l'erreur disparaît.
+
+**Elle doit rester décochée, et ce n'est pas un oubli.** On n'entre dans
+Messagr que par invitation (ADR-0004) : il n'y a ni formulaire, ni nom
+d'utilisateur, ni mot de passe. Le compte est créé sur l'appareil au moment où
+un lien d'invitation est ouvert. Il n'existe aucun identifiant à inventer, et
+quelqu'un qui en chercherait un pour faire taire ce message en fabriquerait un
+qui ne mène nulle part — et le relecteur se retrouverait devant un écran qui
+ne demande rien de ce qu'on lui a donné.
+
+Ce qu'Apple attend de cette case est un compte de démonstration : « Sign-in
+information for a demo account. […] The demo account is used during the App
+Review process and must not expire. » Et la règle 2.1 dit quoi faire quand on
+ne peut pas en fournir : « If you are unable to provide a demo account due to
+legal or security obligations, you may include a built-in demo mode in lieu of
+a demo account with prior approval by Apple. »
+
+Messagr ne fait ni l'un ni l'autre : il fait entrer le relecteur pour de bon,
+avec une invitation que `scripts/testflight-reviewer.mjs` tient vivante, et la
+note de `review-notes.txt` explique le geste pas à pas (section suivante). Sa
+première phrase répond à la question que la case pose : « there is no sign-up
+form, no user name and no password, so there are no demo credentials to
+give. »
+
+### L'entrée du relecteur, à chaque soumission
+
+**Sans elle, Apple arrête la revue.** Le 22 septembre 2026, la 1.0 (26) a été
+tenue en 2.1 « Information Needed » : « Provide us an invitation link so we can
+access the app features. How do users obtain an invitation? Do they pay for
+it? » Les notes ne portaient que la note de confidentialité, et personne
+n'avait émis ni admis (#377). Chaque mise à jour repasse en revue : l'étape
+vaut pour chaque soumission, et `scripts/fiche-app-store.sh` la déroule.
 
 ```
-Messagr can only be joined by invitation, by design: there is no sign-up
-form, no user name and no password. An account is created on the device at
-the moment an invitation link is opened. We have created an invitation for
-you.
-
-1. Install Messagr from TestFlight. If you open it from TestFlight, close it
-   completely afterwards (swipe it away in the app switcher).
-
-2. Open this link on your computer:
-
-   <LINK>
-
-   The page shows a QR code. Scan it with the iPhone's Camera app and tap the
-   banner: Messagr opens. Tapping the link on the iPhone itself, for example
-   from Notes or Mail, works the same way. Typing it into Safari does not: it
-   only shows the page.
-
-   The link is valid until <DEADLINE> and can be used twice.
-
-3. The first screen states what Messagr promises. Choose a language, tick
-   "I accept Messagr's terms and conditions of use", and tap "Begin".
-
-4. Messagr creates your account from the invitation. This takes a few
-   seconds and shows no progress. iOS then asks whether Messagr may send
-   notifications.
-
-5. A conversation named "@exploitation" appears in the list. It is a
-   conversation with the Messagr operations account, which issued your
-   invitation, and nobody else is in it. You can write in it; messages are
-   end-to-end encrypted. The operations account does not reply.
-
-If Messagr says "You are not in yet", close it completely and open the link
-again as in step 2. The invitation is still valid and the second attempt
-completes.
-
-Accounts are pseudonymous: Messagr asks for no email address and no phone
-number, which is why we cannot provide demo credentials.
+node scripts/testflight-reviewer.mjs emettre --compte ~/.messagr-exploitation/racine-mmaudet.json --duree 30j --usages 5
+nohup caffeinate -i node scripts/testflight-reviewer.mjs admettre --compte ~/.messagr-exploitation/racine-mmaudet.json \
+  >> ~/.messagr-exploitation/mmaudet-relecteur-apple.log 2>&1 < /dev/null &
+node scripts/testflight-reviewer.mjs etat --compte ~/.messagr-exploitation/racine-mmaudet.json
+node scripts/testflight-reviewer.mjs revoquer --compte ~/.messagr-exploitation/racine-mmaudet.json
 ```
+
+**`@mmaudet`, et pas `@exploitation`.** Le relecteur lit en anglais, où
+« exploitation » se lit comme un abus ; tranché le 26 septembre 2026. Et un
+téléphone ne peut pas tenir ce rôle : l'application ne fait entrer que
+lorsqu'elle est à l'écran (#376).
+
+**Trente jours et cinq usages**, pour tenir une revue, un aller-retour et un
+second appareil. **`admettre` est détaché** par `nohup`, pour survivre à la
+session qui l'a lancé, sur un Mac qui ne dort pas : le 15 septembre 2026, il
+n'a pas atteint le service pendant trois heures, et un relecteur arrivé à ce
+moment-là n'entrait pas.
+
+**La note vit dans `deploy/messagr-eu/app-store-listing/review-notes.txt`**,
+qui porte tout le champ : l'entrée, la façon dont on obtient une invitation et
+son prix, puis la confidentialité. Elle répond d'avance aux trois questions du
+22 septembre. Ses trous, `<LINK>`, `<DEADLINE>` et `<USES>`, sont remplis par
+l'assistant avec l'état de l'invitation. `check.py` en tient la limite sur la
+note remplie au plus long, « The Notes field can contain up to 4000 bytes »,
+et refuse un lien réel : il ferait entrer quiconque lit ce dépôt.
+
+**Ce que voit le relecteur**, essayé le 26 septembre 2026 avec la build 27, sur
+un simulateur iPad Air 11 pouces (M3) réglé en anglais, le modèle de la revue
+du 22 :
+
+- l'application s'ouvre en anglais ; sur iPad, elle tourne en compatibilité
+  iPhone, à 375 × 667 points (#355), et « Begin » est sous le pli ;
+- « You are not in yet », le champ « Paste the invitation link », « Enter » ;
+- « Opening the invitation… » une vingtaine de secondes, puis la conversation
+  « @mmaudet » et la demande d'autorisation des notifications ;
+- un message envoyé garde une seule coche, puisque personne ne lit
+  `@mmaudet`, et un appel sonne dans le vide.
+
+**L'écran dit qu'un lien vaut une heure et un seul usage.** C'est vrai de ceux
+que l'application émet, et la note dit que celui-ci a été créé pour la revue.
+**Tapé en minuscules, le lien est refusé** tant que #375 n'est pas déployé,
+d'où la consigne de garder les majuscules.
+
+**Après l'approbation, `revoquer`**, que le porteur tape lui-même : le compte du
+relecteur est désactivé avec l'invitation.
+
+### Les droits relatifs au contenu, et ce qu'Apple ne tranche pas
+
+Informations sur l'app → **Droits relatifs au contenu**. La console demande si
+l'application contient, affiche ou accède à du contenu de tiers, et, si oui,
+fait confirmer qu'on en a les droits.
+
+La seule phrase normative d'Apple est celle de son aide : « Apps that contain,
+show, or access third-party content must have all the necessary rights to that
+content or be otherwise permitted to use it under the laws of each App Store
+country or region in which they're available »
+(<https://developer.apple.com/help/app-store-connect/reference/app-information/app-information/>,
+lue le 16 septembre 2026).
+
+**Apple ne définit nulle part « third-party content », et ne dit nulle part si
+ce qu'écrivent les utilisateurs en fait partie.** Les deux règles voisines
+tirent dans des sens opposés, et aucune ne conclut :
+
+- la 5.2.1 vise ce que l'éditeur embarque — « Don't use protected third-party
+  material such as trademarks, copyrighted works, or patented ideas in your
+  app without permission » — et Messagr n'embarque rien de tel ;
+- la 1.2 traite le contenu produit par les utilisateurs comme un sujet à part,
+  avec ses propres obligations, ce qui **suggère** qu'Apple sépare les deux
+  notions. Suggère seulement : elle ne l'écrit pas.
+
+**La réponse recommandée est « oui ».** Trois raisons, dans l'ordre de leur
+force :
+
+1. **L'asymétrie du risque tranche à elle seule.** Un « oui » de trop déclare
+   qu'on a les droits sur un contenu qu'on a de toute façon le droit de
+   transmettre. Un « non » de trop déclare que rien dans l'application ne
+   vient d'un tiers, ce qui est manifestement faux pour une messagerie, et la
+   2.3.1 punit exactement ce genre d'affirmation.
+2. **Les mots de la question sont larges** : « contain, show, or **access** ».
+   L'application affiche, sur l'appareil, des textes et des photographies
+   écrits par quelqu'un d'autre. Elle les affiche.
+3. **La confirmation demandée est satisfaite par sa seconde branche.** « all
+   the necessary rights […] **or be otherwise permitted to use it** » : le §2
+   des conditions générales dit ce qu'une personne ne peut pas publier, et les
+   §3 à §5 portent la modération, le signalement et le réexamen humain, au
+   sens du règlement 2022/2065. C'est cette branche-là qui tient, pas la
+   première.
+
+**Le chiffrement de bout en bout ne change pas la réponse**, et c'est le
+contresens à éviter : l'éditeur ne voit jamais ce contenu, mais la question
+porte sur ce que **l'application** contient, affiche ou atteint, pas sur ce que
+le serveur peut lire.
+
+**Ceci est une lecture, pas une citation.** Apple ne tranche pas, la case est
+une déclaration, et une déclaration fausse se paie en revue : c'est au porteur
+de la signer. Quelle que soit la réponse retenue, elle s'écrit ici, pour que la
+version suivante ne la retourne pas par hasard.
 
 ## Ce que la build écrit d'elle-même
 

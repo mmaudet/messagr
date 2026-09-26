@@ -1,3 +1,5 @@
+import type { Logger } from 'matrix-js-sdk/lib/logger'
+
 /**
  * The one place this application writes to the console.
  *
@@ -34,14 +36,23 @@
  * So a store build writes the trace (#285): the events `TRACE` lists, with
  * only the fields it names, each of which must read as a flag, a count or
  * words. What is left says how a call moved and ended, what a notification
- * woke, what became of the pusher and whether the backup was offered, and it
- * names nobody. The whole log is for a build somebody is going to read on a
- * cable, and `writesTheWholeLog` says how a bundle declares that.
+ * woke, what became of the pusher, whether the backup was offered and where
+ * accepting it stopped, and it names nobody. The whole log is for a build
+ * somebody is going to read on a cable, and `writesTheWholeLog` says how a
+ * bundle declares that.
  *
  * On Android either one lands in logcat under `ReactNativeJS`. On iOS it
  * lands in the unified log under `com.facebook.react.log`, where React Native
  * writes `info` and `warn` as info messages (`RCTLog.mm`): Console.app shows
  * them only once asked to include info messages.
+ *
+ * # Except matrix-js-sdk, which writes around it
+ *
+ * The library logs through a logger of its own, straight to the console. A
+ * store build keeps that one to warnings and errors, and takes out of those
+ * every word that could name a room, an account or an event:
+ * `keepTheSdkToWarnings` says what it wrote before, why it is set before the
+ * library loads, and how a line of the library's is read.
  */
 export type LogLevel = 'info' | 'warn' | 'error'
 
@@ -105,6 +116,13 @@ const TRACE = new Map<string, Shape>([
   ['MESSAGR_PUSH_REGISTERED', {}],
   ['MESSAGR_PUSH_NOT_REGISTERED', { reason: 'words' }],
   ['MESSAGR_PUSH_REMOVED', {}],
+  // Why an iPhone has no token of Apple's (#334), which is four different
+  // failures that read as one wait. Firebase used to ask Apple for that
+  // token; now a fifty-line module does, and a build that does not carry it,
+  // a registration Apple refused and a token of the wrong shape all look
+  // exactly like a launch that was simply early. The token is never carried
+  // here -- only the word for what went wrong, which names nobody.
+  ['MESSAGR_APNS_TOKEN_UNREAD', { unread: 'words' }],
   // Whether the backup was offered, and what that decision read.
   [
     'MESSAGR_BACKUP_OFFER',
@@ -116,6 +134,27 @@ const TRACE = new Map<string, Shape>([
       unreadable: 'words',
     },
   ],
+  // Where accepting the backup stopped, and from which screen, or `replace`
+  // for a replacement of the key (#284), and whether a commitment the next
+  // launch would turn on could not be forgotten. Never its cause: an error
+  // message can carry an account or an address.
+  //
+  // `undone` is a replacement's (#327): whether the version it published was
+  // taken back, which is what tells « rien n'a changé » from a device that
+  // has stopped feeding its backup. A flag, and one this line is no use
+  // without: the same step reads two different ways depending on it.
+  [
+    'MESSAGR_BACKUP_ACCEPT_FAILED',
+    { from: 'words', failedAt: 'words', undone: 'flag', forgotten: 'flag' },
+  ],
+  // Why the device's own language could not be read (#353), which is the
+  // difference between « je ne sais pas » and « c'est du français ». It
+  // belongs to the trace because a store build is exactly where it went
+  // unseen: every installed build read the constant as a property, answered
+  // "no idea", and opened in French with nothing written anywhere. The tag
+  // itself is never carried -- only which platform was asked and how the
+  // reading failed, both of which name nobody.
+  ['MESSAGR_DEVICE_LOCALE_UNREAD', { platform: 'words', unread: 'words' }],
 ])
 
 /**
@@ -234,5 +273,215 @@ export function logEvent(
     console.warn(line)
   } else {
     console.log(line)
+  }
+}
+
+/** What a store build makes nothing of, in matrix-js-sdk's logger. */
+const BELOW_WARNINGS: ReadonlySet<string> = new Set(['trace', 'debug', 'info'])
+
+/** What stands in a line of the library's for a word withheld from it. */
+const WITHHELD = '[withheld]'
+
+/**
+ * One word of a line the library wrote: what runs up to the next space, or
+ * bracket, or quote.
+ *
+ * None of those separators can be inside a Matrix identifier, and each stays
+ * where it is, so a line keeps its shape: `(roomId=...)` reads back as
+ * `([withheld])`, and the name a logger prepends still reads as a name.
+ */
+const WORD = /[^\s[\](){}<>"]+/g
+
+/** A word can end on these without any of it being an identifier's. */
+const ENDS_ON = /[.,:;!?]+$/
+
+/** Printable ASCII. Nothing outside it is a word of a line in English. */
+const PRINTABLE = /^[!-~]+$/
+
+/** What makes a word more than punctuation. */
+const LETTER_OR_DIGIT = /[A-Za-z0-9]/
+
+/** A count, or a status. */
+const COUNT = /^[0-9]+$/
+
+/** A directive `console` fills in from one of the arguments after it. */
+const DIRECTIVE = /^%[sdifjoOc%]$/
+
+/**
+ * Whether a word of a line the library wrote can leave in a store build.
+ *
+ * `WORDS` decides, for the reason it was written: what it refuses is
+ * everything an identifier is made of. Three things pass beside it, and none
+ * of them can carry one:
+ *
+ *   - punctuation alone, so `-->` and a stray `:` stay legible;
+ *   - a run of digits, which is a count or a status -- the kind `TRACE` calls
+ *     a `count`. An identifier is never one: it carries a sigil or a colon,
+ *     and that character is inside this same word;
+ *   - a `console` directive, which says nothing of itself and is filled in
+ *     from an argument this same test has already read.
+ *
+ * Trailing punctuation comes off first, because a sentence ends on it and no
+ * identifier does. Everything else is withheld, which costs `URGENT`, `ID`
+ * and every algorithm name: the price `WORDS` already names.
+ */
+function saysNobody(word: string): boolean {
+  if (PRINTABLE.test(word) && !LETTER_OR_DIGIT.test(word)) return true
+  const core = word.replace(ENDS_ON, '')
+  return DIRECTIVE.test(core) || COUNT.test(core) || WORDS.test(core)
+}
+
+/** A line of the library's, with every word that could name somebody gone. */
+function withoutIdentifiers(line: string): string {
+  return line.replace(WORD, word => (saysNobody(word) ? word : WITHHELD))
+}
+
+/**
+ * What an argument the library handed its logger says, as a line to read.
+ *
+ * An `Error` says its name and its message, which is where a request that
+ * failed names what it asked for. Its stack says a bundle's own line numbers
+ * and not why anything failed, so it is not worth the room it takes in a
+ * buffer of 256 KiB.
+ */
+function asALine(value: unknown): string {
+  if (typeof value === 'string') return value
+  if (
+    value !== null &&
+    typeof value === 'object' &&
+    !(value instanceof Error)
+  ) {
+    return render(value as LogFields)
+  }
+  try {
+    return String(value)
+  } catch {
+    // A `toString` that throws. The rule the whole module is about holds
+    // here too: a log must not be able to take down what it is logging.
+    return WITHHELD
+  }
+}
+
+/**
+ * The library's own logger, under a name read like everything else.
+ *
+ * The name is in none of the messages: the method the library's factory makes
+ * puts it there itself, out of `this` (`logger.js`). And it is a room often
+ * enough to matter -- `rust-crypto.js` names each room's encryptor after its
+ * room, so that name is on every line that encryptor ever writes. The call is
+ * made on a logger whose `prefix` has been read, rather than on the logger.
+ */
+function underAReadName(logger: unknown): unknown {
+  const named = logger as { prefix?: unknown } | null | undefined
+  if (typeof named?.prefix !== 'string') return logger
+  const read = Object.create(named) as { prefix: string }
+  read.prefix = withoutIdentifiers(named.prefix)
+  return read
+}
+
+/**
+ * Keeps matrix-js-sdk's own logger to warnings and errors in a store build.
+ *
+ * # What it wrote
+ *
+ * The library does not log through this module. It has a logger of its own
+ * that writes straight to the console, and a client made without one is handed
+ * it, with every request that client makes (`client.js`). On the Play build
+ * 135, 14 September 2026, a line went out for each request and another for its
+ * answer, beside the trace and not through it:
+ * `FetchHttpApi: --> GET https://messagr.eu/_matrix/client/v3/sync?timeout=xxx`.
+ *
+ * # How, and why before the library loads
+ *
+ * That logger is a `loglevel` logger, which its type does not say: each of its
+ * methods is made by its `methodFactory` whenever it is rebuilt. So a store
+ * build hands it a factory that makes nothing below a warning, and rebuilds it.
+ * A child takes its parent's factory at the moment it is made and never
+ * afterwards (`getChild`, in the library's `logger.js`), and the library makes
+ * one while its modules load (`models/room-sticky-events.js`). That is why
+ * `bootstrap.ts` calls this, ahead of everything `index.js` loads after it.
+ *
+ * # Warnings and errors still go out, word by word
+ *
+ * They are the lines that say why the library failed, so a store build keeps
+ * them. It does not keep whom they name (#319): twenty-seven lines of
+ * matrix-js-sdk 42.3.0 warn or error with a room in them -- among them
+ * `Room ${room.roomId}: ignoring crypto event with invalid algorithm ...`
+ * (`rust-crypto.js`) -- and the page this application publishes says the lines
+ * it leaves on a telephone carry no identifier at all.
+ *
+ * So every word of them is read before it goes out, by the test `TRACE`
+ * applies to a field: a word that could be a room, an account, an event, a
+ * device, a token or an address is replaced by `[withheld]`, and what is left
+ * is the part that says what went wrong. The name the logger prepends is read
+ * the same way, and so is each argument the library hands over, an error
+ * among them.
+ *
+ * A line is read rather than dropped because dropping it would leave a
+ * failure with nothing said about it at all, and rewritten here rather than
+ * asked of the library, which has no such setting.
+ *
+ * A debug bundle and a bundle built to be read keep every line whole, as
+ * `writesTheWholeLog` says.
+ */
+export function keepTheSdkToWarnings(sdk: Logger): void {
+  if (writesTheWholeLog()) return
+  // A `loglevel` logger, whatever its declared type says. See above.
+  const made = sdk as unknown as {
+    methodFactory: (
+      method: string,
+      level: number,
+      name: string | symbol | undefined,
+    ) => (...message: unknown[]) => void
+    rebuild: () => void
+  }
+  const make = made.methodFactory
+  made.methodFactory = (method, level, name) => {
+    if (BELOW_WARNINGS.has(method)) return () => undefined
+    const write = make(method, level, name)
+    // Not an arrow: the method the library's factory makes reads the
+    // logger's name off `this`, and `underAReadName` is what it reads.
+    return function (this: unknown, ...message: unknown[]): void {
+      write.apply(
+        underAReadName(this),
+        message.map(value => withoutIdentifiers(asALine(value))),
+      )
+    }
+  }
+  made.rebuild()
+}
+
+/**
+ * An event written when what it says changes, rather than each time it is
+ * said.
+ *
+ * #291. `MESSAGR_BACKUP_OFFER` is decided each time a conversation draws, and
+ * a conversation draws again on every sync cycle that touches it. On build
+ * 135, during a call, that was the same line ten times in seventeen seconds,
+ * and a telephone's log buffer holds 256 KiB: a line repeated pushes out the
+ * ones that would have explained something.
+ *
+ * Compared on what the caller hands over, serialised by `render`, which does
+ * not throw.
+ *
+ * `forget` has the next line written whatever it says. The caller says when,
+ * because only the caller knows what a new occasion to read the event is: for
+ * the backup offer, a conversation being opened.
+ */
+export function logWhenChanged(event: string): {
+  readonly log: (level: LogLevel, fields: LogFields) => void
+  readonly forget: () => void
+} {
+  let last: string | null = null
+  return {
+    log: (level, fields) => {
+      const said = render(fields)
+      if (said === last) return
+      last = said
+      logEvent(level, event, fields)
+    },
+    forget: () => {
+      last = null
+    },
   }
 }

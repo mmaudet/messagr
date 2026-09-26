@@ -270,6 +270,21 @@ export const es: Readonly<Record<CopyKey, string>> = {
     'Ya tiene una conversación con %@. Es la que continúa: la invitación no ha abierto una segunda.',
   list_not_in_yet:
     'Todavía no ha entrado. Abra el enlace de invitación que le enviaron: es la única puerta, y la aplicación no puede hacer nada antes.',
+  // LA SEGUNDA PUERTA, Y SOLO LA SEGUNDA. #367. El razonamiento completo está
+  // en el catálogo francés: la aplicación nunca lee el portapapeles por sí
+  // misma, y lo que cuesta un enlace copiado se dice donde se pide.
+  list_paste_lead: 'Si el enlace no se abre solo, cópielo y péguelo aquí.',
+  list_paste_cost:
+    'Un enlace copiado puede ser leído por las demás aplicaciones de este teléfono. Este vale una hora y sirve una sola vez.',
+  list_paste_field: 'Pegue el enlace de invitación',
+  list_paste_confirm: 'Entrar',
+  list_paste_working: 'Abriendo la invitación…',
+  list_paste_not_a_link:
+    'Esto no es un enlace de invitación de Messagr. No se ha enviado nada, y no se ha gastado ninguna invitación.',
+  list_paste_refused:
+    'Esta invitación no se puede usar. Pida una nueva a la persona que se la envió.',
+  list_paste_retry:
+    'Esta invitación no se ha podido seguir por ahora. Inténtelo de nuevo dentro de un momento: el enlace sigue siendo bueno.',
   list_reinstalled_back:
     'Este dispositivo se ha reinstalado. Ha vuelto con una nueva identidad de dispositivo, y los mensajes recibidos antes de la reinstalación siguen siendo ilegibles: sus claves se fueron con la instalación anterior.',
   list_reinstalled_stranded:
@@ -279,6 +294,7 @@ export const es: Readonly<Record<CopyKey, string>> = {
   list_nothing_said: 'Todavía no se ha dicho nada',
   list_unreadable: 'Este dispositivo no puede leer el último mensaje',
   list_unreachable: 'No se ha podido releer esta conversación',
+  list_opening: 'Abriendo…',
   list_name_action: 'Poner un nombre',
   list_name_title: '¿Cómo llama a esta persona?',
   list_name_hint:
@@ -289,6 +305,9 @@ export const es: Readonly<Record<CopyKey, string>> = {
   list_back: 'Conversaciones',
   invite_action: 'Invitar a alguien',
   invite_who: '¿A quién invita?',
+  invite_declared: '¿Cómo se presenta?',
+  invite_declared_hint:
+    'Opcional. Este nombre viaja en el enlace y en ningún otro sitio: el servicio no lo recibe ni conserva nada de él.',
   invite_working: 'Creando la conversación…',
   invite_ready: 'Envíele este enlace. Vale una hora y sirve una sola vez.',
   invite_qr: 'O deja que escaneen este código.',
@@ -298,6 +317,29 @@ export const es: Readonly<Record<CopyKey, string>> = {
   invite_failed: 'No se ha podido crear la invitación.',
   invite_waiting: 'Todavía nadie ha abierto el enlace.',
   invite_admitted: 'Hecho: esta persona puede entrar.',
+  invited_title: 'Invitación recibida',
+  invited_lead: 'Le invita a unirse a una conversación.',
+  invited_who_unknown:
+    'Esta conversación no dice quién la creó. Por eso aquí no se puede nombrar a nadie.',
+  invited_who_undeclared:
+    'Este enlace no dice quién le invita: esa persona no se ha dado ningún nombre.',
+  'invited_instance %@': 'Esta cuenta está alojada en %@.',
+  'invited_instance_elsewhere %@':
+    'Esta cuenta está alojada en %@, que no es su servidor.',
+  invited_terms_unknown:
+    'Aquí no se ha abierto ningún enlace para esta invitación: cuánto dura y cuántos usos le quedan no se pueden leer desde este dispositivo.',
+  invited_terms_link:
+    'Cuánto dura este enlace y cuántos usos le quedan no se pueden leer aquí: solo la cuenta que lo emitió puede preguntarlo.',
+  invited_nothing_sent:
+    'Todavía no se ha enviado nada. Mientras no responda, esta invitación se queda donde está.',
+  invited_nothing_spent:
+    'Todavía no se ha enviado nada. Mientras no responda, este enlace no se gasta.',
+  'invited_behind %1$d': '%1$d invitación(es) más esperan detrás de esta.',
+  invited_join: 'Unirse a la conversación',
+  invited_refuse: 'Rechazar la invitación',
+  invited_working: 'Un momento…',
+  invited_failed:
+    'Nada ha cambiado: esta invitación no se ha aceptado ni rechazado. Puede intentarlo de nuevo.',
   list_name_not_kept:
     'El nombre no se ha podido conservar: se olvidará en el próximo arranque.',
   settings_action: 'Ajustes',
@@ -336,6 +378,10 @@ export const es: Readonly<Record<CopyKey, string>> = {
     'Una decisión puede recurrirse ante conformite@messagr.eu, citando la referencia. La reexamina una persona distinta de quien la tomó siempre que la organización lo permita. En un servicio explotado por una o dos personas, esa condición no siempre puede cumplirse, y escribirlo vale más que prometer una separación que no existiría.',
   legal_report_scope:
     'Messagr es un servicio de alojamiento y no una plataforma en línea; el considerando 14 del DSA excluye los servicios de comunicaciones interpersonales. Los artículos 20 y 21 no se aplican, por tanto, y este texto no pretende ofrecerlos.',
+  legal_delete_title: 'Eliminar su cuenta',
+  legal_delete_body:
+    'La eliminación se solicita por correo electrónico a conformite@messagr.eu: el gesto desde la aplicación aún no existe. La cuenta queda entonces desactivada y sus datos se purgan; los mensajes ya enviados siguen siendo eventos de las salas donde se escribieron, y el servidor no puede retirarlos, ya que no puede leerlos.',
+  legal_delete_link: 'Solicitar la eliminación: messagr.eu/aide',
   legal_full_terms: 'Condiciones generales completas: messagr.eu',
   trust_action: 'Lo que se sabe de esta persona',
   trust_title: 'Lo que se sabe de esta persona',
@@ -519,14 +565,23 @@ export const es: Readonly<Record<CopyKey, string>> = {
   'backup_settings_progress %1$d %2$d': '%1$d claves guardadas de %2$d',
   backup_settings_catching_up:
     'El resto sale con las siguientes sincronizaciones. Mientras tanto no se pierde nada.',
-  'backup_settings_count %1$d':
-    '%1$d claves guardadas: es lo que Messagr ve en el servidor.',
+  'backup_settings_count %1$d': '%1$d claves enviadas desde este dispositivo.',
   backup_settings_reading: 'Leyendo el estado de la copia de seguridad…',
   backup_settings_unreadable:
     'No se ha podido leer el estado de la copia de seguridad en este dispositivo.',
   backup_settings_unreadable_why:
     'Esto no dice nada sobre la copia en sí: si estaba activada, lo sigue estando, y aquí no se ha cambiado nada.',
   backup_settings_retry: 'Reintentar',
+  backup_settings_superseded:
+    'Otra copia ha sustituido a la de este dispositivo: de aquí ya no sale nada.',
+  backup_settings_dormant:
+    'Hay una copia en el servidor, pero este dispositivo no la alimenta.',
+  backup_settings_unchecked:
+    'El servidor no ha respondido: no se ha podido leer el estado de la copia.',
+  backup_settings_unchecked_why: 'Aquí no se ha cambiado nada.',
+  backup_settings_enter_current: 'Introducir la clave actual',
+  backup_settings_enter_key: 'Introducir mi clave de recuperación',
+  backup_settings_new: 'Crear una copia nueva',
   backup_settings_enable: 'Guardar mis mensajes',
   backup_settings_never_shown:
     'Su clave actual no puede volver a mostrarse, ni aquí ni en ningún otro sitio.',
@@ -544,6 +599,8 @@ export const es: Readonly<Record<CopyKey, string>> = {
   backup_offer_accept: 'Guardar mis claves',
   backup_offer_refuse: 'Ahora no',
   backup_offer_later: 'Podrá activarlo más tarde desde Ajustes.',
+  backup_accept_failed: 'No se ha podido activar la copia. Inténtelo de nuevo.',
+  backup_accept_working: 'Activando…',
   backup_replace_title: 'Sustituir su clave de recuperación',
   backup_replace_lead: 'Antes de decidir, lo que este gesto se lleva.',
   backup_replace_fact_old: 'La clave antigua no abrirá nada',
@@ -625,7 +682,5 @@ export const es: Readonly<Record<CopyKey, string>> = {
   settings_vault_hint:
     'Un archivo, para quien no quiere dejar nada en un servidor.',
   restore_done_close: 'Cerrar',
-  settings_restore: 'Recuperar mis mensajes antiguos',
-  settings_restore_hint: 'Si tiene su clave de recuperación.',
   back_to_newest: 'Volver al último mensaje',
 }

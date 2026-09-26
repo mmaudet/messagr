@@ -64,4 +64,23 @@ describe('scopeOfPress', () => {
   it('routes a notification with no id nowhere either', () => {
     expect(scopeOfPress(undefined)).toBeNull()
   })
+
+  it('routes a notification this application did not draw to the list', () => {
+    // SINCE #341 THE PUSH ITSELF CAN DISPLAY SOMETHING. ADR-0009's visible
+    // fallback is an `aps.alert`, which iOS shows without the application
+    // ever running -- on a phone that is killed and locked, which is the
+    // whole point of it. Its identifier is then Apple's, a value this
+    // application never chose, and every identifier used to be read as a
+    // conversation to open.
+    //
+    // The ADR asks for the other half in the same breath: "A notification the
+    // user taps must land somewhere sensible even when the wake failed and
+    // the application does not yet know what arrived." Somewhere sensible is
+    // the list. A room identifier begins with `!`; a system identifier does
+    // not, and opening a conversation named after one is a screen for a
+    // conversation that does not exist.
+    expect(scopeOfPress('8C1E0C4F-0B1B-4D5B-9A2E-9E7E2B1A0000')).toBeNull()
+    expect(scopeOfPress('')).toBeNull()
+    expect(scopeOfPress('@her:messagr.eu')).toBeNull()
+  })
 })

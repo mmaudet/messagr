@@ -1,0 +1,18 @@
+/* English — the base, and the one iOS falls back to.
+
+   CFBundleDevelopmentRegion is `en`, so this catalogue and Info.plist must say
+   the same words: a telephone set to a language Messagr does not speak is
+   shown the plist, and anything else here would make the fallback disagree
+   with itself. `scripts/assert-ios-localisation.sh` holds the two to each
+   other, which is also what keeps the plist from drifting back into French.
+
+   Why each string says what it says — and what it is not allowed to promise —
+   is written beside the keys in Info.plist. */
+
+"NSMicrophoneUsageDescription" = "So the person you are speaking to can hear you during a call. The sound is end-to-end encrypted: neither the server nor Messagr can listen to it, and nothing is recorded.";
+
+"NSCameraUsageDescription" = "So the person you are speaking to can see you during a video call. The picture is end-to-end encrypted: neither the server nor Messagr can see it, and nothing is recorded.";
+
+"NSPhotoLibraryUsageDescription" = "To choose a picture to send in a conversation. The picture is encrypted on this device before it is sent: neither the server nor Messagr can read it.";
+
+"NSPhotoLibraryAddUsageDescription" = "To save a photograph received in a conversation to your photo library, when you ask for it. A saved picture leaves Messagr: it then follows the backups and the permissions of your photo library.";

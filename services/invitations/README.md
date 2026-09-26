@@ -25,7 +25,7 @@ preserved than rewritten from memory.
 ## Running it
 
 ```
-cargo test          # 152 tests, no network, about a second
+cargo test          # 191 tests, no network, about a second
 cargo clippy --all-targets -- -D warnings
 cargo fmt --check
 ```
@@ -36,9 +36,17 @@ rather than on every commit.
 
 ## Configuration
 
-Seven variables, four of them mandatory: `DATABASE_URL`, `HOMESERVER_URL`,
+Eight variables, four of them mandatory: `DATABASE_URL`, `HOMESERVER_URL`,
 `REGISTRATION_TOKEN`, `ENCRYPTION_KEY`, plus optional `EDGE_RETENTION_DAYS`,
-`BIND_ADDR` and `MAX_RESERVED_ACCOUNTS_PER_INVITER`.
+`BIND_ADDR`, `MAX_RESERVED_ACCOUNTS_PER_INVITER` and `PUSH_GATEWAY_URL`.
+
+`PUSH_GATEWAY_URL` was missing from this list. It is where a stripped push
+notification is forwarded, and a deployment without it accepts every
+notification and wakes nobody — answering "delivered, nothing to clean up",
+which is the least wrong thing a gateway with nowhere to send can say and
+looks exactly like success. `config::usable_gateway` refuses a value that
+would put device tokens on the wire in clear, so a rejected setting is also a
+gateway that sends nothing.
 
 Losing `ENCRYPTION_KEY` makes every secret already stored undecipherable, and
 the accounts behind them can then neither be handed out nor deactivated —

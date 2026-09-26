@@ -185,7 +185,7 @@
         Ce que Messagr ne vous demande pas, ce que le service ne peut pas lire,
         et ce que le serveur voit malgré tout.
       </p>
-      <p class="stamp">Version du 13 septembre 2026</p>
+      <p class="stamp">Version du 16 septembre 2026</p>
 
       <h2>Qui traite vos données</h2>
       <p>
@@ -267,6 +267,12 @@
         </li>
         <li>la taille approximative de ce qui transite&nbsp;;</li>
         <li>
+          quand un compte est en appel&nbsp;: pour chaque appel, l'application
+          demande au serveur l'accès au relais qui achemine le son et
+          l'image&nbsp;; ce relais voit l'adresse IP des téléphones qui s'en
+          servent, jamais le contenu de l'appel&nbsp;;
+        </li>
+        <li>
           les adresses IP au moment des requêtes, dans les journaux techniques.
         </li>
       </ul>
@@ -292,8 +298,9 @@
         <li>
           quelques lignes dans le journal du système de l'appareil, limitées
           aux appels, aux réveils par notification, à l'enregistrement des
-          notifications et à l'offre de sauvegarde. Elles ne portent ni contenu
-          ni identifiant, et l'application ne les envoie nulle part&nbsp;;
+          notifications, à l'offre de sauvegarde et aux sauvegardes qui n'ont
+          pas pu être activées. Elles ne portent ni contenu ni identifiant, et
+          l'application ne les envoie nulle part&nbsp;;
         </li>
         <li>
           rien d'autre.
@@ -333,10 +340,10 @@
           message.</strong
         >
         Le signal envoyé porte l'identifiant technique de votre appareil, une
-        priorité de remise, et un nombre tiré au hasard. Rien d'autre — pas
-        d'identifiant de salon, pas d'aperçu, pas de compteur. C'est une
-        passerelle écrite pour cela, et le contenu est déchiffré par votre
-        appareil, chez vous, après le réveil.
+        priorité de remise, et un nombre tiré au hasard. Pas d'identifiant de
+        salon, pas d'aperçu, pas de compteur, pas de nom. C'est une passerelle
+        écrite pour cela, et le contenu est déchiffré par votre appareil, chez
+        vous, après le réveil.
       </p>
       <p>
         Le nombre tiré au hasard mérite une phrase, parce qu'il occupe un champ
@@ -350,8 +357,47 @@
         Ce que Google détient donc, c'est un jeton d'appareil et le fait que
         quelque chose est arrivé à un moment donné. Le jeton est un identifiant
         d'installation, renouvelé par Google, conservé tant que l'application
-        est installée. Sur iOS le même rôle est tenu par le service de
-        notifications d'Apple.
+        est installée.
+      </p>
+      <p>
+        <strong
+          >Le réveil d'un iPhone passe par Apple, et Google reçoit tout de
+          même un jeton.</strong
+        >
+        La notification part de notre serveur vers celui d'Apple, directement.
+        Mais l'application embarque la bibliothèque de Firebase, la même que sur
+        Android, et cette bibliothèque s'enregistre d'elle-même&nbsp;: à la
+        première ouverture, elle envoie à Google un identifiant d'installation
+        et le jeton qu'Apple vient de donner à votre téléphone. Nous ne le lui
+        demandons pas et nous n'en faisons rien&nbsp;; elle le fait parce
+        qu'elle est là.
+      </p>
+      <p>
+        Cette page disait auparavant que sur iOS ce rôle était tenu par le
+        service de notifications d'Apple, sans plus. C'était incomplet. La
+        correction ne change rien à ce que fait l'application&nbsp;: elle décrit
+        ce qu'elle faisait déjà. Retirer cette bibliothèque du paquet iPhone, où
+        elle ne sert qu'à demander le jeton d'Apple, est en cours.
+      </p>
+      <p>
+        <strong>Sur iPhone, une phrase en plus, et toujours la même.</strong>
+        Apple ne garantit pas qu'un réveil silencieux arrive&nbsp;: il peut être
+        différé, ou abandonné, et votre téléphone n'afficherait alors rien du
+        tout. Le signal envoyé à Apple porte donc une phrase écrite d'avance,
+        « Quelque chose est arrivé. », pour qu'il reste quelque chose à voir
+        quand le réveil n'a pas eu lieu. Elle ne nomme ni votre correspondant,
+        ni votre conversation, ni vous, et elle n'est pas écrite d'après votre
+        message&nbsp;: c'est la même pour tout le monde, à chaque envoi.
+      </p>
+      <p>
+        Cette phrase existe dans les sept langues de l'application, et c'est
+        votre téléphone qui dit laquelle il lit, une fois, en s'enregistrant.
+        Apple voit donc laquelle des sept vous est envoyée, c'est-à-dire la
+        langue que vous lisez — qu'un appareil Apple lui a apprise bien avant
+        nous. C'est la même valeur à chaque envoi, jamais liée à un message ni à
+        un correspondant. Sur Android, rien de tout cela ne traverse
+        Google&nbsp;: le réveil silencieux y fonctionne, et c'est votre
+        téléphone qui écrit la notification, après l'avoir déchiffrée.
       </p>
       <p>
         Les notifications se désactivent dans les réglages de l'application. Le
@@ -361,9 +407,16 @@
 
       <h2>Où vos données sont traitées</h2>
       <p>
-        Le serveur est hébergé par Hetzner Online GmbH, à Helsinki, en Finlande
-        — donc au sein de l'Union européenne. Il n'y a aucun transfert hors de
-        l'Union.
+        Le serveur est hébergé par Hetzner Online GmbH, à Helsinki, en Finlande,
+        au sein de l'Union européenne.
+      </p>
+      <p>
+        Une exception&nbsp;: le signal qui réveille votre téléphone, décrit plus
+        haut, passe par Firebase Cloud Messaging (Google) sur Android et par le
+        service de notifications d'Apple sur iOS. Ces services peuvent le traiter
+        hors de l'Union. Il ne porte que l'identifiant technique de votre
+        appareil, une priorité de remise et un nombre tiré au hasard — et, sur
+        iPhone seulement, la phrase écrite d'avance décrite plus haut.
       </p>
 
       <h2>Sur quelle base</h2>
@@ -375,11 +428,22 @@
       </p>
 
       <h2>Combien de temps</h2>
+      <!-- #313 : le lien d'invitation porte son jeton dans son chemin, et ce
+           jeton est un secret porteur — tant que l'invitation n'est ni
+           réclamée ni expirée, il fait entrer. Le serveur qui sert la page
+           n'a pas à le garder, et il ne le garde plus : le vhost écrit
+           « /i/... » à la place du chemin. La phrase ci-dessous est celle que
+           `deploy/messagr-eu/retention.json` déclare sous « dit », et que
+           `scripts/assert-retention.sh` vérifie contre cette page. -->
       <p>
         <b>Les journaux techniques, douze mois.</b> Cette durée n'est pas un
         choix&nbsp;: le décret n°&nbsp;2021-1362 l'impose aux fournisseurs
         d'hébergement pour les données permettant d'identifier la source d'une
         connexion, dont les adresses IP. Passé ce délai, elles sont effacées.
+        En revanche, le lien d'invitation n'y est pas écrit&nbsp;: quand vous
+        ouvrez une invitation dans un navigateur, le serveur note la date,
+        l'adresse IP, le résultat et le navigateur, et
+        «&nbsp;/i/...&nbsp;» à la place du lien.
       </p>
       <p>
         <b>Les données d'identité civile, sans objet.</b> La loi en prévoit la

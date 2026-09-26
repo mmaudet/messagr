@@ -27,16 +27,22 @@ import type { HttpRequester } from './pump'
  * So entering is its own function now, on the product's path rather than the
  * diagnostic one.
  *
- * # WHY IT ACCEPTS WITHOUT ASKING
+ * # WHICH DOOR, AND WHICH ONES IT LEAVES SHUT
  *
- * On this product an invitation to a conversation is not an unsolicited
- * approach: §7.6 has no directory and no address book, so nobody can invite
- * an account they were not given by the invitation service, and the person
- * being invited is the one who opened the link a moment earlier. Asking them
- * to confirm again would be asking about a decision they have already made.
+ * The one this device is waiting for, and no other. Spending an invitation
+ * link is the decision, and it was taken a moment earlier by the person
+ * holding the telephone: every link claimed entitles this device to enter one
+ * invitation, and `awaitedInvitations.ts` is the register of what is owed.
+ * Asking them to confirm that again would be asking about a decision they
+ * have already made.
  *
- * The day a conversation can be started by anybody who knows an identifier,
- * this becomes a screen and not a function.
+ * Every other invitation is left exactly as it arrived -- neither entered nor
+ * declined -- and reported as waiting. What becomes of it is a screen's
+ * business rather than a function's: §13.3's first screen describes an
+ * invitation before any decision is taken -- sender, scope, validity,
+ * remaining uses, origin instance -- and offers two symmetric actions, join
+ * and refuse. Until that screen is built, an invitation nobody spent a link
+ * for stands where it arrived, on the threshold.
  */
 
 export interface Entering {
@@ -45,11 +51,22 @@ export interface Entering {
   readonly invitedRooms: (http: HttpRequester) => Promise<readonly Invitation[]>
   readonly join: (http: HttpRequester, roomId: string) => Promise<string>
   /**
+   * How many invitations this device is waiting for: one per invitation link
+   * it has spent and not yet been answered about. `awaitedInvitations.ts`
+   * keeps the count, and `cryptoPump.ts` tells it what this walk answered.
+   *
+   * Read once per walk rather than held: a link can be spent while a tick is
+   * under way, and the number that matters is the one at the moment the
+   * invitations are looked at.
+   */
+  readonly awaited: () => number
+  /**
    * Everyone this account already has a direct conversation with.
    *
-   * Asked for lazily, and only when there is an invitation to decide about:
-   * answering it costs a call per conversation, and the overwhelming
-   * majority of sync ticks carry no invitation at all.
+   * Asked for lazily, and only when there is an invitation this device may
+   * enter: answering it costs a call per conversation, the overwhelming
+   * majority of sync ticks carry no invitation at all, and a tick with
+   * nothing to enter has nothing to decide either.
    */
   readonly alreadyWith: (http: HttpRequester) => Promise<ReadonlySet<string>>
   /**
@@ -80,10 +97,25 @@ export interface Entered {
     readonly scope: string
     readonly from: string
   }[]
+  /**
+   * The invitations this device was not waiting for, and who made each
+   * conversation.
+   *
+   * Nothing was sent about them: they are neither joined nor declined, and
+   * they stand on the homeserver exactly as they arrived. Reported so that a
+   * screen has something to draw -- §13.3's first screen is what decides
+   * them -- and so that a launch can say how many are standing.
+   */
+  readonly waiting: readonly Invitation[]
 }
 
 /**
- * Joins every room this account has been invited to.
+ * Enters the invitations this device is waiting for, and leaves the rest
+ * standing.
+ *
+ * AS MANY DOORS AS LINKS SPENT. `deps.awaited` says how many invitations this
+ * device is owed; each one entered or declined uses one up, and every
+ * invitation past that is reported as waiting and touched in no way at all.
  *
  * ONE FAILURE DOES NOT COST THE OTHERS. A room whose join is refused -- a
  * conversation the issuer left, a homeserver that says no -- must not keep
@@ -97,6 +129,7 @@ export async function enterInvitations(deps: Entering): Promise<Entered> {
   const joined: string[] = []
   const refused: { scope: string; reason: string }[] = []
   const collapsed: { scope: string; from: string }[] = []
+  const waiting: Invitation[] = []
 
   let invited: readonly Invitation[]
   try {
@@ -106,15 +139,22 @@ export async function enterInvitations(deps: Entering): Promise<Entered> {
       joined: [],
       refused: [{ scope: '', reason: getErrorMessage(cause) }],
       collapsed: [],
+      waiting: [],
     }
   }
 
-  if (invited.length === 0) return { joined, refused, collapsed }
+  if (invited.length === 0) return { joined, refused, collapsed, waiting }
+
+  // HOW MANY DOORS THIS WALK MAY OPEN, read once and spent as it goes. A tick
+  // that is owed nothing enters nothing, and says so without asking the
+  // homeserver a single question about rooms it will not touch.
+  let owed = deps.awaited()
+  if (owed <= 0) return { joined, refused, collapsed, waiting: [...invited] }
 
   // ASKED ONCE, AND ONLY BECAUSE THERE IS SOMETHING TO DECIDE. Every sync
   // tick reaches this function and almost none of them carry an invitation;
   // building this set costs a call per conversation, so it is built after
-  // the early return above and never on a quiet tick.
+  // the early returns above and never on a quiet tick.
   //
   // A failure to build it is not a failure to enter. Entering is what this
   // product did before it asked the question at all, and an empty set makes
@@ -128,7 +168,21 @@ export async function enterInvitations(deps: Entering): Promise<Entered> {
     already = new Set()
   }
 
-  for (const { scope, from } of invited) {
+  for (const invitation of invited) {
+    const { scope, from } = invitation
+    // PAST WHAT THIS DEVICE IS OWED, AN INVITATION IS LEFT WHERE IT IS.
+    // Nothing is joined, nothing is declined, and nothing is asked about it:
+    // the screen of §13.3 is what puts it to the person.
+    if (owed <= 0) {
+      waiting.push(invitation)
+      continue
+    }
+    // One of the doors this walk may open, whichever way the door goes: a
+    // conversation declined below answered the invitation just as a
+    // conversation joined does. A join that failed spends this walk's door
+    // and no more than that -- `cryptoPump.ts` settles the register on what
+    // came back, so the next tick is owed it again.
+    owed -= 1
     // ONE DIRECT CONVERSATION PER PERSON, which is the rule this answers.
     //
     // Two people already in contact can each issue the other an invitation
@@ -160,5 +214,5 @@ export async function enterInvitations(deps: Entering): Promise<Entered> {
     }
   }
 
-  return { joined, refused, collapsed }
+  return { joined, refused, collapsed, waiting }
 }

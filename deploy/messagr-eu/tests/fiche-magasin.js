@@ -107,13 +107,38 @@ if (Object.keys(tableau).length === 0) {
 }
 
 // ── Les fiches ────────────────────────────────────────────────────────────
-var dossier = path.join(racine, 'play-listing')
-var fiches = fs.readdirSync(dossier).filter(function (f) {
-  return f.endsWith('.json')
+//
+// DEUX MAGASINS, DEUX DOSSIERS, ET LE MÊME CONTRÔLE. Ce fichier n'a longtemps
+// lu que `play-listing/`, parce qu'il n'existait qu'une fiche. La fiche App
+// Store est arrivée avec la même prose et un autre nom de champ ; la laisser
+// hors du champ aurait reconstruit à l'identique la faute racontée en tête,
+// dans le seul magasin qu'aucun contrôle ne regardait.
+//
+// Le nom du champ est déclaré ici plutôt que deviné : Play appelle ce texte
+// `fullDescription`, Apple l'appelle `description`, et un `||` entre les deux
+// ferait passer pour vide une fiche dont on aurait mal orthographié le champ.
+var DOSSIERS = [
+  { nom: 'play-listing', texte: 'fullDescription' },
+  { nom: 'app-store-listing', texte: 'description' },
+]
+
+var fiches = []
+DOSSIERS.forEach(function (magasin) {
+  var dossier = path.join(racine, magasin.nom)
+  var lues = fs.readdirSync(dossier).filter(function (f) {
+    return f.endsWith('.json')
+  })
+  if (lues.length === 0) {
+    echouer('aucune fiche à lire dans ' + magasin.nom + '/')
+  }
+  lues.forEach(function (fichier) {
+    fiches.push({
+      quoi: 'la fiche ' + magasin.nom + '/' + fichier,
+      champ: magasin.texte,
+      chemin: path.join(dossier, fichier),
+    })
+  })
 })
-if (fiches.length === 0) {
-  echouer('aucune fiche à lire dans play-listing/')
-}
 
 function echapper(mot) {
   return mot.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
@@ -155,10 +180,14 @@ function motsDe(cap, langue, quoi) {
   return famille[langue]
 }
 
-fiches.forEach(function (fichier) {
-  var quoi = 'la fiche ' + fichier
-  var fiche = JSON.parse(fs.readFileSync(path.join(dossier, fichier), 'utf8'))
-  var texte = fiche.fullDescription || ''
+fiches.forEach(function (lue) {
+  var quoi = lue.quoi
+  var fiche = JSON.parse(fs.readFileSync(lue.chemin, 'utf8'))
+  var texte = fiche[lue.champ] || ''
+  if (!texte) {
+    echouer(quoi + " n'écrit rien dans son champ « " + lue.champ + ' »')
+    return
+  }
   var langue = String(fiche.language || '').split('-')[0]
   if (!langue) {
     echouer(quoi + ' ne dit pas sa langue')

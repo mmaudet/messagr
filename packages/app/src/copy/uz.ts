@@ -286,6 +286,22 @@ export const uz: Readonly<Record<CopyKey, string>> = {
     'Sizda %@ bilan suhbat allaqachon bor. Oʻsha davom etadi: taklif ikkinchisini ochmadi.',
   list_not_in_yet:
     'Siz hali ichkarida emassiz. Kimdir yuborgan taklif havolasini oching: bu yagona eshik va ilova undan oldin hech nima qila olmaydi.',
+  // IKKINCHI ESHIK, VA FAQAT IKKINCHISI. #367. Butun mulohaza fransuz
+  // katalogida: ilova buferni hech qachon oʻzi oʻqimaydi, va nusxalangan
+  // havola nimaga tushishi soʻralgan joyda aytiladi.
+  list_paste_lead:
+    'Agar havola oʻzi ochilmasa, uni nusxalab, shu yerga joylashtiring.',
+  list_paste_cost:
+    'Nusxalangan havolani bu telefondagi boshqa ilovalar ham oʻqiy oladi. Bu havola bir soat amal qiladi va faqat bir marta ishlaydi.',
+  list_paste_field: 'Taklif havolasini joylashtiring',
+  list_paste_confirm: 'Kirish',
+  list_paste_working: 'Taklif ochilmoqda…',
+  list_paste_not_a_link:
+    'Bu Messagr taklif havolasi emas. Hech nima yuborilmadi va hech qanday taklif sarflanmadi.',
+  list_paste_refused:
+    'Bu takliftan foydalanib boʻlmaydi. Uni yuborgan odamdan yangisini soʻrang.',
+  list_paste_retry:
+    'Bu taklifga hozircha amal qilib boʻlmadi. Bir ozdan keyin qayta urinib koʻring: havolaning oʻzi yaroqli.',
   list_reinstalled_back:
     'Bu qurilma qayta oʻrnatilgan. U yangi qurilma sifatida qaytdi va qayta oʻrnatishdan oldin kelgan xabarlar oʻqilmay qoladi: ularning kalitlari eski oʻrnatma bilan ketdi.',
   list_reinstalled_stranded:
@@ -294,6 +310,7 @@ export const uz: Readonly<Record<CopyKey, string>> = {
   list_nothing_said: 'Hali hech nima aytilmagan',
   list_unreadable: 'Bu qurilma oxirgi xabarni oʻqiy olmaydi',
   list_unreachable: 'Bu suhbatni qayta oʻqib boʻlmadi',
+  list_opening: 'Ochilmoqda…',
   list_name_action: 'Nom berish',
   list_name_title: 'Bu odamni nima deb ataysiz?',
   list_name_hint:
@@ -304,6 +321,9 @@ export const uz: Readonly<Record<CopyKey, string>> = {
   list_back: 'Suhbatlar',
   invite_action: 'Odam taklif qilish',
   invite_who: 'Kimni taklif qilyapsiz?',
+  invite_declared: 'Oʻzingizni qanday tanishtirasiz?',
+  invite_declared_hint:
+    'Ixtiyoriy. Bu nom havola ichida sayohat qiladi, boshqa hech qayerda emas: xizmat uni olmaydi va undan hech narsa saqlamaydi.',
   invite_working: 'Suhbat yaratilmoqda…',
   invite_ready:
     'Bu havolani ularga yuboring. U bir soat amal qiladi va bir marta ishlaydi.',
@@ -314,6 +334,29 @@ export const uz: Readonly<Record<CopyKey, string>> = {
   invite_failed: 'Taklifni yaratib boʻlmadi.',
   invite_waiting: 'Havolani hali hech kim ochmadi.',
   invite_admitted: 'Tayyor: bu odam kirishi mumkin.',
+  invited_title: 'Taklif keldi',
+  invited_lead: 'Sizni suhbatga qoʻshilishga taklif qiladi.',
+  invited_who_unknown:
+    'Bu suhbat kim tomonidan yaratilganini aytmaydi. Shu sababli bu yerda hech kimni nomlab boʻlmaydi.',
+  invited_who_undeclared:
+    'Bu havola sizni kim taklif qilayotganini aytmaydi: u odam oʻziga nom bermagan.',
+  'invited_instance %@': 'Bu hisob %@ da joylashgan.',
+  'invited_instance_elsewhere %@':
+    'Bu hisob %@ da joylashgan, u esa sizning serveringiz emas.',
+  invited_terms_unknown:
+    'Bu taklif uchun bu yerda hech qanday havola ochilmagan: uning muddati va unga necha marta ochish qolgani bu qurilmadan oʻqilmaydi.',
+  invited_terms_link:
+    'Bu havola qancha amal qilishi va unga necha marta ochish qolgani bu yerda oʻqilmaydi: faqat uni bergan hisob buni soʻray oladi.',
+  invited_nothing_sent:
+    'Hali hech narsa yuborilmadi. Siz javob bermaguningizcha bu taklif joyida qoladi.',
+  invited_nothing_spent:
+    'Hali hech narsa yuborilmadi. Siz javob bermaguningizcha bu havola sarflanmaydi.',
+  'invited_behind %1$d': 'Bunisining orqasida yana %1$d taklif kutmoqda.',
+  invited_join: 'Suhbatga qoʻshilish',
+  invited_refuse: 'Taklifni rad etish',
+  invited_working: 'Bir daqiqa…',
+  invited_failed:
+    'Hech narsa oʻzgarmadi: bu taklifga na qoʻshildingiz, na uni rad etdingiz. Qayta urinib koʻrishingiz mumkin.',
   list_name_not_kept:
     'Nomni saqlab boʻlmadi: keyingi ishga tushirishda u unutiladi.',
   settings_action: 'Sozlamalar',
@@ -352,6 +395,10 @@ export const uz: Readonly<Record<CopyKey, string>> = {
     'Qarorga raqamini koʻrsatgan holda conformite@messagr.eu orqali eʼtiroz bildirish mumkin. Tashkilot imkon bergan har holatda uni qaror qabul qilgan odamdan boshqa birov qayta koʻrib chiqadi. Bir-ikki kishi yuritadigan xizmatda bu shart doim bajarilmaydi va buni yozib qoʻyish mavjud boʻlmagan ajratmani vaʼda qilishdan yaxshiroq.',
   legal_report_scope:
     'Messagr — hosting xizmati, onlayn platforma emas: DSA ning 14-bandi shaxslararo xabar almashish xizmatlarini bundan chiqaradi. Demak 20- va 21-moddalar qoʻllanmaydi va bu matn ularni taklif qilayotgani yoʻq.',
+  legal_delete_title: 'Hisobingizni oʻchirish',
+  legal_delete_body:
+    'Oʻchirish conformite@messagr.eu manziliga elektron xat orqali soʻraladi: ilovaning oʻzida bunday amal hali yoʻq. Shundan keyin hisob oʻchiriladi va uning maʼlumotlari tozalanadi; allaqachon yuborilgan xabarlar esa yozilgan xonalarning hodisasi boʻlib qoladi, va server ularni qaytarib ololmaydi, chunki ularni oʻqiy olmaydi.',
+  legal_delete_link: 'Oʻchirishni soʻrash: messagr.eu/aide',
   legal_full_terms: 'Toʻliq foydalanish shartlari: messagr.eu',
   trust_action: 'Bu odam haqida nima maʼlum',
   trust_title: 'Bu odam haqida nima maʼlum',
@@ -535,13 +582,22 @@ export const uz: Readonly<Record<CopyKey, string>> = {
   'backup_settings_progress %1$d %2$d': '%2$d tadan %1$d kalit zaxiralandi',
   backup_settings_catching_up:
     'Qolgani suhbatlar sinxronlangani sari ketadi. Bu orada hech nima yoʻqolmaydi.',
-  'backup_settings_count %1$d':
-    '%1$d kalit zaxiralandi: Messagr serverda shuni koʻradi.',
+  'backup_settings_count %1$d': '%1$d kalit shu qurilmadan yuborildi.',
   backup_settings_reading: 'Zaxira holati oʻqilmoqda…',
   backup_settings_unreadable: 'Zaxira holatini bu qurilmada oʻqib boʻlmadi.',
   backup_settings_unreadable_why:
     'Bu zaxiraning oʻzi haqida hech nima demaydi: yoqilgan boʻlsa, hamon yoqilgan, va bu yerda hech nima oʻzgartirilmadi.',
   backup_settings_retry: 'Qayta urinish',
+  backup_settings_superseded:
+    'Boshqa zaxira shu qurilmanikining oʻrnini egalladi: bu yerdan endi hech nima ketmaydi.',
+  backup_settings_dormant:
+    'Serverda zaxira bor, lekin bu qurilma uni toʻldirmayapti.',
+  backup_settings_unchecked:
+    'Server javob bermadi: zaxira holatini oʻqib boʻlmadi.',
+  backup_settings_unchecked_why: 'Bu yerda hech nima oʻzgartirilmadi.',
+  backup_settings_enter_current: 'Joriy kalitni kiritish',
+  backup_settings_enter_key: 'Tiklash kalitimni kiritish',
+  backup_settings_new: 'Yangi zaxira yaratish',
   backup_settings_enable: 'Xabarlarimni zaxiralash',
   backup_settings_never_shown:
     'Joriy kalitingizni qayta koʻrsatib boʻlmaydi — na bu yerda, na boshqa joyda.',
@@ -560,6 +616,8 @@ export const uz: Readonly<Record<CopyKey, string>> = {
   backup_offer_accept: 'Kalitlarimni zaxiralash',
   backup_offer_refuse: 'Hozir emas',
   backup_offer_later: 'Buni keyinroq Sozlamalardan yoqishingiz mumkin.',
+  backup_accept_failed: 'Zaxirani yoqib boʻlmadi. Qayta urinib koʻring.',
+  backup_accept_working: 'Yoqilmoqda…',
   backup_replace_title: 'Tiklash kalitingizni almashtirish',
   backup_replace_lead: 'Qaror qilishdan oldin, bu imo nimani olib ketadi.',
   backup_replace_fact_old: 'Eski kalit endi hech nimani ochmaydi',
@@ -642,7 +700,5 @@ export const uz: Readonly<Record<CopyKey, string>> = {
   settings_vault_hint:
     'Fayl — serverda hech nima qoldirishni istamaganlar uchun.',
   restore_done_close: 'Yopish',
-  settings_restore: 'Eski xabarlarimni qaytarish',
-  settings_restore_hint: 'Agar tiklash kalitingiz boʻlsa.',
   back_to_newest: 'Oxirgi xabarga qaytish',
 }

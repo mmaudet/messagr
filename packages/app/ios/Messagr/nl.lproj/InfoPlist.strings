@@ -1,0 +1,19 @@
+/* Dutch.
+
+   Translated from the English base. Why each string says what it says — and
+   what it is not allowed to promise — is written beside the keys in
+   Info.plist; `scripts/assert-ios-localisation.sh` refuses a language that is
+   missing one.
+
+   `u` and the vocabulary of `src/copy/nl.ts`: end-to-end versleuteld, server,
+   fotobibliotheek, gesprekspartner. `oproep` for a call and `gesprek` for a
+   conversation, which the catalogue keeps apart wherever both could be
+   read. */
+
+"NSMicrophoneUsageDescription" = "Zodat uw gesprekspartner u tijdens een oproep hoort. Het geluid is end-to-end versleuteld: noch de server noch Messagr kan het beluisteren, en er wordt niets opgenomen.";
+
+"NSCameraUsageDescription" = "Zodat uw gesprekspartner u tijdens een video-oproep ziet. Het beeld is end-to-end versleuteld: noch de server noch Messagr kan het zien, en er wordt niets opgenomen.";
+
+"NSPhotoLibraryUsageDescription" = "Om een afbeelding te kiezen om in een gesprek te versturen. De afbeelding wordt op dit toestel versleuteld voordat ze verstuurd wordt: noch de server noch Messagr kan ze lezen.";
+
+"NSPhotoLibraryAddUsageDescription" = "Om een in een gesprek ontvangen foto in uw fotobibliotheek te bewaren, wanneer u daarom vraagt. Een bewaarde afbeelding verlaat Messagr: ze volgt daarna de back-ups en de rechten van uw fotobibliotheek.";
