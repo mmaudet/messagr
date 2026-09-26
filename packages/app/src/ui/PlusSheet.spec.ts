@@ -81,6 +81,25 @@ function press(drawn: readonly Drawn[], testID: string) {
 }
 
 describe('the sheet the "+" opens', () => {
+  it("offers to find one's contacts when discovery is served, between inviting and closing", () => {
+    const onFindContacts = vi.fn()
+    const drawn = draw(
+      createElement(PlusSheet, {
+        onInvite: vi.fn(),
+        onClose: vi.fn(),
+        onFindContacts,
+      }),
+    )
+
+    expect(said(drawn)).toEqual([
+      t('plus_invite'),
+      t('plus_find_contacts'),
+      t('plus_close'),
+    ])
+    press(drawn, 'plus-find-contacts')
+    expect(onFindContacts).toHaveBeenCalledTimes(1)
+  })
+
   it('offers to invite somebody, and a way to close, nothing else', () => {
     const { drawn } = sheet()
 

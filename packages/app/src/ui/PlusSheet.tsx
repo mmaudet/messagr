@@ -9,11 +9,11 @@ import { color, floors, radius, space, type } from '../design/tokens'
  *
  * # A SHEET, EVEN WITH ONE LINE IN IT
  *
- * Today the only line is inviting somebody, which is what the "+" used to do
- * directly. Address-book discovery (#392) adds « Retrouver mes contacts »
- * beside it, and a second gesture on the same circle needs a place to be
- * chosen from. The sheet comes first, alone, so that the discovery ticket
- * adds a line rather than a new way of opening things.
+ * Inviting somebody is what the "+" used to do directly. Address-book
+ * discovery (#392, #400) adds « Retrouver mes contacts » beside it, where
+ * this service serves discovery, and a second gesture on the same circle
+ * needed a place to be chosen from: the sheet came first, alone, so that
+ * discovery adds a line rather than a new way of opening things.
  *
  * Its shape is `RemoveSheet`'s: a scrim that closes, the choices, then a way
  * out of the same weight. Closing it, by any of the three ways, does nothing
@@ -21,9 +21,16 @@ import { color, floors, radius, space, type } from '../design/tokens'
  */
 export function PlusSheet({
   onInvite,
+  onFindContacts,
   onClose,
 }: {
   readonly onInvite: () => void
+  /**
+   * « Retrouver mes contacts » (#400), given only when this service serves
+   * discovery: without it, the line is not drawn at all rather than drawn
+   * and refused later, as « Être trouvable » in Settings.
+   */
+  readonly onFindContacts?: () => void
   readonly onClose: () => void
 }) {
   return (
@@ -49,6 +56,19 @@ export function PlusSheet({
             style={({ pressed }) => [styles.choice, pressed && styles.pressed]}>
             <Text style={styles.choiceLabel}>{t('plus_invite')}</Text>
           </Pressable>
+
+          {onFindContacts !== undefined && (
+            <Pressable
+              testID="plus-find-contacts"
+              onPress={onFindContacts}
+              accessibilityRole="button"
+              style={({ pressed }) => [
+                styles.choice,
+                pressed && styles.pressed,
+              ]}>
+              <Text style={styles.choiceLabel}>{t('plus_find_contacts')}</Text>
+            </Pressable>
+          )}
 
           <Pressable
             testID="plus-close"
