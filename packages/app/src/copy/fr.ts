@@ -943,6 +943,11 @@ export const fr = {
   // identifier on a screen a person reads is the diagnostic string §13.27
   // refuses, and this is a fact with a true sentence.
   list_nobody_else: 'Personne d’autre ici',
+  // QUELQU'UN QUI ÉTAIT LÀ ET N'Y EST PLUS (#388), sous le nom qu'on lui a
+  // donné : supprimé, évincé ou parti, la même phrase pour les trois, puisque
+  // la ligne ne sait pas lequel. Seconde ligne, sous le nom : elle commence
+  // donc par le verbe.
+  list_participant_left: 'n’est plus dans cette conversation',
   // The other shape of being alone: an invitation nobody took up. A
   // conversation is created the moment a link is minted, so every unclaimed
   // invitation leaves one of these on the issuer's list. True whichever way

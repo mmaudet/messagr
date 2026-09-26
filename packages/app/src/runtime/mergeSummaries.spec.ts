@@ -68,6 +68,18 @@ describe('a row whose derivation did not run', () => {
   })
 })
 
+describe('who was here, when the memberships could not be read (#388)', () => {
+  it('keeps the name the row already had', () => {
+    // A moment of bad signal must not take the name away again: the row
+    // would fall back to a sentence about nobody.
+    const before = row({ other: null, others: 0, departed: '@her:example.org' })
+    const now = row({ other: null, others: 0, membershipsUnread: true })
+    expect(mergeSummaries([before], [now])[0]?.departed).toBe(
+      '@her:example.org',
+    )
+  })
+})
+
 describe('the two answers this must never overwrite', () => {
   it('lets a conversation whose last message is unreadable through', () => {
     // A reason WITH a timestamp: the keys never arrived, or the message was

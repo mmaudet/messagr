@@ -86,7 +86,24 @@ describe('the remembered conversation list', () => {
       },
     ])
     const insert = ran.find(one => one.sql.startsWith('INSERT'))
-    expect(insert?.params).toEqual(['!b:x', '', '', '', 0, 0, -1])
+    expect(insert?.params).toEqual(['!b:x', '', '', '', 0, 0, -1, ''])
+  })
+
+  it('keeps who was here and left, and reads them back (#388)', async () => {
+    // Without it, a relaunch drew the remembered list with the name gone,
+    // until the network answered.
+    const { database, ran } = fake()
+    const cache = await openListCache(database)
+    await cache.keep([
+      { ...SUMMARY, other: null, others: 0, departed: '@her:x' },
+    ])
+    const insert = ran.find(one => one.sql.startsWith('INSERT'))
+    expect(insert?.params?.[7]).toBe('@her:x')
+
+    const again = await openListCache(
+      fake([{ ...ROW, other: '', others: 0, departed: '@her:x' }]).database,
+    )
+    expect((await again.all())[0]?.departed).toBe('@her:x')
   })
 
   it('reads those empty strings back as nothing', async () => {

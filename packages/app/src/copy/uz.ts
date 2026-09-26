@@ -602,6 +602,7 @@ export const uz: Readonly<Record<CopyKey, string>> = {
   conversation_attaching: 'Surat shifrlanib yuborilmoqda…',
   'list_unread %1$d': '%1$d ta oʻqilmagan xabar',
   list_nobody_else: 'Bu yerda boshqa hech kim yoʻq',
+  list_participant_left: 'endi bu suhbatda emas',
   list_nobody_joined: 'Bu suhbatga hech kim qoʻshilmadi',
   invite_open: 'Odam taklif qilish',
   plus_invite: 'Odam taklif qilish',

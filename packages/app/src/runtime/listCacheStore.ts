@@ -96,6 +96,12 @@ const SCHEMA = `CREATE TABLE IF NOT EXISTS list_cache (
  */
 const ADD_OTHERS = `ALTER TABLE list_cache ADD COLUMN others INTEGER NOT NULL DEFAULT -1`
 
+/**
+ * Who was here and is not any more (#388), added the way `others` was: a row
+ * from before the column reads the empty string, which is no name.
+ */
+const ADD_DEPARTED = `ALTER TABLE list_cache ADD COLUMN departed TEXT NOT NULL DEFAULT ''`
+
 export function forgetfulListCache(): ListCache {
   return { all: async () => [], keep: async () => false }
 }
@@ -104,15 +110,16 @@ export async function openListCache(
   database: EncryptedDatabase,
 ): Promise<ListCache> {
   await database.execute(SCHEMA)
-  // Fails on a notebook that already has the column, which is the state it
-  // wants. See `ADD_OTHERS`.
+  // Each fails on a notebook that already has its column, which is the state
+  // it wants. See `ADD_OTHERS`.
   await database.execute(ADD_OTHERS).catch(() => undefined)
+  await database.execute(ADD_DEPARTED).catch(() => undefined)
 
   return {
     all: async () => {
       try {
         const { rows } = await database.execute(
-          'SELECT scope, other, preview, reason, last_at, unread, others ' +
+          'SELECT scope, other, preview, reason, last_at, unread, others, departed ' +
             'FROM list_cache ORDER BY last_at DESC',
         )
         const found: ConversationSummary[] = []
@@ -120,8 +127,16 @@ export async function openListCache(
           // Read defensively rather than cast, for the reason the names store
           // gives: this is a file on a device, and a row of the wrong shape is
           // a row to drop rather than a screen to crash.
-          const { scope, other, preview, reason, last_at, unread, others } =
-            row as Record<string, unknown>
+          const {
+            scope,
+            other,
+            preview,
+            reason,
+            last_at,
+            unread,
+            others,
+            departed,
+          } = row as Record<string, unknown>
           if (typeof scope !== 'string' || scope === '') continue
           if (typeof last_at !== 'number' || typeof unread !== 'number')
             continue
@@ -135,6 +150,9 @@ export async function openListCache(
             // this page saying it does not know -- not a conversation with
             // nobody else in it.
             others: typeof others === 'number' && others >= 0 ? others : null,
+            ...(typeof departed === 'string' && departed !== ''
+              ? { departed }
+              : {}),
             lastAt: last_at,
             unread,
           })
@@ -155,8 +173,8 @@ export async function openListCache(
         for (const summary of summaries) {
           await database.execute(
             'INSERT INTO list_cache ' +
-              '(scope, other, preview, reason, last_at, unread, others) ' +
-              'VALUES (?, ?, ?, ?, ?, ?, ?)',
+              '(scope, other, preview, reason, last_at, unread, others, departed) ' +
+              'VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
             // THE EMPTY STRING IS HOW THIS PAGE SPELLS `null`.
             // `EncryptedDatabase.execute` takes strings and numbers, which
             // is the right shape for four of the five pages; widening it so
@@ -174,6 +192,7 @@ export async function openListCache(
               // `-1` is how this column spells "not known", for the reason
               // the empty string spells it above.
               summary.others ?? -1,
+              summary.departed ?? '',
             ],
           )
         }

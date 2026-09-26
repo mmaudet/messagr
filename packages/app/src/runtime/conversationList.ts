@@ -1,3 +1,4 @@
+import { membershipLeaveOf } from '../calls/transport'
 import type { TimelineMachine } from '../timeline/buildTimeline'
 import { fetchRoomMessages, toTimelineEntries } from '../timeline/buildTimeline'
 import { fetchJoinedMembers, fetchJoinedRooms } from './encryptedSend'
@@ -23,10 +24,11 @@ import { howManyOthers, theOtherMember } from './vouch'
  * nothing, and a list built from it would be empty. The loop says *when* a
  * conversation moved (ADR-0007); this says *what the conversations are*.
  *
- * # One round trip per conversation, and that is a limit
+ * # A few round trips per conversation, and that is a limit
  *
- * A conversation's last message is not in `/joined_rooms`, so each one is
- * asked for separately. Fine for the handful a person has, and it is written
+ * A conversation's members and last messages are not in `/joined_rooms`, so
+ * each one is asked for separately -- and who was here, for one this account
+ * is alone in (#388). Fine for the handful a person has, and it is written
  * down here rather than discovered: the day somebody has two hundred, this
  * needs a different shape, not a bigger `Promise.all`.
  */
@@ -50,6 +52,21 @@ export interface ConversationSummary {
    * thing again and not a zero.
    */
   readonly others: number | null
+  /**
+   * The one other participant who was in this conversation and is not any
+   * more -- deleted, evicted or gone -- when this account is now alone in it.
+   * Absent otherwise, and for a conversation somebody was only invited to.
+   * #388: without it, the row lost the name it was given and said nobody had
+   * ever joined.
+   */
+  readonly departed?: string
+  /**
+   * Set when this account is alone in the conversation and its memberships
+   * could not be read: who was here is not known, which is not the same as
+   * nobody. The row says « personne d'autre ici », true either way, and
+   * `mergeSummaries` keeps a name it already had.
+   */
+  readonly membershipsUnread?: true
   /**
    * The opening of the last message this device could read, or `null`.
    *
@@ -139,6 +156,24 @@ async function summarise(
     // Left null. A conversation whose membership could not be read is still a
     // conversation, and the row shows what it can.
   }
+  // WHO WAS HERE, asked only of a conversation this account is alone in: one
+  // more request, and only where the answer could change the row.
+  let departed: string | undefined
+  let membershipsUnread = false
+  if (others === 0) {
+    try {
+      departed = whoWasHereAndLeft(
+        await fetchMemberships(deps.http, scope),
+        selfUserId,
+      )
+    } catch {
+      membershipsUnread = true
+    }
+  }
+  const whoWasHere = {
+    ...(departed === undefined ? {} : { departed }),
+    ...(membershipsUnread ? { membershipsUnread: true as const } : {}),
+  }
 
   try {
     // Only the entries: a row shows the last thing said, and a reaction is
@@ -165,6 +200,7 @@ async function summarise(
       scope,
       other,
       others,
+      ...whoWasHere,
       preview: readable?.body ?? null,
       // Named separately from a missing preview, because "nothing has been
       // said" and "this device cannot read what was said" look identical on a
@@ -195,6 +231,7 @@ async function summarise(
       scope,
       other,
       others,
+      ...whoWasHere,
       preview: null,
       reason: getErrorMessage(cause),
       lastAt: 0,
@@ -204,4 +241,79 @@ async function summarise(
       unread: 0,
     }
   }
+}
+
+/** Everybody who ever had a membership in the conversation: `/members`. */
+async function fetchMemberships(
+  http: HttpRequester,
+  scope: string,
+): Promise<readonly unknown[]> {
+  const answer = JSON.parse(
+    await http.authedRequest(
+      'GET',
+      `/_matrix/client/v3/rooms/${encodeURIComponent(scope)}/members`,
+      {},
+      undefined,
+    ),
+  ) as { readonly chunk?: unknown }
+  return Array.isArray(answer.chunk) ? answer.chunk : []
+}
+
+/**
+ * The other participant who was in this conversation and is not any more, or
+ * `undefined`. #388.
+ *
+ * `/joined_members` has forgotten them; `/members` has not. Its last word on
+ * each person is a membership event, and `unsigned` carries the one before it
+ * and who sent it -- measured on Continuwuity, 26 September 2026. A leave or
+ * a ban after a join is somebody who was here: deleted, evicted or gone
+ * (`membershipLeaveOf` says why a ban counts). After an invite, somebody who
+ * never came in, which is the invitation nobody took up and keeps its own
+ * sentence.
+ *
+ * NOT THE ACCOUNT THE SERVICE DREW. When a link is opened by somebody who
+ * already has an account, the service's drawn account joins, invites that
+ * account, then leaves and is deactivated (`claim.rs`): a leave after a join,
+ * from an account nobody here ever talked to. Whoever sent an invitation
+ * that `/members` still shows is that account, and is not named.
+ *
+ * THE MOST RECENT, WHEN MORE THAN ONE IS LEFT. Once the person it let in has
+ * left too, their invitation is two events back and out of sight -- but the
+ * drawn account always leaves first, so the latest departure is theirs.
+ */
+export function whoWasHereAndLeft(
+  memberships: readonly unknown[],
+  selfUserId: string,
+): string | undefined {
+  const inviters = new Set<string>()
+  const departures: { readonly who: string; readonly at: number }[] = []
+  for (const event of memberships) {
+    const member = event as {
+      readonly sender?: unknown
+      readonly origin_server_ts?: unknown
+      readonly content?: { readonly membership?: unknown }
+      readonly unsigned?: {
+        readonly prev_content?: { readonly membership?: unknown }
+        readonly prev_sender?: unknown
+      }
+    }
+    const before = member.unsigned?.prev_content?.membership
+    if (
+      member.content?.membership === 'invite' &&
+      typeof member.sender === 'string'
+    ) {
+      inviters.add(member.sender)
+    }
+    const beforeBy = member.unsigned?.prev_sender
+    if (before === 'invite' && typeof beforeBy === 'string') {
+      inviters.add(beforeBy)
+    }
+    const who = membershipLeaveOf(event)
+    if (who === undefined || who === selfUserId || before !== 'join') continue
+    const at = member.origin_server_ts
+    departures.push({ who, at: typeof at === 'number' ? at : 0 })
+  }
+  return departures
+    .filter(departure => !inviters.has(departure.who))
+    .sort((a, b) => b.at - a.at)[0]?.who
 }
