@@ -274,6 +274,20 @@ export const de: Readonly<Record<CopyKey, string>> = {
   delete_mail_subject: 'Mein Konto löschen',
   'delete_mail_body %@':
     'Guten Tag,\n\nich beantrage die Löschung meines Messagr-Kontos. Mein Telefon bewahrt das Passwort dieses Kontos nicht auf.\n\nKontokennung: %@\n',
+  lost_title: 'Dieses Telefon hat keinen Zugriff mehr auf dieses Konto.',
+  lost_body:
+    'Sein Server nimmt dieses Telefon nicht mehr an. Das Konto wurde vielleicht gelöscht oder dieses Telefon daraus entfernt.',
+  lost_come_back: 'Zu diesem Konto zurückkehren',
+  lost_forget: 'Dieses Konto vergessen',
+  lost_working: 'Einen Moment…',
+  lost_refused:
+    'Dieses Telefon kann nicht zu diesem Konto zurückkehren. Es bleibt nur, es zu vergessen.',
+  lost_unreachable:
+    'Der Server hat nicht geantwortet. Sie können es erneut versuchen.',
+  lost_back_title: 'Dieses Telefon kehrt zu diesem Konto zurück.',
+  lost_back_body:
+    'Schließen Sie Messagr vollständig: Es kehrt als neues Gerät zurück.',
+  lost_forgotten_title: 'Dieses Telefon wird dieses Konto vergessen.',
   deleted_title: 'Ihr Konto ist gelöscht.',
   deleted_body:
     'Schließen Sie Messagr vollständig: Es beginnt dann wieder von vorn.',

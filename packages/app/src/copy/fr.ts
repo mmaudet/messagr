@@ -393,6 +393,23 @@ export const fr = {
   delete_mail_subject: 'Supprimer mon compte',
   'delete_mail_body %@':
     'Bonjour,\n\nJe demande la suppression de mon compte Messagr. Mon téléphone ne garde pas le mot de passe de ce compte.\n\nIdentifiant du compte : %@\n',
+  // UN TÉLÉPHONE QUE SON SERVEUR N'ACCEPTE PLUS (#391). Une seule phrase pour
+  // trois causes, que l'appareil ne peut pas distinguer : supprimé par
+  // courriel, révoqué, ou ce téléphone retiré du compte. Pas « reconnaît » :
+  // la reconnaissance est un mot de la confiance dans ce produit.
+  lost_title: 'Ce téléphone n’a plus accès à ce compte.',
+  lost_body:
+    'Son serveur n’accepte plus ce téléphone. Le compte a peut-être été supprimé, ou ce téléphone retiré du compte.',
+  lost_come_back: 'Revenir sur ce compte',
+  lost_forget: 'Oublier ce compte',
+  lost_working: 'Un instant…',
+  lost_refused:
+    'Ce téléphone ne peut pas revenir sur ce compte. Il ne reste qu’à l’oublier.',
+  lost_unreachable: 'Le serveur n’a pas répondu. Vous pouvez réessayer.',
+  lost_back_title: 'Ce téléphone revient sur ce compte.',
+  lost_back_body:
+    'Fermez complètement Messagr : il reviendra comme un nouvel appareil.',
+  lost_forgotten_title: 'Ce téléphone oubliera ce compte.',
   deleted_title: 'Votre compte est supprimé.',
   deleted_body: 'Fermez complètement Messagr : il repartira de zéro.',
 

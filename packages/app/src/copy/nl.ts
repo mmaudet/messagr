@@ -266,6 +266,20 @@ export const nl: Readonly<Record<CopyKey, string>> = {
   delete_mail_subject: 'Mijn account verwijderen',
   'delete_mail_body %@':
     'Hallo,\n\nIk vraag om mijn Messagr-account te verwijderen. Mijn telefoon bewaart het wachtwoord van dit account niet.\n\nAccount-ID: %@\n',
+  lost_title: 'Deze telefoon heeft geen toegang meer tot dit account.',
+  lost_body:
+    'De server accepteert deze telefoon niet meer. Het account is misschien verwijderd, of deze telefoon eruit gehaald.',
+  lost_come_back: 'Terugkeren naar dit account',
+  lost_forget: 'Dit account vergeten',
+  lost_working: 'Een ogenblik…',
+  lost_refused:
+    'Deze telefoon kan niet terugkeren naar dit account. Er rest alleen het te vergeten.',
+  lost_unreachable:
+    'De server heeft niet geantwoord. U kunt het opnieuw proberen.',
+  lost_back_title: 'Deze telefoon keert terug naar dit account.',
+  lost_back_body:
+    'Sluit Messagr helemaal af: het komt terug als een nieuw apparaat.',
+  lost_forgotten_title: 'Deze telefoon vergeet dit account.',
   deleted_title: 'Uw account is verwijderd.',
   deleted_body:
     'Sluit Messagr volledig af: het begint dan weer van voren af aan.',
