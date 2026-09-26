@@ -7605,10 +7605,10 @@ react-native-keychain@10:
   resolved "https://registry.yarnpkg.com/react-native-keychain/-/react-native-keychain-10.0.0.tgz#1de6f54d27b2376deaac4d51883c066f53b7be7b"
   integrity sha512-YzPKSAnSzGEJ12IK6CctNLU79T1W15WDrElRQ+1/FsOazGX9ucFPTQwgYe8Dy8jiSEDJKM4wkVa3g4lD2Z+Pnw==
 
-react-native-matrix-crypto@^0.7.0:
-  version "0.7.0"
-  resolved "https://registry.yarnpkg.com/react-native-matrix-crypto/-/react-native-matrix-crypto-0.7.0.tgz#d48985de22539100eada51dc7be8712bec0072e3"
-  integrity sha512-y22VJbhl0hHfoUV2tm8ERyaNYDMwPt4lpTt/5+0M2l32claV9JnAE2UgI+X95lCx4LHJvLhw5VZeYkrS9bmLeQ==
+react-native-matrix-crypto@^0.8.0:
+  version "0.8.0"
+  resolved "https://registry.yarnpkg.com/react-native-matrix-crypto/-/react-native-matrix-crypto-0.8.0.tgz#bb974dea83aba74225456b2194744b3d5892ebbb"
+  integrity sha512-BbeFaO8/V/iuTj/Hxx3J4Qu+gncO27D/3X+D9qoGUo8WBDaoFTnYVZNAYaui4ctQ4fZLuxR1gk2jHm8urYAMeQ==
   dependencies:
     "@ubjs/core" "0.31.0-5"
     uniffi-bindgen-react-native "0.31.0-5"

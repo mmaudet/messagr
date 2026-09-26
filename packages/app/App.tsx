@@ -22,7 +22,7 @@ import { GestureHandlerRootView } from 'react-native-gesture-handler'
 import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context'
 import { createClient } from 'matrix-js-sdk'
 
-import { runProbe } from 'react-native-matrix-crypto'
+import { blindOprf, finalizeOprf, runProbe } from 'react-native-matrix-crypto'
 
 import { fetchBridgeStatus } from './src/runtime/cryptoBridge'
 import {
@@ -221,6 +221,15 @@ import { rememberStoreDirectory } from './src/runtime/storeDirectory'
 import { rememberTermsAccepted } from './src/runtime/termsAccepted'
 import { allowWake, wakeIsAllowed } from './src/runtime/wakeSetting'
 import { deviceLocale } from './src/runtime/deviceLocale'
+import {
+  askForTheAddressBook,
+  readAddressBook,
+} from './src/runtime/addressBook'
+import {
+  findingJourney,
+  regionOf,
+  type FindingStage,
+} from './src/runtime/findContacts'
 import { pickFromLibrary } from './src/runtime/imageLibrary'
 import { sendImages } from './src/runtime/sendImages'
 import { keepLastPushkey, readLastPushkey } from './src/runtime/lastPushkey'
@@ -253,6 +262,7 @@ import type { Wants } from './src/calls/media'
 import { CallScreen } from './src/ui/CallScreen'
 import { SelectionBar } from './src/ui/SelectionBar'
 import { PlusSheet } from './src/ui/PlusSheet'
+import { FindContacts } from './src/ui/FindContacts'
 import { RemoveSheet } from './src/ui/RemoveSheet'
 import { PickConversation } from './src/ui/PickConversation'
 import { ConversationHeader } from './src/ui/ConversationHeader'
@@ -583,6 +593,9 @@ export function App({
   // account, read when Settings shows, and where a proof stands.
   const [discovery, setDiscovery] = useState<DiscoveryReading>({ read: false })
   const [proof, setProof] = useState<ProofStage>({ stage: 'shut' })
+  // « RETROUVER MES CONTACTS » (#400): what its screen shows, `shut` while
+  // the list is showing.
+  const [finding, setFinding] = useState<FindingStage>({ stage: 'shut' })
   // The number this account proved, kept on this telephone (#398): the row
   // shows it, and a renewal sends its code to it. `null` until read, and when
   // none was kept.
@@ -1244,6 +1257,22 @@ export function App({
       () => setKeptNumber(null),
     )
   }, [])
+  // LOOKING FOR ONE'S CONTACTS (#400), from the « + » sheet, for a findable
+  // account: the address book through the system, each number masked by the
+  // crypto bridge's OPRF client, and the comparison made on this telephone.
+  // Nothing runs before the person continues from the reminder.
+  const findingRef = useRef(
+    findingJourney(
+      {
+        service: discoveryDeps.service,
+        readAddressBook,
+        askForTheAddressBook,
+        masking: { blind: blindOprf, finalize: finalizeOprf },
+        region: regionOf(deviceLocale()),
+      },
+      setFinding,
+    ),
+  )
   // DELETING THE ACCOUNT THIS DEVICE HOLDS, FROM SETTINGS (#382).
   //
   // The server first, then this device: `deleteAccount.ts` holds that order.
@@ -4603,11 +4632,12 @@ export function App({
       openScope !== null ||
       tab !== 'chat' ||
       invite.stage !== 'shut' ||
+      finding.stage !== 'shut' ||
       plusOpen
     ) {
       waitingRef.current.letGo()
     }
-  }, [openScope, tab, invite.stage, plusOpen])
+  }, [openScope, tab, invite.stage, finding.stage, plusOpen])
 
   // THE SHEET THE "+" OPENS BELONGS TO THE LIST, AND GOES WITH IT (#394).
   //
@@ -4623,6 +4653,7 @@ export function App({
     tab === 'chat' &&
     inYet === true &&
     invite.stage === 'shut' &&
+    finding.stage === 'shut' &&
     otherServerQuestion === null &&
     linkDescribed === null
   useEffect(() => {
@@ -5602,10 +5633,11 @@ export function App({
 
             {/* THE LIST **OR** THE INVITATION, for the same reason as the
               conversation above: inviting is a place you go, not a form that
-              lives under the list. */}
+              lives under the list. So is looking for one's contacts (#400). */}
             {openScope === null &&
               tab === 'chat' &&
-              invite.stage === 'shut' && (
+              invite.stage === 'shut' &&
+              finding.stage === 'shut' && (
                 <View style={styles.block}>
                   <ConversationList
                     summaries={summaries}
@@ -5635,6 +5667,21 @@ export function App({
                         proofRef.current.open(discovery, keptNumber)
                       }
                     }}
+                  />
+                </View>
+              )}
+
+            {openScope === null &&
+              tab === 'chat' &&
+              invite.stage === 'shut' &&
+              finding.stage !== 'shut' && (
+                <View style={styles.block}>
+                  <FindContacts
+                    stage={finding}
+                    // Cannot fail: the journey says every refusal as a
+                    // stage.
+                    onContinue={() => findingRef.current.go()}
+                    onClose={() => findingRef.current.close()}
                   />
                 </View>
               )}
@@ -5931,7 +5978,8 @@ export function App({
             {openScope === null &&
               tab === 'chat' &&
               inYet === true &&
-              invite.stage === 'shut' && (
+              invite.stage === 'shut' &&
+              finding.stage === 'shut' && (
                 <FloatingAction
                   testID="invite-open"
                   label={t('invite_open')}
@@ -5948,6 +5996,26 @@ export function App({
                   setPlusOpen(false)
                   setInvite({ stage: 'resting' })
                 }}
+                // ONLY WHERE THIS SERVICE SERVES DISCOVERY (#400), as « Être
+                // trouvable » in Settings. An account that is not findable
+                // proves its number first: the consent, in Settings, as the
+                // row there would open it (#392).
+                onFindContacts={
+                  discovery.read && discovery.on
+                    ? () => {
+                        setPlusOpen(false)
+                        if (
+                          discovery.findableUntil !== null &&
+                          discovery.findableUntil > Date.now()
+                        ) {
+                          findingRef.current.open()
+                        } else {
+                          setTab('settings')
+                          proofRef.current.open(discovery, keptNumber)
+                        }
+                      }
+                    : undefined
+                }
                 onClose={() => setPlusOpen(false)}
               />
             )}
@@ -6104,7 +6172,8 @@ export function App({
         {deciding !== null &&
           openScope === null &&
           tab === 'chat' &&
-          invite.stage === 'shut' && (
+          invite.stage === 'shut' &&
+          finding.stage === 'shut' && (
             <SafeAreaView
               testID="invited-overlay"
               style={[StyleSheet.absoluteFill, styles.root]}

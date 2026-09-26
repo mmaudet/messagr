@@ -15,7 +15,7 @@ PODS:
     - hermes-engine/Pre-built (= 250829098.0.17)
   - hermes-engine/Pre-built (250829098.0.17)
   - JitsiWebRTC (124.0.2)
-  - MatrixCrypto (0.7.0):
+  - MatrixCrypto (0.8.0):
     - hermes-engine
     - RCTRequired
     - RCTTypeSafety
@@ -1315,6 +1315,28 @@ PODS:
     - ReactCommon/turbomodule/core
     - ReactNativeDependencies
     - Yoga
+  - react-native-contacts (8.0.10):
+    - hermes-engine
+    - RCTRequired
+    - RCTTypeSafety
+    - React-bridging
+    - React-Core
+    - React-Core-prebuilt
+    - React-debug
+    - React-Fabric
+    - React-featureflags
+    - React-graphics
+    - React-ImageManager
+    - React-jsi
+    - React-NativeModulesApple
+    - React-RCTFabric
+    - React-renderercss
+    - React-rendererdebug
+    - React-utils
+    - ReactCodegen
+    - ReactCommon/turbomodule/core
+    - ReactNativeDependencies
+    - Yoga
   - react-native-document-picker (12.0.2):
     - hermes-engine
     - RCTRequired
@@ -2034,6 +2056,7 @@ DEPENDENCIES:
   - React-microtasksnativemodule (from `../../../node_modules/react-native/ReactCommon/react/nativemodule/microtasks`)
   - React-mutationobservernativemodule (from `../../../node_modules/react-native/ReactCommon/react/nativemodule/mutationobserver`)
   - "react-native-cameraroll (from `../../../node_modules/@react-native-camera-roll/camera-roll`)"
+  - react-native-contacts (from `../../../node_modules/react-native-contacts`)
   - "react-native-document-picker (from `../../../node_modules/@react-native-documents/picker`)"
   - react-native-get-random-values (from `../../../node_modules/react-native-get-random-values`)
   - react-native-image-picker (from `../../../node_modules/react-native-image-picker`)
@@ -2194,6 +2217,8 @@ EXTERNAL SOURCES:
     :path: "../../../node_modules/react-native/ReactCommon/react/nativemodule/mutationobserver"
   react-native-cameraroll:
     :path: "../../../node_modules/@react-native-camera-roll/camera-roll"
+  react-native-contacts:
+    :path: "../../../node_modules/react-native-contacts"
   react-native-document-picker:
     :path: "../../../node_modules/@react-native-documents/picker"
   react-native-get-random-values:
@@ -2304,9 +2329,9 @@ SPEC CHECKSUMS:
   FBLazyVector: e08a27053b503eeb756ea4bd75d570d2f2522a1b
   fmt: ba0886e864ebb21d14c98b2e12e164b8002f5b93
   glog: 3cf7cb46f743c4bc758ae3e6d9c15bd1b4cfd6d4
-  hermes-engine: 13f2cbca949b6046aa085a86a0144da88f4e15b7
+  hermes-engine: 8930e5f68b09f76e00ab617da3f7587e7262efd0
   JitsiWebRTC: b47805ab5668be38e7ee60e2258f49badfe8e1d0
-  MatrixCrypto: a551e4132836340d246e91225af571b407644345
+  MatrixCrypto: 56a3d16061a0915b04f98999b75803b8c9cc5704
   op-sqlite: 4f53eb7d5d72ba1f33e6cc04cbce61738782bb1a
   RCT-Folly: 82921e585c0400eda46fac1068297aa9dfb035e4
   RCTDeprecation: 5cc865306ce4974b7a57ddbc575fd1f3fef41957
@@ -2350,6 +2375,7 @@ SPEC CHECKSUMS:
   React-microtasksnativemodule: 269f81deee27a2a9bedb6b2d1088c1ae93de9bd3
   React-mutationobservernativemodule: 877e9f730e0d8175c2e952901b55c170fc3d372f
   react-native-cameraroll: 8de502febd3b1008249ad131245537153b18bcde
+  react-native-contacts: 4a5a595cb1994f939d20e8029306eed9a3d1fef0
   react-native-document-picker: dc236df61d18acb1e8aebe6fd79cdb0eedf4679d
   react-native-get-random-values: 4c923ad74f603ac6359e7990c36fd3af06f129b9
   react-native-image-picker: 870b31525256975a2d4b6b20a54db9b380cd725d
@@ -2389,7 +2415,7 @@ SPEC CHECKSUMS:
   React-viewtransitionnativemodule: 1bc6bb59029e578e62cb1a818ff4a4d548071a66
   React-webperformancenativemodule: 10cf05e9bcf2f28a4b1c498d580e21ba3cc114f1
   ReactAppDependencyProvider: 3949ea6b2df0d96295128aae79f068cb6c5f81dc
-  ReactCodegen: a5761eab71cc9e104c9e402e047a5b6036148c60
+  ReactCodegen: f03daf0e1d33809884e7c018cdde02e96925fcb7
   ReactCommon: 749169e12aa3461a3df3656a00e48dbe0456b2d6
   ReactNativeDependencies: 94c922c39e0e6150ee9ad05e2ca1946e0ef55783
   ReactNativeFs: cd0d0ea408c6ed53c692650747364d181b29db49
