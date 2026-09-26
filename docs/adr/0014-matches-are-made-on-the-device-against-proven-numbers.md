@@ -28,7 +28,9 @@ The service does not learn:
 
 - the numbers in anybody's address book, in clear or hashed;
 - who is looking for whom;
-- whether a search found anybody.
+- whether a search found anybody;
+- the name an inviter gives themselves in an invitation delivered inside
+  Messagr, which it passes on sealed for the recipient.
 
 Against a malicious client, the only bound is the quota: at most 5,000 numbers
 masked per proven number over a sliding 30 days. Nothing else can stop

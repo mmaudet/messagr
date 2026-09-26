@@ -120,6 +120,10 @@ read it if it wanted to. It is not kept on either device either. A declared
 name is a sentence in one invitation rather than an attribute of an account,
 which is what keeps a product that asks for no identity from acquiring one.
 
+An invitation delivered inside the application has no link. There the name is
+sealed for the findable account it is meant for: the service passes it on
+without being able to read it, and forgets it with the invitation.
+
 It is a claim and is always reported as one — « Se présente comme » (§13.26).
 Nothing verifies it and nothing could.
 _Avoid_: Display name, profile name, account name, identity. The account
