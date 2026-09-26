@@ -273,7 +273,7 @@ export const uz: Readonly<Record<CopyKey, string>> = {
   delete_cancel: 'Hisobimni saqlab qolish',
   delete_working: 'Oʻchirilmoqda…',
   delete_failed:
-    'Hech narsa oʻchirilmadi, hisobingiz avvalgidek. Qayta urinib koʻrishingiz mumkin.',
+    'Oʻchirish oxiriga yetmadi, hisobingiz hali ham mavjud. Qayta urinib koʻrishingiz mumkin.',
   deleted_title: 'Hisobingiz oʻchirildi.',
   deleted_body: 'Messagrni butunlay yoping: u noldan qayta boshlanadi.',
   promise_thesis: 'Sizdan hech narsa soʻramaydigan messenjer.',

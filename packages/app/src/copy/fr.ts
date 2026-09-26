@@ -367,8 +367,16 @@ export const fr = {
   delete_confirm: 'Oui, supprimer mon compte',
   delete_cancel: 'Garder mon compte',
   delete_working: 'Suppression…',
+  // NI « RIEN N'A ÉTÉ SUPPRIMÉ », NI « TEL QU'IL ÉTAIT » (#383). Avant la
+  // désactivation, le pusher et la sauvegarde des clés sont peut-être déjà
+  // partis. Ce qui reste vrai après une désactivation refusée ou coupée : le
+  // compte existe, et un nouvel essai reprend là où celui-ci s'est arrêté.
+  // Une seule exception : une réponse perdue, puis la question suivante restée
+  // sans réponse ; le compte a peut-être disparu, et le nouvel essai le dira.
+  // Sans mot de passe gardé, réessayer ne sert à rien : #384 dira quoi
+  // proposer à la place.
   delete_failed:
-    'Rien n’a été supprimé, et votre compte est tel qu’il était. Vous pouvez réessayer.',
+    'La suppression n’est pas allée au bout, et votre compte existe toujours. Vous pouvez réessayer.',
   deleted_title: 'Votre compte est supprimé.',
   deleted_body: 'Fermez complètement Messagr : il repartira de zéro.',
 

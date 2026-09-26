@@ -264,7 +264,7 @@ export const de: Readonly<Record<CopyKey, string>> = {
   delete_cancel: 'Mein Konto behalten',
   delete_working: 'Wird gelöscht…',
   delete_failed:
-    'Es wurde nichts gelöscht, und Ihr Konto ist unverändert. Sie können es erneut versuchen.',
+    'Die Löschung wurde nicht abgeschlossen, und Ihr Konto besteht weiterhin. Sie können es erneut versuchen.',
   deleted_title: 'Ihr Konto ist gelöscht.',
   deleted_body:
     'Schließen Sie Messagr vollständig: Es beginnt dann wieder von vorn.',

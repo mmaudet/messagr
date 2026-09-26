@@ -5,22 +5,19 @@
 // functions.
 import { exists, unlink } from '@dr.pogodin/react-native-fs'
 import { createClient } from 'matrix-js-sdk'
-import { Platform } from 'react-native'
 
 import { cryptoStorePath } from './cryptoMachineConfig'
-import { stopWakingThisDevice } from './cryptoPump'
 import {
   forgetAccountSecrets,
   forgetSecrets,
-  pushkeySecrets,
   recoverySecrets,
 } from './deviceSecrets'
-import { readLastPushkey } from './lastPushkey'
 import type { Departure } from './leaveAccount'
 import { logEvent } from './log'
 import { forgetNotebook } from './notebook'
 import { isOurs } from './pickedLitter'
 import type { SecretStore } from './sessionStore'
+import { thisDevicesPusher } from './thisDevicesPusher'
 
 /**
  * What leaving an account does on this device, bound to the directory it
@@ -29,7 +26,8 @@ import type { SecretStore } from './sessionStore'
  * # NOTHING HERE IS NEW ON THE WIRE
  *
  * The pusher is taken away by `stopWakingThisDevice`, the removal the
- * notifications switch already makes, and the session is ended by the SDK's
+ * notifications switch already makes, read and bound in `thisDevicesPusher.ts`
+ * for deleting an account as well; and the session is ended by the SDK's
  * own `logout`. Both go through a client restored from the old account's
  * credentials, which carries them to that account's server and to no other.
  * No request is spelled in this file.
@@ -48,14 +46,7 @@ import type { SecretStore } from './sessionStore'
  */
 export function departureFrom(storeDir: string): Departure {
   return {
-    pusher: async () => {
-      const token = await readLastPushkey(pushkeySecrets)
-      return token === null
-        ? null
-        : { token, road: Platform.OS === 'ios' ? 'ios' : 'android' }
-    },
-    stopWaking: (account, pusher) =>
-      stopWakingThisDevice(createClient(account), pusher.token, pusher.road),
+    ...thisDevicesPusher,
     logOut: async account => {
       await createClient(account).logout()
     },

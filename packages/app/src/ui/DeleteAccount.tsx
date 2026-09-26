@@ -9,8 +9,8 @@ import { NotchedButton } from './NotchedButton'
 /**
  * Where deleting the account stands (#382), one stage at a time, so that no
  * two of them can be true together: shut; the screen of facts, with whether
- * the last attempt left the account as it was; the request under way; and
- * the account gone, after which nothing else is drawn.
+ * the last attempt failed; the request under way; and the account gone, after
+ * which nothing else is drawn.
  */
 export type DeletionStage =
   | { readonly stage: 'shut' }
@@ -39,7 +39,10 @@ export function DeleteAccount({
 }: {
   /** While the server is being asked: the buttons give way to a line. */
   readonly working: boolean
-  /** Whether the last attempt left the account as it was. */
+  /**
+   * Whether the last attempt failed. Not « as it was »: its pusher and its
+   * key backup may already be gone (#383).
+   */
   readonly failed: boolean
   readonly onDelete: () => void
   readonly onKeep: () => void

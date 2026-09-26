@@ -260,7 +260,7 @@ export const en: Readonly<Record<CopyKey, string>> = {
   delete_cancel: 'Keep my account',
   delete_working: 'Deleting…',
   delete_failed:
-    'Nothing was deleted, and your account is as it was. You can try again.',
+    'The deletion did not go through, and your account still exists. You can try again.',
   deleted_title: 'Your account is deleted.',
   deleted_body: 'Close Messagr completely: it will start again from scratch.',
   promise_thesis: 'The messenger that asks you for nothing.',

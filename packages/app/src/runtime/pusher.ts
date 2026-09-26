@@ -1,6 +1,7 @@
 import { currentLanguage } from '../copy'
 import type { Language } from '../copy/languages'
 import { getErrorMessage } from './errors'
+import type { RestoreCredentials } from './sessionCredentials'
 
 /**
  * Telling the homeserver where to send a wake-up.
@@ -83,6 +84,39 @@ const APP_IDS = {
 } as const
 
 export type Road = keyof typeof APP_IDS
+
+/**
+ * A push token and the road it goes by: what a pusher is registered under,
+ * and all that taking it away needs (`forgetPusher`).
+ */
+export interface PushToken {
+  readonly token: string
+  readonly road: Road
+}
+
+/**
+ * This device's pusher, as leaving an account and deleting one both take it
+ * away (#304, #383).
+ */
+export interface ThisDevicesPusher {
+  /**
+   * The pusher this device last registered, or `null` when it never wrote one
+   * down. It answers rather than throws, the way `lastPushkey.ts` does.
+   */
+  readonly pusher: () => Promise<PushToken | null>
+  /**
+   * Takes that pusher away on the account's own server: the removal
+   * `cryptoPump.ts` already makes for the notifications switch, bound to this
+   * account. A throw is a pusher that did not go.
+   */
+  readonly stopWaking: (
+    account: RestoreCredentials,
+    pusher: PushToken,
+  ) => Promise<void>
+}
+
+/** What became of that pusher. For the log, never a screen. */
+export type PusherTakenAway = 'removed' | 'failed' | 'none'
 
 /** What the homeserver shows in the account's device list. */
 const SHOWN_AS = 'Messagr'
