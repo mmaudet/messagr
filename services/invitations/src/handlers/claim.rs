@@ -857,8 +857,8 @@ pub async fn claim(
             // The accepted price: an exchange that fails AFTER this point
             // leaves an edge with no use consumed, and a retry will write a
             // second one. That is the error on the right side — traceability
-            // may over-record, never under-record. The counters, for their
-            // part, stay exact: `claimed_count` is only incremented inside the
+            // may over-record, never under-record. The use count, for its
+            // part, stays exact: `used_count` is only incremented inside the
             // transaction.
             let edge = record_edge(
                 &st.pool,
@@ -1247,13 +1247,6 @@ pub async fn claim(
     if r.rows_affected() == 0 {
         return Err(AppError::UsesExhausted);
     }
-    sqlx::query(
-        "UPDATE inviter_counters SET claimed_count = claimed_count + 1 WHERE inviter_user_id = ?",
-    )
-    .bind(&inviter)
-    .execute(&mut *tx)
-    .await
-    .map_err(anyhow::Error::from)?;
     tx.commit().await.map_err(anyhow::Error::from)?;
 
     Ok(Json(ClaimResponse {
@@ -1882,13 +1875,6 @@ mod tests {
         .execute(pool)
         .await
         .unwrap();
-        sqlx::query(
-            "INSERT INTO inviter_counters (inviter_user_id, issued_count) \
-                     VALUES ('@alice:h',1)",
-        )
-        .execute(pool)
-        .await
-        .unwrap();
     }
 
     async fn seed_account(
@@ -2407,10 +2393,6 @@ mod tests {
                 .await
                 .unwrap();
             sqlx::query("DELETE FROM invitations")
-                .execute(&pool)
-                .await
-                .unwrap();
-            sqlx::query("DELETE FROM inviter_counters")
                 .execute(&pool)
                 .await
                 .unwrap();
@@ -3252,17 +3234,9 @@ mod tests {
             "the neutralisation must present the candidate read back by the RETURNING"
         );
 
-        // The counters stay exact, and the row ends without a secret.
+        // The use stays exact, and the row ends without a secret.
         assert_eq!(
             count(&pool, "SELECT used_count FROM invitations WHERE id='inv1'").await,
-            1
-        );
-        assert_eq!(
-            count(
-                &pool,
-                "SELECT claimed_count FROM inviter_counters WHERE inviter_user_id='@alice:h'"
-            )
-            .await,
             1
         );
         assert_eq!(
@@ -3585,5 +3559,85 @@ mod tests {
             response_for(&st, "TOKEN-REVOKED").await,
             (status_rev, body_rev)
         );
+    }
+
+    /// **A CLAIM INCREMENTS NO PER-INVITER COUNTER** (#416).
+    ///
+    /// The count of claimed invitations per inviter was read by nothing and
+    /// never emptied. A row a previous image left there is no longer touched:
+    /// the cleanup removes it on its next pass.
+    #[sqlx::test(migrations = "./migrations")]
+    async fn a_claim_increments_no_per_inviter_counter(pool: SqlitePool) {
+        seed_invitation(&pool, 1).await;
+        sqlx::query(
+            "INSERT INTO inviter_counters (inviter_user_id, issued_count) \
+             VALUES ('@alice:h', 1)",
+        )
+        .execute(&pool)
+        .await
+        .unwrap();
+        let (st, _fake) = setup(pool.clone(), "@whoever:h", View::Invite(ROOM), "none").await;
+
+        let _ = perform_claim(&st, None, None)
+            .await
+            .expect("the hand-out must succeed");
+
+        assert_eq!(
+            count(
+                &pool,
+                "SELECT claimed_count FROM inviter_counters WHERE inviter_user_id='@alice:h'"
+            )
+            .await,
+            0
+        );
+    }
+
+    /// **A REAL ENTRY BY LINK IS FORGOTTEN THIRTY DAYS LATER** (#416).
+    ///
+    /// The cleanup tests plant the rows a claim leaves. This one lets a real
+    /// claim write them, through the handler and its fake homeserver, then
+    /// runs the hourly pass twenty-nine and thirty-one days later: whatever a
+    /// claim writes, the purge knows how to forget.
+    #[sqlx::test(migrations = "./migrations")]
+    async fn a_real_entry_by_link_is_forgotten_thirty_days_later(pool: SqlitePool) {
+        const DAY: i64 = 86_400;
+        async fn traces_of(pool: &SqlitePool, user: &str) -> i64 {
+            sqlx::query_scalar(
+                "SELECT (SELECT COUNT(*) FROM reserved_accounts WHERE user_id = ?1) \
+                      + (SELECT COUNT(*) FROM invitation_edges WHERE invited_user_id = ?1) \
+                      + (SELECT COUNT(*) FROM pending_existing_invites WHERE user_id = ?1)",
+            )
+            .bind(user)
+            .fetch_one(pool)
+            .await
+            .unwrap()
+        }
+
+        let now = crate::util::now();
+        seed_invitation(&pool, 1).await;
+        sqlx::query("UPDATE invitations SET created_at = ?, expires_at = ? WHERE id = 'inv1'")
+            .bind(now - 60)
+            .bind(now + 3_600)
+            .execute(&pool)
+            .await
+            .unwrap();
+        let (st, _fake) = setup(pool.clone(), "@whoever:h", View::Invite(ROOM), "none").await;
+        let Json(entered) = perform_claim(&st, None, None)
+            .await
+            .expect("the hand-out must succeed");
+
+        assert!(crate::cleanup::sweep_once(&st, now + 29 * DAY).await);
+        assert!(
+            traces_of(&pool, &entered.user_id).await > 0,
+            "twenty-nine days after the claim, the link is still kept"
+        );
+
+        assert!(crate::cleanup::sweep_once(&st, now + 31 * DAY).await);
+        assert_eq!(
+            traces_of(&pool, &entered.user_id).await,
+            0,
+            "thirty-one days after, no table may say who brought this account in"
+        );
+        assert_eq!(count(&pool, "SELECT COUNT(*) FROM invitations").await, 0);
     }
 }

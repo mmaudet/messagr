@@ -41,6 +41,120 @@ pub async fn purge_invitation_requests(pool: &SqlitePool, now: i64) -> Result<u6
     Ok(r.rows_affected())
 }
 
+/// Qui a fait entrer qui, oublié trente jours après que l'invitation a été
+/// dépensée (#416).
+///
+/// LA PAGE LE PROMET POUR LE LIEN, PAS POUR UNE TABLE : « Le lien entre celui
+/// qui invite et celui qui entre est effacé trente jours après que
+/// l'invitation a été dépensée. » `purge_edges` efface l'arête. Mais
+/// l'invitation porte l'inviteur, et le compte réservé réclamé EST le compte
+/// de la personne entrée : leur jointure redonnait le même lien, sans limite
+/// de durée, tout comme l'attente d'un compte existant jamais admis. Cette
+/// purge efface ces lignes au même terme, `EDGE_RETENTION_DAYS`.
+///
+/// ELLE NE TOUCHE QU'À CE QUI EST FINI. Une ligne de compte réservé qui garde
+/// ses secrets ne l'est pas : une révocation l'a verrouillée sans l'effacer,
+/// ou une réclamation l'a prise, et c'est avec ces secrets que
+/// `repair_half_deactivated` ou `deactivate_orphans` neutralisent le compte
+/// sur le homeserver. L'effacer laisserait un compte vivant que plus rien ne
+/// sait éteindre. Seules partent donc les lignes `claimed` ou `deactivated`
+/// sans secret. Une invitation vit trente jours au plus : celle d'une ligne
+/// réclamée il y a trente jours a forcément expiré, ses secrets sont déjà
+/// effacés, et la révocation n'y perd rien. Reste un cas que rien ne finit :
+/// une réclamation qui croise une révocation peut laisser une ligne `claimed`,
+/// secrets compris, sur une invitation révoquée. Cette purge la garde, parce
+/// qu'une révocation répétée a encore besoin de ces secrets pour l'évincer.
+///
+/// L'INVITATION PART EN DERNIER, trente jours après sa fin, quand plus rien ne
+/// la désigne : ni compte réservé, ni attente, ni arête. Sa fin est la plus
+/// proche de son expiration et de sa révocation, car `revoke` accepte une
+/// invitation déjà expirée ; une invitation épuisée, qui reste `pending`
+/// jusqu'à son expiration, compte comme finie dès sa création passée de trente
+/// jours, et ses lignes de réclamation la retiennent jusqu'au terme de chacune.
+/// Une arête gelée par un signalement la garde avec elle. Une demande
+/// d'invitation qui la désigne part avec elle.
+pub async fn purge_invitation_graph(
+    pool: &SqlitePool,
+    now: i64,
+    retention_days: i64,
+) -> Result<u64> {
+    let cutoff = now - retention_days * 86_400;
+    let reserved = sqlx::query(&format!(
+        "DELETE FROM reserved_accounts \
+         WHERE status IN ('claimed','deactivated') \
+           AND length(password_enc) = 0 AND password_next_enc IS NULL \
+           AND (claimed_at <= ?1 \
+                OR (claimed_at IS NULL AND invitation_id IN ( \
+                      SELECT id FROM invitations WHERE {ENDED_BY})))"
+    ))
+    .bind(cutoff)
+    .execute(pool)
+    .await?
+    .rows_affected();
+    let waiting = sqlx::query(
+        "DELETE FROM pending_existing_invites WHERE requested_at <= ? \
+           AND NOT EXISTS (SELECT 1 FROM invitations i \
+                           WHERE i.id = pending_existing_invites.invitation_id \
+                             AND i.status = 'pending')",
+    )
+    .bind(cutoff)
+    .execute(pool)
+    .await?
+    .rows_affected();
+    // Due: ended, or used up, thirty days ago, and named by no row still
+    // linking somebody. A request naming a due invitation goes with it; the
+    // `NOT EXISTS` on requests only keeps the foreign key from failing the pass
+    // should a request name it between the two statements.
+    let due = format!(
+        "SELECT id FROM invitations \
+         WHERE (({ENDED_BY}) OR (used_count >= max_uses AND created_at <= ?1)) \
+           AND NOT EXISTS (SELECT 1 FROM reserved_accounts r \
+                           WHERE r.invitation_id = invitations.id) \
+           AND NOT EXISTS (SELECT 1 FROM pending_existing_invites p \
+                           WHERE p.invitation_id = invitations.id) \
+           AND NOT EXISTS (SELECT 1 FROM invitation_edges e \
+                           WHERE e.invitation_id = invitations.id)"
+    );
+    let requests = sqlx::query(&format!(
+        "DELETE FROM invitation_requests WHERE invitation_id IN ({due})"
+    ))
+    .bind(cutoff)
+    .execute(pool)
+    .await?
+    .rows_affected();
+    let invitations = sqlx::query(&format!(
+        "DELETE FROM invitations WHERE id IN ({due}) \
+           AND NOT EXISTS (SELECT 1 FROM invitation_requests q \
+                           WHERE q.invitation_id = invitations.id)"
+    ))
+    .bind(cutoff)
+    .execute(pool)
+    .await?
+    .rows_affected();
+    Ok(reserved + waiting + requests + invitations)
+}
+
+/// An invitation ended by `?1`: expired or revoked, whichever came first.
+/// `revoke` accepts an invitation that has already expired, and its date must
+/// not push the end back.
+const ENDED_BY: &str = "status <> 'pending' \
+     AND MIN(expires_at, COALESCE(revoked_at, expires_at)) <= ?1";
+
+/// Le compteur par inviteur, vidé (#416).
+///
+/// Il comptait, pour chaque compte, les invitations émises et réclamées, sans
+/// jamais se vider ni être lu : une mesure d'usage par compte, que la page de
+/// confidentialité ne promet pas. Plus rien ne l'écrit ; ce qu'une image
+/// précédente y a laissé part ici. La table reste, vide, pour qu'un retour à
+/// cette image puisse encore émettre : la prochaine migration du service la
+/// supprimera.
+pub async fn purge_inviter_counters(pool: &SqlitePool) -> Result<u64> {
+    let r = sqlx::query("DELETE FROM inviter_counters")
+        .execute(pool)
+        .await?;
+    Ok(r.rows_affected())
+}
+
 pub async fn expire_invitations(pool: &SqlitePool, now: i64) -> Result<u64> {
     let r = sqlx::query(
         "UPDATE invitations SET status='expired' \
@@ -331,24 +445,38 @@ async fn repair_half_deactivated(st: &Arc<AppState>) -> Result<u64> {
     Ok(n)
 }
 
-pub async fn run_forever(st: Arc<AppState>) {
-    loop {
-        let now = now();
-        match (
-            purge_edges(&st.pool, now).await,
-            expire_invitations(&st.pool, now).await,
-            deactivate_orphans(&st).await,
-            repair_half_deactivated(&st).await,
-            purge_claimed_secrets_of_expired(&st.pool).await,
-            purge_invitation_requests(&st.pool, now).await,
-        ) {
-            (Ok(a), Ok(b), Ok(c), Ok(d), Ok(e), Ok(f)) => tracing::info!(
+/// One pass of the cleanup, as `run_forever` runs it every hour. `false` when
+/// a sweep failed: the others have still run, and the next pass retries.
+pub(crate) async fn sweep_once(st: &Arc<AppState>, now: i64) -> bool {
+    match (
+        purge_edges(&st.pool, now).await,
+        expire_invitations(&st.pool, now).await,
+        deactivate_orphans(st).await,
+        repair_half_deactivated(st).await,
+        purge_claimed_secrets_of_expired(&st.pool).await,
+        purge_invitation_requests(&st.pool, now).await,
+        purge_invitation_graph(&st.pool, now, st.cfg.edge_retention_days).await,
+        purge_inviter_counters(&st.pool).await,
+    ) {
+        (Ok(a), Ok(b), Ok(c), Ok(d), Ok(e), Ok(f), Ok(g), Ok(h)) => {
+            tracing::info!(
                 "cleanup: {a} edges, {b} invitations, {c} accounts, \
                                 {d} rows repaired, {e} claimed rows purged, \
-                                {f} requests purged"
-            ),
-            _ => tracing::warn!("cleanup partially failed"),
+                                {f} requests purged, {g} graph rows purged, \
+                                {h} inviter counters purged"
+            );
+            true
         }
+        _ => {
+            tracing::warn!("cleanup partially failed");
+            false
+        }
+    }
+}
+
+pub async fn run_forever(st: Arc<AppState>) {
+    loop {
+        sweep_once(&st, now()).await;
         tokio::time::sleep(std::time::Duration::from_secs(3600)).await;
     }
 }
@@ -1114,6 +1242,461 @@ mod tests {
             "the wipe must not empty a row we no longer hold: that would be a \
              pool row without secrets, which nothing can decrypt or pick up \
              any more"
+        );
+    }
+
+    // ---- Who brought whom in (#416) ----------------------------------------
+
+    const DAY: i64 = 86_400;
+    /// The moment the invitation is spent, in every scenario of the graph.
+    const SPENT: i64 = 1_000_000;
+
+    /// One real pass of the cleanup at `now`, the one `run_forever` runs every
+    /// hour. The homeserver is unreachable: none of these scenarios plants a
+    /// row the sweeps that call it would act on.
+    async fn a_pass_over_the_database(pool: &sqlx::SqlitePool, now: i64) {
+        let st = test_state(pool.clone(), "http://127.0.0.1:1".into());
+        assert!(
+            sweep_once(&st, now).await,
+            "every sweep of the pass succeeds"
+        );
+    }
+
+    /// Everything the database still says about who brought `invited` in: the
+    /// edge, the reserved account they received, or an existing account's wait.
+    async fn who_the_database_says_invited(pool: &sqlx::SqlitePool, invited: &str) -> Vec<String> {
+        let mut inviters: Vec<String> = sqlx::query_scalar(
+            "SELECT inviter_user_id FROM invitation_edges WHERE invited_user_id = ?1 \
+             UNION SELECT i.inviter_user_id FROM invitations i \
+               JOIN reserved_accounts r ON r.invitation_id = i.id WHERE r.user_id = ?1 \
+             UNION SELECT i.inviter_user_id FROM invitations i \
+               JOIN pending_existing_invites p ON p.invitation_id = i.id WHERE p.user_id = ?1",
+        )
+        .bind(invited)
+        .fetch_all(pool)
+        .await
+        .unwrap();
+        inviters.sort();
+        inviters
+    }
+
+    /// What an entry by link leaves behind: a one-hour invitation issued by
+    /// `@alice:h` a minute before `SPENT`, the reserved account `invited`
+    /// received by spending it, secrets still sealed, and the edge the claim
+    /// writes.
+    async fn plant_an_entry_by_link(pool: &sqlx::SqlitePool, invitation: &str, invited: &str) {
+        let key = [0u8; 32];
+        sqlx::query(
+            "INSERT INTO invitations (id, inviter_user_id, token_sha256, created_at, \
+             expires_at, max_uses, used_count, status) \
+             VALUES (?, '@alice:h', ?, ?, ?, 1, 1, 'pending')",
+        )
+        .bind(invitation)
+        .bind(crypto::token_hash(invitation))
+        .bind(SPENT - 60)
+        .bind(SPENT - 60 + 3_600)
+        .execute(pool)
+        .await
+        .unwrap();
+        sqlx::query(
+            "INSERT INTO reserved_accounts (user_id, invitation_id, password_enc, \
+             access_token_enc, status, created_at, claimed_at) \
+             VALUES (?, ?, ?, ?, 'claimed', ?, ?)",
+        )
+        .bind(invited)
+        .bind(invitation)
+        .bind(crypto::seal(&key, "rotated-password").unwrap())
+        .bind(crypto::seal(&key, "access-token").unwrap())
+        .bind(SPENT)
+        .bind(SPENT)
+        .execute(pool)
+        .await
+        .unwrap();
+        sqlx::query(
+            "INSERT INTO invitation_edges \
+             (inviter_user_id, invited_user_id, invitation_id, redeemed_at, purge_after) \
+             VALUES ('@alice:h', ?, ?, ?, ?)",
+        )
+        .bind(invited)
+        .bind(invitation)
+        .bind(SPENT)
+        .bind(SPENT + 30 * DAY)
+        .execute(pool)
+        .await
+        .unwrap();
+    }
+
+    async fn count(pool: &sqlx::SqlitePool, sql: &str) -> i64 {
+        sqlx::query_scalar(sql).fetch_one(pool).await.unwrap()
+    }
+
+    /// **WHO BROUGHT WHOM IN IS FORGOTTEN BY EVERY TABLE AFTER THIRTY DAYS.**
+    ///
+    /// The privacy page promises: « Le lien entre celui qui invite et celui qui
+    /// entre est effacé trente jours après que l'invitation a été dépensée. »
+    /// The edge was. But the invitation carries the inviter, and the claimed
+    /// reserved account IS the account of the person who entered: joined, they
+    /// gave back the same link, with no time limit.
+    #[sqlx::test(migrations = "./migrations")]
+    async fn who_brought_whom_in_is_forgotten_by_every_table_after_thirty_days(
+        pool: sqlx::SqlitePool,
+    ) {
+        plant_an_entry_by_link(&pool, "i1", "@bob:h").await;
+
+        a_pass_over_the_database(&pool, SPENT + 29 * DAY).await;
+        assert_eq!(
+            who_the_database_says_invited(&pool, "@bob:h").await,
+            vec!["@alice:h".to_string()],
+            "twenty-nine days after the invitation was spent, the link is still kept"
+        );
+
+        a_pass_over_the_database(&pool, SPENT + 31 * DAY).await;
+        assert!(
+            who_the_database_says_invited(&pool, "@bob:h")
+                .await
+                .is_empty(),
+            "thirty-one days after, no table may say who brought @bob:h in"
+        );
+        assert_eq!(
+            count(&pool, "SELECT COUNT(*) FROM invitations").await,
+            0,
+            "an ended invitation goes thirty days after its end"
+        );
+    }
+
+    /// **AN EVICTED PERSON STAYS LINKED TO THE INVITER NO LONGER.**
+    ///
+    /// Revocation destroys the account it let in: the row ends `deactivated`,
+    /// secrets wiped, but keeps its claim date, and the invitation keeps the
+    /// inviter. The link goes at the same term as for a person who stayed.
+    #[sqlx::test(migrations = "./migrations")]
+    async fn an_evicted_person_is_forgotten_as_well(pool: sqlx::SqlitePool) {
+        plant_an_entry_by_link(&pool, "i1", "@bob:h").await;
+        sqlx::query("UPDATE invitations SET status='revoked', revoked_at=? WHERE id='i1'")
+            .bind(SPENT + 60)
+            .execute(&pool)
+            .await
+            .unwrap();
+        sqlx::query(
+            "UPDATE reserved_accounts SET status='deactivated', password_enc=X'', \
+             password_next_enc=NULL, access_token_enc=X'' WHERE user_id='@bob:h'",
+        )
+        .execute(&pool)
+        .await
+        .unwrap();
+
+        a_pass_over_the_database(&pool, SPENT + 29 * DAY).await;
+        assert_eq!(
+            who_the_database_says_invited(&pool, "@bob:h").await,
+            vec!["@alice:h".to_string()]
+        );
+
+        a_pass_over_the_database(&pool, SPENT + 31 * DAY).await;
+        assert!(who_the_database_says_invited(&pool, "@bob:h")
+            .await
+            .is_empty());
+        assert_eq!(count(&pool, "SELECT COUNT(*) FROM invitations").await, 0);
+    }
+
+    /// **AN ENDED INVITATION GOES EVEN WHEN IT LET NOBODY IN.**
+    ///
+    /// A reserved account never handed out, which `deactivate_orphans`
+    /// neutralised, links nobody to the inviter. But it names the invitation,
+    /// which carries the inviter: both go thirty days after the invitation
+    /// ended.
+    #[sqlx::test(migrations = "./migrations")]
+    async fn an_ended_invitation_goes_with_the_account_nobody_received(pool: sqlx::SqlitePool) {
+        sqlx::query(
+            "INSERT INTO invitations (id, inviter_user_id, token_sha256, created_at, \
+             expires_at, max_uses, used_count, status) \
+             VALUES ('i1', '@alice:h', X'01', ?, ?, 1, 0, 'expired')",
+        )
+        .bind(SPENT - 60)
+        .bind(SPENT - 60 + 3_600)
+        .execute(&pool)
+        .await
+        .unwrap();
+        sqlx::query(
+            "INSERT INTO reserved_accounts (user_id, invitation_id, password_enc, \
+             access_token_enc, status, created_at) \
+             VALUES ('@spare:h', 'i1', X'', X'', 'deactivated', ?)",
+        )
+        .bind(SPENT)
+        .execute(&pool)
+        .await
+        .unwrap();
+
+        a_pass_over_the_database(&pool, SPENT + 29 * DAY).await;
+        assert_eq!(count(&pool, "SELECT COUNT(*) FROM invitations").await, 1);
+
+        a_pass_over_the_database(&pool, SPENT + 31 * DAY).await;
+        assert_eq!(
+            count(&pool, "SELECT COUNT(*) FROM invitations").await,
+            0,
+            "thirty days after its end, the invitation and its inviter are gone"
+        );
+        assert_eq!(
+            count(&pool, "SELECT COUNT(*) FROM reserved_accounts").await,
+            0
+        );
+    }
+
+    /// **AN EXISTING ACCOUNT NEVER ADMITTED STAYS LINKED NO LONGER.**
+    ///
+    /// When an existing account claims a link, the service notes that it waits
+    /// to be invited into the conversation. If the inviter's device never
+    /// invites it, that row stays: it links the invitation, hence the inviter,
+    /// to that account. It goes at the same term as the others.
+    #[sqlx::test(migrations = "./migrations")]
+    async fn an_existing_account_never_admitted_is_forgotten_as_well(pool: sqlx::SqlitePool) {
+        sqlx::query(
+            "INSERT INTO invitations (id, inviter_user_id, token_sha256, created_at, \
+             expires_at, max_uses, used_count, status) \
+             VALUES ('i1', '@alice:h', X'01', ?, ?, 1, 0, 'pending')",
+        )
+        .bind(SPENT - 60)
+        .bind(SPENT - 60 + 3_600)
+        .execute(&pool)
+        .await
+        .unwrap();
+        sqlx::query(
+            "INSERT INTO pending_existing_invites (invitation_id, user_id, requested_at) \
+             VALUES ('i1', '@carol:h', ?)",
+        )
+        .bind(SPENT)
+        .execute(&pool)
+        .await
+        .unwrap();
+
+        a_pass_over_the_database(&pool, SPENT + 29 * DAY).await;
+        assert_eq!(
+            who_the_database_says_invited(&pool, "@carol:h").await,
+            vec!["@alice:h".to_string()]
+        );
+
+        a_pass_over_the_database(&pool, SPENT + 31 * DAY).await;
+        assert!(who_the_database_says_invited(&pool, "@carol:h")
+            .await
+            .is_empty());
+        assert_eq!(
+            count(&pool, "SELECT COUNT(*) FROM pending_existing_invites").await,
+            0,
+            "no row may be left naming @carol:h, even once its invitation is gone"
+        );
+    }
+
+    /// **THE PURGE NEVER REMOVES A ROW THE CLEANUP STILL HAS TO FINISH.**
+    ///
+    /// A row still holding its secrets is not finished: a revocation locked it
+    /// without wiping it, or a claim took it, and those secrets are what
+    /// `repair_half_deactivated` or `deactivate_orphans` neutralise the account
+    /// with on the homeserver. Removing it, even past thirty days, would leave
+    /// a living account nothing knows how to switch off any more. Intermediate
+    /// states (`reserved`, `claiming`, `purging`) are likewise left to their
+    /// sweeps. And the invitation stays while a row still names it.
+    #[sqlx::test(migrations = "./migrations")]
+    async fn the_purge_never_removes_a_row_the_cleanup_still_has_to_finish(pool: sqlx::SqlitePool) {
+        let key = [0u8; 32];
+        sqlx::query(
+            "INSERT INTO invitations (id, inviter_user_id, token_sha256, created_at, \
+             expires_at, max_uses, used_count, status, revoked_at) VALUES \
+             ('i1', '@alice:h', X'01', ?1, ?2, 4, 1, 'revoked', ?3), \
+             ('i2', '@alice:h', X'02', ?1, ?2, 4, 0, 'expired', NULL)",
+        )
+        .bind(SPENT - 60)
+        .bind(SPENT - 60 + 3_600)
+        .bind(SPENT + 60)
+        .execute(&pool)
+        .await
+        .unwrap();
+        for (user_id, invitation, status, claimed_at) in [
+            ("@locked:h", "i1", "deactivated", Some(SPENT)),
+            ("@reserved:h", "i2", "reserved", None),
+            ("@claiming:h", "i2", "claiming", None),
+            ("@purging:h", "i2", "purging", None),
+        ] {
+            sqlx::query(
+                "INSERT INTO reserved_accounts (user_id, invitation_id, password_enc, \
+                 access_token_enc, status, created_at, claimed_at) \
+                 VALUES (?, ?, ?, ?, ?, ?, ?)",
+            )
+            .bind(user_id)
+            .bind(invitation)
+            .bind(crypto::seal(&key, "password").unwrap())
+            .bind(crypto::seal(&key, "access-token").unwrap())
+            .bind(status)
+            .bind(SPENT)
+            .bind(claimed_at)
+            .execute(&pool)
+            .await
+            .unwrap();
+        }
+
+        // The purge on its own: a real pass would first let the sweeps that call
+        // the homeserver finish these rows, which is precisely not the point.
+        purge_invitation_graph(&pool, SPENT + 31 * DAY, 30)
+            .await
+            .unwrap();
+
+        assert_eq!(
+            count(&pool, "SELECT COUNT(*) FROM reserved_accounts").await,
+            4,
+            "every row still holding its secrets, or in an intermediate state, stays"
+        );
+        assert_eq!(
+            count(&pool, "SELECT COUNT(*) FROM invitations").await,
+            2,
+            "an invitation stays while a row still names it"
+        );
+    }
+
+    /// **AN EXHAUSTED INVITATION GOES THIRTY DAYS AFTER ITS LAST USE.**
+    ///
+    /// Spending an invitation's last use does not end it in the database: it
+    /// stays `pending` until it expires. A thirty-day invitation used up on
+    /// its first day would otherwise keep its inviter for sixty days.
+    #[sqlx::test(migrations = "./migrations")]
+    async fn an_exhausted_invitation_goes_thirty_days_after_its_last_use(pool: sqlx::SqlitePool) {
+        plant_an_entry_by_link(&pool, "i1", "@bob:h").await;
+        sqlx::query("UPDATE invitations SET expires_at = ? WHERE id = 'i1'")
+            .bind(SPENT - 60 + 30 * DAY)
+            .execute(&pool)
+            .await
+            .unwrap();
+
+        a_pass_over_the_database(&pool, SPENT + 29 * DAY).await;
+        assert_eq!(count(&pool, "SELECT COUNT(*) FROM invitations").await, 1);
+
+        a_pass_over_the_database(&pool, SPENT + 31 * DAY).await;
+        assert_eq!(
+            count(&pool, "SELECT COUNT(*) FROM invitations").await,
+            0,
+            "used up on its first day, the invitation goes thirty days later, not sixty"
+        );
+    }
+
+    /// **A REVOCATION AFTER EXPIRY DOES NOT PUSH THE END BACK.**
+    ///
+    /// `revoke` accepts an invitation that has already expired, and stamps its
+    /// own date. The invitation still ended when it expired.
+    #[sqlx::test(migrations = "./migrations")]
+    async fn a_revocation_after_expiry_does_not_push_the_end_back(pool: sqlx::SqlitePool) {
+        sqlx::query(
+            "INSERT INTO invitations (id, inviter_user_id, token_sha256, created_at, \
+             expires_at, max_uses, used_count, status, revoked_at) \
+             VALUES ('i1', '@alice:h', X'01', ?, ?, 1, 0, 'revoked', ?)",
+        )
+        .bind(SPENT - 60)
+        .bind(SPENT - 60 + 3_600)
+        .bind(SPENT + 20 * DAY)
+        .execute(&pool)
+        .await
+        .unwrap();
+
+        a_pass_over_the_database(&pool, SPENT + 31 * DAY).await;
+
+        assert_eq!(
+            count(&pool, "SELECT COUNT(*) FROM invitations").await,
+            0,
+            "expired on its first day, the invitation goes thirty days later, whatever came after"
+        );
+    }
+
+    /// **A LINK FROZEN BY A REPORT KEEPS ITS INVITATION.**
+    ///
+    /// The privacy page: « Un lien gelé par un signalement en cours fait
+    /// exception : il est conservé tant que l'examen dure. » The frozen edge
+    /// stays, and so does the invitation it names, rather than an edge pointing
+    /// at nothing.
+    #[sqlx::test(migrations = "./migrations")]
+    async fn a_link_frozen_by_a_report_keeps_its_invitation(pool: sqlx::SqlitePool) {
+        plant_an_entry_by_link(&pool, "i1", "@bob:h").await;
+        sqlx::query("UPDATE invitation_edges SET purge_after = NULL")
+            .execute(&pool)
+            .await
+            .unwrap();
+
+        a_pass_over_the_database(&pool, SPENT + 31 * DAY).await;
+
+        assert_eq!(
+            who_the_database_says_invited(&pool, "@bob:h").await,
+            vec!["@alice:h".to_string()],
+            "the frozen link is kept while the review lasts"
+        );
+        assert_eq!(
+            count(&pool, "SELECT COUNT(*) FROM invitations").await,
+            1,
+            "and so is the invitation it names"
+        );
+    }
+
+    /// **AN INVITATION TAKES ITS REQUEST WITH IT.**
+    ///
+    /// A granted invitation request keeps the id of the invitation it was
+    /// given, under a foreign key. It is forgotten thirty days after its own
+    /// creation, usually before the invitation; but `grant` may attach any
+    /// invitation its caller owns, an ended one included. When the invitation
+    /// is due, the request naming it goes with it rather than holding it back,
+    /// and the foreign key never makes the pass fail.
+    #[sqlx::test(migrations = "./migrations")]
+    async fn an_invitation_takes_its_request_with_it(pool: sqlx::SqlitePool) {
+        sqlx::query(
+            "INSERT INTO invitations (id, inviter_user_id, token_sha256, created_at, \
+             expires_at, max_uses, used_count, status) \
+             VALUES ('i1', '@alice:h', X'01', ?, ?, 1, 0, 'expired')",
+        )
+        .bind(SPENT - 60)
+        .bind(SPENT - 60 + 3_600)
+        .execute(&pool)
+        .await
+        .unwrap();
+        sqlx::query(
+            "INSERT INTO invitation_requests \
+             (id, code_sha256, created_at, ripe_at, status, invitation_id, purge_after) \
+             VALUES ('q1', X'01', 0, 0, 'granted', 'i1', ?)",
+        )
+        .bind(SPENT + 40 * DAY)
+        .execute(&pool)
+        .await
+        .unwrap();
+
+        a_pass_over_the_database(&pool, SPENT + 29 * DAY).await;
+        assert_eq!(count(&pool, "SELECT COUNT(*) FROM invitations").await, 1);
+
+        a_pass_over_the_database(&pool, SPENT + 31 * DAY).await;
+        assert_eq!(
+            count(&pool, "SELECT COUNT(*) FROM invitations").await,
+            0,
+            "thirty days after its end, the invitation goes"
+        );
+        assert_eq!(
+            count(&pool, "SELECT COUNT(*) FROM invitation_requests").await,
+            0,
+            "and the request naming it goes with it"
+        );
+    }
+
+    /// **THE PER-INVITER COUNTER IS EMPTIED.**
+    ///
+    /// It counted, for each account, the invitations issued and claimed, never
+    /// emptied and never read: a per-account usage measure the privacy page
+    /// does not promise. Nothing writes it any more; what a previous image left
+    /// in it goes with the next pass.
+    #[sqlx::test(migrations = "./migrations")]
+    async fn the_per_inviter_counter_is_emptied(pool: sqlx::SqlitePool) {
+        sqlx::query(
+            "INSERT INTO inviter_counters (inviter_user_id, issued_count, claimed_count) \
+             VALUES ('@alice:h', 12, 9), ('@dan:h', 3, 0)",
+        )
+        .execute(&pool)
+        .await
+        .unwrap();
+
+        a_pass_over_the_database(&pool, SPENT).await;
+
+        assert_eq!(
+            count(&pool, "SELECT COUNT(*) FROM inviter_counters").await,
+            0
         );
     }
 }
