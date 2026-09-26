@@ -786,4 +786,21 @@ export const de: Readonly<Record<CopyKey, string>> = {
   findable_proven_title: 'Nummer nachgewiesen',
   'findable_proven_until %@': 'Sie sind bis %@ auffindbar.',
   findable_done: 'Fertig',
+  findable_row_renew: 'Nachweis zu erneuern',
+  findable_renew: 'Nachweis erneuern',
+  findable_withdraw_number: 'Meine Nummer zurückziehen',
+  findable_withdrawing: 'Nummer wird zurückgezogen…',
+  findable_withdrawn_title: 'Nummer zurückgezogen',
+  findable_withdrawn:
+    'Niemand kann Sie mehr über diese Nummer finden. Sie können sie jederzeit erneut nachweisen.',
+  'findable_proven_renew %@':
+    'Ihr Nachweis endet am %@: Erneuern Sie ihn, um auffindbar zu bleiben.',
+  'list_findable_renew %@':
+    'Ihr Nachweis endet am %@: Erneuern Sie ihn, um auffindbar zu bleiben.',
+  list_findable_expired:
+    'Ihr Nachweis ist abgelaufen: Sie sind nicht mehr auffindbar und können Ihre Kontakte nicht mehr finden.',
+  list_findable_replaced:
+    'Ihre Nummer macht jetzt ein anderes Konto auffindbar.',
+  list_findable_renew_action: 'Nachweis erneuern',
+  list_findable_prove_action: 'Meine Nummer nachweisen',
 }

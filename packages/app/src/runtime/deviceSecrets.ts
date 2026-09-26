@@ -323,6 +323,20 @@ export const receiptSecrets = keychainStore(
 )
 
 /**
+ * The number this account proved to be findable (#398): what the row
+ * « Être trouvable » shows, and where a renewal sends its code. The service
+ * keeps only its mask, so this telephone is the one place it can be read
+ * back from.
+ *
+ * The account's: it is that account's number, and leaving the account
+ * forgets it with the rest.
+ */
+export const findableNumberSecrets = keychainStore(
+  'eu.messagr.findable-number',
+  'account',
+)
+
+/**
  * Whether this device asks to be woken when a message arrives.
  *
  * The device's, for the reason the receipts give: whether this telephone asks

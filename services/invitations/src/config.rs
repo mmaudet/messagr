@@ -56,6 +56,8 @@ pub struct Config {
     /// The countries whose numbers can be proved, each with its provider
     /// (#397). See `discovery_countries`.
     pub countries: Vec<crate::countries::Country>,
+    /// The time discovery's routes read (#398): the system's, but in tests.
+    pub clock: crate::util::Clock,
 }
 
 /// Reads the ceiling, or falls back to the conservative default.
@@ -252,6 +254,7 @@ impl Config {
             masking_keys: masking_keys(std::env::var("MASKING_KEYS").ok())?,
             sms_provider: sms_provider(|key| std::env::var(key).ok())?,
             countries: discovery_countries(std::env::var("DISCOVERY_COUNTRIES").ok())?,
+            clock: crate::util::Clock::system(),
         })
     }
 
@@ -277,6 +280,7 @@ impl Config {
             masking_keys: None,
             sms_provider: None,
             countries: crate::countries::launch_list(),
+            clock: crate::util::Clock::system(),
         }
     }
 

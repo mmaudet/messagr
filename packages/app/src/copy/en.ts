@@ -763,4 +763,19 @@ export const en: Readonly<Record<CopyKey, string>> = {
   findable_proven_title: 'Number proved',
   'findable_proven_until %@': 'You are findable until %@.',
   findable_done: 'Done',
+  findable_row_renew: 'Proof to renew',
+  findable_renew: 'Renew the proof',
+  findable_withdraw_number: 'Withdraw my number',
+  findable_withdrawing: 'Withdrawing the number…',
+  findable_withdrawn_title: 'Number withdrawn',
+  findable_withdrawn:
+    'Nobody can find you by this number any more. You can prove it again whenever you want.',
+  'findable_proven_renew %@':
+    'Your proof ends on %@: renew it to stay findable.',
+  'list_findable_renew %@': 'Your proof ends on %@: renew it to stay findable.',
+  list_findable_expired:
+    'Your proof has run out: you are no longer findable, and you can no longer look for your contacts.',
+  list_findable_replaced: 'Your number now makes another account findable.',
+  list_findable_renew_action: 'Renew the proof',
+  list_findable_prove_action: 'Prove my number',
 }

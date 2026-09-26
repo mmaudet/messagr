@@ -1166,6 +1166,24 @@ export const fr = {
   findable_proven_title: 'Numéro prouvé',
   'findable_proven_until %@': 'Vous êtes trouvable jusqu’au %@.',
   findable_done: 'Terminé',
+  // RESTER TROUVABLE, OU CESSER DE L’ÊTRE (#398).
+  findable_row_renew: 'Preuve à renouveler',
+  findable_renew: 'Renouveler la preuve',
+  findable_withdraw_number: 'Retirer mon numéro',
+  findable_withdrawing: 'Retrait du numéro…',
+  findable_withdrawn_title: 'Numéro retiré',
+  findable_withdrawn:
+    'Personne ne peut plus vous trouver par ce numéro. Vous pourrez le prouver à nouveau quand vous voudrez.',
+  'findable_proven_renew %@':
+    'Votre preuve se termine le %@ : renouvelez-la pour rester trouvable.',
+  'list_findable_renew %@':
+    'Votre preuve se termine le %@ : renouvelez-la pour rester trouvable.',
+  list_findable_expired:
+    'Votre preuve a expiré : vous n’êtes plus trouvable, et vous ne pouvez plus chercher vos contacts.',
+  list_findable_replaced:
+    'Votre numéro rend maintenant trouvable un autre compte.',
+  list_findable_renew_action: 'Renouveler la preuve',
+  list_findable_prove_action: 'Prouver mon numéro',
 } as const
 
 /** Every key any screen may ask for. A typo is a compile error, not a blank. */

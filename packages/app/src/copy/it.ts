@@ -761,4 +761,20 @@ export const it: Readonly<Record<CopyKey, string>> = {
   findable_proven_title: 'Numero provato',
   'findable_proven_until %@': 'È trovabile. Scadenza: %@.',
   findable_done: 'Fatto',
+  findable_row_renew: 'Prova da rinnovare',
+  findable_renew: 'Rinnovare la prova',
+  findable_withdraw_number: 'Ritirare il mio numero',
+  findable_withdrawing: 'Ritiro del numero…',
+  findable_withdrawn_title: 'Numero ritirato',
+  findable_withdrawn:
+    'Nessuno può più trovarla tramite questo numero. Potrà provarlo di nuovo quando vorrà.',
+  'findable_proven_renew %@':
+    'Scadenza della prova: %@. La rinnovi per restare trovabile.',
+  'list_findable_renew %@':
+    'Scadenza della prova: %@. La rinnovi per restare trovabile.',
+  list_findable_expired:
+    'La Sua prova è scaduta: non è più trovabile e non può più trovare i Suoi contatti.',
+  list_findable_replaced: 'Il Suo numero rende ora trovabile un altro account.',
+  list_findable_renew_action: 'Rinnovare la prova',
+  list_findable_prove_action: 'Provare il mio numero',
 }

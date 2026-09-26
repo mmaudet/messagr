@@ -761,4 +761,20 @@ export const es: Readonly<Record<CopyKey, string>> = {
   findable_proven_title: 'Número probado',
   'findable_proven_until %@': 'Es localizable hasta el %@.',
   findable_done: 'Hecho',
+  findable_row_renew: 'Prueba por renovar',
+  findable_renew: 'Renovar la prueba',
+  findable_withdraw_number: 'Retirar mi número',
+  findable_withdrawing: 'Retirando el número…',
+  findable_withdrawn_title: 'Número retirado',
+  findable_withdrawn:
+    'Ya nadie puede encontrarle por este número. Puede volver a probarlo cuando quiera.',
+  'findable_proven_renew %@':
+    'Su prueba termina el %@: renuévela para seguir siendo localizable.',
+  'list_findable_renew %@':
+    'Su prueba termina el %@: renuévela para seguir siendo localizable.',
+  list_findable_expired:
+    'Su prueba ha caducado: ya no es localizable y ya no puede encontrar a sus contactos.',
+  list_findable_replaced: 'Su número hace ahora localizable otra cuenta.',
+  list_findable_renew_action: 'Renovar la prueba',
+  list_findable_prove_action: 'Probar mi número',
 }

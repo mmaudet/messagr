@@ -769,4 +769,20 @@ export const nl: Readonly<Record<CopyKey, string>> = {
   findable_proven_title: 'Nummer bewezen',
   'findable_proven_until %@': 'U bent vindbaar tot %@.',
   findable_done: 'Klaar',
+  findable_row_renew: 'Bewijs te vernieuwen',
+  findable_renew: 'Het bewijs vernieuwen',
+  findable_withdraw_number: 'Mijn nummer intrekken',
+  findable_withdrawing: 'Nummer wordt ingetrokken…',
+  findable_withdrawn_title: 'Nummer ingetrokken',
+  findable_withdrawn:
+    'Niemand kan u nog vinden via dit nummer. U kunt het opnieuw bewijzen wanneer u wilt.',
+  'findable_proven_renew %@':
+    'Uw bewijs loopt af op %@: vernieuw het om vindbaar te blijven.',
+  'list_findable_renew %@':
+    'Uw bewijs loopt af op %@: vernieuw het om vindbaar te blijven.',
+  list_findable_expired:
+    'Uw bewijs is verlopen: u bent niet meer vindbaar en kunt uw contacten niet meer vinden.',
+  list_findable_replaced: 'Uw nummer maakt nu een ander account vindbaar.',
+  list_findable_renew_action: 'Het bewijs vernieuwen',
+  list_findable_prove_action: 'Mijn nummer bewijzen',
 }

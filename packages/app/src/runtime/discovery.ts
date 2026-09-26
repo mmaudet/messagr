@@ -1,12 +1,13 @@
 /**
- * Address-book discovery, as far as proving one's number (#397, #392,
- * ADR 0014).
+ * Address-book discovery, as far as proving one's number and keeping it
+ * proved (#397, #398, #392, ADR 0014).
  *
  * The person proves a number by a code the service sends it by SMS, and is
  * then findable for 28 days by the people who already have that number. This
- * module holds that journey: the consent, the number, the code, and the proof
- * with its date. The screens draw the stage it shows and hand it what was
- * typed; they decide nothing.
+ * module holds that journey: the consent, the number, the code, the proof
+ * with its date, its renewal and its withdrawal, and the sentence above the
+ * conversation list when a proof is about to end or has ended. The screens
+ * draw the stage it shows and hand it what was typed; they decide nothing.
  *
  * # THE NUMBER LEAVES THE TELEPHONE ONCE, AND ONLY FOR THIS
  *
@@ -18,9 +19,10 @@
  *
  * # WHAT IS INJECTED
  *
- * The transport to the service and the clock, which is all this part of
- * discovery needs. The tests stand both in and record every request, which is
- * the seam #392 agreed for the application.
+ * The transport to the service, the clock, and where the proven number is
+ * kept on this telephone (`keepNumber`), which is all this part of discovery
+ * needs. The tests stand them in and record every request, which is the seam
+ * #392 agreed for the application.
  */
 
 /** An answer of the service: its status and its body, read as text. */
@@ -40,6 +42,8 @@ export interface DiscoveryService {
   readonly startProof: (body: string) => Promise<Answer>
   /** `POST /discovery/proofs/finish`, with the code. */
   readonly finishProof: (body: string) => Promise<Answer>
+  /** `DELETE /discovery/number` (#398). */
+  readonly withdraw: () => Promise<Answer>
 }
 
 export interface DiscoveryDeps {
@@ -71,8 +75,21 @@ export type DiscoveryReading =
       readonly on: boolean
       /** Milliseconds, or `null` for an account that is not findable. */
       readonly findableUntil: number | null
+      /**
+       * Why an account that was findable is not any more, which the service
+       * says for thirty days (#398).
+       */
+      readonly ended: Ended | null
       readonly countries: readonly OpenCountry[]
     }
+
+/**
+ * How being findable ended: the proof ran out, the number was withdrawn, or
+ * another account proved it since.
+ */
+export type Ended = 'expired' | 'withdrawn' | 'replaced'
+
+const ENDINGS: readonly Ended[] = ['expired', 'withdrawn', 'replaced']
 
 export async function readDiscovery(
   deps: DiscoveryDeps,
@@ -90,6 +107,7 @@ export async function readDiscovery(
     !(
       body.findable_until === null || typeof body.findable_until === 'number'
     ) ||
+    !(body.ended === null || ENDINGS.includes(body.ended as Ended)) ||
     !Array.isArray(body.countries) ||
     !body.countries.every(isOpenCountry)
   ) {
@@ -100,7 +118,72 @@ export async function readDiscovery(
     on: body.on,
     findableUntil:
       body.findable_until === null ? null : body.findable_until * 1000,
+    ended: body.ended as Ended | null,
     countries: body.countries,
+  }
+}
+
+/** Seven days before its end, the 21st day of 28: a proof to renew. */
+const RENEW_FROM_MS = 7 * 86_400_000
+
+/**
+ * The sentence above the conversation list (#398): a proof to renew, with the
+ * day it ends; one that ran out; a number that now makes another account
+ * findable.
+ */
+export type ListNotice =
+  | { readonly notice: 'renew'; readonly until: number }
+  | { readonly notice: 'expired' }
+  | { readonly notice: 'replaced' }
+
+/**
+ * Which sentence, if any: a proof to renew from its 21st day and at every
+ * opening, one that ran out, a number another account proved since. A number
+ * withdrawn is said where it was withdrawn, and nothing is said while
+ * discovery is off or unread.
+ *
+ * A PROOF WHOSE DAY HAS PASSED HAS RUN OUT, whatever the last reading said:
+ * the reading is taken once a launch, and a telephone left on across the
+ * deadline must not go on proposing to renew a proof that is over.
+ */
+export function listNotice(
+  reading: DiscoveryReading,
+  now: number,
+): ListNotice | null {
+  if (!reading.read || !reading.on) return null
+  if (reading.findableUntil !== null) {
+    if (reading.findableUntil <= now) return { notice: 'expired' }
+    return isDueForRenewal(reading.findableUntil, now)
+      ? { notice: 'renew', until: reading.findableUntil }
+      : null
+  }
+  return reading.ended === 'expired' || reading.ended === 'replaced'
+    ? { notice: reading.ended }
+    : null
+}
+
+/** Whether a proof is in its last seven days, from the 21st of 28. */
+export function isDueForRenewal(findableUntil: number, now: number): boolean {
+  return findableUntil - now <= RENEW_FROM_MS
+}
+
+/**
+ * The reading as a stage of the journey leaves it: a proof just made, or a
+ * number just withdrawn, is written from the journey's own answer rather than
+ * read again, since closing the journey must send nothing (#392).
+ */
+export function readingAfter(
+  reading: DiscoveryReading,
+  stage: ProofStage,
+): DiscoveryReading {
+  if (!reading.read) return reading
+  switch (stage.stage) {
+    case 'proven':
+      return { ...reading, findableUntil: stage.findableUntil, ended: null }
+    case 'withdrawn':
+      return { ...reading, findableUntil: null, ended: 'withdrawn' }
+    default:
+      return reading
   }
 }
 
@@ -192,6 +275,9 @@ export function numberRefusal(where: NumberVerdict): StartRefusal | null {
   }
 }
 
+/** Why a number could not be withdrawn: the service did not answer. */
+export type WithdrawRefusal = 'unreachable'
+
 /** Why a code did not prove the number. */
 export type FinishRefusal =
   | { readonly why: 'wrong'; readonly attemptsLeft: number }
@@ -233,14 +319,42 @@ export type ProofStage =
       readonly refused: FinishRefusal | null
     }
   | { readonly stage: 'proving'; readonly number: string }
-  | { readonly stage: 'proven'; readonly findableUntil: number }
+  | {
+      readonly stage: 'proven'
+      readonly findableUntil: number
+      /** The number proved, when this telephone kept it. */
+      readonly number: string | null
+      /** Why withdrawing it did not go through, when it did not. */
+      readonly refused: WithdrawRefusal | null
+    }
+  | {
+      readonly stage: 'withdrawing'
+      readonly findableUntil: number
+      readonly number: string | null
+    }
+  | { readonly stage: 'withdrawn' }
 
 export interface ProofJourney {
   /**
    * The row « Être trouvable »: the consent for an account that is not
-   * findable, the proof and its date for one that is.
+   * findable, the proof and its date for one that is. `number` is the one
+   * this telephone kept, if any.
    */
-  readonly open: (reading: DiscoveryReading & { readonly read: true }) => void
+  readonly open: (
+    reading: DiscoveryReading & { readonly read: true },
+    number: string | null,
+  ) => void
+  /**
+   * « Renouveler la preuve », from the proof or from the sentence above the
+   * list: the SMS goes to the number kept, with neither the consent nor the
+   * number screen again. Without a kept number, the journey starts over.
+   */
+  readonly renew: (
+    reading: DiscoveryReading & { readonly read: true },
+    number: string | null,
+  ) => Promise<void>
+  /** « Retirer mon numéro »: findable no more, at once (#398). */
+  readonly withdraw: () => Promise<void>
   /** « Continuer », from the consent to the number. */
   readonly consent: () => void
   /** « Pas maintenant », and every way back: nothing is sent. */
@@ -257,11 +371,17 @@ export function proofJourney(
   deps: DiscoveryDeps & {
     /** The application's language, for the SMS. */
     readonly language: () => string
+    /**
+     * Keeps the number just proved on this telephone, or forgets it once
+     * withdrawn (`null`): what the row shows, and what a renewal sends to.
+     */
+    readonly keepNumber: (number: string | null) => Promise<void>
   },
   show: (stage: ProofStage) => void,
 ): ProofJourney {
   let stage: ProofStage = { stage: 'shut' }
   let countries: readonly OpenCountry[] = []
+  let kept: string | null = null
   // Which opening of the journey an answer belongs to. Closing or opening
   // again moves it on, and an answer for an earlier one is dropped: a code
   // asked for and abandoned must not reopen a screen somebody left.
@@ -272,23 +392,78 @@ export function proofJourney(
     show(next)
   }
 
+  // Asks for a code for a number in international form, from whatever
+  // stage asked: the number screen, or a renewal.
+  const sendTo = async (number: string, typed: string) => {
+    const mine = opening
+    go({ stage: 'sending', countries, number })
+    const started = await startProof(deps, number, deps.language())
+    if (mine !== opening) return
+    if (started.started) {
+      go({ stage: 'code', number, refused: null })
+    } else {
+      // AS IT WAS TYPED, not as it was sent: the screen says why nothing
+      // came for as long as the field still holds that number.
+      go({ stage: 'number', countries, number: typed, refused: started.why })
+    }
+  }
+
+  const begin = (
+    reading: DiscoveryReading & { readonly read: true },
+    number: string | null,
+  ) => {
+    opening += 1
+    countries = reading.countries
+    kept = number
+  }
+
   return {
-    open: reading => {
-      opening += 1
-      countries = reading.countries
+    open: (reading, number) => {
+      begin(reading, number)
       if (
         reading.findableUntil !== null &&
         reading.findableUntil > deps.now()
       ) {
-        go({ stage: 'proven', findableUntil: reading.findableUntil })
+        go({
+          stage: 'proven',
+          findableUntil: reading.findableUntil,
+          number,
+          refused: null,
+        })
       } else {
         go({ stage: 'consent' })
       }
     },
 
+    renew: async (reading, number) => {
+      begin(reading, number)
+      if (number === null) {
+        go({ stage: 'consent' })
+        return
+      }
+      await sendTo(number, number)
+    },
+
+    withdraw: async () => {
+      if (stage.stage !== 'proven') return
+      const { findableUntil, number } = stage
+      const mine = opening
+      go({ stage: 'withdrawing', findableUntil, number })
+      const withdrawn = await withdrawNumber(deps)
+      if (mine !== opening) return
+      if (withdrawn) {
+        kept = null
+        await deps.keepNumber(null)
+        if (mine !== opening) return
+        go({ stage: 'withdrawn' })
+      } else {
+        go({ stage: 'proven', findableUntil, number, refused: 'unreachable' })
+      }
+    },
+
     consent: () => {
       if (stage.stage !== 'consent') return
-      go({ stage: 'number', countries, number: '', refused: null })
+      go({ stage: 'number', countries, number: kept ?? '', refused: null })
     },
 
     close: () => {
@@ -308,17 +483,7 @@ export function proofJourney(
         })
         return
       }
-      const mine = opening
-      go({ stage: 'sending', countries, number: where.number })
-      const started = await startProof(deps, where.number, deps.language())
-      if (mine !== opening) return
-      if (started.started) {
-        go({ stage: 'code', number: where.number, refused: null })
-      } else {
-        // AS IT WAS TYPED, not as it was sent: the screen says why nothing
-        // came for as long as the field still holds that number.
-        go({ stage: 'number', countries, number: typed, refused: started.why })
-      }
+      await sendTo(where.number, typed)
     },
 
     prove: async code => {
@@ -329,7 +494,15 @@ export function proofJourney(
       const finished = await finishProof(deps, code.trim())
       if (mine !== opening) return
       if (finished.proven) {
-        go({ stage: 'proven', findableUntil: finished.findableUntil })
+        kept = number
+        await deps.keepNumber(number)
+        if (mine !== opening) return
+        go({
+          stage: 'proven',
+          findableUntil: finished.findableUntil,
+          number,
+          refused: null,
+        })
       } else {
         go({ stage: 'code', number, refused: finished.refused })
       }
@@ -378,6 +551,17 @@ const FINISH_REFUSED: Readonly<Record<string, FinishRefusal>> = {
   MESSAGR_CODE_EXPIRED: { why: 'expired' },
   MESSAGR_NO_PROOF_PENDING: { why: 'no-proof' },
   MESSAGR_DISCOVERY_OFF: { why: 'off' },
+}
+
+/** `DELETE /discovery/number`: whether the number was withdrawn. */
+async function withdrawNumber(
+  deps: Pick<DiscoveryDeps, 'service'>,
+): Promise<boolean> {
+  try {
+    return (await deps.service.withdraw()).status === 204
+  } catch {
+    return false
+  }
 }
 
 type Finished =

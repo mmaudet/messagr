@@ -11,6 +11,7 @@ import {
 import { t } from '../copy'
 import type { Language } from '../copy/languages'
 import { color, floors, layout, space, stroke, type } from '../design/tokens'
+import { isDueForRenewal } from '../runtime/discovery'
 import { LanguagePicker } from './LanguagePicker'
 import { dayOf } from './whenLabel'
 
@@ -47,6 +48,7 @@ export function Settings({
   onFavourites,
   findable,
   onFindable,
+  now = Date.now(),
   receipts,
   onReceipts,
   receiptsNotKept,
@@ -91,9 +93,15 @@ export function Settings({
    * deployment before it ships -- and then the row is absent rather than
    * present and refused, for the reason the header gives.
    */
-  readonly findable: { readonly until: number | null } | null
+  readonly findable: {
+    readonly until: number | null
+    /** The number proved, when this telephone kept it (#398). */
+    readonly number: string | null
+  } | null
   /** The consent for an account that is not findable, its proof otherwise. */
   readonly onFindable: () => void
+  /** The clock, injectable, for the day a proof is to be renewed from. */
+  readonly now?: number
   readonly receipts: boolean
   readonly onReceipts: (on: boolean) => void
   /** `true` when the last change could not be kept. */
@@ -181,10 +189,17 @@ export function Settings({
             style={styles.rowLayout}>
             <Text style={styles.rowLabel}>{t('findable_row')}</Text>
           </Pressable>
+          {findable.until !== null && findable.number !== null && (
+            <Text style={styles.rowValue} testID="setting-findable-number">
+              {findable.number}
+            </Text>
+          )}
           <Text style={styles.hint}>
             {findable.until === null
               ? t('findable_row_not')
-              : t('findable_row_until %@', dayOf(findable.until))}
+              : isDueForRenewal(findable.until, now)
+                ? t('findable_row_renew')
+                : t('findable_row_until %@', dayOf(findable.until))}
           </Text>
         </View>
       )}

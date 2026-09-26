@@ -130,6 +130,7 @@ import {
   sessionSecrets,
   signUpSecrets,
   keepEverySecrets,
+  findableNumberSecrets,
 } from './src/runtime/deviceSecrets'
 import {
   publishReceipts,
@@ -283,8 +284,10 @@ import {
 } from './src/runtime/entry'
 import { deleteAccount, wayToDelete } from './src/runtime/deleteAccount'
 import {
+  listNotice,
   proofJourney,
   readDiscovery,
+  readingAfter,
   type DiscoveryReading,
   type ProofStage,
 } from './src/runtime/discovery'
@@ -568,6 +571,10 @@ export function App({
   // account, read when Settings shows, and where a proof stands.
   const [discovery, setDiscovery] = useState<DiscoveryReading>({ read: false })
   const [proof, setProof] = useState<ProofStage>({ stage: 'shut' })
+  // The number this account proved, kept on this telephone (#398): the row
+  // shows it, and a renewal sends its code to it. `null` until read, and when
+  // none was kept.
+  const [keptNumber, setKeptNumber] = useState<string | null>(null)
   const [favouritesOpen, setFavouritesOpen] = useState(false)
   const [backupOpen, setBackupOpen] = useState(false)
   /** Whether the key vault screen is showing. ADR-0013's second route. */
@@ -1188,31 +1195,39 @@ export function App({
   }).current
   // A PROOF JUST MADE IS WRITTEN INTO THE ROW FROM ITS OWN ANSWER, rather
   // than read again: closing the journey, « Pas maintenant » included, sends
-  // nothing (#392).
+  // nothing (#392). So is a number just withdrawn (#398): `readingAfter`.
   const proofRef = useRef(
-    proofJourney({ ...discoveryDeps, language: currentLanguage }, stage => {
-      setProof(stage)
-      if (stage.stage === 'proven') {
-        setDiscovery(reading =>
-          reading.read
-            ? { ...reading, findableUntil: stage.findableUntil }
-            : reading,
-        )
-      }
-    }),
+    proofJourney(
+      {
+        ...discoveryDeps,
+        language: currentLanguage,
+        keepNumber: async number => {
+          setKeptNumber(number)
+          // EMPTY IS « NONE »: `SecretStore` has no delete, so a number
+          // withdrawn is written as an empty string, which the reading below
+          // treats as absent -- the same limitation `forgetBackupCommitment`
+          // names.
+          try {
+            await findableNumberSecrets.write(number ?? '')
+          } catch {
+            // Kept for this launch all the same: the proof itself is the
+            // service's, and a keystore that refused a write takes nothing
+            // back from it. The next launch shows the row without the number.
+          }
+        },
+      },
+      stage => {
+        setProof(stage)
+        setDiscovery(reading => readingAfter(reading, stage))
+      },
+    ),
   )
-  // READ WHEN SETTINGS SHOWS, and only then: the row says whether this
-  // account is findable and until when.
   useEffect(() => {
-    if (tab !== 'settings') return
-    let current = true
-    readDiscovery(discoveryDeps).then(reading => {
-      if (current) setDiscovery(reading)
-    })
-    return () => {
-      current = false
-    }
-  }, [tab, discoveryDeps])
+    findableNumberSecrets.read().then(
+      held => setKeptNumber(held === null || held === '' ? null : held),
+      () => setKeptNumber(null),
+    )
+  }, [])
   // DELETING THE ACCOUNT THIS DEVICE HOLDS, FROM SETTINGS (#382).
   //
   // The server first, then this device: `deleteAccount.ts` holds that order.
@@ -1536,6 +1551,24 @@ export function App({
   // yet known" keeps the list from telling somebody they are locked out for
   // the second the keystore takes to answer.
   const [inYet, setInYet] = useState<boolean | null>(null)
+  // READ ONCE A LAUNCH, WHEN THE ACCOUNT IS IN, AND EACH TIME SETTINGS SHOWS
+  // (#397, #398). The first is for the sentence above the list -- a proof to
+  // renew from its 21st day, one that ran out, a number another account
+  // proved since -- which is « à chaque ouverture »; the second for the row,
+  // which says whether this account is findable and until when.
+  const discoveryReadThisLaunch = useRef(false)
+  useEffect(() => {
+    if (inYet !== true) return
+    if (tab !== 'settings' && discoveryReadThisLaunch.current) return
+    discoveryReadThisLaunch.current = true
+    let current = true
+    readDiscovery(discoveryDeps).then(reading => {
+      if (current) setDiscovery(reading)
+    })
+    return () => {
+      current = false
+    }
+  }, [inYet, tab, discoveryDeps])
   // What the keyboard is covering. See `keyboardInset.ts`: the manifest's
   // `adjustResize` stopped resizing anything under Android's enforced
   // edge-to-edge display, so the composer sat under the keyboard.
@@ -5190,11 +5223,13 @@ export function App({
                     }}
                     findable={
                       discovery.read && discovery.on
-                        ? { until: discovery.findableUntil }
+                        ? { until: discovery.findableUntil, number: keptNumber }
                         : null
                     }
                     onFindable={() => {
-                      if (discovery.read) proofRef.current.open(discovery)
+                      if (discovery.read) {
+                        proofRef.current.open(discovery, keptNumber)
+                      }
                     }}
                     receipts={receipts}
                     receiptsNotKept={receiptsNotKept}
@@ -5282,6 +5317,12 @@ export function App({
                     onSend={typed => proofRef.current.send(typed)}
                     onProve={code => proofRef.current.prove(code)}
                     onAnother={() => proofRef.current.another()}
+                    onRenew={() => {
+                      if (discovery.read) {
+                        proofRef.current.renew(discovery, keptNumber)
+                      }
+                    }}
+                    onWithdraw={() => proofRef.current.withdraw()}
                   />
                 </View>
               )}
@@ -5436,6 +5477,23 @@ export function App({
                     shareRefused={shareRefused}
                     opening={waitingOn}
                     onOpen={openConversation}
+                    findableNotice={listNotice(discovery, Date.now())}
+                    // THE GESTURE OF THE SENTENCE IS THE ONE OF SETTINGS, and
+                    // the journey opens there. A proof still running is
+                    // renewed with the code sent to the number kept; one that
+                    // ran out goes back through the consent, which is where an
+                    // account that is not findable any more is sent (#392).
+                    onProveAgain={() => {
+                      if (!discovery.read) return
+                      setTab('settings')
+                      if (
+                        listNotice(discovery, Date.now())?.notice === 'renew'
+                      ) {
+                        proofRef.current.renew(discovery, keptNumber)
+                      } else {
+                        proofRef.current.open(discovery, keptNumber)
+                      }
+                    }}
                   />
                 </View>
               )}
