@@ -6,6 +6,10 @@ pub enum ConfigError {
     Missing(&'static str),
     #[error("the encryption key must be exactly 32 bytes once decoded")]
     InvalidKey,
+    /// Why `MASKING_KEYS` was refused: a sentence about its shape, never a
+    /// piece of it.
+    #[error("MASKING_KEYS is unusable: {0}")]
+    InvalidMaskingKeys(&'static str),
 }
 
 /// Default ceiling on accounts reserved simultaneously in the charge of a
@@ -35,6 +39,10 @@ pub struct Config {
     /// deployment that carries no push gateway, which is not an error --
     /// `handlers::wake` says what it answers then and why.
     pub push_gateway_url: Option<String>,
+    /// The keys that mask the numbers of address-book discovery (#396).
+    /// `None` while a deployment has not been given them: discovery stays off
+    /// and the log says so. See `masking_keys`.
+    pub masking_keys: Option<std::sync::Arc<crate::masking::MaskingKeys>>,
 }
 
 /// Reads the ceiling, or falls back to the conservative default.
@@ -51,6 +59,44 @@ pub fn reserved_accounts_ceiling(raw: Option<String>) -> i64 {
     raw.and_then(|v| v.trim().parse::<i64>().ok())
         .filter(|n| *n >= 0)
         .unwrap_or(DEFAULT_RESERVED_ACCOUNTS_CEILING)
+}
+
+/// The masking keys, from `MASKING_KEYS`: `<key number>:<base64 seed>`,
+/// separated by commas. Or nothing, with two answers of different weight.
+///
+/// Absent or blank, discovery stays off and the service starts: a deployment
+/// that has not been given the keys yet goes on serving invitations, and every
+/// deployment of this service before discovery ships is one. Present but
+/// malformed, the service refuses to start: a typo in a key is not a choice to
+/// leave discovery off, and serving with a key other than the one meant would
+/// make every mask already kept unreadable. The refusal names the variable and
+/// the shape it expects, never a piece of the value.
+pub fn masking_keys(
+    raw: Option<String>,
+) -> Result<Option<std::sync::Arc<crate::masking::MaskingKeys>>, ConfigError> {
+    use crate::masking::{MaskingKey, MaskingKeys};
+    let Some(value) = raw.filter(|v| !v.trim().is_empty()) else {
+        return Ok(None);
+    };
+    let unusable = ConfigError::InvalidMaskingKeys;
+    let mut keys: Vec<MaskingKey> = Vec::new();
+    for entry in value.split(',').map(str::trim).filter(|e| !e.is_empty()) {
+        let not_an_entry = || unusable("an entry is not <key number>:<base64 seed>");
+        let (number, seed) = entry.split_once(':').ok_or_else(not_an_entry)?;
+        let id: u32 = number.trim().parse().map_err(|_| not_an_entry())?;
+        let seed = Config::parse_key(seed.trim())
+            .map_err(|_| unusable("a seed is not 32 bytes of base64"))?;
+        if keys.iter().any(|k| k.id() == id) {
+            return Err(unusable("a key number appears twice"));
+        }
+        keys.push(
+            MaskingKey::from_seed(id, &seed)
+                .map_err(|_| unusable("a key could not be derived from its seed"))?,
+        );
+    }
+    MaskingKeys::new(keys)
+        .map(|keys| Some(std::sync::Arc::new(keys)))
+        .ok_or(unusable("it names no key"))
 }
 
 /// The forward address, or nothing, with the same posture as the ceiling
@@ -113,6 +159,7 @@ impl Config {
             // somewhere, and the somewhere a push gateway forwards to is not
             // a thing to guess.
             push_gateway_url: usable_gateway(std::env::var("PUSH_GATEWAY_URL").ok()),
+            masking_keys: masking_keys(std::env::var("MASKING_KEYS").ok())?,
         })
     }
 
@@ -135,6 +182,7 @@ impl Config {
             bind_addr: String::new(),
             max_reserved_accounts_per_inviter: DEFAULT_RESERVED_ACCOUNTS_CEILING,
             push_gateway_url: None,
+            masking_keys: None,
         }
     }
 }
@@ -142,6 +190,70 @@ impl Config {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    const ONE_SEED: &str = "AQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQE=";
+
+    #[test]
+    fn absent_masking_keys_leave_discovery_off() {
+        // Not a refusal to start: a deployment that has not given the keys
+        // yet serves invitations as before, and the log says discovery is off.
+        assert!(masking_keys(None).unwrap().is_none());
+        assert!(masking_keys(Some("   ".into())).unwrap().is_none());
+    }
+
+    #[test]
+    fn malformed_masking_keys_stop_the_start_without_showing_them() {
+        let refused = masking_keys(Some("1:not-a-seed".into()));
+        let said = refused
+            .expect_err("a malformed setting is refused")
+            .to_string();
+        assert!(said.contains("MASKING_KEYS"), "{said}");
+        assert!(!said.contains("not-a-seed"), "{said}");
+    }
+
+    #[test]
+    fn well_formed_masking_keys_are_loaded() {
+        let keys = masking_keys(Some(format!("3:{ONE_SEED}")))
+            .unwrap()
+            .expect("the keys are loaded");
+        assert_eq!(keys.current().id(), 3);
+    }
+
+    #[test]
+    fn the_environment_names_each_key_by_its_key_number() {
+        let two = "AgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgI="; // 32 × 0x02
+        let keys = masking_keys(Some(format!("2:{two}, 1:{ONE_SEED}")))
+            .unwrap()
+            .expect("the keys are loaded");
+
+        assert_eq!(keys.len(), 2);
+        assert_eq!(keys.current().id(), 2, "the highest key number is current");
+        assert_eq!(keys.get(1).map(|k| k.id()), Some(1));
+    }
+
+    #[test]
+    fn a_malformed_setting_is_refused_without_showing_a_seed() {
+        // EVERY INPUT CARRIES A SEED, so that the check below could fail on
+        // each of them: a refusal that echoed its input would show `AQEB`.
+        let seed = &ONE_SEED[..4];
+        assert_eq!(seed, "AQEB");
+        for bad in [
+            ONE_SEED.to_string(),
+            format!("x:{ONE_SEED}"),
+            format!("1:{ONE_SEED}!"),
+            "1:AQEB".to_string(),
+            format!("1:{ONE_SEED},1:{ONE_SEED}"),
+            format!("1:{ONE_SEED},2"),
+        ] {
+            let said = masking_keys(Some(bad.clone()))
+                .expect_err(&format!("{bad:?} must be refused"))
+                .to_string();
+            assert!(said.starts_with("MASKING_KEYS is unusable: "), "{said}");
+            assert!(!said.contains(seed), "{bad:?} shows its seed: {said}");
+        }
+        // A setting of commas alone carries nothing to show, and names no key.
+        assert!(masking_keys(Some(" , ".into())).is_err());
+    }
 
     #[test]
     fn a_gateway_over_tls_is_kept() {

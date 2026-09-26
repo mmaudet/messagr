@@ -6,6 +6,7 @@ mod db;
 mod error;
 mod extract;
 mod handlers;
+mod masking;
 mod matrix;
 mod named_deactivation;
 mod util;
@@ -62,6 +63,7 @@ async fn main() -> anyhow::Result<()> {
 
     tokio::spawn(cleanup::run_forever(state.clone()));
 
+    let masking_keys = state.cfg.masking_keys.clone();
     let app = router(state);
 
     let listener = tokio::net::TcpListener::bind(&addr).await?;
@@ -69,6 +71,16 @@ async fn main() -> anyhow::Result<()> {
         "messagr-invitations version {} — listening on {addr}",
         version()
     );
+    // AFTER THE VERSION, which an update reads as the first line (step 6 of
+    // `deploy/messagr-eu-invitations.md`).
+    match &masking_keys {
+        Some(keys) => tracing::info!(
+            "masking keys: {} in service, the current one is #{}",
+            keys.len(),
+            keys.current().id()
+        ),
+        None => tracing::warn!("MASKING_KEYS absent: address-book discovery stays off"),
+    }
     axum::serve(listener, app).await?;
     Ok(())
 }
