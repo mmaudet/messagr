@@ -3,8 +3,9 @@
 --
 -- LE COMPTEUR SUIT LE NUMÉRO, PAS LE COMPTE : il porte le masque du numéro
 -- prouvé, sous sa clé, si bien qu'un retrait ou une nouvelle preuve du même
--- numéro, sur ce compte ou sur un autre, ne le remet pas à zéro. Une ligne
--- par jour ; le ménage oublie les jours sortis de la fenêtre.
+-- numéro, sur ce compte ou sur un autre, ne le remet pas à zéro tant que la
+-- clé reste la même (#409 le fera passer sur la nouvelle). Une ligne par
+-- jour ; le ménage oublie les jours sortis de la fenêtre.
 CREATE TABLE masking_counts (
     key_id  INTEGER NOT NULL,
     mask    BLOB    NOT NULL,

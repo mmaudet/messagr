@@ -5,15 +5,17 @@
 //! how much of the directory a findable account can walk. So it is counted
 //! on the mask of the caller's proven number, under its key, and not on the
 //! account: withdrawing the number, or proving it again, on this account or
-//! on another, leaves the count where it was.
+//! on another, leaves the count where it was. Under the same key: a proof
+//! renewed under a new key starts a count of its own, until #409 carries the
+//! count over with it.
 //!
 //! # A DAY AT A TIME
 //!
-//! The count is kept per calendar day, and a day leaves the window thirty
-//! days after it began. A refusal says how many numbers are still allowed,
-//! and when the oldest day counted leaves, which is when the window frees
-//! next. Ordinary use never locks a number out for good: every day counted
-//! leaves within thirty days, and nothing else is kept.
+//! The count is kept per calendar day, in UTC, and a day leaves the window
+//! thirty days after it began. A refusal says how many numbers are still
+//! allowed, and when the oldest day that counts leaves, which is the first
+//! moment more are. Ordinary use never locks a number out for good: every day
+//! counted leaves within thirty days, and nothing else is kept.
 //!
 //! # COUNTED BEFORE THE WORK, RELEASED WHEN IT FAILS
 //!
@@ -80,8 +82,10 @@ async fn judge_and_count(
     today: i64,
 ) -> anyhow::Result<Verdict> {
     let days: Vec<(i64, i64)> = sqlx::query_as(
+        // A day whose batches were all given back counts nothing, and its
+        // leaving would free nothing: it is not the oldest day that counts.
         "SELECT day, masked FROM masking_counts \
-         WHERE key_id = ? AND mask = ? AND day > ? ORDER BY day",
+         WHERE key_id = ? AND mask = ? AND day > ? AND masked > 0 ORDER BY day",
     )
     .bind(number.key_id)
     .bind(number.mask)
@@ -90,8 +94,9 @@ async fn judge_and_count(
     .await?;
     let used: i64 = days.iter().map(|(_, masked)| masked).sum();
     if used + elements > PER_NUMBER {
-        // With nothing counted, a batch cannot be over: `MAX_BATCH` is the
-        // limit itself. The oldest day is then today, at worst.
+        // With nothing counted, a batch cannot be over: the largest batch
+        // (`MAX_BATCH`, `handlers/discovery.rs`) is the limit itself. The
+        // oldest day is then today, at worst.
         let oldest = days.first().map_or(today, |(day, _)| *day);
         return Ok(Verdict::Over {
             remaining: (PER_NUMBER - used).max(0),

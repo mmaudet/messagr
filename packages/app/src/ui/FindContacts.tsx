@@ -75,8 +75,8 @@ export function FindContacts({
       )}
       {stage.stage === 'refused' && (
         <View style={styles.body}>
-          <View style={styles.refusal} testID="find-contacts-refused">
-            <Text style={styles.refusalText}>{t(REFUSED[stage.why])}</Text>
+          <View style={styles.notice} testID="find-contacts-refused">
+            <Text style={styles.noticeText}>{t(REFUSED[stage.why])}</Text>
           </View>
           <NotchedButton
             testID="find-contacts-done"
@@ -118,28 +118,32 @@ function Found({
       contentContainerStyle={styles.body}
       testID="find-contacts-found">
       {waiting !== null && (
-        <View style={styles.refusal} testID="find-contacts-waiting">
-          <Text style={styles.refusalText}>
+        <View style={styles.notice} testID="find-contacts-waiting">
+          <Text style={styles.noticeText}>
             {t(
               'find_waiting %1$@ %2$@',
-              String(waiting.contacts),
+              String(waiting.count),
               dayOf(waiting.freesAt),
             )}
           </Text>
         </View>
       )}
-      <Text style={styles.heading}>{t('find_on_messagr')}</Text>
-      {matches.length === 0 ? (
-        <Text style={styles.hint} testID="find-contacts-nobody">
-          {t('find_nobody')}
-        </Text>
-      ) : (
-        matches.map((name, i) => (
-          <Text key={`m${i}`} style={styles.row} testID="find-contacts-match">
-            {name}
-          </Text>
-        ))
+      {/* Nobody found is said only when every number was compared: with
+          some left for later, the line above says how many. */}
+      {(matches.length > 0 || waiting === null) && (
+        <Text style={styles.heading}>{t('find_on_messagr')}</Text>
       )}
+      {matches.length === 0
+        ? waiting === null && (
+            <Text style={styles.hint} testID="find-contacts-nobody">
+              {t('find_nobody')}
+            </Text>
+          )
+        : matches.map((name, i) => (
+            <Text key={`m${i}`} style={styles.row} testID="find-contacts-match">
+              {name}
+            </Text>
+          ))}
       {others.length > 0 && (
         <>
           <Text style={styles.heading}>{t('find_others')}</Text>
@@ -192,11 +196,11 @@ const styles = StyleSheet.create({
   row: { ...type.body, color: color.neutral['900'] },
   other: { ...type.body, color: color.neutral['600'] },
   actions: { gap: space.s, marginTop: space.m },
-  refusal: {
+  notice: {
     padding: space.m,
     borderLeftWidth: stroke.accent,
     backgroundColor: color.wait['100'],
     borderLeftColor: color.wait['500'],
   },
-  refusalText: { ...type.bodySm, color: color.neutral['900'] },
+  noticeText: { ...type.bodySm, color: color.neutral['900'] },
 })

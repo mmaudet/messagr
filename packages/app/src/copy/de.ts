@@ -841,5 +841,5 @@ export const de: Readonly<Record<CopyKey, string>> = {
   find_not_findable:
     'Um Ihre Kontakte zu finden, weisen Sie zuerst Ihre Nummer nach.',
   'find_waiting %1$@ %2$@':
-    'Noch zu bearbeitende Kontakte: %1$@. Messagr kann sie ab dem %2$@ maskieren.',
+    'Noch zu bearbeitende Kontakte: %1$@. Messagr kann ab dem %2$@ weitere davon bearbeiten.',
 }

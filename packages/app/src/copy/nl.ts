@@ -821,5 +821,5 @@ export const nl: Readonly<Record<CopyKey, string>> = {
   find_off: 'Contacten vinden wordt hier niet aangeboden.',
   find_not_findable: 'Om uw contacten te vinden, bewijst u eerst uw nummer.',
   'find_waiting %1$@ %2$@':
-    'Nog te verwerken contacten: %1$@. Messagr kan ze maskeren vanaf %2$@.',
+    'Nog te verwerken contacten: %1$@. Messagr kan er vanaf %2$@ meer verwerken.',
 }

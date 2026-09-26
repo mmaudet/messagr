@@ -1229,7 +1229,7 @@ export const fr = {
     'Pour retrouver vos contacts, prouvez d’abord votre numéro.',
   // LA LIMITE DE MASQUAGE (#401): how many cards wait, and from when.
   'find_waiting %1$@ %2$@':
-    'Fiches encore à traiter : %1$@. Messagr pourra les masquer à partir du %2$@.',
+    'Contacts encore à traiter : %1$@. Messagr pourra en traiter de nouveau à partir du %2$@.',
 } as const
 
 /** Every key any screen may ask for. A typo is a compile error, not a blank. */

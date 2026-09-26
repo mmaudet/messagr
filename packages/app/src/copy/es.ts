@@ -814,5 +814,5 @@ export const es: Readonly<Record<CopyKey, string>> = {
   find_off: 'Encontrar contactos no se ofrece aquí.',
   find_not_findable: 'Para encontrar sus contactos, pruebe primero su número.',
   'find_waiting %1$@ %2$@':
-    'Fichas pendientes: %1$@. Messagr podrá enmascararlas a partir del %2$@.',
+    'Contactos pendientes: %1$@. Messagr podrá procesar más a partir del %2$@.',
 }

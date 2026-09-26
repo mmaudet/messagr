@@ -540,17 +540,15 @@ describe('the limit on masking (#401)', () => {
       found: true,
       matches: [{ contact: PAUL, reference: 'ref-paul' }],
       others: [ANNE, ZOE],
-      waiting: { contacts: 1, freesAt: FREES_AT * 1000 },
+      waiting: { count: 1, freesAt: FREES_AT * 1000 },
     })
   })
 
-  it('masks nothing when the limit is spent, and does not download the directory for nothing', async () => {
+  it('masks nothing when the limit is spent, and still downloads the whole directory', async () => {
     const { deps: d, asked } = deps(
       [PAUL, ZOE],
       { '+33612345678': 'ref-paul' },
-      {
-        limit: 0,
-      },
+      { limit: 0 },
     )
 
     const found = await findContacts(d)
@@ -559,8 +557,34 @@ describe('the limit on masking (#401)', () => {
       found: true,
       matches: [],
       others: [PAUL, ZOE],
-      waiting: { contacts: 2, freesAt: FREES_AT * 1000 },
+      waiting: { count: 2, freesAt: FREES_AT * 1000 },
     })
-    expect(asked.map(a => a.route)).toEqual(['keys', 'maskBatch'])
+    expect(asked.map(a => a.route)).toEqual(['keys', 'maskBatch', 'directory'])
+  })
+
+  it('sends the same requests through the limit for an address book that finds somebody and one that finds nobody', async () => {
+    const proven = { '+33612345678': 'ref-paul' }
+    const LEA: Contact = { name: 'Léa', numbers: ['06 11 22 33 44'] }
+    const findsPaul = deps([PAUL, ZOE, ANNE], proven, { limit: 2 })
+    const findsNobody = deps([LEA, ZOE, ANNE], proven, { limit: 2 })
+
+    const one = await findContacts(findsPaul.deps)
+    const none = await findContacts(findsNobody.deps)
+
+    expect(one.found && one.matches).toHaveLength(1)
+    expect(none.found && none.matches).toHaveLength(0)
+    const shape = (asked: Asked[]) =>
+      asked.map(a =>
+        a.body
+          ? `${a.route}:${a.body.key_number}:${a.body.blinded.length}`
+          : a.route,
+      )
+    expect(shape(findsPaul.asked)).toEqual(shape(findsNobody.asked))
+    expect(shape(findsPaul.asked)).toEqual([
+      'keys',
+      `maskBatch:${KEY}:3`,
+      `maskBatch:${KEY}:2`,
+      'directory',
+    ])
   })
 })

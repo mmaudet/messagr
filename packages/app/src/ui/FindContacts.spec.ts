@@ -172,7 +172,7 @@ describe('« Retrouver mes contacts »', () => {
       stage: 'found',
       matches: [],
       others: [contact('Zoé')],
-      waiting: { contacts: 12, freesAt },
+      waiting: { count: 12, freesAt },
     })
 
     expect(textIn(withId(drawn, 'find-contacts-waiting'))).toBe(
@@ -184,6 +184,31 @@ describe('« Retrouver mes contacts »', () => {
         'find-contacts-waiting',
       ),
     ).toBeUndefined()
+  })
+
+  it('says nobody is on Messagr only when every number was compared', () => {
+    const waiting = { count: 12, freesAt: new Date(2026, 9, 26, 12).getTime() }
+    const noneYet = show({
+      stage: 'found',
+      matches: [],
+      others: [contact('Zoé')],
+      waiting,
+    })
+
+    expect(withId(noneYet, 'find-contacts-nobody')).toBeUndefined()
+    expect(textIn(withId(noneYet, 'find-contacts-found'))).not.toContain(
+      t('find_on_messagr'),
+    )
+    const some = show({
+      stage: 'found',
+      matches: [{ contact: contact('Anne'), reference: 'r-anne' }],
+      others: [],
+      waiting,
+    })
+    expect(textIn(withId(some, 'find-contacts-found'))).toContain(
+      t('find_on_messagr'),
+    )
+    expect(all(some, 'find-contacts-match').map(textIn)).toEqual(['Anne'])
   })
 
   it('says why nothing is shown, and leads back', () => {

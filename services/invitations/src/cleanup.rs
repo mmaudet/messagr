@@ -56,10 +56,10 @@ pub async fn purge_spent_proofs(pool: &SqlitePool, now: i64) -> Result<u64> {
     Ok(r.rows_affected())
 }
 
-/// La passe de la découverte (#397, #398, #399), en une ligne du ménage :
-/// les preuves abandonnées, ce que les preuves finies laissent, les SMS à
-/// effacer chez OVHcloud, les compteurs des plafonds, et les crédits
-/// prépayés qui baissent.
+/// La passe de la découverte (#397, #398, #399, #401), en une ligne du
+/// ménage : les preuves abandonnées, ce que les preuves finies laissent, les
+/// SMS à effacer chez OVHcloud, les compteurs des plafonds, ceux de la limite
+/// de masquage, et les crédits prépayés qui baissent.
 ///
 /// CHAQUE ÉTAPE TOURNE, QUOI QUE FASSENT LES AUTRES : un échec n'en saute
 /// aucune, et il est rendu une fois toutes passées.

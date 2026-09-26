@@ -32,9 +32,10 @@
 //!
 //! # WHAT THE SERVICE KEEPS OF A NUMBER
 //!
-//! Its mask under the current key, nothing else: not the number, not the
-//! code, not the SMS. The number leaves the service once, towards the SMS
-//! provider named on the number screen.
+//! Its mask under the current key and, under that mask, how many numbers
+//! were masked for it each day, kept thirty days (#401). Nothing else: not
+//! the number, not the code, not the SMS. The number leaves the service once,
+//! towards the SMS provider named on the number screen.
 
 use std::sync::Arc;
 
@@ -57,9 +58,9 @@ const ATTEMPTS: u32 = 5;
 /// a month after it is given up (#392, Q36).
 pub const PROOF_LIFETIME_SECONDS: i64 = 28 * 86_400;
 /// The most blinded elements one request may carry: the most numbers one
-/// proven number may have masked in thirty days (#392, counted from #401), so
-/// that no single request asks for more than a whole allowance.
-const MAX_BATCH: usize = 5_000;
+/// proven number may have masked in thirty days (#401), so that no single
+/// request asks for more than a whole allowance.
+const MAX_BATCH: usize = masking_quota::PER_NUMBER as usize;
 
 #[derive(Serialize)]
 pub struct OpenCountry {
@@ -456,7 +457,7 @@ pub async fn mask_batch(
     headers: HeaderMap,
     Body(req): Body<MaskRequest>,
 ) -> Result<Json<MaskedBatch>, AppError> {
-    let (_, proof) = findable_caller(&st, &headers).await?;
+    let proof = findable_caller(&st, &headers).await?;
     let keys = st.cfg.masking_keys.clone().ok_or(AppError::DiscoveryOff)?;
     if req.blinded.is_empty() || req.blinded.len() > MAX_BATCH {
         return Err(AppError::NotABatch);
@@ -474,47 +475,50 @@ pub async fn mask_batch(
 
     // THE LIMIT OF #401, counted on the caller's proven number before the
     // work, and given back when the batch turns out not to be one.
-    let number = masking_quota::Number {
-        key_id: proof.key_id,
-        mask: &proof.mask,
-    };
     let elements = i64::try_from(blinded.len()).map_err(anyhow::Error::from)?;
-    let counted =
-        match masking_quota::count_if_allowed(&st.pool, &number, elements, st.cfg.clock.now())
-            .await?
-        {
-            masking_quota::Verdict::Counted(counted) => counted,
-            masking_quota::Verdict::Over {
-                remaining,
+    let counted = match masking_quota::count_if_allowed(
+        &st.pool,
+        &proof.number(),
+        elements,
+        st.cfg.clock.now(),
+    )
+    .await?
+    {
+        masking_quota::Verdict::Counted(counted) => counted,
+        masking_quota::Verdict::Over {
+            remaining,
+            frees_at,
+        } => {
+            return Err(AppError::MaskingQuotaReached {
+                remaining: u32::try_from(remaining).unwrap_or(0),
                 frees_at,
-            } => {
-                return Err(AppError::MaskingQuota {
-                    remaining: u32::try_from(remaining).unwrap_or(0),
-                    frees_at,
-                })
-            }
-        };
+            })
+        }
+    };
     let masked = tokio::task::spawn_blocking(move || {
         keys.get(key_number)
             .map(|key| key.mask_blinded(&mut rand::rngs::OsRng, &blinded))
     })
     .await;
     let masked = match masked {
-        Ok(Some(Ok(masked))) => masked,
-        failed => {
+        Ok(Some(Ok(masked))) => Ok(masked),
+        Ok(Some(Err(
+            crate::masking::MaskingError::EmptyBatch | crate::masking::MaskingError::NotAnElement,
+        ))) => Err(AppError::NotABatch),
+        Ok(Some(Err(other))) => Err(AppError::Internal(anyhow::anyhow!(
+            "masking a batch: {other}"
+        ))),
+        Ok(None) => Err(AppError::UnknownMaskingKey),
+        Err(joined) => Err(AppError::Internal(anyhow::anyhow!(
+            "masking a batch: {joined}"
+        ))),
+    };
+    // A batch that was not masked after all gives back what it counted.
+    let masked = match masked {
+        Ok(masked) => masked,
+        Err(refused) => {
             masking_quota::release(&st.pool, counted).await?;
-            return Err(match failed {
-                Ok(Some(Err(
-                    crate::masking::MaskingError::EmptyBatch
-                    | crate::masking::MaskingError::NotAnElement,
-                ))) => AppError::NotABatch,
-                Ok(Some(Err(other))) => {
-                    AppError::Internal(anyhow::anyhow!("masking a batch: {other}"))
-                }
-                Ok(None) => AppError::UnknownMaskingKey,
-                Err(joined) => AppError::Internal(anyhow::anyhow!("masking a batch: {joined}")),
-                Ok(Some(Ok(_))) => unreachable!("matched above"),
-            });
+            return Err(refused);
         }
     };
     Ok(Json(MaskedBatch {
@@ -574,20 +578,16 @@ pub async fn directory(
     Ok(Json(Directory { entries }))
 }
 
-/// The account asking and its current proof, when it may look for its
+/// The current proof of the account asking, when it may look for its
 /// contacts: discovery is served here, and the account is findable. What
 /// masking a batch and downloading the directory both require, before
 /// anything else.
-async fn findable_caller(
-    st: &AppState,
-    headers: &HeaderMap,
-) -> Result<(String, CurrentProof), AppError> {
+async fn findable_caller(st: &AppState, headers: &HeaderMap) -> Result<CurrentProof, AppError> {
     let user = auth::authenticate(&st.mx, headers).await?;
     served(st)?;
-    let proof = current_proof(st, &user)
+    current_proof(st, &user, st.cfg.clock.now())
         .await?
-        .ok_or(AppError::NotFindable)?;
-    Ok((user, proof))
+        .ok_or(AppError::NotFindable)
 }
 
 /// A findable account's proven number, as the service holds it: its mask
@@ -597,15 +597,29 @@ struct CurrentProof {
     mask: Vec<u8>,
 }
 
-/// The current proof of `user`: proven, not withdrawn and not run out. An
-/// account whose number another one proved since has no row at all.
-async fn current_proof(st: &AppState, user: &str) -> Result<Option<CurrentProof>, AppError> {
+impl CurrentProof {
+    /// The number, as the limit of #401 counts it.
+    fn number(&self) -> masking_quota::Number<'_> {
+        masking_quota::Number {
+            key_id: self.key_id,
+            mask: &self.mask,
+        }
+    }
+}
+
+/// The current proof of `user` at `now`: proven, not withdrawn and not run
+/// out. An account whose number another one proved since has no row at all.
+async fn current_proof(
+    st: &AppState,
+    user: &str,
+    now: i64,
+) -> Result<Option<CurrentProof>, AppError> {
     let proof: Option<(i64, Vec<u8>)> = sqlx::query_as(
         "SELECT key_id, mask FROM findable_numbers \
          WHERE user_id = ? AND withdrawn_at IS NULL AND expires_at > ?",
     )
     .bind(user)
-    .bind(st.cfg.clock.now())
+    .bind(now)
     .fetch_optional(&st.pool)
     .await
     .map_err(anyhow::Error::from)?;
@@ -661,25 +675,19 @@ async fn proves_it_now(
     number: &str,
     now: i64,
 ) -> Result<bool, AppError> {
-    let running: Option<(i64, Vec<u8>)> = sqlx::query_as(
-        "SELECT key_id, mask FROM findable_numbers \
-         WHERE user_id = ? AND withdrawn_at IS NULL AND expires_at > ?",
-    )
-    .bind(user)
-    .bind(now)
-    .fetch_optional(&st.pool)
-    .await
-    .map_err(anyhow::Error::from)?;
-    let Some((key_id, mask)) = running else {
+    let Some(running) = current_proof(st, user, now).await? else {
         return Ok(false);
     };
-    let Some(key) = u32::try_from(key_id).ok().and_then(|id| keys.get(id)) else {
+    let Some(key) = u32::try_from(running.key_id)
+        .ok()
+        .and_then(|id| keys.get(id))
+    else {
         return Ok(false);
     };
     let again = key
         .mask(number.as_bytes())
         .map_err(|e| anyhow::anyhow!("masking a number: {e}"))?;
-    Ok(again.as_slice() == mask.as_slice())
+    Ok(again.as_slice() == running.mask.as_slice())
 }
 
 /// What discovery serves with, or `DiscoveryOff` (`Config::discovery`).
@@ -1973,7 +1981,7 @@ mod tests {
     async fn over_the_limit(st: &Arc<AppState>, who: &str, n: usize) -> Result<(), (u32, i64)> {
         match send_batch(st, who, 1, batch_of(n)).await {
             Ok(_) => Ok(()),
-            Err(AppError::MaskingQuota {
+            Err(AppError::MaskingQuotaReached {
                 remaining,
                 frees_at,
             }) => Err((remaining, frees_at)),
@@ -2071,6 +2079,86 @@ mod tests {
             send_batch(&st, "alice", 1, spoiled).await,
             Err(AppError::NotABatch)
         ));
+        assert_eq!(over_the_limit(&st, "alice", 5_000).await, Ok(()));
+    }
+    #[sqlx::test(migrations = "./migrations")]
+    async fn a_day_whose_batch_was_given_back_does_not_say_when_more_are_allowed(pool: SqlitePool) {
+        let (ovh, inbox) = fake_ovhcloud(false).await;
+        let (clock, time) = crate::util::Clock::settable(T0);
+        let st = state_at(pool, whoami_hs().await, Some(ovh), clock);
+        prove(&st, &inbox, "alice", NUMBER).await;
+        let mut spoiled = batch_of(10);
+        spoiled.push(BASE64.encode(&[0xff; 32]));
+        assert!(matches!(
+            send_batch(&st, "alice", 1, spoiled).await,
+            Err(AppError::NotABatch)
+        ));
+
+        set(&time, T0 + 5 * DAY);
+        assert_eq!(over_the_limit(&st, "alice", 5_000).await, Ok(()));
+        assert_eq!(
+            over_the_limit(&st, "alice", 1).await,
+            Err((0, (DAY_ZERO + 35) * DAY)),
+            "when the fifth day leaves: the first counts nothing"
+        );
+    }
+
+    /// The two sweeps that keep what a number leaves behind: the proofs that
+    /// ended, and the days that left the window.
+    async fn sweep(st: &Arc<AppState>, now: i64) {
+        crate::cleanup::purge_ended_proofs(&st.pool, now)
+            .await
+            .unwrap();
+        masking_quota::purge(&st.pool, now).await.unwrap();
+    }
+
+    #[sqlx::test(migrations = "./migrations")]
+    async fn the_count_stays_thirty_days_after_a_withdrawal(pool: SqlitePool) {
+        let (ovh, inbox) = fake_ovhcloud(false).await;
+        let (clock, time) = crate::util::Clock::settable(T0);
+        let st = state_at(pool, whoami_hs().await, Some(ovh), clock);
+        prove(&st, &inbox, "alice", NUMBER).await;
+        assert_eq!(over_the_limit(&st, "alice", 5_000).await, Ok(()));
+        withdraw_number(State(st.clone()), bearer("alice"))
+            .await
+            .unwrap();
+
+        set(&time, (DAY_ZERO + 30) * DAY - 1);
+        sweep(&st, (DAY_ZERO + 30) * DAY - 1).await;
+        prove(&st, &inbox, "bob", NUMBER).await;
+        assert_eq!(
+            over_the_limit(&st, "bob", 1).await,
+            Err((0, (DAY_ZERO + 30) * DAY)),
+            "a second before the thirtieth day, the sweep has kept the count"
+        );
+
+        set(&time, (DAY_ZERO + 30) * DAY);
+        sweep(&st, (DAY_ZERO + 30) * DAY).await;
+        assert_eq!(over_the_limit(&st, "bob", 5_000).await, Ok(()));
+    }
+
+    #[sqlx::test(migrations = "./migrations")]
+    async fn the_count_stays_thirty_days_after_a_proof_runs_out(pool: SqlitePool) {
+        let (ovh, inbox) = fake_ovhcloud(false).await;
+        let (clock, time) = crate::util::Clock::settable(T0);
+        let st = state_at(pool, whoami_hs().await, Some(ovh), clock);
+        prove(&st, &inbox, "alice", NUMBER).await;
+        assert_eq!(over_the_limit(&st, "alice", 5_000).await, Ok(()));
+
+        // The proof runs out on the 28th day, and alice is no longer findable.
+        set(&time, T0 + PROOF_LIFETIME_SECONDS);
+        assert!(!may_look_for_contacts(&st, "alice").await);
+        set(&time, (DAY_ZERO + 30) * DAY - 1);
+        sweep(&st, (DAY_ZERO + 30) * DAY - 1).await;
+        prove(&st, &inbox, "alice", NUMBER).await;
+        assert_eq!(
+            over_the_limit(&st, "alice", 1).await,
+            Err((0, (DAY_ZERO + 30) * DAY)),
+            "proved again after running out, the number keeps its count"
+        );
+
+        set(&time, (DAY_ZERO + 30) * DAY);
+        sweep(&st, (DAY_ZERO + 30) * DAY).await;
         assert_eq!(over_the_limit(&st, "alice", 5_000).await, Ok(()));
     }
 }
