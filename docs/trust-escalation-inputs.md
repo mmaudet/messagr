@@ -111,6 +111,13 @@ nominal path, because verification there is automatic.
    there is no check to forget.
 2. **Does not appear in discovery**, so an unpromoted account cannot serve as
    social proof to a third party.
+
+   _Set aside on 15 September 2026 (Q27 of the framing of #38, carried into
+   #392 and ADR 0014): being findable depends on the account's proof alone,
+   never on vouching or on a membership status. « Entrant » is a status within
+   one conversation, not a state of the account, and whoever holds an account
+   able to invite can vouch for the accounts they let in themselves._
+
 3. **Reads and writes the live conversation, but not its past.** This one is
    free: Megolm does not give access to history by default, so the
    restriction is something not done rather than something enforced, and

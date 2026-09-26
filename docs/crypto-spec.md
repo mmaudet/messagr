@@ -76,18 +76,18 @@ The product spec owns the model. Below, the security consequences.
 | `LinkedDevice` | Each device has its own device key. Compromise of a device exposes local content and threatens session continuity. Removing a device must propagate a group key rotation. |
 | `TrustState` | Semantically: `unverified` = product signal, no crypto commitment; `recognized` = local non-cryptographic trust; `verified` = crypto attestation (QR / SAS) carried by the bridge. Only the `verified` transition has cryptographic value. |
 | `RecoveryBundle` | Sealed bundle protected by passphrase / PIN, containing the secrets needed for restoration. Its leakage compromises every past session it can decrypt and must be treated as an incident. |
-| `DiscoveryIdentity` | Attribute to minimize radically. Represented as a salted hash when matching an address-book contact. Never conflated with the account identity. |
+| `DiscoveryIdentity` | Attribute to minimize radically: a phone number its holder has proved and chosen to be findable by. The service keeps it only masked by an oblivious pseudorandom function (RFC 9497) under a key held outside its database, and the numbers of an address book are masked on the device and matched there (ADR 0014). Never conflated with the account identity. |
 | `FederatedIdentity` | Remote identity whose trust is not inherited automatically. Any cross-instance elevation of permission requires an explicit grant. |
 | `CapabilityGrant` | Cryptographic audit support: each grant is recorded with a verifiable identifier for traceability and revocation. |
 | `ExternalAction` | Action triggered outside the E2EE perimeter. Its success or failure has no cryptographic value, but its authorization must be auditable. |
 
 ## 4. Abstraction of Matrix
 
-Normative choice: Matrix is infrastructure, not UX. The user sees contacts, channels, direct conversations, linked devices, trust states, and agent participants — not room IDs, homeserver mechanics, or backup jargon.
+Normative choice: Matrix is infrastructure, not UX. The user sees the people they talk to, channels, direct conversations, linked devices, trust states, and agent participants — not room IDs, homeserver mechanics, or backup jargon.
 
 ### Required abstraction mechanisms
 
-1. contact-first model rather than room-first;
+1. people-first model rather than room-first;
 2. linked-device model rather than raw device/session jargon;
 3. trust ladder rather than cryptographic ceremony;
 4. agent participants rather than invisible automations.
@@ -103,7 +103,7 @@ This document is the canonical owner of the threat model. The product and bridge
 | Compromised desktop linked device | Cleartext, session continuity | Device freeze, rotation, weaker desktop permissions |
 | Compromised appservice or agent runtime | Message visibility, external-action abuse | Runtime / bridge separation, isolated tool gateway, audit |
 | Malicious authorized agent | Abuse of granted capabilities | Capability sheet, human approval, revocation |
-| Discovery service leakage | Contact-graph exposure | Minimization, salted hashing, purpose-binding |
+| Discovery service leakage | Contact-graph exposure | Matching on the device against numbers masked by an OPRF (RFC 9497, verifiable mode), masking key outside the database, a quota per proven number, purpose-binding (ADR 0014) |
 | Federated abuse between instances | Remote trust and routing | No automatic inheritance of permissions, health checks, removal of federated participant |
 | Tool gateway compromise | Undesired external effects, corrupted audit | Strict separation, per-instance credentials, encrypted audit |
 | Recovery orchestrator compromise | Bundle leakage, abusive restores | Strict boundaries, no cleartext retention |
@@ -119,7 +119,7 @@ The distinction is normative:
 - **Cleartext content** — protected by end-to-end encryption. Never visible on the server side, never visible in clear on the remote federated side.
 - **Metadata at the local homeserver** — membership events, timing, sizes, ratchets. Must be minimized but remain visible.
 - **Metadata at the remote federated homeserver** — propagated subset. Must be explicitly defined by category.
-- **Metadata at the discovery service** — inputs declared by the user; output limited to a `present / absent` signal on the service. Purpose-bound.
+- **Metadata at the discovery service** — the number of each findable account, proved and consented to by its holder, kept only masked; how many numbers each proven number had masked. The service returns no `present / absent` signal: the device compares its masked contacts with the list of findable accounts itself, so the service never learns an address book, who is looking for whom, or whether a search found anybody (ADR 0014). Purpose-bound.
 - **Metadata at the agent runtime** — profiles, prompts, memory, injected context. Must be visible to the user, must not transit to the tool gateway without a grant.
 - **Metadata at the tool gateway** — strict inputs needed for the external action; never the whole conversation by default.
 
@@ -132,7 +132,8 @@ A visibility matrix must accompany the implementation:
 | Social graphs | Not kept readable | No | No | No | No |
 | Encrypted payload | Yes (encrypted) | Yes (encrypted) | No | No | No |
 | Cleartext content | No | No | No | On consent | On explicit grant |
-| Discovery identity | No | No | Yes, hashed, purpose-bound | No | No |
+| Discovery identity | No | No | Yes, masked (OPRF), purpose-bound | No | No |
+| Address-book numbers | No | No | No: masked on the device, never readable, never kept | No | No |
 | Push tokens | Separated | No | No | No | No |
 
 The audit must **never** silently become a second cleartext content store.
@@ -170,7 +171,7 @@ Messagr adopts a positioning of **strong pseudonymity by default, enhanced anony
 - Account identity is backed by a **root key generated on-device**;
 - a **short public identifier** or a signed contact card may be shared voluntarily;
 - neither phone number nor email is required as a primary identifier;
-- address-book-based discoverability remains possible but **optional, local, and purpose-bound**; it never automatically grants the right to write to a contact.
+- address-book-based discoverability remains possible but **optional, local, and purpose-bound**; it never automatically grants the right to write to a matched account.
 
 ### 8.2 Discovery modes
 
@@ -179,12 +180,21 @@ Messagr adopts a positioning of **strong pseudonymity by default, enhanced anony
 | QR / invitation link | Signed link carrying a scoped invitation. |
 | Explicit username | Opt-in public identifier with a strong suffix. |
 | Signed contact cards | Signed file shared hand-to-hand. |
-| Introduction via an already approved contact | Explicit social trust chain. |
-| Manual import of the local address book | Controlled import, without permanent sync. |
+| Introduction via an already approved account | Explicit social trust chain. |
+| Manual import of the local address book | Controlled import, without permanent sync; matched on the device (§8.3). |
 
 ### 8.3 Private discovery
 
 A real private-contact-discovery protocol is required if address-book discovery is offered without letting the central service learn who is looking for whom. Absent that, only discovery via voluntarily shared identifier is acceptable. The product spec details the UX; this document only restates the requirement of no server-side graph leakage.
+
+The protocol retained is ADR 0014: matches are made on the device, against numbers their holders have proved. Its guarantee:
+
+- the service learns the number of every findable account, which the SMS provider sees too; it keeps it only masked, but it holds the key and could recover it from what it keeps;
+- it learns how many numbers each proven number had masked, a count kept with the masked number for 30 days after that number leaves discovery;
+- it learns who invites whom, at the moment an invitation leaves;
+- it never learns the numbers in anybody's address book, in clear or hashed, who is looking for whom, whether a search found anybody, or the name an inviter gives themselves in an invitation delivered inside Messagr.
+
+Against a malicious client, the only bound is the quota: at most 5,000 numbers masked per proven number over a sliding 30 days. Recognition through a match still depends on the service's honesty, since it holds the key; verification remains the only defence against the service itself.
 
 ### 8.4 Network protection and sealed sender
 
@@ -307,7 +317,7 @@ The approach is **incremental and crypto-agile**.
 1. What minimum metadata may an agent runtime access by default, without a grant?
 2. Which logs are mandatory for audit without creating a second leakage surface?
 3. What is the exact approval model for an `ExternalAction` triggered from a `Channel`?
-4. What portion of `DiscoveryIdentity` may leave the product backend, if any?
+4. What portion of `DiscoveryIdentity` may leave the product backend, if any? Answered by ADR 0014: the proven number leaves it only towards the SMS provider that proves it.
 5. How to represent a federated `AgentParticipant`: local mirror, transparent remote participant, or refusal?
 6. What canonical format for capability links (§7.3) and what rotation policy?
 
@@ -332,7 +342,7 @@ Strict subset, derived from the canonical glossary in the product spec.
 | Linked device | Secondary device with its own keys; removal requires rotation. |
 | Metadata | Any information outside cleartext payload; distinguished by boundary (homeserver, discovery, agent, tool). |
 | Federation | Matrix server-to-server communication; security surface and event propagation. |
-| Discovery identity | Technical attribute, hashed and purpose-bound; never conflated with the account identity. |
+| Discovery identity | A phone number its holder has proved, kept only masked by an OPRF (RFC 9497) and purpose-bound; never conflated with the account identity. |
 | Agent runtime trust perimeter | Trust zone distinct from the bridge and the homeserver, dedicated to AI agent execution. |
 | Capability link | Invitation or sharing link carrying a scoped, limited-use authorization, primary material for anonymous groups. |
 | Sealed-sender-like | Sender envelope hiding the sender from the service, in the manner of Signal's sealed sender. |
