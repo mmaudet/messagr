@@ -428,13 +428,13 @@ Révoqué, le compte est désactivé. Laissé à l'échéance sans révocation, 
 
 Lu dans le code, pas supposé ; les phrases sont celles de l'interface anglaise.
 
-**Le lien.** Sur un ordinateur, la page d'invitation montre un code QR (« Open this link on your phone: Messagr is a mobile application. Scan this code: ») : l'appareil photo de l'iPhone l'ouvre, et le domaine associé `/i*` le remet à Messagr. Touché sur l'iPhone lui-même, depuis Notes ou Mail, le lien fait de même. **Tapé dans Safari, il ne mène qu'à la page** : son bouton « Open in Messagr » recharge la même adresse, et Safari n'ouvre pas une application pour un lien de son propre domaine. Le bouton « Copy the link » promet que l'application proposera de le coller ; elle ne lit jamais le presse-papiers, et aucun écran ne permet de saisir un lien.
+**Le lien.** Sur un ordinateur, la page d'invitation montre un code QR (« Open this link on your phone: Messagr is a mobile application. Scan this code: ») : l'appareil photo de l'iPhone l'ouvre, et le domaine associé `/i*` le remet à Messagr. Touché sur l'iPhone lui-même, depuis Notes ou Mail, le lien fait de même. **Tapé dans Safari, il ne mène qu'à la page** : son bouton « Open in Messagr » recharge la même adresse, et Safari n'ouvre pas une application pour un lien de son propre domaine. Le bouton « Copy the link » mène, depuis #370, au champ « Paste the invitation link » de l'écran d'avant l'entrée ; l'application, elle, ne lit jamais le presse-papiers d'elle-même.
 
-**Non vérifié sur iPhone, et c'est le risque principal.** `AppDelegate.swift` ne transmet ni `continueUserActivity` ni `openURL` à React Native. Un lien ouvert pendant que Messagr tourne n'arrive donc probablement pas au JavaScript ; un lancement à froid le lit par `getInitialURL`, ce qui reste à constater sur un appareil. D'où la consigne des notes : fermer complètement Messagr avant d'ouvrir le lien.
+**Un lien ouvert pendant que Messagr tourne arrive**, depuis #279 : `AppDelegate.swift` transmet `continueUserActivity` et `openURL` à `RCTLinkingManager`. Il n'y a plus à fermer Messagr avant d'ouvrir le lien.
 
 **Le premier écran**, un seul : « The messenger that asks you for nothing. », « Choose your language », la case « I accept Messagr’s terms and conditions of use. » et le bouton « Begin ». La réclamation ne part qu'après « Begin ».
 
-**Pendant la réclamation**, aucun indicateur : la liste dit « No conversations yet. Invite someone to start one. ». Si elle échoue, pour quelque raison que ce soit, y compris un compte qu'`admettre` n'a pas invité à temps : « You are not in yet. Open the invitation link somebody sent you: it is the only door, and the application can do nothing before it. », et rien ne réessaie. Rouvrir le lien suffit : le compte tiré attend, invité, et la seconde tentative aboutit.
+**Pendant la réclamation**, aucun indicateur : la liste dit « No conversations yet. Invite someone to start one. ». Si elle échoue, pour quelque raison que ce soit, y compris un compte qu'`admettre` n'a pas invité à temps : « You are not in yet. Open the invitation link somebody sent you: it is the only door, and the application can do nothing before it. », et rien ne réessaie. Rouvrir le lien suffit : le compte tiré attend, invité, et la seconde tentative aboutit. Collé dans le champ de #370, le lien fait dire « Opening the invitation… » au bouton pendant la réclamation : une vingtaine de secondes, essayé le 26 septembre 2026.
 
 **Juste après l'entrée**, iOS demande l'autorisation d'envoyer des notifications, sans explication préalable.
 
@@ -457,49 +457,11 @@ L'état est alors `~/.messagr-exploitation/mmaudet-pixel.json` : un par compte e
 
 Lancer `admettre`, puis ouvrir le lien sur le téléphone. Un téléphone qui porte déjà un compte prend l'autre chemin du service : deux invitations, le compte tiré puis le sien, que le suivi de deux secondes enchaîne. Ce chemin n'écrit pas `claimed`, donc `admettre` s'arrête cinq minutes après l'échéance, ou à ctrl-c, qui ne défait rien.
 
-### Les notes de revue, à coller dans App Store Connect
+### Les notes de revue bêta
 
-TestFlight, informations de test de la build, rubrique des notes pour la revue bêta. Remplacer `<LINK>` et `<DEADLINE>` par ce qu'affiche `etat`.
+TestFlight, informations de test de la build, rubrique des notes pour la revue bêta. **Le texte est celui de l'App Store** : la première section de `deploy/messagr-eu/app-store-listing/review-notes.txt`, « HOW TO ENTER MESSAGR », avec une invitation émise au nom de `@mmaudet` comme plus bas, dans « L'entrée du relecteur, à chaque soumission ». La note nomme ce compte.
 
-```
-Messagr can only be joined by invitation, by design: there is no sign-up
-form, no user name and no password. An account is created on the device at
-the moment an invitation link is opened. We have created an invitation for
-you.
-
-1. Install Messagr from TestFlight. If you open it from TestFlight, close it
-   completely afterwards (swipe it away in the app switcher).
-
-2. Open this link on your computer:
-
-   <LINK>
-
-   The page shows a QR code. Scan it with the iPhone's Camera app and tap the
-   banner: Messagr opens. Tapping the link on the iPhone itself, for example
-   from Notes or Mail, works the same way. Typing it into Safari does not: it
-   only shows the page.
-
-   The link is valid until <DEADLINE> and can be used twice.
-
-3. The first screen states what Messagr promises. Choose a language, tick
-   "I accept Messagr's terms and conditions of use", and tap "Begin".
-
-4. Messagr creates your account from the invitation. This takes a few
-   seconds and shows no progress. iOS then asks whether Messagr may send
-   notifications.
-
-5. A conversation named "@exploitation" appears in the list. It is a
-   conversation with the Messagr operations account, which issued your
-   invitation, and nobody else is in it. You can write in it; messages are
-   end-to-end encrypted. The operations account does not reply.
-
-If Messagr says "You are not in yet", close it completely and open the link
-again as in step 2. The invitation is still valid and the second attempt
-completes.
-
-Accounts are pseudonymous: Messagr asks for no email address and no phone
-number, which is why we cannot provide demo credentials.
-```
+Celles qui étaient écrites ici faisaient fermer Messagr avant d'ouvrir le lien, ce que #279 a rendu inutile, et ignoraient le champ de collage de #370. Deux textes pour un même geste finissent par en décrire deux.
 
 ## Soumettre une version à l'App Store
 
@@ -579,11 +541,67 @@ legal or security obligations, you may include a built-in demo mode in lieu of
 a demo account with prior approval by Apple. »
 
 Messagr ne fait ni l'un ni l'autre : il fait entrer le relecteur pour de bon,
-avec une invitation que `scripts/testflight-reviewer.mjs` tient vivante, et
-les notes de revue plus haut expliquent le geste pas à pas. La dernière phrase
-de ces notes est celle qui répond à la question que la case pose :
-« Accounts are pseudonymous: Messagr asks for no email address and no phone
-number, which is why we cannot provide demo credentials. »
+avec une invitation que `scripts/testflight-reviewer.mjs` tient vivante, et la
+note de `review-notes.txt` explique le geste pas à pas (section suivante). Sa
+première phrase répond à la question que la case pose : « there is no sign-up
+form, no user name and no password, so there are no demo credentials to
+give. »
+
+### L'entrée du relecteur, à chaque soumission
+
+**Sans elle, Apple arrête la revue.** Le 22 septembre 2026, la 1.0 (26) a été
+tenue en 2.1 « Information Needed » : « Provide us an invitation link so we can
+access the app features. How do users obtain an invitation? Do they pay for
+it? » Les notes ne portaient que la note de confidentialité, et personne
+n'avait émis ni admis (#377). Chaque mise à jour repasse en revue : l'étape
+vaut pour chaque soumission, et `scripts/fiche-app-store.sh` la déroule.
+
+```
+node scripts/testflight-reviewer.mjs emettre --compte ~/.messagr-exploitation/racine-mmaudet.json --duree 30j --usages 5
+nohup caffeinate -i node scripts/testflight-reviewer.mjs admettre --compte ~/.messagr-exploitation/racine-mmaudet.json \
+  >> ~/.messagr-exploitation/mmaudet-relecteur-apple.log 2>&1 < /dev/null &
+node scripts/testflight-reviewer.mjs etat --compte ~/.messagr-exploitation/racine-mmaudet.json
+node scripts/testflight-reviewer.mjs revoquer --compte ~/.messagr-exploitation/racine-mmaudet.json
+```
+
+**`@mmaudet`, et pas `@exploitation`.** Le relecteur lit en anglais, où
+« exploitation » se lit comme un abus ; tranché le 26 septembre 2026. Et un
+téléphone ne peut pas tenir ce rôle : l'application ne fait entrer que
+lorsqu'elle est à l'écran (#376).
+
+**Trente jours et cinq usages**, pour tenir une revue, un aller-retour et un
+second appareil. **`admettre` est détaché** par `nohup`, pour survivre à la
+session qui l'a lancé, sur un Mac qui ne dort pas : le 15 septembre 2026, il
+n'a pas atteint le service pendant trois heures, et un relecteur arrivé à ce
+moment-là n'entrait pas.
+
+**La note vit dans `deploy/messagr-eu/app-store-listing/review-notes.txt`**,
+qui porte tout le champ : l'entrée, la façon dont on obtient une invitation et
+son prix, puis la confidentialité. Elle répond d'avance aux trois questions du
+22 septembre. Ses trous, `<LINK>`, `<DEADLINE>` et `<USES>`, sont remplis par
+l'assistant avec l'état de l'invitation. `check.py` en tient la limite sur la
+note remplie au plus long, « The Notes field can contain up to 4000 bytes »,
+et refuse un lien réel : il ferait entrer quiconque lit ce dépôt.
+
+**Ce que voit le relecteur**, essayé le 26 septembre 2026 avec la build 27, sur
+un simulateur iPad Air 11 pouces (M3) réglé en anglais, le modèle de la revue
+du 22 :
+
+- l'application s'ouvre en anglais ; sur iPad, elle tourne en compatibilité
+  iPhone, à 375 × 667 points (#355), et « Begin » est sous le pli ;
+- « You are not in yet », le champ « Paste the invitation link », « Enter » ;
+- « Opening the invitation… » une vingtaine de secondes, puis la conversation
+  « @mmaudet » et la demande d'autorisation des notifications ;
+- un message envoyé garde une seule coche, puisque personne ne lit
+  `@mmaudet`, et un appel sonne dans le vide.
+
+**L'écran dit qu'un lien vaut une heure et un seul usage.** C'est vrai de ceux
+que l'application émet, et la note dit que celui-ci a été créé pour la revue.
+**Tapé en minuscules, le lien est refusé** tant que #375 n'est pas déployé,
+d'où la consigne de garder les majuscules.
+
+**Après l'approbation, `revoquer`**, que le porteur tape lui-même : le compte du
+relecteur est désactivé avec l'invitation.
 
 ### Les droits relatifs au contenu, et ce qu'Apple ne tranche pas
 

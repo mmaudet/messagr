@@ -184,11 +184,17 @@ finish() {
 # `fr-FR.json` change, cet assistant dit la nouvelle valeur au tour suivant.
 # ──────────────────────────────────────────────────────────────────────────
 
-TOTAL_STAGES=9
+TOTAL_STAGES=10
 APP_ID=6809352505
 FICHE="deploy/messagr-eu/app-store-listing/fr-FR.json"
-DOC="docs/declarations-magasins.md"
 CAPTURES="${MESSAGR_CAPTURES_DIR:-$PWD/captures-store}"
+
+# L'entrée du relecteur (#377). La note nomme @mmaudet : l'invitation vient de
+# ce compte-là, dont l'état porte le lien, l'échéance et les usages.
+NOTE_RELECTEUR="deploy/messagr-eu/app-store-listing/review-notes.txt"
+COMPTE_RELECTEUR="${MESSAGR_RELECTEUR_COMPTE:-$HOME/.messagr-exploitation/racine-mmaudet.json}"
+ETAT_RELECTEUR="${MESSAGR_RELECTEUR_ETAT:-$HOME/.messagr-exploitation/mmaudet-relecteur-apple.json}"
+JOURNAL_RELECTEUR="$HOME/.messagr-exploitation/mmaudet-relecteur-apple.log"
 
 # champ <clé> — sort la valeur du dépôt, sans jamais l'inventer.
 champ() {
@@ -201,6 +207,31 @@ montrer() {
   local v; v=$(champ "$1") || return
   printf '  %s%s%s (%s caractères)\n' "$BOLD" "$2" "$RESET" "${#v}"
   printf '\n%s\n\n' "$v"
+}
+
+# note_remplie — le champ Notes tel qu'il se colle : le gabarit du dépôt, avec
+# le lien, l'échéance et les usages lus dans l'état de l'invitation. Refuse
+# une invitation qui ne vient pas du compte que la note nomme.
+note_remplie() {
+  python3 - "$NOTE_RELECTEUR" "$ETAT_RELECTEUR" <<'PY'
+import datetime, json, sys
+
+gabarit = open(sys.argv[1], encoding="utf-8").read()
+try:
+    etat = json.load(open(sys.argv[2], encoding="utf-8"))
+except (OSError, ValueError):
+    sys.exit(f"aucun état lisible à {sys.argv[2]}")
+if not str(etat.get("emetteur", "")).startswith("@mmaudet:"):
+    sys.exit(f"l'invitation vient de {etat.get('emetteur')}, et la note nomme @mmaudet")
+fin = datetime.datetime.fromisoformat(etat["echeance"].replace("Z", "+00:00"))
+mois = ("January February March April May June July August September "
+        "October November December").split()[fin.month - 1]
+echeance = f"{mois} {fin.day}, {fin.year}, {fin:%H:%M} UTC"
+print(gabarit.replace("<LINK>", etat["lien"])
+             .replace("<DEADLINE>", echeance)
+             .replace("<USES>", str(etat["usages"]))
+             .rstrip("\n"))
+PY
 }
 
 banner "La fiche App Store de Messagr (#350)"
@@ -281,21 +312,57 @@ say "  Elle peut recevoir https://messagr.eu/aide/#supprimer-votre-compte,"
 say "  qu'Apple décrit comme « a webpage where users can request deletion »."
 pause "Les adresses et le copyright sont saisis ?"
 
+stage "L'entrée du relecteur"
+say "On n'entre dans Messagr que par invitation, et une invitation émise par"
+say "l'application ne vit qu'une heure. Le 22 septembre 2026, Apple a arrêté"
+say "la revue faute de lien (#377) : le relecteur entre par une invitation"
+say "longue, émise au nom de @mmaudet, que la note nomme."
+printf '\n'
+if [[ -f "$ETAT_RELECTEUR" ]]; then
+  note "Ce que dit l'invitation déjà émise, lien masqué :"
+  node scripts/testflight-reviewer.mjs etat --compte "$COMPTE_RELECTEUR" 2>&1 \
+    | grep -v -E '^lien|/i/' | sed 's/^/    /' || true
+  printf '\n'
+fi
+if ! confirm "Une invitation vit, et il lui reste plus d'une semaine ?"; then
+  step "Émettre, depuis la racine du dépôt :"
+  printf '\n      node scripts/testflight-reviewer.mjs emettre --compte %s --duree 30j --usages 5\n\n' \
+    "$COMPTE_RELECTEUR"
+  note "Trente jours et cinq usages : une revue, un aller-retour, un second appareil."
+  note "Une invitation encore vivante se révoque d'abord : emettre la reprendrait."
+  pause "L'invitation est émise ?"
+fi
+printf '\n'
+if pgrep -f "testflight-reviewer.mjs admettre" >/dev/null 2>&1; then
+  note "La boucle d'admission tourne. Son journal : $JOURNAL_RELECTEUR"
+else
+  warn "Personne n'entre tant qu'admettre ne tourne pas. La lancer, détachée :"
+  printf '\n      nohup caffeinate -i node scripts/testflight-reviewer.mjs admettre --compte %s \\\n        >> %s 2>&1 < /dev/null &\n\n' \
+    "$COMPTE_RELECTEUR" "$JOURNAL_RELECTEUR"
+  pause "La boucle tourne ?"
+fi
+warn "Le Mac reste allumé, capot ouvert et branché, jusqu'à la décision d'Apple."
+say "  Le 15 septembre 2026, le Mac n'a pas atteint le service pendant trois"
+say "  heures : un relecteur arrivé à ce moment-là n'entrait pas."
+pause "On passe à la note ?"
+
 stage "La note au relecteur"
-say "Elle désamorce la seule question probable en revue : pourquoi les photos"
-say "ne sont pas déclarées alors que l'application en envoie."
+say "Un seul texte pour tout le champ, dans $NOTE_RELECTEUR :"
+say "l'entrée du relecteur, la façon dont on obtient une invitation, puis la"
+say "confidentialité. Il répond d'avance aux trois questions d'Apple du 22 septembre."
+note "check.py en tient la limite, 4000 OCTETS, avec le lien le plus long possible."
 printf '\n'
-step "Son texte est dans $DOC,"
-step "section « La note au relecteur d'App Store Connect »."
-printf '\n'
+if remplie=$(note_remplie); then
+  printf '%s  ────────%s\n%s\n%s  ────────%s\n\n' "$DIM" "$RESET" "$remplie" "$DIM" "$RESET"
+else
+  warn "La note ne se remplit pas : revenez à l'étape précédente."
+fi
 step "Dans la console : « Informations de vérification » → « Notes »."
-step "Coller la note EN ENTIER, sans la raccourcir."
-note "Elle cite la définition d'Apple et l'adresse publique du document."
-note "C'est ce qui la rend vérifiable plutôt que plaidante."
+step "Remplacer tout le contenu par ce bloc, sans le raccourcir."
+note "Le lien fait entrer : ce bloc ne se colle nulle part ailleurs."
 printf '\n'
 warn "« Connexion requise » doit rester DÉCOCHÉE."
-say "  On n'entre dans Messagr que par invitation : il n'y a ni identifiant"
-say "  ni mot de passe à confier. Tout passe par cette note."
+say "  Il n'y a ni identifiant ni mot de passe à confier : la note porte le lien."
 pause "La note est collée ?"
 
 stage "Relire, puis soumettre"
@@ -308,6 +375,10 @@ printf '\n'
 warn "La build que le relecteur recevra doit être sur TestFlight."
 say "  La dernière publiée est la 139, du 16 septembre, sur la piste interne"
 say "  Play. Côté iOS, vérifiez quelle build est attachée à cette version."
+printf '\n'
+note "Après l'approbation, et pas avant : révoquer l'invitation, en tapant"
+note "vous-même la confirmation. Le compte du relecteur est désactivé avec elle."
+printf '      node scripts/testflight-reviewer.mjs revoquer --compte %s\n' "$COMPTE_RELECTEUR"
 pause "Soumis ?"
 
 finish
@@ -323,6 +394,18 @@ RECORD="/tmp/fiche-app-store-$(date +%Y%m%d-%H%M).md"
   done
   printf '\nDescription et texte promotionnel : tels que le dépôt les porte.\n'
   printf '\nCaptures : deux classes d.iPhone. L.iPad n.est pas revendique par la V1.\n'
+  # Tout de l'invitation, sauf le lien : il fait entrer, et ce relevé se pose
+  # sur un ticket public.
+  python3 - "$ETAT_RELECTEUR" <<'PY' || true
+import json, sys
+try:
+    e = json.load(open(sys.argv[1], encoding="utf-8"))
+except (OSError, ValueError):
+    sys.exit(0)
+print(f"\nEntrée du relecteur : invitation {e.get('invitation_id')}, émise par "
+      f"{e.get('emetteur')}, jusqu'au {e.get('echeance')}, {e.get('usages')} usages. "
+      "Le lien n'est pas recopié ici : il fait entrer.")
+PY
 } > "$RECORD"
 note "relevé écrit dans $RECORD"
 note "à poser sur le ticket : gh issue comment 350 --body-file $RECORD"
