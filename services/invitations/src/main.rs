@@ -31,14 +31,6 @@ pub struct AppState {
 async fn main() -> anyhow::Result<()> {
     tracing_subscriber::fmt::init();
     let cfg = config::Config::from_env()?;
-    match &cfg.masking_keys {
-        Some(keys) => tracing::info!(
-            "masking keys: {} in service, the current one is #{}",
-            keys.len(),
-            keys.current().id()
-        ),
-        None => tracing::warn!("MASKING_KEYS absent: address-book discovery stays off"),
-    }
     let pool = db::connect(&cfg.database_url).await?;
     let mx = Arc::new(matrix::MatrixClient::new(
         cfg.homeserver_url.clone(),
@@ -71,6 +63,7 @@ async fn main() -> anyhow::Result<()> {
 
     tokio::spawn(cleanup::run_forever(state.clone()));
 
+    let masking_keys = state.cfg.masking_keys.clone();
     let app = router(state);
 
     let listener = tokio::net::TcpListener::bind(&addr).await?;
@@ -78,6 +71,16 @@ async fn main() -> anyhow::Result<()> {
         "messagr-invitations version {} — listening on {addr}",
         version()
     );
+    // AFTER THE VERSION, which an update reads as the first line (step 6 of
+    // `deploy/messagr-eu-invitations.md`).
+    match &masking_keys {
+        Some(keys) => tracing::info!(
+            "masking keys: {} in service, the current one is #{}",
+            keys.len(),
+            keys.current().id()
+        ),
+        None => tracing::warn!("MASKING_KEYS absent: address-book discovery stays off"),
+    }
     axum::serve(listener, app).await?;
     Ok(())
 }

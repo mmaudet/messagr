@@ -20,30 +20,6 @@ production stopped building the prototype (#289).
     `REGISTRATION_TOKEN`, `ENCRYPTION_KEY`;
   - optional: `EDGE_RETENTION_DAYS`, `BIND_ADDR`,
     `MAX_RESERVED_ACCOUNTS_PER_INVITER`, `PUSH_GATEWAY_URL`, `MASKING_KEYS`.
-
-## The masking keys of address-book discovery
-
-`MASKING_KEYS` holds the keys that mask phone numbers for address-book
-discovery (#392, ADR 0014): `<number>:<base64 seed>`, several separated by
-commas, `1:…,2:…`. The highest number is the key new masks are made with; two
-serve together while one replaces the other. A seed is 32 random bytes:
-
-    openssl rand -base64 32
-
-- **Absent, discovery stays off.** The service starts, serves invitations as
-  before, and its first log lines say `MASKING_KEYS absent: address-book
-discovery stays off`. Every deployment before discovery ships is in this case.
-- **Malformed, the service refuses to start.** The refusal names the variable
-  and the shape it expects, never a piece of the value.
-- **Never in the database, never off the host.** The keys live in this
-  environment file only. A copy of the database without them reveals neither
-  the numbers nor which accounts are findable; a copy of the keys elsewhere is
-  one more place to steal them from, and a lost key costs at most one SMS per
-  findable account. Whatever backs this host up must leave the environment
-  file out.
-- **Changing a key is a gesture of its own**, described with the key change of
-  discovery (#409). Removing a number from the list makes every mask made with
-  it useless.
 - **The networks.** `default`, and `sygnal` (the external network
   `messagr-sygnal_default`), because the push gateway forwards to
   `http://messagr-sygnal:5000/_matrix/push/v1/notify`.
@@ -51,6 +27,34 @@ discovery stays off`. Every deployment before discovery ships is in this case.
 The bench, `messagr-invitations-fork` in `/opt/messagr-fork`, has the same shape
 and builds from its own copy of `services/invitations`, which lags this
 repository until somebody copies it again.
+
+## The masking keys of address-book discovery
+
+`MASKING_KEYS` holds the keys that mask phone numbers for address-book
+discovery (#392, ADR 0014): `<key number>:<base64 seed>`, several separated by
+commas, `1:…,2:…`. The highest key number is the key new masks are made with;
+two serve together while one replaces the other. A seed is 32 random bytes:
+
+    openssl rand -base64 32
+
+- **Absent, discovery stays off.** The service starts, serves invitations as
+  before, and says so right after the line that names its version:
+  `MASKING_KEYS absent: address-book discovery stays off`. Every deployment
+  before discovery ships is in this case.
+- **Malformed, the service refuses to start.** The refusal names the variable
+  and the shape it expects, never a piece of the value.
+- **A key is its seed and its key number together.** The same seed under
+  another number is another key: renumbering one makes every mask made with it
+  useless, exactly as removing it would.
+- **Never in the database.** A copy of the database without the keys reveals
+  neither the numbers nor which accounts are findable.
+- **On this host, and only here, in three places.** The environment file; the
+  dated copy of it that step 4 of an update makes; and the container's own
+  configuration, which Docker keeps under `/var/lib/docker/containers` and
+  `docker inspect` prints. Whatever backs this host up leaves all three out,
+  and a key that is retired (#409) is removed from all three.
+- **Changing a key is a gesture of its own**, described with the key change of
+  discovery (#409).
 
 ## Until 13 September 2026, production built the prototype
 

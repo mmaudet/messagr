@@ -10,12 +10,11 @@ something it cannot build, and every install would carry that lie.
 
 ## What is not here
 
-**Private discovery.** The blind directory built on an oblivious pseudorandom
-function, its usage tokens and its quota stayed in the previous repository
-when this service was internalised. Nothing in the current slice exercises
-them, and internalising an unexercised cryptographic component is how a
-dependency breaks silently — which is the thing internalising was meant to
-prevent. Issue #38 brings it back the day a slice needs it.
+**Private discovery, coming back one ticket at a time.** The prototype's blind
+directory, its usage tokens and its quota stayed in the previous repository
+when this service was internalised, and they do not come back: #392 rebuilds
+discovery on a new design (ADR 0014). The masking of numbers is here
+(`masking`, #396); the routes that use it arrive with the tickets after it.
 
 Three variants in `AppError` still describe discovery refusals. They are kept
 deliberately, with the reason written at the enum: their documentation
@@ -25,7 +24,7 @@ preserved than rewritten from memory.
 ## Running it
 
 ```
-cargo test          # 225 tests, no network, about a second
+cargo test          # 227 tests, no network, about a second
 cargo clippy --all-targets -- -D warnings
 cargo fmt --check
 ```
@@ -41,10 +40,11 @@ Nine variables, four of them mandatory: `DATABASE_URL`, `HOMESERVER_URL`,
 `BIND_ADDR`, `MAX_RESERVED_ACCOUNTS_PER_INVITER`, `PUSH_GATEWAY_URL` and
 `MASKING_KEYS`.
 
-`MASKING_KEYS` masks the phone numbers of address-book discovery (`masking`,
-RFC 9497, ADR 0014). Absent, discovery stays off and the service starts;
-malformed, it refuses to start without showing the value. Its format and where
-it lives are in `deploy/messagr-eu-invitations.md`.
+`MASKING_KEYS` holds the keys that mask the phone numbers of address-book
+discovery (`masking`, RFC 9497, ADR 0014), each under its key number. Absent,
+discovery stays off and the service starts; malformed, it refuses to start
+without showing the value. Its format, and the three places a key lives on the
+host, are in `deploy/messagr-eu-invitations.md`.
 
 `PUSH_GATEWAY_URL` was missing from this list. It is where a stripped push
 notification is forwarded, and a deployment without it accepts every

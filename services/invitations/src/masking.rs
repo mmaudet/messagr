@@ -7,8 +7,9 @@
 //!   being made: RFC 9497's `Evaluate`. The mask is what the service keeps;
 //!   the number is forgotten.
 //! - **blind**, a batch of elements a device sent: the service cannot read
-//!   them, returns them evaluated, and adds one proof for the whole batch,
-//!   which the device checks against the published public key.
+//!   them, returns them evaluated, and adds one batch proof for all of them
+//!   (the RFC's DLEQ proof, not the proof of a number), which the device
+//!   checks against the published public key.
 //!
 //! A device that unblinds a blind evaluation obtains the very mask the direct
 //! evaluation gives: the RFC's test vectors pin both halves to the byte.
@@ -16,26 +17,18 @@
 //! # THE KEYS NEVER LIVE IN THE DATABASE
 //!
 //! They come from the host's environment, like the service's other secrets,
-//! each with its number so that two can serve together while one replaces the
-//! other. Nothing here prints one: `MaskingKey` has its own `Debug`, because
-//! the library's would print the secret scalar.
+//! each with its key number so that two can serve together while one replaces
+//! the other; `config` reads them. Nothing here prints one: `MaskingKey` has
+//! its own `Debug`, because the library's would print the secret scalar.
 
-use base64::{engine::general_purpose::STANDARD, Engine};
+use data_encoding::HEXLOWER;
 use rand::{CryptoRng, RngCore};
 use voprf::{BlindedElement, Group, Ristretto255, VoprfServer};
 
-/// A refusal that never carries key material: every variant is a sentence
-/// about the shape of the setting, never a piece of it.
+/// Why a masking could not be done. None carries a key, an element or a
+/// number.
 #[derive(Debug, thiserror::Error)]
 pub enum MaskingError {
-    #[error("MASKING_KEYS names no key")]
-    NoKey,
-    #[error("a MASKING_KEYS entry is not <number>:<base64 seed>")]
-    NotAnEntry,
-    #[error("a MASKING_KEYS seed is not 32 bytes of base64")]
-    NotASeed,
-    #[error("a MASKING_KEYS number appears twice")]
-    SameNumberTwice,
     #[error("a masking key could not be derived from its seed")]
     Derivation,
     #[error("a batch to mask is empty")]
@@ -46,23 +39,32 @@ pub enum MaskingError {
     Evaluation,
 }
 
-/// One masking key: its number, and the server of RFC 9497 it drives.
-#[derive(Clone)]
+/// One masking key: its key number, and the server of RFC 9497 it drives.
+///
+/// Neither `Clone` nor `Copy`: the secret scalar is held once, and whoever
+/// needs a key borrows it from `MaskingKeys`, which the configuration shares
+/// behind an `Arc`.
 pub struct MaskingKey {
     id: u32,
     server: VoprfServer<Ristretto255>,
 }
 
 /// What the service returns for a batch a device sent: each element evaluated,
-/// and one proof for all of them.
+/// and one batch proof for all of them.
 pub struct MaskedBatch {
     pub evaluated: Vec<[u8; 32]>,
-    pub proof: [u8; 64],
+    pub batch_proof: [u8; 64],
 }
 
 impl MaskingKey {
+    /// The key of this key number and this seed. The two together make the
+    /// key: the same seed under another number is another key.
+    pub fn from_seed(id: u32, seed: &[u8; 32]) -> Result<Self, MaskingError> {
+        Self::derive(id, seed, &info_for(id))
+    }
+
     /// The key RFC 9497's `DeriveKeyPair` gives for this seed and this `info`.
-    pub fn derive(id: u32, seed: &[u8], info: &[u8]) -> Result<Self, MaskingError> {
+    fn derive(id: u32, seed: &[u8], info: &[u8]) -> Result<Self, MaskingError> {
         let server = VoprfServer::<Ristretto255>::new_from_seed(seed, info)
             .map_err(|_| MaskingError::Derivation)?;
         Ok(Self { id, server })
@@ -90,10 +92,10 @@ impl MaskingKey {
         Ok(output.into())
     }
 
-    /// Masks a batch of blinded elements a device sent, with one proof for the
-    /// whole batch. Any element that is not a point of the group refuses the
-    /// batch: nothing is evaluated.
-    // Its caller is the search of an address book (#400).
+    /// Masks a batch of blinded elements a device sent, with one batch proof
+    /// for all of them. Any element that is not a point of the group refuses
+    /// the batch: nothing is evaluated.
+    // Its caller is a device looking for its own contacts (#400).
     #[allow(dead_code)]
     pub fn mask_blinded<R: RngCore + CryptoRng>(
         &self,
@@ -118,66 +120,45 @@ impl MaskingKey {
                 .iter()
                 .map(|m| m.serialize().into())
                 .collect(),
-            proof: result.proof.serialize().into(),
+            batch_proof: result.proof.serialize().into(),
         })
     }
 }
 
 /// The library's `Debug` would print the secret scalar: this one prints the
-/// key's number and its public key, which is published anyway.
+/// key number and the public key, which is published anyway.
 impl std::fmt::Debug for MaskingKey {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let public: String = self
-            .public_key()
-            .iter()
-            .map(|b| format!("{b:02x}"))
-            .collect();
         f.debug_struct("MaskingKey")
             .field("id", &self.id)
-            .field("public_key", &public)
+            .field("public_key", &HEXLOWER.encode(&self.public_key()))
             .finish()
     }
 }
 
-/// The keys in service, from `MASKING_KEYS`: `<number>:<base64 seed>`,
-/// separated by commas. Two serve together while one replaces the other, and
-/// the highest number is the current one.
-#[derive(Clone, Debug)]
+/// The keys in service. Two serve together while one replaces the other, and
+/// the highest key number is the current one.
+#[derive(Debug)]
 pub struct MaskingKeys {
-    /// Sorted by number, never empty.
+    /// Sorted by key number, never empty.
     keys: Vec<MaskingKey>,
 }
 
 impl MaskingKeys {
-    pub fn parse(value: &str) -> Result<Self, MaskingError> {
-        let mut keys = Vec::new();
-        for entry in value.split(',').map(str::trim).filter(|e| !e.is_empty()) {
-            let (number, seed) = entry.split_once(':').ok_or(MaskingError::NotAnEntry)?;
-            let id: u32 = number
-                .trim()
-                .parse()
-                .map_err(|_| MaskingError::NotAnEntry)?;
-            let seed = STANDARD
-                .decode(seed.trim())
-                .map_err(|_| MaskingError::NotASeed)?;
-            if seed.len() != 32 {
-                return Err(MaskingError::NotASeed);
-            }
-            if keys.iter().any(|k: &MaskingKey| k.id == id) {
-                return Err(MaskingError::SameNumberTwice);
-            }
-            keys.push(MaskingKey::derive(id, &seed, &info_for(id))?);
-        }
+    /// The keys, or nothing when there are none: a setting that names no key
+    /// is not a set of keys. Each key number is expected once; `config`
+    /// refuses a setting that repeats one.
+    pub fn new(mut keys: Vec<MaskingKey>) -> Option<Self> {
         if keys.is_empty() {
-            return Err(MaskingError::NoKey);
+            return None;
         }
         keys.sort_by_key(|k| k.id);
-        Ok(Self { keys })
+        Some(Self { keys })
     }
 
-    /// The key new masks are made with: the highest number.
+    /// The key new masks are made with: the highest key number.
     pub fn current(&self) -> &MaskingKey {
-        self.keys.last().expect("parse refuses an empty setting")
+        self.keys.last().expect("`new` refuses an empty set")
     }
 
     // Its callers are the routes of discovery (#397, #400).
@@ -191,7 +172,7 @@ impl MaskingKeys {
     }
 }
 
-/// Binds each derivation to its key's number, so that two numbers given the
+/// Binds each derivation to its key number, so that two key numbers given the
 /// same seed by mistake still make two keys.
 fn info_for(id: u32) -> Vec<u8> {
     format!("messagr masking key {id}").into_bytes()
@@ -227,11 +208,7 @@ mod tests {
     impl CryptoRng for Fixed {}
 
     fn hex(s: &str) -> Vec<u8> {
-        let s: String = s.split_whitespace().collect();
-        (0..s.len())
-            .step_by(2)
-            .map(|i| u8::from_str_radix(&s[i..i + 2], 16).unwrap())
-            .collect()
+        HEXLOWER.decode(s.as_bytes()).unwrap()
     }
 
     fn scalar(s: &str) -> [u8; 32] {
@@ -284,7 +261,7 @@ mod tests {
     }
 
     #[test]
-    fn masking_one_blinded_element_gives_the_rfc_element_and_proof() {
+    fn masking_one_blinded_element_gives_the_rfc_element_and_batch_proof() {
         let key = rfc_key();
         for (blinded, evaluated, proof) in [
             (BLINDED_1, EVALUATED_1, PROOF_1),
@@ -295,12 +272,12 @@ mod tests {
                 .unwrap();
             assert_eq!(batch.evaluated.len(), 1);
             assert_eq!(batch.evaluated[0].to_vec(), hex(evaluated));
-            assert_eq!(batch.proof.to_vec(), hex(proof));
+            assert_eq!(batch.batch_proof.to_vec(), hex(proof));
         }
     }
 
     #[test]
-    fn masking_a_batch_gives_one_proof_for_the_whole_batch() {
+    fn masking_a_batch_gives_one_batch_proof_for_all_of_it() {
         let batch = rfc_key()
             .mask_blinded(
                 &mut Fixed(scalar(BATCH_PROOF_RANDOM)),
@@ -309,7 +286,7 @@ mod tests {
             .unwrap();
         assert_eq!(batch.evaluated[0].to_vec(), hex(EVALUATED_1));
         assert_eq!(batch.evaluated[1].to_vec(), hex(BATCH_EVALUATED_2));
-        assert_eq!(batch.proof.to_vec(), hex(BATCH_PROOF));
+        assert_eq!(batch.batch_proof.to_vec(), hex(BATCH_PROOF));
     }
 
     #[test]
@@ -321,15 +298,14 @@ mod tests {
     }
 
     #[test]
-    fn the_environment_names_each_key_by_its_number() {
-        let one = "AQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQE="; // 32 × 0x01
-        let two = "AgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgI="; // 32 × 0x02
-        let keys = MaskingKeys::parse(&format!("1:{one}, 2:{two}")).unwrap();
+    fn the_keys_are_known_by_their_key_number() {
+        let key = |id, byte| MaskingKey::from_seed(id, &[byte; 32]).unwrap();
+        let keys = MaskingKeys::new(vec![key(2, 0x02), key(1, 0x01)]).unwrap();
 
         assert_eq!(
             keys.current().id(),
             2,
-            "the highest number is the current key"
+            "the highest key number is the current key"
         );
         assert_eq!(keys.get(1).map(MaskingKey::id), Some(1));
         assert!(keys.get(3).is_none());
@@ -337,24 +313,16 @@ mod tests {
             keys.get(1).unwrap().public_key(),
             keys.get(2).unwrap().public_key()
         );
+        assert!(MaskingKeys::new(Vec::new()).is_none(), "no key, no set");
     }
 
     #[test]
-    fn a_malformed_setting_is_refused_without_showing_the_key() {
-        let one = "AQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQE=";
-        for bad in [
-            String::new(),
-            "1".to_string(),
-            format!("x:{one}"),
-            "1:not-base64!".to_string(),
-            "1:AQEB".to_string(),
-            format!("1:{one},1:{one}"),
-        ] {
-            let refused = MaskingKeys::parse(&bad);
-            assert!(refused.is_err(), "{bad:?} must be refused");
-            let said = refused.expect_err("refused").to_string();
-            assert!(!said.contains("AQEB"), "the refusal must not show the key");
-        }
+    fn the_same_seed_under_another_key_number_is_another_key() {
+        let seed = [0x01; 32];
+        assert_ne!(
+            MaskingKey::from_seed(1, &seed).unwrap().public_key(),
+            MaskingKey::from_seed(2, &seed).unwrap().public_key()
+        );
     }
 
     #[test]
