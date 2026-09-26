@@ -175,6 +175,11 @@ fn router(state: Arc<AppState>) -> Router {
             "/discovery/proofs/finish",
             post(handlers::discovery::finish_proof),
         )
+        // LOOKING FOR ONE'S CONTACTS (#400): the public keys, a batch masked
+        // blind, and the directory the device compares against itself.
+        .route("/discovery/keys", get(handlers::discovery::public_keys))
+        .route("/discovery/masks", post(handlers::discovery::mask_batch))
+        .route("/discovery/directory", get(handlers::discovery::directory))
         // L'ANNONCE D'UNE SUPPRESSION DE COMPTE (#385), faite par le compte
         // lui-même juste avant qu'il soit désactivé. Sans corps : le jeton dit
         // qui. `handlers::deletion` dit ce qu'elle enregistre et ce qu'elle
@@ -402,9 +407,10 @@ mod tests {
 
     /// THE DISCOVERY ROUTES ARE IN THE ROUTER. `handlers::discovery` tests its
     /// handlers by calling them, which stays green with none of them routed:
-    /// this asks a real router, over HTTP, for each route of a proof, and must
-    /// reach the handler, whose first act is to refuse a request without a
-    /// token. A missing route answers `M_UNRECOGNIZED` instead.
+    /// this asks a real router, over HTTP, for each route of a proof and of
+    /// looking for one's contacts, and must reach the handler, whose first act
+    /// is to refuse a request without a token. A missing route answers
+    /// `M_UNRECOGNIZED` instead.
     #[sqlx::test(migrations = "./migrations")]
     async fn every_route_of_a_proof_reaches_its_handler(pool: SqlitePool) {
         let st = Arc::new(AppState {
@@ -438,6 +444,19 @@ mod tests {
             (
                 "withdraw a number",
                 http.delete(format!("{base}/discovery/number")),
+            ),
+            (
+                "read the public keys",
+                http.get(format!("{base}/discovery/keys")),
+            ),
+            (
+                "mask a batch",
+                http.post(format!("{base}/discovery/masks"))
+                    .json(&serde_json::json!({"key_number": 1, "blinded": ["AA=="]})),
+            ),
+            (
+                "download the directory",
+                http.get(format!("{base}/discovery/directory")),
             ),
         ];
         for (name, request) in routes {

@@ -1,7 +1,8 @@
-//! Address-book discovery: proving a number (#397, #392, ADR 0014).
+//! Address-book discovery: proving a number (#397, #392, ADR 0014), and
+//! looking for one's contacts (#400).
 //!
-//! Four routes, all authenticated by the account's Matrix token like the
-//! others:
+//! Seven routes, all authenticated by the account's Matrix token like the
+//! others. Four prove a number and keep the account findable:
 //!
 //! - `GET /discovery/state`: whether discovery is served here, whether this
 //!   account is findable and until when, and the countries whose numbers can
@@ -17,6 +18,18 @@
 //!   Its mask stays thirty days at the service, like that of a proof run
 //!   out (#398).
 //!
+//! Three serve a findable account looking for its contacts, and the last two
+//! are for findable accounts only:
+//!
+//! - `GET /discovery/keys`: the public keys, by key number, that a device
+//!   checks every masked batch against;
+//! - `POST /discovery/masks`: a batch of blinded elements, evaluated under
+//!   the key named, with one proof for all of them. The service cannot read
+//!   what it masks;
+//! - `GET /discovery/directory`: every current proof, as a mask and an
+//!   opaque reference, the same for everyone. The device compares its masks
+//!   with it, so the service never learns whether a contact was found.
+//!
 //! # WHAT THE SERVICE KEEPS OF A NUMBER
 //!
 //! Its mask under the current key, nothing else: not the number, not the
@@ -26,6 +39,7 @@
 use std::sync::Arc;
 
 use axum::{extract::State, http::HeaderMap, Json};
+use data_encoding::BASE64;
 use serde::{Deserialize, Serialize};
 
 use crate::{
@@ -42,6 +56,10 @@ const ATTEMPTS: u32 = 5;
 /// How long a proof lasts: the shortest month, since a number can change hands
 /// a month after it is given up (#392, Q36).
 pub const PROOF_LIFETIME_SECONDS: i64 = 28 * 86_400;
+/// The most blinded elements one request may carry: the most numbers one
+/// proven number may have masked in thirty days (#392, counted from #401), so
+/// that no single request asks for more than a whole allowance.
+const MAX_BATCH: usize = 5_000;
 
 #[derive(Serialize)]
 pub struct OpenCountry {
@@ -370,6 +388,184 @@ pub async fn withdraw_number(
     Ok(axum::http::StatusCode::NO_CONTENT)
 }
 
+#[derive(Serialize)]
+pub struct PublicKey {
+    pub key_number: u32,
+    /// 32 bytes, standard base64 with padding.
+    pub public_key: String,
+}
+
+#[derive(Serialize)]
+pub struct PublicKeys {
+    /// By key number: the last one is the current key.
+    pub keys: Vec<PublicKey>,
+}
+
+/// `GET /discovery/keys`: the public keys a device checks every masked batch
+/// against. Any account may read them, findable or not: they are public.
+pub async fn public_keys(
+    State(st): State<Arc<AppState>>,
+    headers: HeaderMap,
+) -> Result<Json<PublicKeys>, AppError> {
+    auth::authenticate(&st.mx, &headers).await?;
+    let served = served(&st)?;
+    Ok(Json(PublicKeys {
+        keys: served
+            .keys
+            .iter()
+            .map(|k| PublicKey {
+                key_number: k.id(),
+                public_key: BASE64.encode(&k.public_key()),
+            })
+            .collect(),
+    }))
+}
+
+#[derive(Deserialize)]
+pub struct MaskRequest {
+    /// The key number to mask under, read from `GET /discovery/keys`.
+    pub key_number: u32,
+    /// The blinded elements, 32 bytes each, in standard base64 with padding.
+    /// What a device blinds is a number's international form, the exact
+    /// bytes of `+` and its digits, as the service masks a number it proves.
+    pub blinded: Vec<String>,
+}
+
+#[derive(Serialize)]
+pub struct MaskedBatch {
+    pub key_number: u32,
+    /// One per blinded element, in the same order, base64.
+    pub evaluated: Vec<String>,
+    /// RFC 9497's one proof for the whole batch, 64 bytes, base64. Not the
+    /// proof of a number.
+    pub batch_proof: String,
+}
+
+/// `POST /discovery/masks`: a batch of blinded elements, evaluated under the
+/// key named, with one proof for all of them.
+///
+/// The service cannot read what it masks: each element hides its number
+/// under a blind that never leaves the device. What it learns is how many
+/// elements a findable account sent, and when.
+///
+/// The work runs on the blocking pool: five thousand elements hold a thread
+/// for about a fifth of a second, which on a worker would hold every other
+/// route up with it.
+pub async fn mask_batch(
+    State(st): State<Arc<AppState>>,
+    headers: HeaderMap,
+    Body(req): Body<MaskRequest>,
+) -> Result<Json<MaskedBatch>, AppError> {
+    findable_caller(&st, &headers).await?;
+    let keys = st.cfg.masking_keys.clone().ok_or(AppError::DiscoveryOff)?;
+    if req.blinded.is_empty() || req.blinded.len() > MAX_BATCH {
+        return Err(AppError::NotABatch);
+    }
+    let blinded = req
+        .blinded
+        .iter()
+        .map(|element| BASE64.decode(element.as_bytes()))
+        .collect::<Result<Vec<_>, _>>()
+        .map_err(|_| AppError::NotABatch)?;
+    let key_number = req.key_number;
+    let masked = tokio::task::spawn_blocking(move || {
+        keys.get(key_number)
+            .map(|key| key.mask_blinded(&mut rand::rngs::OsRng, &blinded))
+    })
+    .await
+    .map_err(|e| anyhow::anyhow!("masking a batch: {e}"))?
+    .ok_or(AppError::UnknownMaskingKey)?
+    .map_err(|e| match e {
+        crate::masking::MaskingError::EmptyBatch | crate::masking::MaskingError::NotAnElement => {
+            AppError::NotABatch
+        }
+        other => AppError::Internal(anyhow::anyhow!("masking a batch: {other}")),
+    })?;
+    Ok(Json(MaskedBatch {
+        key_number,
+        evaluated: masked
+            .evaluated
+            .iter()
+            .map(|element| BASE64.encode(element))
+            .collect(),
+        batch_proof: BASE64.encode(&masked.batch_proof),
+    }))
+}
+
+#[derive(Serialize)]
+pub struct DirectoryEntry {
+    /// The key number the mask was made under.
+    pub key_number: u32,
+    /// 64 bytes, base64.
+    pub mask: String,
+    /// What the service knows the account by, and nobody else can link to it.
+    pub reference: String,
+}
+
+#[derive(Serialize)]
+pub struct Directory {
+    pub entries: Vec<DirectoryEntry>,
+}
+
+/// `GET /discovery/directory`: every current proof, the same for everyone.
+///
+/// Whole, always: the device compares its masks with it, so what it asks for
+/// never depends on what it found. Sorted by key number and mask, so the order
+/// says nothing of when anybody proved a number.
+pub async fn directory(
+    State(st): State<Arc<AppState>>,
+    headers: HeaderMap,
+) -> Result<Json<Directory>, AppError> {
+    findable_caller(&st, &headers).await?;
+    let rows: Vec<(i64, Vec<u8>, String)> = sqlx::query_as(
+        "SELECT key_id, mask, reference FROM findable_numbers \
+         WHERE withdrawn_at IS NULL AND expires_at > ? ORDER BY key_id, mask",
+    )
+    .bind(st.cfg.clock.now())
+    .fetch_all(&st.pool)
+    .await
+    .map_err(anyhow::Error::from)?;
+    let entries = rows
+        .into_iter()
+        .map(|(key_number, mask, reference)| {
+            Ok(DirectoryEntry {
+                key_number: u32::try_from(key_number).map_err(anyhow::Error::from)?,
+                mask: BASE64.encode(&mask),
+                reference,
+            })
+        })
+        .collect::<Result<Vec<_>, AppError>>()?;
+    Ok(Json(Directory { entries }))
+}
+
+/// The account asking, when it may look for its contacts: discovery is
+/// served here, and the account is findable. What masking a batch and
+/// downloading the directory both require, before anything else.
+async fn findable_caller(st: &AppState, headers: &HeaderMap) -> Result<String, AppError> {
+    let user = auth::authenticate(&st.mx, headers).await?;
+    served(st)?;
+    if !is_findable(st, &user).await? {
+        return Err(AppError::NotFindable);
+    }
+    Ok(user)
+}
+
+/// Whether `user` is a findable account: a current proof, not withdrawn and
+/// not run out. An account whose number another one proved since has no row
+/// at all.
+async fn is_findable(st: &AppState, user: &str) -> Result<bool, AppError> {
+    let findable: bool = sqlx::query_scalar(
+        "SELECT EXISTS (SELECT 1 FROM findable_numbers \
+         WHERE user_id = ? AND withdrawn_at IS NULL AND expires_at > ?)",
+    )
+    .bind(user)
+    .bind(st.cfg.clock.now())
+    .fetch_one(&st.pool)
+    .await
+    .map_err(anyhow::Error::from)?;
+    Ok(findable)
+}
+
 /// Refuses when a mask still in service was made with a key that
 /// `MASKING_KEYS` does not hold, naming the key number and never a key.
 ///
@@ -616,8 +812,8 @@ mod tests {
         time.store(at, std::sync::atomic::Ordering::SeqCst);
     }
 
-    /// The reference a findable account is known by. No route shows it yet:
-    /// the directory that will is #400's, so the test reads the table.
+    /// The reference a findable account is known by, read from the table, so
+    /// that a test can name the account behind a directory entry.
     async fn reference_of(pool: &SqlitePool, who: &str) -> Option<String> {
         sqlx::query_scalar("SELECT reference FROM findable_numbers WHERE user_id = ?")
             .bind(format!("@{who}:h"))
@@ -1350,5 +1546,371 @@ mod tests {
         assert!(seen
             .iter()
             .any(|(place, _, numeric)| *numeric && place == "findable_numbers.expires_at"));
+    }
+
+    // ---- looking for one's contacts (#400) --------------------------------
+
+    /// A second number of an open country, for a second findable account.
+    const OTHER: &str = "+33687654321";
+
+    async fn public_keys_of(st: &Arc<AppState>, who: &str) -> Result<PublicKeys, AppError> {
+        public_keys(State(st.clone()), bearer(who))
+            .await
+            .map(|Json(k)| k)
+    }
+
+    async fn send_batch(
+        st: &Arc<AppState>,
+        who: &str,
+        key_number: u32,
+        blinded: Vec<String>,
+    ) -> Result<MaskedBatch, AppError> {
+        mask_batch(
+            State(st.clone()),
+            bearer(who),
+            Body(MaskRequest {
+                key_number,
+                blinded,
+            }),
+        )
+        .await
+        .map(|Json(m)| m)
+    }
+
+    async fn directory_of(st: &Arc<AppState>, who: &str) -> Result<Directory, AppError> {
+        directory(State(st.clone()), bearer(who))
+            .await
+            .map(|Json(d)| d)
+    }
+
+    type Client = voprf::VoprfClient<voprf::Ristretto255>;
+
+    /// What a device sends: each number blinded, as base64.
+    fn blind(numbers: &[&str]) -> (Vec<Client>, Vec<String>) {
+        numbers
+            .iter()
+            .map(|n| {
+                let blinded = Client::blind(n.as_bytes(), &mut rand::rngs::OsRng).unwrap();
+                (blinded.state, BASE64.encode(&blinded.message.serialize()))
+            })
+            .unzip()
+    }
+
+    /// What a device does with the answer: check the proof against the public
+    /// key it read, and unblind. The masks come back as base64, the way the
+    /// directory carries them.
+    #[allow(clippy::ptr_arg)] // upstream iterates `&Vec`, not `&[_]`
+    fn unblind(
+        numbers: &[&str],
+        clients: &Vec<Client>,
+        answer: &MaskedBatch,
+        public_key: &str,
+    ) -> Vec<String> {
+        use voprf::Group;
+        let evaluated = answer
+            .evaluated
+            .iter()
+            .map(|e| {
+                voprf::EvaluationElement::deserialize(&BASE64.decode(e.as_bytes()).unwrap())
+                    .unwrap()
+            })
+            .collect::<Vec<_>>();
+        let proof =
+            voprf::Proof::deserialize(&BASE64.decode(answer.batch_proof.as_bytes()).unwrap())
+                .unwrap();
+        let key =
+            voprf::Ristretto255::deserialize_elem(&BASE64.decode(public_key.as_bytes()).unwrap())
+                .unwrap();
+        let inputs: Vec<&[u8]> = numbers.iter().map(|n| n.as_bytes()).collect();
+        Client::batch_finalize(&inputs, clients, &evaluated, &proof, key)
+            .expect("the proof checks against the published key")
+            .map(|output| BASE64.encode(&output.unwrap()))
+            .collect()
+    }
+
+    #[sqlx::test(migrations = "./migrations")]
+    async fn a_findable_account_finds_a_proven_number_and_only_it(pool: SqlitePool) {
+        let (ovh, inbox) = fake_ovhcloud(false).await;
+        let st = state_with(pool.clone(), whoami_hs().await, Some(ovh));
+        prove(&st, &inbox, "alice", NUMBER).await;
+        prove(&st, &inbox, "bob", OTHER).await;
+
+        let keys = public_keys_of(&st, "bob").await.unwrap();
+        let current = keys.keys.last().unwrap();
+        let numbers = [NUMBER, "+33699999999"];
+        let (clients, blinded) = blind(&numbers);
+        let answer = send_batch(&st, "bob", current.key_number, blinded)
+            .await
+            .unwrap();
+        let masks = unblind(&numbers, &clients, &answer, &current.public_key);
+
+        let listed = directory_of(&st, "bob").await.unwrap();
+        let alice = reference_of(&pool, "alice").await.unwrap();
+        let found: Vec<&str> = listed
+            .entries
+            .iter()
+            .filter(|e| masks.contains(&e.mask))
+            .map(|e| e.reference.as_str())
+            .collect();
+        assert_eq!(
+            found,
+            vec![alice.as_str()],
+            "alice, and nobody for the unknown number"
+        );
+    }
+
+    /// Whether `who` may look for its contacts, read from the two routes that
+    /// require it.
+    async fn may_look_for_contacts(st: &Arc<AppState>, who: &str) -> bool {
+        let (_, blinded) = blind(&[NUMBER]);
+        let masked = send_batch(st, who, 1, blinded).await;
+        let listed = directory_of(st, who).await;
+        match (masked, listed) {
+            (Ok(_), Ok(_)) => true,
+            (Err(AppError::NotFindable), Err(AppError::NotFindable)) => false,
+            (m, d) => panic!(
+                "both routes must agree: {:?} and {:?}",
+                m.err().map(|e| e.to_string()),
+                d.err().map(|e| e.to_string())
+            ),
+        }
+    }
+
+    #[sqlx::test(migrations = "./migrations")]
+    async fn only_a_findable_account_may_look_for_its_contacts(pool: SqlitePool) {
+        let (ovh, inbox) = fake_ovhcloud(false).await;
+        let (clock, time) = crate::util::Clock::settable(T0);
+        let st = state_at(pool, whoami_hs().await, Some(ovh), clock);
+
+        assert!(!may_look_for_contacts(&st, "alice").await, "never proved");
+        assert!(
+            public_keys_of(&st, "alice").await.is_ok(),
+            "the public keys are for anybody"
+        );
+
+        prove(&st, &inbox, "alice", NUMBER).await;
+        assert!(may_look_for_contacts(&st, "alice").await, "proved");
+
+        withdraw_number(State(st.clone()), bearer("alice"))
+            .await
+            .unwrap();
+        assert!(!may_look_for_contacts(&st, "alice").await, "withdrawn");
+
+        prove(&st, &inbox, "bob", OTHER).await;
+        prove(&st, &inbox, "carol", OTHER).await;
+        assert!(
+            !may_look_for_contacts(&st, "bob").await,
+            "replaced by carol"
+        );
+        assert!(may_look_for_contacts(&st, "carol").await);
+
+        set(&time, T0 + PROOF_LIFETIME_SECONDS);
+        assert!(
+            !may_look_for_contacts(&st, "carol").await,
+            "run out on the 28th day"
+        );
+    }
+
+    #[sqlx::test(migrations = "./migrations")]
+    async fn the_directory_holds_the_current_proofs_and_is_the_same_for_everyone(pool: SqlitePool) {
+        let (ovh, inbox) = fake_ovhcloud(false).await;
+        let (clock, time) = crate::util::Clock::settable(T0);
+        let st = state_at(pool.clone(), whoami_hs().await, Some(ovh), clock);
+        prove(&st, &inbox, "dave", "+33611111111").await;
+        set(&time, T0 + DAY);
+        prove(&st, &inbox, "alice", NUMBER).await;
+        prove(&st, &inbox, "bob", OTHER).await;
+        prove(&st, &inbox, "carol", "+33622222222").await;
+        withdraw_number(State(st.clone()), bearer("carol"))
+            .await
+            .unwrap();
+        prove(&st, &inbox, "erin", "+33633333333").await;
+        prove(&st, &inbox, "frank", "+33633333333").await;
+        // Dave's proof, a day older than the others, runs out first.
+        set(&time, T0 + PROOF_LIFETIME_SECONDS);
+
+        let for_alice = directory_of(&st, "alice").await.unwrap();
+        let for_bob = directory_of(&st, "bob").await.unwrap();
+
+        let mut expected = Vec::new();
+        for who in ["alice", "bob", "frank"] {
+            expected.push(reference_of(&pool, who).await.unwrap());
+        }
+        let mut listed: Vec<String> = for_alice
+            .entries
+            .iter()
+            .map(|e| e.reference.clone())
+            .collect();
+        listed.sort();
+        expected.sort();
+        assert_eq!(
+            listed, expected,
+            "not carol (withdrawn), erin (replaced) nor dave (run out)"
+        );
+        let entries = |d: &Directory| {
+            d.entries
+                .iter()
+                .map(|e| (e.key_number, e.mask.clone(), e.reference.clone()))
+                .collect::<Vec<_>>()
+        };
+        assert_eq!(
+            entries(&for_alice),
+            entries(&for_bob),
+            "the same for everyone"
+        );
+        let masks: Vec<&String> = for_alice.entries.iter().map(|e| &e.mask).collect();
+        let mut by_mask = masks.clone();
+        by_mask.sort_by_key(|m| BASE64.decode(m.as_bytes()).unwrap());
+        assert_eq!(
+            masks, by_mask,
+            "in the order of the masks, not of the proofs"
+        );
+    }
+
+    #[sqlx::test(migrations = "./migrations")]
+    async fn a_batch_that_is_not_one_is_refused(pool: SqlitePool) {
+        let (ovh, inbox) = fake_ovhcloud(false).await;
+        let st = state_with(pool, whoami_hs().await, Some(ovh));
+        prove(&st, &inbox, "alice", NUMBER).await;
+        let (_, one) = blind(&[NUMBER]);
+
+        let refused = |r: Result<MaskedBatch, AppError>| match r {
+            Err(AppError::NotABatch) => "not a batch",
+            Err(AppError::UnknownMaskingKey) => "unknown key",
+            Err(_) => "another refusal",
+            Ok(_) => "masked",
+        };
+        assert_eq!(
+            refused(send_batch(&st, "alice", 1, vec![]).await),
+            "not a batch"
+        );
+        assert_eq!(
+            refused(send_batch(&st, "alice", 1, vec!["not base64 !".into()]).await),
+            "not a batch"
+        );
+        assert_eq!(
+            refused(send_batch(&st, "alice", 1, vec![BASE64.encode(&[0xff; 32])]).await),
+            "not a batch",
+            "32 bytes that are not a point of the group"
+        );
+        assert_eq!(
+            refused(send_batch(&st, "alice", 1, vec![one[0].clone(); MAX_BATCH + 1]).await),
+            "not a batch"
+        );
+        assert_eq!(
+            refused(send_batch(&st, "alice", 1, vec![one[0].clone(); MAX_BATCH]).await),
+            "masked",
+            "the largest batch one request may carry"
+        );
+        assert_eq!(
+            refused(send_batch(&st, "alice", 2, one).await),
+            "unknown key"
+        );
+    }
+
+    #[sqlx::test(migrations = "./migrations")]
+    async fn without_its_keys_discovery_serves_neither_keys_nor_directory(pool: SqlitePool) {
+        let st = state_with(pool, whoami_hs().await, None);
+        assert!(matches!(
+            public_keys_of(&st, "alice").await,
+            Err(AppError::DiscoveryOff)
+        ));
+        assert!(matches!(
+            directory_of(&st, "alice").await,
+            Err(AppError::DiscoveryOff)
+        ));
+    }
+
+    /// The shape the application reads, field by field: a rename here breaks
+    /// it without breaking any test above, which read the structures.
+    #[test]
+    fn what_the_three_routes_answer_is_named_as_the_application_reads_it() {
+        let keys = serde_json::to_value(PublicKeys {
+            keys: vec![PublicKey {
+                key_number: 1,
+                public_key: "pk".into(),
+            }],
+        })
+        .unwrap();
+        assert_eq!(
+            keys,
+            serde_json::json!({"keys": [{"key_number": 1, "public_key": "pk"}]})
+        );
+        let masked = serde_json::to_value(MaskedBatch {
+            key_number: 1,
+            evaluated: vec!["e".into()],
+            batch_proof: "p".into(),
+        })
+        .unwrap();
+        assert_eq!(
+            masked,
+            serde_json::json!({"key_number": 1, "evaluated": ["e"], "batch_proof": "p"})
+        );
+        let listed = serde_json::to_value(Directory {
+            entries: vec![DirectoryEntry {
+                key_number: 1,
+                mask: "m".into(),
+                reference: "r".into(),
+            }],
+        })
+        .unwrap();
+        assert_eq!(
+            listed,
+            serde_json::json!({"entries": [{"key_number": 1, "mask": "m", "reference": "r"}]})
+        );
+        let asked: MaskRequest =
+            serde_json::from_value(serde_json::json!({"key_number": 2, "blinded": ["b"]})).unwrap();
+        assert_eq!(
+            (asked.key_number, asked.blinded),
+            (2, vec!["b".to_string()])
+        );
+    }
+
+    /// Two keys in service, as during a planned change: both are published, a
+    /// batch is masked under whichever it names, and each directory entry
+    /// says the key its mask was made under.
+    #[sqlx::test(migrations = "./migrations")]
+    async fn with_two_keys_in_service_each_mask_is_found_under_its_own(pool: SqlitePool) {
+        let (ovh, inbox) = fake_ovhcloud(false).await;
+        let hs = whoami_hs().await;
+        let one_key = state_with(pool.clone(), hs.clone(), Some(ovh.clone()));
+        prove(&one_key, &inbox, "alice", NUMBER).await;
+
+        let mut cfg = discovery_config(&hs, Some(ovh), crate::util::Clock::system());
+        let both = crate::masking::MaskingKeys::new(vec![
+            crate::masking::MaskingKey::from_seed(1, &[0x01; 32]).unwrap(),
+            crate::masking::MaskingKey::from_seed(2, &[0x02; 32]).unwrap(),
+        ])
+        .unwrap();
+        cfg.masking_keys = Some(Arc::new(both));
+        let two_keys = state_from(pool, hs, cfg);
+        prove(&two_keys, &inbox, "bob", OTHER).await;
+
+        let keys = public_keys_of(&two_keys, "bob").await.unwrap();
+        assert_eq!(
+            keys.keys.iter().map(|k| k.key_number).collect::<Vec<_>>(),
+            vec![1, 2],
+            "both, the current one last"
+        );
+        let listed = directory_of(&two_keys, "bob").await.unwrap();
+        for (key, number, who) in [
+            (&keys.keys[0], NUMBER, "alice"),
+            (&keys.keys[1], OTHER, "bob"),
+        ] {
+            let (clients, blinded) = blind(&[number]);
+            let answer = send_batch(&two_keys, "bob", key.key_number, blinded)
+                .await
+                .unwrap();
+            assert_eq!(answer.key_number, key.key_number);
+            let masks = unblind(&[number], &clients, &answer, &key.public_key);
+            let found: Vec<(u32, &str)> = listed
+                .entries
+                .iter()
+                .filter(|e| masks.contains(&e.mask))
+                .map(|e| (e.key_number, e.reference.as_str()))
+                .collect();
+            let reference = reference_of(&two_keys.pool, who).await.unwrap();
+            assert_eq!(found, vec![(key.key_number, reference.as_str())], "{who}");
+        }
     }
 }
