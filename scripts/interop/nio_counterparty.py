@@ -1237,9 +1237,15 @@ async def witness_deletion(session_file: Path, store: Path) -> int:
 
     Ce témoin ne connaît pas le mot de passe du compte, que seule
     l'application a reçu : il ne peut pas constater qu'il n'ouvre plus rien.
-    Il constate ce que le serveur fait d'un compte désactivé, mesuré en
-    production le 26 septembre 2026 (commentaire de #381) : le compte n'a plus
-    aucun appareil, et il a quitté la conversation qu'ils partagent.
+    Il constate ce que le serveur fait d'un compte désactivé : le compte a
+    quitté la conversation qu'ils partagent, et il n'a plus aucun appareil.
+
+    LE DÉPART EST MESURÉ, LE RETRAIT DES APPAREILS NE L'ÉTAIT PAS. Le départ
+    l'a été en production le 26 septembre 2026 (commentaire de #381). Pas le
+    retrait des appareils : le compte d'essai, réclamé par script, n'en avait
+    publié aucun, et « aucun appareil » après la désactivation n'y prouvait
+    rien. Ce témoin est le premier à le mesurer, sur un compte qui a publié
+    les siens.
 
     LES DEUX, ET CHACUN POUR SA RAISON. Quitter la conversation ne prouvera
     plus rien le jour où l'application le fera d'elle-même avant de désactiver

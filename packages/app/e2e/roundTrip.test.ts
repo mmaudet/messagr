@@ -818,13 +818,14 @@ describeRoundTrip('encrypted round trip', () => {
     await waitFor(element(by.id('account-deleted')))
       .toBeVisible()
       .withTimeout(60000)
-    await device.takeScreenshot('suppression-2-la-cloture')
+    await device.takeScreenshot('suppression-2-le-compte-supprime')
 
     // LE JUGE, ET IL N'EST PAS CETTE APPLICATION. Il ne connaît pas le mot de
     // passe du compte, que seule l'application a reçu ; il constate ce que le
-    // serveur fait d'un compte désactivé (mesuré le 26 septembre 2026,
-    // commentaire de #381) : plus aucun appareil, et parti de la conversation
-    // qu'ils partagent. `witness_deletion` dit pourquoi il faut les deux.
+    // serveur fait d'un compte désactivé : parti de la conversation qu'ils
+    // partagent, ce qui a été mesuré le 26 septembre 2026 (commentaire de
+    // #381), et plus aucun appareil, ce que ce test est le premier à mesurer.
+    // `witness_deletion` dit pourquoi il faut les deux.
     runCounterparty('witness-deletion')
 
     // LE LANCEMENT À FROID SUIVANT OUBLIE LE COMPTE : l'écran d'un appareil
