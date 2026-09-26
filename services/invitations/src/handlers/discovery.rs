@@ -28,12 +28,15 @@ use std::sync::Arc;
 use axum::{extract::State, http::HeaderMap, Json};
 use serde::{Deserialize, Serialize};
 
-use crate::{auth, countries as country, crypto, error::AppError, extract::Body, sms, AppState};
+use crate::{
+    auth, ceilings, countries as country, crypto, error::AppError, extract::Body, sms, sms_history,
+    AppState,
+};
 
 /// How long a code stays good: said to the provider as well, which does not
 /// deliver it later.
 const CODE_LIFETIME_MINUTES: i64 = 10;
-const CODE_LIFETIME_SECONDS: i64 = CODE_LIFETIME_MINUTES * 60;
+pub(crate) const CODE_LIFETIME_SECONDS: i64 = CODE_LIFETIME_MINUTES * 60;
 /// How many wrong codes end a proof.
 const ATTEMPTS: u32 = 5;
 /// How long a proof lasts: the shortest month, since a number can change hands
@@ -67,7 +70,8 @@ pub async fn start_proof(
     Body(req): Body<StartRequest>,
 ) -> Result<Json<Started>, AppError> {
     let user = auth::authenticate(&st.mx, &headers).await?;
-    let (keys, ovhcloud) = served(&st)?;
+    let served = served(&st)?;
+    let keys = served.keys;
     if !country::is_international(&req.number) {
         return Err(AppError::NotANumber);
     }
@@ -76,7 +80,7 @@ pub async fn start_proof(
     // WHO SENDS IS THE COUNTRY'S PROVIDER. One today; a second one (Q24)
     // gets its arm here, and the compiler asks for it.
     let sender = match open.provider {
-        country::Provider::Ovhcloud => ovhcloud,
+        country::Provider::Ovhcloud => served.provider,
     };
     let key = keys.current();
     let mask = key
@@ -84,6 +88,25 @@ pub async fn start_proof(
         .map_err(|e| anyhow::anyhow!("masking a number: {e}"))?;
     let code = crypto::proof_code();
     let now = st.cfg.clock.now();
+
+    // THE CEILINGS OF #399, before anything is kept or sent, and the code is
+    // counted by the same step (`ceilings`). A renewal proves again the
+    // number this account proves now: it goes through a country's ceiling
+    // and the budget, never through the account's own.
+    let asked = ceilings::Asked {
+        user: &user,
+        country: &open.code,
+        renewal: proves_it_now(&st, keys, &user, &req.number, now).await?,
+        at: now,
+    };
+    let counted = match ceilings::count_if_allowed(&st.pool, &st.cfg.sms_ceilings, &asked).await? {
+        ceilings::Verdict::Counted(counted) => counted,
+        ceilings::Verdict::TooMany { retry_at } => return Err(AppError::TooManyCodes { retry_at }),
+        ceilings::Verdict::Later(reached) => {
+            ceilings::tell_the_operator(&st, sender, served.operator, &reached, now).await;
+            return Err(AppError::SmsLater);
+        }
+    };
 
     // ONE PROOF IN PROGRESS PER ACCOUNT: asking again replaces the code, and
     // the attempts start over with it.
@@ -106,13 +129,20 @@ pub async fn start_proof(
     // withdraws the proof it was for: nobody holds its code. The job's id,
     // on success, is what #399 deletes the SMS at OVHcloud by.
     let message = sms::proof_message(&req.language, &code);
-    if let Err(refused) = sender
+    match sender
         .send(&req.number, &message, CODE_LIFETIME_MINUTES, now)
         .await
     {
-        tracing::warn!("a proof's code was not sent: {refused}");
-        forget_the_proof(&st, &user).await?;
-        return Err(AppError::SmsNotSent);
+        Err(refused) => {
+            tracing::warn!("a proof's code was not sent: {refused}");
+            forget_the_proof(&st, &user).await?;
+            ceilings::release(&st.pool, counted).await?;
+            return Err(AppError::SmsNotSent);
+        }
+        // TO BE ERASED from OVHcloud's history once the code has run out.
+        Ok(message_id) => {
+            sms_history::remember(&st.pool, message_id, now + CODE_LIFETIME_SECONDS).await?;
+        }
     }
     Ok(Json(Started {
         provider: open.provider.name(),
@@ -379,8 +409,39 @@ pub async fn keys_of_live_masks_are_held(
     Ok(())
 }
 
-/// The keys and the provider, or `DiscoveryOff` (`Config::discovery`).
-fn served(st: &AppState) -> Result<(&crate::masking::MaskingKeys, &sms::Ovhcloud), AppError> {
+/// Whether `user` proves `number` now: a running proof of that number, made
+/// under any key still in service. A proof that ran out, or was withdrawn, is
+/// not one: proving the number again is a new proof.
+async fn proves_it_now(
+    st: &AppState,
+    keys: &crate::masking::MaskingKeys,
+    user: &str,
+    number: &str,
+    now: i64,
+) -> Result<bool, AppError> {
+    let running: Option<(i64, Vec<u8>)> = sqlx::query_as(
+        "SELECT key_id, mask FROM findable_numbers \
+         WHERE user_id = ? AND withdrawn_at IS NULL AND expires_at > ?",
+    )
+    .bind(user)
+    .bind(now)
+    .fetch_optional(&st.pool)
+    .await
+    .map_err(anyhow::Error::from)?;
+    let Some((key_id, mask)) = running else {
+        return Ok(false);
+    };
+    let Some(key) = u32::try_from(key_id).ok().and_then(|id| keys.get(id)) else {
+        return Ok(false);
+    };
+    let again = key
+        .mask(number.as_bytes())
+        .map_err(|e| anyhow::anyhow!("masking a number: {e}"))?;
+    Ok(again.as_slice() == mask.as_slice())
+}
+
+/// What discovery serves with, or `DiscoveryOff` (`Config::discovery`).
+fn served(st: &AppState) -> Result<crate::config::Discovery<'_>, AppError> {
     st.cfg.discovery().map_err(|_| AppError::DiscoveryOff)
 }
 
@@ -424,28 +485,61 @@ mod tests {
     #[derive(Default)]
     struct Inbox {
         sent: Vec<(Vec<String>, String)>,
+        /// The ids OVHcloud was asked to erase from its history (#399).
+        erased: Vec<u64>,
     }
 
     async fn fake_ovhcloud(refuse: bool) -> (String, Arc<Mutex<Inbox>>) {
+        fake_ovhcloud_with(refuse, 0, 1_000.0).await
+    }
+
+    /// The same, answering each SMS after `delay_ms`, and saying
+    /// `credits_left` of the account.
+    async fn fake_ovhcloud_with(
+        refuse: bool,
+        delay_ms: u64,
+        credits_left: f64,
+    ) -> (String, Arc<Mutex<Inbox>>) {
         let inbox = Arc::new(Mutex::new(Inbox::default()));
         let kept = inbox.clone();
-        let app = axum::Router::new().route(
-            "/sms/sms-test-1/jobs",
-            post(move |Json(body): Json<serde_json::Value>| {
-                let kept = kept.clone();
-                async move {
-                    let receivers: Vec<String> =
-                        serde_json::from_value(body["receivers"].clone()).unwrap();
-                    let message = body["message"].as_str().unwrap().to_string();
-                    kept.lock().unwrap().sent.push((receivers, message));
-                    if refuse {
-                        Json(serde_json::json!({"ids": [], "invalidReceivers": [NUMBER]}))
-                    } else {
-                        Json(serde_json::json!({"ids": [7], "invalidReceivers": []}))
+        let erasing = inbox.clone();
+        let app = axum::Router::new()
+            .route(
+                "/sms/sms-test-1",
+                get(move || async move { Json(serde_json::json!({"creditsLeft": credits_left})) }),
+            )
+            .route(
+                "/sms/sms-test-1/jobs",
+                post(move |Json(body): Json<serde_json::Value>| {
+                    let kept = kept.clone();
+                    async move {
+                        tokio::time::sleep(std::time::Duration::from_millis(delay_ms)).await;
+                        let receivers: Vec<String> =
+                            serde_json::from_value(body["receivers"].clone()).unwrap();
+                        let message = body["message"].as_str().unwrap().to_string();
+                        let mut inbox = kept.lock().unwrap();
+                        inbox.sent.push((receivers, message));
+                        // One id per SMS, as OVHcloud answers: the one its
+                        // history knows the SMS by.
+                        let id = inbox.sent.len();
+                        if refuse {
+                            Json(serde_json::json!({"ids": [], "invalidReceivers": [NUMBER]}))
+                        } else {
+                            Json(serde_json::json!({"ids": [id], "invalidReceivers": []}))
+                        }
                     }
-                }
-            }),
-        );
+                }),
+            )
+            .route(
+                "/sms/sms-test-1/outgoing/:id",
+                axum::routing::delete(move |axum::extract::Path(id): axum::extract::Path<u64>| {
+                    let erasing = erasing.clone();
+                    async move {
+                        erasing.lock().unwrap().erased.push(id);
+                        Json(serde_json::Value::Null)
+                    }
+                }),
+            );
         let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
         let base = format!("http://{}", listener.local_addr().unwrap());
         tokio::spawn(async move { axum::serve(listener, app).await.unwrap() });
@@ -468,24 +562,39 @@ mod tests {
         ovh: Option<String>,
         clock: crate::util::Clock,
     ) -> Arc<AppState> {
+        let cfg = discovery_config(&hs, ovh, clock);
+        state_from(pool, hs, cfg)
+    }
+
+    fn state_from(pool: SqlitePool, hs: String, cfg: crate::config::Config) -> Arc<AppState> {
         Arc::new(AppState {
             pool,
-            mx: Arc::new(crate::matrix::MatrixClient::new(hs.clone(), "token".into())),
-            cfg: crate::config::Config {
-                homeserver_url: hs,
-                masking_keys: ovh.as_ref().map(|_| keys()),
-                sms_provider: ovh.map(|base_url| sms::Ovhcloud {
-                    base_url,
-                    application_key: "ak".into(),
-                    application_secret: "as".into(),
-                    consumer_key: "ck".into(),
-                    service_name: "sms-test-1".into(),
-                    sender: "Messagr".into(),
-                }),
-                clock,
-                ..crate::config::Config::for_tests()
-            },
+            mx: Arc::new(crate::matrix::MatrixClient::new(hs, "token".into())),
+            cfg,
         })
+    }
+
+    /// Discovery served through a fake OVHcloud at `ovh`, when there is one.
+    fn discovery_config(
+        hs: &str,
+        ovh: Option<String>,
+        clock: crate::util::Clock,
+    ) -> crate::config::Config {
+        crate::config::Config {
+            homeserver_url: hs.to_string(),
+            alert_sms_to: ovh.as_ref().map(|_| ALERT.to_string()),
+            masking_keys: ovh.as_ref().map(|_| keys()),
+            sms_provider: ovh.map(|base_url| sms::Ovhcloud {
+                base_url,
+                application_key: "ak".into(),
+                application_secret: "as".into(),
+                consumer_key: "ck".into(),
+                service_name: "sms-test-1".into(),
+                sender: "Messagr".into(),
+            }),
+            clock,
+            ..crate::config::Config::for_tests()
+        }
     }
 
     async fn reading(st: &Arc<AppState>, who: &str) -> DiscoveryState {
@@ -874,6 +983,287 @@ mod tests {
         prove(&st, &inbox, "bob", NUMBER).await;
 
         assert_eq!(reading(&st, "alice").await.ended, Some(Ended::Replaced));
+    }
+
+    const ALERT: &str = "+33600000000";
+
+    fn sent_to(inbox: &Arc<Mutex<Inbox>>, number: &str) -> usize {
+        inbox
+            .lock()
+            .unwrap()
+            .sent
+            .iter()
+            .filter(|(receivers, _)| receivers.iter().any(|r| r == number))
+            .count()
+    }
+
+    #[sqlx::test(migrations = "./migrations")]
+    async fn an_account_gets_three_codes_a_day_and_ten_in_thirty_days(pool: SqlitePool) {
+        let (ovh, _) = fake_ovhcloud(false).await;
+        let (clock, time) = crate::util::Clock::settable(T0);
+        let st = state_at(pool, whoami_hs().await, Some(ovh), clock);
+
+        for _ in 0..3 {
+            start(&st, "alice", NUMBER).await.unwrap();
+        }
+        match start(&st, "alice", NUMBER).await {
+            Err(AppError::TooManyCodes { retry_at }) => assert_eq!(retry_at, T0 + DAY),
+            other => panic!("the fourth code of the day: {:?}", other.err()),
+        }
+        for day in 1..=2 {
+            set(&time, T0 + day * DAY);
+            for _ in 0..3 {
+                start(&st, "alice", NUMBER).await.unwrap();
+            }
+        }
+        set(&time, T0 + 3 * DAY);
+        start(&st, "alice", NUMBER)
+            .await
+            .expect("the tenth code in thirty days");
+        match start(&st, "alice", NUMBER).await {
+            Err(AppError::TooManyCodes { retry_at }) => assert_eq!(retry_at, T0 + 30 * DAY),
+            other => panic!("the eleventh code in thirty days: {:?}", other.err()),
+        }
+    }
+
+    #[sqlx::test(migrations = "./migrations")]
+    async fn a_country_s_ceiling_holds_new_proofs_back_but_lets_renewals_through(pool: SqlitePool) {
+        let (ovh, inbox) = fake_ovhcloud(false).await;
+        let hs = whoami_hs().await;
+        let (clock, _) = crate::util::Clock::settable(T0);
+        let st = state_from(
+            pool,
+            hs.clone(),
+            crate::config::Config {
+                sms_ceilings: crate::config::SmsCeilings {
+                    per_country_day: 2,
+                    ..crate::config::SmsCeilings::default()
+                },
+                ..discovery_config(&hs, Some(ovh), clock)
+            },
+        );
+
+        prove(&st, &inbox, "alice", "+33612345678").await;
+        start(&st, "bob", "+33612345679")
+            .await
+            .expect("the second SMS of the day");
+        assert!(matches!(
+            start(&st, "carol", "+33612345670").await,
+            Err(AppError::SmsLater)
+        ));
+        assert_eq!(sent_to(&inbox, ALERT), 1, "the operator is told");
+        assert!(matches!(
+            start(&st, "dave", "+33612345671").await,
+            Err(AppError::SmsLater)
+        ));
+        assert_eq!(sent_to(&inbox, ALERT), 1, "and told once");
+
+        start(&st, "alice", "+33612345678")
+            .await
+            .expect("a renewal passes");
+        start(&st, "erin", "+4915123456789")
+            .await
+            .expect("another country is not held back");
+    }
+
+    #[sqlx::test(migrations = "./migrations")]
+    async fn the_monthly_budget_holds_new_proofs_back_but_lets_renewals_through(pool: SqlitePool) {
+        let (ovh, inbox) = fake_ovhcloud(false).await;
+        let hs = whoami_hs().await;
+        let (clock, time) = crate::util::Clock::settable(T0);
+        let st = state_from(
+            pool,
+            hs.clone(),
+            crate::config::Config {
+                sms_ceilings: crate::config::SmsCeilings {
+                    budget: 2,
+                    ..crate::config::SmsCeilings::default()
+                },
+                ..discovery_config(&hs, Some(ovh), clock)
+            },
+        );
+
+        let day0 = T0.div_euclid(DAY);
+        prove(&st, &inbox, "alice", "+33612345678").await;
+        set(&time, T0 + 5 * DAY);
+        start(&st, "bob", "+4915123456789")
+            .await
+            .expect("the second SMS of the month");
+        assert!(matches!(
+            start(&st, "carol", "+33612345670").await,
+            Err(AppError::SmsLater)
+        ));
+        assert_eq!(sent_to(&inbox, ALERT), 1, "the operator is told");
+        start(&st, "alice", "+33612345678")
+            .await
+            .expect("a renewal passes beyond the budget");
+
+        // A renewal goes through, and still spends: the budget, counted by
+        // calendar days, frees itself once the fifth day, bob's SMS and
+        // alice's, leaves its thirty days.
+        set(&time, (day0 + 35) * DAY - 1);
+        assert!(matches!(
+            start(&st, "carol", "+33612345670").await,
+            Err(AppError::SmsLater)
+        ));
+        set(&time, (day0 + 35) * DAY);
+        start(&st, "carol", "+33612345670")
+            .await
+            .expect("the budget frees itself with the window");
+    }
+
+    #[sqlx::test(migrations = "./migrations")]
+    async fn requests_sent_together_cannot_get_past_an_account_s_ceiling(pool: SqlitePool) {
+        // OVHcloud answers slowly, so that all five requests have read the
+        // counts before the first SMS is sent.
+        let (ovh, inbox) = fake_ovhcloud_with(false, 100, 1_000.0).await;
+        let (clock, _) = crate::util::Clock::settable(T0);
+        let st = state_at(pool, whoami_hs().await, Some(ovh), clock);
+
+        let (a, b, c, d, e) = tokio::join!(
+            start(&st, "alice", NUMBER),
+            start(&st, "alice", NUMBER),
+            start(&st, "alice", NUMBER),
+            start(&st, "alice", NUMBER),
+            start(&st, "alice", NUMBER),
+        );
+        let sent = [a, b, c, d, e].into_iter().filter(Result::is_ok).count();
+        assert_eq!(sent, 3, "three codes a day, however they are asked for");
+        assert_eq!(sent_to(&inbox, NUMBER), 3);
+    }
+
+    #[sqlx::test(migrations = "./migrations")]
+    async fn a_renewal_is_a_running_proof_of_the_same_number_under_any_key_in_service(
+        pool: SqlitePool,
+    ) {
+        let (ovh, inbox) = fake_ovhcloud(false).await;
+        let hs = whoami_hs().await;
+        let (clock, time) = crate::util::Clock::settable(T0);
+        // Proved under key 1, alone in service then.
+        let first = state_from(
+            pool.clone(),
+            hs.clone(),
+            discovery_config(&hs, Some(ovh.clone()), clock.clone()),
+        );
+        prove(&first, &inbox, "alice", "+33612345678").await;
+        prove(&first, &inbox, "bob", "+33612345679").await;
+
+        // Key 2 joins and becomes the current one: both serve together.
+        let key = |id, byte| crate::masking::MaskingKey::from_seed(id, &[byte; 32]).unwrap();
+        let both =
+            Arc::new(crate::masking::MaskingKeys::new(vec![key(1, 0x01), key(2, 0x02)]).unwrap());
+        let later = state_from(
+            pool,
+            hs.clone(),
+            crate::config::Config {
+                masking_keys: Some(both),
+                sms_ceilings: crate::config::SmsCeilings {
+                    per_country_day: 0,
+                    ..crate::config::SmsCeilings::default()
+                },
+                ..discovery_config(&hs, Some(ovh), clock)
+            },
+        );
+        start(&later, "alice", "+33612345678")
+            .await
+            .expect("a renewal of a number proved under the older key passes");
+
+        // Bob's proof ran out: proving his number again is a new proof.
+        set(&time, T0 + 28 * DAY);
+        assert!(matches!(
+            start(&later, "bob", "+33612345679").await,
+            Err(AppError::SmsLater)
+        ));
+    }
+
+    #[sqlx::test(migrations = "./migrations")]
+    async fn an_alert_is_erased_only_once_it_has_had_a_day_to_arrive(pool: SqlitePool) {
+        let (ovh, inbox) = fake_ovhcloud(false).await;
+        let hs = whoami_hs().await;
+        let (clock, _) = crate::util::Clock::settable(T0);
+        let st = state_from(
+            pool,
+            hs.clone(),
+            crate::config::Config {
+                sms_ceilings: crate::config::SmsCeilings {
+                    per_country_day: 0,
+                    ..crate::config::SmsCeilings::default()
+                },
+                ..discovery_config(&hs, Some(ovh), clock)
+            },
+        );
+        assert!(matches!(
+            start(&st, "alice", NUMBER).await,
+            Err(AppError::SmsLater)
+        ));
+        assert_eq!(sent_to(&inbox, ALERT), 1);
+
+        let an_hour_later = T0 + 3_600;
+        assert_eq!(
+            crate::sms_history::erase_due(&st, an_hour_later)
+                .await
+                .unwrap(),
+            0
+        );
+        let a_day_later = T0 + DAY;
+        assert_eq!(
+            crate::sms_history::erase_due(&st, a_day_later)
+                .await
+                .unwrap(),
+            1
+        );
+        assert_eq!(inbox.lock().unwrap().erased, [1]);
+    }
+
+    #[sqlx::test(migrations = "./migrations")]
+    async fn the_operator_is_told_once_a_day_when_the_prepaid_credits_run_low(pool: SqlitePool) {
+        let (ovh, inbox) = fake_ovhcloud_with(false, 0, 12.0).await;
+        let (clock, _) = crate::util::Clock::settable(T0);
+        let st = state_at(pool, whoami_hs().await, Some(ovh), clock);
+
+        crate::ceilings::check_the_credits(&st, T0).await.unwrap();
+        assert_eq!(
+            sent_to(&inbox, ALERT),
+            1,
+            "12 credits left, under the threshold"
+        );
+        crate::ceilings::check_the_credits(&st, T0 + 3_600)
+            .await
+            .unwrap();
+        assert_eq!(sent_to(&inbox, ALERT), 1, "told once a day");
+        crate::ceilings::check_the_credits(&st, T0 + DAY)
+            .await
+            .unwrap();
+        assert_eq!(sent_to(&inbox, ALERT), 2, "and the next day again");
+    }
+
+    #[sqlx::test(migrations = "./migrations")]
+    async fn every_code_is_erased_at_ovhcloud_once_it_has_run_out(pool: SqlitePool) {
+        let (ovh, inbox) = fake_ovhcloud(false).await;
+        let (clock, _) = crate::util::Clock::settable(T0);
+        let st = state_at(pool, whoami_hs().await, Some(ovh), clock);
+        start(&st, "alice", NUMBER).await.unwrap();
+
+        let still_good = T0 + CODE_LIFETIME_SECONDS - 1;
+        assert_eq!(
+            crate::sms_history::erase_due(&st, still_good)
+                .await
+                .unwrap(),
+            0
+        );
+        assert!(inbox.lock().unwrap().erased.is_empty());
+
+        let run_out = T0 + CODE_LIFETIME_SECONDS;
+        assert_eq!(
+            crate::sms_history::erase_due(&st, run_out).await.unwrap(),
+            1
+        );
+        assert_eq!(inbox.lock().unwrap().erased, [1]);
+        assert_eq!(
+            crate::sms_history::erase_due(&st, run_out).await.unwrap(),
+            0,
+            "erased once"
+        );
     }
 
     #[sqlx::test(migrations = "./migrations")]

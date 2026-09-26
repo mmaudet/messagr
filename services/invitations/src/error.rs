@@ -404,6 +404,14 @@ pub enum AppError {
     /// Not the code that was sent. After the fifth, the proof ends.
     #[error("this is not the code that was sent ({attempts_left} attempts left)")]
     CodeWrong { attempts_left: u32 },
+    /// This account asked for more codes than it may (#399): three a day, ten
+    /// in thirty days. `retry_at` is when it may ask again, in Unix time.
+    #[error("too many codes were asked for from this account: try again later")]
+    TooManyCodes { retry_at: i64 },
+    /// A country's ceiling or the service's budget is reached (#399): new
+    /// proofs wait, and renewals go through.
+    #[error("no new code can be sent for now: try again later")]
+    SmsLater,
     #[error(transparent)]
     Internal(#[from] anyhow::Error),
 }
@@ -544,6 +552,10 @@ impl IntoResponse for AppError {
             AppError::NoProofPending => (StatusCode::NOT_FOUND, "MESSAGR_NO_PROOF_PENDING"),
             AppError::CodeExpired => (StatusCode::GONE, "MESSAGR_CODE_EXPIRED"),
             AppError::CodeWrong { .. } => (StatusCode::BAD_REQUEST, "MESSAGR_CODE_WRONG"),
+            AppError::TooManyCodes { .. } => {
+                (StatusCode::TOO_MANY_REQUESTS, "MESSAGR_TOO_MANY_CODES")
+            }
+            AppError::SmsLater => (StatusCode::SERVICE_UNAVAILABLE, "MESSAGR_SMS_LATER"),
             AppError::Internal(_) => (StatusCode::INTERNAL_SERVER_ERROR, "M_UNKNOWN"),
         };
         let message = match &self {
@@ -555,10 +567,15 @@ impl IntoResponse for AppError {
             other => other.to_string(),
         };
         let mut body = serde_json::json!({"errcode": errcode, "error": message});
-        // The one refusal whose number the application shows in its own
-        // language, so it travels as a number and not only inside the text.
+        // THE TWO REFUSALS WHOSE NUMBER THE APPLICATION SAYS in its own
+        // language: how many attempts a wrong code leaves, and when an account
+        // may ask for a code again (#399). Each travels as a number of its
+        // own, not only inside the text.
         if let AppError::CodeWrong { attempts_left } = &self {
             body["attempts_left"] = serde_json::json!(attempts_left);
+        }
+        if let AppError::TooManyCodes { retry_at } = &self {
+            body["retry_at"] = serde_json::json!(retry_at);
         }
         (code, Json(body)).into_response()
     }
@@ -826,6 +843,20 @@ mod tests {
         assert_eq!(got, StatusCode::BAD_REQUEST);
         assert_eq!(body["errcode"], "MESSAGR_CODE_WRONG");
         assert_eq!(body["attempts_left"], 3);
+
+        // THE CEILINGS OF #399: an account told when it may ask again, in a
+        // field of its own, and a ceiling beyond it told only to wait.
+        let (got, body) = render(AppError::TooManyCodes {
+            retry_at: 1_790_086_400,
+        })
+        .await;
+        assert_eq!(got, StatusCode::TOO_MANY_REQUESTS);
+        assert_eq!(body["errcode"], "MESSAGR_TOO_MANY_CODES");
+        assert_eq!(body["retry_at"], 1_790_086_400_i64);
+        let (got, body) = render(AppError::SmsLater).await;
+        assert_eq!(got, StatusCode::SERVICE_UNAVAILABLE);
+        assert_eq!(body["errcode"], "MESSAGR_SMS_LATER");
+        assert!(body.get("retry_at").is_none(), "{body}");
     }
 
     /// Renders an error and extracts (status, JSON body) from it.

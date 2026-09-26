@@ -819,4 +819,8 @@ export const de: Readonly<Record<CopyKey, string>> = {
     'Ihre Nummer macht jetzt ein anderes Konto auffindbar.',
   list_findable_renew_action: 'Nachweis erneuern',
   list_findable_prove_action: 'Meine Nummer nachweisen',
+  'findable_too_many %1$@ %2$@':
+    'Sie haben zu viele Codes angefordert. Versuchen Sie es am %1$@ um %2$@ erneut.',
+  findable_later:
+    'Gerade werden zu viele Codes angefordert. Versuchen Sie es später erneut.',
 }

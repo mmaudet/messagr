@@ -801,4 +801,8 @@ export const nl: Readonly<Record<CopyKey, string>> = {
   list_findable_replaced: 'Uw nummer maakt nu een ander account vindbaar.',
   list_findable_renew_action: 'Het bewijs vernieuwen',
   list_findable_prove_action: 'Mijn nummer bewijzen',
+  'findable_too_many %1$@ %2$@':
+    'U hebt te veel codes aangevraagd. Probeer het opnieuw op %1$@ om %2$@.',
+  findable_later:
+    'Er worden op dit moment te veel codes aangevraagd. Probeer het later opnieuw.',
 }

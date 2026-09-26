@@ -810,4 +810,8 @@ export const uz: Readonly<Record<CopyKey, string>> = {
   list_findable_replaced: 'Raqamingiz endi boshqa hisobni topiladigan qiladi.',
   list_findable_renew_action: 'Isbotni yangilash',
   list_findable_prove_action: 'Raqamimni isbotlash',
+  'findable_too_many %1$@ %2$@':
+    'Siz juda koʻp kod soʻradingiz. %1$@ kuni soat %2$@ dan keyin qayta urinib koʻring.',
+  findable_later:
+    'Hozir juda koʻp kod soʻralmoqda. Keyinroq qayta urinib koʻring.',
 }

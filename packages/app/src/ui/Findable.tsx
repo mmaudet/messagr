@@ -23,7 +23,7 @@ import {
   type WithdrawRefusal,
 } from '../runtime/discovery'
 import { NotchedButton } from './NotchedButton'
-import { dayOf } from './whenLabel'
+import { dayOf, timeOf } from './whenLabel'
 
 /**
  * « Être trouvable », from Settings (#397, #392): the consent, the number,
@@ -164,13 +164,30 @@ function Consent({
   )
 }
 
-const START_REFUSED: Record<StartRefusal, CopyKey> = {
-  closed: 'findable_number_closed',
-  'no-country-code': 'findable_number_country_code',
-  'not-a-number': 'findable_number_not_a_number',
-  off: 'findable_off',
-  'not-sent': 'findable_not_sent',
-  unreachable: 'findable_unreachable',
+/** The sentence of a refusal, with the day and hour to ask again when there is one. */
+function startRefused(refused: StartRefusal): string {
+  switch (refused.why) {
+    case 'too-many':
+      return t(
+        'findable_too_many %1$@ %2$@',
+        dayOf(refused.retryAt),
+        timeOf(refused.retryAt),
+      )
+    case 'closed':
+      return t('findable_number_closed')
+    case 'no-country-code':
+      return t('findable_number_country_code')
+    case 'not-a-number':
+      return t('findable_number_not_a_number')
+    case 'off':
+      return t('findable_off')
+    case 'not-sent':
+      return t('findable_not_sent')
+    case 'later':
+      return t('findable_later')
+    case 'unreachable':
+      return t('findable_unreachable')
+  }
 }
 
 function TheNumber({
@@ -194,7 +211,7 @@ function TheNumber({
   // than the verdict and takes its place until the number changes.
   const refusal =
     refused !== null && draft === number ? refused : numberRefusal(where)
-  const said: CopyKey | null = refusal === null ? null : START_REFUSED[refusal]
+  const said: string | null = refusal === null ? null : startRefused(refusal)
   const send = () => {
     if (ready) onSend(draft)
   }
@@ -225,7 +242,7 @@ function TheNumber({
       )}
       {said !== null && (
         <View style={styles.refusal} testID="findable-number-refused">
-          <Text style={styles.refusalText}>{t(said)}</Text>
+          <Text style={styles.refusalText}>{said}</Text>
         </View>
       )}
       <NotchedButton

@@ -792,4 +792,8 @@ export const it: Readonly<Record<CopyKey, string>> = {
   list_findable_replaced: 'Il Suo numero rende ora trovabile un altro account.',
   list_findable_renew_action: 'Rinnovare la prova',
   list_findable_prove_action: 'Provare il mio numero',
+  'findable_too_many %1$@ %2$@':
+    'Ha chiesto troppi codici. Potrà riprovare dal giorno %1$@ alle ore %2$@.',
+  findable_later:
+    'In questo momento vengono chiesti troppi codici. Riprovi più tardi.',
 }

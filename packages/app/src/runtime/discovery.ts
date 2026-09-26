@@ -249,14 +249,22 @@ export function whereTheNumberGoes(
     : { verdict: 'closed' }
 }
 
-/** Why no code left for the number. */
+/**
+ * Why no code left for the number. Too many codes asked for by this account
+ * carries when it may ask again (#399); every other refusal says only why.
+ */
 export type StartRefusal =
-  | 'closed'
-  | 'no-country-code'
-  | 'not-a-number'
-  | 'off'
-  | 'not-sent'
-  | 'unreachable'
+  | {
+      readonly why:
+        | 'closed'
+        | 'no-country-code'
+        | 'not-a-number'
+        | 'off'
+        | 'not-sent'
+        | 'later'
+        | 'unreachable'
+    }
+  | { readonly why: 'too-many'; readonly retryAt: number }
 
 /**
  * What the number screen says of a number before anything is sent, or
@@ -268,7 +276,7 @@ export function numberRefusal(where: NumberVerdict): StartRefusal | null {
     case 'closed':
     case 'no-country-code':
     case 'not-a-number':
-      return where.verdict
+      return { why: where.verdict }
     case 'incomplete':
     case 'open':
       return null
@@ -404,7 +412,12 @@ export function proofJourney(
     } else {
       // AS IT WAS TYPED, not as it was sent: the screen says why nothing
       // came for as long as the field still holds that number.
-      go({ stage: 'number', countries, number: typed, refused: started.why })
+      go({
+        stage: 'number',
+        countries,
+        number: typed,
+        refused: started.refused,
+      })
     }
   }
 
@@ -479,7 +492,7 @@ export function proofJourney(
           stage: 'number',
           countries,
           number: typed,
-          refused: numberRefusal(where) ?? 'not-a-number',
+          refused: numberRefusal(where) ?? { why: 'not-a-number' },
         })
         return
       }
@@ -517,7 +530,7 @@ export function proofJourney(
 
 type Started =
   | { readonly started: true }
-  | { readonly started: false; readonly why: StartRefusal }
+  | { readonly started: false; readonly refused: StartRefusal }
 
 async function startProof(
   deps: Pick<DiscoveryDeps, 'service'>,
@@ -528,19 +541,36 @@ async function startProof(
   try {
     answer = await deps.service.startProof(JSON.stringify({ number, language }))
   } catch {
-    return { started: false, why: 'unreachable' }
+    return { started: false, refused: { why: 'unreachable' } }
   }
   if (answer.status === 200) return { started: true }
-  const errcode = errcodeOf(answer.body)
-  return { started: false, why: START_REFUSED[errcode] ?? 'unreachable' }
+  const body = parsed(answer.body)
+  if (
+    body?.errcode === 'MESSAGR_TOO_MANY_CODES' &&
+    typeof body.retry_at === 'number'
+  ) {
+    return {
+      started: false,
+      refused: { why: 'too-many', retryAt: body.retry_at * 1000 },
+    }
+  }
+  const errcode = errcodeOf(body)
+  return {
+    started: false,
+    refused: START_REFUSED[errcode] ?? { why: 'unreachable' },
+  }
 }
 
-/** What the service's refusals of a start mean here. */
+/**
+ * What the service's refusals of a start mean here, but for too many codes,
+ * whose refusal carries when to ask again.
+ */
 const START_REFUSED: Readonly<Record<string, StartRefusal>> = {
-  MESSAGR_COUNTRY_CLOSED: 'closed',
-  MESSAGR_NOT_A_NUMBER: 'not-a-number',
-  MESSAGR_DISCOVERY_OFF: 'off',
-  MESSAGR_SMS_NOT_SENT: 'not-sent',
+  MESSAGR_COUNTRY_CLOSED: { why: 'closed' },
+  MESSAGR_NOT_A_NUMBER: { why: 'not-a-number' },
+  MESSAGR_DISCOVERY_OFF: { why: 'off' },
+  MESSAGR_SMS_NOT_SENT: { why: 'not-sent' },
+  MESSAGR_SMS_LATER: { why: 'later' },
 }
 
 /**
@@ -593,16 +623,16 @@ async function finishProof(
       refused: { why: 'wrong', attemptsLeft: body.attempts_left },
     }
   }
-  const errcode = typeof body?.errcode === 'string' ? body.errcode : ''
+  const errcode = errcodeOf(body)
   return {
     proven: false,
     refused: FINISH_REFUSED[errcode] ?? { why: 'unreachable' },
   }
 }
 
-function errcodeOf(text: string): string {
-  const errcode = parsed(text)?.errcode
-  return typeof errcode === 'string' ? errcode : ''
+/** The service's name for a refusal, or nothing when the body has none. */
+function errcodeOf(body: Record<string, unknown> | null): string {
+  return typeof body?.errcode === 'string' ? body.errcode : ''
 }
 
 function parsed(text: string): Record<string, unknown> | null {

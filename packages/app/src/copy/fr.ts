@@ -1203,6 +1203,11 @@ export const fr = {
     'Votre numéro rend maintenant trouvable un autre compte.',
   list_findable_renew_action: 'Renouveler la preuve',
   list_findable_prove_action: 'Prouver mon numéro',
+  // LES PLAFONDS DE SMS (#399).
+  'findable_too_many %1$@ %2$@':
+    'Vous avez demandé trop de codes. Réessayez le %1$@ à %2$@.',
+  findable_later:
+    'Trop de codes sont demandés en ce moment. Réessayez plus tard.',
 } as const
 
 /** Every key any screen may ask for. A typo is a compile error, not a blank. */

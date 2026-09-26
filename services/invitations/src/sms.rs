@@ -1,9 +1,13 @@
-//! Sending the SMS that proves a number, through OVHcloud (#397, Q24).
+//! Sending the SMS that proves a number, through OVHcloud (#397, Q24), and
+//! what goes with it (#399).
 //!
-//! One call: `POST /sms/{serviceName}/jobs` of OVHcloud's API, signed as that
-//! API asks. The number leaves the service here, and only here, towards the
-//! provider named on the consent screen and the number screen; the service
-//! itself keeps only its mask (`masking`).
+//! Three calls of OVHcloud's API, each signed as that API asks:
+//! `POST /sms/{serviceName}/jobs` sends, `DELETE
+//! /sms/{serviceName}/outgoing/{id}` erases a sent SMS from the history, and
+//! `GET /sms/{serviceName}` reads the prepaid balance. The number leaves the
+//! service here, and only here, towards the provider named on the consent
+//! screen and the number screen; the service itself keeps only its mask
+//! (`masking`).
 //!
 //! # NOTHING HERE PRINTS A SECRET
 //!
@@ -46,6 +50,9 @@ pub enum SmsError {
     Unreachable,
     #[error("the SMS provider refused the message")]
     Refused,
+    /// The history does not know this SMS: see `sms_history`.
+    #[error("the SMS provider's history does not know this SMS")]
+    Unknown,
 }
 
 fn client() -> &'static reqwest::Client {
@@ -82,25 +89,8 @@ impl Ovhcloud {
             "validityPeriod": valid_minutes,
         })
         .to_string();
-        let timestamp = now.to_string();
-        let answer = client()
-            .post(&url)
-            .header("Content-Type", "application/json")
-            .header("X-Ovh-Application", &self.application_key)
-            .header("X-Ovh-Consumer", &self.consumer_key)
-            .header("X-Ovh-Timestamp", &timestamp)
-            .header(
-                "X-Ovh-Signature",
-                signature(
-                    &self.application_secret,
-                    &self.consumer_key,
-                    "POST",
-                    &url,
-                    &body,
-                    &timestamp,
-                ),
-            )
-            .body(body)
+        let answer = self
+            .signed(reqwest::Method::POST, &url, body, now)
             .send()
             .await
             .map_err(|_| SmsError::Unreachable)?;
@@ -111,6 +101,70 @@ impl Ovhcloud {
         match (report.ids.first(), report.invalid_receivers.is_empty()) {
             (Some(id), true) => Ok(*id),
             _ => Err(SmsError::Refused),
+        }
+    }
+
+    /// Erases a sent SMS from OVHcloud's history, by the id `send` answered
+    /// (#399). An id the history does not know is `Unknown`, which
+    /// `sms_history` tells apart from an SMS erased.
+    pub async fn erase(&self, id: u64, now: i64) -> Result<(), SmsError> {
+        let url = format!("{}/sms/{}/outgoing/{id}", self.base_url, self.service_name);
+        let answer = self
+            .signed(reqwest::Method::DELETE, &url, String::new(), now)
+            .send()
+            .await
+            .map_err(|_| SmsError::Unreachable)?;
+        match answer.status() {
+            status if status.is_success() => Ok(()),
+            reqwest::StatusCode::NOT_FOUND => Err(SmsError::Unknown),
+            _ => Err(SmsError::Refused),
+        }
+    }
+
+    /// The prepaid credits left on the SMS account (#399).
+    pub async fn credits_left(&self, now: i64) -> Result<f64, SmsError> {
+        let url = format!("{}/sms/{}", self.base_url, self.service_name);
+        let answer = self
+            .signed(reqwest::Method::GET, &url, String::new(), now)
+            .send()
+            .await
+            .map_err(|_| SmsError::Unreachable)?;
+        if !answer.status().is_success() {
+            return Err(SmsError::Refused);
+        }
+        let account: serde_json::Value = answer.json().await.map_err(|_| SmsError::Refused)?;
+        account["creditsLeft"].as_f64().ok_or(SmsError::Refused)
+    }
+
+    /// A request signed as OVHcloud's API asks, at `now`.
+    fn signed(
+        &self,
+        method: reqwest::Method,
+        url: &str,
+        body: String,
+        now: i64,
+    ) -> reqwest::RequestBuilder {
+        let timestamp = now.to_string();
+        let signed = signature(
+            &self.application_secret,
+            &self.consumer_key,
+            method.as_str(),
+            url,
+            &body,
+            &timestamp,
+        );
+        let request = client()
+            .request(method, url)
+            .header("X-Ovh-Application", &self.application_key)
+            .header("X-Ovh-Consumer", &self.consumer_key)
+            .header("X-Ovh-Timestamp", timestamp)
+            .header("X-Ovh-Signature", signed);
+        if body.is_empty() {
+            request
+        } else {
+            request
+                .header("Content-Type", "application/json")
+                .body(body)
         }
     }
 }
@@ -308,6 +362,80 @@ mod tests {
             .send("+33612345678", "x", 10, 0)
             .await;
         assert!(matches!(sent, Err(SmsError::Unreachable)));
+    }
+
+    /// OVHcloud's history, reduced to the one call that erases from it: it
+    /// keeps the paths it was asked to delete, and knows only the ids given.
+    async fn fake_history(known: Vec<u64>) -> (String, Arc<Mutex<Vec<(String, HeaderMap)>>>) {
+        let asked = Arc::new(Mutex::new(Vec::new()));
+        let kept = asked.clone();
+        let app = Router::new().route(
+            "/sms/sms-ab12345-1/outgoing/:id",
+            axum::routing::delete(
+                move |axum::extract::Path(id): axum::extract::Path<u64>, headers: HeaderMap| {
+                    let kept = kept.clone();
+                    let known = known.clone();
+                    async move {
+                        kept.lock()
+                            .unwrap()
+                            .push((format!("/sms/sms-ab12345-1/outgoing/{id}"), headers));
+                        if known.contains(&id) {
+                            (axum::http::StatusCode::OK, Json(serde_json::Value::Null))
+                        } else {
+                            (
+                                axum::http::StatusCode::NOT_FOUND,
+                                Json(serde_json::json!({"message": "not found"})),
+                            )
+                        }
+                    }
+                },
+            ),
+        );
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let base = format!("http://{}", listener.local_addr().unwrap());
+        tokio::spawn(async move { axum::serve(listener, app).await.unwrap() });
+        (base, asked)
+    }
+
+    #[tokio::test]
+    async fn an_sms_is_erased_from_the_history_signed_like_any_call() {
+        let (base, asked) = fake_history(vec![42]).await;
+        provider(base.clone())
+            .erase(42, 1_458_034_342)
+            .await
+            .unwrap();
+
+        let asked = asked.lock().unwrap();
+        assert_eq!(asked.len(), 1);
+        let (path, headers) = &asked[0];
+        assert_eq!(path, "/sms/sms-ab12345-1/outgoing/42");
+        assert_eq!(
+            headers["x-ovh-signature"],
+            signature(
+                "AS",
+                "CK",
+                "DELETE",
+                &format!("{base}/sms/sms-ab12345-1/outgoing/42"),
+                "",
+                "1458034342"
+            )
+            .as_str()
+        );
+    }
+
+    #[tokio::test]
+    async fn an_sms_the_history_does_not_know_is_not_counted_as_erased() {
+        let (base, _) = fake_history(Vec::new()).await;
+        assert!(matches!(
+            provider(base).erase(7, 0).await,
+            Err(SmsError::Unknown)
+        ));
+    }
+
+    #[tokio::test]
+    async fn an_erasure_that_does_not_reach_the_provider_says_so() {
+        let erased = provider("http://127.0.0.1:1".into()).erase(7, 0).await;
+        assert!(matches!(erased, Err(SmsError::Unreachable)));
     }
 
     #[test]
