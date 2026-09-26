@@ -220,8 +220,9 @@ say "                    le correctif du relais avant de soumettre."
 ask TRANSIT "Qu'avez-vous répondu ? (oui / non)"
 printf '\n'
 step "« Proposez-vous un moyen de demander la suppression des données ? »  →  OUI"
-note "conformite@messagr.eu suffit à Play. Attention : l'exigence de suppression"
-note "de COMPTE est une autre chose, et elle n'est pas remplie (#333)."
+note "Le lien de suppression de compte, si le formulaire le demande :"
+note "https://messagr.eu/aide/#supprimer-votre-compte. La section existe depuis #333 ;"
+note "à partir de la version qui porte le geste, elle le présente d'abord (#386)."
 pause "Les trois questions sont répondues ?"
 
 stage "Play · étape « Types de données »"
@@ -363,10 +364,11 @@ stage "App Store Connect · les deux liens"
 step "À côté de « Privacy Policy », cliquer « Edit »."
 step "Privacy Policy URL  →  https://messagr.eu/confidentialite"
 printf '\n'
-step "« Privacy Choices URL »  →  LAISSER VIDE"
+step "« Privacy Choices URL »  →  https://messagr.eu/aide/#supprimer-votre-compte"
 note "Apple la décrit comme « a webpage where users can access their data, request"
-note "deletion, or make changes ». La page n'a pas encore de section de suppression"
-note "qu'un lien puisse viser : c'est #333. Y mettre la page entière serait faux."
+note "deletion, or make changes ». La section existe depuis #333 et dit comment"
+note "demander la suppression ; elle présente le geste d'abord à partir de la version"
+note "qui le porte (#386)."
 printf '\n'
 warn "« Any changes to the URLs release with your next app version. »"
 pause "Les liens sont saisis ?"
@@ -403,7 +405,8 @@ RECORD="/tmp/declarations-$(date +%Y%m%d-%H%M).md"
   printf '**Chiffrement en transit** : répondu « %s ».\n\n' "$TRANSIT"
   printf '**App Store Connect, « App Privacy »** : six types déclarés, tous\n'
   printf '« App Functionality », tous liés sauf « Other Diagnostic Data », aucun\n'
-  printf 'utilisé pour le suivi. « Privacy Choices URL » laissée vide (#333).\n'
+  printf 'utilisé pour le suivi. « Privacy Choices URL » :\n'
+  printf 'https://messagr.eu/aide/#supprimer-votre-compte (#333, #386).\n'
 } > "$RECORD"
 
 note "relevé écrit dans $RECORD"

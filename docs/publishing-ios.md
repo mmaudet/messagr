@@ -577,7 +577,11 @@ moment-là n'entrait pas.
 
 **La note vit dans `deploy/messagr-eu/app-store-listing/review-notes.txt`**,
 qui porte tout le champ : l'entrée, la façon dont on obtient une invitation et
-son prix, puis la confidentialité. Elle répond d'avance aux trois questions du
+son prix, le chemin de la suppression du compte, puis la confidentialité. Ce
+chemin n'existe qu'à partir de la build 28 (#380) : l'assistant demande si la
+build soumise le porte, et retire sinon la section « DELETING THE ACCOUNT »
+(#386). La note TestFlight, qui ne reprend que la première section, ne la
+porte jamais. Elle répond d'avance aux trois questions du
 22 septembre. Ses trous, `<LINK>`, `<DEADLINE>` et `<USES>`, sont remplis par
 l'assistant avec l'état de l'invitation. `check.py` en tient la limite sur la
 note remplie au plus long, « The Notes field can contain up to 4000 bytes »,

@@ -14,6 +14,10 @@ HOW PEOPLE GET AN INVITATION
 
 From someone who already uses Messagr: any user can tap "Invite someone" and pass the link, or its QR code, however they like. A link created in the app is valid for one hour and for a single use; the one above was created for the review, with the same mechanism. Invitations are free and cannot be bought. Messagr is free, with no in-app purchases and no subscriptions.
 
+DELETING THE ACCOUNT
+
+To delete the account: "Settings", then "Delete my account".
+
 PRIVACY
 
 Messagr is an end-to-end encrypted messenger. Photos, files and message text are encrypted on the device before they are uploaded. The server stores ciphertext only and never holds the key, so it cannot render any of it.
