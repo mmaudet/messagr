@@ -1035,8 +1035,9 @@ mockup suffixes the state with a phase marker; that marker is a reference to
 this specification for whoever reads the mockup, and does not belong on the
 screen of somebody reading their own messages.
 
-**A green circular + floats above the bar, and it is the only way to invite
-somebody.** The inline button under the list is gone. With four tabs, a
+**A green circular + floats above the bar, and inviting somebody starts
+there.** It opens a sheet (#394) whose first line is « Inviter quelqu’un »;
+address-book discovery adds « Retrouver mes contacts » beside it. The inline button under the list is gone. With four tabs, a
 control living inside one tab's content scrolls away with it, and inviting is
 the one thing a person opens this application to do that is not reading. Two
 entrances to the same gesture would also be two things to keep in step, and

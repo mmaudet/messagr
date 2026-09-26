@@ -251,6 +251,7 @@ import { FullScreenPlate } from './src/ui/FullScreenPlate'
 import type { Wants } from './src/calls/media'
 import { CallScreen } from './src/ui/CallScreen'
 import { SelectionBar } from './src/ui/SelectionBar'
+import { PlusSheet } from './src/ui/PlusSheet'
 import { RemoveSheet } from './src/ui/RemoveSheet'
 import { PickConversation } from './src/ui/PickConversation'
 import { ConversationHeader } from './src/ui/ConversationHeader'
@@ -480,6 +481,8 @@ export function App({
   const restedIn = useRef<string | null>(null)
 
   const [invite, setInvite] = useState<InviteStage>({ stage: 'shut' })
+  // Whether the sheet the green "+" opens is showing (#394).
+  const [plusOpen, setPlusOpen] = useState(false)
   const [admission, setAdmission] = useState<'waiting' | 'admitted' | null>(
     null,
   )
@@ -5592,9 +5595,23 @@ export function App({
                 <FloatingAction
                   testID="invite-open"
                   label={t('invite_open')}
-                  onPress={() => setInvite({ stage: 'resting' })}
+                  onPress={() => setPlusOpen(true)}
                 />
               )}
+
+            {/* THE "+" OPENS A SHEET RATHER THAN THE FORM (#394). Inviting is
+              its only line today; address-book discovery adds the second.
+              Choosing to invite closes the sheet and opens the same form the
+              circle used to open directly. */}
+            {plusOpen && (
+              <PlusSheet
+                onInvite={() => {
+                  setPlusOpen(false)
+                  setInvite({ stage: 'resting' })
+                }}
+                onClose={() => setPlusOpen(false)}
+              />
+            )}
 
             {/* AND THE WAY BACK DOWN, in the same corner as the green one.
               Reported from the Pixel: « lorsqu'on remonte dans l'historique
