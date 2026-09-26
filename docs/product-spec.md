@@ -43,7 +43,7 @@ This view is canonical. The bridge and crypto specs only keep the portions neede
                                 ▼
 ┌───────────────────────────────────────────────────────────────────┐
 │              Product-facing client abstraction                    │
-│  Contacts / channels / linked devices / trust states              │
+│  People / channels / linked devices / trust states                │
 │  Agent directory / agent profiles / capability views              │
 │  Recovery / onboarding / discovery UX                             │
 └───────────────────────────────────────────────────────────────────┘
@@ -92,7 +92,7 @@ The product spec is the canonical source of this model. The other specs referenc
 | `TrustState` | Product signal `unverified` / `recognized` / `verified`. | UX on top of verification mechanisms. |
 | `CapabilityGrant` | Scoped permission granted to an agent or user in a given context. | Required for external actions and sensitive reads. |
 | `ExternalAction` | Invocation of a tool or workflow outside Messagr. | Must be auditable. |
-| `DiscoveryIdentity` | Discoverability attribute (hashed phone/email for instance). | Separated from canonical Matrix identity. |
+| `DiscoveryIdentity` | Discoverability attribute: a phone number its holder has proved and chosen to be findable by, kept only masked (ADR 0014). | Separated from canonical Matrix identity. |
 | `FederatedIdentity` | Identity of a participant hosted on a remote homeserver. | Must remain largely invisible in UX. |
 | `RecoveryBundle` | Product abstraction of a backup / restore. | Simplified vocabulary above the Matrix machinery. |
 
@@ -125,14 +125,16 @@ The app offers to recognize contacts already present on Messagr, with explicit c
 - Discovery result listing existing users.
 - Simple invitation flow for the other contacts.
 - Clear fallback path if address book sync is refused.
-- Recognizing a contact never automatically grants the right to write to them.
+- A match never automatically grants the right to write to the matched account.
+
+The comparison is made on the device, against numbers their holders have proved by SMS and chosen to make findable: the service never learns the numbers in an address book, who is looking for whom, or whether a search found anybody (ADR 0014). Finding a contact leads to an invitation delivered inside Messagr, never to a conversation opened without the other person's consent.
 
 Complementary discovery modes when address book access is absent:
 
 - QR code or invitation link.
 - Explicit username with a strong suffix (`@name#code`).
 - Signed contact cards.
-- Introductions by an already approved contact.
+- Introductions by an already approved account.
 - Manual import from the local address book.
 
 ### 4.3 First conversation
@@ -145,8 +147,8 @@ Three visible, unobtrusive levels with an explicit escalation path.
 
 | Level | Meaning | Trigger |
 |---|---|---|
-| Unverified | Contact exists, identity not confirmed | service-level presence |
-| Recognized | Contact matched through address book or a reliable local signal | contact discovery |
+| Unverified | Account exists, identity not confirmed | service-level presence |
+| Recognized | Account matched through the address book or a reliable local signal | address-book discovery |
 | Verified | Key confirmed via QR or SAS | explicit verification |
 
 The trust state is visible but discreet, without an alarmist tone by default. The details screen clearly explains the state, its scope, and its escalation.
@@ -227,7 +229,7 @@ The product consolidates the retained decisions here.
 - Each `Channel` relies on group encryption. **V1 ships Megolm.** MLS (RFC 9420) is the
   target trajectory, not a target already chosen: no implementation is within reach today,
   and the migration is the one screen 30 already annotates. See ADR-0003 and the crypto spec.
-- Invitations flow through **capability links** or limited-use invitation tokens, never a server-readable directory.
+- Invitations flow through **capability links** or limited-use invitation tokens, or arrive inside the application for a findable account (ADR 0014); never through a directory anybody can browse.
 - Admin roles are **signed client-side** and not held in a server-readable registry.
 - Server-side metadata (membership, roles, social graphs) is **radically minimized**: the crypto spec details the exact surface.
 
@@ -243,7 +245,8 @@ This configuration weakens neither encryption nor moderation: it only constrains
 
 ### 6.3 Private discovery
 
-- The `DiscoveryIdentity` is a technical attribute declared by the user (hashed phone/email, opt-in public username) and **never** conflated with the account identity.
+- The `DiscoveryIdentity` is a technical attribute declared by the user (a phone number they have proved, kept only masked; later an email or an opt-in public username) and **never** conflated with the account identity.
+- Matching happens on the device (ADR 0014): the service masks the numbers of an address book without being able to read them, and the device compares them with the list of findable accounts.
 - Discovery is purpose-bound: inputs and outputs are logged by the product with the same minimization requirement as federation.
 - A no-address-book fallback must remain usable, otherwise the product would fall back to an external identifier.
 
@@ -254,7 +257,7 @@ Federation is invisible in ordinary UX but explicitly handled internally.
 ### 7.1 UX principles
 
 - A `FederatedIdentity` appears as a normal participant.
-- The `:server` suffix is never imposed on screen; it is available on demand in the contact details.
+- The `:server` suffix is never imposed on screen; it is available on demand in the person's details.
 - Degraded federation states (delay, uncertain delivery, remote revocation) are visibly reported in the conversation, without protocol jargon.
 
 ### 7.2 Product responsibilities
@@ -384,7 +387,7 @@ Set A — messaging foundation:
 
 Set B — trust and verification:
 
-1. Open contact details.
+1. Open the other person's details.
 2. Read initial trust state.
 3. Perform QR or SAS verification.
 4. Assert updated trust state in details and in the conversation.
@@ -468,7 +471,7 @@ The V3 prototype is organised in four rail rows. The “priority” column refle
 | 13 | Erase my account | Mobile | §8.3 | 5 |
 | 14 | Export my data (GDPR) | Mobile | §8.3 | 5 |
 | 15 | Report content | Mobile | §8.1 | — |
-| 16 | Block a contact | Mobile | §8.1 | — |
+| 16 | Block an account | Mobile | §8.1 | — |
 | 17 | New device detected | Mobile | §4.6, §9.2 | — |
 | 18 | Remove a device remotely | Mobile | §4.6 | — |
 | 19 | Mobile settings (full parity) | Mobile | §9.3 | 3 |
@@ -580,11 +583,11 @@ The V3 briefing identified seven ambiguities to resolve. All are closed and mate
 
 **Screen 15 — Report content.** Three destinations, ordered from most local (default) to most exposing. Local report contacts no server. Escalating to administrators or the instance is explicit, with its consequence stated.
 
-**Screen 16 — Block a contact.** Effects table that states what blocking does and, importantly, does not do. No notification to the blocked person. Current block list on the same screen: blocking is not a point of no return.
+**Screen 16 — Block an account.** Effects table that states what blocking does and, importantly, does not do. No notification to the blocked person. Current block list on the same screen: blocking is not a point of no return. For a findable account, it also says that whoever has the number still sees the account is on Messagr, and that only withdrawing the number hides it.
 
 ### 13.9 Companion device handling (§4.6, §9.2)
 
-**Screen 17 — New device detected.** Dark screen (security boundary). Facts first (device, place, time, method), decision after. Two outcomes: it's me, cut it. Refusal is as accessible as acceptance. Reminder that verified contacts also see the device: a device never appears quietly.
+**Screen 17 — New device detected.** Dark screen (security boundary). Facts first (device, place, time, method), decision after. Two outcomes: it's me, cut it. Refusal is as accessible as acceptance. Reminder that whoever has verified the account also sees the device: a device never appears quietly.
 
 **Screen 18 — Remove a device remotely.** Critical flow handled separately from the Devices screen: four steps stated before the action. The limit is stated honestly: cutting access does not erase what has already been downloaded. Red reserved for the measure itself.
 
@@ -631,6 +634,8 @@ Read mode: inactive toggles, link to edit. Edit mode (screen 4): same rows, acti
 
 Screens 25 (trust explained), 26 (SAS/QR verification), 27 (show your code), 28 (scan), 29 (private discovery), 30 (community and channels), 31 (federated participant), 32 (audio call), 33 (video call), 34 (devices and continuity), and 35 (journal and measures) are carried over without major functional change. They inherit the V3 tokens and the arbitrations of §13.2.
 
+**Screen 29, the address-book path** (#392, ADR 0014). From the « + » sheet, « Retrouver mes contacts » opens a consent screen that says, in five points, what discovery does with the address book and with the person's own number, with two actions of equal weight. Continuing leads to the number, then to a code received by SMS that proves it: the person is then findable for 28 days. Searching comes next, and a one-line reminder with a single action precedes the system's contacts prompt. The results list the contacts already on Messagr under the name of their address-book entry, then the others. A found contact is invited by an invitation delivered inside Messagr, a missing one by an SMS written in advance and sent from the phone. Finding someone never opens a conversation: rule 5 of §13.19 holds, and the V3 mockup's screen 25, where recognition is enough to write, is overruled by it.
+
 Two new annotations carried by V3:
 
 - **Screen 30 (community)** — two explicit MLS transition states: “joining” on an anonymous room (anonymous session setup is not instantaneous), “room migrating” for a Megolm → MLS switch.
@@ -643,7 +648,7 @@ The desktop is the second V1 target (macOS first, then Windows, then Debian/Ubun
 
 - **37. Desktop home** — three columns: conversations, thread, right pane that only exists on desktop (agent capability sheet consultable without leaving the thread). This is where direction A becomes viable again, without redesign.
 - **38. Desktop first launch** — the desktop does not create an identity; it exists only as a device of an identity already carried by the phone. One action only: *Link this computer to my phone*.
-- **39. Device pairing** — physical gesture with oneself. Word pair displayed on both sides, same mechanism as contact verification (§13.15). Verified contacts see the new device appear.
+- **39. Device pairing** — physical gesture with oneself. Word pair displayed on both sides, same mechanism as verifying someone (§13.15). Whoever has verified the account sees the new device appear.
 - **40. Desktop settings** — six sections. Agent capabilities are caps; a room can grant less, never more. A locked setting stays visible, greyed, with its reason.
 
 Tauri framing: default window 900×600, native macOS chrome, title bar carrying context and nothing else. Agent column 280 pt in wide desktop (≥ 1180 pt), collapsed as a drawer in narrow desktop (≤ 780 pt).
@@ -658,7 +663,7 @@ The V3 palette is carried by `tokens.json`, the single source consumable by Reac
 |---|---|
 | `brand` (green 500 / 700 / 100, ink 900) | Human + verified. Primary action, receipt, brand, security boundary (`ink900`). |
 | `agent` (700 / 400 / 100 / border) | Agent ink, with `agent.400` legible on dark backgrounds (4.6:1 contrast on `ink900`, WCAG AA text). The `agent.border` dotted stroke is never a disabled state. |
-| `wait` (700 / 500 / 200 / 100) | Waiting on a human gesture or the network: agent draft, deferred send, recognized-but-not-verified contact. |
+| `wait` (700 / 500 / 200 / 100) | Waiting on a human gesture or the network: agent draft, deferred send, recognized-but-not-verified account. |
 | `deny` (700 / 500 / 200 / 100) | Measure or refusal: suspension, revocation, blocking. Never a warning. |
 
 A **neutral** scale (900 / 600 / 400 / 300 / 200): `neutral.300` is the only allowed disabled grey — it never means “agent” any more, closing the V2 briefing ambiguity.
@@ -705,7 +710,7 @@ Default-on settings. Some are locked by a room policy when the room policy is st
 | Section | Default-on setting | Scope |
 |---|---|---|
 | General | Launch at startup, Dock badge | Account |
-| Privacy | Typing indicator, read receipts, online presence (verified contacts only) | Account |
+| Privacy | Typing indicator, read receipts, online presence (verified accounts only) | Account |
 | Agents | Proposed draft allowed, agent logging (not disableable in a shared room) | Account + room |
 | Devices | Peer-to-peer history sync, 15-minute auto-lock, remote revocation | Device |
 | Network | Discreet flagging of remotely-hosted participants, relay allowed when direct fails | Account |
@@ -721,7 +726,7 @@ These rules take precedence over aesthetic choices and are normative for any UI 
 
    *This invariant used to read “it is used only for verified humans”, which was narrower than the token file it governs and which the product had never obeyed: the brand screen's action, its bullets and the mark were already green when it was written. Narrowed rules that the product contradicts are worse than no rule, because the next person resolves the contradiction by ignoring the rule. Reconciled with `tokens.json`, which is normative (invariant 11).*
 4. No “continue anyway” button crosses a security boundary (failed SAS, refused-origin code, ungranted external action, unrecognised new device).
-5. Recognising a contact ≠ being able to write to them. Discovery, trust, verification remain three distinct notions.
+5. Finding or recognising someone ≠ being able to write to them. Discovery, trust, verification remain three distinct notions.
 6. Degraded states are stated in natural language, never with an error code or the word “federation”.
 7. Any capability or device change appears in the relevant room's journal, visible to its members.
 8. The journal records decisions and refusals, never contents.
@@ -1021,9 +1026,11 @@ communities.
 
 **The header is a dark band, and it is a security boundary rather than a title
 bar.** `brand.ink900` is *« fond des frontières de sécurité »* in the token's
-own words. It carries the mark and the wordmark, and on the right, in the mono
-role, the one fact about this instance nobody would guess: *« aucun annuaire
-»*. No screen title — the screen below already says which screen it is. The
+own words. It carries the mark and the wordmark, and nothing on the right any
+more: the one fact about this instance nobody would guess, *« aucun annuaire »*,
+moved under the list of conversations, where it has room to say what stays true
+once somebody may choose to be findable (#392). No screen title: the screen
+below already says which screen it is. The
 mockup suffixes the state with a phase marker; that marker is a reference to
 this specification for whoever reads the mockup, and does not belong on the
 screen of somebody reading their own messages.
@@ -1059,8 +1066,8 @@ This section is the project's canonical glossary. The bridge and crypto specs on
 | Linked device | Secondary device attached to an account, including desktop companions. |
 | Trust state | Product-visible trust signal `unverified` / `recognized` / `verified`. |
 | Verification | Cryptographic process that modifies trust state. |
-| Discovery | Mechanism for finding contacts or approved agents. |
-| Discovery identity | Discoverability attribute declared by the user (hashed phone, email, username). |
+| Discovery | Finding that a contact or an approved agent exists on Messagr. It grants no right to write. |
+| Discovery identity | Discoverability attribute declared by the user: a phone number they have proved, kept only masked (ADR 0014); an email or a username may come later. |
 | Federation | Matrix server-to-server communication between homeservers. |
 | Federated identity | Identity of a remote participant on another homeserver. |
 | Product API / backend | Messagr-specific service layer above Matrix. |
