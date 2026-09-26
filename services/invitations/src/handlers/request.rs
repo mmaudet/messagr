@@ -189,7 +189,7 @@ pub async fn look(
          LEFT JOIN invitations i ON i.id = r.invitation_id \
          WHERE r.code_sha256 = ?",
     )
-    .bind(crypto::token_hash(&code))
+    .bind(crypto::presented_token_hash(&code))
     .fetch_optional(&st.pool)
     .await
     .map_err(anyhow::Error::from)?
@@ -512,6 +512,19 @@ mod tests {
     async fn an_unknown_code_says_nothing(pool: SqlitePool) {
         let answered = look(State(state(pool)), Path("NOTACODE".into())).await;
         assert!(matches!(answered, Err(AppError::InvitationInvalid)));
+    }
+
+    #[sqlx::test(migrations = "./migrations")]
+    async fn a_code_typed_in_lowercase_finds_the_same_request(pool: SqlitePool) {
+        // #375. Le code est tiré par `generate_token`, en capitales, et une
+        // personne qui le recopie sur un téléphone le tape en minuscules.
+        let st = state(pool.clone());
+        let Json(asked) = ask(State(st.clone())).await.unwrap();
+        let typed = asked.code.to_lowercase();
+        assert_ne!(typed, asked.code, "sans lettre, ce test ne prouverait rien");
+
+        let Json(seen) = look(State(st), Path(typed)).await.unwrap();
+        assert_eq!(seen.status, "waiting");
     }
 
     #[sqlx::test(migrations = "./migrations")]
