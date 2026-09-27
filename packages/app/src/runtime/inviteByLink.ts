@@ -1,4 +1,5 @@
 import { t } from '../copy'
+import type { InvitationNames } from './deliveredInvitations'
 import {
   ABSENT_LINK_TTL_SECONDS,
   LINK_TTL_SECONDS,
@@ -37,11 +38,21 @@ import type { Outstanding } from './outstandingStore'
  */
 
 /** How a link to a contact absent from Messagr leaves (#408). */
-export type AbsentChannel =
+export type LinkChannel =
   /** « Inviter par SMS »: the telephone's messaging application. */
   | { readonly by: 'sms'; readonly number: string }
   /** « Autre moyen »: the share sheet. */
   | { readonly by: 'share' }
+
+/**
+ * The text drafted around a link for a contact absent from Messagr, which the
+ * screen's share button sends too, and whether the messaging application
+ * refused to open with it.
+ */
+export interface Drafted {
+  readonly message: string
+  readonly smsRefused: boolean
+}
 
 export interface LinkDeps {
   /**
@@ -75,31 +86,23 @@ export type ByLink =
        * relaunch.
        */
       readonly kept: boolean
-      /**
-       * For a contact absent from Messagr: the drafted text, which the
-       * screen's share button sends too, and whether the messaging
-       * application refused to open with it. `null` for any other link.
-       */
-      readonly drafted: {
-        readonly message: string
-        readonly smsRefused: boolean
-      } | null
+      /** For a contact absent from Messagr; `null` for any other link. */
+      readonly drafted: Drafted | null
     }
   | Extract<Issued, { readonly issued: false }>
 
 export async function inviteByLink(
   deps: LinkDeps,
-  names: {
-    /** What the inviter calls the person invited: it stays here. */
-    readonly given: string | null
-    /** What the inviter calls themselves: it travels in the fragment. */
-    readonly declared: string | null
-  },
+  /**
+   * `given` stays here, for whoever comes in; `declared` travels in the
+   * link's fragment.
+   */
+  names: InvitationNames,
   /** For a contact absent from Messagr; nothing for any other link. */
-  absent?: AbsentChannel,
+  channel?: LinkChannel,
 ): Promise<ByLink> {
   const ttlSeconds =
-    absent === undefined ? LINK_TTL_SECONDS : ABSENT_LINK_TTL_SECONDS
+    channel === undefined ? LINK_TTL_SECONDS : ABSENT_LINK_TTL_SECONDS
   const issued = await deps.issue(names.declared, ttlSeconds)
   if (!issued.issued) return issued
 
@@ -108,17 +111,17 @@ export async function inviteByLink(
     scope: issued.scope,
     issuedAt: deps.now(),
     lifetime: ttlSeconds * 1000,
-    name: names.given,
+    given: names.given,
   })
-  if (absent === undefined) return { ...issued, kept, drafted: null }
+  if (channel === undefined) return { ...issued, kept, drafted: null }
 
   // IN THE LANGUAGE OF THE APPLICATION, and the person sees it and may
   // change it before sending it (#392, story 48).
   const message = t('invite_absent_text %1$@', issued.link)
   let smsRefused = false
-  if (absent.by === 'sms') {
+  if (channel.by === 'sms') {
     try {
-      await deps.openUrl(smsAddress(deps.os, absent.number, message))
+      await deps.openUrl(smsAddress(deps.os, channel.number, message))
     } catch {
       // No messaging application, or one that would not open: the screen
       // says so, and the link is there to share another way.

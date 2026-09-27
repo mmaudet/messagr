@@ -33,8 +33,8 @@ import { dayOf } from './whenLabel'
  * # A LIST THAT DRAWS WHAT IS ON SCREEN
  *
  * The others are the address book but for a few, and each row now carries
- * two buttons, each drawn and measured for its notch: a thousand cards would
- * be two thousand of them drawn at once. The list draws the rows as they
+ * a button or two, each drawn and measured for its notch: a thousand cards
+ * would be up to two thousand of them drawn at once. The list draws the rows as they
  * come into view, and the rest of the page is its header and its footer.
  *
  * # SOME CARDS, OR NONE (#403)
@@ -285,7 +285,7 @@ function AbsentRow({
             testID="find-contacts-invite-sms"
             label={t('find_invite_sms')}
             onPress={() =>
-              onInvite({ name: contact.name, absent: { by: 'sms', number } })
+              onInvite({ name: contact.name, channel: { by: 'sms', number } })
             }
             tone="quiet"
           />
@@ -294,7 +294,7 @@ function AbsentRow({
           testID="find-contacts-invite-other"
           label={t('find_invite_other')}
           onPress={() =>
-            onInvite({ name: contact.name, absent: { by: 'share' } })
+            onInvite({ name: contact.name, channel: { by: 'share' } })
           }
           tone="quiet"
         />

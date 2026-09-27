@@ -884,9 +884,9 @@ export async function inviteSomebody(
   sessionClient: ReturnType<typeof createClient>,
   credentials: { readonly baseUrl: string; readonly accessToken: string },
   /** The name the inviter gave themselves, or `null`. #329. */
-  declared: string | null = null,
+  declared: string | null,
   /** An hour, or three days for a contact absent from Messagr (#408). */
-  ttlSeconds?: number,
+  ttlSeconds: number,
 ): Promise<Issued> {
   return issueInvitation(
     {

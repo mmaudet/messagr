@@ -1,9 +1,11 @@
 import { describe, expect, it } from 'vitest'
 
+import { t } from '../copy'
+
 import {
   inviteByLink,
   smsAddress,
-  type AbsentChannel,
+  type LinkChannel,
   type LinkDeps,
 } from './inviteByLink'
 import {
@@ -28,9 +30,9 @@ const THREE_DAYS = 3 * 24 * HOUR
 
 const LINK = 'https://messagr.eu/i/a-token'
 /** The text the owner chose on 27 September 2026, in French. */
-const DRAFTED = `Invitation à me rejoindre sur Messagr :\n${LINK}\nCe lien vaut trois jours et ne sert qu’une fois.`
+const DRAFTED = `Invitation à me rejoindre sur Messagr :\n${LINK}\nCe lien vaut trois jours et ne sert qu'une fois.`
 
-const SMS: AbsentChannel = { by: 'sms', number: '+33612345678' }
+const SMS: LinkChannel = { by: 'sms', number: '+33612345678' }
 
 /** Every request the minting makes, in the order it makes them. */
 function aService() {
@@ -126,7 +128,7 @@ describe('inviting by a link', () => {
         scope: '!made:x',
         issuedAt: NOW,
         lifetime: HOUR,
-        name: 'Nadia',
+        given: 'Nadia',
       },
     ])
     // Nothing is opened for it: the screen shows the link to share.
@@ -169,7 +171,7 @@ describe('inviting a contact absent from Messagr (#408)', () => {
         scope: '!made:x',
         issuedAt: NOW,
         lifetime: THREE_DAYS,
-        name: 'Marie',
+        given: 'Marie',
       },
     ])
   })
@@ -291,6 +293,24 @@ describe('inviting a contact absent from Messagr (#408)', () => {
 
     expect(invited).toMatchObject({ issued: true, kept: false })
     expect(opened).toHaveLength(1)
+  })
+})
+
+describe('the text drafted for a contact absent from Messagr (#408)', () => {
+  it('is written in the alphabet of SMS, so a short one leaves as one SMS rather than three', () => {
+    // GSM 03.38's basic alphabet. One character outside it, a typographic
+    // apostrophe, sent the whole message as UCS-2: seventy characters a part
+    // instead of a hundred and sixty, and three parts, on the emulator.
+    const alphabet =
+      '@£$¥èéùìòÇ\nØø\rÅåΔ_ΦΓΛΩΠΨΣΘΞÆæßÉ !"#¤%&\'()*+,-./0123456789:;<=>?¡' +
+      'ABCDEFGHIJKLMNOPQRSTUVWXYZÄÖÑÜ§¿abcdefghijklmnopqrstuvwxyzäöñüà'
+    // A token as the service mints them, 32 characters of base32
+    // (`crypto.rs`), and a short declared name in the fragment.
+    const link = `https://messagr.eu/i/${'A'.repeat(32)}#n=Michel%20Maudet`
+    const drafted = t('invite_absent_text %1$@', link)
+
+    expect([...drafted].filter(one => !alphabet.includes(one))).toEqual([])
+    expect([...drafted].length).toBeLessThanOrEqual(160)
   })
 })
 

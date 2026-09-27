@@ -193,11 +193,11 @@ describe('inviting a contact found (#404)', () => {
 describe('inviting a contact absent from Messagr (#408)', () => {
   const BY_SMS = {
     name: 'Zoé',
-    absent: { by: 'sms', number: '+33698765432' },
+    channel: { by: 'sms', number: '+33698765432' },
   } as const
-  const OTHERWISE = { name: 'Zoé', absent: { by: 'share' } } as const
+  const OTHERWISE = { name: 'Zoé', channel: { by: 'share' } } as const
   const LINK = 'https://messagr.eu/i/a-token'
-  const DRAFTED = `Invitation à me rejoindre sur Messagr :\n${LINK}\nCe lien vaut trois jours et ne sert qu’une fois.`
+  const DRAFTED = `Invitation à me rejoindre sur Messagr :\n${LINK}\nCe lien vaut trois jours et ne sert qu'une fois.`
 
   beforeEach(() => {
     shared.length = 0
@@ -260,7 +260,7 @@ describe('inviting a contact absent from Messagr (#408)', () => {
   })
 
   it('keeps its hour and shares the link alone for any other link', async () => {
-    const drawn = show({ stage: 'ready', link: LINK })
+    const drawn = show({ stage: 'ready', link: LINK, drafted: null })
 
     expect(textIn(withId(drawn, 'invite-ready'))).toBe(t('invite_ready'))
     ;(withId(drawn, 'invite-share')?.props.onPress as () => void)()

@@ -59,6 +59,17 @@ export interface AdmissionRound {
   readonly expired: number
 }
 
+/**
+ * Who a name typed at invite time belongs to, of the accounts let in through
+ * one link: the last, not the first. On a link opened by somebody who already
+ * has an account there are two, the account the service drew, which cedes
+ * its place and deactivates itself, and then the real person. Naming the
+ * drawn one would put the name on an account that no longer exists.
+ */
+export function lastIn(entrants: readonly string[]): string | undefined {
+  return entrants[entrants.length - 1]
+}
+
 export async function admitAnyoneWaiting(
   asking: Asking,
 ): Promise<AdmissionRound> {
@@ -93,14 +104,11 @@ export async function admitAnyoneWaiting(
         // yet claimed, a refused invite, a dropped request -- leaves the row,
         // because the next tick is what this whole file is for.
         await asking.outstanding.forget(invitation.invitationId)
-        // THE LAST ONE IN IS NAMED, not the first, for the reason the minute
-        // after issuing gives (`App.tsx`): on a link opened by somebody who
-        // already has an account, the account the service drew cedes its
-        // place to them. After the row is forgotten, so that a name which
-        // does not hold never has the same person let in twice.
-        const who = answer.entrants[answer.entrants.length - 1]
-        if (invitation.name !== null && who !== undefined) {
-          await asking.giveName(who, invitation.name)
+        // NAMED AFTER THE ROW IS FORGOTTEN, so that a name which does not
+        // hold never has the same person let in twice.
+        const who = lastIn(answer.entrants)
+        if (invitation.given !== null && who !== undefined) {
+          await asking.giveName(who, invitation.given)
         }
       }
     } catch {

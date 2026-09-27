@@ -24,7 +24,7 @@ import type {
   DeliveryRefusal,
   DeliveryWait,
 } from '../runtime/deliveredInvitations'
-import type { AbsentChannel } from '../runtime/inviteByLink'
+import type { Drafted, LinkChannel } from '../runtime/inviteByLink'
 import { NotchedButton } from './NotchedButton'
 import { QrCode } from './QrCode'
 import { dayOf, timeOf } from './whenLabel'
@@ -122,7 +122,15 @@ export interface InvitedMatch {
  */
 export interface InvitedAbsent {
   readonly name: string
-  readonly absent: AbsentChannel
+  readonly channel: LinkChannel
+}
+
+/**
+ * Whether the form invites a contact found, inside the application (#404),
+ * rather than a contact absent from Messagr, by a link (#408).
+ */
+export function isFound(to: InvitedMatch | InvitedAbsent): to is InvitedMatch {
+  return 'reference' in to
 }
 
 export type InviteStage =
@@ -143,14 +151,10 @@ export type InviteStage =
       readonly stage: 'ready'
       readonly link: string
       /**
-       * For a contact absent from Messagr (#408): the text drafted around
-       * the link, which « Partager le lien » sends too, and whether the
-       * messaging application refused to open with it.
+       * For a contact absent from Messagr, whose link is good for three days
+       * (#408); `null` for any other link, good for an hour.
        */
-      readonly drafted?: {
-        readonly message: string
-        readonly smsRefused: boolean
-      }
+      readonly drafted: Drafted | null
     }
   /**
    * An invitation delivered inside the application: nothing to share, and
@@ -203,7 +207,8 @@ export function Invite({ stage, onInvite, onClose, admission }: InviteProps) {
     // A contact found (#404), a contact absent (#408), or `undefined` for a
     // link. Only a contact found is invited without a link.
     const { to } = stage
-    const found = to !== undefined && 'reference' in to ? to : undefined
+    const found = to !== undefined && isFound(to) ? to : undefined
+    const channel = to !== undefined && !isFound(to) ? to.channel : undefined
     return (
       <View style={styles.resting} testID="invite-panel">
         {/* The question before the field, and the action after both. The
@@ -259,9 +264,7 @@ export function Invite({ stage, onInvite, onClose, admission }: InviteProps) {
 
         <NotchedButton
           label={
-            to !== undefined && 'absent' in to && to.absent.by === 'sms'
-              ? t('find_invite_sms')
-              : t('invite_action')
+            channel?.by === 'sms' ? t('find_invite_sms') : t('invite_action')
           }
           testID="invite"
           onPress={() =>
@@ -355,9 +358,7 @@ export function Invite({ stage, onInvite, onClose, admission }: InviteProps) {
       {/* Three days for a contact absent from Messagr (#408), an hour for
           any other link: the screen says what the link was minted for. */}
       <Text style={styles.hint} testID="invite-ready">
-        {stage.drafted === undefined
-          ? t('invite_ready')
-          : t('invite_ready_days')}
+        {stage.drafted === null ? t('invite_ready') : t('invite_ready_days')}
       </Text>
       {stage.drafted?.smsRefused === true && (
         <Text style={styles.failed} testID="invite-sms-failed">

@@ -313,7 +313,7 @@ export const it: Readonly<Record<CopyKey, string>> = {
   // quanto costa un link copiato è detto dove viene chiesto.
   list_paste_lead: 'Se il link non si apre da solo, lo copi e lo incolli qui.',
   list_paste_cost:
-    'Un link copiato può essere letto dalle altre applicazioni di questo telefono. Questo vale un’ora e serve una sola volta.',
+    'Un link copiato può essere letto dalle altre applicazioni di questo telefono. Questo vale per un tempo limitato e serve una sola volta.',
   list_paste_field: 'Incolli il link di invito',
   list_paste_confirm: 'Entrare',
   list_paste_working: 'Apertura dell’invito…',

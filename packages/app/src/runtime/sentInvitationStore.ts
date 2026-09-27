@@ -6,11 +6,11 @@ import type { EncryptedDatabase } from './givenNameStore'
  * somebody is let in through them or they run out.
  *
  * A page of the notebook (ADR-0010), beside `outstanding_invitations`, which
- * keeps a link's for the hour it is good. Its own page rather than a column
- * there, because the two differ in all that is asked of them: a week rather
- * than an hour, another route to ask, and the name typed in « Qui
- * invitez-vous ? » kept until the account it is for comes through, days
- * later. A link's name is given within the minute or not at all.
+ * keeps a link's for as long as it is good, an hour or three days (#408). Its
+ * own page rather than a column there, because the two differ in what is
+ * asked of them: a week, past its deadline for as long as the service keeps
+ * it, and another route to ask. Both keep the name typed in « Qui
+ * invitez-vous ? » until the account it is for comes through, days later.
  *
  * What it holds is what the service must never learn, the conversation each
  * invitation leads to, and the name this device will give its recipient.

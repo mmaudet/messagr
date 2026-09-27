@@ -24,7 +24,7 @@ const ONE: OutstandingInvitation = {
   scope: '!room:example.org',
   issuedAt: NOW - 60_000,
   lifetime: HOUR,
-  name: null,
+  given: null,
 }
 
 /** Nobody is named in most of these, and naming is not what they test. */
@@ -112,7 +112,7 @@ describe('admitAnyoneWaiting', () => {
     // The last and not the first, as on the minute after issuing: somebody
     // who already had an account comes in after the one the service drew,
     // which cedes its place.
-    const store = held({ ...ONE, name: 'Marie' })
+    const store = held({ ...ONE, given: 'Marie' })
     const giveName = vi.fn(async (_who: string, _name: string) => {})
 
     await admitAnyoneWaiting({
@@ -141,7 +141,7 @@ describe('admitAnyoneWaiting', () => {
       giveName,
     })
     await admitAnyoneWaiting({
-      outstanding: held({ ...ONE, name: 'Marie' }),
+      outstanding: held({ ...ONE, given: 'Marie' }),
       admit: async (): Promise<NotAdmitted> => ({
         admitted: false,
         reason: 'not yet',
@@ -155,7 +155,7 @@ describe('admitAnyoneWaiting', () => {
 
   it('a name that does not hold leaves the admission done', async () => {
     // Somebody is in: asking again would invite them a second time.
-    const store = held({ ...ONE, name: 'Marie' })
+    const store = held({ ...ONE, given: 'Marie' })
 
     const report = await admitAnyoneWaiting({
       outstanding: store,

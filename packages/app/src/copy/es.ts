@@ -317,7 +317,7 @@ export const es: Readonly<Record<CopyKey, string>> = {
   // misma, y lo que cuesta un enlace copiado se dice donde se pide.
   list_paste_lead: 'Si el enlace no se abre solo, cópielo y péguelo aquí.',
   list_paste_cost:
-    'Un enlace copiado puede ser leído por las demás aplicaciones de este teléfono. Este vale una hora y sirve una sola vez.',
+    'Un enlace copiado puede ser leído por las demás aplicaciones de este teléfono. Este vale por un tiempo limitado y sirve una sola vez.',
   list_paste_field: 'Pegue el enlace de invitación',
   list_paste_confirm: 'Entrar',
   list_paste_working: 'Abriendo la invitación…',
@@ -358,7 +358,7 @@ export const es: Readonly<Record<CopyKey, string>> = {
   invite_qr_label: 'Código QR del enlace de invitación',
   invite_share: 'Compartir el enlace',
   'invite_absent_text %1$@':
-    'Invitación para encontrarnos en Messagr:\n%1$@\nEste enlace vale tres días y sirve una sola vez.',
+    'Invitación a reunirse conmigo en Messagr:\n%1$@\nEste enlace vale tres días y sirve una sola vez.',
   invite_ready_days:
     'Envíele este enlace. Vale tres días y sirve una sola vez.',
   invite_sms_failed:

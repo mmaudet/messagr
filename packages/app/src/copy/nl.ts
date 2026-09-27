@@ -319,7 +319,7 @@ export const nl: Readonly<Record<CopyKey, string>> = {
   list_paste_lead:
     'Als de link niet vanzelf opengaat, kopieer hem en plak hem hier.',
   list_paste_cost:
-    'Een gekopieerde link kan door de andere applicaties op dit toestel gelezen worden. Deze is een uur geldig en werkt maar één keer.',
+    'Een gekopieerde link kan door de andere applicaties op dit toestel gelezen worden. Deze is beperkte tijd geldig en werkt maar één keer.',
   list_paste_field: 'Plak de uitnodigingslink',
   list_paste_confirm: 'Binnenkomen',
   list_paste_working: 'De uitnodiging wordt geopend…',
@@ -361,7 +361,7 @@ export const nl: Readonly<Record<CopyKey, string>> = {
   invite_qr_label: 'QR-code van de uitnodigingslink',
   invite_share: 'De link delen',
   'invite_absent_text %1$@':
-    'Uitnodiging om met mij te praten op Messagr:\n%1$@\nDeze link is drie dagen geldig en werkt één keer.',
+    'Uitnodiging om zich bij mij aan te sluiten op Messagr:\n%1$@\nDeze link is drie dagen geldig en werkt één keer.',
   invite_ready_days:
     'Stuur deze link naar die persoon. Hij is drie dagen geldig en werkt één keer.',
   invite_sms_failed:

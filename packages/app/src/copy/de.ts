@@ -328,7 +328,7 @@ export const de: Readonly<Record<CopyKey, string>> = {
   list_paste_lead:
     'Wenn sich der Link nicht von selbst öffnet, kopieren Sie ihn und fügen Sie ihn hier ein.',
   list_paste_cost:
-    'Ein kopierter Link ist für die anderen Anwendungen auf diesem Telefon lesbar. Dieser gilt eine Stunde und nur ein einziges Mal.',
+    'Ein kopierter Link ist für die anderen Anwendungen auf diesem Telefon lesbar. Dieser gilt nur eine begrenzte Zeit und nur ein einziges Mal.',
   list_paste_field: 'Einladungslink einfügen',
   list_paste_confirm: 'Eintreten',
   list_paste_working: 'Einladung wird geöffnet…',
@@ -370,7 +370,7 @@ export const de: Readonly<Record<CopyKey, string>> = {
   invite_qr_label: 'QR-Code des Einladungslinks',
   invite_share: 'Link teilen',
   'invite_absent_text %1$@':
-    'Einladung, mit mir auf Messagr zu schreiben:\n%1$@\nDer Link gilt drei Tage und funktioniert einmal.',
+    'Einladung, sich mir auf Messagr anzuschließen:\n%1$@\nDer Link gilt drei Tage und funktioniert einmal.',
   invite_ready_days:
     'Senden Sie dieser Person diesen Link. Er gilt drei Tage und funktioniert einmal.',
   invite_sms_failed:

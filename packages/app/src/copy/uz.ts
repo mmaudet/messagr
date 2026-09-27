@@ -334,7 +334,7 @@ export const uz: Readonly<Record<CopyKey, string>> = {
   list_paste_lead:
     'Agar havola oʻzi ochilmasa, uni nusxalab, shu yerga joylashtiring.',
   list_paste_cost:
-    'Nusxalangan havolani bu telefondagi boshqa ilovalar ham oʻqiy oladi. Bu havola bir soat amal qiladi va faqat bir marta ishlaydi.',
+    'Nusxalangan havolani bu telefondagi boshqa ilovalar ham oʻqiy oladi. Bu havola cheklangan vaqt amal qiladi va faqat bir marta ishlaydi.',
   list_paste_field: 'Taklif havolasini joylashtiring',
   list_paste_confirm: 'Kirish',
   list_paste_working: 'Taklif ochilmoqda…',
@@ -375,7 +375,7 @@ export const uz: Readonly<Record<CopyKey, string>> = {
   invite_qr_label: 'Taklif havolasining QR kodi',
   invite_share: 'Havolani ulashish',
   'invite_absent_text %1$@':
-    'Messagrda men bilan yozishish uchun taklif:\n%1$@\nBu havola uch kun amal qiladi va bir marta ishlaydi.',
+    'Messagrda menga qoʻshilish uchun taklif:\n%1$@\nBu havola uch kun amal qiladi va bir marta ishlaydi.',
   invite_ready_days:
     'Bu havolani ularga yuboring. U uch kun amal qiladi va bir marta ishlaydi.',
   invite_sms_failed:

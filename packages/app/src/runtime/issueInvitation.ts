@@ -82,7 +82,10 @@ export type Issued =
       readonly scope?: string
     }
 
-/** How long a link is good for. An hour, which is the bench's own figure. */
+/**
+ * How long a link is good for, but one to a contact absent from Messagr: an
+ * hour, which is the bench's own figure.
+ */
 export const LINK_TTL_SECONDS = 3600
 
 /**

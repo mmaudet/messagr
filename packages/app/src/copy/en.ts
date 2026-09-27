@@ -322,7 +322,7 @@ export const en: Readonly<Record<CopyKey, string>> = {
   list_paste_lead:
     'If the link will not open by itself, copy it and paste it here.',
   list_paste_cost:
-    'A copied link can be read by the other applications on this telephone. This one is good for one hour and for a single use.',
+    'A copied link can be read by the other applications on this telephone. This one is good for a limited time and for a single use.',
   list_paste_field: 'Paste the invitation link',
   list_paste_confirm: 'Enter',
   list_paste_working: 'Opening the invitation…',

@@ -193,3 +193,11 @@ announcement of its deletion. The person chooses that trace by blocking, and
 the screen that asks says the block does not lift. Nothing tells the blocked
 account: its invitations are taken, never delivered, read as pending and run
 out, and every limit applies to them as to any other.
+
+**Amended on 27 September 2026 (inviting by SMS, #408).** A contact absent from
+Messagr is invited by an ordinary link, sent from the telephone by SMS or by the
+share sheet. That link is good for three days where any other is good for an
+hour, so the service can tell that it was minted from the results of a search,
+for somebody the search did not find there. It learns nothing else of that
+person: not the number, which goes to the telephone's messaging application
+only, and not who comes in through the link before they do, as for any link.

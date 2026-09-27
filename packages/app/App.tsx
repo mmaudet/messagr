@@ -205,8 +205,8 @@ import {
   type WaitingInvitation,
 } from './src/runtime/deliveredInvitations'
 import { envelopeKeysIn } from './src/runtime/envelopeKeys'
-import { admitAnyoneWaiting } from './src/runtime/admitAnyoneWaiting'
-import { inviteByLink, type AbsentChannel } from './src/runtime/inviteByLink'
+import { admitAnyoneWaiting, lastIn } from './src/runtime/admitAnyoneWaiting'
+import { inviteByLink, type LinkChannel } from './src/runtime/inviteByLink'
 import { displayNameFor } from './src/runtime/givenName'
 import Clipboard from '@react-native-clipboard/clipboard'
 import { removeMessage } from './src/runtime/cryptoPump'
@@ -281,7 +281,12 @@ import type { EvictOutcome } from './src/runtime/evict'
 import type { HistoryClaim } from './src/runtime/claimHistory'
 import { Conversation } from './src/ui/Conversation'
 import { ConversationList } from './src/ui/ConversationList'
-import { Invite, type InvitedMatch, type InviteStage } from './src/ui/Invite'
+import {
+  Invite,
+  isFound,
+  type InvitedMatch,
+  type InviteStage,
+} from './src/ui/Invite'
 import { Invited, type Answering } from './src/ui/Invited'
 import { BackupOffer } from './src/ui/BackupOffer'
 import { BackupSettings } from './src/ui/BackupSettings'
@@ -579,7 +584,7 @@ export function App({
     | ((
         name: string | null,
         declared: string | null,
-        absent?: AbsentChannel,
+        channel?: LinkChannel,
       ) => void)
     | null
   >(null)
@@ -622,7 +627,8 @@ export function App({
   const outstandingRef = useRef<Outstanding>(forgetfulOutstanding())
   /**
    * The invitations delivered inside the application from here (#404), for a
-   * week rather than a link's hour: the notebook's page, and what this launch
+   * week rather than a link's hour or three days: the notebook's page, and
+   * what this launch
    * sent besides, should the page not hold (`keptThisLaunchToo`). Refs for
    * the reason `outstandingRef` is one: a sync tick reads them.
    */
@@ -4168,7 +4174,7 @@ export function App({
             inviteRef.current = (
               name: string | null,
               declared: string | null,
-              absent?: AbsentChannel,
+              channel?: LinkChannel,
             ) => {
               setInvite({ stage: 'working' })
               setAdmission(null)
@@ -4198,21 +4204,17 @@ export function App({
                     os: Platform.OS === 'ios' ? 'ios' : 'android',
                   },
                   { given: name, declared },
-                  absent,
+                  channel,
                 )
                 if (!issued.issued) {
                   setInvite({ stage: 'failed', reason: issued.reason })
                   return
                 }
-                setInvite(
-                  issued.drafted === null
-                    ? { stage: 'ready', link: issued.link }
-                    : {
-                        stage: 'ready',
-                        link: issued.link,
-                        drafted: issued.drafted,
-                      },
-                )
+                setInvite({
+                  stage: 'ready',
+                  link: issued.link,
+                  drafted: issued.drafted,
+                })
                 setAdmission('waiting')
                 // WRITTEN DOWN BEFORE ANYBODY IS ASKED ABOUT IT, by
                 // `inviteByLink`, with how long the link lasts and the name
@@ -4250,13 +4252,8 @@ export function App({
                 // Somebody came through inside the minute, so there is
                 // nothing left to ask about.
                 await outstandingRef.current.forget(issued.invitationId)
-                // THE LAST ONE NAMED, not the first. On a link opened by
-                // somebody who already has an account there are two: the
-                // account the service drew, which cedes its place and
-                // deactivates itself, and then the real person. Naming the
-                // drawn one would put the given name on an account that no
-                // longer exists.
-                const who = admitted.entrants[admitted.entrants.length - 1]
+                // THE LAST ONE NAMED, not the first: `lastIn` says why.
+                const who = lastIn(admitted.entrants)
                 if (name !== null && who !== undefined) {
                   await giveName(who, name)
                 }
@@ -6277,10 +6274,10 @@ export function App({
                       // A contact found is invited inside the application
                       // (#404); a contact absent, and anybody else, by a
                       // link (#408).
-                      if (to !== undefined && 'reference' in to) {
+                      if (to !== undefined && isFound(to)) {
                         deliverRef.current?.(name, to, declared)
                       } else {
-                        inviteRef.current?.(name, declared, to?.absent)
+                        inviteRef.current?.(name, declared, to?.channel)
                       }
                     }}
                     onClose={() => {

@@ -233,12 +233,12 @@ const ANNE: Contact = { name: 'Anne', numbers: ['+44 7911 123456'] }
 const ZOE: Contact = { name: 'Zoé', numbers: ['+33 6 98 76 54 32'] }
 
 /** Each of those three not on Messagr, with the number an SMS goes to (#408). */
-const AWAY: ReadonlyMap<Contact, Absent> = new Map([
+const ABSENT: ReadonlyMap<Contact, Absent> = new Map([
   [PAUL, { contact: PAUL, number: '+33612345678' }],
   [ANNE, { contact: ANNE, number: '+447911123456' }],
   [ZOE, { contact: ZOE, number: '+33698765432' }],
 ])
-const away = (...contacts: Contact[]) => contacts.map(one => AWAY.get(one)!)
+const absent = (...contacts: Contact[]) => contacts.map(one => ABSENT.get(one)!)
 
 describe('looking for contacts', () => {
   it('shows the contacts found under the name of their card, then the others', async () => {
@@ -265,7 +265,7 @@ describe('looking for contacts', () => {
           envelopeKey: null,
         },
       ],
-      others: away(ZOE),
+      others: absent(ZOE),
       waiting: null,
     })
   })
@@ -540,7 +540,7 @@ describe('the journey of looking for contacts', () => {
           envelopeKey: null,
         },
       ],
-      others: away(ZOE),
+      others: absent(ZOE),
       waiting: null,
       limited: false,
     })
@@ -579,7 +579,7 @@ describe('the journey of looking for contacts', () => {
           envelopeKey: null,
         },
       ],
-      others: away(PAUL),
+      others: absent(PAUL),
       limited: true,
     })
   })
@@ -845,7 +845,7 @@ describe('the limit on masking (#401)', () => {
           envelopeKey: null,
         },
       ],
-      others: away(ANNE, ZOE),
+      others: absent(ANNE, ZOE),
       waiting: { count: 1, freesAt: FREES_AT * 1000 },
     })
   })
@@ -862,7 +862,7 @@ describe('the limit on masking (#401)', () => {
     expect(found).toEqual({
       found: true,
       matches: [],
-      others: away(PAUL, ZOE),
+      others: absent(PAUL, ZOE),
       waiting: { count: 2, freesAt: FREES_AT * 1000 },
     })
     expect(asked.map(a => a.route)).toEqual(['keys', 'maskBatch', 'directory'])
@@ -950,7 +950,7 @@ describe('looking again (#402)', () => {
           envelopeKey: null,
         },
       ],
-      others: away(ANNE, ZOE),
+      others: absent(ANNE, ZOE),
       waiting: null,
     })
   })
@@ -1078,7 +1078,7 @@ describe('looking again (#402)', () => {
 
     const found = await findContacts(d)
 
-    expect(found.found && found.others).toEqual(away(PAUL))
+    expect(found.found && found.others).toEqual(absent(PAUL))
     expect(page.get(`${KEY}/${PAUL_NUMBER}`)?.reference).toBe('ref-paul')
   })
 
@@ -1170,7 +1170,7 @@ describe('looking again (#402)', () => {
           envelopeKey: null,
         },
       ],
-      others: away(ANNE, ZOE),
+      others: absent(ANNE, ZOE),
       waiting: { count: 1, freesAt: FREES_AT * 1000 },
     })
   })

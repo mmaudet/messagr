@@ -310,8 +310,8 @@ describe('« Retrouver mes contacts »', () => {
     ;(sms[0]!.props.onPress as () => void)()
     ;(other[0]!.props.onPress as () => void)()
     expect(invited).toEqual([
-      { name: 'Zoé', absent: { by: 'sms', number: '+33698765432' } },
-      { name: 'Sans numéro', absent: { by: 'share' } },
+      { name: 'Zoé', channel: { by: 'sms', number: '+33698765432' } },
+      { name: 'Sans numéro', channel: { by: 'share' } },
     ])
     // Each under the name of its own card.
     const page = textIn(withId(drawn, 'find-contacts-found'))

@@ -1,3 +1,4 @@
+import { createRequire } from 'node:module'
 import { describe, expect, it } from 'vitest'
 
 import type { EncryptedDatabase } from './givenNameStore'
@@ -49,7 +50,7 @@ const THREE_DAYS: OutstandingInvitation = {
   scope: '!room:x',
   issuedAt: 1_700_000_000_000,
   lifetime: 3 * 86_400_000,
-  name: 'Marie',
+  given: 'Marie',
 }
 
 describe('the invitations waiting for somebody to walk through them', () => {
@@ -65,37 +66,11 @@ describe('the invitations waiting for somebody to walk through them', () => {
     const { database, rows } = fake()
     const page = await openOutstanding(database)
 
-    await page.remember({ ...THREE_DAYS, name: null })
+    await page.remember({ ...THREE_DAYS, given: null })
 
     // The notebook binds strings and numbers: none is the empty string.
     expect(rows.get('inv-1')?.given_name).toBe('')
-    expect((await page.all())[0]?.name).toBeNull()
-  })
-
-  it('reads a row from before either column as an hour’s link, with no name', async () => {
-    // Every link issued before #408 was good for an hour, and the name was
-    // never kept: the columns' defaults say exactly that.
-    const page = await openOutstanding(
-      fake([
-        {
-          invitation_id: 'inv-0',
-          scope: '!old:x',
-          issued_at: 1_600_000_000_000,
-          lifetime: 3_600_000,
-          given_name: '',
-        },
-      ]).database,
-    )
-
-    expect(await page.all()).toEqual([
-      {
-        invitationId: 'inv-0',
-        scope: '!old:x',
-        issuedAt: 1_600_000_000_000,
-        lifetime: 3_600_000,
-        name: null,
-      },
-    ])
+    expect((await page.all())[0]?.given).toBeNull()
   })
 
   it('skips a row of the wrong shape rather than losing the others', async () => {
@@ -134,5 +109,70 @@ describe('the invitations waiting for somebody to walk through them', () => {
     const page = forgetfulOutstanding()
     expect(await page.remember(THREE_DAYS)).toBe(false)
     expect(await page.all()).toEqual([])
+  })
+})
+
+/**
+ * SQLite itself, in memory, behind the notebook's port: what the fake above
+ * cannot say is what the engine gives the rows written before a column was
+ * added, and that is the whole of the migration.
+ */
+function sqlite() {
+  // Required rather than imported: the module exists only under its `node:`
+  // name, which the test runner's resolver strips before looking it up.
+  const { DatabaseSync } = createRequire(import.meta.url)(
+    'node:sqlite',
+  ) as typeof import('node:sqlite')
+  const engine = new DatabaseSync(':memory:')
+  const database: EncryptedDatabase = {
+    execute: async (sql, params = []) => {
+      const statement = engine.prepare(sql)
+      if (sql.trimStart().startsWith('SELECT')) {
+        return { rows: statement.all(...params) }
+      }
+      statement.run(...params)
+      return { rows: [] }
+    },
+  }
+  return { database, engine }
+}
+
+describe('a notebook written before #408', () => {
+  it('reads each invitation it holds as a link of an hour, with no name', async () => {
+    // The table as every device had it: three columns, and a link good for
+    // the hour every link was good for.
+    const { database, engine } = sqlite()
+    engine.exec(`CREATE TABLE outstanding_invitations (
+      invitation_id TEXT PRIMARY KEY NOT NULL,
+      scope TEXT NOT NULL,
+      issued_at INTEGER NOT NULL
+    )`)
+    engine
+      .prepare('INSERT INTO outstanding_invitations VALUES (?, ?, ?)')
+      .run('inv-0', '!old:x', 1_600_000_000_000)
+
+    const page = await openOutstanding(database)
+
+    expect(await page.all()).toEqual([
+      {
+        invitationId: 'inv-0',
+        scope: '!old:x',
+        issuedAt: 1_600_000_000_000,
+        lifetime: 3_600_000,
+        given: null,
+      },
+    ])
+  })
+
+  it('opens again once migrated, and keeps a link of three days beside it', async () => {
+    // The second opening finds both columns there, and its two additions
+    // fail, which is the state they were trying to reach.
+    const { database } = sqlite()
+    await openOutstanding(database)
+
+    const page = await openOutstanding(database)
+
+    expect(await page.remember(THREE_DAYS)).toBe(true)
+    expect(await page.all()).toEqual([THREE_DAYS])
   })
 })

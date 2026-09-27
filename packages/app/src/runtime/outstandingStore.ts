@@ -55,10 +55,10 @@ export interface OutstandingInvitation {
    */
   readonly lifetime: number
   /**
-   * The name typed for whoever walks through it, or `null`: given to them
-   * when they are let in, however late that is (#408).
+   * The name typed in « Qui invitez-vous ? », or `null`: given to whoever
+   * walks through it when they are let in, however late that is (#408).
    */
-  readonly name: string | null
+  readonly given: string | null
 }
 
 /**
@@ -66,8 +66,8 @@ export interface OutstandingInvitation {
  *
  * `issuedAt` is stored rather than derived because the service is the
  * authority on expiry and this side needs an answer when the service cannot
- * be reached -- a row nobody can ask about and that is a day old is a row to
- * drop, not one to keep asking about forever.
+ * be reached -- a row nobody can ask about and whose link has run out is a
+ * row to drop, not one to keep asking about forever.
  */
 const SCHEMA = `CREATE TABLE IF NOT EXISTS outstanding_invitations (
   invitation_id TEXT PRIMARY KEY NOT NULL,
@@ -119,7 +119,7 @@ export async function openOutstanding(
             scope: row.scope,
             issuedAt: row.issued_at,
             lifetime: row.lifetime,
-            name: row.given_name === '' ? null : row.given_name,
+            given: row.given_name === '' ? null : row.given_name,
           })
         }
       }
@@ -141,7 +141,7 @@ export async function openOutstanding(
             invitation.issuedAt,
             invitation.lifetime,
             // Strings and numbers only, as `listCacheStore.ts` says.
-            invitation.name ?? '',
+            invitation.given ?? '',
           ],
         )
         return true
