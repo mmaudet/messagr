@@ -3,7 +3,7 @@
 //!
 //! # WHAT THE SERVICE DOES WITH IT
 //!
-//! Two things, in one transaction. It records the account and the instant,
+//! Four things, in one transaction. It records the account and the instant,
 //! once, whatever the number of calls: what the manual purge within thirty
 //! days needs, which the privacy policy promises and #423 will automate --
 //! not the whole list, since a deletion made by e-mail is never announced. And
@@ -11,6 +11,12 @@
 //! somebody in, a partly used one included (decided on 26 September 2026): an
 //! invitee holding one is refused at once, rather than left waiting for an
 //! inviter who can no longer let anybody in.
+//!
+//! AND DISCOVERY (#410). Its number leaves discovery at once, as a withdrawal
+//! does: its entry leaves the directory, a proof in progress goes, and its
+//! mask and count stay thirty days, then go with the rest (ADR 0014). The
+//! invitations delivered inside Messagr that wait on it, or that it sent,
+//! run out at once too: nobody waits for an account that is gone.
 //!
 //! The row itself goes after thirty days (`PURGE_AFTER_SECONDS`): it names a
 //! deleted account, and the promise holds for it too.
@@ -42,7 +48,7 @@ use std::sync::Arc;
 use axum::{extract::State, http::HeaderMap, Json};
 use serde::Serialize;
 
-use crate::{auth, error::AppError, util::now, AppState};
+use crate::{auth, error::AppError, AppState};
 
 /// How long the row that announces a deletion is kept: the thirty days of
 /// `compte_supprime` in `deploy/messagr-eu/retention.json`, within which the
@@ -62,7 +68,7 @@ pub async fn announce(
     headers: HeaderMap,
 ) -> Result<Json<DeletionResponse>, AppError> {
     let user_id = auth::authenticate(&st.mx, &headers).await?;
-    let at = now();
+    let at = st.cfg.clock.now();
     let mut tx = st.pool.begin().await.map_err(anyhow::Error::from)?;
 
     sqlx::query(
@@ -96,6 +102,18 @@ pub async fn announce(
     .await
     .map_err(anyhow::Error::from)?
     .rows_affected();
+
+    crate::handlers::discovery::withdraw_on(&mut tx, &user_id, at).await?;
+    sqlx::query(
+        "UPDATE delivered_invitations SET expires_at = ?1 \
+         WHERE (recipient_user_id = ?2 OR inviter_user_id = ?2) \
+         AND claimed_at IS NULL AND expires_at > ?1",
+    )
+    .bind(at)
+    .bind(&user_id)
+    .execute(&mut *tx)
+    .await
+    .map_err(anyhow::Error::from)?;
 
     tx.commit().await.map_err(anyhow::Error::from)?;
     Ok(Json(DeletionResponse {
