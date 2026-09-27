@@ -370,11 +370,11 @@ export const es: Readonly<Record<CopyKey, string>> = {
   invite_refused_not_findable:
     'Su número ya no está probado. Vuelva a probarlo en los Ajustes para invitar a un contacto encontrado.',
   invite_refused_pending:
-    'Ya hay una invitación esperando a esta persona en Messagr: una sola a la vez.',
+    'Su invitación ya espera a esta persona en Messagr: una sola a la vez entre ustedes dos.',
   'invite_refused_recently %1$@ %2$@':
     'Ha invitado a esta persona hace poco. Podrá invitarla de nuevo el %1$@ a las %2$@.',
   'invite_refused_quota %1$@ %2$@':
-    'Ha enviado las diez invitaciones del día. Las siguientes podrán salir el %1$@ a las %2$@.',
+    'Ha enviado hoy las diez invitaciones permitidas en Messagr; las siguientes podrán enviarse el %1$@ a las %2$@. Un enlace de invitación siempre puede enviarse.',
   invite_failed: 'No se ha podido crear la invitación.',
   invite_waiting: 'Todavía nadie ha abierto el enlace.',
   invite_admitted: 'Hecho: esta persona puede entrar.',
@@ -407,9 +407,15 @@ export const es: Readonly<Record<CopyKey, string>> = {
   invited_block: 'Rechazar y bloquear',
   invited_block_title: '¿Bloquear esta cuenta?',
   invited_block_does:
-    'La invitación se rechaza, y esta cuenta ya no podrá invitarle en Messagr. No lo sabrá: sus próximas invitaciones quedarán sin respuesta, como si no las hubiera visto.',
+    'Se rechaza la invitación, y esta cuenta ya no podrá invitarle en Messagr. La cuenta no lo sabrá: sus próximas invitaciones quedarán sin respuesta, como si usted no las hubiera visto.',
   invited_block_not:
     'El bloqueo no le oculta: quien tenga su número sigue viendo que está en Messagr, y puede enviarle un enlace de invitación por otra vía. Solo retirar su número, en Ajustes, le oculta.',
+  invited_block_lasts:
+    'El bloqueo no se levanta: dura mientras existan sus dos cuentas.',
+  invited_block_not_hidden:
+    'Ahora mismo no se le puede encontrar: quien tenga su número no le ve en Messagr. El bloqueo no impide que le envíen un enlace de invitación por otra vía.',
+  invited_block_failed:
+    'Nada ha cambiado: esta cuenta no está bloqueada, y la invitación sigue esperando su respuesta. Puede volver a intentarlo.',
   invited_block_confirm: 'Bloquear',
   invited_block_cancel: 'Cancelar',
   invited_working: 'Un momento…',

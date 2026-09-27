@@ -584,11 +584,11 @@ export const fr = {
   // jours après une invitation restée sans réponse, dix par jour. Les deux
   // dernières disent quand réessayer, au jour et à l'heure du téléphone.
   invite_refused_pending:
-    'Une invitation attend déjà cette personne dans Messagr : une seule à la fois.',
+    'Votre invitation attend déjà cette personne dans Messagr : une seule à la fois entre vous deux.',
   'invite_refused_recently %1$@ %2$@':
     'Vous avez invité cette personne il y a peu. Vous pourrez l’inviter de nouveau le %1$@ à %2$@.',
   'invite_refused_quota %1$@ %2$@':
-    'Vous avez envoyé les dix invitations de la journée. Les suivantes pourront partir le %1$@ à %2$@.',
+    'Vous avez envoyé aujourd’hui les dix invitations permises dans Messagr ; les suivantes pourront partir le %1$@ à %2$@. Un lien d’invitation, lui, peut toujours partir.',
   invite_failed: 'L’invitation n’a pas pu être créée.',
   invite_waiting: 'Personne n’a encore ouvert le lien.',
   invite_admitted: 'C’est fait : cette personne peut entrer.',
@@ -654,15 +654,23 @@ export const fr = {
   invited_join: 'Rejoindre la conversation',
   invited_refuse: 'Refuser l’invitation',
   // REFUSER ET BLOQUER (#406), pour une invitation remise dans Messagr. Le
-  // compte bloqué n'en sait rien. L'écran qui le précède dit aussi ce que le
-  // blocage ne fait pas : il ne cache personne, et seul le retrait du numéro
-  // sort de la découverte.
+  // compte bloqué n'en sait rien. L'écran qui le précède dit aussi que le
+  // blocage ne se lève pas, décision du porteur du 27 septembre, et ce qu'il
+  // ne fait pas : il ne cache personne. Deux phrases pour ce dernier point,
+  // selon que la personne est trouvable ou non : à qui ne l'est plus, dire
+  // qu'on la voit sur Messagr serait faux.
   invited_block: 'Refuser et bloquer',
   invited_block_title: 'Bloquer ce compte ?',
   invited_block_does:
     'L’invitation est refusée, et ce compte ne pourra plus vous inviter dans Messagr. Il ne le saura pas : ses invitations suivantes resteront sans réponse, comme si vous ne les aviez pas vues.',
   invited_block_not:
     'Le blocage ne vous cache pas : qui a votre numéro voit toujours que vous êtes sur Messagr, et peut encore vous envoyer un lien d’invitation par un autre moyen. Seul le retrait de votre numéro, dans les Réglages, vous cache.',
+  invited_block_lasts:
+    'Le blocage ne se lève pas : il dure tant que vos deux comptes existent.',
+  invited_block_not_hidden:
+    'Vous n’êtes pas trouvable en ce moment : qui a votre numéro ne vous voit pas sur Messagr. Le blocage n’empêche pas de vous envoyer un lien d’invitation par un autre moyen.',
+  invited_block_failed:
+    'Rien n’a changé : ce compte n’est pas bloqué, et l’invitation attend toujours votre réponse. Vous pouvez réessayer.',
   invited_block_confirm: 'Bloquer',
   invited_block_cancel: 'Annuler',
   invited_working: 'Un instant…',

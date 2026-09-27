@@ -316,7 +316,7 @@ describe('delivering an invitation to a match (#404)', () => {
       ).toEqual({
         delivered: false,
         reason: `the invitation service refused it: ${errcode}`,
-        wait: { why, retryAt: 1_791_000_000_000 },
+        refusal: { why, retryAt: 1_791_000_000_000 },
       })
     }
   })

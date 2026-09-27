@@ -88,14 +88,16 @@ const REFUSED: Readonly<Record<DeliveryRefusal, CopyKey>> = {
 }
 
 /** And each refusal that says when another may leave (#406), with it. */
-function sayWait({ why, retryAt }: DeliveryWait): string {
-  return t(
-    why === 'recently'
-      ? 'invite_refused_recently %1$@ %2$@'
-      : 'invite_refused_quota %1$@ %2$@',
-    dayOf(retryAt),
-    timeOf(retryAt),
-  )
+const WAITED: Readonly<Record<DeliveryWait['why'], CopyKey>> = {
+  recently: 'invite_refused_recently %1$@ %2$@',
+  quota: 'invite_refused_quota %1$@ %2$@',
+}
+
+/** The sentence of a refusal, or of a failure the service did not name. */
+function refusedSaying(refusal?: DeliveryRefusal | DeliveryWait): string {
+  if (refusal === undefined) return t('invite_failed')
+  if (typeof refusal === 'string') return t(REFUSED[refusal])
+  return t(WAITED[refusal.why], dayOf(refusal.retryAt), timeOf(refusal.retryAt))
 }
 
 /**
@@ -139,9 +141,7 @@ export type InviteStage =
        * application, when it said so (#404): a sentence of its own, rather
        * than « L'invitation n'a pas pu être créée. ».
        */
-      readonly refusal?: DeliveryRefusal
-      /** A refusal that lasts until a moment, and that moment (#406). */
-      readonly wait?: DeliveryWait
+      readonly refusal?: DeliveryRefusal | DeliveryWait
     }
 
 export interface InviteProps {
@@ -274,13 +274,7 @@ export function Invite({ stage, onInvite, onClose, admission }: InviteProps) {
     return (
       <View style={styles.resting}>
         <Text testID="invite-failed" style={styles.failed}>
-          {stage.wait !== undefined
-            ? sayWait(stage.wait)
-            : t(
-                stage.refusal === undefined
-                  ? 'invite_failed'
-                  : REFUSED[stage.refusal],
-              )}
+          {refusedSaying(stage.refusal)}
         </Text>
         {/* The reason verbatim, under the sentence rather than instead of it.
             Invariant 6 governs what a person is told; it does not require

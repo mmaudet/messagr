@@ -427,8 +427,9 @@ describe('« Refuser et bloquer », for an invitation delivered inside Messagr (
   const delivered = whatADeliveredInvitationSays(
     new Date(2026, 9, 4, 12).getTime(),
   )
-  const block = (asking: boolean, pressed: string[] = []) => ({
+  const block = (asking: boolean, pressed: string[] = [], findable = true) => ({
     asking,
+    findable,
     onAsk: () => pressed.push('ask'),
     onConfirm: () => pressed.push('confirm'),
     onCancel: () => pressed.push('cancel'),
@@ -455,13 +456,30 @@ describe('« Refuser et bloquer », for an invitation delivered inside Messagr (
     expect(said(drawn)).toEqual([
       t('invited_block_title'),
       t('invited_block_does'),
+      t('invited_block_lasts'),
       t('invited_block_not'),
       t('invited_block_confirm'),
       t('invited_block_cancel'),
     ])
+    // A measure taken against somebody, never the principal action's green.
+    expect(find(drawn, 'invited-block-confirm')?.props.tone).toBe('measure')
     ;(find(drawn, 'invited-block-confirm')?.props.onPress as () => void)()
     ;(find(drawn, 'invited-block-cancel')?.props.onPress as () => void)()
     expect(pressed).toEqual(['confirm', 'cancel'])
+  })
+
+  it('says what is true of somebody no longer findable, rather than that they are seen', () => {
+    const drawn = screen({ known: delivered, block: block(true, [], false) })
+
+    expect(said(drawn)).toContain(t('invited_block_not_hidden'))
+    expect(said(drawn)).not.toContain(t('invited_block_not'))
+  })
+
+  it('says a block that did not go through is no block', () => {
+    const drawn = screen({ known: delivered, block: block(true), failed: true })
+
+    expect(said(drawn)).toContain(t('invited_block_failed'))
+    expect(said(drawn)).not.toContain(t('invited_failed'))
   })
 
   it('holds both buttons while the block is on its way', () => {

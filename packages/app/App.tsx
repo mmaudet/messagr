@@ -273,7 +273,7 @@ import type { HistoryClaim } from './src/runtime/claimHistory'
 import { Conversation } from './src/ui/Conversation'
 import { ConversationList } from './src/ui/ConversationList'
 import { Invite, type InvitedMatch, type InviteStage } from './src/ui/Invite'
-import { Invited } from './src/ui/Invited'
+import { Invited, type Answering } from './src/ui/Invited'
 import { BackupOffer } from './src/ui/BackupOffer'
 import { BackupSettings } from './src/ui/BackupSettings'
 import { Favourites } from './src/ui/Favourites'
@@ -333,6 +333,7 @@ import {
 } from './src/runtime/entry'
 import { deleteAccount, wayToDelete } from './src/runtime/deleteAccount'
 import {
+  isFindable,
   listNotice,
   proofJourney,
   readDiscovery,
@@ -704,9 +705,8 @@ export function App({
   /** The one open on §13.3's screen, and how its answer is going. */
   const [deliveredOnScreen, setDeliveredOnScreen] =
     useState<WaitingInvitation | null>(null)
-  const [answeringDelivered, setAnsweringDelivered] = useState<
-    'join' | 'refuse' | 'block' | null
-  >(null)
+  const [answeringDelivered, setAnsweringDelivered] =
+    useState<Answering | null>(null)
   /**
    * Whether the screen that says what a block does and does not do is up,
    * before « Bloquer » is sent (#406).
@@ -722,17 +722,15 @@ export function App({
     'expired' | 'gone' | null
   >(null)
   /**
-   * « Rejoindre » or « Refuser » on §13.3's screen for an invitation
-   * delivered inside Messagr (#404). Joined, it waits on the list for its
-   * conversation, which is entered at the tick that brings it, on this run
-   * or a later one. Declined, it leaves the list. Run out or gone, it leaves
+   * « Rejoindre », « Refuser » or « Refuser et bloquer » (#406) on §13.3's
+   * screen for an invitation delivered inside Messagr (#404). Joined, it
+   * waits on the list for its conversation, which is entered at the tick
+   * that brings it, on this run or a later one. Declined, blocked or not, it
+   * leaves the list. Run out or gone, it leaves
    * the list too, and the list says why; only a service that could not be
    * reached keeps the screen, and says so.
    */
-  const answerDelivered = (
-    how: 'join' | 'refuse' | 'block',
-    invitation: WaitingInvitation,
-  ) => {
+  const answerDelivered = (how: Answering, invitation: WaitingInvitation) => {
     setAnsweringDelivered(how)
     setDeliveredFailed(null)
     const answering = async () => {
@@ -4192,9 +4190,6 @@ export function App({
                     ...(delivered.refusal === undefined
                       ? {}
                       : { refusal: delivered.refusal }),
-                    ...(delivered.wait === undefined
-                      ? {}
-                      : { wait: delivered.wait }),
                   })
                   return
                 }
@@ -4998,6 +4993,7 @@ export function App({
         // And from the screen that explains a block, back is « Annuler »
         // (#406): the invitation is on screen again, unanswered.
         if (answeringDelivered === null) {
+          setDeliveredFailed(null)
           if (blockingDelivered) setBlockingDelivered(false)
           else setDeliveredOnScreen(null)
         }
@@ -6667,12 +6663,18 @@ export function App({
               onRefuse={() => answerDelivered('refuse', deliveredOnScreen)}
               block={{
                 asking: blockingDelivered,
+                // Unknown counts as findable: telling somebody they are
+                // still seen is the cautious error of the two.
+                findable: !discovery.read || isFindable(discovery, Date.now()),
                 onAsk: () => {
                   setDeliveredFailed(null)
                   setBlockingDelivered(true)
                 },
                 onConfirm: () => answerDelivered('block', deliveredOnScreen),
-                onCancel: () => setBlockingDelivered(false),
+                onCancel: () => {
+                  setDeliveredFailed(null)
+                  setBlockingDelivered(false)
+                },
               }}
             />
           </SafeAreaView>

@@ -385,11 +385,11 @@ export const uz: Readonly<Record<CopyKey, string>> = {
   invite_refused_not_findable:
     'Raqamingiz endi isbotlanmagan. Topilgan kontaktni taklif qilish uchun uni Sozlamalarda qayta isbotlang.',
   invite_refused_pending:
-    'Bu kishini Messagrda allaqachon bitta taklif kutmoqda: bir vaqtda faqat bittasi.',
+    'Taklifingiz bu kishini Messagrda allaqachon kutmoqda: ikkingiz orasida bir vaqtda faqat bittasi.',
   'invite_refused_recently %1$@ %2$@':
     'Siz bu kishini yaqinda taklif qilgansiz. Uni %1$@ kuni soat %2$@ da yana taklif qila olasiz.',
   'invite_refused_quota %1$@ %2$@':
-    'Siz kunlik oʻnta taklifni yubordingiz. Keyingilari %1$@ kuni soat %2$@ da yuborilishi mumkin.',
+    'Siz bugun Messagrda ruxsat etilgan oʻnta taklifni yubordingiz; keyingilari %1$@ kuni soat %2$@ da yuborilishi mumkin. Taklif havolasini esa har doim yuborish mumkin.',
   invite_failed: 'Taklifni yaratib boʻlmadi.',
   invite_waiting: 'Havolani hali hech kim ochmadi.',
   invite_admitted: 'Tayyor: bu odam kirishi mumkin.',
@@ -425,6 +425,12 @@ export const uz: Readonly<Record<CopyKey, string>> = {
     'Taklif rad etiladi va bu hisob sizni Messagrda boshqa taklif qila olmaydi. U buni bilmaydi: keyingi takliflari xuddi siz ularni koʻrmagandek javobsiz qoladi.',
   invited_block_not:
     'Bloklash sizni yashirmaydi: raqamingiz bor kishi hamon Messagrda ekaningizni koʻradi va sizga boshqa yoʻl bilan taklif havolasini yubora oladi. Faqat Sozlamalarda raqamingizni olib tashlash sizni yashiradi.',
+  invited_block_lasts:
+    'Bloklash olib tashlanmaydi: u ikkala hisobingiz mavjud ekan davom etadi.',
+  invited_block_not_hidden:
+    'Hozir sizni topib boʻlmaydi: raqamingiz bor kishi sizni Messagrda koʻrmaydi. Bloklash sizga boshqa yoʻl bilan taklif havolasi yuborilishiga toʻsqinlik qilmaydi.',
+  invited_block_failed:
+    'Hech narsa oʻzgarmadi: bu hisob bloklanmagan va taklif hamon javobingizni kutmoqda. Qayta urinib koʻrishingiz mumkin.',
   invited_block_confirm: 'Bloklash',
   invited_block_cancel: 'Bekor qilish',
   invited_working: 'Bir daqiqa…',

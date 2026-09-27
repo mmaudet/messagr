@@ -357,8 +357,8 @@ export type Delivered =
   | {
       readonly delivered: false
       readonly reason: string
-      readonly refusal?: DeliveryRefusal
-      readonly wait?: DeliveryWait
+      /** Why the service would not take it, when it said so. */
+      readonly refusal?: DeliveryRefusal | DeliveryWait
     }
 
 const REFUSALS: Readonly<Record<string, DeliveryRefusal>> = {
@@ -407,15 +407,13 @@ export async function deliverInvitation(
   const { scope } = conversation
   const refused = async (
     reason: string,
-    refusal?: DeliveryRefusal,
-    wait?: DeliveryWait,
+    refusal?: DeliveryRefusal | DeliveryWait,
   ): Promise<Delivered> => {
     await leave(deps.http, scope)
     return {
       delivered: false,
       reason,
       ...(refusal === undefined ? {} : { refusal }),
-      ...(wait === undefined ? {} : { wait }),
     }
   }
   let answer: Answer
@@ -439,10 +437,11 @@ export async function deliverInvitation(
     const retryAt = body?.retry_at
     return refused(
       `the invitation service refused it: ${errcode ?? answer.status}`,
-      errcode === null ? undefined : REFUSALS[errcode],
       why !== undefined && typeof retryAt === 'number'
         ? { why, retryAt: retryAt * 1000 }
-        : undefined,
+        : errcode === null
+          ? undefined
+          : REFUSALS[errcode],
     )
   }
   const { id, expires_at: expiresAt } = body

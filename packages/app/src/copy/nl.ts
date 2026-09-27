@@ -372,11 +372,11 @@ export const nl: Readonly<Record<CopyKey, string>> = {
   invite_refused_not_findable:
     'Uw nummer is niet meer bewezen. Bewijs het opnieuw in de Instellingen om een gevonden contact uit te nodigen.',
   invite_refused_pending:
-    'Er wacht al een uitnodiging op deze persoon in Messagr: één tegelijk.',
+    'Uw uitnodiging wacht al op deze persoon in Messagr: één tegelijk tussen u beiden.',
   'invite_refused_recently %1$@ %2$@':
     'U hebt deze persoon onlangs uitgenodigd. U kunt die op %1$@ om %2$@ opnieuw uitnodigen.',
   'invite_refused_quota %1$@ %2$@':
-    'U hebt de tien uitnodigingen van vandaag verstuurd. De volgende kunnen op %1$@ om %2$@ vertrekken.',
+    'U hebt vandaag de tien uitnodigingen verstuurd die Messagr toestaat; de volgende kunnen op %1$@ om %2$@ worden verstuurd. Een uitnodigingslink kan altijd nog.',
   invite_failed: 'De uitnodiging kon niet worden aangemaakt.',
   invite_waiting: 'Nog niemand heeft de link geopend.',
   invite_admitted: 'Klaar: deze persoon kan binnenkomen.',
@@ -411,7 +411,13 @@ export const nl: Readonly<Record<CopyKey, string>> = {
   invited_block_does:
     'De uitnodiging wordt geweigerd, en dit account kan u in Messagr niet meer uitnodigen. Het komt dat niet te weten: zijn volgende uitnodigingen blijven onbeantwoord, alsof u ze niet had gezien.',
   invited_block_not:
-    'Blokkeren verbergt u niet: wie uw nummer heeft, ziet nog steeds dat u op Messagr bent, en kan u op een andere manier een uitnodigingslink sturen. Alleen het intrekken van uw nummer, in Instellingen, verbergt u.',
+    'Blokkeren verbergt u niet: wie uw nummer heeft, ziet nog steeds dat u op Messagr bent, en kan u op een andere manier een uitnodigingslink sturen. Alleen het intrekken van uw nummer, in de Instellingen, verbergt u.',
+  invited_block_lasts:
+    'Blokkeren wordt niet opgeheven: het geldt zolang uw beide accounts bestaan.',
+  invited_block_not_hidden:
+    'U bent op dit moment niet vindbaar: wie uw nummer heeft, ziet u niet op Messagr. Blokkeren belet niet dat iemand u op een andere manier een uitnodigingslink stuurt.',
+  invited_block_failed:
+    'Er is niets veranderd: dit account is niet geblokkeerd, en de uitnodiging wacht nog op uw antwoord. U kunt het opnieuw proberen.',
   invited_block_confirm: 'Blokkeren',
   invited_block_cancel: 'Annuleren',
   invited_working: 'Een ogenblik…',

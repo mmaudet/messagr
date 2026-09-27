@@ -174,7 +174,7 @@ describe('inviting a contact found (#404)', () => {
       const drawn = show({
         stage: 'failed',
         reason: 'refused',
-        wait: { why, retryAt },
+        refusal: { why, retryAt },
       })
       expect(textIn(withId(drawn, 'invite-failed'))).toBe(
         t(key, dayOf(retryAt), timeOf(retryAt)),

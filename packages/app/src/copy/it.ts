@@ -367,11 +367,11 @@ export const it: Readonly<Record<CopyKey, string>> = {
   invite_refused_not_findable:
     'Il suo numero non è più provato. Lo provi di nuovo nelle Impostazioni per invitare un contatto trovato.',
   invite_refused_pending:
-    'Un invito attende già questa persona in Messagr: uno alla volta.',
+    'Il suo invito attende già questa persona in Messagr: uno alla volta tra voi due.',
   'invite_refused_recently %1$@ %2$@':
-    'Ha invitato questa persona da poco. Potrà invitarla di nuovo il %1$@ alle %2$@.',
+    'Ha invitato questa persona da poco. Potrà invitarla di nuovo dal giorno %1$@ alle ore %2$@.',
   'invite_refused_quota %1$@ %2$@':
-    'Ha inviato i dieci inviti della giornata. I prossimi potranno partire il %1$@ alle %2$@.',
+    'Ha inviato oggi i dieci inviti consentiti in Messagr; i prossimi potranno essere inviati dal giorno %1$@ alle ore %2$@. Un link di invito si può sempre inviare.',
   invite_failed: 'Non è stato possibile creare l’invito.',
   invite_waiting: 'Nessuno ha ancora aperto il link.',
   invite_admitted: 'Fatto: questa persona può entrare.',
@@ -404,9 +404,15 @@ export const it: Readonly<Record<CopyKey, string>> = {
   invited_block: 'Rifiutare e bloccare',
   invited_block_title: 'Bloccare questo account?',
   invited_block_does:
-    'L’invito viene rifiutato, e questo account non potrà più invitarla in Messagr. Non lo saprà: i suoi prossimi inviti resteranno senza risposta, come se non li avesse visti.',
+    'L’invito viene rifiutato, e questo account non potrà più invitarla in Messagr. L’account non lo saprà: i suoi prossimi inviti resteranno senza risposta, come se lei non li avesse visti.',
   invited_block_not:
     'Il blocco non la nasconde: chi ha il suo numero vede ancora che è su Messagr, e può ancora mandarle un link di invito in altro modo. Solo ritirare il suo numero, nelle Impostazioni, la nasconde.',
+  invited_block_lasts:
+    'Il blocco non si toglie: dura finché esistono i vostri due account.',
+  invited_block_not_hidden:
+    'Al momento lei non è trovabile: chi ha il suo numero non la vede su Messagr. Il blocco non impedisce di mandarle un link di invito in altro modo.',
+  invited_block_failed:
+    'Non è cambiato nulla: questo account non è bloccato, e l’invito attende ancora la sua risposta. Può riprovare.',
   invited_block_confirm: 'Bloccare',
   invited_block_cancel: 'Annullare',
   invited_working: 'Un momento…',
