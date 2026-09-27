@@ -41,14 +41,25 @@ export function Trust({
   participant,
   given,
   reading,
+  cardName,
   onBack,
 }: {
   readonly participant: string | null
   readonly given: string | undefined
   readonly reading: TrustReading
+  /**
+   * The name of the card this account came from, when it joined through an
+   * invitation from a number this device found in its address book (#407):
+   * what the product calls « recognized », matched through the address book
+   * and never verified. `recognizedStore.ts`.
+   */
+  readonly cardName?: string
   readonly onBack: () => void
 }) {
   const headline = headlineOf(reading)
+  // THE ADDRESS BOOK SAID IN THE HEADLINE when nothing stronger is known,
+  // and under its own title otherwise (#407): said once either way.
+  const bookInHeadline = headline === 'nothing-yet' && cardName !== undefined
   const tone =
     headline === 'confirmed'
       ? styles.confirmed
@@ -80,9 +91,27 @@ export function Trust({
             ? t('trust_state_confirmed')
             : headline === 'vouched'
               ? t('trust_state_vouched')
-              : t('trust_state_nothing')}
+              : bookInHeadline
+                ? t('trust_state_book %@', cardName)
+                : t('trust_state_nothing')}
         </Text>
       </View>
+
+      {/* WHAT THE ADDRESS BOOK ESTABLISHES, AND WHAT IT DOES NOT (#407):
+          that a code sent by SMS showed this account had the number, not
+          long ago. Only when it is so; the words are neither of the two the
+          catalogue's guards refuse. */}
+      {cardName !== undefined && (
+        <View style={styles.section} testID="trust-in-book">
+          <Text style={styles.heading}>{t('trust_book_title')}</Text>
+          {!bookInHeadline && (
+            <Text style={styles.paragraph}>
+              {t('trust_state_book %@', cardName)}
+            </Text>
+          )}
+          <Text style={styles.paragraph}>{t('trust_book_means')}</Text>
+        </View>
+      )}
 
       <View style={styles.section}>
         <Text style={styles.heading}>{t('trust_devices_title')}</Text>

@@ -3,7 +3,9 @@ import { describe, expect, it } from 'vitest'
 import type { Answer } from './discovery'
 import {
   blockDelivered,
+  cardsOfTheInviters,
   declineDelivered,
+  recognizedOnJoining,
   deliverInvitation,
   joinDelivered,
   KEPT_AFTER_DEADLINE_MS,
@@ -541,9 +543,19 @@ describe('the invitations waiting for this account (#404)', () => {
 
     expect(await readTheWaiting(service)).toEqual({
       unanswered: [
-        { id: 'a', expiresAt: 1_790_604_800_000, sealedName: null },
+        {
+          id: 'a',
+          expiresAt: 1_790_604_800_000,
+          sealedName: null,
+          inviterReference: null,
+        },
         // The name its inviter gave itself, sealed for this device (#405).
-        { id: 'd', expiresAt: 1_790_605_100_000, sealedName: 'ENVELOPE' },
+        {
+          id: 'd',
+          expiresAt: 1_790_605_100_000,
+          sealedName: 'ENVELOPE',
+          inviterReference: null,
+        },
       ],
       joined: [
         { id: 'b', inviter: '@alice:x' },
@@ -627,6 +639,7 @@ describe('the names sealed for this device (#405)', () => {
     id,
     expiresAt: NOW,
     sealedName,
+    inviterReference: null,
   })
 
   it('opens the name each invitation carries, and remembers one that does not open as no name', async () => {
@@ -673,5 +686,106 @@ describe('the names sealed for this device (#405)', () => {
     )
 
     expect(opened.has('a')).toBe(false)
+  })
+})
+
+describe('the card each inviter came from, without reading the address book (#407)', () => {
+  const waiting = (id: string, inviterReference: string | null) => ({
+    id,
+    expiresAt: NOW,
+    sealedName: null,
+    inviterReference,
+  })
+  const page = new Map([['ref-paul', 'Paul Martin']])
+  const nameOf = async (reference: string) => page.get(reference) ?? null
+
+  it('reads the reference an invitation carries', async () => {
+    const { service } = harness({
+      waiting: {
+        status: 200,
+        body: JSON.stringify({
+          invitations: [
+            { id: 'a', expires_at: 1, inviter_reference: 'ref-paul' },
+            { id: 'b', expires_at: 1 },
+          ],
+        }),
+      },
+    })
+
+    const read = await readTheWaiting(service)
+
+    expect(read?.unanswered.map(one => one.inviterReference)).toEqual([
+      'ref-paul',
+      null,
+    ])
+  })
+
+  it('finds the card of each inviter this device found, and nothing for another', async () => {
+    const found = await cardsOfTheInviters(
+      [
+        waiting('a', 'ref-paul'),
+        waiting('b', 'ref-stranger'),
+        waiting('c', null),
+      ],
+      nameOf,
+    )
+
+    expect(found).toEqual(new Map([['a', 'Paul Martin']]))
+  })
+
+  it('names no card once the inviter is findable no more, and its reference gone', async () => {
+    const before = await cardsOfTheInviters([waiting('a', 'ref-paul')], nameOf)
+    const after = await cardsOfTheInviters([waiting('a', null)], nameOf)
+
+    expect(before.get('a')).toBe('Paul Martin')
+    expect(after.size).toBe(0)
+  })
+})
+
+describe('joining an invitation from a card of the address book (#407)', () => {
+  function recognition(named: Record<string, string> = {}, fails = false) {
+    const recognized: [string, string][] = []
+    const given: [string, string][] = []
+    return {
+      deps: {
+        recognize: async (userId: string, cardName: string) => {
+          if (fails) throw new Error('the notebook is read-only')
+          recognized.push([userId, cardName])
+          return true
+        },
+        givenNames: async () => new Map(Object.entries(named)),
+        giveName: async (userId: string, name: string) => {
+          given.push([userId, name])
+        },
+      },
+      recognized,
+      given,
+    }
+  }
+
+  it('knows the inviter through the card, and gives it the card name', async () => {
+    const { deps, recognized, given } = recognition()
+
+    expect(await recognizedOnJoining(deps, '@paul:x', 'Paul Martin')).toBe(true)
+
+    expect(recognized).toEqual([['@paul:x', 'Paul Martin']])
+    expect(given).toEqual([['@paul:x', 'Paul Martin']])
+  })
+
+  it('keeps a name this device already gave the account', async () => {
+    const { deps, given } = recognition({ '@paul:x': 'Popol' })
+
+    await recognizedOnJoining(deps, '@paul:x', 'Paul Martin')
+
+    expect(given).toEqual([])
+  })
+
+  it('does not fail the answer when the notebook refuses', async () => {
+    const { deps, given } = recognition({}, true)
+
+    expect(await recognizedOnJoining(deps, '@paul:x', 'Paul Martin')).toBe(
+      false,
+    )
+    expect(given).toEqual([])
   })
 })

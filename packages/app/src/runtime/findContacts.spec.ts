@@ -154,6 +154,8 @@ type Row = readonly [keyNumber: number, number: string, remembered: Remembered]
  */
 function thePage(rows: readonly Row[] = []) {
   const page = new Map(rows.map(([k, n, r]) => [`${k}/${n}`, r] as const))
+  /** The name of each card found, by number (#407). */
+  const names = new Map<string, string>()
   const results: DiscoveryResults = {
     recall: async (keyNumber, numbers) =>
       new Map(
@@ -170,10 +172,29 @@ function thePage(rows: readonly Row[] = []) {
       for (const id of [...page.keys()]) {
         if (!numbers.includes(id.slice(id.indexOf('/') + 1))) page.delete(id)
       }
+      for (const number of [...names.keys()]) {
+        if (!numbers.includes(number)) names.delete(number)
+      }
+      return true
+    },
+    keepNames: async named => {
+      for (const [number, name] of named) names.set(number, name)
+      return true
+    },
+    nameOf: async reference => {
+      for (const [id, kept] of page) {
+        const name = names.get(id.slice(id.indexOf('/') + 1))
+        if (kept.reference === reference && name !== undefined) return name
+      }
+      return null
+    },
+    forgetAll: async () => {
+      page.clear()
+      names.clear()
       return true
     },
   }
-  return { results, page }
+  return { results, page, names }
 }
 
 function deps(
@@ -194,7 +215,7 @@ function deps(
     options.limit,
     options.envelopeKeys,
   )
-  const { results, page } = thePage(options.rows)
+  const { results, page, names } = thePage(options.rows)
   const all: FindingDeps = {
     readAddressBook: async () => contacts,
     masking,
@@ -203,7 +224,7 @@ function deps(
     results,
     ownNumber: () => null,
   }
-  return { deps: all, asked, calls, page }
+  return { deps: all, asked, calls, page, names }
 }
 
 const PAUL: Contact = { name: 'Paul', numbers: ['06 12 34 56 78'] }
@@ -951,6 +972,38 @@ describe('looking again (#402)', () => {
     expect(page.get(`${KEY}/${PAUL_NUMBER}`)?.reference).toBe('ref-first')
   })
 
+  it('forgets the page, card names included, when the address book holds no number any more (#407)', async () => {
+    const {
+      deps: d,
+      page,
+      names,
+    } = deps(
+      [{ name: 'Paul', numbers: ['not a number'] }],
+      {},
+      { rows: [row(PAUL_NUMBER, 'ref-paul')] },
+    )
+    names.set(PAUL_NUMBER, 'Paul')
+
+    await findContacts(d)
+
+    expect(page.size).toBe(0)
+    expect(names.size).toBe(0)
+  })
+
+  it('keeps the name of each card found, and none for a number that changed hands (#407)', async () => {
+    const { deps: d, names } = deps(
+      [PAUL, ANNE],
+      { [PAUL_NUMBER]: 'ref-new', '+447911123456': 'ref-anne' },
+      { rows: [row(PAUL_NUMBER, 'ref-first')] },
+    )
+
+    await findContacts(d)
+
+    expect(names).toEqual(new Map([['+447911123456', 'Anne']]))
+    expect(await d.results.nameOf('ref-anne')).toBe('Anne')
+    expect(await d.results.nameOf('ref-new')).toBeNull()
+  })
+
   it('keeps the reference of a number found for the first time', async () => {
     const { deps: d, page } = deps(
       [PAUL],
@@ -1091,6 +1144,15 @@ describe('looking again (#402)', () => {
         throw new Error('the notebook is read-only')
       },
       forgetAllBut: async () => {
+        throw new Error('the notebook is read-only')
+      },
+      keepNames: async () => {
+        throw new Error('the notebook is read-only')
+      },
+      nameOf: async () => {
+        throw new Error('the notebook is unreadable')
+      },
+      forgetAll: async () => {
         throw new Error('the notebook is read-only')
       },
     }

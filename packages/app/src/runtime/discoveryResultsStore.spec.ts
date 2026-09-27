@@ -17,6 +17,8 @@ function fake(refuse: 'none' | 'read' | 'write' = 'none') {
   const ran: { sql: string; params: readonly (string | number)[] }[] = []
   let key: string | null = null
   const rows = new Map<string, Record<string, unknown>>()
+  /** The names of cards found, by fingerprint (#407). */
+  const names = new Map<string, string>()
   const database: EncryptedDatabase = {
     execute: async (sql, params = []) => {
       ran.push({ sql, params })
@@ -42,12 +44,48 @@ function fake(refuse: 'none' | 'read' | 'write' = 'none') {
           rows: [...rows.values()].filter(row => row.key_number === params[0]),
         }
       }
-      if (sql.startsWith('SELECT DISTINCT fingerprint')) {
+      if (sql.startsWith('SELECT fingerprint FROM discovery_results UNION')) {
         return {
           rows: [
-            ...new Set([...rows.values()].map(row => row.fingerprint)),
+            ...new Set([
+              ...[...rows.values()].map(row => row.fingerprint),
+              ...names.keys(),
+            ]),
           ].map(fingerprint => ({ fingerprint })),
         }
+      }
+      if (sql.startsWith('INSERT OR REPLACE INTO discovery_found_names')) {
+        for (let at = 0; at < params.length; at += 2) {
+          names.set(String(params[at]), String(params[at + 1]))
+        }
+        return { rows: [] }
+      }
+      if (
+        sql.startsWith('DELETE FROM discovery_found_names WHERE fingerprint IN')
+      ) {
+        for (const fingerprint of params) names.delete(String(fingerprint))
+        return { rows: [] }
+      }
+      if (sql === 'DELETE FROM discovery_results') {
+        rows.clear()
+        return { rows: [] }
+      }
+      if (sql === 'DELETE FROM discovery_found_names') {
+        names.clear()
+        return { rows: [] }
+      }
+      if (sql === 'DELETE FROM discovery_fingerprint_key') {
+        key = null
+        return { rows: [] }
+      }
+      if (sql.startsWith('SELECT n.name AS name FROM discovery_found_names')) {
+        for (const row of rows.values()) {
+          const name = names.get(row.fingerprint as string)
+          if (row.reference === params[0] && name !== undefined) {
+            return { rows: [{ name }] }
+          }
+        }
+        return { rows: [] }
       }
       if (sql.startsWith('INSERT OR REPLACE INTO discovery_results')) {
         for (let at = 0; at < params.length; at += 4) {
@@ -75,7 +113,7 @@ function fake(refuse: 'none' | 'read' | 'write' = 'none') {
       throw new Error(`a statement this fake does not know: ${sql}`)
     },
   }
-  return { database, ran, rows }
+  return { database, ran, rows, names }
 }
 
 /** A generator that gives a new byte each time, so two devices differ. */
@@ -206,12 +244,15 @@ describe('what looking for contacts found (#402)', () => {
     )
 
     await page.keep(KEY, many)
+    await page.keepNames(new Map([...many.keys()].map(n => [n, 'Paul'])))
     await page.forgetAllBut([])
 
     const writes = ran.filter(one => one.sql.startsWith('INSERT OR REPLACE'))
     const forgets = ran.filter(one => one.sql.startsWith('DELETE'))
-    expect(writes).toHaveLength(25)
-    expect(forgets).toHaveLength(6)
+    // The rows, then the names (#407): twenty-five statements each.
+    expect(writes).toHaveLength(50)
+    // Six handfuls of fingerprints, forgotten from both tables.
+    expect(forgets).toHaveLength(12)
     for (const one of [...writes, ...forgets]) {
       expect(one.params.length).toBeLessThanOrEqual(999)
     }
@@ -265,6 +306,64 @@ describe('what looking for contacts found (#402)', () => {
     const page = forgetfulDiscoveryResults()
     expect(await page.keep(KEY, new Map([[PAUL, found]]))).toBe(false)
     expect(await page.forgetAllBut([PAUL])).toBe(false)
+    expect((await page.recall(KEY, [PAUL])).size).toBe(0)
+  })
+
+  it('keeps the name of a card found, and gives it back by the reference its number led to (#407)', async () => {
+    const page = await openDiscoveryResults(fake().database, counting())
+    await page.keep(
+      KEY,
+      new Map([
+        [PAUL, found],
+        [ZOE, none],
+      ]),
+    )
+
+    expect(await page.keepNames(new Map([[PAUL, 'Paul Martin']]))).toBe(true)
+
+    expect(await page.nameOf('ref-paul')).toBe('Paul Martin')
+    expect(await page.nameOf('ref-other')).toBeNull()
+  })
+
+  it('forgets the name with its number, and writes no number for it either', async () => {
+    const { database, ran, names } = fake()
+    const page = await openDiscoveryResults(database, counting())
+    await page.keep(KEY, new Map([[PAUL, found]]))
+    await page.keepNames(new Map([[PAUL, 'Paul Martin']]))
+
+    expect(await page.forgetAllBut([ZOE])).toBe(true)
+
+    expect(await page.nameOf('ref-paul')).toBeNull()
+    expect(names.size).toBe(0)
+    const written = ran.flatMap(one => one.params.map(String)).join(' ')
+    expect(written).not.toContain('12345678')
+  })
+
+  it('names nobody when the page will not open, and says a write did not hold', async () => {
+    const reading = await openDiscoveryResults(
+      fake('read').database,
+      counting(),
+    )
+    expect(await reading.nameOf('ref-paul')).toBeNull()
+
+    const writing = await openDiscoveryResults(
+      fake('write').database,
+      counting(),
+    )
+    expect(await writing.keepNames(new Map([[PAUL, 'Paul']]))).toBe(false)
+    expect(await forgetfulDiscoveryResults().nameOf('ref-paul')).toBeNull()
+  })
+
+  it('forgets everything, key included, once the number is withdrawn (#407)', async () => {
+    const { database, rows, names } = fake()
+    const page = await openDiscoveryResults(database, counting())
+    await page.keep(KEY, new Map([[PAUL, found]]))
+    await page.keepNames(new Map([[PAUL, 'Paul']]))
+
+    expect(await page.forgetAll()).toBe(true)
+
+    expect(rows.size).toBe(0)
+    expect(names.size).toBe(0)
     expect((await page.recall(KEY, [PAUL])).size).toBe(0)
   })
 })

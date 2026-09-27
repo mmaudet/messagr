@@ -68,6 +68,11 @@ export interface WaitingInvitation {
    * base64 (#405), or `null`: `sealedName.ts` opens it.
    */
   readonly sealedName: string | null
+  /**
+   * The reference its inviter is findable by now (#407), or `null`: what the
+   * results of this device's own looks can tell a card from.
+   */
+  readonly inviterReference: string | null
 }
 
 /**
@@ -111,6 +116,7 @@ export async function readTheWaiting(
       expires_at: expiresAt,
       inviter_user_id: inviter,
       sealed_name: sealedName,
+      inviter_reference: inviterReference,
     } = entry as Record<string, unknown>
     if (typeof id !== 'string' || id === '' || typeof expiresAt !== 'number') {
       continue
@@ -122,6 +128,10 @@ export async function readTheWaiting(
         id,
         expiresAt: expiresAt * 1000,
         sealedName: typeof sealedName === 'string' ? sealedName : null,
+        inviterReference:
+          typeof inviterReference === 'string' && inviterReference !== ''
+            ? inviterReference
+            : null,
       })
     }
   }
@@ -151,6 +161,54 @@ export async function namesSealedFor(
     opened.set(id, openSealedName(keys, sealedName ?? ''))
   }
   return opened
+}
+
+/**
+ * The card this device's own looks found each inviter's number on (#407), by
+ * invitation, looked up in the page of results with `nameOf` at every reading:
+ * an inviter findable no more carries no reference, and names no card any
+ * more. No address book is read: only a look the person starts may do that
+ * (#392, story 30).
+ */
+export async function cardsOfTheInviters(
+  unanswered: readonly WaitingInvitation[],
+  nameOf: (reference: string) => Promise<string | null>,
+): Promise<ReadonlyMap<string, string>> {
+  const found = new Map<string, string>()
+  for (const { id, inviterReference } of unanswered) {
+    if (inviterReference === null) continue
+    const card = await nameOf(inviterReference)
+    if (card !== null) found.set(id, card)
+  }
+  return found
+}
+
+/**
+ * Joining an invitation from a card of the address book (#407): the inviter
+ * is known through it from now on, what the product calls « recognized »,
+ * and takes the card's name as its given name unless it has one. Once: the
+ * card is not read again for this account. Neither is the answer: a failure
+ * here leaves the invitation joined, and the account simply not known
+ * through the address book on this device.
+ */
+export async function recognizedOnJoining(
+  deps: {
+    readonly recognize: (userId: string, cardName: string) => Promise<boolean>
+    readonly givenNames: () => Promise<ReadonlyMap<string, string>>
+    readonly giveName: (userId: string, name: string) => Promise<unknown>
+  },
+  inviter: string,
+  cardName: string,
+): Promise<boolean> {
+  try {
+    const recognized = await deps.recognize(inviter, cardName)
+    if (!(await deps.givenNames()).has(inviter)) {
+      await deps.giveName(inviter, cardName)
+    }
+    return recognized
+  } catch {
+    return false
+  }
 }
 
 /**

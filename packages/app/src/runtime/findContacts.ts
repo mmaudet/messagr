@@ -151,6 +151,23 @@ export interface DiscoveryResults {
    * stands. Whether it held.
    */
   readonly forgetAllBut: (numbers: readonly string[]) => Promise<boolean>
+  /**
+   * Keeps, for each of these numbers found, the name of its card (#407).
+   * Whether it held.
+   */
+  readonly keepNames: (named: ReadonlyMap<string, string>) => Promise<boolean>
+  /**
+   * The name of the card whose number first led to `reference`, or `null`:
+   * what tells an invitation from somebody in the address book, without
+   * reading it again (#407).
+   */
+  readonly nameOf: (reference: string) => Promise<string | null>
+  /**
+   * Forgets everything the page holds, its key included: the number was
+   * withdrawn (#407, the owner's decision of 27 September 2026). Whether it
+   * held.
+   */
+  readonly forgetAll: () => Promise<boolean>
 }
 
 /** A contact whose number a findable account proved, and that account. */
@@ -245,6 +262,9 @@ export async function findContacts(deps: FindingDeps): Promise<Findings> {
   const contacts = await deps.readAddressBook()
   const holders = numbersOf(contacts, deps.region(), deps.ownNumber())
   if (holders.size === 0) {
+    // NOTHING LEFT TO FIND, AND NOTHING LEFT TO KEEP: the page follows the
+    // address book as it stands, the names of its cards included (#407).
+    await quietly(() => deps.results.forgetAllBut([]))
     return { found: true, matches: [], others: byName(contacts), waiting: null }
   }
 
@@ -292,6 +312,11 @@ export async function findContacts(deps: FindingDeps): Promise<Findings> {
 
   const matched = new Map<Contact, Match>()
   const toKeep = new Map<string, Remembered>()
+  // THE NAME OF EACH CARD FOUND (#407), for an invitation from its account
+  // to be told apart without a look: the first card holding the number, and
+  // none for a number that changed hands, whose new account is not the one
+  // the card was found for.
+  const named = new Map<string, string>()
   for (const [number, mask] of masks) {
     const entry = listed.get(mask)
     const reference = entry?.reference ?? null
@@ -309,7 +334,11 @@ export async function findContacts(deps: FindingDeps): Promise<Findings> {
       before !== undefined &&
       before.reference !== null &&
       before.reference !== reference
-    for (const contact of holders.get(number)!) {
+    const holding = holders.get(number)!
+    if (!holderChanged && holding[0] !== undefined) {
+      named.set(number, holding[0].name)
+    }
+    for (const contact of holding) {
       // A contact's number that did not change hands wins over one that did.
       const already = matched.get(contact)
       if (already === undefined || (already.holderChanged && !holderChanged)) {
@@ -326,6 +355,7 @@ export async function findContacts(deps: FindingDeps): Promise<Findings> {
   // costs the next look its numbers again. And a number that has left the
   // address book leaves the page.
   await quietly(() => deps.results.keep(key.keyNumber, toKeep))
+  await quietly(() => deps.results.keepNames(named))
   await quietly(() => deps.results.forgetAllBut(numbers))
   // The contacts holding a number the limit left unmasked, gathered once for
   // every number rather than once for every contact.

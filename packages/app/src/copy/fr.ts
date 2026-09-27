@@ -636,11 +636,16 @@ export const fr = {
   // n'a pas été dépensé. Le lien est encore bon après un refus.
   invited_nothing_spent:
     'Rien n’a encore été envoyé. Tant que vous n’avez pas répondu, ce lien n’est pas dépensé.',
-  // UNE INVITATION REMISE DANS MESSAGR (#404) ne nomme personne avant
-  // d'être rejointe : le service ne dit l'inviteur qu'à ce moment-là.
-  // D'où la même franchise que `invited_who_undeclared` pour un lien.
+  // UNE INVITATION REMISE DANS MESSAGR (#404) ne nomme aucun compte avant
+  // d'être rejointe : le service ne dit le compte de l'inviteur qu'à ce
+  // moment-là. Avant, il n'en donne que la référence, qui ne dit un nom qu'à
+  // l'appareil qui a trouvé son numéro (#407, `invited_in_book`). D'où la
+  // même franchise que `invited_who_undeclared` pour un lien.
   invited_who_delivered:
     'Quelqu’un vous invite à une conversation dans Messagr, sans dire qui.',
+  // L'INVITEUR DANS LE CARNET (#407) : le nom de la fiche où les recherches
+  // de cet appareil ont trouvé son numéro, sans relire le carnet.
+  'invited_in_book %@': '%@ (dans votre carnet)',
   // « Valable », comme la ligne de la liste qui mène ici.
   'invited_terms_delivered %1$@':
     'Cette invitation est valable jusqu’au %1$@, pour une seule fois.',
@@ -774,6 +779,12 @@ export const fr = {
     'Ce n’est pas une alerte. Vos messages sont chiffrés de bout en bout depuis le premier, et cela ne dépend de rien de ce qui suit. Ce qui suit parle de la certitude sur la personne, pas du chiffrement.',
 
   trust_state_nothing: 'Rien n’établit encore qui est cette personne.',
+  // CE QUE LE CARNET ÉTABLIT (#407) : qu'un code reçu par SMS avait montré,
+  // au moment de l'invitation, que ce compte avait ce numéro. Ni « reconnu »
+  // ni rien de ce qui se confirme en personne : les gardes le refusent, et ce
+  // serait dire plus que ce qui est su.
+  'trust_state_book %@':
+    'Ce compte a prouvé un numéro de votre carnet : celui de la fiche %@.',
   trust_state_vouched:
     'Quelqu’un qui était déjà là a répondu de cette personne.',
   trust_state_confirmed:
@@ -787,6 +798,9 @@ export const fr = {
   trust_none_confirmed:
     'Aucun n’a été confirmé depuis ici. C’est l’état de départ normal.',
 
+  trust_book_title: 'Votre carnet',
+  trust_book_means:
+    'Au moment de son invitation, un code reçu par SMS avait montré que ce compte avait ce numéro. Cela ne dit pas qui tient ce compte aujourd’hui. Le nom de la fiche est celui du jour où vous avez accepté son invitation : il ne suit pas les changements de votre carnet.',
   trust_vouch_title: 'Ce que « répondre de quelqu’un » établit',
   trust_vouch_means:
     'Une personne déjà présente a estimé savoir qui entrait, et lui a ouvert la porte. C’est un jugement humain, et c’est tout : rien n’a été établi par la cryptographie. Un compte peut être tenu par quelqu’un d’autre sans que ce jugement en sache rien.',

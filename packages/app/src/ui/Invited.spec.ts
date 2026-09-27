@@ -112,6 +112,7 @@ const her: WhatIsKnown = {
   instance: 'messagr.eu',
   elsewhere: false,
   expiresAt: null,
+  cardName: null,
 }
 
 /** The same screen, opened by a link nobody has spent yet. #329. */
@@ -125,6 +126,7 @@ const byLink: WhatIsKnown = {
   instance: 'messagr.eu',
   elsewhere: false,
   expiresAt: null,
+  cardName: null,
 }
 
 function screen(over: Partial<Parameters<typeof Invited>[0]> = {}): Drawn[] {
@@ -231,6 +233,7 @@ describe('the invitation standing on the threshold', () => {
         instance: null,
         elsewhere: false,
         expiresAt: null,
+        cardName: null,
       },
     })
     expect(said(drawn)).toEqual([
@@ -392,7 +395,9 @@ describe('an invitation delivered inside Messagr (#404)', () => {
 
   it('draws the name its inviter gave itself after « Se présente comme », once its envelope opened here (#405)', () => {
     const drawn = screen({
-      known: whatADeliveredInvitationSays(expiresAt, 'Nadia du club'),
+      known: whatADeliveredInvitationSays(expiresAt, {
+        declared: 'Nadia du club',
+      }),
     })
 
     expect(said(drawn)).toEqual([
@@ -492,5 +497,41 @@ describe('« Refuser et bloquer », for an invitation delivered inside Messagr (
     expect(find(drawn, 'invited-block-confirm')?.props.disabled).toBe(true)
     expect(find(drawn, 'invited-block-cancel')?.props.disabled).toBe(true)
     expect(said(drawn)).toContain(t('invited_working'))
+  })
+})
+
+describe('an invitation from somebody in the address book (#407)', () => {
+  const expiresAt = new Date(2026, 9, 4, 12).getTime()
+
+  it('names the card, and nothing it claims under it but what it declared', () => {
+    const drawn = screen({
+      known: whatADeliveredInvitationSays(expiresAt, {
+        cardName: 'Paul Martin',
+      }),
+    })
+
+    expect(said(drawn).slice(0, 3)).toEqual([
+      t('invited_title'),
+      t('invited_in_book %@', 'Paul Martin'),
+      t('invited_lead'),
+    ])
+    expect(has(drawn, 'invited-in-book')).toBe(true)
+    expect(said(drawn)).not.toContain(t('invited_who_delivered'))
+  })
+
+  it('says the name its inviter declared under the card, as a claim', () => {
+    const drawn = screen({
+      known: whatADeliveredInvitationSays(expiresAt, {
+        declared: 'Popol',
+        cardName: 'Paul Martin',
+      }),
+    })
+
+    expect(said(drawn).slice(0, 4)).toEqual([
+      t('invited_title'),
+      t('invited_in_book %@', 'Paul Martin'),
+      t('conversation_sender_claimed %@', 'Popol'),
+      t('invited_lead'),
+    ])
   })
 })
