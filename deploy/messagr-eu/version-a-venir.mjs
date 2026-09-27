@@ -5,6 +5,7 @@
 //   node deploy/messagr-eu/version-a-venir.mjs annoncer AAAA-MM-JJ [site]
 //   node deploy/messagr-eu/version-a-venir.mjs reporter AAAA-MM-JJ [site]
 //   node deploy/messagr-eu/version-a-venir.mjs appliquer [site]
+//   node deploy/messagr-eu/version-a-venir.mjs preavis <page a-venir construite>
 //
 // `site` vaut `deploy/messagr-eu/site` par défaut. Chaque geste écrit dans le
 // dépôt, et rien d'autre : le reste, c'est un commit et un déploiement, que
@@ -24,18 +25,30 @@
 // personne qui lit la date, et à partir d'aujourd'hui : le préavis court du
 // déploiement, qui suit l'annonce le jour même.
 //
+// PREAVIS, qui n'écrit rien, le mesure de nouveau le jour où la page est
+// servie pour la première fois : `deploy.sh` le demande pour chaque page
+// `a-venir/` que le serveur ne sert pas encore, et s'arrête s'il est trop
+// court. Une annonce déployée une semaine plus tard donnerait sinon une
+// semaine de moins.
+//
 // REPORTER. Une date annoncée peut reculer, jamais avancer : le préavis donné
 // vaut pour toute date plus lointaine. Avancer demande une annonce nouvelle,
 // avec ses trente jours.
 //
-// APPLIQUER, le jour venu et pas avant. Pour chaque page qui a une version à
-// venir, décision du porteur du 27 septembre 2026 :
+// APPLIQUER, le jour venu et pas avant. Pour chaque page dont la version à
+// venir est annoncée pour aujourd'hui ou avant, décision du porteur du 27
+// septembre 2026 :
 //   - la version en vigueur part à `<page>/jusqu-au-AAAA-MM-JJ/`, où elle
 //     reste lisible, et dit jusqu'à quand elle s'est appliquée ;
 //   - la version à venir devient `<page>/index.html`, et renvoie à celle
 //     qu'elle remplace ;
 //   - `<page>/a-venir/` disparaît, et `retention.json` cesse d'y renvoyer.
-// Tout est vérifié avant que rien ne soit écrit.
+// Une version annoncée pour plus tard, ou pas encore annoncée, attend.
+//
+// CHAQUE GESTE VÉRIFIE CE QU'IL S'APPRÊTE À ÉCRIRE, et n'écrit rien si une
+// page ne dit pas exactement ce qu'il faut : `build-site.sh` vérifie de même
+// sa sortie plutôt que ses intentions. Une date réécrite dans une page et pas
+// dans l'autre serait publiée comme deux dates.
 //
 // Le passage qui n'existe que tant qu'une version est à venir se trouve entre
 // `<!-- a-venir -->` et `<!-- /a-venir -->` : l'annonce en tête de la version
@@ -47,6 +60,7 @@ import {
   mkdirSync,
   readFileSync,
   readdirSync,
+  realpathSync,
   rmSync,
   statSync,
   writeFileSync,
@@ -54,7 +68,7 @@ import {
 import { join, dirname } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
-export const MARQUE = 'MESSAGR-DATE-A-VENIR'
+const MARQUE = 'MESSAGR-DATE-A-VENIR'
 const PREAVIS_JOURS = 30
 const MOIS = [
   'janvier',
@@ -71,15 +85,16 @@ const MOIS = [
   'décembre',
 ]
 const PASSAGE = /<!-- a-venir -->[\s\S]*?<!-- \/a-venir -->/g
+const DATES = /<time datetime="([^"]*)">/g
 
 /** « 1er novembre 2026 », « 12 novembre 2026 ». */
-export function enFrancais(date) {
+function enFrancais(date) {
   const [annee, mois, jour] = date.split('-').map(Number)
   return `${jour === 1 ? '1er' : jour} ${MOIS[mois - 1]} ${annee}`
 }
 
 /** La date telle que les pages l'écrivent. */
-export function balise(date) {
+function balise(date) {
   return `<time datetime="${date}">${enFrancais(date)}</time>`
 }
 
@@ -103,7 +118,7 @@ function joursEntre(de, a) {
 class Refus extends Error {}
 
 /** Refuse ce qui n'est pas une date AAAA-MM-JJ du calendrier. */
-function dateDuCalendrier(date) {
+function exigerUneDate(date) {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(date ?? '')) {
     throw new Refus('la date s’écrit AAAA-MM-JJ')
   }
@@ -119,6 +134,8 @@ function dateDuCalendrier(date) {
 }
 
 const lire = fichier => readFileSync(fichier, 'utf8')
+const passageDe = texte => texte.match(PASSAGE) ?? []
+const datesDe = texte => [...texte.matchAll(DATES)].map(d => d[1])
 
 /**
  * Les pages légales qui ont une version à venir : chaque dossier du site qui
@@ -142,7 +159,9 @@ function versionsAVenir(site) {
  * Ce qu'une version à venir doit porter pour que les trois gestes la
  * trouvent : un passage `a-venir` de chaque côté, l'annonce qui renvoie à
  * la version à venir, la version à venir qui renvoie à celle en vigueur, et
- * « à venir » dans son titre et en tête, qu'`appliquer` retire.
+ * « à venir » dans son titre et en tête, qu'`appliquer` retire. Rien de la
+ * version qu'elle recopie : la carte `depuis` d'une version appliquée
+ * porterait une seconde date.
  */
 function verifierLaForme({ nom, venir, enVigueur }) {
   if (!existsSync(enVigueur)) {
@@ -158,16 +177,21 @@ function verifierLaForme({ nom, venir, enVigueur }) {
       `${nom}/a-venir/ doit dire « à venir » dans son titre et son h1, et « Version applicable le » en tête`,
     )
   }
+  if (texte.includes('<!-- depuis -->')) {
+    throw new Refus(
+      `${nom}/a-venir/ porte encore la carte « depuis » de la version qu’elle recopie`,
+    )
+  }
   if (!/<title>[^<]*? — Messagr<\/title>/.test(lire(enVigueur))) {
     throw new Refus(`${nom}/index.html doit avoir un titre « … — Messagr »`)
   }
-  const annonce = lire(enVigueur).match(PASSAGE) ?? []
+  const annonce = passageDe(lire(enVigueur))
   if (annonce.length !== 1 || !annonce[0].includes(`href="/${nom}/a-venir/"`)) {
     throw new Refus(
       `${nom}/index.html doit porter un passage a-venir, un seul, qui renvoie à /${nom}/a-venir/`,
     )
   }
-  const entete = lire(venir).match(PASSAGE) ?? []
+  const entete = passageDe(texte)
   if (entete.length !== 1 || !entete[0].includes(`href="/${nom}/"`)) {
     throw new Refus(
       `${nom}/a-venir/ doit porter un passage a-venir, un seul, qui renvoie à /${nom}/`,
@@ -179,8 +203,7 @@ function verifierLaForme({ nom, venir, enVigueur }) {
 function dateAnnoncee({ nom, venir }) {
   const texte = lire(venir)
   if (texte.includes(MARQUE)) return null
-  const dates = [...texte.matchAll(/<time datetime="(\d{4}-\d{2}-\d{2})">/g)]
-  const uniques = [...new Set(dates.map(d => d[1]))]
+  const uniques = [...new Set(datesDe(texte))]
   if (uniques.length !== 1) {
     throw new Refus(
       `${nom}/a-venir/ ne porte ni la marque ni une date annoncée, une seule`,
@@ -189,13 +212,39 @@ function dateAnnoncee({ nom, venir }) {
   return uniques[0]
 }
 
+/**
+ * La date réécrite dans les deux pages d'une version, vérifiée avant d'être
+ * écrite : plus de marque, et `date` seule, dans la version à venir comme dans
+ * le passage qui l'annonce.
+ */
+function redater({ nom, venir, enVigueur }, ancienne, date) {
+  const pages = [venir, enVigueur].map(page => ({
+    page,
+    texte: lire(page).split(ancienne).join(balise(date)),
+  }))
+  const [aVenir, annonce] = [pages[0].texte, passageDe(pages[1].texte)[0] ?? '']
+  for (const texte of [aVenir, annonce]) {
+    const dates = datesDe(texte)
+    if (
+      texte.includes(MARQUE) ||
+      !texte.includes(balise(date)) ||
+      dates.some(d => d !== date)
+    ) {
+      throw new Refus(
+        `${nom} : la date ne s’écrirait pas partout où la version à venir la porte, rien n’est écrit`,
+      )
+    }
+  }
+  return pages
+}
+
 /** Écrit la date à la place de la marque, et dit dans quelles pages. */
-export function annoncer(date, site, maintenant = new Date()) {
-  dateDuCalendrier(date)
-  const preavis = joursEntre(aujourdhuiAParis(maintenant), date)
-  if (preavis < PREAVIS_JOURS) {
+function annoncer(date, site) {
+  exigerUneDate(date)
+  const jours = joursEntre(aujourdhuiAParis(new Date()), date)
+  if (jours < PREAVIS_JOURS) {
     throw new Refus(
-      `${date} est à ${preavis} jour(s) : la politique promet ${PREAVIS_JOURS} jours de préavis`,
+      `${date} est à ${jours} jour(s) : la politique promet ${PREAVIS_JOURS} jours de préavis`,
     )
   }
   const aAnnoncer = versionsAVenir(site).filter(v =>
@@ -206,28 +255,24 @@ export function annoncer(date, site, maintenant = new Date()) {
       'aucune version à venir ne porte la marque, il n’y a rien à annoncer',
     )
   }
-  aAnnoncer.forEach(verifierLaForme)
-  const touchees = []
-  for (const { venir, enVigueur } of aAnnoncer) {
-    for (const page of [venir, enVigueur]) {
-      writeFileSync(page, lire(page).split(MARQUE).join(balise(date)))
-      touchees.push(page)
-    }
-  }
-  return touchees
+  const ecritures = aAnnoncer.flatMap(version => {
+    verifierLaForme(version)
+    return redater(version, MARQUE, date)
+  })
+  for (const { page, texte } of ecritures) writeFileSync(page, texte)
+  return ecritures.map(e => e.page)
 }
 
 /** Recule la date annoncée, et dit dans quelles pages. */
-export function reporter(date, site) {
-  dateDuCalendrier(date)
+function reporter(date, site) {
+  exigerUneDate(date)
   const annoncees = versionsAVenir(site).filter(v => dateAnnoncee(v) !== null)
   if (annoncees.length === 0) {
     throw new Refus(
       'aucune version à venir n’est annoncée, il n’y a rien à reporter',
     )
   }
-  const touchees = []
-  for (const version of annoncees) {
+  const ecritures = annoncees.flatMap(version => {
     verifierLaForme(version)
     const avant = dateAnnoncee(version)
     if (date <= avant) {
@@ -235,25 +280,41 @@ export function reporter(date, site) {
         `${version.nom}/a-venir/ est annoncée pour le ${avant} : une date peut reculer, pas avancer`,
       )
     }
-    for (const page of [version.venir, version.enVigueur]) {
-      touchees.push({
-        page,
-        texte: lire(page).split(balise(avant)).join(balise(date)),
-      })
-    }
-  }
-  for (const { page, texte } of touchees) writeFileSync(page, texte)
-  return touchees.map(t => t.page)
+    return redater(version, balise(avant), date)
+  })
+  for (const { page, texte } of ecritures) writeFileSync(page, texte)
+  return ecritures.map(e => e.page)
 }
 
-/** Remplace l'unique passage `a-venir` d'une page. */
-function sansLePassage(texte, remplacement) {
+/**
+ * Le préavis, en jours, que donne une page `a-venir/` construite si elle est
+ * servie aujourd'hui, ou le refus s'il est trop court.
+ */
+function preavis(page) {
+  if (!page || !existsSync(page)) {
+    throw new Refus('preavis prend la page a-venir construite')
+  }
+  const dates = [...new Set(datesDe(lire(page)))]
+  if (dates.length !== 1 || lire(page).includes(MARQUE)) {
+    throw new Refus(`${page} ne porte pas une date annoncée, une seule`)
+  }
+  const jours = joursEntre(aujourdhuiAParis(new Date()), dates[0])
+  if (jours < PREAVIS_JOURS) {
+    throw new Refus(
+      `servie aujourd’hui pour la première fois, ${page} s’appliquerait dans ${jours} jour(s), et la politique promet ${PREAVIS_JOURS} jours de préavis : reculer d’abord la date (reporter AAAA-MM-JJ)`,
+    )
+  }
+  return jours
+}
+
+/** L'unique passage `a-venir` d'une page, remplacé. */
+function remplacerLePassage(texte, remplacement) {
   return texte.replace(PASSAGE, () => remplacement)
 }
 
 /** La version en vigueur, telle qu'elle reste lisible à son adresse datée. */
 function archive(texte, nom, date) {
-  return sansLePassage(
+  return remplacerLePassage(
     texte,
     `<!-- jusqu-au -->
       <div class="card">
@@ -272,7 +333,7 @@ function archive(texte, nom, date) {
 
 /** La version à venir, telle qu'elle s'applique. */
 function enVigueurDepuis(texte, nom, date) {
-  return sansLePassage(
+  return remplacerLePassage(
     texte,
     `<!-- depuis -->
         <p>
@@ -329,35 +390,30 @@ function retentionSans(texte, adresses) {
 }
 
 /**
- * Applique chaque version à venir annoncée, le jour venu, et dit ce qui a
- * été écrit. `retention` vaut le `retention.json` voisin du site.
+ * Applique chaque version à venir annoncée pour aujourd'hui ou avant, et dit
+ * ce qui a été écrit. `retention` vaut le `retention.json` voisin du site.
  */
 export function appliquer(
   site,
   retention = join(site, '..', 'retention.json'),
   maintenant = new Date(),
 ) {
-  const versions = versionsAVenir(site)
-  if (versions.length === 0) {
-    throw new Refus('aucune version à venir, il n’y a rien à appliquer')
-  }
   const aujourdhui = aujourdhuiAParis(maintenant)
+  const echues = versionsAVenir(site).filter(version => {
+    const date = dateAnnoncee(version)
+    return date !== null && joursEntre(aujourdhui, date) <= 0
+  })
+  if (echues.length === 0) {
+    throw new Refus(
+      `aucune version à venir n’est annoncée pour le ${enFrancais(aujourdhui)} ou avant, il n’y a rien à appliquer`,
+    )
+  }
   const ecritures = []
   const retirees = []
-  for (const version of versions) {
+  for (const version of echues) {
     const { nom, venir, enVigueur } = version
-    const date = dateAnnoncee(version)
-    if (date === null) {
-      throw new Refus(
-        `${nom}/a-venir/ n’est pas annoncée : elle ne peut pas s’appliquer`,
-      )
-    }
     verifierLaForme(version)
-    if (joursEntre(aujourdhui, date) > 0) {
-      throw new Refus(
-        `${nom}/a-venir/ s’applique le ${enFrancais(date)}, et nous sommes le ${enFrancais(aujourdhui)}`,
-      )
-    }
+    const date = dateAnnoncee(version)
     const adresseDatee = join(site, nom, `jusqu-au-${date}`)
     if (existsSync(adresseDatee)) {
       throw new Refus(`${nom}/jusqu-au-${date}/ existe déjà`)
@@ -377,7 +433,7 @@ export function appliquer(
       `${retention} n’existe pas : les durées ne peuvent pas suivre`,
     )
   }
-  const duree = retentionSans(
+  const nouvelleRetention = retentionSans(
     lire(retention),
     retirees.map(r => r.adresse),
   )
@@ -387,7 +443,7 @@ export function appliquer(
     writeFileSync(page, texte)
   }
   for (const { dossier } of retirees) rmSync(dossier, { recursive: true })
-  writeFileSync(retention, duree)
+  writeFileSync(retention, nouvelleRetention)
   return [
     ...ecritures.map(e => e.page),
     ...retirees.map(r => `${r.dossier} (retiré)`),
@@ -395,32 +451,47 @@ export function appliquer(
   ]
 }
 
-if (process.argv[1] === fileURLToPath(import.meta.url)) {
-  const [geste, ...reste] = process.argv.slice(2)
+const SUITE = 'puis à lancer les contrôles de LISEZ-MOI-pages-legales.md.'
+const GESTES = {
+  annoncer: (date, site) => ({
+    touchees: annoncer(date, site),
+    suite: `la version à venir s’appliquera le ${enFrancais(date)}. Reste à commiter et à déployer aujourd’hui, le préavis courant du jour où la page est servie, ${SUITE}`,
+  }),
+  reporter: (date, site) => ({
+    touchees: reporter(date, site),
+    suite: `la version à venir s’appliquera le ${enFrancais(date)}. Reste à commiter et à déployer aujourd’hui, la page servie disant l’ancienne date d’ici là, ${SUITE}`,
+  }),
+  appliquer: site => ({
+    touchees: appliquer(site),
+    suite: `la version à venir est en vigueur. Reste à commiter, à déployer, ${SUITE}`,
+  }),
+  preavis: page => ({
+    touchees: [],
+    suite: `servie aujourd’hui, ${page} donne ${preavis(page)} jours de préavis`,
+  }),
+}
+
+// Par le chemin réel : lancé par un lien symbolique, `argv[1]` nomme le lien
+// et `import.meta.url` le fichier, et le geste ne se ferait pas, en silence.
+if (
+  process.argv[1] &&
+  realpathSync(process.argv[1]) === fileURLToPath(import.meta.url)
+) {
+  const [nom, ...reste] = process.argv.slice(2)
   const siteParDefaut = join(dirname(fileURLToPath(import.meta.url)), 'site')
   try {
-    let touchees
-    let suite
-    if (geste === 'annoncer' || geste === 'reporter') {
-      const [date, site = siteParDefaut] = reste
-      touchees =
-        geste === 'annoncer' ? annoncer(date, site) : reporter(date, site)
-      suite =
-        `la version à venir s’appliquera le ${enFrancais(date)}. Reste à commiter et à ` +
-        'déployer aujourd’hui, ' +
-        (geste === 'annoncer'
-          ? 'le préavis courant du jour où la page est servie'
-          : 'la page servie disant l’ancienne date d’ici là') +
-        ', puis à lancer les contrôles de LISEZ-MOI-pages-legales.md.'
-    } else if (geste === 'appliquer') {
-      const [site = siteParDefaut] = reste
-      touchees = appliquer(site)
-      suite =
-        'la version à venir est en vigueur. Reste à commiter, à déployer, puis à lancer ' +
-        'les contrôles de LISEZ-MOI-pages-legales.md.'
-    } else {
-      throw new Refus('annoncer AAAA-MM-JJ, reporter AAAA-MM-JJ ou appliquer')
+    const geste = Object.hasOwn(GESTES, nom) ? GESTES[nom] : null
+    if (geste === null) {
+      throw new Refus(
+        'annoncer AAAA-MM-JJ, reporter AAAA-MM-JJ, appliquer ou preavis <page>',
+      )
     }
+    const { touchees, suite } =
+      nom === 'appliquer'
+        ? geste(reste[0] ?? siteParDefaut)
+        : nom === 'preavis'
+          ? geste(reste[0])
+          : geste(reste[0], reste[1] ?? siteParDefaut)
     for (const page of touchees) console.log(`version-a-venir : ${page}`)
     console.log(`version-a-venir : ${suite}`)
   } catch (e) {

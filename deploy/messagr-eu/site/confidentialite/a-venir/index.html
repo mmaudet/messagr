@@ -250,10 +250,7 @@
       </p>
 
       <h2>Ce que Messagr ne vous demande pas</h2>
-      <p>
-        Pour ouvrir un compte, rien ne vous est demandé, et un compte Messagr
-        ne porte aucune donnée d'identification que vous auriez fournie&nbsp;:
-      </p>
+      <p>Pour ouvrir un compte, rien ne vous est demandé&nbsp;:</p>
       <ul>
         <li>pas de numéro de téléphone&nbsp;;</li>
         <li>pas d'adresse électronique&nbsp;;</li>
@@ -263,12 +260,14 @@
         </li>
       </ul>
       <p>
-        L'identifiant de votre compte est tiré au hasard au moment où vous
-        entrez. Il n'est rattaché à rien d'autre que lui-même.
+        Le compte que vous ouvrez ne porte donc aucune donnée d'identification
+        que vous auriez fournie. Son identifiant est tiré au hasard au moment
+        où vous entrez, et n'est rattaché à rien d'autre que lui-même.
       </p>
       <p>
         Être trouvable, plus bas, est le seul chemin par lequel un numéro de
-        téléphone nous parvient, et vous seul le prenez.
+        téléphone nous parvient, et vous seul le prenez&nbsp;: votre compte
+        porte alors votre numéro, masqué, tant que vous restez trouvable.
       </p>
       <p>
         <strong
@@ -374,15 +373,19 @@
         sur notre serveur, au début de la preuve&nbsp;: il sert à choisir le
         fournisseur du pays, à envoyer le SMS et à calculer une empreinte
         masquée, puis il est oublié. Le serveur garde cette empreinte, jamais
-        le numéro, et du code, seulement une empreinte, le temps de sa
-        validité, dix minutes. Une preuve vaut 28 jours, et se renouvelle.
+        le numéro en clair. Mais il détient la clé qui masque les numéros&nbsp;:
+        il peut donc retrouver votre numéro à partir de ce qu'il garde. Du
+        code, il ne garde qu'une empreinte, le temps de sa validité, dix
+        minutes, et l'efface dans l'heure qui suit. Une preuve vaut 28 jours,
+        et se renouvelle.
       </p>
       <p>
         <b>OVHcloud envoie ce SMS, pour notre compte.</b> OVH SAS, 2 rue
         Kellermann, 59100 Roubaix, en France, est notre sous-traitant pour cet
         envoi&nbsp;: il reçoit votre numéro et le texte du SMS, qui ne porte que
-        le code. Nous effaçons chaque SMS de l'historique d'OVHcloud dès qu'il
-        a été remis, et au plus tard au bout d'un jour.
+        le code. Dès que ce code ne vaut plus, nous demandons à OVHcloud
+        d'effacer le SMS de son historique, et s'il ne l'y trouve pas encore,
+        nous le lui redemandons chaque heure pendant un jour.
       </p>
       <p>
         <b>Ce qu'OVHcloud garde malgré tout.</b> Comme opérateur de
@@ -400,18 +403,21 @@
         qui vous cherchez, ni si la recherche trouve quelqu'un. Votre téléphone
         compare lui-même le résultat à la liste des comptes trouvables, qui est
         la même pour tout le monde. Les noms de vos contacts ne quittent
-        jamais votre téléphone. Pour qu'on ne puisse pas parcourir cette liste,
-        un numéro prouvé peut faire masquer au plus 5&nbsp;000 numéros en
-        trente jours.
+        jamais votre téléphone. Chaque numéro prouvé peut faire masquer au
+        plus 5&nbsp;000 numéros en trente jours, et 5&nbsp;000 de plus sous la
+        nouvelle clé quand celle qui masque les numéros change.
       </p>
       <p>
         <b>Inviter un contact.</b> Inviter un contact trouvé lui remet une
-        invitation dans Messagr&nbsp;: notre serveur apprend qui invite qui,
-        comme pour tout lien, et la garde une semaine, le temps qu'elle vaut.
-        Inviter un contact qui n'est pas sur Messagr passe par un SMS que vous
-        envoyez vous-même, depuis votre téléphone&nbsp;: son numéro ne nous
-        parvient pas. Le lien vaut alors trois jours au lieu d'une heure, ce
-        qui nous dit seulement qu'il a été émis depuis une recherche, pour
+        invitation dans Messagr, qui vaut une semaine&nbsp;: notre serveur
+        apprend qui invite qui dès l'envoi, là où un lien ne le lui apprend
+        qu'au moment où quelqu'un entre. Il le garde trente jours après la
+        réponse ou l'échéance de l'invitation, comme le lien entre celui qui
+        invite et celui qui entre. Inviter un contact qui n'est pas sur
+        Messagr passe par un lien que vous envoyez vous-même, depuis votre
+        téléphone, par SMS ou par la feuille de partage&nbsp;: son numéro ne
+        nous parvient pas. Le lien vaut alors trois jours au lieu d'une heure,
+        ce qui nous dit seulement qu'il a été émis depuis une recherche, pour
         quelqu'un qu'elle n'a pas trouvé.
       </p>
       <p>
@@ -430,13 +436,18 @@
           puis, avec le compteur des numéros qu'il a fait masquer, trente jours
           après que vous cessez d'être trouvable&nbsp;;
         </li>
-        <li>le SMS chez OVHcloud, au plus tard au bout d'un jour&nbsp;;</li>
+        <li>
+          le SMS chez OVHcloud, jusqu'à ce qu'il en soit effacé&nbsp;: nous le
+          demandons dès que son code ne vaut plus, puis chaque heure pendant un
+          jour&nbsp;;
+        </li>
         <li>
           les compteurs des SMS envoyés, sans aucun numéro, trente jours&nbsp;;
         </li>
         <li>
-          une invitation remise dans Messagr, une semaine, et le nom scellé
-          qu'elle porte, jusqu'à la réponse&nbsp;;
+          qui invite qui dans une invitation remise dans Messagr, trente jours
+          après la réponse ou l'échéance, et le nom scellé qu'elle porte,
+          jusqu'à la réponse ou l'échéance&nbsp;;
         </li>
         <li>un blocage, tant que vos deux comptes existent&nbsp;;</li>
         <li>
@@ -468,9 +479,10 @@
         <li>
           si vous cherchez vos contacts, ce que la recherche a trouvé, dans le
           carnet chiffré de l'application&nbsp;: une empreinte de chaque
-          numéro, jamais le numéro, et le nom des fiches trouvées. Il est oublié
-          quand un numéro quitte votre carnet d'adresses, et tout entier quand
-          vous retirez le vôtre&nbsp;;
+          numéro, jamais le numéro, et le nom des fiches trouvées. Ce qu'il
+          tient d'un numéro est oublié à la recherche qui suit le départ de ce
+          numéro de votre carnet d'adresses, et le tout, quand vous retirez le
+          vôtre&nbsp;;
         </li>
         <li>
           rien d'autre.
@@ -578,16 +590,17 @@
       <h2>Où vos données sont traitées</h2>
       <p>
         Le serveur est hébergé par Hetzner Online GmbH, à Helsinki, en Finlande,
-        au sein de l'Union européenne.
+        au sein de l'Union européenne. Deux choses peuvent être traitées hors
+        de l'Union.
       </p>
       <p>
         Si vous choisissez d'être trouvable, le SMS qui prouve votre numéro est
         envoyé par OVHcloud, en France, puis acheminé par les opérateurs du pays
-        de ce numéro.
+        de ce numéro&nbsp;: hors de l'Union pour un numéro suisse ou
+        britannique, par exemple.
       </p>
       <p>
-        Une exception&nbsp;: le signal qui réveille votre téléphone, décrit plus
-        haut, passe par Firebase Cloud Messaging (Google) sur Android et par le
+        Le signal qui réveille votre téléphone, décrit plus haut, passe par Firebase Cloud Messaging (Google) sur Android et par le
         service de notifications d'Apple sur iOS. Ces services peuvent le traiter
         hors de l'Union. Il ne porte que l'identifiant technique de votre
         appareil, une priorité de remise et un nombre tiré au hasard — et, sur
@@ -655,8 +668,9 @@
         «&nbsp;Si vous choisissez d'être trouvable&nbsp;»&nbsp;: la preuve, 28
         jours&nbsp;; l'empreinte masquée de votre numéro et son compteur,
         trente jours après que vous cessez d'être trouvable&nbsp;; le SMS chez
-        OVHcloud, un jour au plus&nbsp;; une invitation remise dans Messagr,
-        une semaine&nbsp;; un blocage, tant que vos deux comptes existent.
+        OVHcloud, jusqu'à ce qu'il en soit effacé&nbsp;; qui invite qui dans une
+        invitation remise dans Messagr, trente jours après la réponse ou
+        l'échéance&nbsp;; un blocage, tant que vos deux comptes existent.
       </p>
 
       <h2>Ce que l'effacement peut, et ce qu'il ne peut pas</h2>

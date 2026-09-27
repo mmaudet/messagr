@@ -37,18 +37,20 @@
 # dies of SIGPIPE, and `pipefail` reads a found match as a failure -- which
 # cost a real publishing run once already. curl reports the status itself.
 #
-# AND THE VERSIONS AROUND THE ONE IN FORCE, SINCE #412. A change to either
-# legal page is published thirty days before it applies, at
-# `<page>/a-venir/`, and the version it replaces stays readable at
-# `<page>/jusqu-au-<date>/` once it has. Which of them should answer is read
-# from the repository, not listed here: an upcoming version answers once it
-# is announced -- its source no longer carries the mark that waits for the
-# date -- and every dated version the repository holds answers.
+# AND THE VERSIONS AROUND THE ONE IN FORCE, SINCE #412. A change to a legal
+# page is published thirty days before it applies, at `<page>/a-venir/`, and
+# the version it replaces stays readable at `<page>/jusqu-au-<date>/` once it
+# has. Which of them should answer is read from the repository, by shape as
+# `build-site.sh` builds them, and not listed here: an upcoming version answers
+# once it is announced -- its source no longer carries the mark that waits for
+# the date -- and every dated version the repository holds answers.
 #
-# The other direction too. An upcoming version the repository has not
-# announced, or no longer holds because it applied, must NOT be served: the
-# first would be publishing ahead of the date the porteur sets, the second a
-# page still saying the policy « s'appliquera » on a day it already does.
+# The other direction too, and exactly: 404. An upcoming version the
+# repository has not announced, or no longer holds because it applied, must
+# NOT be served. The first would be publishing ahead of the date the porteur
+# sets, the second a page still saying the policy « s'appliquera » on a day it
+# already does. nginx answers a missing file with a plain 404, so anything
+# else -- a page, an error, no answer -- is not the absence being checked.
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
@@ -57,18 +59,22 @@ BASE="${MESSAGR_SITE:-https://messagr.eu}"
 PAGES=(/confidentialite /conditions-generales /aide)
 UNSERVED=()
 
-for legal in confidentialite conditions-generales; do
-  upcoming="$SITE_SOURCE/$legal/a-venir/index.html"
-  if [ -f "$upcoming" ] && ! grep -qF 'MESSAGR-DATE-A-VENIR' "$upcoming"; then
-    PAGES+=("/$legal/a-venir/")
-  else
-    UNSERVED+=("/$legal/a-venir/")
-  fi
-  for dated in "$SITE_SOURCE/$legal"/jusqu-au-*/index.html; do
+for dir in "$SITE_SOURCE"/*/; do
+  dir="${dir%/}"
+  legal="$(basename "$dir")"
+  upcoming="$dir/a-venir/index.html"
+  dated_any=0
+  for dated in "$dir"/jusqu-au-*/index.html; do
     [ -f "$dated" ] || continue
+    dated_any=1
     dated="${dated#"$SITE_SOURCE"}"
     PAGES+=("${dated%index.html}")
   done
+  if [ -f "$upcoming" ] && ! grep -qF 'MESSAGR-DATE-A-VENIR' "$upcoming"; then
+    PAGES+=("/$legal/a-venir/")
+  elif [ -f "$upcoming" ] || [ "$dated_any" -eq 1 ]; then
+    UNSERVED+=("/$legal/a-venir/")
+  fi
 done
 
 failed=0
@@ -88,11 +94,11 @@ done
 # unbound under `set -u`, and both upcoming versions can be announced at once.
 for page in ${UNSERVED[@]+"${UNSERVED[@]}"}; do
   code="$(curl -sSL -o /dev/null -w '%{http_code}' --max-time 20 "$BASE$page" || echo 000)"
-  if [ "$code" = "200" ]; then
-    printf '  FAIL  %s%s is served, and the repository has no announced version there\n' "$BASE" "$page" >&2
-    failed=1
+  if [ "$code" = "404" ]; then
+    printf '  OK    %s%s is not served (404)\n' "$BASE" "$page"
   else
-    printf '  OK    %s%s is not served (%s)\n' "$BASE" "$page" "$code"
+    printf '  FAIL  %s%s answered %s, and the repository has no announced version there\n' "$BASE" "$page" "$code" >&2
+    failed=1
   fi
 done
 

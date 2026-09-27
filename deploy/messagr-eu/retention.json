@@ -47,8 +47,8 @@
     ]
   },
   "decouverte_sms": {
-    "$note": "Le SMS qui porte le code d'une preuve, dans l'historique d'OVHcloud (#399). Effacé dès sa remise, et au plus tard au bout d'un jour par le ménage horaire.",
-    "duree": "au plus tard au bout d'un jour",
+    "$note": "Le SMS qui porte le code d'une preuve, dans l'historique d'OVHcloud (#399). Le service demande à OVHcloud de l'effacer dès que le code ne vaut plus, puis chaque heure pendant un jour s'il ne l'y trouve pas : un 404 peut dire un SMS pas encore dans l'historique ou déjà parti (sms_history.rs). La page dit ce que le service fait, pas un résultat qu'il ne peut pas garantir.",
+    "duree": "chaque heure pendant un jour",
     "jours": 1,
     "page": "/confidentialite/a-venir/",
     "applique_par": [
@@ -65,7 +65,7 @@
   },
   "decouverte_preuve_en_cours": {
     "$note": "Une preuve en cours : le masque du numéro, sous chaque clé en service (#409), et une empreinte du code, jamais le code.",
-    "duree": "le temps de sa validité, dix minutes",
+    "duree": "le temps de sa validité, dix minutes, et l'efface dans l'heure qui suit",
     "page": "/confidentialite/a-venir/",
     "applique_par": [
       "services/invitations/src/handlers/discovery.rs : CODE_LIFETIME_MINUTES",
@@ -73,13 +73,13 @@
     ]
   },
   "decouverte_invitations_remises": {
-    "$note": "Une invitation remise dans Messagr (#404) : qui invite qui, et le nom scellé que l'inviteur se donne (#405), effacé dès la réponse. Qui a invité qui s'efface ensuite avec le graphe, trente jours après.",
-    "duree": "une invitation remise dans Messagr, une semaine",
-    "jours": 7,
+    "$note": "Qui invite qui dans une invitation remise dans Messagr (#404), appris dès l'envoi, et gardé trente jours après la réponse ou l'échéance de l'invitation, qui vaut une semaine : le même terme que le lien entre celui qui invite et celui qui entre (#392, #416). Le nom scellé que l'inviteur se donne (#405) s'efface à la réponse ou à l'échéance.",
+    "duree": "trente jours après la réponse ou l'échéance",
+    "jours": 30,
     "page": "/confidentialite/a-venir/",
     "applique_par": [
-      "services/invitations/src/handlers/delivered.rs : DELIVERED_LIFETIME_SECONDS",
-      "services/invitations : cleanup::purge_delivered_invitations"
+      "services/invitations/src/handlers/delivered.rs : DELIVERED_LIFETIME_SECONDS, la semaine que vaut une invitation",
+      "services/invitations : cleanup::purge_delivered_invitations, au terme de EDGE_RETENTION_DAYS"
     ]
   },
   "decouverte_avis": {

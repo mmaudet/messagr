@@ -12,8 +12,10 @@
 //      la marque, et retire de la version en vigueur le passage qui
 //      l'annonce. Avant l'annonce, le site construit est celui d'aujourd'hui.
 //   2. Annoncer mal : une date à moins de trente jours, mal écrite, avancée
-//      après coup, ou une marque oubliée quelque part. `version-a-venir.mjs`
-//      refuse les trois premières, et `build-site.sh` la dernière.
+//      après coup, écrite dans une page et pas dans l'autre, ou une marque
+//      oubliée quelque part. `version-a-venir.mjs` refuse les premières, et
+//      `build-site.sh` la dernière. Et le préavis se mesure de nouveau le
+//      jour où la page est servie pour la première fois.
 //   3. Appliquer mal : avant le jour, ou en perdant la version remplacée,
 //      qui reste lisible à son adresse datée (décision du porteur du 27
 //      septembre 2026), ou en laissant `retention.json` vérifier les durées
@@ -25,8 +27,16 @@
 // LE TEST CONDUIT LES VRAIS SCRIPTS sur une copie du site, comme
 // destinations-page-invitation.js conduit build-site.sh, et il mène le cycle
 // deux fois : une version appliquée laisse le site dans l'état où la suivante
-// commence. Quand le dépôt ne tient aucune version à venir, entre deux cycles,
-// la copie en reçoit une, préparée comme `LISEZ-MOI-pages-legales.md` le dit.
+// commence.
+//
+// IL TIENT DANS LES TROIS ÉTATS DU DÉPÔT, puisque l'intégration continue le
+// lance à chaque changement : une version qui attend sa date, une version
+// annoncée, et aucune version à venir, entre deux cycles. La copie est
+// ramenée au premier état avant chaque scénario : une version annoncée y
+// reprend la marque, et une page qui n'en a pas en reçoit une, préparée comme
+// `LISEZ-MOI-pages-legales.md` le dit. Les pages sont trouvées par leur forme
+// (une version à venir, ou une version datée), comme `build-site.sh` et
+// `version-a-venir.mjs` les trouvent.
 'use strict';
 
 var fs = require('fs');
@@ -40,7 +50,6 @@ var tool = path.join(root, 'version-a-venir.mjs');
 var siteDir = path.join(root, 'site');
 var retentionFile = path.join(root, 'retention.json');
 var MARQUE = 'MESSAGR-DATE-A-VENIR';
-var PAGES = ['confidentialite', 'conditions-generales'];
 var status = 0;
 
 function fail(message) {
@@ -104,11 +113,22 @@ function textOf(html) {
     .replace(/\s+/g, ' ');
 }
 
+/** Les pages légales du site : celles qui ont une version à venir, ou datée. */
+function legalPages(site) {
+  return fs.readdirSync(site).filter(function (name) {
+    var dir = path.join(site, name);
+    return fs.statSync(dir).isDirectory() &&
+      (exists(path.join(dir, 'a-venir', 'index.html')) ||
+       fs.readdirSync(dir).some(function (entry) { return /^jusqu-au-/.test(entry); }));
+  }).sort();
+}
+var PAGES = legalPages(siteDir);
+
 /**
  * Une version à venir préparée comme LISEZ-MOI-pages-legales.md le dit,
- * quand le dépôt n'en tient aucune : la version en vigueur recopiée, « à
- * venir » dans son titre et en tête, la marque à la place de la date, un
- * passage `a-venir` de chaque côté.
+ * quand le dépôt n'en tient aucune : la version en vigueur recopiée, sans sa
+ * carte « depuis », « à venir » dans son titre et en tête, la marque à la
+ * place de la date, un passage `a-venir` de chaque côté.
  */
 function prepare(site, page) {
   var inForcePath = path.join(site, page, 'index.html');
@@ -136,7 +156,19 @@ function prepare(site, page) {
     '      <!-- /a-venir -->'));
 }
 
-/** Une copie du site et de retention.json, chaque page avec sa version à venir. */
+/** Une version annoncée qui reprend la marque, dans ses deux pages. */
+function unannounce(site, page) {
+  var upcoming = path.join(site, page, 'a-venir', 'index.html');
+  var dated = /<time datetime="(\d{4}-\d{2}-\d{2})">/.exec(read(upcoming));
+  if (read(upcoming).indexOf(MARQUE) !== -1 || dated === null) {
+    return;
+  }
+  [upcoming, path.join(site, page, 'index.html')].forEach(function (file) {
+    fs.writeFileSync(file, read(file).split(said(dated[1])).join(MARQUE));
+  });
+}
+
+/** Une copie du site et de retention.json, chaque page avec sa version à venir non annoncée. */
 function aCopy() {
   var copy = fs.mkdtempSync(path.join(os.tmpdir(), 'a-venir-source-'));
   var site = path.join(copy, 'site');
@@ -144,7 +176,9 @@ function aCopy() {
   child.execFileSync('cp', ['-R', siteDir + '/.', site]);
   child.execFileSync('cp', [retentionFile, path.join(copy, 'retention.json')]);
   PAGES.forEach(function (page) {
-    if (!exists(path.join(site, page, 'a-venir', 'index.html'))) {
+    if (exists(path.join(site, page, 'a-venir', 'index.html'))) {
+      unannounce(site, page);
+    } else {
       prepare(site, page);
     }
   });
@@ -159,6 +193,11 @@ function built(source) {
 
 function gesture(args) {
   return run('node', [tool].concat(args));
+}
+
+/** Refusé par le geste, et non tombé en cours de route. */
+function refused(result) {
+  return result.code !== 0 && /REFUS|Refus \[Error\]/.test(result.err);
 }
 
 /** `appliquer` à l'instant donné, que la ligne de commande ne permet pas de choisir. */
@@ -184,6 +223,10 @@ function parisMidnight(date, minutes) {
   return new Date(Date.parse(date + 'T00:00:00Z') - hours * 3600000 - minutes * 60000).toISOString();
 }
 
+if (PAGES.length === 0) {
+  fail('no page of the site has an upcoming or a dated version: nothing here is exercised');
+}
+
 // ── 1. Le dépôt, tel qu'il est ───────────────────────────────────────────
 (function () {
   var site = built(siteDir);
@@ -202,8 +245,9 @@ function parisMidnight(date, minutes) {
       return;
     }
     if (read(upcoming).indexOf(MARQUE) === -1) {
-      if (!exists(path.join(site.out, page, 'a-venir', 'index.html'))) {
-        fail(page + '/a-venir/ is announced and not built');
+      if (!exists(path.join(site.out, page, 'a-venir', 'index.html')) ||
+          served.indexOf('href="/' + page + '/a-venir/"') === -1) {
+        fail(page + '/a-venir/ is announced and not built, or not announced by ' + page);
       }
       return;
     }
@@ -287,6 +331,19 @@ function parisMidnight(date, minutes) {
     if (inForce.indexOf(said(date)) === -1) {
       fail(page + ' announces its upcoming version without its date');
     }
+    // Le préavis se mesure de nouveau le jour où la page est servie.
+    var notice = gesture(['preavis', upcoming]);
+    if (notice.code !== 0 || notice.out.indexOf('40 jours') === -1) {
+      fail(page + '/a-venir/ served today should give forty days of notice: ' + notice.out + notice.err);
+    }
+    [[29, false], [30, true]].forEach(function (days) {
+      var late = path.join(site.out, page, 'a-venir', 'tard.html');
+      fs.writeFileSync(late, text.split(date).join(inDays(days[0])));
+      if ((gesture(['preavis', late]).code === 0) !== days[1]) {
+        fail(page + '/a-venir/ served ' + days[0] + ' days before it applies was ' +
+          (days[1] ? 'refused' : 'let through'));
+      }
+    });
   });
 })();
 
@@ -298,9 +355,9 @@ function parisMidnight(date, minutes) {
     ['2026-02-30', 'the thirtieth of February'],
     ['1/11/2026', 'a date not written AAAA-MM-JJ'],
     ['', 'no date at all'],
-  ].forEach(function (refused) {
-    if (gesture(['annoncer', refused[0], copy.site]).code === 0) {
-      fail('announcing ' + JSON.stringify(refused[0]) + ' was accepted: ' + refused[1]);
+  ].forEach(function (wrong) {
+    if (!refused(gesture(['annoncer', wrong[0], copy.site]))) {
+      fail('announcing ' + JSON.stringify(wrong[0]) + ' was not refused: ' + wrong[1]);
     }
   });
   PAGES.forEach(function (page) {
@@ -309,16 +366,37 @@ function parisMidnight(date, minutes) {
     }
   });
 
-  // Une version en vigueur qui ne l'annoncerait pas : refusée, et rien d'écrit.
-  var bare = aCopy();
-  var inForce = path.join(bare.site, 'conditions-generales', 'index.html');
-  fs.writeFileSync(inForce, read(inForce).replace(/<!-- a-venir -->[\s\S]*?<!-- \/a-venir -->/, ''));
-  if (gesture(['annoncer', inDays(40), bare.site]).code === 0) {
-    fail('an upcoming version the version in force does not announce was announced');
-  }
-  if (read(path.join(bare.site, 'confidentialite', 'a-venir', 'index.html')).indexOf(MARQUE) === -1) {
-    fail('a refused announcement wrote into the other page');
-  }
+  // Une page dont la forme ne permettrait pas les gestes suivants : refusée,
+  // et rien d'écrit nulle part, quel que soit l'ordre où les pages sont lues.
+  var malformed = [
+    ['whose version in force does not announce it', function (site, page) {
+      var file = path.join(site, page, 'index.html');
+      fs.writeFileSync(file, read(file).replace(/<!-- a-venir -->[\s\S]*?<!-- \/a-venir -->/, ''));
+    }],
+    ['whose announcement is already dated', function (site, page) {
+      var file = path.join(site, page, 'index.html');
+      fs.writeFileSync(file, read(file).replace(/(<!-- a-venir -->[\s\S]*?)MESSAGR-DATE-A-VENIR/, '$1' + said(inDays(45))));
+    }],
+    ['that still carries the card of an applied version', function (site, page) {
+      var file = path.join(site, page, 'a-venir', 'index.html');
+      fs.writeFileSync(file, read(file).replace('</main>', '<!-- depuis --><p></p><!-- /depuis --></main>'));
+    }],
+  ];
+  malformed.forEach(function (flaw) {
+    PAGES.forEach(function (broken) {
+      var bare = aCopy();
+      flaw[1](bare.site, broken);
+      if (!refused(gesture(['annoncer', inDays(40), bare.site]))) {
+        fail('an upcoming version ' + flaw[0] + ' (' + broken + ') was not refused');
+      }
+      PAGES.forEach(function (other) {
+        if (other !== broken &&
+            read(path.join(bare.site, other, 'a-venir', 'index.html')).indexOf(MARQUE) === -1) {
+          fail('a refused announcement (' + broken + ' ' + flaw[0] + ') wrote into ' + other);
+        }
+      });
+    });
+  });
 
   if (gesture(['annoncer', inDays(30), copy.site]).code !== 0) {
     fail('thirty days exactly, the notice promised, was refused');
@@ -328,13 +406,26 @@ function parisMidnight(date, minutes) {
   }
 })();
 
-// ── 4. Une marque oubliée ailleurs arrête la construction ────────────────
+// ── 4. La construction ne coupe rien, et ne laisse aucune marque ─────────
 (function () {
   var copy = aCopy();
   var page = path.join(copy.site, 'aide', 'index.html');
   fs.writeFileSync(page, read(page).replace('</main>', '<p>' + MARQUE + '</p></main>'));
   if (built(copy.site).result.code === 0) {
     fail('a site still carrying the mark was built');
+  }
+
+  // Le passage d'annonce sur une seule ligne : retiré, et le reste construit.
+  var oneLine = aCopy();
+  var inForce = path.join(oneLine.site, PAGES[0], 'index.html');
+  var flat = read(inForce).replace(/<!-- a-venir -->[\s\S]*?<!-- \/a-venir -->/, function (passage) {
+    return passage.replace(/\s*\n\s*/g, ' ');
+  });
+  fs.writeFileSync(inForce, flat);
+  var site = built(oneLine.site);
+  var served = site.result.code === 0 ? read(path.join(site.out, PAGES[0], 'index.html')) : '';
+  if (served !== flat.replace(/ *<!-- a-venir -->.*?<!-- \/a-venir --> *\n?/, '')) {
+    fail('a passage on one line is not removed alone: ' + served.length + ' characters built');
   }
 })();
 
@@ -364,6 +455,22 @@ function parisMidnight(date, minutes) {
         fail(file + ' does not carry the postponed date alone');
       }
     });
+  });
+
+  // Une date que le geste ne trouverait pas dans une page : rien d'écrit.
+  var rewrapped = path.join(copy.site, PAGES[0], 'index.html');
+  fs.writeFileSync(rewrapped, read(rewrapped).split(said(later)).join(
+    '<time datetime="' + later + '">\n' + enFrancais(later) + '</time>'));
+  var before = PAGES.map(function (page) {
+    return read(path.join(copy.site, page, 'a-venir', 'index.html'));
+  });
+  if (gesture(['reporter', inDays(55), copy.site]).code === 0) {
+    fail('a postponement that could not rewrite ' + PAGES[0] + ' was accepted');
+  }
+  PAGES.forEach(function (page, i) {
+    if (read(path.join(copy.site, page, 'a-venir', 'index.html')) !== before[i]) {
+      fail('a refused postponement wrote into ' + page + '/a-venir/');
+    }
   });
 })();
 
@@ -446,11 +553,10 @@ function parisMidnight(date, minutes) {
     var retention = JSON.parse(read(copy.retention));
     Object.keys(retentionBefore).forEach(function (key) {
       var was = retentionBefore[key];
-      var now = retention[key];
       if (was && typeof was === 'object') {
         var expected = JSON.parse(JSON.stringify(was));
         delete expected.page;
-        if (JSON.stringify(now) !== JSON.stringify(expected)) {
+        if (JSON.stringify(retention[key]) !== JSON.stringify(expected)) {
           fail('retention.json ' + key + ' is not what it was without its page');
         }
       }
@@ -469,6 +575,49 @@ function parisMidnight(date, minutes) {
     });
     if (applyAt(copy, parisMidnight(date, -60)).code === 0) {
       fail('cycle ' + (cycle + 1) + ': a second application was accepted with nothing upcoming');
+    }
+  });
+})();
+
+// ── 7. Seules les versions échues s'appliquent ───────────────────────────
+(function () {
+  if (PAGES.length < 2) {
+    return;
+  }
+  var copy = aCopy();
+  var date = inDays(40);
+  gesture(['annoncer', date, copy.site]);
+  var waiting = PAGES[1];
+  unannounce(copy.site, waiting);
+  var untouched = read(path.join(copy.site, waiting, 'index.html'));
+  var applied = applyAt(copy, parisMidnight(date, 0));
+  if (applied.code !== 0) {
+    fail('an announced version was not applied beside one still waiting: ' + applied.err);
+    return;
+  }
+  if (!exists(path.join(copy.site, PAGES[0], 'jusqu-au-' + date, 'index.html'))) {
+    fail(PAGES[0] + ' was not applied on its date');
+  }
+  if (!exists(path.join(copy.site, waiting, 'a-venir', 'index.html')) ||
+      read(path.join(copy.site, waiting, 'index.html')) !== untouched) {
+    fail(waiting + ', not announced, was applied with ' + PAGES[0]);
+  }
+})();
+
+// ── 8. Une forme défaite après l'annonce, refusée le jour venu ───────────
+(function () {
+  var copy = aCopy();
+  var date = inDays(40);
+  gesture(['annoncer', date, copy.site]);
+  var inForce = path.join(copy.site, PAGES[0], 'index.html');
+  fs.writeFileSync(inForce, read(inForce).replace(/<!-- a-venir -->[\s\S]*?<!-- \/a-venir -->/, ''));
+  if (!refused(applyAt(copy, parisMidnight(date, 0)))) {
+    fail('an upcoming version whose announcement was taken out was applied, or fell over');
+  }
+  PAGES.forEach(function (page) {
+    if (exists(path.join(copy.site, page, 'jusqu-au-' + date)) ||
+        !exists(path.join(copy.site, page, 'a-venir', 'index.html'))) {
+      fail('a refused application wrote into ' + page);
     }
   });
 })();

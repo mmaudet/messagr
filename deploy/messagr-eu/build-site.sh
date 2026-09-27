@@ -92,14 +92,14 @@ for venir in "$destination"/*/a-venir/index.html; do
     echo "build-site: $(basename "$(dirname "$(dirname "$venir")")")/a-venir/ is not announced yet, and is not built"
   fi
 done
+# The passage is removed by the same expression `version-a-venir.mjs` reads
+# it with, over the whole page rather than line by line: a line-by-line
+# reading that met both marks on one line would skip to the end of the page,
+# and build a page cut short without a word.
 for page in "$destination"/*/index.html; do
   grep -qF -- '<!-- a-venir -->' "$page" || continue
   grep -qF -- "$marque" "$page" || continue
-  work=$(mktemp)
-  awk '/<!-- a-venir -->/ { skip = 1; next }
-       /<!-- \/a-venir -->/ { skip = 0; next }
-       !skip { print }' "$page" > "$work"
-  mv "$work" "$page"
+  perl -0777 -pi -e 's/[ \t]*<!-- a-venir -->.*?<!-- \/a-venir -->[ \t]*\n?//gs' "$page"
 done
 if grep -rlF -- "$marque" "$destination" >/dev/null; then
   echo "build-site: FAIL: a built page still carries $marque:" >&2

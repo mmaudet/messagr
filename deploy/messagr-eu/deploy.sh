@@ -119,6 +119,23 @@ MESSAGR_DEST_ANDROID_APK="$MESSAGR_DEST_ANDROID_APK" \
 
 chmod -R u=rwX,go=rX "$poussee"
 
+# THE NOTICE STARTS THE DAY THE PAGE IS SERVED, NOT THE DAY IT IS DATED (#412).
+#
+# `version-a-venir.mjs annoncer` refuses a date less than thirty days from the
+# day it writes into the repository, and LISEZ-MOI-pages-legales.md says to
+# deploy that same day. Nothing held the second half: an announcement deployed
+# a week late would give a week less than the policy promises. So an upcoming
+# version the server does not serve yet is measured here, against today,
+# before anything goes up; a short notice stops the deployment, and the date
+# is postponed first.
+for venir in "$poussee"/*/a-venir/index.html; do
+  [ -f "$venir" ] || continue
+  served="${venir#"$poussee"/}"
+  if ! ssh "$HOST" "test -f $SITE_DIR/$served"; then
+    node version-a-venir.mjs preavis "$venir"
+  fi
+done
+
 ssh "$HOST" "sudo mkdir -p $SITE_DIR/i $SITE_DIR/.well-known"
 
 # THE FILE GOES UP BEFORE THE PAGE THAT NAMES IT, AND COMES DOWN AFTER.

@@ -129,7 +129,11 @@ fait pour autre chose publie donc le site d'aujourd'hui, exactement.
 Pour en préparer une, à partir de la version en vigueur :
 
 1. La recopier dans `<page>/a-venir/index.html`, et y dire « à venir » dans
-   le titre (`… à venir — Messagr`) et dans le `h1`.
+   le titre (`… à venir — Messagr`) et dans le `h1`. Si elle vient d'une
+   version appliquée, retirer de la copie sa carte « Cette version s'applique
+   depuis… », entre `<!-- depuis -->` et `<!-- /depuis -->` : la version à
+   venir en porte une à elle, et `annoncer` refuse une copie qui garde
+   l'ancienne.
 2. Écrire en tête, dans le `<p class="stamp">`, « Version applicable le
    MESSAGR-DATE-A-VENIR », puis une carte dont le début, entre
    `<!-- a-venir -->` et `<!-- /a-venir -->`, dit « Cette version
@@ -157,7 +161,10 @@ venir et dans le passage qui l'annonce. Il refuse une version dont la forme
 ne permettrait pas les deux gestes suivants.
 
 Le préavis court du jour où la page est servie : le déploiement suit
-l'annonce le jour même.
+l'annonce le jour même. `deploy.sh` le mesure de nouveau avant d'envoyer une
+version à venir que le serveur ne sert pas encore
+(`version-a-venir.mjs preavis`), et s'arrête s'il reste moins de trente
+jours : la date se reporte d'abord.
 
 ### Reporter
 
