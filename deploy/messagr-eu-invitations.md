@@ -52,19 +52,62 @@ two serve together while one replaces the other. A seed is 32 random bytes:
   was made with, so a key dropped or renumbered while this file is edited
   stops the start, naming the key number, until it is back or until the masks
   made with it have run out, 28 days after their proof.
-- **Retiring a key at once**, when it must stop serving before its masks run
-  out (the emergency of ADR 0014): delete what was made with it first, then
-  remove it from this file and restart. On the database, with the key number
-  for `N`:
 
-      DELETE FROM findable_numbers WHERE key_id = N;
-      DELETE FROM pending_proofs WHERE key_id = N;
+### Changing the key, once a year
 
-  Those accounts stop being findable until their next proof, which is what
-  ADR 0014 says of an emergency. #409 makes this a gesture of its own.
+No SMS is sent, and nobody stops being findable (#409, ADR 0014). With the
+current key numbered `1`:
 
-- **Changing a key is a gesture of its own**, described with the key change of
-  discovery (#409).
+1. **Mint the new seed**, `openssl rand -base64 32`, and keep it where the
+   other secrets of the host are kept, nowhere else: the host's backup must not
+   carry it.
+2. **Add it with the next number**, the old one kept: `1:…,2:…`. The highest
+   number is the key new masks are made with.
+3. **Restart** (`docker compose up -d --no-deps --no-build invitations`). The
+   line after the version names two keys, the current one `#2`. The service
+   notes the date `#2` is first served; a later restart keeps that date.
+4. **For 28 days, both keys serve.**
+   - Every proof renewed moves onto `#2`, with the reference devices know the
+     account by and the count of numbers its number had masked.
+   - Devices compare under both keys, so an account that has not renewed yet is
+     still found.
+   - Each proven number may have 5,000 more numbers masked under `#2`, for a
+     device to compare its address book again, once. That extension ends 28 days
+     after `#2` was first served, whatever `MASKING_KEYS` says.
+5. **After those 28 days, remove `#1`** from `MASKING_KEYS` and restart. Every
+   proof made under it has run out or moved by then. If a mask still lives
+   under it, the service refuses to start and names the key: put it back and
+   wait, or retire it at once, below.
+6. **Destroy the old seed** wherever it was kept.
+
+### Retiring a key at once, after a theft or a loss
+
+The key stops serving before its masks run out, and the accounts made findable
+under it stop being findable until their next proof (#409, ADR 0014). With the
+key to retire numbered `N`:
+
+1. **If `N` is the current key, add a new one first**, with a higher number, as
+   in step 2 above, and restart. Proofs can then go on under the new key.
+2. **Retire `N`**, in `/opt/messagr-eu`:
+
+       docker compose run --rm invitations --retire-masking-key N
+
+   It binds no port and starts no sweeper, so it runs beside the live service,
+   and it runs even when `N` is lost and no longer in `MASKING_KEYS`. It says
+   first how many findable accounts stop being findable and how many proofs in
+   progress are dropped. Type the key number back to retire it; any other
+   answer, or none, leaves everything as it is and exits in error.
+
+3. **What it did**, in one transaction:
+   - every proof running under `N` ended. Its account reads that the key changed
+     until its next proof, thirty days at most, and the application says so
+     above the list;
+   - every mask made under `N` is erased, with the proofs in progress under it
+     and the counts of numbers masked;
+   - the date `N` was first served is forgotten.
+4. **Remove `N` from `MASKING_KEYS`** and restart. The start no longer needs
+   it.
+5. **Destroy the seed of `N`**, if it still exists anywhere.
 
 ## The SMS provider of address-book discovery
 

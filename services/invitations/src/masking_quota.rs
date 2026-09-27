@@ -5,9 +5,15 @@
 //! how much of the directory a findable account can walk. So it is counted
 //! on the mask of the caller's proven number, under its key, and not on the
 //! account: withdrawing the number, or proving it again, on this account or
-//! on another, leaves the count where it was. Under the same key: a proof
-//! renewed under a new key starts a count of its own, until #409 carries the
-//! count over with it.
+//! on another, leaves the count where it was. Under a new key too: the proof
+//! that moves the number onto it carries its count over (#409).
+//!
+//! # THE EXTENSION OF A KEY CHANGE
+//!
+//! While two keys serve, and for 28 days from the new one's first service,
+//! a batch under the new key may count `EXTENSION` more: what lets a device
+//! compare its address book again under the new key, once (#409,
+//! `handlers/discovery.rs`).
 //!
 //! # A DAY AT A TIME
 //!
@@ -28,6 +34,10 @@ use sqlx::SqlitePool;
 
 /// The most numbers one proven number has masked in the window.
 pub const PER_NUMBER: i64 = 5_000;
+
+/// How many more a key change allows under the new key, while two keys serve
+/// (#409, `handlers/discovery.rs`).
+pub const EXTENSION: i64 = 5_000;
 const WINDOW_DAYS: i64 = 30;
 const DAY_SECONDS: i64 = 86_400;
 
@@ -55,17 +65,19 @@ pub enum Verdict {
     },
 }
 
-/// Counts `elements` numbers on `number` if the limit allows them all.
+/// Counts `elements` numbers on `number` if `limit` allows them all:
+/// `PER_NUMBER`, or more during a key change (#409).
 pub async fn count_if_allowed(
     pool: &SqlitePool,
     number: &Number<'_>,
     elements: i64,
     now: i64,
+    limit: i64,
 ) -> anyhow::Result<Verdict> {
     let today = now.div_euclid(DAY_SECONDS);
     let mut conn = pool.acquire().await?;
     sqlx::query("BEGIN IMMEDIATE").execute(&mut *conn).await?;
-    let verdict = judge_and_count(&mut conn, number, elements, today).await;
+    let verdict = judge_and_count(&mut conn, number, elements, today, limit).await;
     let end = if matches!(verdict, Ok(Verdict::Counted(_))) {
         "COMMIT"
     } else {
@@ -80,6 +92,7 @@ async fn judge_and_count(
     number: &Number<'_>,
     elements: i64,
     today: i64,
+    limit: i64,
 ) -> anyhow::Result<Verdict> {
     let days: Vec<(i64, i64)> = sqlx::query_as(
         // A day whose batches were all given back counts nothing, and its
@@ -93,13 +106,13 @@ async fn judge_and_count(
     .fetch_all(&mut *conn)
     .await?;
     let used: i64 = days.iter().map(|(_, masked)| masked).sum();
-    if used + elements > PER_NUMBER {
+    if used + elements > limit {
         // With nothing counted, a batch cannot be over: the largest batch
         // (`MAX_BATCH`, `handlers/discovery.rs`) is the limit itself. The
         // oldest day is then today, at worst.
         let oldest = days.first().map_or(today, |(day, _)| *day);
         return Ok(Verdict::Over {
-            remaining: (PER_NUMBER - used).max(0),
+            remaining: (limit - used).max(0),
             frees_at: (oldest + WINDOW_DAYS) * DAY_SECONDS,
         });
     }
@@ -168,7 +181,9 @@ mod tests {
         };
         let at = DAY_ZERO * DAY_SECONDS + 3_600;
         assert!(matches!(
-            count_if_allowed(&pool, &number, 10, at).await.unwrap(),
+            count_if_allowed(&pool, &number, 10, at, PER_NUMBER)
+                .await
+                .unwrap(),
             Verdict::Counted(_)
         ));
 

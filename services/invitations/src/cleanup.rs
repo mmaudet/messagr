@@ -83,7 +83,8 @@ pub const ENDED_PROOFS_KEPT_SECONDS: i64 = 30 * 86_400;
 ///
 /// Un numéro retiré ou une preuve expirée garde son masque trente jours au
 /// service, et l'avis au compte qu'une preuve plus récente a remplacé vit
-/// autant. Au-delà, les deux s'effacent.
+/// autant, comme celui d'une clé retirée d'urgence (#409). Au-delà, tout
+/// s'efface.
 pub async fn purge_ended_proofs(pool: &SqlitePool, now: i64) -> Result<u64> {
     let horizon = now - ENDED_PROOFS_KEPT_SECONDS;
     let masks = sqlx::query("DELETE FROM findable_numbers WHERE expires_at <= ?")
@@ -94,7 +95,12 @@ pub async fn purge_ended_proofs(pool: &SqlitePool, now: i64) -> Result<u64> {
         .bind(horizon)
         .execute(pool)
         .await?;
-    Ok(masks.rows_affected() + notices.rows_affected())
+    // Et l'avis d'une clé retirée d'urgence (#409), qui vit autant.
+    let retired = sqlx::query("DELETE FROM retired_key_proofs WHERE retired_at <= ?")
+        .bind(horizon)
+        .execute(pool)
+        .await?;
+    Ok(masks.rows_affected() + notices.rows_affected() + retired.rows_affected())
 }
 
 /// Les invitations remises dans Messagr (#404) : le refus et le nom scellé
@@ -643,6 +649,33 @@ mod tests {
             (1, 0),
             "the mask of a proof still running stays"
         );
+    }
+
+    #[sqlx::test(migrations = "./migrations")]
+    async fn the_notice_of_a_key_retired_at_once_is_forgotten_after_thirty_days(
+        pool: sqlx::SqlitePool,
+    ) {
+        let retired_at = 1_790_000_000_i64;
+        sqlx::query("INSERT INTO retired_key_proofs (user_id, retired_at) VALUES ('@a:h', ?)")
+            .bind(retired_at)
+            .execute(&pool)
+            .await
+            .unwrap();
+        let left = || async {
+            sqlx::query_scalar::<_, i64>("SELECT COUNT(*) FROM retired_key_proofs")
+                .fetch_one(&pool)
+                .await
+                .unwrap()
+        };
+
+        purge_ended_proofs(&pool, retired_at + ENDED_PROOFS_KEPT_SECONDS - 1)
+            .await
+            .unwrap();
+        assert_eq!(left().await, 1, "kept thirty days, as the others");
+        purge_ended_proofs(&pool, retired_at + ENDED_PROOFS_KEPT_SECONDS)
+            .await
+            .unwrap();
+        assert_eq!(left().await, 0);
     }
 
     #[sqlx::test(migrations = "./migrations")]
