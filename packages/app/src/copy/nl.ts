@@ -359,6 +359,10 @@ export const nl: Readonly<Record<CopyKey, string>> = {
   invite_qr_label: 'QR-code van de uitnodigingslink',
   invite_share: 'De link delen',
   invite_close: 'Sluiten',
+  'invite_sent %1$@ %2$@': '%1$@ vindt uw uitnodiging in Messagr tot %2$@.',
+  'invite_sent_unnamed %1$@': 'Uw uitnodiging wacht in Messagr tot %1$@.',
+  invite_sent_waits:
+    'Het gesprek wacht in uw lijst tot de uitgenodigde persoon meedoet.',
   invite_failed: 'De uitnodiging kon niet worden aangemaakt.',
   invite_waiting: 'Nog niemand heeft de link geopend.',
   invite_admitted: 'Klaar: deze persoon kan binnenkomen.',
@@ -814,6 +818,7 @@ export const nl: Readonly<Record<CopyKey, string>> = {
   find_holder_changed: 'Dit nummer is van houder veranderd.',
   find_limited: 'Messagr bekijkt alleen de contacten die u hebt gedeeld.',
   find_share_more: 'Meer contacten delen',
+  find_invite: 'Uitnodigen',
   find_others: 'Uw andere contacten',
   find_nobody: 'Nog geen van uw contacten is vindbaar op Messagr.',
   find_no_access:

@@ -22,6 +22,7 @@ import { cleanDeclaredName } from '../runtime/declaredName'
 import { normaliseGivenName } from '../runtime/givenName'
 import { NotchedButton } from './NotchedButton'
 import { QrCode } from './QrCode'
+import { dayOf } from './whenLabel'
 
 /**
  * Inviting somebody, which is the same gesture as starting a conversation
@@ -74,12 +75,36 @@ import { QrCode } from './QrCode'
  */
 const QR_SIZE = 220
 
+/**
+ * A contact found by looking for one's contacts (#404): the name of its card,
+ * which « Qui invitez-vous ? » opens with, and the reference the invitation
+ * is delivered to inside the application.
+ */
+export interface InvitedContact {
+  readonly name: string
+  readonly reference: string
+}
+
 export type InviteStage =
   /** Nothing on screen. What a launch starts in, and what closing returns to. */
   | { readonly stage: 'shut' }
-  | { readonly stage: 'resting' }
+  /**
+   * The form. `to`, for a contact found: the invitation is delivered inside
+   * the application rather than carried by a link (#404).
+   */
+  | { readonly stage: 'resting'; readonly to?: InvitedContact }
   | { readonly stage: 'working' }
   | { readonly stage: 'ready'; readonly link: string }
+  /**
+   * An invitation delivered inside the application: nothing to share, and
+   * the conversation waits in the list. `name` is the one typed, if any.
+   */
+  | {
+      readonly stage: 'sent'
+      readonly name: string | null
+      /** Milliseconds since the epoch. */
+      readonly expiresAt: number
+    }
   | { readonly stage: 'failed'; readonly reason: string }
 
 export interface InviteProps {
@@ -98,7 +123,12 @@ export interface InviteProps {
 }
 
 export function Invite({ stage, onInvite, onClose, admission }: InviteProps) {
-  const [draft, setDraft] = useState('')
+  // A CONTACT FOUND OPENS WITH THE NAME OF ITS CARD (#404), to keep or to
+  // change. `App.tsx` keys the form by the contact, so a form opened for
+  // another starts again from its card rather than from the last draft.
+  const [draft, setDraft] = useState(
+    stage.stage === 'resting' ? (stage.to?.name ?? '') : '',
+  )
   const [presented, setPresented] = useState('')
 
   if (stage.stage === 'shut') return null
@@ -120,7 +150,14 @@ export function Invite({ stage, onInvite, onClose, admission }: InviteProps) {
         />
         <Text style={styles.hint}>{t('list_name_hint')}</Text>
 
-        {/* TWO NAMES, AND THE TWO HINTS ARE THE TEACHING. #329.
+        {/* NO DECLARED NAME FOR A CONTACT FOUND, YET. Delivered inside the
+            application, an invitation has no link, and so no fragment to
+            carry the name in: it travels sealed for its recipient, which is
+            #405. Until then, asking for it would be asking for a name that
+            goes nowhere. */}
+        {stage.to === undefined && (
+          <>
+            {/* TWO NAMES, AND THE TWO HINTS ARE THE TEACHING. #329.
             The first is what you call THEM, and it stays on this telephone.
             The second is what you call YOURSELF, and it is the only name in
             this product that travels -- because the person opening the link
@@ -132,16 +169,18 @@ export function Invite({ stage, onInvite, onClose, admission }: InviteProps) {
             invitation rather than a property of an account, and a name
             remembered and re-sent by default would be a name declared to
             people who never watched it being typed. `declaredName.ts`. */}
-        <Text style={styles.who}>{t('invite_declared')}</Text>
-        <TextInput
-          testID="invite-declared"
-          value={presented}
-          onChangeText={setPresented}
-          placeholder={t('list_name_placeholder')}
-          placeholderTextColor={color.neutral['400']}
-          style={styles.field}
-        />
-        <Text style={styles.hint}>{t('invite_declared_hint')}</Text>
+            <Text style={styles.who}>{t('invite_declared')}</Text>
+            <TextInput
+              testID="invite-declared"
+              value={presented}
+              onChangeText={setPresented}
+              placeholder={t('list_name_placeholder')}
+              placeholderTextColor={color.neutral['400']}
+              style={styles.field}
+            />
+            <Text style={styles.hint}>{t('invite_declared_hint')}</Text>
+          </>
+        )}
 
         <NotchedButton
           label={t('invite_action')}
@@ -165,6 +204,25 @@ export function Invite({ stage, onInvite, onClose, admission }: InviteProps) {
       <Text testID="invite-working" style={styles.hint}>
         {t('invite_working')}
       </Text>
+    )
+  }
+
+  if (stage.stage === 'sent') {
+    return (
+      <View style={styles.resting}>
+        <Text testID="invite-sent" style={styles.who}>
+          {stage.name === null
+            ? t('invite_sent_unnamed %1$@', dayOf(stage.expiresAt))
+            : t('invite_sent %1$@ %2$@', stage.name, dayOf(stage.expiresAt))}
+        </Text>
+        <Text style={styles.hint}>{t('invite_sent_waits')}</Text>
+        <Pressable
+          onPress={onClose}
+          style={styles.action}
+          testID="invite-close">
+          <Text style={styles.actionLabel}>{t('invite_close')}</Text>
+        </Pressable>
+      </View>
     )
   }
 

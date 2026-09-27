@@ -563,6 +563,12 @@ export const fr = {
   invite_qr_label: 'Code QR du lien d’invitation',
   invite_share: 'Partager le lien',
   invite_close: 'Fermer',
+  'invite_sent %1$@ %2$@':
+    '%1$@ trouvera votre invitation dans Messagr jusqu’au %2$@.',
+  'invite_sent_unnamed %1$@':
+    'Votre invitation attend dans Messagr jusqu’au %1$@.',
+  invite_sent_waits:
+    'La conversation attend dans votre liste que la personne invitée la rejoigne.',
   invite_failed: 'L’invitation n’a pas pu être créée.',
   invite_waiting: 'Personne n’a encore ouvert le lien.',
   invite_admitted: 'C’est fait : cette personne peut entrer.',
@@ -1220,6 +1226,7 @@ export const fr = {
   find_limited:
     'Messagr ne regarde que les contacts que vous avez choisi de partager.',
   find_share_more: 'Partager d’autres contacts',
+  find_invite: 'Inviter',
   find_others: 'Vos autres contacts',
   find_nobody:
     'Aucun de vos contacts n’est trouvable sur Messagr pour l’instant.',

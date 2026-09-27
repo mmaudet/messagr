@@ -194,35 +194,9 @@ export async function issueInvitation(
    */
   declared: string | null = null,
 ): Promise<Issued> {
-  let scope: string
-  try {
-    const created = await deps.http.authedRequest(
-      'POST',
-      '/_matrix/client/v3/createRoom',
-      {},
-      JSON.stringify({ preset: 'private_chat', room_version: ROOM_VERSION }),
-    )
-    const roomId = (JSON.parse(created) as { room_id?: unknown }).room_id
-    if (typeof roomId !== 'string' || roomId === '') {
-      return { issued: false, reason: 'the conversation was not created' }
-    }
-    scope = roomId
-  } catch (cause: unknown) {
-    return {
-      issued: false,
-      reason: `the conversation was not created: ${getErrorMessage(cause)}`,
-    }
-  }
-
-  try {
-    await setTheRules(deps.http, scope)
-  } catch (cause: unknown) {
-    return {
-      issued: false,
-      scope,
-      reason: `the conversation's rules were refused: ${getErrorMessage(cause)}`,
-    }
-  }
+  const conversation = await createTheConversation(deps.http)
+  if (!conversation.created) return { issued: false, ...conversation }
+  const { scope } = conversation
 
   try {
     const answer = await deps.service.issue(
@@ -299,6 +273,53 @@ export async function issueInvitation(
       reason: `the invitation could not be minted: ${getErrorMessage(cause)}`,
     }
   }
+}
+
+/**
+ * The conversation an invitation is for, with the rules it must carry: what
+ * a link and an invitation delivered inside the application (#404) both open
+ * with. See `issueInvitation` for why each rule is there, and for what a
+ * failure after the creation leaves behind: a conversation with nobody else
+ * in it, reported rather than cleaned up.
+ */
+export async function createTheConversation(http: HttpRequester): Promise<
+  | { readonly created: true; readonly scope: string }
+  | {
+      readonly created: false
+      readonly reason: string
+      readonly scope?: string
+    }
+> {
+  let scope: string
+  try {
+    const created = await http.authedRequest(
+      'POST',
+      '/_matrix/client/v3/createRoom',
+      {},
+      JSON.stringify({ preset: 'private_chat', room_version: ROOM_VERSION }),
+    )
+    const roomId = (JSON.parse(created) as { room_id?: unknown }).room_id
+    if (typeof roomId !== 'string' || roomId === '') {
+      return { created: false, reason: 'the conversation was not created' }
+    }
+    scope = roomId
+  } catch (cause: unknown) {
+    return {
+      created: false,
+      reason: `the conversation was not created: ${getErrorMessage(cause)}`,
+    }
+  }
+
+  try {
+    await setTheRules(http, scope)
+  } catch (cause: unknown) {
+    return {
+      created: false,
+      scope,
+      reason: `the conversation's rules were refused: ${getErrorMessage(cause)}`,
+    }
+  }
+  return { created: true, scope }
 }
 
 /**

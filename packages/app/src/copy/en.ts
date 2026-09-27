@@ -361,6 +361,11 @@ export const en: Readonly<Record<CopyKey, string>> = {
   invite_qr_label: 'QR code of the invitation link',
   invite_share: 'Share the link',
   invite_close: 'Close',
+  'invite_sent %1$@ %2$@':
+    '%1$@ will find your invitation in Messagr until %2$@.',
+  'invite_sent_unnamed %1$@': 'Your invitation waits in Messagr until %1$@.',
+  invite_sent_waits:
+    'The conversation waits in your list for the person you invited to join it.',
   invite_failed: 'The invitation could not be created.',
   invite_waiting: 'Nobody has opened the link yet.',
   invite_admitted: 'Done: this person can come in.',
@@ -807,6 +812,7 @@ export const en: Readonly<Record<CopyKey, string>> = {
   find_holder_changed: 'This number has changed hands.',
   find_limited: 'Messagr only looks at the contacts you chose to share.',
   find_share_more: 'Share more contacts',
+  find_invite: 'Invite',
   find_others: 'Your other contacts',
   find_nobody: 'None of your contacts can be found on Messagr yet.',
   find_no_access:

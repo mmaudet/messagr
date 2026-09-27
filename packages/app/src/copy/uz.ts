@@ -373,6 +373,10 @@ export const uz: Readonly<Record<CopyKey, string>> = {
   invite_qr_label: 'Taklif havolasining QR kodi',
   invite_share: 'Havolani ulashish',
   invite_close: 'Yopish',
+  'invite_sent %1$@ %2$@': '%1$@ taklifingizni Messagrda %2$@ gacha topadi.',
+  'invite_sent_unnamed %1$@': 'Taklifingiz Messagrda %1$@ gacha kutadi.',
+  invite_sent_waits:
+    'Suhbat roʻyxatingizda taklif qilingan kishi qoʻshilishini kutadi.',
   invite_failed: 'Taklifni yaratib boʻlmadi.',
   invite_waiting: 'Havolani hali hech kim ochmadi.',
   invite_admitted: 'Tayyor: bu odam kirishi mumkin.',
@@ -823,6 +827,7 @@ export const uz: Readonly<Record<CopyKey, string>> = {
   find_holder_changed: 'Bu raqamning egasi oʻzgargan.',
   find_limited: 'Messagr faqat siz ulashishni tanlagan kontaktlarni koʻradi.',
   find_share_more: 'Boshqa kontaktlarni ulashish',
+  find_invite: 'Taklif qilish',
   find_others: 'Boshqa kontaktlaringiz',
   find_nobody: 'Hozircha kontaktlaringizdan hech biri Messagrda topilmaydi.',
   find_no_access:

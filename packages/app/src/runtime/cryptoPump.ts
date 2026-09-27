@@ -123,6 +123,13 @@ import {
   type Admission,
   type Issued,
 } from './issueInvitation'
+import {
+  deliverInvitation,
+  letInTheJoined,
+  type Delivered,
+  type DeliveryService,
+  type Letting,
+} from './deliveredInvitations'
 import { invitationService, serviceAt } from './servicePoster'
 import {
   startSyncLoop,
@@ -919,6 +926,45 @@ export async function admitEntrant(
     joined,
   })
   return admission
+}
+
+/**
+ * Inviting a contact found (#404): the conversation as for a link, then an
+ * invitation delivered inside the application to the account behind
+ * `reference`. Pure glue: `deliveredInvitations.ts` says what leaves, and
+ * what never does.
+ */
+export async function deliverToContact(
+  sessionClient: ReturnType<typeof createClient>,
+  service: DeliveryService,
+  reference: string,
+): Promise<Delivered> {
+  return deliverInvitation(
+    { http: makePumpHttp(sessionClient), service },
+    reference,
+  )
+}
+
+/**
+ * The inviter's half of an invitation delivered inside the application
+ * (#404), at each sync tick: whoever joined one is let into its
+ * conversation. `deliveredInvitations.ts`.
+ */
+export async function letInWhoeverJoined(
+  sessionClient: ReturnType<typeof createClient>,
+  letting: Omit<Letting, 'http' | 'now'>,
+): Promise<readonly string[]> {
+  const admitted = await letInTheJoined({
+    ...letting,
+    http: makePumpHttp(sessionClient),
+    now: () => Date.now(),
+  })
+  // Only when somebody came through: a line per tick saying « nobody yet »
+  // would bury the one that matters, as `MESSAGR_ADMITTED_LATE` says.
+  if (admitted.length > 0) {
+    logEvent('info', 'MESSAGR_LET_IN', { admitted: admitted.length })
+  }
+  return admitted
 }
 
 export type { Issued, Admission } from './issueInvitation'

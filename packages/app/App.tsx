@@ -36,7 +36,9 @@ import {
   sendOneEncryptedMessage,
   sendTypedMessage,
   admitEntrant,
+  deliverToContact,
   inviteSomebody,
+  letInWhoeverJoined,
   listConversations,
   openPhotograph,
   reactToMessage,
@@ -175,6 +177,8 @@ import {
   forgetfulOutstanding,
   type Outstanding,
 } from './src/runtime/outstandingStore'
+import { forgetfulSentInvitations } from './src/runtime/sentInvitationStore'
+import type { SentInvitations } from './src/runtime/deliveredInvitations'
 import { admitAnyoneWaiting } from './src/runtime/admitAnyoneWaiting'
 import { displayNameFor } from './src/runtime/givenName'
 import Clipboard from '@react-native-clipboard/clipboard'
@@ -250,7 +254,7 @@ import type { EvictOutcome } from './src/runtime/evict'
 import type { HistoryClaim } from './src/runtime/claimHistory'
 import { Conversation } from './src/ui/Conversation'
 import { ConversationList } from './src/ui/ConversationList'
-import { Invite, type InviteStage } from './src/ui/Invite'
+import { Invite, type InvitedContact, type InviteStage } from './src/ui/Invite'
 import { Invited } from './src/ui/Invited'
 import { BackupOffer } from './src/ui/BackupOffer'
 import { BackupSettings } from './src/ui/BackupSettings'
@@ -530,7 +534,12 @@ export function App({
     null,
   )
   const inviteRef = useRef<
-    ((name: string | null, declared: string | null) => void) | null
+    | ((
+        name: string | null,
+        declared: string | null,
+        to?: InvitedContact,
+      ) => void)
+    | null
   >(null)
   const namesRef = useRef<GivenNames>(forgetfulGivenNames())
   // How far each conversation has been read here. Forgetful until the
@@ -546,6 +555,12 @@ export function App({
    * re-render per poll.
    */
   const outstandingRef = useRef<Outstanding>(forgetfulOutstanding())
+  /**
+   * The invitations delivered inside the application from here (#404), for a
+   * week rather than a link's hour. A ref for the reason `outstandingRef` is
+   * one: a sync tick reads it.
+   */
+  const sentRef = useRef<SentInvitations>(forgetfulSentInvitations())
   // The list as it was last drawn. Read once at the top of the launch and
   // written by every derivation after it. `listCacheStore.ts` says why.
   const listCacheRef = useRef<ListCache>(forgetfulListCache())
@@ -2345,6 +2360,7 @@ export function App({
         namesRef.current = book.names
         lastReadRef.current = book.lastRead
         outstandingRef.current = book.outstanding
+        sentRef.current = book.sent
         listCacheRef.current = book.list
         eventsRef.current = book.events
         hiddenRef.current = book.hidden
@@ -3801,9 +3817,55 @@ export function App({
             inviteRef.current = (
               name: string | null,
               declared: string | null,
+              to?: InvitedContact,
             ) => {
               setInvite({ stage: 'working' })
               setAdmission(null)
+              // A CONTACT FOUND (#404): the conversation as for a link, and
+              // an invitation delivered inside the application to its
+              // reference. Nothing to share and nothing to wait for here:
+              // the recipient may answer in a week, and each sync tick asks
+              // (`letInWhoeverJoined`, below).
+              if (to !== undefined) {
+                const delivering = async () => {
+                  const delivered = await deliverToContact(
+                    sessionClient,
+                    discoveryDeps.service,
+                    to.reference,
+                  )
+                  if (!delivered.delivered) {
+                    setInvite({ stage: 'failed', reason: delivered.reason })
+                    return
+                  }
+                  setInvite({
+                    stage: 'sent',
+                    name,
+                    expiresAt: delivered.expiresAt,
+                  })
+                  const kept = await sentRef.current.remember({
+                    invitationId: delivered.invitationId,
+                    scope: delivered.scope,
+                    expiresAt: delivered.expiresAt,
+                    given: name,
+                  })
+                  if (!kept) {
+                    // Not a failure of the invitation: it is good, and this
+                    // launch still lets the recipient in. What is lost is
+                    // the asking after a relaunch.
+                    logEvent('warn', 'MESSAGR_SENT_INVITATION_NOT_KEPT', {})
+                  }
+                  // The conversation exists now, so it belongs on the list,
+                  // waiting as a link's does.
+                  await refreshList().catch(() => {})
+                }
+                delivering().catch((cause: unknown) =>
+                  setInvite({
+                    stage: 'failed',
+                    reason: getErrorMessage(cause),
+                  }),
+                )
+                return
+              }
               const gesture = async () => {
                 const issued = await inviteSomebody(
                   sessionClient,
@@ -4127,6 +4189,31 @@ export function App({
                     })
                     .catch((cause: unknown) =>
                       logEvent('warn', 'MESSAGR_ADMIT_ROUND_FAILED', {
+                        reason: getErrorMessage(cause),
+                      }),
+                    )
+
+                  // AND THE INVITATIONS DELIVERED INSIDE THE APPLICATION
+                  // (#404), asked about once a tick for as long as they are
+                  // good: whoever joined one is let into its conversation and
+                  // given the name typed for them. Not awaited, for the reason
+                  // above.
+                  letInWhoeverJoined(sessionClient, {
+                    sent: sentRef.current,
+                    service: discoveryDeps.service,
+                    name: async (who, given) => {
+                      const kept = await namesRef.current.set(who, given)
+                      setNames(held => new Map(held).set(who, given))
+                      if (!kept) {
+                        logEvent('warn', 'MESSAGR_GIVEN_NAME_NOT_KEPT', {})
+                      }
+                    },
+                  })
+                    .then(admitted => {
+                      if (admitted.length > 0) refreshList().catch(() => {})
+                    })
+                    .catch((cause: unknown) =>
+                      logEvent('warn', 'MESSAGR_LET_IN_FAILED', {
                         reason: getErrorMessage(cause),
                       }),
                     )
@@ -5728,11 +5815,17 @@ export function App({
                     // stage.
                     onContinue={() => findingRef.current.go()}
                     onShareMore={() => findingRef.current.shareMore()}
-                    // THE INVITATION FORM, AS FROM THE « + » SHEET: the
-                    // address book was refused, and a link needs none (#403).
-                    onInvite={() => {
+                    // THE INVITATION FORM, AS FROM THE « + » SHEET: for a
+                    // contact found, delivered inside the application
+                    // (#404); when the address book was refused, a link,
+                    // which needs none (#403).
+                    onInvite={to => {
                       findingRef.current.close()
-                      setInvite({ stage: 'resting' })
+                      setInvite(
+                        to === undefined
+                          ? { stage: 'resting' }
+                          : { stage: 'resting', to },
+                      )
                     }}
                     onClose={() => findingRef.current.close()}
                   />
@@ -5744,10 +5837,21 @@ export function App({
               invite.stage !== 'shut' && (
                 <View style={styles.block}>
                   <Invite
+                    // One form per contact found: the name of its card is
+                    // where the form starts (#404).
+                    key={
+                      invite.stage === 'resting'
+                        ? (invite.to?.reference ?? 'link')
+                        : 'invite'
+                    }
                     stage={invite}
                     admission={admission}
                     onInvite={(name, declared) =>
-                      inviteRef.current?.(name, declared)
+                      inviteRef.current?.(
+                        name,
+                        declared,
+                        invite.stage === 'resting' ? invite.to : undefined,
+                      )
                     }
                     onClose={() => {
                       setInvite({ stage: 'shut' })
