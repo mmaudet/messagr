@@ -609,7 +609,11 @@ impl IntoResponse for AppError {
             AppError::NotFindable => (StatusCode::FORBIDDEN, "MESSAGR_NOT_FINDABLE"),
             AppError::UnknownMaskingKey => (StatusCode::NOT_FOUND, "MESSAGR_UNKNOWN_MASKING_KEY"),
             AppError::NotABatch => (StatusCode::BAD_REQUEST, "MESSAGR_NOT_A_BATCH"),
-            AppError::InvitationPending => (StatusCode::CONFLICT, "MESSAGR_INVITATION_PENDING"),
+            // A LIMIT THAT LIFTS BY ITSELF, at the pending invitation's
+            // deadline, like every refusal of this family: 429.
+            AppError::InvitationPending => {
+                (StatusCode::TOO_MANY_REQUESTS, "MESSAGR_INVITATION_PENDING")
+            }
             AppError::InvitedRecently { .. } => {
                 (StatusCode::TOO_MANY_REQUESTS, "MESSAGR_INVITED_RECENTLY")
             }
@@ -633,10 +637,11 @@ impl IntoResponse for AppError {
             other => other.to_string(),
         };
         let mut body = serde_json::json!({"errcode": errcode, "error": message});
-        // THE TWO REFUSALS WHOSE NUMBER THE APPLICATION SAYS in its own
-        // language: how many attempts a wrong code leaves, and when an account
-        // may ask for a code again (#399). Each travels as a number of its
-        // own, not only inside the text.
+        // THE REFUSALS WHOSE NUMBER THE APPLICATION SAYS in its own language:
+        // how many attempts a wrong code leaves, and when an account may ask
+        // for a code again (#399), invite that account again, or send another
+        // invitation (#406). Each travels as a number of its own, not only
+        // inside the text.
         if let AppError::CodeWrong { attempts_left } = &self {
             body["attempts_left"] = serde_json::json!(attempts_left);
         }
@@ -979,7 +984,7 @@ mod tests {
         let (got, body) = render(AppError::InvitationPending).await;
         assert_eq!(
             (got.as_u16(), body["errcode"].as_str()),
-            (409, Some("MESSAGR_INVITATION_PENDING"))
+            (429, Some("MESSAGR_INVITATION_PENDING"))
         );
         for (refusal, errcode) in [
             (

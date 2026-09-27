@@ -183,3 +183,13 @@ again only when its proof is renewed.
   Proofs are capped per account, per country per day, and by a monthly budget.
   Past a country's cap or the budget, new proofs wait while renewals still go
   through, so that a fraudster never makes anybody stop being findable.
+
+**Amended on 27 September 2026 (blocking, #406).** A copy of the database also
+shows who blocked whom. A recipient may decline an invitation delivered inside
+Messagr and block its inviter; the block is a refusal the service keeps, where
+a refusal otherwise goes at the invitation's deadline, and it lasts as long as
+both accounts exist, lifted by the purge of a deleted account and never by the
+announcement of its deletion. The person chooses that trace by blocking, and
+the screen that asks says the block does not lift. Nothing tells the blocked
+account: its invitations are taken, never delivered, read as pending and run
+out, and every limit applies to them as to any other.

@@ -29,9 +29,9 @@
     "$note": "Un blocage (#406) : la personne invitée refuse une invitation remise dans Messagr et bloque celui qui l'invite. Deux identifiants de compte, sans date. Les invitations suivantes de ce compte sont acceptées, jamais remises, puis expirent, et rien ne le lui dit.",
     "jusqua": "tant que les deux comptes existent",
     "applique_par": [
-      "services/invitations : handlers::deletion::announce efface les blocages du compte qui annonce sa suppression, de part et d'autre (#406)"
+      "la purge d'un compte supprimé efface ses blocages, de part et d'autre, et jamais l'annonce de sa suppression, qui n'est pas une preuve (#406)"
     ],
-    "$manque": "La page publiée n'en dit encore rien : la nouvelle version de la politique (#412) doit le dire. Cette entrée gagnera alors sa « duree », que scripts/assert-retention.sh vérifiera sur la page."
+    "$manque": "Cette purge est manuelle d'ici #423, et une suppression faite par courriel n'est jamais annoncée au service : l'exploitant doit penser à la table delivered_blocks. La page publiée n'en dit encore rien : la nouvelle version de la politique (#412) doit le dire. Cette entrée gagnera alors sa « duree », que scripts/assert-retention.sh vérifiera sur la page."
   },
   "demandes_dinvitation": {
     "$note": "Une demande ne porte ni adresse, ni nom, ni texte libre, ni adresse IP : une empreinte de code, deux horodatages, et un sceau que le service ne peut pas ouvrir. Elle est purgée quand même — une file qui ne se vide jamais finit par dire combien de gens ont demandé et quand, ce qui est une mesure d'audience, et la page n'en promet aucune.",

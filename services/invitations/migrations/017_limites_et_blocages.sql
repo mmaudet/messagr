@@ -1,10 +1,13 @@
 -- Les limites des invitations remises dans Messagr, et le blocage (#406, #392).
 --
 -- LE BLOCAGE : un destinataire refuse une invitation et bloque son inviteur.
--- Les invitations suivantes de ce compte sont acceptées, jamais remises, puis
--- expirent : rien ne dit à l'inviteur qu'il est bloqué. Gardé tant que les
--- deux comptes existent : l'annonce de la suppression de l'un ou de l'autre
--- l'efface. Sans date : il n'a rien d'autre à dire que son existence.
+-- Ses invitations ne lui sont plus remises : acceptées, elles expirent, et
+-- rien ne dit à l'inviteur qu'il est bloqué. Un refus que le service garde,
+-- quand celui d'une invitation s'oublie à l'échéance : c'est le prix du
+-- blocage, que la personne choisit. Gardé tant que les deux comptes existent :
+-- la purge d'un compte supprimé l'efface, de part et d'autre, jamais
+-- l'annonce de sa suppression, qui n'est pas une preuve (#423). Sans date : il
+-- n'a rien d'autre à dire que son existence.
 CREATE TABLE delivered_blocks (
     blocker_user_id TEXT NOT NULL,
     blocked_user_id TEXT NOT NULL,

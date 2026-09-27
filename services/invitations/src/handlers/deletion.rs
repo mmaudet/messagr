@@ -24,7 +24,10 @@
 //! handed out, as it does for every expired invitation.
 //!
 //! AN ANNOUNCEMENT, NOT A PROOF. The deactivation comes after, and can fail.
-//! Whoever purges checks that the account is deactivated first.
+//! Whoever purges checks that the account is deactivated first. So it lifts
+//! no block either side of the account (#406): an account blocked could
+//! otherwise announce a deletion it never carries out, and be delivered
+//! again. The blocks go with the purge.
 //!
 //! # WHY THE CALLER'S OWN TOKEN
 //!
@@ -93,15 +96,6 @@ pub async fn announce(
     .await
     .map_err(anyhow::Error::from)?
     .rows_affected();
-
-    // A BLOCK LASTS AS LONG AS BOTH ACCOUNTS EXIST (#406), whichever side
-    // goes.
-    sqlx::query("DELETE FROM delivered_blocks WHERE blocker_user_id = ? OR blocked_user_id = ?")
-        .bind(&user_id)
-        .bind(&user_id)
-        .execute(&mut *tx)
-        .await
-        .map_err(anyhow::Error::from)?;
 
     tx.commit().await.map_err(anyhow::Error::from)?;
     Ok(Json(DeletionResponse {
@@ -179,8 +173,9 @@ mod tests {
     }
 
     #[sqlx::test(migrations = "./migrations")]
-    async fn the_blocks_the_account_is_on_either_side_of_go_and_no_other(pool: SqlitePool) {
-        // A block lasts as long as both accounts exist (#406).
+    async fn an_announcement_lifts_no_block_either_side(pool: SqlitePool) {
+        // An announcement is not a proof: a block goes with the purge of a
+        // deleted account, never with its announcement (#406).
         for (blocker, blocked) in [
             ("@alice:h", "@bob:h"),
             ("@carol:h", "@alice:h"),
@@ -199,12 +194,11 @@ mod tests {
         let st = state_with(pool.clone(), whoami_hs().await);
         let Json(_) = announce(State(st), bearer("alice")).await.unwrap();
 
-        let left: Vec<(String, String)> =
-            sqlx::query_as("SELECT blocker_user_id, blocked_user_id FROM delivered_blocks")
-                .fetch_all(&pool)
-                .await
-                .unwrap();
-        assert_eq!(left, [("@bob:h".to_string(), "@carol:h".to_string())]);
+        let left: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM delivered_blocks")
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+        assert_eq!(left, 3);
     }
 
     #[sqlx::test(migrations = "./migrations")]
