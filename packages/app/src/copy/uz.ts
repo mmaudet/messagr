@@ -366,6 +366,8 @@ export const uz: Readonly<Record<CopyKey, string>> = {
   invite_declared: 'Oʻzingizni qanday tanishtirasiz?',
   invite_declared_hint:
     'Ixtiyoriy. Bu nom havola ichida sayohat qiladi, boshqa hech qayerda emas: xizmat uni olmaydi va undan hech narsa saqlamaydi.',
+  invite_declared_sealed_hint:
+    'Ixtiyoriy. Bu nom taklif qilingan kishi uchun muhrlanadi: xizmat uni oʻqiy olmasdan yetkazadi va u javob bergach yoki muddat tugaganda oʻchiradi.',
   invite_working: 'Suhbat yaratilmoqda…',
   invite_ready:
     'Bu havolani ularga yuboring. U bir soat amal qiladi va bir marta ishlaydi.',

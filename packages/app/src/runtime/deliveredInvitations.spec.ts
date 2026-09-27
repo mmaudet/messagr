@@ -8,13 +8,18 @@ import {
   KEPT_AFTER_DEADLINE_MS,
   keptThisLaunchToo,
   letInTheJoined,
+  namesSealedFor,
   readTheWaiting,
   sayEntered,
   type DeliveryService,
   type SentInvitation,
   type SentInvitations,
 } from './deliveredInvitations'
+import { bytesOf } from './base64'
+import { generateKeyPair } from './hpke'
 import type { HttpRequester } from './pump'
+import { base64Of } from './receiveImage'
+import { openSealedName, sealName, SEALED_NAME_BYTES } from './sealedName'
 
 interface Call {
   readonly method: string
@@ -146,6 +151,9 @@ const claimed = (entrant: string): Answer => ({
 })
 
 const NOW = 1_790_000_000_000
+
+/** A match whose proof published no envelope key. */
+const NO_KEY = { reference: 'ref-paul', envelopeKey: null }
 const SENT: SentInvitation = {
   invitationId: 'inv-1',
   scope: '!room:x',
@@ -161,8 +169,8 @@ describe('delivering an invitation to a match (#404)', () => {
 
     const delivered = await deliverInvitation(
       { http, service, sent: page },
-      'ref-paul',
-      'Paul',
+      NO_KEY,
+      { given: 'Paul', declared: null },
     )
 
     expect(delivered).toEqual({
@@ -192,13 +200,59 @@ describe('delivering an invitation to a match (#404)', () => {
     ])
   })
 
+  it("sends the declared name sealed for the recipient's device, which opens there and nowhere else (#405)", async () => {
+    const { http, service, sent } = harness()
+    const bob = generateKeyPair()
+
+    await deliverInvitation(
+      { http, service, sent: thePage().sent },
+      { reference: 'ref-paul', envelopeKey: base64Of(bob.publicKey) },
+      { given: 'Paul', declared: 'Nadia du club' },
+    )
+
+    const body = JSON.parse(sent[0]!) as Record<string, unknown>
+    expect(Object.keys(body).sort()).toEqual(['reference', 'sealed_name'])
+    const sealed = body.sealed_name as string
+    expect(bytesOf(sealed).length).toBe(SEALED_NAME_BYTES)
+    expect(openSealedName([bob.secretKey], sealed)).toBe('Nadia du club')
+    expect(openSealedName([generateKeyPair().secretKey], sealed)).toBeNull()
+    // The name given stays here: it is on the page, not in the body.
+    expect(sent[0]).not.toContain('Paul')
+  })
+
+  it('sends an envelope of the same size when no name is declared, so the service cannot tell (#405)', async () => {
+    const { http, service, sent } = harness()
+    const bob = generateKeyPair()
+
+    await deliverInvitation(
+      { http, service, sent: thePage().sent },
+      { reference: 'ref-paul', envelopeKey: base64Of(bob.publicKey) },
+      { given: null, declared: null },
+    )
+
+    const sealed = (JSON.parse(sent[0]!) as { sealed_name: string }).sealed_name
+    expect(bytesOf(sealed).length).toBe(SEALED_NAME_BYTES)
+    expect(openSealedName([bob.secretKey], sealed)).toBeNull()
+  })
+
+  it('sends no envelope for an account whose proof published no key (#405)', async () => {
+    const { http, service, sent } = harness()
+
+    await deliverInvitation({ http, service, sent: thePage().sent }, NO_KEY, {
+      given: null,
+      declared: 'Nadia',
+    })
+
+    expect(sent).toEqual([JSON.stringify({ reference: 'ref-paul' })])
+  })
+
   it('sends nothing when the conversation could not be created', async () => {
     const { http, service, sent } = harness({ createRoom: new Error('down') })
 
     const delivered = await deliverInvitation(
       { http, service, sent: thePage().sent },
-      'ref-paul',
-      null,
+      NO_KEY,
+      { given: null, declared: null },
     )
 
     expect(delivered.delivered).toBe(false)
@@ -217,7 +271,11 @@ describe('delivering an invitation to a match (#404)', () => {
       const { sent: page, page: kept } = thePage()
 
       expect(
-        await deliverInvitation({ http, service, sent: page }, 'ref', null),
+        await deliverInvitation(
+          { http, service, sent: page },
+          { reference: 'ref', envelopeKey: null },
+          { given: null, declared: null },
+        ),
       ).toEqual({
         delivered: false,
         reason: `the invitation service refused it: ${errcode}`,
@@ -235,8 +293,8 @@ describe('delivering an invitation to a match (#404)', () => {
 
     const delivered = await deliverInvitation(
       { http, service, sent: thePage([], false).sent },
-      'ref-paul',
-      'Paul',
+      NO_KEY,
+      { given: 'Paul', declared: null },
     )
 
     expect(delivered).toMatchObject({ delivered: true, kept: false })
@@ -442,13 +500,18 @@ describe('the invitations waiting for this account (#404)', () => {
             null,
             { id: 42, expires_at: 1 },
             { id: 'c', expires_at: 1_790_605_000, inviter_user_id: '@bob:x' },
+            { id: 'd', expires_at: 1_790_605_100, sealed_name: 'ENVELOPE' },
           ],
         }),
       },
     })
 
     expect(await readTheWaiting(service)).toEqual({
-      unanswered: [{ id: 'a', expiresAt: 1_790_604_800_000 }],
+      unanswered: [
+        { id: 'a', expiresAt: 1_790_604_800_000, sealedName: null },
+        // The name its inviter gave itself, sealed for this device (#405).
+        { id: 'd', expiresAt: 1_790_605_100_000, sealedName: 'ENVELOPE' },
+      ],
       joined: [
         { id: 'b', inviter: '@alice:x' },
         { id: 'c', inviter: '@bob:x' },
@@ -513,5 +576,62 @@ describe('the invitations waiting for this account (#404)', () => {
       expect(await joinDelivered(service, 'a')).toBe(said)
       expect(await declineDelivered(service, 'a')).toBe(said)
     }
+  })
+})
+
+describe('the names sealed for this device (#405)', () => {
+  const bob = generateKeyPair()
+  const sealedFor = (name: string | null) =>
+    sealName(base64Of(bob.publicKey), name)!
+  const waiting = (id: string, sealedName: string | null) => ({
+    id,
+    expiresAt: NOW,
+    sealedName,
+  })
+
+  it('opens the name each invitation carries, and remembers one that does not open as no name', async () => {
+    const opened = await namesSealedFor(
+      [
+        waiting('a', sealedFor('Nadia')),
+        waiting('b', sealName(base64Of(generateKeyPair().publicKey), 'X')!),
+        waiting('c', null),
+      ],
+      new Map(),
+      async () => [bob.secretKey],
+    )
+
+    expect(opened).toEqual(
+      new Map([
+        ['a', 'Nadia'],
+        ['b', null],
+      ]),
+    )
+  })
+
+  it('opens each envelope once, without asking the keystore when nothing is new', async () => {
+    const known = new Map([['a', 'Nadia']])
+    let asked = 0
+
+    const opened = await namesSealedFor(
+      [waiting('a', sealedFor('Nadia'))],
+      known,
+      async () => {
+        asked += 1
+        return [bob.secretKey]
+      },
+    )
+
+    expect(opened).toBe(known)
+    expect(asked).toBe(0)
+  })
+
+  it('opens nothing, and asks again next time, when the keystore gives no key', async () => {
+    const opened = await namesSealedFor(
+      [waiting('a', sealedFor('Nadia'))],
+      new Map(),
+      async () => [],
+    )
+
+    expect(opened.has('a')).toBe(false)
   })
 })

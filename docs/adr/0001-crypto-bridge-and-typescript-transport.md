@@ -156,3 +156,18 @@ no directory and no request enter the bridge, and the calls need no crypto
 machine. On a Pixel 10 Pro Fold, 2,000 numbers take under half a second to
 blind and finalise, proof checked. Shipped in `react-native-matrix-crypto`
 0.8.0 (linagora/react-native-matrix-crypto#66).
+
+**Amended on 27 September 2026 (the declared name of an invitation delivered
+inside the application).** Such an invitation has no link, so the name the
+inviter declares for itself travels sealed for the recipient's device (#405):
+HPKE (RFC 9180) in its base mode, with DHKEM(X25519, HKDF-SHA256),
+HKDF-SHA256 and ChaCha20-Poly1305, assembled in TypeScript from
+`@noble/curves` and `@noble/ciphers` 2.4.0, on the owner's choice written on
+#405. It is a second piece of cryptography outside the bridge, and it stays
+outside for two reasons. It takes no part in Matrix's protocol: its keys are
+its own, one pair per proof of a number, published with the proof, and it
+touches no Matrix key, no message and no room. And speed, which moved the
+masking into the bridge, does not argue for it here: one seal per invitation
+sent, one opening per invitation received. The assembly is checked against
+the vectors of the RFC's appendix A.2.1. Anything that would seal more than
+that one self-declared name belongs in the bridge.

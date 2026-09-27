@@ -196,15 +196,20 @@ export function whatALinkSays(described: Described): WhatIsKnown {
 
 /**
  * The same screen, for an invitation delivered inside the application
- * (#404): the inviter is unknown until the person joins, since the service
- * names them only then, and the name they declared will travel sealed with
- * #405. What is known is its deadline, which the service says.
+ * (#404): the inviter's account is unknown until the person joins, since the
+ * service names it only then. What is known is its deadline, which the
+ * service says, and the name the inviter gave itself when its envelope opened
+ * on this device (#405): a declared name, as a link's, drawn after « Se
+ * présente comme ».
  */
-export function whatADeliveredInvitationSays(expiresAt: number): WhatIsKnown {
+export function whatADeliveredInvitationSays(
+  expiresAt: number,
+  declared: string | null = null,
+): WhatIsKnown {
   return {
     source: 'delivered',
     scope: '',
-    declared: '',
+    declared: declared ?? '',
     who: '',
     named: false,
     identifier: '',

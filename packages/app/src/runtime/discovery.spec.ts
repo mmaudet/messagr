@@ -12,6 +12,8 @@ import {
   type OpenCountry,
   type ProofStage,
 } from './discovery'
+import type { KeyPair } from './hpke'
+import { base64Of } from './receiveImage'
 
 /**
  * The discovery module, as far as proving one's number (#397), driven through
@@ -81,15 +83,43 @@ const NOT_FINDABLE: Extract<DiscoveryReading, { read: true }> = {
 
 const DAY = 86_400_000
 
-function journeyWith(answers: Partial<Record<Route, (Answer | Error)[]>>) {
+/** The envelope key pair every proof in these tests publishes (#405). */
+const PAIR: KeyPair = {
+  secretKey: new Uint8Array(32).fill(1),
+  publicKey: new Uint8Array(32).fill(7),
+}
+
+/**
+ * An envelope keyring that hands out `PAIR`, or nothing when its keystore
+ * refuses, and records the proofs said to have held.
+ */
+function envelopeKeys(refuses = false) {
+  const keptPairs: KeyPair[] = []
+  return {
+    envelope: {
+      toPublish: async () => (refuses ? null : PAIR),
+      published: async (pair: KeyPair) => {
+        keptPairs.push(pair)
+      },
+    },
+    keptPairs,
+  }
+}
+
+function journeyWith(
+  answers: Partial<Record<Route, (Answer | Error)[]>>,
+  keystoreRefuses = false,
+) {
   const { service, asked } = theService(answers)
   const shown: ProofStage[] = []
   const kept: (string | null)[] = []
+  const { envelope, keptPairs } = envelopeKeys(keystoreRefuses)
   const journey = proofJourney(
     {
       service,
       now: () => NOW,
       language: () => 'fr',
+      envelope,
       keepNumber: async number => {
         kept.push(number)
       },
@@ -97,7 +127,7 @@ function journeyWith(answers: Partial<Record<Route, (Answer | Error)[]>>) {
     stage => shown.push(stage),
   )
   const last = () => shown[shown.length - 1]
-  return { journey, asked, shown, last, kept }
+  return { journey, asked, shown, last, kept, keptPairs }
 }
 
 describe('reading the state of discovery', () => {
@@ -209,7 +239,7 @@ describe('the journey of a proof', () => {
   })
 
   it('goes consent, number, code, proven, in that order', async () => {
-    const { journey, asked, shown, last } = journeyWith({
+    const { journey, asked, shown, last, keptPairs } = journeyWith({
       startProof: [ok({ provider: 'OVHcloud', expires_in: 600 })],
       finishProof: [ok({ findable_until: 1_792_419_200 })],
     })
@@ -232,7 +262,13 @@ describe('the journey of a proof', () => {
     })
 
     await journey.prove(' 123456 ')
-    expect(asked[1]).toEqual({ route: 'finishProof', body: { code: '123456' } })
+    // WITH THE CODE, AN ENVELOPE KEY (#405), and the proof said to have held
+    // with it.
+    expect(asked[1]).toEqual({
+      route: 'finishProof',
+      body: { code: '123456', envelope_key: base64Of(PAIR.publicKey) },
+    })
+    expect(keptPairs).toEqual([PAIR])
     expect(last()).toEqual({
       stage: 'proven',
       findableUntil: 1_792_419_200_000,
@@ -295,7 +331,7 @@ describe('the journey of a proof', () => {
   })
 
   it('says a wrong code leaves attempts, and asks for another code after the last', async () => {
-    const { journey, last } = journeyWith({
+    const { journey, last, keptPairs } = journeyWith({
       startProof: [ok({ provider: 'OVHcloud', expires_in: 600 })],
       finishProof: [
         refused(400, 'MESSAGR_CODE_WRONG', { attempts_left: 4 }),
@@ -316,6 +352,62 @@ describe('the journey of a proof', () => {
       stage: 'code',
       refused: { why: 'wrong', attemptsLeft: 0 },
     })
+    // A REFUSED CODE PUBLISHES NO KEY: the one the directory lists stays
+    // the one this device opens names with (#405).
+    expect(keptPairs).toEqual([])
+  })
+
+  it('sends no envelope key when the keystore will not keep one (#405)', async () => {
+    const { journey, asked, last } = journeyWith(
+      {
+        startProof: [ok({ provider: 'OVHcloud', expires_in: 600 })],
+        finishProof: [ok({ findable_until: 1_792_419_200 })],
+      },
+      true,
+    )
+    journey.open(NOT_FINDABLE, null)
+    journey.consent()
+    await journey.send('+33612345678')
+
+    await journey.prove('123456')
+
+    expect(asked[1]).toEqual({ route: 'finishProof', body: { code: '123456' } })
+    expect(last()).toMatchObject({ stage: 'proven' })
+  })
+
+  it('says the proof held to the keyring even when the journey was closed meanwhile (#405)', async () => {
+    let answer: ((a: Answer) => void) | null = null
+    const { envelope, keptPairs } = envelopeKeys()
+    const journey = proofJourney(
+      {
+        service: {
+          state: () => Promise.reject(new Error('not asked')),
+          startProof: async () => ok({ provider: 'OVHcloud', expires_in: 600 }),
+          finishProof: () =>
+            new Promise(resolve => {
+              answer = resolve
+            }),
+          withdraw: () => Promise.reject(new Error('not asked')),
+        },
+        now: () => NOW,
+        language: () => 'fr',
+        envelope,
+        keepNumber: async () => undefined,
+      },
+      () => undefined,
+    )
+    journey.open(NOT_FINDABLE, null)
+    journey.consent()
+    await journey.send('+33612345678')
+
+    const proving = journey.prove('123456')
+    // Closed while the code is with the service, then the service answers.
+    while (answer === null) await Promise.resolve()
+    journey.close()
+    ;(answer as (a: Answer) => void)(ok({ findable_until: 1_792_419_200 }))
+    await proving
+
+    expect(keptPairs).toEqual([PAIR])
   })
 
   it('goes back to the number, kept, for another code', async () => {
@@ -394,6 +486,7 @@ describe('the journey of a proof', () => {
         },
         now: () => NOW,
         language: () => 'fr',
+        envelope: envelopeKeys().envelope,
         keepNumber: async () => undefined,
       },
       stage => shown.push(stage),
@@ -506,6 +599,7 @@ describe('keeping the proof, or ending it (#398)', () => {
         },
         now: () => NOW,
         language: () => 'fr',
+        envelope: envelopeKeys().envelope,
         keepNumber: async () => undefined,
       },
       stage => shown.push(stage),

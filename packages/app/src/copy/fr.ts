@@ -556,6 +556,11 @@ export const fr = {
   invite_declared: 'Comment vous présentez-vous ?',
   invite_declared_hint:
     'Facultatif. Ce nom voyage dans le lien, et nulle part ailleurs : le service ne le reçoit pas et n’en garde rien.',
+  // LE MÊME NOM, POUR UN CONTACT TROUVÉ (#405) : pas de lien, donc pas de
+  // fragment. Il voyage scellé pour l'appareil de la personne invitée, que
+  // le service transmet sans pouvoir l'ouvrir et efface dès la réponse.
+  invite_declared_sealed_hint:
+    'Facultatif. Ce nom est scellé pour la personne invitée : le service le transmet sans pouvoir le lire, et l’efface dès qu’elle a répondu, ou à l’échéance.',
   invite_working: 'Création de la conversation…',
   invite_ready:
     'Envoyez ce lien à cette personne. Il est valable une heure et ne sert qu’une fois.',

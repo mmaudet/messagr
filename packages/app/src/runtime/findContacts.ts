@@ -167,6 +167,12 @@ export interface Match {
    * soon a number given up can change hands (#392, Q36).
    */
   readonly holderChanged: boolean
+  /**
+   * The envelope key the account's device published with its proof, base64
+   * (#405): what an inviter seals its name for. `null` when it published
+   * none, and then the invitation goes without a name.
+   */
+  readonly envelopeKey: string | null
 }
 
 export type Findings =
@@ -287,7 +293,8 @@ export async function findContacts(deps: FindingDeps): Promise<Findings> {
   const matched = new Map<Contact, Match>()
   const toKeep = new Map<string, Remembered>()
   for (const [number, mask] of masks) {
-    const reference = listed.get(mask) ?? null
+    const entry = listed.get(mask)
+    const reference = entry?.reference ?? null
     const before = remembered.get(number)
     // THE FIRST REFERENCE A NUMBER LED TO IS THE ONE KEPT: another one since
     // is a number that changed hands, and the new account inherits nothing.
@@ -306,7 +313,12 @@ export async function findContacts(deps: FindingDeps): Promise<Findings> {
       // A contact's number that did not change hands wins over one that did.
       const already = matched.get(contact)
       if (already === undefined || (already.holderChanged && !holderChanged)) {
-        matched.set(contact, { contact, reference, holderChanged })
+        matched.set(contact, {
+          contact,
+          reference,
+          holderChanged,
+          envelopeKey: entry?.envelopeKey ?? null,
+        })
       }
     }
   }
@@ -471,22 +483,35 @@ export function numberBytes(number: string): Uint8Array {
   return Uint8Array.from(number, c => c.charCodeAt(0))
 }
 
-/** The directory, as the masks under the key and the reference of each. */
+/** What the directory lists under a mask. */
+interface Listed {
+  readonly reference: string
+  readonly envelopeKey: string | null
+}
+
+/**
+ * The directory, as the masks under the key, and the reference and envelope
+ * key of each.
+ */
 async function directoryOf(
   service: FindingService,
   keyNumber: number,
-): Promise<Map<string, string> | FindingRefusal> {
+): Promise<Map<string, Listed> | FindingRefusal> {
   const answer = await asked(() => service.directory())
   if (typeof answer === 'string') return answer
   if (!Array.isArray(answer.entries)) return 'unreachable'
-  const listed = new Map<string, string>()
+  const listed = new Map<string, Listed>()
   for (const entry of answer.entries as Record<string, unknown>[]) {
     if (
       entry.key_number === keyNumber &&
       typeof entry.mask === 'string' &&
       typeof entry.reference === 'string'
     ) {
-      listed.set(entry.mask, entry.reference)
+      listed.set(entry.mask, {
+        reference: entry.reference,
+        envelopeKey:
+          typeof entry.envelope_key === 'string' ? entry.envelope_key : null,
+      })
     }
   }
   return listed

@@ -379,7 +379,7 @@ describe('an invitation delivered inside Messagr (#404)', () => {
   const expiresAt = new Date(2026, 9, 4, 12).getTime()
   const delivered = whatADeliveredInvitationSays(expiresAt)
 
-  it('says its sender had this number, when it runs out, and that nothing is told until joining', () => {
+  it('names nobody, says when it runs out, and that nothing is told until joining', () => {
     expect(said(screen({ known: delivered }))).toEqual([
       t('invited_title'),
       t('invited_who_delivered'),
@@ -388,6 +388,23 @@ describe('an invitation delivered inside Messagr (#404)', () => {
       t('invited_join'),
       t('invited_refuse'),
     ])
+  })
+
+  it('draws the name its inviter gave itself after « Se présente comme », once its envelope opened here (#405)', () => {
+    const drawn = screen({
+      known: whatADeliveredInvitationSays(expiresAt, 'Nadia du club'),
+    })
+
+    expect(said(drawn)).toEqual([
+      t('invited_title'),
+      t('conversation_sender_claimed %@', 'Nadia du club'),
+      t('invited_lead'),
+      t('invited_terms_delivered %1$@', dayOf(expiresAt)),
+      t('invited_nothing_told'),
+      t('invited_join'),
+      t('invited_refuse'),
+    ])
+    expect(find(drawn, 'invited-declared')).toBeDefined()
   })
 
   it('offers « Rejoindre » and « Refuser », of the same rank', () => {

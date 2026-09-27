@@ -89,6 +89,7 @@ export function FindContacts({
             name: m.contact.name,
             reference: m.reference,
             holderChanged: m.holderChanged,
+            envelopeKey: m.envelopeKey,
           }))}
           onInvite={onInvite}
           others={stage.others.map(c => c.name)}
@@ -149,6 +150,8 @@ function Found({
     readonly reference: string
     /** The number led to another account before (#402). */
     readonly holderChanged: boolean
+    /** What the inviter's name is sealed for (#405), if anything. */
+    readonly envelopeKey: string | null
   }[]
   readonly others: readonly string[]
   /** What the limit on masking left for later (#401). */
@@ -197,7 +200,7 @@ function Found({
               {t('find_nobody')}
             </Text>
           )
-        : matches.map(({ name, reference, holderChanged }, i) => (
+        : matches.map(({ name, reference, holderChanged, envelopeKey }, i) => (
             <View key={`m${i}`} style={styles.match}>
               <View style={styles.matchName}>
                 <Text style={styles.row} testID="find-contacts-match">
@@ -218,7 +221,11 @@ function Found({
                 // leads to now inherits nothing of the card's (#392), not
                 // even as the name the form opens with.
                 onPress={() =>
-                  onInvite({ name: holderChanged ? '' : name, reference })
+                  onInvite({
+                    name: holderChanged ? '' : name,
+                    reference,
+                    envelopeKey,
+                  })
                 }
                 tone="quiet"
               />

@@ -359,6 +359,19 @@ export const findableNumberSecrets = keychainStore(
 )
 
 /**
+ * The secret halves of this device's envelope keys (#405): what opens the
+ * names inviters seal for this account. `envelopeKeys.ts` says what is kept,
+ * and for how long.
+ *
+ * The account's: its proofs published their public halves, and leaving the
+ * account forgets them with the rest.
+ */
+export const envelopeKeySecrets = keychainStore(
+  'eu.messagr.envelope-keys',
+  'account',
+)
+
+/**
  * Whether this device asks to be woken when a message arrives.
  *
  * The device's, for the reason the receipts give: whether this telephone asks

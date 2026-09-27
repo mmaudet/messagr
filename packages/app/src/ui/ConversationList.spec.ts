@@ -342,8 +342,8 @@ describe('a conversation an invitation delivered inside Messagr waits in (#404)'
 
 describe('invitations delivered inside Messagr, atop the list (#404)', () => {
   const waiting = [
-    { id: 'a', expiresAt: NOW + 7 * 86_400_000 },
-    { id: 'b', expiresAt: NOW + 3 * 86_400_000 },
+    { id: 'a', expiresAt: NOW + 7 * 86_400_000, sealedName: null },
+    { id: 'b', expiresAt: NOW + 3 * 86_400_000, sealedName: null },
   ]
 
   it('draws each above the conversations, with its deadline, and opens it', () => {

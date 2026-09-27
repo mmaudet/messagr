@@ -1,3 +1,6 @@
+import type { EnvelopeKeys } from './envelopeKeys'
+import { base64Of } from './receiveImage'
+
 /**
  * Address-book discovery, as far as proving one's number and keeping it
  * proved (#397, #398, #392, ADR 0014).
@@ -19,10 +22,11 @@
  *
  * # WHAT IS INJECTED
  *
- * The transport to the service, the clock, and where the proven number is
- * kept on this telephone (`keepNumber`), which is all this part of discovery
- * needs. The tests stand them in and record every request, which is the seam
- * #392 agreed for the application.
+ * The transport to the service, the clock, where the proven number is kept
+ * on this telephone (`keepNumber`), and this device's envelope keys, one
+ * published with each proof (#405): all this part of discovery needs. The
+ * tests stand them in and record every request, which is the seam #392
+ * agreed for the application.
  */
 
 /** An answer of the service: its status and its body, read as text. */
@@ -380,6 +384,11 @@ export function proofJourney(
     /** The application's language, for the SMS. */
     readonly language: () => string
     /**
+     * This device's envelope keys (#405): each proof publishes one with its
+     * code, kept before it leaves (`envelopeKeys.ts`).
+     */
+    readonly envelope: Pick<EnvelopeKeys, 'toPublish' | 'published'>
+    /**
      * Keeps the number just proved on this telephone, or forgets it once
      * withdrawn (`null`): what the row shows, and what a renewal sends to.
      */
@@ -501,7 +510,21 @@ export function proofJourney(
       const { number } = stage
       const mine = opening
       go({ stage: 'proving', number })
-      const finished = await finishProof(deps, code.trim())
+      // AN ENVELOPE KEY WITH THE CODE (#405), in the keystore before it
+      // leaves: the service publishes it as soon as the proof holds, whether
+      // or not this device hears the answer. A keystore that will not keep
+      // it sends none, and invitations to this account then carry no name.
+      const pair = await deps.envelope.toPublish()
+      const finished = await finishProof(
+        deps,
+        code.trim(),
+        pair?.publicKey ?? null,
+      )
+      // Said to the keyring even for a journey closed meanwhile: the proof
+      // held at the service all the same.
+      if (finished.proven && pair !== null) {
+        await deps.envelope.published(pair)
+      }
       if (mine !== opening) return
       if (finished.proven) {
         kept = number
@@ -598,10 +621,17 @@ type Finished =
 async function finishProof(
   deps: DiscoveryDeps,
   code: string,
+  envelopeKey: Uint8Array | null,
 ): Promise<Finished> {
   let answer: Answer
   try {
-    answer = await deps.service.finishProof(JSON.stringify({ code }))
+    answer = await deps.service.finishProof(
+      JSON.stringify(
+        envelopeKey === null
+          ? { code }
+          : { code, envelope_key: base64Of(envelopeKey) },
+      ),
+    )
   } catch {
     return { proven: false, refused: { why: 'unreachable' } }
   }

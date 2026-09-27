@@ -133,6 +133,7 @@ import {
   signUpSecrets,
   keepEverySecrets,
   findableNumberSecrets,
+  envelopeKeySecrets,
 } from './src/runtime/deviceSecrets'
 import {
   publishReceipts,
@@ -186,6 +187,7 @@ import {
   declineDelivered,
   joinDelivered,
   keptThisLaunchToo,
+  namesSealedFor,
   readTheWaiting,
   sayEntered,
   type JoinedInvitation,
@@ -193,6 +195,7 @@ import {
   type SentInvitations,
   type WaitingInvitation,
 } from './src/runtime/deliveredInvitations'
+import { envelopeKeysIn } from './src/runtime/envelopeKeys'
 import { admitAnyoneWaiting } from './src/runtime/admitAnyoneWaiting'
 import { displayNameFor } from './src/runtime/givenName'
 import Clipboard from '@react-native-clipboard/clipboard'
@@ -550,9 +553,14 @@ export function App({
   const inviteRef = useRef<
     ((name: string | null, declared: string | null) => void) | null
   >(null)
-  /** Inviting a contact found (#404): its own gesture, beside a link's. */
+  /**
+   * Inviting a contact found (#404): its own gesture, beside a link's, with
+   * the name the inviter gives itself, sealed for the recipient's device
+   * (#405).
+   */
   const deliverRef = useRef<
-    ((name: string | null, to: InvitedMatch) => void) | null
+    | ((name: string | null, to: InvitedMatch, declared: string | null) => void)
+    | null
   >(null)
   const namesRef = useRef<GivenNames>(forgetfulGivenNames())
   /**
@@ -655,12 +663,33 @@ export function App({
     tellEntered().catch(() => {})
   }
   /**
+   * The names inviters gave themselves, opened on this device (#405), by
+   * invitation: `null` for an envelope that did not open.
+   * `namesSealedFor` says when each is opened.
+   */
+  const [deliveredNames, setDeliveredNames] = useState<
+    ReadonlyMap<string, string | null>
+  >(new Map())
+  const openedNamesRef = useRef<ReadonlyMap<string, string | null>>(new Map())
+  const openTheNames = async (unanswered: readonly WaitingInvitation[]) => {
+    const opened = await namesSealedFor(
+      unanswered,
+      openedNamesRef.current,
+      envelopeKeys.secrets,
+    )
+    if (opened === openedNamesRef.current) return
+    openedNamesRef.current = opened
+    setDeliveredNames(opened)
+  }
+  /**
    * Reads the invitations delivered inside Messagr for this account (#404),
-   * once the service has heard of the conversations entered. An answer that
-   * could not be read changes nothing: the list keeps what it showed, and
-   * the next tick asks again.
+   * once the service has heard of the conversations entered, and opens the
+   * names sealed for this device (#405). An answer that could not be read
+   * changes nothing: the list keeps what it showed, and the next tick asks
+   * again.
    */
   const readDelivered = async () => {
+    if (!mayBeInvitedHereRef.current) return
     await tellEntered()
     const waiting = await readTheWaiting(discoveryDeps.service).catch(
       () => null,
@@ -669,6 +698,7 @@ export function App({
     joinedDeliveredRef.current = waiting.joined
     setDeliveredWaiting(waiting.unanswered)
     setDeliveredJoined(awaitedDeliveries())
+    await openTheNames(waiting.unanswered).catch(() => {})
   }
   /** The one open on §13.3's screen, and how its answer is going. */
   const [deliveredOnScreen, setDeliveredOnScreen] =
@@ -1423,6 +1453,22 @@ export function App({
     service: discoveryService(() => credentialsRef.current),
     now: () => Date.now(),
   }).current
+  /**
+   * This device's envelope keys (#405): one published with each proof, and
+   * what opens the names inviters seal for this account.
+   */
+  const envelopeKeys = useRef(
+    envelopeKeysIn(envelopeKeySecrets, () => Date.now()),
+  ).current
+  /**
+   * WHETHER AN INVITATION CAN HAVE BEEN DELIVERED HERE AT ALL: only to an
+   * account with a proof, and a device that made one holds an envelope key
+   * (#405). A device that never proved a number never asks the service for
+   * its delivered invitations, at launch or at any tick -- which is every
+   * device while discovery is off. Read from the keystore at launch, and set
+   * as soon as a proof holds.
+   */
+  const mayBeInvitedHereRef = useRef(false)
   // LOOKING FOR ONE'S CONTACTS (#400), from the « + » sheet, for a findable
   // account: the address book through the system, each number masked by the
   // crypto bridge's OPRF client, and the comparison made on this telephone.
@@ -1465,6 +1511,13 @@ export function App({
       {
         ...discoveryDeps,
         language: currentLanguage,
+        envelope: {
+          toPublish: envelopeKeys.toPublish,
+          published: async pair => {
+            await envelopeKeys.published(pair)
+            mayBeInvitedHereRef.current = true
+          },
+        },
         keepNumber: async number => {
           setKeptNumber(number)
           // EMPTY IS « NONE »: `SecretStore` has no delete, so a number
@@ -3096,11 +3149,17 @@ export function App({
             // WHOSE ROOM INVITE THIS ACCOUNT AWAITS (#404), read before the
             // walk, so that a relaunch enters it as the tick would have. For
             // three seconds at most: a service slow to answer must not hold
-            // the list back, and the next tick enters it all the same.
-            await Promise.race([
-              readDelivered(),
-              new Promise<void>(resolve => setTimeout(resolve, 3_000)),
-            ])
+            // the list back, and the next tick enters it all the same. And
+            // only on a device that may have been invited this way at all:
+            // every other launch waits for nothing (`mayBeInvitedHereRef`).
+            mayBeInvitedHereRef.current =
+              (await envelopeKeys.secrets()).length > 0
+            if (mayBeInvitedHereRef.current) {
+              await Promise.race([
+                readDelivered(),
+                new Promise<void>(resolve => setTimeout(resolve, 3_000)),
+              ])
+            }
             const walkedAtLaunch = await enterAnyInvitations(
               sessionClient,
               credentials.userId,
@@ -4100,16 +4159,22 @@ export function App({
             // Nothing to share and nothing to wait for here: the recipient
             // may answer in a week, and each sync tick asks
             // (`letInWhoeverJoined`, below).
-            deliverRef.current = (name: string | null, to: InvitedMatch) => {
+            deliverRef.current = (
+              name: string | null,
+              to: InvitedMatch,
+              declared: string | null,
+            ) => {
               setInvite({ stage: 'working' })
               setAdmission(null)
               const delivering = async () => {
+                // The declared name leaves sealed for the recipient's device
+                // (#405), which `deliveredInvitations.ts` does.
                 const delivered = await deliverToMatch(
                   sessionClient,
                   discoveryDeps.service,
                   sentInvitationsRef.current,
-                  to.reference,
-                  name,
+                  to,
+                  { given: name, declared },
                 )
                 if (!delivered.delivered) {
                   setInvite({
@@ -6079,7 +6144,7 @@ export function App({
                     admission={admission}
                     onInvite={(name, declared) =>
                       invite.stage === 'resting' && invite.to !== undefined
-                        ? deliverRef.current?.(name, invite.to)
+                        ? deliverRef.current?.(name, invite.to, declared)
                         : inviteRef.current?.(name, declared)
                     }
                     onClose={() => {
@@ -6572,7 +6637,10 @@ export function App({
             style={[StyleSheet.absoluteFill, styles.root]}
             edges={['top', 'bottom', 'left', 'right']}>
             <Invited
-              known={whatADeliveredInvitationSays(deliveredOnScreen.expiresAt)}
+              known={whatADeliveredInvitationSays(
+                deliveredOnScreen.expiresAt,
+                deliveredNames.get(deliveredOnScreen.id) ?? null,
+              )}
               behind={0}
               working={answeringDelivered}
               failed={deliveredFailed === deliveredOnScreen.id}
