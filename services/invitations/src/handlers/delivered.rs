@@ -48,8 +48,9 @@
 //! The service knows the recipient from the moment the invitation leaves:
 //! the reference names it. The inviter is told who it is when it joins,
 //! which is when its device must invite that account; before, the invitation
-//! reads « pending » and names nobody. The recipient is told who invited it
-//! at the same moment, which is how its device recognises the room invite it
+//! reads « pending » and names nobody. The recipient is told the inviter's
+//! account at the same moment (before, only the reference it is findable by:
+//! see below), which is how its device recognises the room invite it
 //! waits for among any other, days later if the inviter's device was asleep,
 //! and after a relaunch as well: a joined invitation stays in its list, with
 //! the inviter, until the device says it entered (`entered`), past the
@@ -61,10 +62,11 @@
 //! # BEFORE IT ANSWERS, THE RECIPIENT LEARNS ITS INVITER'S REFERENCE (#407)
 //!
 //! Not its account: the reference its current proof is listed by in the
-//! directory, which anybody can download. It tells nothing to a recipient who
-//! never found that number in its own address book, and tells one who did,
-//! from the results its device keeps, that the inviter is in it. An inviter
-//! that withdrew its number, or whose proof ran out, is listed without one.
+//! directory, which every findable account downloads. It tells nothing to a
+//! recipient who never found that number in its own address book, and tells
+//! one who did, from the results its device keeps, that the inviter is in it.
+//! An inviter that withdrew its number, or whose proof ran out, is listed
+//! without one.
 //!
 //! # A REFUSAL READS AS AN INVITATION NOBODY HAS SEEN
 //!
@@ -339,7 +341,9 @@ async fn within_limits_then_written(
 /// `GET /discovery/invitations`: the caller's invitations waiting for an
 /// answer, not run out and not declined, and those it joined and has not
 /// entered yet, whatever their deadline; oldest first. One waiting for an
-/// answer names nobody; one joined names the inviter.
+/// answer names its inviter by the reference it is findable by, if it still
+/// is (#407), and never by its account; one joined names the inviter's
+/// account.
 ///
 /// Served even with discovery off, as withdrawing a number is: an invitation
 /// already delivered is still the recipient's to answer.
@@ -795,7 +799,7 @@ mod tests {
                 "expires_at": T0 + 7 * DAY,
                 "inviter_reference": reference_of(&st.pool, "alice").await.unwrap(),
             }]),
-            "waiting for an answer, it names nobody"
+            "waiting for an answer, it names its inviter by reference only"
         );
         assert_eq!(waiting_for(&st, "alice").await, json!([]));
         let (inviter, recipient): (String, String) = sqlx::query_as(
