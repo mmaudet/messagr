@@ -804,6 +804,7 @@ export const en: Readonly<Record<CopyKey, string>> = {
   find_looking:
     'Messagr is masking the numbers in your address book and comparing them on this phone.',
   find_on_messagr: 'Already on Messagr',
+  find_holder_changed: 'This number has changed hands.',
   find_others: 'Your other contacts',
   find_nobody: 'None of your contacts can be found on Messagr yet.',
   find_no_access:

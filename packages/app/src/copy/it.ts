@@ -802,6 +802,7 @@ export const it: Readonly<Record<CopyKey, string>> = {
   find_looking:
     'Messagr sta mascherando i numeri della Sua rubrica e li confronta su questo telefono.',
   find_on_messagr: 'Già su Messagr',
+  find_holder_changed: 'Questo numero ha cambiato titolare.',
   find_others: 'Gli altri Suoi contatti',
   find_nobody: 'Per ora nessuno dei Suoi contatti è trovabile su Messagr.',
   find_no_access:

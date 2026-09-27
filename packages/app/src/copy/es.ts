@@ -803,6 +803,7 @@ export const es: Readonly<Record<CopyKey, string>> = {
   find_looking:
     'Messagr está enmascarando los números de su agenda y comparándolos en este teléfono.',
   find_on_messagr: 'Ya en Messagr',
+  find_holder_changed: 'Este número ha cambiado de titular.',
   find_others: 'Sus otros contactos',
   find_nobody: 'Por ahora, ninguno de sus contactos es localizable en Messagr.',
   find_no_access:

@@ -7,6 +7,10 @@ import { exists, unlink } from '@dr.pogodin/react-native-fs'
 import { open, type DB } from '@op-engineering/op-sqlite'
 
 import { givenNamesSecrets } from './deviceSecrets'
+import {
+  forgetfulDiscoveryResults,
+  openDiscoveryResults,
+} from './discoveryResultsStore'
 import { getErrorMessage } from './errors'
 import type { GivenNames } from './givenName'
 import { forgetfulGivenNames, openGivenNames } from './givenNameStore'
@@ -32,6 +36,7 @@ import {
   openFavourites,
   type Favourites,
 } from './favouriteStore'
+import type { DiscoveryResults } from './findContacts'
 import { forgetfulHidden, openHidden, type Hidden } from './hiddenStore'
 import { forgetfulReadBy, openReadBy, type ReadBy } from './readByStore'
 import { openStorePassphrase } from './storePassphrase'
@@ -66,6 +71,11 @@ export interface NotebookOpening {
    * relaunch. `readByStore.ts` argues it.
    */
   readonly readBy: ReadBy
+  /**
+   * What looking for contacts found, by a fingerprint of each number and
+   * never the number: the next look masks only the new ones (#402).
+   */
+  readonly discoveryResults: DiscoveryResults
   readonly opened: boolean
   /** Why it did not open, when it did not. */
   readonly reason?: string
@@ -76,7 +86,7 @@ export interface NotebookOpening {
 /**
  * Opens the application's own encrypted notebook. ADR-0010.
  *
- * # Seven pages, one file
+ * # Every page, one file
  *
  * Who you call what (`given_names`), how far you have read (`last_read`),
  * and who you have invited and not yet let in
@@ -88,6 +98,9 @@ export interface NotebookOpening {
  * The fifth is the conversation list itself, kept so a launch can draw it
  * before it asks anybody anything -- ADR-0006's own "when to revisit",
  * answered the way that ADR said it would be. `listCacheStore.ts` argues it.
+ *
+ * The latest keeps what looking for contacts found (#402), by a fingerprint
+ * of each number and never the number: `discoveryResultsStore.ts` argues it.
  *
  * The third arrived with #118: admission used to be a poll that ran for one
  * minute after a link was issued and then stopped, which made an invitation
@@ -131,6 +144,7 @@ export async function openNotebook(storeDir: string): Promise<NotebookOpening> {
       hidden: forgetfulHidden(),
       favourites: forgetfulFavourites(),
       readBy: forgetfulReadBy(),
+      discoveryResults: forgetfulDiscoveryResults(),
       opened: false,
       reason: 'no writable directory was supplied at launch',
     }
@@ -150,6 +164,7 @@ export async function openNotebook(storeDir: string): Promise<NotebookOpening> {
       hidden: forgetfulHidden(),
       favourites: forgetfulFavourites(),
       readBy: forgetfulReadBy(),
+      discoveryResults: forgetfulDiscoveryResults(),
       opened: false,
       reason: passphrase.reason,
     }
@@ -179,6 +194,7 @@ export async function openNotebook(storeDir: string): Promise<NotebookOpening> {
       hidden: await openHidden(page),
       favourites: await openFavourites(page),
       readBy: await openReadBy(page),
+      discoveryResults: await openDiscoveryResults(page),
       opened: true,
       minted: passphrase.minted,
     }
@@ -196,6 +212,7 @@ export async function openNotebook(storeDir: string): Promise<NotebookOpening> {
       hidden: forgetfulHidden(),
       favourites: forgetfulFavourites(),
       readBy: forgetfulReadBy(),
+      discoveryResults: forgetfulDiscoveryResults(),
       opened: false,
       reason: getErrorMessage(cause),
       minted: passphrase.minted,

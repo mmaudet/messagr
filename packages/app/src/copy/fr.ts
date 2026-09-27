@@ -1216,6 +1216,7 @@ export const fr = {
   find_looking:
     'Messagr masque les numéros de votre carnet et les compare sur ce téléphone.',
   find_on_messagr: 'Déjà sur Messagr',
+  find_holder_changed: 'Ce numéro a changé de titulaire.',
   find_others: 'Vos autres contacts',
   find_nobody:
     'Aucun de vos contacts n’est trouvable sur Messagr pour l’instant.',

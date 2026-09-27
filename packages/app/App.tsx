@@ -226,10 +226,12 @@ import {
   readAddressBook,
 } from './src/runtime/addressBook'
 import { bridgeMasking } from './src/runtime/bridgeMasking'
+import { forgetfulDiscoveryResults } from './src/runtime/discoveryResultsStore'
 import {
   findContactsEntry,
   findingJourney,
   regionOf,
+  type DiscoveryResults,
   type FindingStage,
 } from './src/runtime/findContacts'
 import { pickFromLibrary } from './src/runtime/imageLibrary'
@@ -1005,6 +1007,13 @@ export function App({
   }
   /** What this device has been told not to draw. `hiddenStore.ts` says why. */
   const hiddenRef = useRef<Hidden>(forgetfulHidden())
+  /**
+   * What looking for contacts found, so that the next look masks only the
+   * new numbers (#402). `discoveryResultsStore.ts` says what it keeps.
+   */
+  const discoveryResultsRef = useRef<DiscoveryResults>(
+    forgetfulDiscoveryResults(),
+  )
   const [hidden, setHidden] = useState<ReadonlySet<string>>(new Set())
   // The same starting value as the state above, so a receipt sent before the
   // keystore has answered follows the default rather than the opposite of it.
@@ -1236,6 +1245,16 @@ export function App({
         askForTheAddressBook,
         masking: bridgeMasking,
         region: () => regionOf(deviceLocale()),
+        // THROUGH THE REF, since the journey is made once and the notebook
+        // is opened after it, and opened again for another account (#304).
+        results: {
+          recall: (keyNumber, numbers) =>
+            discoveryResultsRef.current.recall(keyNumber, numbers),
+          keep: (keyNumber, found) =>
+            discoveryResultsRef.current.keep(keyNumber, found),
+          forgetAllBut: numbers =>
+            discoveryResultsRef.current.forgetAllBut(numbers),
+        },
       },
       setFinding,
     ),
@@ -2328,6 +2347,7 @@ export function App({
         eventsRef.current = book.events
         hiddenRef.current = book.hidden
         readByRef.current = book.readBy
+        discoveryResultsRef.current = book.discoveryResults
         // SEEDED BEFORE ANYTHING IS DRAWN, so a conversation opened on the
         // first frame already knows how far it was read.
         readMarksRef.current = new Map(await book.readBy.all())
