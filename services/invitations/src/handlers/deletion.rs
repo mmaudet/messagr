@@ -94,6 +94,15 @@ pub async fn announce(
     .map_err(anyhow::Error::from)?
     .rows_affected();
 
+    // A BLOCK LASTS AS LONG AS BOTH ACCOUNTS EXIST (#406), whichever side
+    // goes.
+    sqlx::query("DELETE FROM delivered_blocks WHERE blocker_user_id = ? OR blocked_user_id = ?")
+        .bind(&user_id)
+        .bind(&user_id)
+        .execute(&mut *tx)
+        .await
+        .map_err(anyhow::Error::from)?;
+
     tx.commit().await.map_err(anyhow::Error::from)?;
     Ok(Json(DeletionResponse {
         announced_at,
@@ -167,6 +176,35 @@ mod tests {
             .fetch_one(pool)
             .await
             .unwrap()
+    }
+
+    #[sqlx::test(migrations = "./migrations")]
+    async fn the_blocks_the_account_is_on_either_side_of_go_and_no_other(pool: SqlitePool) {
+        // A block lasts as long as both accounts exist (#406).
+        for (blocker, blocked) in [
+            ("@alice:h", "@bob:h"),
+            ("@carol:h", "@alice:h"),
+            ("@bob:h", "@carol:h"),
+        ] {
+            sqlx::query(
+                "INSERT INTO delivered_blocks (blocker_user_id, blocked_user_id) VALUES (?, ?)",
+            )
+            .bind(blocker)
+            .bind(blocked)
+            .execute(&pool)
+            .await
+            .unwrap();
+        }
+
+        let st = state_with(pool.clone(), whoami_hs().await);
+        let Json(_) = announce(State(st), bearer("alice")).await.unwrap();
+
+        let left: Vec<(String, String)> =
+            sqlx::query_as("SELECT blocker_user_id, blocked_user_id FROM delivered_blocks")
+                .fetch_all(&pool)
+                .await
+                .unwrap();
+        assert_eq!(left, [("@bob:h".to_string(), "@carol:h".to_string())]);
     }
 
     #[sqlx::test(migrations = "./migrations")]

@@ -12,17 +12,30 @@
 //!   account into the conversation;
 //! - `POST /discovery/invitations/:id/decline`: the recipient declines, and
 //!   the invitation leaves its list;
+//! - `POST /discovery/invitations/:id/block`: the recipient declines, and
+//!   blocks the inviter (#406);
 //! - `POST /discovery/invitations/:id/entered`: the recipient's device says it
 //!   entered the conversation, and the invitation leaves its list;
 //! - `GET /discovery/invitations/:id`: the inviter reads where its invitation
 //!   stands.
 //!
-//! # ANY REFERENCE OF THE DIRECTORY
+//! # ANY REFERENCE OF THE DIRECTORY, WITHIN LIMITS
 //!
 //! The directory is the same for everyone, and the service cannot tell a
 //! reference found in an address book from any other it lists: it never
-//! learns the address book. How many invitations leave, and between whom,
-//! is bounded by #406.
+//! learns the address book. So how many invitations leave, and between whom,
+//! is bounded (#406): one pending at a time between two accounts; fourteen
+//! days after one ran out unanswered before the same account is invited
+//! again; ten a day per inviter.
+//!
+//! # A BLOCK IS SILENT
+//!
+//! A recipient may decline and block the inviter. The inviter's later
+//! invitations are taken, never delivered, and run out: they read
+//! « pending », then « expired », like an invitation nobody saw, and the
+//! limits apply to them as to any other, so that no refusal gives the block
+//! away. The service keeps the block as long as both accounts exist
+//! (`deletion.rs`).
 //!
 //! # EACH SIDE LEARNS THE OTHER WHEN THE RECIPIENT JOINS
 //!
@@ -83,6 +96,14 @@ use crate::{
 
 /// How long an invitation delivered inside the application stays good.
 pub const DELIVERED_LIFETIME_SECONDS: i64 = 7 * 86_400;
+
+/// How many invitations delivered inside Messagr an account may send a day,
+/// UTC (#406). Links sent by SMS are not counted.
+pub const PER_DAY: i64 = 10;
+
+/// How long after an invitation ran out unanswered the same account may be
+/// invited again (#406): fourteen days after its apparent end, the seventh.
+pub const AGAIN_AFTER_SECONDS: i64 = 14 * 86_400;
 
 /// The size of a sealed name (#405): the 32-byte key HPKE encapsulates
 /// (X25519), then the name padded to the 48 bytes a declared name may take,
@@ -153,6 +174,58 @@ pub async fn send(
     if recipient == inviter {
         return Err(AppError::OwnReference);
     }
+    // THE LIMITS (#406), read the same way whether or not the recipient
+    // blocked the inviter: no refusal here may give a block away.
+    let day_start = now - now.rem_euclid(86_400);
+    let sent_today: i64 = sqlx::query_scalar(
+        "SELECT COUNT(*) FROM delivered_invitations WHERE inviter_user_id = ? AND sent_at >= ?",
+    )
+    .bind(&inviter)
+    .bind(day_start)
+    .fetch_one(&st.pool)
+    .await
+    .map_err(anyhow::Error::from)?;
+    if sent_today >= PER_DAY {
+        return Err(AppError::DeliveryQuotaReached {
+            retry_at: day_start + 86_400,
+        });
+    }
+    let last: Option<(i64, Option<i64>)> = sqlx::query_as(
+        "SELECT expires_at, claimed_at FROM delivered_invitations \
+         WHERE inviter_user_id = ? AND recipient_user_id = ? \
+         ORDER BY sent_at DESC, id DESC LIMIT 1",
+    )
+    .bind(&inviter)
+    .bind(&recipient)
+    .fetch_optional(&st.pool)
+    .await
+    .map_err(anyhow::Error::from)?;
+    // AN INVITATION JOINED ENDS NOTHING HERE: the two are in a conversation,
+    // and another may follow. One unanswered, declined or never delivered
+    // reads as pending until its deadline, and ends there.
+    if let Some((expires_at, None)) = last {
+        if now < expires_at {
+            return Err(AppError::InvitationPending);
+        }
+        if now < expires_at + AGAIN_AFTER_SECONDS {
+            return Err(AppError::InvitedRecently {
+                retry_at: expires_at + AGAIN_AFTER_SECONDS,
+            });
+        }
+    }
+    // A BLOCKED INVITER'S INVITATION IS TAKEN AND NEVER DELIVERED (#406):
+    // written as any other, so that it reads « pending » and runs out, and
+    // without its sealed name, which nobody will ever open.
+    let blocked: bool = sqlx::query_scalar(
+        "SELECT EXISTS (SELECT 1 FROM delivered_blocks \
+         WHERE blocker_user_id = ? AND blocked_user_id = ?)",
+    )
+    .bind(&recipient)
+    .bind(&inviter)
+    .fetch_one(&st.pool)
+    .await
+    .map_err(anyhow::Error::from)?;
+    let sealed_name = if blocked { None } else { sealed_name };
     let id = uuid::Uuid::new_v4().simple().to_string();
     let expires_at = now + DELIVERED_LIFETIME_SECONDS;
     sqlx::query(
@@ -193,6 +266,9 @@ pub async fn waiting(
         "SELECT id, expires_at, inviter_user_id, claimed_at, sealed_name \
          FROM delivered_invitations \
          WHERE recipient_user_id = ? AND declined = 0 AND entered = 0 \
+           AND NOT EXISTS (SELECT 1 FROM delivered_blocks \
+             WHERE blocker_user_id = recipient_user_id \
+               AND blocked_user_id = inviter_user_id) \
            AND (expires_at > ? OR claimed_at IS NOT NULL) \
          ORDER BY sent_at, id",
     )
@@ -270,6 +346,40 @@ pub async fn decline(
     Ok(axum::http::StatusCode::NO_CONTENT)
 }
 
+/// `POST /discovery/invitations/:id/block`: the recipient declines, and
+/// blocks the inviter (#406). The invitation leaves its list as a refusal
+/// does; the inviter's later invitations are taken and never delivered, and
+/// nothing tells it (see the module). Blocking twice is blocking once. An
+/// invitation already joined cannot be declined, so it cannot block either.
+pub async fn block(
+    State(st): State<Arc<AppState>>,
+    headers: HeaderMap,
+    Path(id): Path<String>,
+) -> Result<axum::http::StatusCode, AppError> {
+    let recipient = auth::authenticate(&st.mx, &headers).await?;
+    let row = answerable(&st, &id, &recipient, st.cfg.clock.now()).await?;
+    if row.claimed {
+        return Err(AppError::InvitationInvalid);
+    }
+    let mut tx = st.pool.begin().await.map_err(anyhow::Error::from)?;
+    sqlx::query("UPDATE delivered_invitations SET declined = 1, sealed_name = NULL WHERE id = ?")
+        .bind(&id)
+        .execute(&mut *tx)
+        .await
+        .map_err(anyhow::Error::from)?;
+    sqlx::query(
+        "INSERT INTO delivered_blocks (blocker_user_id, blocked_user_id) VALUES (?, ?) \
+         ON CONFLICT DO NOTHING",
+    )
+    .bind(&recipient)
+    .bind(&row.inviter)
+    .execute(&mut *tx)
+    .await
+    .map_err(anyhow::Error::from)?;
+    tx.commit().await.map_err(anyhow::Error::from)?;
+    Ok(axum::http::StatusCode::NO_CONTENT)
+}
+
 /// `POST /discovery/invitations/:id/entered`: the recipient's device entered
 /// the conversation of an invitation it joined, and the invitation leaves its
 /// list. Saying it twice is saying it once. An invitation not joined, or not
@@ -316,9 +426,14 @@ async fn answerable(
     recipient: &str,
     now: i64,
 ) -> Result<Answerable, AppError> {
+    // One from an inviter the caller blocked is not the caller's to answer:
+    // it was never delivered (#406).
     let row = sqlx::query(
         "SELECT inviter_user_id, expires_at, claimed_at, declined FROM delivered_invitations \
-         WHERE id = ? AND recipient_user_id = ?",
+         WHERE id = ? AND recipient_user_id = ? \
+           AND NOT EXISTS (SELECT 1 FROM delivered_blocks \
+             WHERE blocker_user_id = recipient_user_id \
+               AND blocked_user_id = inviter_user_id)",
     )
     .bind(id)
     .bind(recipient)
@@ -440,6 +555,32 @@ mod tests {
         )
         .await
         .map(|Json(s)| s.id)
+    }
+
+    /// `who`, findable at `T0` for 28 days, written straight into the table
+    /// rather than proved: the limits need more accounts than a day's SMS
+    /// ceilings let prove. Its reference.
+    async fn listed(st: &Arc<AppState>, who: &str) -> String {
+        let reference = format!("ref-{who}");
+        sqlx::query(
+            "INSERT INTO findable_numbers (key_id, mask, user_id, reference, proven_at, expires_at) \
+             VALUES (1, ?, ?, ?, ?, ?)",
+        )
+        .bind(who.as_bytes())
+        .bind(format!("@{who}:h"))
+        .bind(&reference)
+        .bind(T0)
+        .bind(T0 + 28 * DAY)
+        .execute(&st.pool)
+        .await
+        .unwrap();
+        reference
+    }
+
+    async fn blocked(st: &Arc<AppState>, who: &str, id: &str) -> Result<(), AppError> {
+        block(State(st.clone()), bearer(who), Path(id.into()))
+            .await
+            .map(|_| ())
     }
 
     /// An envelope of the size a device seals, every byte `fill`: the service
@@ -627,8 +768,11 @@ mod tests {
     #[sqlx::test(migrations = "./migrations")]
     async fn an_invitation_runs_out_on_the_seventh_day_unless_joined_in_time(pool: SqlitePool) {
         let (st, time, bob) = two_findable(pool).await;
+        // Two inviters, since one account has one invitation pending at a
+        // time for another (#406).
+        listed(&st, "carol").await;
         let ran_out = sent(&st, "alice", &bob).await.unwrap();
-        let joined_in_time = sent(&st, "alice", &bob).await.unwrap();
+        let joined_in_time = sent(&st, "carol", &bob).await.unwrap();
 
         set_clock(&time, T0 + 7 * DAY - 1);
         joined(&st, "bob", &joined_in_time).await.unwrap();
@@ -643,7 +787,7 @@ mod tests {
             json!([{
                 "id": joined_in_time,
                 "expires_at": T0 + 7 * DAY,
-                "inviter_user_id": "@alice:h"
+                "inviter_user_id": "@carol:h"
             }]),
             "the one run out leaves the list; the one joined in time stays until entered"
         );
@@ -660,7 +804,7 @@ mod tests {
             Err(AppError::InvitationExpired)
         ));
         assert_eq!(
-            status_of(&st, "alice", &joined_in_time).await.unwrap()["status"],
+            status_of(&st, "carol", &joined_in_time).await.unwrap()["status"],
             "claimed",
             "answered in time, it is let in however late the inviter reads"
         );
@@ -669,8 +813,9 @@ mod tests {
     #[sqlx::test(migrations = "./migrations")]
     async fn a_refusal_reads_as_an_invitation_nobody_has_seen(pool: SqlitePool) {
         let (st, time, bob) = two_findable(pool).await;
+        listed(&st, "carol").await;
         let refused = sent(&st, "alice", &bob).await.unwrap();
-        let unseen = sent(&st, "alice", &bob).await.unwrap();
+        let unseen = sent(&st, "carol", &bob).await.unwrap();
 
         declined(&st, "bob", &refused).await.unwrap();
 
@@ -687,8 +832,8 @@ mod tests {
             set_clock(&time, at);
             assert_eq!(
                 status_of(&st, "alice", &refused).await.unwrap(),
-                status_of(&st, "alice", &unseen).await.unwrap(),
-                "at {at}, the inviter cannot tell a refusal from an invitation nobody saw"
+                status_of(&st, "carol", &unseen).await.unwrap(),
+                "at {at}, an inviter cannot tell a refusal from an invitation nobody saw"
             );
         }
     }
@@ -714,8 +859,9 @@ mod tests {
         pool: SqlitePool,
     ) {
         let (st, _, bob) = two_findable(pool).await;
+        listed(&st, "carol").await;
         let claimed = sent(&st, "alice", &bob).await.unwrap();
-        let _ran_out = sent(&st, "alice", &bob).await.unwrap();
+        let _ran_out = sent(&st, "carol", &bob).await.unwrap();
         joined(&st, "bob", &claimed).await.unwrap();
         let kept = || async {
             sqlx::query_scalar::<_, i64>("SELECT COUNT(*) FROM delivered_invitations")
@@ -886,13 +1032,15 @@ mod tests {
         pool: SqlitePool,
     ) {
         let (st, time, bob) = two_findable(pool).await;
+        listed(&st, "carol").await;
+        listed(&st, "dave").await;
         let joined_one = sent_with(&st, "alice", &bob, Some(&envelope(1)))
             .await
             .unwrap();
-        let declined_one = sent_with(&st, "alice", &bob, Some(&envelope(2)))
+        let declined_one = sent_with(&st, "carol", &bob, Some(&envelope(2)))
             .await
             .unwrap();
-        let unanswered = sent_with(&st, "alice", &bob, Some(&envelope(3)))
+        let unanswered = sent_with(&st, "dave", &bob, Some(&envelope(3)))
             .await
             .unwrap();
 
@@ -948,5 +1096,168 @@ mod tests {
             .await
             .unwrap();
         assert_eq!(rows().await, 0, "and goes with everything it held");
+    }
+
+    #[sqlx::test(migrations = "./migrations")]
+    async fn a_second_invitation_to_the_same_account_waits_for_the_first(pool: SqlitePool) {
+        let (st, time, bob) = two_findable(pool).await;
+        sent(&st, "alice", &bob).await.unwrap();
+
+        set_clock(&time, T0 + 7 * DAY - 1);
+        assert!(matches!(
+            sent(&st, "alice", &bob).await,
+            Err(AppError::InvitationPending)
+        ));
+        // Somebody else may invite Bob meanwhile.
+        listed(&st, "carol").await;
+        sent(&st, "carol", &bob).await.unwrap();
+    }
+
+    #[sqlx::test(migrations = "./migrations")]
+    async fn fourteen_days_after_one_ran_out_before_the_same_account_again(pool: SqlitePool) {
+        let (st, time, bob) = two_findable(pool).await;
+        sent(&st, "alice", &bob).await.unwrap();
+        let again = T0 + 7 * DAY + 14 * DAY;
+
+        for at in [T0 + 7 * DAY, again - 1] {
+            set_clock(&time, at);
+            assert!(
+                matches!(
+                    sent(&st, "alice", &bob).await,
+                    Err(AppError::InvitedRecently { retry_at }) if retry_at == again
+                ),
+                "at {at}"
+            );
+        }
+        set_clock(&time, again);
+        assert!(sent(&st, "alice", &bob).await.is_ok());
+    }
+
+    #[sqlx::test(migrations = "./migrations")]
+    async fn an_invitation_joined_holds_nothing_back(pool: SqlitePool) {
+        let (st, _, bob) = two_findable(pool).await;
+        let id = sent(&st, "alice", &bob).await.unwrap();
+
+        joined(&st, "bob", &id).await.unwrap();
+
+        assert!(sent(&st, "alice", &bob).await.is_ok());
+    }
+
+    #[sqlx::test(migrations = "./migrations")]
+    async fn ten_a_day_and_the_eleventh_says_when_the_next_day_starts(pool: SqlitePool) {
+        let (st, time, _) = two_findable(pool).await;
+        // Midway through a day, UTC.
+        let day_start = T0 - T0.rem_euclid(DAY);
+        set_clock(&time, day_start + DAY / 2);
+        let mut references = Vec::new();
+        for n in 0..=PER_DAY {
+            references.push(listed(&st, &format!("r{n}")).await);
+        }
+
+        for reference in &references[..PER_DAY as usize] {
+            sent(&st, "alice", reference).await.unwrap();
+        }
+        let eleventh = &references[PER_DAY as usize];
+        assert!(matches!(
+            sent(&st, "alice", eleventh).await,
+            Err(AppError::DeliveryQuotaReached { retry_at }) if retry_at == day_start + DAY
+        ));
+        // Bob's allowance is his own.
+        sent(&st, "bob", eleventh).await.unwrap();
+
+        set_clock(&time, day_start + DAY);
+        let twelfth = listed(&st, "r-next").await;
+        assert!(sent(&st, "alice", &twelfth).await.is_ok());
+    }
+
+    #[sqlx::test(migrations = "./migrations")]
+    async fn a_block_is_silent_and_the_blocked_account_s_invitations_are_never_delivered(
+        pool: SqlitePool,
+    ) {
+        let (st, time, bob) = two_findable(pool).await;
+        let first = sent(&st, "alice", &bob).await.unwrap();
+
+        blocked(&st, "bob", &first).await.unwrap();
+
+        assert_eq!(waiting_for(&st, "bob").await, json!([]));
+        // TO THE INVITER, A BLOCK READS AS AN INVITATION NOBODY SAW: pending
+        // until its deadline, then expired.
+        assert_eq!(
+            status_of(&st, "alice", &first).await.unwrap()["status"],
+            "pending"
+        );
+        set_clock(&time, T0 + 7 * DAY);
+        assert_eq!(
+            status_of(&st, "alice", &first).await.unwrap()["status"],
+            "expired"
+        );
+
+        // Taken as any other, limits included, and never delivered.
+        set_clock(&time, T0 + 21 * DAY);
+        let later = sent_with(&st, "alice", &bob, Some(&envelope(5)))
+            .await
+            .unwrap();
+        assert!(matches!(
+            sent(&st, "alice", &bob).await,
+            Err(AppError::InvitationPending)
+        ));
+        assert_eq!(waiting_for(&st, "bob").await, json!([]));
+        assert!(matches!(
+            joined(&st, "bob", &later).await,
+            Err(AppError::InvitationInvalid)
+        ));
+        assert_eq!(
+            sealed_kept(&st, &later).await,
+            None,
+            "its name is not even kept"
+        );
+        assert_eq!(
+            status_of(&st, "alice", &later).await.unwrap()["status"],
+            "pending"
+        );
+        set_clock(&time, T0 + 28 * DAY);
+        assert_eq!(
+            status_of(&st, "alice", &later).await.unwrap()["status"],
+            "expired"
+        );
+    }
+
+    #[sqlx::test(migrations = "./migrations")]
+    async fn a_block_holds_back_nobody_else_and_blocking_twice_is_once(pool: SqlitePool) {
+        let (st, _, bob) = two_findable(pool).await;
+        listed(&st, "carol").await;
+        let from_alice = sent(&st, "alice", &bob).await.unwrap();
+        let from_carol = sent(&st, "carol", &bob).await.unwrap();
+
+        blocked(&st, "bob", &from_alice).await.unwrap();
+        assert!(matches!(
+            blocked(&st, "bob", &from_alice).await,
+            Err(AppError::InvitationInvalid)
+        ));
+
+        let listed_now = waiting_for(&st, "bob").await;
+        assert_eq!(listed_now.as_array().unwrap().len(), 1);
+        assert_eq!(listed_now[0]["id"], from_carol);
+        let blocks: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM delivered_blocks")
+            .fetch_one(&st.pool)
+            .await
+            .unwrap();
+        assert_eq!(blocks, 1);
+    }
+
+    #[sqlx::test(migrations = "./migrations")]
+    async fn an_invitation_joined_cannot_block(pool: SqlitePool) {
+        let (st, _, bob) = two_findable(pool).await;
+        let id = sent(&st, "alice", &bob).await.unwrap();
+        joined(&st, "bob", &id).await.unwrap();
+
+        assert!(matches!(
+            blocked(&st, "bob", &id).await,
+            Err(AppError::InvitationInvalid)
+        ));
+        assert!(matches!(
+            blocked(&st, "alice", &id).await,
+            Err(AppError::InvitationInvalid)
+        ));
     }
 }
