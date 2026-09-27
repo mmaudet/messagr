@@ -16,40 +16,66 @@
 # decides -- the device's system keeps and clears it -- so its sentence is the
 # claim there is to hold, and a sentence nothing checks is how a policy starts
 # saying something the code does not do.
+#
+# And an entry can name, under `page`, the page that says it, when that is not
+# the policy in force: the upcoming version (#412), which states a new
+# duration from the day it is announced until the day it applies. Until it is
+# announced -- while the repository's copy still carries the mark that waits
+# for its date -- nothing serves it, and what it will say is not checked.
 set -uo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 SOURCE="$ROOT/deploy/messagr-eu/retention.json"
-PAGE="${MESSAGR_SITE:-https://messagr.eu}/confidentialite"
+SITE_SOURCE="$ROOT/deploy/messagr-eu/site"
+SITE="${MESSAGR_SITE:-https://messagr.eu}"
 HOST="${MESSAGR_HOST:-hermes}"
 
 failed=0
 
-# ── The page says what the source declares ────────────────────────────────
-page="$(curl -sSL --max-time 20 "$PAGE" 2>/dev/null || true)"
-if [ -z "$page" ]; then
-  echo "FAIL  the policy page could not be read at $PAGE" >&2
-  failed=1
-else
+# ── Each page says what the source declares ───────────────────────────────
+while IFS= read -r where; do
+  # The upcoming version only: the policy in force carries the same mark in
+  # the passage that will announce it, and is checked all the same.
+  if [[ "$where" == */a-venir/ ]] &&
+    grep -qF 'MESSAGR-DATE-A-VENIR' "$SITE_SOURCE${where}index.html" 2>/dev/null; then
+    printf '  ----  %s is not announced yet; what it will say is not checked\n' "$where"
+    continue
+  fi
+  page="$(curl -sSL --fail --max-time 20 "$SITE$where" 2>/dev/null || true)"
+  if [ -z "$page" ]; then
+    echo "FAIL  the policy page could not be read at $SITE$where" >&2
+    failed=1
+    continue
+  fi
   while IFS= read -r phrase; do
     if printf '%s' "$page" | tr -s ' \n' ' ' | grep -qF "$phrase"; then
-      printf '  OK    the page says "%s"\n' "$phrase"
+      printf '  OK    %s says "%s"\n' "$where" "$phrase"
     else
-      printf '  FAIL  the page never says "%s"\n' "$phrase" >&2
+      printf '  FAIL  %s never says "%s"\n' "$where" "$phrase" >&2
       failed=1
     fi
-  done < <(python3 -c "
-import json
-d = json.load(open('$SOURCE'))
+  done < <(python3 - "$SOURCE" "$where" <<'EOF'
+import json, sys
+d = json.load(open(sys.argv[1]))
 for k, v in d.items():
-    if not isinstance(v, dict):
+    if not isinstance(v, dict) or v.get('page', '/confidentialite/') != sys.argv[2]:
         continue
     if 'duree' in v:
         print(v['duree'])
     for phrase in v.get('dit', []):
         print(phrase)
-")
-fi
+EOF
+)
+done < <(python3 - "$SOURCE" <<'EOF'
+import json, sys
+d = json.load(open(sys.argv[1]))
+pages = ['/confidentialite/']
+for v in d.values():
+    if isinstance(v, dict) and v.get('page', '/confidentialite/') not in pages:
+        pages.append(v['page'])
+print('\n'.join(pages))
+EOF
+)
 
 # ── The server applies what the source declares ───────────────────────────
 if ssh -o ConnectTimeout=10 -o BatchMode=yes "$HOST" true 2>/dev/null; then

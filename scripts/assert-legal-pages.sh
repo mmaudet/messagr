@@ -36,10 +36,40 @@
 # No pipe into `grep -q`: that closes the pipe at the first match, the writer
 # dies of SIGPIPE, and `pipefail` reads a found match as a failure -- which
 # cost a real publishing run once already. curl reports the status itself.
+#
+# AND THE VERSIONS AROUND THE ONE IN FORCE, SINCE #412. A change to either
+# legal page is published thirty days before it applies, at
+# `<page>/a-venir/`, and the version it replaces stays readable at
+# `<page>/jusqu-au-<date>/` once it has. Which of them should answer is read
+# from the repository, not listed here: an upcoming version answers once it
+# is announced -- its source no longer carries the mark that waits for the
+# date -- and every dated version the repository holds answers.
+#
+# The other direction too. An upcoming version the repository has not
+# announced, or no longer holds because it applied, must NOT be served: the
+# first would be publishing ahead of the date the porteur sets, the second a
+# page still saying the policy « s'appliquera » on a day it already does.
 set -euo pipefail
 
+ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+SITE_SOURCE="$ROOT/deploy/messagr-eu/site"
 BASE="${MESSAGR_SITE:-https://messagr.eu}"
 PAGES=(/confidentialite /conditions-generales /aide)
+UNSERVED=()
+
+for legal in confidentialite conditions-generales; do
+  upcoming="$SITE_SOURCE/$legal/a-venir/index.html"
+  if [ -f "$upcoming" ] && ! grep -qF 'MESSAGR-DATE-A-VENIR' "$upcoming"; then
+    PAGES+=("/$legal/a-venir/")
+  else
+    UNSERVED+=("/$legal/a-venir/")
+  fi
+  for dated in "$SITE_SOURCE/$legal"/jusqu-au-*/index.html; do
+    [ -f "$dated" ] || continue
+    dated="${dated#"$SITE_SOURCE"}"
+    PAGES+=("${dated%index.html}")
+  done
+done
 
 failed=0
 for page in "${PAGES[@]}"; do
@@ -54,6 +84,18 @@ for page in "${PAGES[@]}"; do
   fi
 done
 
+# Written this way because the bash macOS ships (3.2) calls an empty array
+# unbound under `set -u`, and both upcoming versions can be announced at once.
+for page in ${UNSERVED[@]+"${UNSERVED[@]}"}; do
+  code="$(curl -sSL -o /dev/null -w '%{http_code}' --max-time 20 "$BASE$page" || echo 000)"
+  if [ "$code" = "200" ]; then
+    printf '  FAIL  %s%s is served, and the repository has no announced version there\n' "$BASE" "$page" >&2
+    failed=1
+  else
+    printf '  OK    %s%s is not served (%s)\n' "$BASE" "$page" "$code"
+  fi
+done
+
 if [ "$failed" -ne 0 ]; then
   echo >&2
   echo "The pages the stores are given are not being served." >&2
@@ -61,6 +103,9 @@ if [ "$failed" -ne 0 ]; then
   echo "  Google follows the privacy policy link during review; a 404 fails it." >&2
   echo "  It fetches the account deletion resource too, and Apple visits the" >&2
   echo "  support URL: both are /aide." >&2
+  echo "  An upcoming version is served from the deployment that follows its" >&2
+  echo "  announcement, and retired by the one that follows its application;" >&2
+  echo "  see deploy/messagr-eu/LISEZ-MOI-pages-legales.md." >&2
   exit 1
 fi
 

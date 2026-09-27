@@ -65,6 +65,49 @@ find "$source_dir" -mindepth 1 -maxdepth 1 -type d -exec cp -R {} "$destination/
 # the root is carried without anyone remembering to add a line.
 find "$source_dir" -maxdepth 1 -type f -exec cp {} "$destination/" \;
 
+# ── LA VERSION À VENIR DES PAGES LÉGALES (#412) ─────────────────────────
+#
+# Un changement de la politique de confidentialité ou des conditions
+# générales paraît trente jours avant de s'appliquer, à côté de la version en
+# vigueur : la page promet qu'« un changement est annoncé avant d'être
+# appliqué ». La version à venir attend dans `<page>/a-venir/index.html`, et
+# la version en vigueur l'annonce dans un passage entre `<!-- a-venir -->` et
+# `<!-- /a-venir -->`.
+#
+# LA DATE, C'EST LE PORTEUR QUI LA FIXE, en annonçant (`version-a-venir.mjs`).
+# D'ici là, les deux portent la marque ci-dessous à la place de la date, et
+# rien de ce qui la porte n'est servi : la page à venir n'est pas construite,
+# et le passage qui l'annonce est retiré de la version en vigueur. Un site
+# construit avant l'annonce est donc celui d'aujourd'hui, exactement, et un
+# déploiement fait pour autre chose ne publie rien d'avance.
+#
+# ET RIEN DE CONSTRUIT NE PORTE LA MARQUE : vérifié sur la sortie, puisqu'une
+# page qui dirait « s'appliquera le MESSAGR-DATE-A-VENIR » serait publiée
+# fausse.
+marque='MESSAGR-DATE-A-VENIR'
+for venir in "$destination"/*/a-venir/index.html; do
+  [ -f "$venir" ] || continue
+  if grep -qF -- "$marque" "$venir"; then
+    rm -r "$(dirname "$venir")"
+    echo "build-site: $(basename "$(dirname "$(dirname "$venir")")")/a-venir/ is not announced yet, and is not built"
+  fi
+done
+for page in "$destination"/*/index.html; do
+  grep -qF -- '<!-- a-venir -->' "$page" || continue
+  grep -qF -- "$marque" "$page" || continue
+  work=$(mktemp)
+  awk '/<!-- a-venir -->/ { skip = 1; next }
+       /<!-- \/a-venir -->/ { skip = 0; next }
+       !skip { print }' "$page" > "$work"
+  mv "$work" "$page"
+done
+if grep -rlF -- "$marque" "$destination" >/dev/null; then
+  echo "build-site: FAIL: a built page still carries $marque:" >&2
+  grep -rlF -- "$marque" "$destination" >&2
+  echo "  A date that was never set would be published as it stands." >&2
+  exit 1
+fi
+
 # THE BRAND MARKS ARE COPIED FROM `design/brand/`, NOT DUPLICATED INTO
 # `site/`. That directory is authoritative for the visual and read-only: a
 # second copy under `site/` would be a second truth, and the two would

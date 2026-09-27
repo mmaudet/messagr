@@ -185,6 +185,23 @@ echo "== site → $HOST:$SITE_DIR"
 rsync -av --checksum --rsync-path="sudo rsync" \
   "$poussee/" "$HOST:$SITE_DIR/"
 
+# AN UPCOMING VERSION LEAVES THE BUILD, AND THEREFORE THE SERVER (#412).
+#
+# The send above deletes nothing, on purpose. But an upcoming version of a
+# legal page leaves the build the day it applies, when
+# `version-a-venir.mjs appliquer` makes it the version in force: without
+# this, `/confidentialite/a-venir/` would stay served, saying the policy
+# « s'appliquera » on the day it already does. So what the build does not
+# hold under `<page>/a-venir/` is not served either, and nothing else is
+# touched: the names come from the server, and only that shape is removed.
+for venir in $(ssh "$HOST" "cd $SITE_DIR && ls -d -- */a-venir 2>/dev/null || true"); do
+  [[ "$venir" =~ ^[a-z0-9-]+/a-venir$ ]] || continue
+  if [ ! -d "$poussee/$venir" ]; then
+    echo "== retiring $HOST:$SITE_DIR/$venir, which this build does not hold"
+    ssh "$HOST" "sudo rm -rf -- '$SITE_DIR/$venir'"
+  fi
+done
+
 if [ "$MESSAGR_APK" = "none" ]; then
   echo "== withdrawing $HOST:$SITE_DIR/$APK_NAME"
   ssh "$HOST" "sudo rm -f $SITE_DIR/$APK_NAME"
