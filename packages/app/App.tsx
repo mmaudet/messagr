@@ -1797,7 +1797,10 @@ export function App({
    * they are still only invited to -- the same defect #284 found in the
    * backup offer, which used to close on a failure and say nothing.
    */
-  const answerTheInvitation = (kind: 'join' | 'refuse', scope: string) => {
+  const answerTheInvitation = (
+    kind: 'join' | 'refuse',
+    { scope, from }: Invitation,
+  ) => {
     const session = sessionClientRef.current
     if (session === null) {
       setAnswerFailed(scope)
@@ -1816,6 +1819,12 @@ export function App({
         // A conversation joined is a row the list does not have yet. A
         // refusal changes nothing it draws.
         if (kind === 'join') refreshListRef.current?.().catch(() => {})
+        // AND A CONVERSATION FROM THE INVITER OF AN INVITATION DELIVERED
+        // INSIDE MESSAGR AND ACCEPTED (#404) answers it, whichever way, as it
+        // would have in the entry walk: a launch whose list the service was
+        // slow to give puts that conversation here instead.
+        const delivered = awaitedDeliveries().find(one => one.inviter === from)
+        if (delivered !== undefined) enteredDelivered([delivered.id])
       })
       .catch((cause: unknown) => {
         logEvent('warn', 'MESSAGR_INVITATION_ANSWER_FAILED', {
@@ -6547,8 +6556,8 @@ export function App({
               behind={threshold.length - 1}
               working={answering}
               failed={answerFailed === deciding.scope}
-              onJoin={() => answerTheInvitation('join', deciding.scope)}
-              onRefuse={() => answerTheInvitation('refuse', deciding.scope)}
+              onJoin={() => answerTheInvitation('join', deciding)}
+              onRefuse={() => answerTheInvitation('refuse', deciding)}
             />
           </SafeAreaView>
         )}
