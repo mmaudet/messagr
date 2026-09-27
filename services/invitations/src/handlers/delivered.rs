@@ -46,13 +46,24 @@
 //! nothing tells it whether it was seen, or refused. The refusal carries no
 //! date, and the cleanup forgets it at the deadline (`cleanup.rs`).
 //!
+//! # THE NAME THE INVITER GIVES ITSELF, SEALED FOR THE RECIPIENT (#405)
+//!
+//! A link carries it in its fragment, which never reaches a server. An
+//! invitation delivered here has no link, so the inviter's device seals the
+//! name for the envelope key the recipient's device published with its proof
+//! (HPKE, RFC 9180), and the service passes the envelope on without being
+//! able to open it. Every envelope has the same size, whatever the name. It
+//! is erased as soon as the recipient answers, and at the deadline: past
+//! either, no screen shows it any more.
+//!
 //! # WHAT THE SERVICE KEEPS
 //!
 //! Who invites whom, from the moment an invitation leaves, declined or never
 //! answered included: ADR 0014 names that price, which a link pays only when
 //! it is spent. Kept thirty days after the invitation ended, the retention of
 //! a link's (#416). Never the conversation: the inviter's device holds it,
-//! and invites the account into it when the claim comes.
+//! and invites the account into it when the claim comes. The sealed name
+//! only until it is answered or runs out, as above.
 
 use std::sync::Arc;
 
@@ -61,6 +72,7 @@ use axum::{
     http::HeaderMap,
     Json,
 };
+use data_encoding::BASE64;
 use serde::{Deserialize, Serialize};
 use sqlx::Row;
 
@@ -72,10 +84,21 @@ use crate::{
 /// How long an invitation delivered inside the application stays good.
 pub const DELIVERED_LIFETIME_SECONDS: i64 = 7 * 86_400;
 
+/// The size of a sealed name (#405): the 32-byte key HPKE encapsulates
+/// (X25519), then the name padded to the 48 bytes a declared name may take,
+/// and the 16-byte tag of ChaCha20-Poly1305. The same for every name, so the
+/// size says nothing of it.
+pub const SEALED_NAME_BYTES: usize = 32 + 48 + 16;
+
 #[derive(Deserialize)]
 pub struct SendRequest {
     /// A reference of the directory (`GET /discovery/directory`).
     pub reference: String,
+    /// The name the inviter gives itself, sealed for the envelope key the
+    /// directory lists with the reference, base64 (#405). Absent, the
+    /// invitation arrives without a name.
+    #[serde(default)]
+    pub sealed_name: Option<String>,
 }
 
 /// An invitation, as the one who sent it and the one it waits for see it.
@@ -88,6 +111,10 @@ pub struct DeliveredInvitation {
     /// invite its device waits for (see the module).
     #[serde(skip_serializing_if = "Option::is_none")]
     pub inviter_user_id: Option<String>,
+    /// The name the inviter gave itself, sealed, base64 (#405): for the
+    /// recipient, while the invitation waits for its answer.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub sealed_name: Option<String>,
 }
 
 #[derive(Serialize)]
@@ -114,6 +141,11 @@ pub async fn send(
     Body(req): Body<SendRequest>,
 ) -> Result<Json<DeliveredInvitation>, AppError> {
     let inviter = discovery::findable_caller(&st, &headers).await?.user;
+    let sealed_name = req
+        .sealed_name
+        .as_deref()
+        .map(|sealed| discovery::decoded_of_size(sealed, SEALED_NAME_BYTES))
+        .transpose()?;
     let now = st.cfg.clock.now();
     let recipient = discovery::account_behind(&st, &req.reference, now)
         .await?
@@ -125,13 +157,15 @@ pub async fn send(
     let expires_at = now + DELIVERED_LIFETIME_SECONDS;
     sqlx::query(
         "INSERT INTO delivered_invitations \
-         (id, inviter_user_id, recipient_user_id, sent_at, expires_at) VALUES (?, ?, ?, ?, ?)",
+         (id, inviter_user_id, recipient_user_id, sent_at, expires_at, sealed_name) \
+         VALUES (?, ?, ?, ?, ?, ?)",
     )
     .bind(&id)
     .bind(&inviter)
     .bind(&recipient)
     .bind(now)
     .bind(expires_at)
+    .bind(sealed_name)
     .execute(&st.pool)
     .await
     .map_err(anyhow::Error::from)?;
@@ -139,6 +173,7 @@ pub async fn send(
         id,
         expires_at,
         inviter_user_id: None,
+        sealed_name: None,
     }))
 }
 
@@ -155,7 +190,8 @@ pub async fn waiting(
 ) -> Result<Json<Waiting>, AppError> {
     let recipient = auth::authenticate(&st.mx, &headers).await?;
     let rows = sqlx::query(
-        "SELECT id, expires_at, inviter_user_id, claimed_at FROM delivered_invitations \
+        "SELECT id, expires_at, inviter_user_id, claimed_at, sealed_name \
+         FROM delivered_invitations \
          WHERE recipient_user_id = ? AND declined = 0 AND entered = 0 \
            AND (expires_at > ? OR claimed_at IS NOT NULL) \
          ORDER BY sent_at, id",
@@ -173,6 +209,9 @@ pub async fn waiting(
             inviter_user_id: row
                 .get::<Option<i64>, _>("claimed_at")
                 .map(|_| row.get("inviter_user_id")),
+            sealed_name: row
+                .get::<Option<Vec<u8>>, _>("sealed_name")
+                .map(|sealed| BASE64.encode(&sealed)),
         })
         .collect();
     Ok(Json(Waiting { invitations }))
@@ -192,8 +231,11 @@ pub async fn join(
     let now = st.cfg.clock.now();
     let row = answerable(&st, &id, &recipient, now).await?;
     if !row.claimed {
+        // THE SEALED NAME GOES WITH THE ANSWER (#405): nothing shows it once
+        // the invitation is joined.
         sqlx::query(
-            "UPDATE delivered_invitations SET claimed_at = ? WHERE id = ? AND claimed_at IS NULL",
+            "UPDATE delivered_invitations SET claimed_at = ?, sealed_name = NULL \
+             WHERE id = ? AND claimed_at IS NULL",
         )
         .bind(now)
         .bind(&id)
@@ -220,7 +262,7 @@ pub async fn decline(
     if row.claimed {
         return Err(AppError::InvitationInvalid);
     }
-    sqlx::query("UPDATE delivered_invitations SET declined = 1 WHERE id = ?")
+    sqlx::query("UPDATE delivered_invitations SET declined = 1, sealed_name = NULL WHERE id = ?")
         .bind(&id)
         .execute(&st.pool)
         .await
@@ -378,15 +420,45 @@ mod tests {
     }
 
     async fn sent(st: &Arc<AppState>, who: &str, reference: &str) -> Result<String, AppError> {
+        sent_with(st, who, reference, None).await
+    }
+
+    /// The same, with a sealed name (#405), base64.
+    async fn sent_with(
+        st: &Arc<AppState>,
+        who: &str,
+        reference: &str,
+        sealed: Option<&str>,
+    ) -> Result<String, AppError> {
         send(
             State(st.clone()),
             bearer(who),
             Body(SendRequest {
                 reference: reference.into(),
+                sealed_name: sealed.map(Into::into),
             }),
         )
         .await
         .map(|Json(s)| s.id)
+    }
+
+    /// An envelope of the size a device seals, every byte `fill`: the service
+    /// cannot tell it from one that holds a name, and has no need to.
+    fn envelope(fill: u8) -> String {
+        BASE64.encode(&[fill; SEALED_NAME_BYTES])
+    }
+
+    /// What the service holds of an invitation's sealed name: `None` once
+    /// erased, or once the invitation itself is gone.
+    async fn sealed_kept(st: &Arc<AppState>, id: &str) -> Option<Vec<u8>> {
+        sqlx::query_scalar::<_, Option<Vec<u8>>>(
+            "SELECT sealed_name FROM delivered_invitations WHERE id = ?",
+        )
+        .bind(id)
+        .fetch_optional(&st.pool)
+        .await
+        .unwrap()
+        .flatten()
     }
 
     async fn waiting_for(st: &Arc<AppState>, who: &str) -> serde_json::Value {
@@ -435,6 +507,7 @@ mod tests {
             bearer("alice"),
             Body(SendRequest {
                 reference: bob.clone(),
+                sealed_name: None,
             }),
         )
         .await
@@ -762,8 +835,118 @@ mod tests {
                 "expires_at",
                 "claimed_at",
                 "declined",
-                "entered"
+                "entered",
+                "sealed_name"
             ]
         );
+    }
+
+    #[sqlx::test(migrations = "./migrations")]
+    async fn the_sealed_name_is_passed_on_as_it_was_sent_and_only_to_the_recipient(
+        pool: SqlitePool,
+    ) {
+        let (st, _, bob) = two_findable(pool).await;
+        let sealed = envelope(7);
+
+        let id = sent_with(&st, "alice", &bob, Some(&sealed)).await.unwrap();
+
+        assert_eq!(
+            waiting_for(&st, "bob").await,
+            json!([{"id": id, "expires_at": T0 + 7 * DAY, "sealed_name": sealed}]),
+        );
+        // ALL THE SERVICE HOLDS OF THE NAME IS THE ENVELOPE, byte for byte: it
+        // never receives anything else, and nothing opens it here.
+        assert_eq!(
+            sealed_kept(&st, &id).await,
+            Some(vec![7; SEALED_NAME_BYTES])
+        );
+        let told = status_of(&st, "alice", &id).await.unwrap();
+        assert!(told.get("sealed_name").is_none(), "{told}");
+    }
+
+    #[sqlx::test(migrations = "./migrations")]
+    async fn a_sealed_name_of_any_other_size_is_refused_and_nothing_leaves(pool: SqlitePool) {
+        let (st, _, bob) = two_findable(pool).await;
+
+        for wrong in [
+            BASE64.encode(&[7; SEALED_NAME_BYTES - 1]),
+            BASE64.encode(&[7; SEALED_NAME_BYTES + 1]),
+            "not base64 at all".to_string(),
+        ] {
+            assert!(matches!(
+                sent_with(&st, "alice", &bob, Some(&wrong)).await,
+                Err(AppError::MalformedEnvelope)
+            ));
+        }
+        assert_eq!(waiting_for(&st, "bob").await, json!([]));
+    }
+
+    #[sqlx::test(migrations = "./migrations")]
+    async fn the_sealed_name_is_erased_by_an_answer_at_the_deadline_and_with_the_invitation(
+        pool: SqlitePool,
+    ) {
+        let (st, time, bob) = two_findable(pool).await;
+        let joined_one = sent_with(&st, "alice", &bob, Some(&envelope(1)))
+            .await
+            .unwrap();
+        let declined_one = sent_with(&st, "alice", &bob, Some(&envelope(2)))
+            .await
+            .unwrap();
+        let unanswered = sent_with(&st, "alice", &bob, Some(&envelope(3)))
+            .await
+            .unwrap();
+
+        joined(&st, "bob", &joined_one).await.unwrap();
+        declined(&st, "bob", &declined_one).await.unwrap();
+
+        assert_eq!(sealed_kept(&st, &joined_one).await, None);
+        assert_eq!(sealed_kept(&st, &declined_one).await, None);
+        // Sent in the same second, so listed in no order that matters here.
+        let listed = waiting_for(&st, "bob").await;
+        let entry = |id: &str| {
+            listed
+                .as_array()
+                .unwrap()
+                .iter()
+                .find(|one| one["id"] == id)
+                .cloned()
+        };
+        assert_eq!(listed.as_array().unwrap().len(), 2);
+        assert_eq!(
+            entry(&joined_one),
+            Some(
+                json!({"id": joined_one, "expires_at": T0 + 7 * DAY, "inviter_user_id": "@alice:h"})
+            ),
+            "joined, it names the inviter and no longer carries the name"
+        );
+        assert_eq!(
+            entry(&unanswered),
+            Some(json!({"id": unanswered, "expires_at": T0 + 7 * DAY, "sealed_name": envelope(3)})),
+        );
+        crate::cleanup::purge_delivered_invitations(&st.pool, T0 + 7 * DAY - 1, 30)
+            .await
+            .unwrap();
+        assert_eq!(
+            sealed_kept(&st, &unanswered).await,
+            Some(vec![3; SEALED_NAME_BYTES]),
+            "still of use before the deadline"
+        );
+        set_clock(&time, T0 + 7 * DAY);
+        crate::cleanup::purge_delivered_invitations(&st.pool, T0 + 7 * DAY, 30)
+            .await
+            .unwrap();
+        assert_eq!(sealed_kept(&st, &unanswered).await, None);
+        let rows = || async {
+            sqlx::query_scalar::<_, i64>("SELECT COUNT(*) FROM delivered_invitations WHERE id = ?")
+                .bind(&unanswered)
+                .fetch_one(&st.pool)
+                .await
+                .unwrap()
+        };
+        assert_eq!(rows().await, 1, "who invited whom is kept thirty days");
+        crate::cleanup::purge_delivered_invitations(&st.pool, T0 + 37 * DAY, 30)
+            .await
+            .unwrap();
+        assert_eq!(rows().await, 0, "and goes with everything it held");
     }
 }
