@@ -6,12 +6,14 @@
 //! - `POST /discovery/invitations`: the inviter, findable, sends an
 //!   invitation to a reference;
 //! - `GET /discovery/invitations`: the recipient lists the invitations
-//!   waiting for it, and those it joined and is still waiting to be let in;
+//!   waiting for it, and those it joined and has not entered yet;
 //! - `POST /discovery/invitations/:id/join`: the recipient joins. The service
 //!   records the claim, which the inviter's device reads to invite the
 //!   account into the conversation;
 //! - `POST /discovery/invitations/:id/decline`: the recipient declines, and
 //!   the invitation leaves its list;
+//! - `POST /discovery/invitations/:id/entered`: the recipient's device says it
+//!   entered the conversation, and the invitation leaves its list;
 //! - `GET /discovery/invitations/:id`: the inviter reads where its invitation
 //!   stands.
 //!
@@ -31,7 +33,10 @@
 //! at the same moment, which is how its device recognises the room invite it
 //! waits for among any other, days later if the inviter's device was asleep,
 //! and after a relaunch as well: a joined invitation stays in its list, with
-//! the inviter, until the deadline.
+//! the inviter, until the device says it entered (`entered`), past the
+//! deadline too, since the inviter's device may let it in late. Each entry
+//! answers one invitation, so a later room of the same inviter is not taken
+//! for it.
 //!
 //! # A REFUSAL READS AS AN INVITATION NOBODY HAS SEEN
 //!
@@ -137,9 +142,10 @@ pub async fn send(
     }))
 }
 
-/// `GET /discovery/invitations`: the caller's invitations that have not run
-/// out and that it has not declined, oldest first. One waiting for an answer
-/// names nobody; one joined names the inviter.
+/// `GET /discovery/invitations`: the caller's invitations waiting for an
+/// answer, not run out and not declined, and those it joined and has not
+/// entered yet, whatever their deadline; oldest first. One waiting for an
+/// answer names nobody; one joined names the inviter.
 ///
 /// Served even with discovery off, as withdrawing a number is: an invitation
 /// already delivered is still the recipient's to answer.
@@ -150,7 +156,8 @@ pub async fn waiting(
     let recipient = auth::authenticate(&st.mx, &headers).await?;
     let rows = sqlx::query(
         "SELECT id, expires_at, inviter_user_id, claimed_at FROM delivered_invitations \
-         WHERE recipient_user_id = ? AND declined = 0 AND expires_at > ? \
+         WHERE recipient_user_id = ? AND declined = 0 AND entered = 0 \
+           AND (expires_at > ? OR claimed_at IS NOT NULL) \
          ORDER BY sent_at, id",
     )
     .bind(&recipient)
@@ -218,6 +225,31 @@ pub async fn decline(
         .execute(&st.pool)
         .await
         .map_err(anyhow::Error::from)?;
+    Ok(axum::http::StatusCode::NO_CONTENT)
+}
+
+/// `POST /discovery/invitations/:id/entered`: the recipient's device entered
+/// the conversation of an invitation it joined, and the invitation leaves its
+/// list. Saying it twice is saying it once. An invitation not joined, or not
+/// the caller's, gets the answer of one that does not exist.
+pub async fn entered(
+    State(st): State<Arc<AppState>>,
+    headers: HeaderMap,
+    Path(id): Path<String>,
+) -> Result<axum::http::StatusCode, AppError> {
+    let recipient = auth::authenticate(&st.mx, &headers).await?;
+    let done = sqlx::query(
+        "UPDATE delivered_invitations SET entered = 1 \
+         WHERE id = ? AND recipient_user_id = ? AND claimed_at IS NOT NULL",
+    )
+    .bind(&id)
+    .bind(&recipient)
+    .execute(&st.pool)
+    .await
+    .map_err(anyhow::Error::from)?;
+    if done.rows_affected() == 0 {
+        return Err(AppError::InvitationInvalid);
+    }
     Ok(axum::http::StatusCode::NO_CONTENT)
 }
 
@@ -370,6 +402,12 @@ mod tests {
         join(State(st.clone()), bearer(who), Path(id.into()))
             .await
             .map(|Json(j)| serde_json::to_value(j).unwrap())
+    }
+
+    async fn said_entered(st: &Arc<AppState>, who: &str, id: &str) -> Result<(), AppError> {
+        entered(State(st.clone()), bearer(who), Path(id.into()))
+            .await
+            .map(|_| ())
     }
 
     async fn declined(st: &Arc<AppState>, who: &str, id: &str) -> Result<(), AppError> {
@@ -527,7 +565,15 @@ mod tests {
         );
 
         set_clock(&time, T0 + 7 * DAY);
-        assert_eq!(waiting_for(&st, "bob").await, json!([]));
+        assert_eq!(
+            waiting_for(&st, "bob").await,
+            json!([{
+                "id": joined_in_time,
+                "expires_at": T0 + 7 * DAY,
+                "inviter_user_id": "@alice:h"
+            }]),
+            "the one run out leaves the list; the one joined in time stays until entered"
+        );
         assert_eq!(
             status_of(&st, "alice", &ran_out).await.unwrap(),
             json!({"status": "expired"})
@@ -654,6 +700,52 @@ mod tests {
     }
 
     #[sqlx::test(migrations = "./migrations")]
+    async fn a_joined_invitation_stays_listed_until_the_device_says_it_entered(pool: SqlitePool) {
+        let (st, time, bob) = two_findable(pool).await;
+        let id = sent(&st, "alice", &bob).await.unwrap();
+        joined(&st, "bob", &id).await.unwrap();
+
+        set_clock(&time, T0 + 20 * DAY);
+        assert_eq!(
+            waiting_for(&st, "bob").await,
+            json!([{"id": id, "expires_at": T0 + 7 * DAY, "inviter_user_id": "@alice:h"}]),
+            "past the deadline, the inviter's device may still let it in"
+        );
+
+        said_entered(&st, "bob", &id).await.unwrap();
+        said_entered(&st, "bob", &id)
+            .await
+            .expect("saying it twice is saying it once");
+        assert_eq!(waiting_for(&st, "bob").await, json!([]));
+        assert_eq!(
+            status_of(&st, "alice", &id).await.unwrap()["status"],
+            "claimed",
+            "the inviter reads nothing new"
+        );
+    }
+
+    #[sqlx::test(migrations = "./migrations")]
+    async fn only_the_recipient_says_it_entered_and_only_once_joined(pool: SqlitePool) {
+        let (st, _, bob) = two_findable(pool).await;
+        let id = sent(&st, "alice", &bob).await.unwrap();
+
+        assert!(
+            matches!(
+                said_entered(&st, "bob", &id).await,
+                Err(AppError::InvitationInvalid)
+            ),
+            "not joined yet"
+        );
+        joined(&st, "bob", &id).await.unwrap();
+        for who in ["alice", "carol"] {
+            assert!(matches!(
+                said_entered(&st, who, &id).await,
+                Err(AppError::InvitationInvalid)
+            ));
+        }
+    }
+
+    #[sqlx::test(migrations = "./migrations")]
     async fn the_service_has_nowhere_to_keep_the_conversation(pool: SqlitePool) {
         let columns: Vec<String> =
             sqlx::query_scalar("SELECT name FROM pragma_table_info('delivered_invitations')")
@@ -669,7 +761,8 @@ mod tests {
                 "sent_at",
                 "expires_at",
                 "claimed_at",
-                "declined"
+                "declined",
+                "entered"
             ]
         );
     }

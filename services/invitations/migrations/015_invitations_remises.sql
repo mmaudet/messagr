@@ -20,7 +20,13 @@ CREATE TABLE delivered_invitations (
     sent_at           INTEGER NOT NULL,
     expires_at        INTEGER NOT NULL,
     claimed_at        INTEGER,
-    declined          INTEGER NOT NULL DEFAULT 0
+    declined          INTEGER NOT NULL DEFAULT 0,
+    -- UNE INVITATION REJOINTE RESTE DANS LA LISTE DU DESTINATAIRE, avec son
+    -- inviteur, jusqu'à ce que son appareil dise être entré dans la
+    -- conversation : il sait ainsi quelle invitation de salon accepter, même
+    -- après l'échéance, que l'appareil de l'inviteur peut dépasser. Un
+    -- drapeau, sans date : la conversation dit déjà quand il est entré.
+    entered           INTEGER NOT NULL DEFAULT 0
 );
 
 CREATE INDEX delivered_invitations_by_recipient

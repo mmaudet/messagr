@@ -200,6 +200,10 @@ fn router(state: Arc<AppState>) -> Router {
             "/discovery/invitations/:id/decline",
             post(handlers::delivered::decline),
         )
+        .route(
+            "/discovery/invitations/:id/entered",
+            post(handlers::delivered::entered),
+        )
         // L'ANNONCE D'UNE SUPPRESSION DE COMPTE (#385), faite par le compte
         // lui-même juste avant qu'il soit désactivé. Sans corps : le jeton dit
         // qui. `handlers::deletion` dit ce qu'elle enregistre et ce qu'elle
@@ -498,6 +502,10 @@ mod tests {
             (
                 "decline an invitation",
                 http.post(format!("{base}/discovery/invitations/i/decline")),
+            ),
+            (
+                "say an invitation was entered",
+                http.post(format!("{base}/discovery/invitations/i/entered")),
             ),
         ];
         for (name, request) in routes {
