@@ -52,6 +52,8 @@ export interface DeliveryService {
   readonly joinInvitation: (id: string) => Promise<Answer>
   /** `POST /discovery/invitations/:id/decline`. */
   readonly declineInvitation: (id: string) => Promise<Answer>
+  /** `POST /discovery/invitations/:id/block` (#406). */
+  readonly blockInvitation: (id: string) => Promise<Answer>
   /** `POST /discovery/invitations/:id/entered`. */
   readonly enteredInvitation: (id: string) => Promise<Answer>
 }
@@ -182,7 +184,22 @@ export async function declineDelivered(
   service: DeliveryService,
   id: string,
 ): Promise<Answered> {
-  const answer = await asked(() => service.declineInvitation(id))
+  return declined(() => service.declineInvitation(id))
+}
+
+/**
+ * « Refuser et bloquer » (#406): declined as above, and the inviter's later
+ * invitations are never delivered to this account. Nothing tells the inviter.
+ */
+export async function blockDelivered(
+  service: DeliveryService,
+  id: string,
+): Promise<Answered> {
+  return declined(() => service.blockInvitation(id))
+}
+
+async function declined(request: () => Promise<Answer>): Promise<Answered> {
+  const answer = await asked(request)
   if (answer === null) return 'unreachable'
   if (answer.status >= 200 && answer.status < 300) return 'declined'
   return refusalOf(answer.status, parsed(answer.body))
@@ -310,10 +327,22 @@ export interface InvitationNames {
 /**
  * Why the service would not take an invitation, when it said so: the
  * caller's own number (`own-reference`), a contact no longer findable
- * (`unknown-reference`), or the caller no longer findable (`not-findable`).
+ * (`unknown-reference`), the caller no longer findable (`not-findable`), or
+ * an invitation to that account still pending (`pending`, #406).
  */
 export type DeliveryRefusal =
-  'own-reference' | 'unknown-reference' | 'not-findable'
+  'own-reference' | 'unknown-reference' | 'not-findable' | 'pending'
+
+/**
+ * A refusal that lasts until a moment (#406): that account was invited
+ * recently (`recently`), or the ten invitations of the day are sent
+ * (`quota`). `retryAt`, in milliseconds since the epoch, is when another may
+ * leave.
+ */
+export interface DeliveryWait {
+  readonly why: 'recently' | 'quota'
+  readonly retryAt: number
+}
 
 export type Delivered =
   | {
@@ -328,13 +357,21 @@ export type Delivered =
   | {
       readonly delivered: false
       readonly reason: string
-      readonly refusal?: DeliveryRefusal
+      /** Why the service would not take it, when it said so. */
+      readonly refusal?: DeliveryRefusal | DeliveryWait
     }
 
 const REFUSALS: Readonly<Record<string, DeliveryRefusal>> = {
   MESSAGR_OWN_REFERENCE: 'own-reference',
   MESSAGR_UNKNOWN_REFERENCE: 'unknown-reference',
   MESSAGR_NOT_FINDABLE: 'not-findable',
+  MESSAGR_INVITATION_PENDING: 'pending',
+}
+
+/** The refusals that say when another may leave (#406). */
+const WAITS: Readonly<Record<string, DeliveryWait['why']>> = {
+  MESSAGR_INVITED_RECENTLY: 'recently',
+  MESSAGR_DELIVERY_QUOTA: 'quota',
 }
 
 /**
@@ -370,7 +407,7 @@ export async function deliverInvitation(
   const { scope } = conversation
   const refused = async (
     reason: string,
-    refusal?: DeliveryRefusal,
+    refusal?: DeliveryRefusal | DeliveryWait,
   ): Promise<Delivered> => {
     await leave(deps.http, scope)
     return {
@@ -396,9 +433,15 @@ export async function deliverInvitation(
   const body = parsed(answer.body)
   if (answer.status < 200 || answer.status >= 300 || body === null) {
     const errcode = typeof body?.errcode === 'string' ? body.errcode : null
+    const why = errcode === null ? undefined : WAITS[errcode]
+    const retryAt = body?.retry_at
     return refused(
       `the invitation service refused it: ${errcode ?? answer.status}`,
-      errcode === null ? undefined : REFUSALS[errcode],
+      why !== undefined && typeof retryAt === 'number'
+        ? { why, retryAt: retryAt * 1000 }
+        : errcode === null
+          ? undefined
+          : REFUSALS[errcode],
     )
   }
   const { id, expires_at: expiresAt } = body

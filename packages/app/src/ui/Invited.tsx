@@ -50,14 +50,16 @@ import { dayOf } from './whenLabel'
  * held it. The screen states that rather than leaving a gap — an invitation
  * described without limits reads as an invitation without limits.
  *
- * # TWO ACTIONS, AND THE ORDER THEY COME IN
+ * # TWO ACTIONS, A THIRD FOR AN INVITATION DELIVERED IN MESSAGR, AND THEIR
+ * ORDER
  *
  * *« Deux actions symétriques : rejoindre, refuser. Pas de "continuer quand
  * même". »* The refusal is a `quiet` button of the same rank rather than a
  * line of text, which is the prototype's own rule for its verification
- * screen: *« Le refus est un bouton de même rang que l'acceptation. »* Both
- * come last, under every fact, because a fact under a button is a fact read
- * after the decision.
+ * screen: *« Le refus est un bouton de même rang que l'acceptation. »* An
+ * invitation delivered inside Messagr adds « Refuser et bloquer » (#406), of
+ * the same rank again. All come last, under every fact, because a fact under
+ * a button is a fact read after the decision.
  *
  * # WHERE THIS DEPARTS FROM THE PROTOTYPE, AND WHY
  *
@@ -99,6 +101,7 @@ export function Invited({
   failed,
   onJoin,
   onRefuse,
+  block,
 }: {
   readonly known: WhatIsKnown
   /**
@@ -110,10 +113,10 @@ export function Invited({
    */
   readonly behind: number
   /**
-   * Which action is under way, if either. A tap that shows nothing invites
+   * Which answer is under way, if any. A tap that shows nothing invites
    * another, and the second would send a refusal over a join.
    */
-  readonly working: 'join' | 'refuse' | null
+  readonly working: Answering | null
   /**
    * Whether the answer given here did not go through. The screen stays and
    * says so: the invitation is exactly where it was, and a screen that
@@ -122,7 +125,78 @@ export function Invited({
   readonly failed: boolean
   readonly onJoin: () => void
   readonly onRefuse: () => void
+  /**
+   * « Refuser et bloquer », for an invitation delivered inside Messagr
+   * (#406), and absent everywhere else. `asking` draws the screen that says
+   * what a block does and does not do, which is where it is sent from.
+   */
+  readonly block?: {
+    readonly asking: boolean
+    /**
+     * Whether this account is findable now: what the screen can truthfully
+     * say of who still sees it on Messagr.
+     */
+    readonly findable: boolean
+    readonly onAsk: () => void
+    readonly onConfirm: () => void
+    readonly onCancel: () => void
+  }
 }) {
+  // BEFORE A BLOCK, WHAT IT DOES, THAT IT DOES NOT LIFT, AND WHAT IT DOES NOT
+  // DO (#406). A block hides nobody: anyone with the number still sees a
+  // findable person on Messagr, and withdrawing the number is what takes them
+  // out of discovery. To somebody no longer findable, that would be false, so
+  // the screen says what is true of them instead. Said before the block is
+  // sent rather than after, since it is what the decision rests on.
+  if (block?.asking === true) {
+    return (
+      <ScrollView
+        testID="invited-block"
+        style={styles.screen}
+        contentContainerStyle={styles.content}>
+        <Text style={styles.title}>{t('invited_block_title')}</Text>
+        <View style={[styles.card, styles.plain]}>
+          <Text style={styles.body}>{t('invited_block_does')}</Text>
+        </View>
+        <View style={[styles.card, styles.plain]}>
+          <Text style={styles.body}>{t('invited_block_lasts')}</Text>
+        </View>
+        <View style={[styles.card, styles.weigh]} testID="invited-block-not">
+          <Text style={styles.body}>
+            {t(
+              block.findable ? 'invited_block_not' : 'invited_block_not_hidden',
+            )}
+          </Text>
+        </View>
+        <View style={styles.actions}>
+          <NotchedButton
+            testID="invited-block-confirm"
+            label={
+              working === 'block'
+                ? t('invited_working')
+                : t('invited_block_confirm')
+            }
+            onPress={block.onConfirm}
+            // A MEASURE TAKEN AGAINST SOMEBODY (§13.17 lists blocking under
+            // `deny`): drawn as `Evict.tsx` draws its own, never in the green
+            // of the principal action.
+            tone="measure"
+            disabled={working !== null}
+            wide
+          />
+          <NotchedButton
+            testID="invited-block-cancel"
+            label={t('invited_block_cancel')}
+            onPress={block.onCancel}
+            tone="quiet"
+            disabled={working !== null}
+            wide
+          />
+          {failed && <Failed saying="invited_block_failed" />}
+        </View>
+      </ScrollView>
+    )
+  }
   const said = SAID_BY_SOURCE[known.source]
   const nobody = known.identifier === ''
   return (
@@ -229,14 +303,17 @@ export function Invited({
           disabled={working !== null}
           wide
         />
-        {/* Under the buttons rather than over them, for #284's reason: above,
-            a card appearing would move the button just pressed out from under
-            the finger. */}
-        {failed && (
-          <View style={[styles.card, styles.weigh]} testID="invited-failed">
-            <Text style={styles.body}>{t('invited_failed')}</Text>
-          </View>
+        {block !== undefined && (
+          <NotchedButton
+            testID="invited-block-open"
+            label={t('invited_block')}
+            onPress={block.onAsk}
+            tone="quiet"
+            disabled={working !== null}
+            wide
+          />
         )}
+        {failed && <Failed saying="invited_failed" />}
         {behind > 0 && (
           <Text testID="invited-behind" style={styles.behind}>
             {t('invited_behind %1$d', behind)}
@@ -290,6 +367,22 @@ const SAID_BY_SOURCE: Readonly<
         : t('invited_terms_delivered %1$@', dayOf(known.expiresAt)),
     nothing: 'invited_nothing_told',
   },
+}
+
+/** Which of the answers is under way: join, refuse, or refuse and block. */
+export type Answering = 'join' | 'refuse' | 'block'
+
+/**
+ * An answer that did not go through, under the buttons rather than over
+ * them, for #284's reason: above, a card appearing would move the button just
+ * pressed out from under the finger.
+ */
+function Failed({ saying }: { readonly saying: CopyKey }) {
+  return (
+    <View style={[styles.card, styles.weigh]} testID="invited-failed">
+      <Text style={styles.body}>{t(saying)}</Text>
+    </View>
+  )
 }
 
 const styles = StyleSheet.create({

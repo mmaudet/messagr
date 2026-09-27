@@ -381,6 +381,12 @@ export const de: Readonly<Record<CopyKey, string>> = {
     'Dieser Kontakt ist nicht mehr auffindbar. Sehen Sie Ihre Kontakte erneut durch, oder laden Sie ihn per Link ein.',
   invite_refused_not_findable:
     'Ihre Nummer ist nicht mehr nachgewiesen. Weisen Sie sie in den Einstellungen erneut nach, um einen gefundenen Kontakt einzuladen.',
+  invite_refused_pending:
+    'Ihre Einladung wartet bereits in Messagr auf diese Person: immer nur eine zwischen Ihnen beiden.',
+  'invite_refused_recently %1$@ %2$@':
+    'Sie haben diese Person vor Kurzem eingeladen. Sie können sie am %1$@ um %2$@ erneut einladen.',
+  'invite_refused_quota %1$@ %2$@':
+    'Sie haben heute die zehn in Messagr erlaubten Einladungen gesendet; die nächsten können am %1$@ um %2$@ gesendet werden. Ein Einladungslink kann weiterhin gesendet werden.',
   invite_failed: 'Die Einladung konnte nicht erstellt werden.',
   invite_waiting: 'Noch niemand hat den Link geöffnet.',
   invite_admitted: 'Erledigt: diese Person kann hereinkommen.',
@@ -410,6 +416,20 @@ export const de: Readonly<Record<CopyKey, string>> = {
   'invited_behind %1$d': '%1$d weitere Einladung(en) warten dahinter.',
   invited_join: 'Dem Gespräch beitreten',
   invited_refuse: 'Die Einladung ablehnen',
+  invited_block: 'Ablehnen und blockieren',
+  invited_block_title: 'Dieses Konto blockieren?',
+  invited_block_does:
+    'Die Einladung wird abgelehnt, und dieses Konto kann Sie in Messagr nicht mehr einladen. Es erfährt davon nichts: Seine nächsten Einladungen bleiben unbeantwortet, als hätten Sie sie nicht gesehen.',
+  invited_block_not:
+    'Das Blockieren verbirgt Sie nicht: Wer Ihre Nummer hat, sieht weiterhin, dass Sie auf Messagr sind, und kann Ihnen auf anderem Weg einen Einladungslink schicken. Nur das Zurückziehen Ihrer Nummer in den Einstellungen verbirgt Sie.',
+  invited_block_lasts:
+    'Die Blockierung wird nicht aufgehoben: Sie gilt, solange Ihre beiden Konten bestehen.',
+  invited_block_not_hidden:
+    'Sie sind derzeit nicht auffindbar: Wer Ihre Nummer hat, sieht Sie nicht auf Messagr. Das Blockieren verhindert nicht, dass Ihnen jemand auf anderem Weg einen Einladungslink schickt.',
+  invited_block_failed:
+    'Nichts hat sich geändert: Dieses Konto ist nicht blockiert, und die Einladung wartet weiter auf Ihre Antwort. Sie können es erneut versuchen.',
+  invited_block_confirm: 'Blockieren',
+  invited_block_cancel: 'Abbrechen',
   invited_working: 'Einen Moment…',
   invited_failed:
     'Nichts hat sich geändert: dieser Einladung wurde weder beigetreten noch wurde sie abgelehnt. Sie können es erneut versuchen.',
