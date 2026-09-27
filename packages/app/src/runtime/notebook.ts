@@ -44,6 +44,11 @@ import {
   forgetfulSentInvitations,
   openSentInvitations,
 } from './sentInvitationStore'
+import {
+  forgetfulRecognizedAccounts,
+  openRecognizedAccounts,
+  type RecognizedAccounts,
+} from './recognizedStore'
 import { openStorePassphrase } from './storePassphrase'
 
 /** What became of the notebook on this launch. Reported, not assumed. */
@@ -86,6 +91,11 @@ export interface NotebookOpening {
    * somebody is let in through them or they run out (#404).
    */
   readonly sentInvitations: SentInvitations
+  /**
+   * The accounts known through the address book, with the name of the card
+   * they came from (#407). `recognizedStore.ts`.
+   */
+  readonly recognized: RecognizedAccounts
   readonly opened: boolean
   /** Why it did not open, when it did not. */
   readonly reason?: string
@@ -156,6 +166,7 @@ export async function openNotebook(storeDir: string): Promise<NotebookOpening> {
       readBy: forgetfulReadBy(),
       discoveryResults: forgetfulDiscoveryResults(),
       sentInvitations: forgetfulSentInvitations(),
+      recognized: forgetfulRecognizedAccounts(),
       opened: false,
       reason: 'no writable directory was supplied at launch',
     }
@@ -177,6 +188,7 @@ export async function openNotebook(storeDir: string): Promise<NotebookOpening> {
       readBy: forgetfulReadBy(),
       discoveryResults: forgetfulDiscoveryResults(),
       sentInvitations: forgetfulSentInvitations(),
+      recognized: forgetfulRecognizedAccounts(),
       opened: false,
       reason: passphrase.reason,
     }
@@ -208,6 +220,7 @@ export async function openNotebook(storeDir: string): Promise<NotebookOpening> {
       readBy: await openReadBy(page),
       discoveryResults: await openDiscoveryResults(page),
       sentInvitations: await openSentInvitations(page),
+      recognized: await openRecognizedAccounts(page),
       opened: true,
       minted: passphrase.minted,
     }
@@ -227,6 +240,7 @@ export async function openNotebook(storeDir: string): Promise<NotebookOpening> {
       readBy: forgetfulReadBy(),
       discoveryResults: forgetfulDiscoveryResults(),
       sentInvitations: forgetfulSentInvitations(),
+      recognized: forgetfulRecognizedAccounts(),
       opened: false,
       reason: getErrorMessage(cause),
       minted: passphrase.minted,

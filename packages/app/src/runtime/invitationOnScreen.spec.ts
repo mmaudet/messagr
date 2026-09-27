@@ -146,6 +146,7 @@ describe('whatALinkSays', () => {
       instance: 'messagr.eu',
       elsewhere: false,
       expiresAt: null,
+      inBook: null,
     })
   })
 

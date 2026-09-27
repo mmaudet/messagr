@@ -184,7 +184,12 @@ import {
 } from './src/runtime/outstandingStore'
 import { forgetfulSentInvitations } from './src/runtime/sentInvitationStore'
 import {
+  forgetfulRecognizedAccounts,
+  type RecognizedAccounts,
+} from './src/runtime/recognizedStore'
+import {
   blockDelivered,
+  cardsOfTheInviters,
   declineDelivered,
   joinDelivered,
   keptThisLaunchToo,
@@ -673,6 +678,26 @@ export function App({
     ReadonlyMap<string, string | null>
   >(new Map())
   const openedNamesRef = useRef<ReadonlyMap<string, string | null>>(new Map())
+  /**
+   * The card this device's own looks found each inviter's number on (#407),
+   * by invitation, for « Paul (dans votre carnet) ». `cardsOfTheInviters`
+   * says how it is found without reading the address book.
+   */
+  const [deliveredCards, setDeliveredCards] = useState<
+    ReadonlyMap<string, string>
+  >(new Map())
+  const deliveredCardsRef = useRef<ReadonlyMap<string, string>>(new Map())
+  /**
+   * The accounts known through the address book, with the name of the card
+   * they came from (#407): what the product calls « recognized ». A page of
+   * the notebook, `recognizedStore.ts`, and what the trust screen reads.
+   */
+  const recognizedRef = useRef<RecognizedAccounts>(
+    forgetfulRecognizedAccounts(),
+  )
+  const [recognized, setRecognized] = useState<ReadonlyMap<string, string>>(
+    new Map(),
+  )
   const openTheNames = async (unanswered: readonly WaitingInvitation[]) => {
     const opened = await namesSealedFor(
       unanswered,
@@ -701,6 +726,15 @@ export function App({
     setDeliveredWaiting(waiting.unanswered)
     setDeliveredJoined(awaitedDeliveries())
     await openTheNames(waiting.unanswered).catch(() => {})
+    const cards = await cardsOfTheInviters(
+      waiting.unanswered,
+      deliveredCardsRef.current,
+      reference => discoveryResultsRef.current.nameOf(reference),
+    ).catch(() => deliveredCardsRef.current)
+    if (cards !== deliveredCardsRef.current) {
+      deliveredCardsRef.current = cards
+      setDeliveredCards(cards)
+    }
   }
   /** The one open on §13.3's screen, and how its answer is going. */
   const [deliveredOnScreen, setDeliveredOnScreen] =
@@ -751,6 +785,18 @@ export function App({
           { id: invitation.id, inviter: answered.joined },
         ]
         setDeliveredJoined(awaitedDeliveries())
+        // FROM A CARD OF THE ADDRESS BOOK (#407): the account is known
+        // through it from now on, and takes the card's name as its given
+        // name unless it has one. Once: the card is not read again.
+        const card = deliveredCardsRef.current.get(invitation.id)
+        if (card !== undefined) {
+          const inviter = answered.joined
+          await recognizedRef.current.recognize(inviter, card)
+          setRecognized(held => new Map(held).set(inviter, card))
+          if (!(await namesRef.current.all()).has(inviter)) {
+            await giveName(inviter, card)
+          }
+        }
       }
       setDeliveredOutcome(
         answered === 'expired' || answered === 'gone' ? answered : null,
@@ -1499,6 +1545,8 @@ export function App({
             discoveryResultsRef.current.keep(keyNumber, found),
           forgetAllBut: numbers =>
             discoveryResultsRef.current.forgetAllBut(numbers),
+          keepNames: named => discoveryResultsRef.current.keepNames(named),
+          nameOf: reference => discoveryResultsRef.current.nameOf(reference),
         },
       },
       setFinding,
@@ -2620,6 +2668,8 @@ export function App({
         hiddenRef.current = book.hidden
         readByRef.current = book.readBy
         discoveryResultsRef.current = book.discoveryResults
+        recognizedRef.current = book.recognized
+        setRecognized(await book.recognized.all())
         // SEEDED BEFORE ANYTHING IS DRAWN, so a conversation opened on the
         // first frame already knows how far it was read.
         readMarksRef.current = new Map(await book.readBy.all())
@@ -6175,6 +6225,7 @@ export function App({
                 <Trust
                   participant={party.other}
                   given={names.get(party.other)}
+                  inBook={recognized.get(party.other)}
                   reading={trust}
                   onBack={() => setTrust(null)}
                 />
@@ -6655,6 +6706,7 @@ export function App({
               known={whatADeliveredInvitationSays(
                 deliveredOnScreen.expiresAt,
                 deliveredNames.get(deliveredOnScreen.id) ?? null,
+                deliveredCards.get(deliveredOnScreen.id) ?? null,
               )}
               behind={0}
               working={answeringDelivered}

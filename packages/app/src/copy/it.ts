@@ -394,6 +394,7 @@ export const it: Readonly<Record<CopyKey, string>> = {
     'Non è ancora stato inviato nulla. Finché non risponde, questo link non è speso.',
   invited_who_delivered:
     'Qualcuno la invita a una conversazione in Messagr, senza dire chi.',
+  'invited_in_book %@': '%@ (nella sua rubrica)',
   'invited_terms_delivered %1$@':
     'Questo invito vale una sola volta. Scadenza: %1$@.',
   invited_nothing_told:
@@ -466,6 +467,8 @@ export const it: Readonly<Record<CopyKey, string>> = {
   trust_calm:
     'Non è un allarme. I suoi messaggi sono cifrati end-to-end fin dal primo, e questo non dipende da nulla di ciò che segue. Ciò che segue parla della certezza sulla persona, non della cifratura.',
   trust_state_nothing: 'Nulla stabilisce ancora chi sia questa persona.',
+  'trust_state_book %@':
+    'Questo account ha provato un numero della sua rubrica: quello della scheda %@.',
   trust_state_vouched:
     'Qualcuno che era già qui ha risposto di questa persona.',
   trust_state_confirmed:
@@ -477,6 +480,9 @@ export const it: Readonly<Record<CopyKey, string>> = {
   'trust_confirmed %d': '%d sono stati confermati da qui, di persona.',
   trust_none_confirmed:
     'Nessuno è stato confermato da qui. È lo stato di partenza normale.',
+  trust_book_title: 'La sua rubrica',
+  trust_book_means:
+    'Un codice ricevuto via SMS ha mostrato, da poco, che questo account aveva questo numero. Non dice chi usa questo account oggi. La sua scheda non viene più letta da quando ha accettato l’invito.',
   trust_vouch_title: 'Cosa stabilisce «rispondere di qualcuno»',
   trust_vouch_means:
     'Una persona già presente ha ritenuto di sapere chi entrava, e le ha aperto la porta. È un giudizio umano, e nient’altro: la crittografia non ha stabilito nulla. Un account può essere tenuto da qualcun altro senza che quel giudizio ne sappia nulla.',

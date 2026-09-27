@@ -399,6 +399,7 @@ export const nl: Readonly<Record<CopyKey, string>> = {
     'Er is nog niets verzonden. Zolang u niet antwoordt, is deze link niet verbruikt.',
   invited_who_delivered:
     'Iemand nodigt u uit voor een gesprek in Messagr, zonder te zeggen wie.',
+  'invited_in_book %@': '%@ (in uw adresboek)',
   'invited_terms_delivered %1$@':
     'Deze uitnodiging is geldig tot %1$@, voor één keer.',
   invited_nothing_told:
@@ -471,6 +472,8 @@ export const nl: Readonly<Record<CopyKey, string>> = {
   trust_calm:
     'Dit is geen waarschuwing. Uw berichten zijn end-to-end versleuteld sinds het eerste, en dat hangt van niets hieronder af. Wat volgt gaat over de zekerheid omtrent de persoon, niet over de versleuteling.',
   trust_state_nothing: 'Nog niets stelt vast wie deze persoon is.',
+  'trust_state_book %@':
+    'Dit account heeft een nummer uit uw adresboek bewezen: dat van de kaart %@.',
   trust_state_vouched:
     'Iemand die er al was heeft voor deze persoon ingestaan.',
   trust_state_confirmed:
@@ -482,6 +485,9 @@ export const nl: Readonly<Record<CopyKey, string>> = {
   'trust_confirmed %d': '%d zijn hier persoonlijk bevestigd.',
   trust_none_confirmed:
     'Geen enkel is hier bevestigd. Dat is de normale begintoestand.',
+  trust_book_title: 'Uw adresboek',
+  trust_book_means:
+    'Een per sms ontvangen code liet onlangs zien dat dit account dit nummer had. Dat zegt niet wie dit account vandaag gebruikt. Uw kaart wordt niet meer gelezen sinds u op de uitnodiging bent ingegaan.',
   trust_vouch_title: 'Wat «voor iemand instaan» vaststelt',
   trust_vouch_means:
     'Iemand die er al was meende te weten wie binnenkwam, en heeft de deur geopend. Dat is een menselijk oordeel, en niets meer: cryptografisch is er niets vastgesteld. Een account kan door iemand anders worden gehouden zonder dat dat oordeel daar iets van weet.',

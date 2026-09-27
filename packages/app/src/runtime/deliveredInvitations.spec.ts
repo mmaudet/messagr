@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest'
 import type { Answer } from './discovery'
 import {
   blockDelivered,
+  cardsOfTheInviters,
   declineDelivered,
   deliverInvitation,
   joinDelivered,
@@ -541,9 +542,19 @@ describe('the invitations waiting for this account (#404)', () => {
 
     expect(await readTheWaiting(service)).toEqual({
       unanswered: [
-        { id: 'a', expiresAt: 1_790_604_800_000, sealedName: null },
+        {
+          id: 'a',
+          expiresAt: 1_790_604_800_000,
+          sealedName: null,
+          inviterReference: null,
+        },
         // The name its inviter gave itself, sealed for this device (#405).
-        { id: 'd', expiresAt: 1_790_605_100_000, sealedName: 'ENVELOPE' },
+        {
+          id: 'd',
+          expiresAt: 1_790_605_100_000,
+          sealedName: 'ENVELOPE',
+          inviterReference: null,
+        },
       ],
       joined: [
         { id: 'b', inviter: '@alice:x' },
@@ -627,6 +638,7 @@ describe('the names sealed for this device (#405)', () => {
     id,
     expiresAt: NOW,
     sealedName,
+    inviterReference: null,
   })
 
   it('opens the name each invitation carries, and remembers one that does not open as no name', async () => {
@@ -673,5 +685,68 @@ describe('the names sealed for this device (#405)', () => {
     )
 
     expect(opened.has('a')).toBe(false)
+  })
+})
+
+describe('the card each inviter came from, without reading the address book (#407)', () => {
+  const waiting = (id: string, inviterReference: string | null) => ({
+    id,
+    expiresAt: NOW,
+    sealedName: null,
+    inviterReference,
+  })
+  const page = new Map([['ref-paul', 'Paul Martin']])
+  const nameOf = async (reference: string) => page.get(reference) ?? null
+
+  it('reads the reference an invitation carries', async () => {
+    const { service } = harness({
+      waiting: {
+        status: 200,
+        body: JSON.stringify({
+          invitations: [
+            { id: 'a', expires_at: 1, inviter_reference: 'ref-paul' },
+            { id: 'b', expires_at: 1 },
+          ],
+        }),
+      },
+    })
+
+    const read = await readTheWaiting(service)
+
+    expect(read?.unanswered.map(one => one.inviterReference)).toEqual([
+      'ref-paul',
+      null,
+    ])
+  })
+
+  it('finds the card of each inviter this device found, and nothing for another', async () => {
+    const found = await cardsOfTheInviters(
+      [
+        waiting('a', 'ref-paul'),
+        waiting('b', 'ref-stranger'),
+        waiting('c', null),
+      ],
+      new Map(),
+      nameOf,
+    )
+
+    expect(found).toEqual(new Map([['a', 'Paul Martin']]))
+  })
+
+  it('keeps a card found, and asks again for one not found yet', async () => {
+    const asked: string[] = []
+    const known = new Map([['a', 'Paul Martin']])
+
+    const found = await cardsOfTheInviters(
+      [waiting('a', 'ref-paul'), waiting('b', 'ref-stranger')],
+      known,
+      async reference => {
+        asked.push(reference)
+        return nameOf(reference)
+      },
+    )
+
+    expect(asked).toEqual(['ref-stranger'])
+    expect(found).toBe(known)
   })
 })

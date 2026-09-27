@@ -68,6 +68,11 @@ export interface WaitingInvitation {
    * base64 (#405), or `null`: `sealedName.ts` opens it.
    */
   readonly sealedName: string | null
+  /**
+   * The reference its inviter is findable by now (#407), or `null`: what the
+   * results of this device's own looks can tell a card from.
+   */
+  readonly inviterReference: string | null
 }
 
 /**
@@ -111,6 +116,7 @@ export async function readTheWaiting(
       expires_at: expiresAt,
       inviter_user_id: inviter,
       sealed_name: sealedName,
+      inviter_reference: inviterReference,
     } = entry as Record<string, unknown>
     if (typeof id !== 'string' || id === '' || typeof expiresAt !== 'number') {
       continue
@@ -122,6 +128,10 @@ export async function readTheWaiting(
         id,
         expiresAt: expiresAt * 1000,
         sealedName: typeof sealedName === 'string' ? sealedName : null,
+        inviterReference:
+          typeof inviterReference === 'string' && inviterReference !== ''
+            ? inviterReference
+            : null,
       })
     }
   }
@@ -151,6 +161,31 @@ export async function namesSealedFor(
     opened.set(id, openSealedName(keys, sealedName ?? ''))
   }
   return opened
+}
+
+/**
+ * The card this device's own looks found each inviter's number on (#407), by
+ * invitation: `known`, and every invitation of `unanswered` whose inviter
+ * names a reference, looked up in the page of results with `nameOf`. A card
+ * found is kept; one not found is asked again at the next reading, since a
+ * look may have found it since. No address book is read: only a look the
+ * person starts may do that (#392, story 30).
+ */
+export async function cardsOfTheInviters(
+  unanswered: readonly WaitingInvitation[],
+  known: ReadonlyMap<string, string>,
+  nameOf: (reference: string) => Promise<string | null>,
+): Promise<ReadonlyMap<string, string>> {
+  const toLookUp = unanswered.filter(
+    one => one.inviterReference !== null && !known.has(one.id),
+  )
+  if (toLookUp.length === 0) return known
+  const found = new Map(known)
+  for (const { id, inviterReference } of toLookUp) {
+    const card = await nameOf(inviterReference ?? '')
+    if (card !== null) found.set(id, card)
+  }
+  return found.size === known.size ? known : found
 }
 
 /**

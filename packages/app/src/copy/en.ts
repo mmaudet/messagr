@@ -402,6 +402,7 @@ export const en: Readonly<Record<CopyKey, string>> = {
     'Nothing has been sent yet. Until you answer, this link is not spent.',
   invited_who_delivered:
     'Someone invites you to a conversation in Messagr, without saying who.',
+  'invited_in_book %@': '%@ (in your address book)',
   'invited_terms_delivered %1$@':
     'This invitation is good until %1$@, for one use only.',
   invited_nothing_told:
@@ -475,6 +476,8 @@ export const en: Readonly<Record<CopyKey, string>> = {
   trust_calm:
     'This is not an alert. Your messages have been end-to-end encrypted since the first one, and that does not depend on anything below. What follows is about certainty as to the person, not about the encryption.',
   trust_state_nothing: 'Nothing establishes yet who this person is.',
+  'trust_state_book %@':
+    'This account proved a number from your address book: the one on the card %@.',
   trust_state_vouched: 'Someone who was already here vouched for this person.',
   trust_state_confirmed:
     'One of their devices was confirmed from this one, in person.',
@@ -485,6 +488,9 @@ export const en: Readonly<Record<CopyKey, string>> = {
   'trust_confirmed %d': '%d were confirmed from here, in person.',
   trust_none_confirmed:
     'None has been confirmed from here. That is the normal starting state.',
+  trust_book_title: 'Your address book',
+  trust_book_means:
+    'A code received by SMS showed, not long ago, that this account had this number. It does not say who holds this account today. Your card has not been read again since you joined its invitation.',
   trust_vouch_title: 'What vouching establishes',
   trust_vouch_means:
     'Someone already present judged that they knew who was coming in, and opened the door. That is a human judgement and nothing more: nothing was established by cryptography. An account can be held by somebody else without that judgement knowing anything about it.',

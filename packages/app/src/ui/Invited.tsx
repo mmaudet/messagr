@@ -206,7 +206,23 @@ export function Invited({
       contentContainerStyle={styles.content}>
       <Text style={styles.title}>{t('invited_title')}</Text>
 
-      {known.declared !== '' ? (
+      {known.inBook !== null ? (
+        /* « PAUL (DANS VOTRE CARNET) » (#407): the name of the card this
+           device's own looks found the inviter's number on. Not a claim of
+           the inviter's, so not under « se présente comme »; that one, when
+           the inviter declared a name as well, comes under it. */
+        <View style={styles.who} testID="invited-in-book">
+          <Text style={styles.name}>
+            {t('invited_in_book %@', known.inBook)}
+          </Text>
+          {known.declared !== '' && (
+            <Text style={styles.lead}>
+              {t('conversation_sender_claimed %@', known.declared)}
+            </Text>
+          )}
+          <Text style={styles.lead}>{t('invited_lead')}</Text>
+        </View>
+      ) : known.declared !== '' ? (
         /* « SE PRÉSENTE COMME », AND NEVER ANYTHING SHORTER. §13.26: a name
            somebody wrote about themselves proves nothing about who holds the
            account that wrote it, so the word is always *claims*. The sentence

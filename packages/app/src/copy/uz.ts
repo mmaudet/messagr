@@ -412,6 +412,7 @@ export const uz: Readonly<Record<CopyKey, string>> = {
     'Hali hech narsa yuborilmadi. Siz javob bermaguningizcha bu havola sarflanmaydi.',
   invited_who_delivered:
     'Kimdir sizni Messagrda suhbatga taklif qilmoqda, kimligini aytmasdan.',
+  'invited_in_book %@': '%@ (manzillar kitobingizda)',
   'invited_terms_delivered %1$@':
     'Bu taklif %1$@ gacha va faqat bir marta amal qiladi.',
   invited_nothing_told:
@@ -484,6 +485,8 @@ export const uz: Readonly<Record<CopyKey, string>> = {
   trust_calm:
     'Bu ogohlantirish emas. Xabarlaringiz birinchisidan boshlab uchdan-uchgacha shifrlangan va bu quyidagilarga bogʻliq emas. Quyida shifrlash haqida emas, odamning kimligiga ishonch haqida gap boradi.',
   trust_state_nothing: 'Bu odam kimligini hali hech nima tasdiqlamaydi.',
+  'trust_state_book %@':
+    'Bu hisob manzillar kitobingizdagi raqamni isbotlagan: %@ kartasidagi raqamni.',
   trust_state_vouched:
     'Bu yerda allaqachon boʻlgan kimdir bu odamga kafillik berdi.',
   trust_state_confirmed:
@@ -495,6 +498,9 @@ export const uz: Readonly<Record<CopyKey, string>> = {
   'trust_confirmed %d': 'Bu yerdan, yuzma-yuz %d tasi tasdiqlangan.',
   trust_none_confirmed:
     'Bu yerdan hech biri tasdiqlanmagan. Bu — odatdagi boshlangʻich holat.',
+  trust_book_title: 'Manzillar kitobingiz',
+  trust_book_means:
+    'SMS orqali olingan kod yaqinda bu hisobda shu raqam borligini koʻrsatdi. Bu hisobni bugun kim ishlatayotganini aytmaydi. Taklifiga qoʻshilganingizdan beri kartangiz qayta oʻqilmaydi.',
   trust_vouch_title: 'Kafillik nimani tasdiqlaydi',
   trust_vouch_means:
     'Bu yerda allaqachon boʻlgan kimdir kirayotgan odam kimligini bilaman deb hisobladi va eshikni ochdi. Bu — inson hukmi, undan ortigʻi emas: kriptografiya bilan hech nima tasdiqlanmagan. Hisobni oʻsha hukm bexabar qolgan holda boshqa odam ushlab turgan boʻlishi mumkin.',

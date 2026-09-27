@@ -41,11 +41,19 @@ export function Trust({
   participant,
   given,
   reading,
+  inBook,
   onBack,
 }: {
   readonly participant: string | null
   readonly given: string | undefined
   readonly reading: TrustReading
+  /**
+   * The name of the card this account came from, when it joined through an
+   * invitation from a number this device found in its address book (#407):
+   * what the product calls « recognized », matched through the address book
+   * and never verified. `recognizedStore.ts`.
+   */
+  readonly inBook?: string
   readonly onBack: () => void
 }) {
   const headline = headlineOf(reading)
@@ -80,9 +88,29 @@ export function Trust({
             ? t('trust_state_confirmed')
             : headline === 'vouched'
               ? t('trust_state_vouched')
-              : t('trust_state_nothing')}
+              : inBook !== undefined
+                ? t('trust_state_book %@', inBook)
+                : t('trust_state_nothing')}
         </Text>
       </View>
+
+      {/* WHAT THE ADDRESS BOOK ESTABLISHES, AND WHAT IT DOES NOT (#407):
+          that a code sent by SMS showed this account had the number, not
+          long ago. Only when it is so; the words are neither of the two the
+          catalogue's guards refuse. */}
+      {inBook !== undefined && (
+        <View style={styles.section} testID="trust-in-book">
+          <Text style={styles.heading}>{t('trust_book_title')}</Text>
+          {/* Said here when the headline says something else, and there
+              when nothing else is known. */}
+          {headline !== 'nothing-yet' && (
+            <Text style={styles.paragraph}>
+              {t('trust_state_book %@', inBook)}
+            </Text>
+          )}
+          <Text style={styles.paragraph}>{t('trust_book_means')}</Text>
+        </View>
+      )}
 
       <View style={styles.section}>
         <Text style={styles.heading}>{t('trust_devices_title')}</Text>

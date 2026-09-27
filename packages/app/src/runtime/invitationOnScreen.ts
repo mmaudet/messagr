@@ -82,7 +82,7 @@ export interface WhatIsKnown {
   /**
    * Which of the three places this invitation is being met in: a link, a
    * Matrix invitation standing on the threshold, or an invitation delivered
-   * inside the application by somebody who had this number (#404).
+   * inside the application (#404).
    */
   readonly source: 'link' | 'threshold' | 'delivered'
   /**
@@ -95,8 +95,9 @@ export interface WhatIsKnown {
    * The name the inviter gave themselves, drawn as « Se présente comme %@ ».
    * Empty when there is none.
    *
-   * ONLY EVER FROM A LINK (`declaredName.ts`), and never the name this
-   * device gave somebody: §13.26's formula reports what its bearer claimed,
+   * ONLY EVER FROM A LINK (`declaredName.ts`), OR SEALED FOR THIS DEVICE
+   * (#405, `sealedName.ts`), and never the name this device gave somebody:
+   * §13.26's formula reports what its bearer claimed,
    * and a given name was claimed by nobody. Putting one under that sentence
    * would be this screen attributing to the inviter a word the person
    * holding the telephone wrote themselves.
@@ -121,6 +122,13 @@ export interface WhatIsKnown {
    * application tells its recipient (#404). `null` elsewhere.
    */
   readonly expiresAt: number | null
+  /**
+   * The name of the card this device found the inviter's number on, by its
+   * own looks (#407), drawn as « Paul (dans votre carnet) ». `null` when the
+   * number is on no card this device found, and for anything but an
+   * invitation delivered inside Messagr.
+   */
+  readonly inBook: string | null
 }
 
 export function whatIsKnown(
@@ -140,6 +148,7 @@ export function whatIsKnown(
       instance: null,
       elsewhere: false,
       expiresAt: null,
+      inBook: null,
     }
   }
   const given = names.get(from)
@@ -162,6 +171,7 @@ export function whatIsKnown(
       serverOf(self) !== null &&
       instance.toLowerCase() !== serverOf(self)?.toLowerCase(),
     expiresAt: null,
+    inBook: null,
   }
 }
 
@@ -191,6 +201,7 @@ export function whatALinkSays(described: Described): WhatIsKnown {
     instance: described.instance,
     elsewhere: described.elsewhere,
     expiresAt: null,
+    inBook: null,
   }
 }
 
@@ -200,11 +211,13 @@ export function whatALinkSays(described: Described): WhatIsKnown {
  * service names it only then. What is known is its deadline, which the
  * service says, and the name the inviter gave itself when its envelope opened
  * on this device (#405): a declared name, as a link's, drawn after « Se
- * présente comme ».
+ * présente comme ». And, when this device's own looks found the inviter's
+ * number on a card of its address book, that card's name (#407).
  */
 export function whatADeliveredInvitationSays(
   expiresAt: number,
   declared: string | null = null,
+  inBook: string | null = null,
 ): WhatIsKnown {
   return {
     source: 'delivered',
@@ -216,6 +229,7 @@ export function whatADeliveredInvitationSays(
     instance: null,
     elsewhere: false,
     expiresAt,
+    inBook,
   }
 }
 
