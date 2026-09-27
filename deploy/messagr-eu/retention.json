@@ -1,5 +1,6 @@
 {
   "$note": "Les durées de conservation, écrites une fois. La page publiée et la configuration du serveur doivent toutes deux s'y accorder, et scripts/assert-retention.sh le vérifie. La politique a déjà affirmé une durée que le code ne pratiquait pas ; c'est ce fichier qui empêche que cela recommence.",
+  "$page": "Une entrée qui porte « page » est dite par une autre page que la politique en vigueur : la version à venir (#412), qui dit une durée nouvelle du jour où elle est annoncée au jour où elle s'applique. scripts/assert-retention.sh vérifie la phrase à cette adresse, une fois la version annoncée, et ne la vérifie pas avant, puisque rien ne sert la page. Le geste qui applique la version (version-a-venir.mjs appliquer) retire « page », et la phrase se vérifie alors sur la politique en vigueur.",
   "journaux_techniques": {
     "$note": "Le lien d'invitation porte son jeton dans le chemin, et le jeton est un secret porteur : tant que l'invitation n'est ni réclamée ni expirée, il fait entrer. Jusqu'au 15 septembre 2026 nginx écrivait ce chemin entier, gardé 366 jours (#313). La durée ne bouge pas — le décret l'impose aux données de connexion — mais le jeton n'en fait plus partie : le vhost journalise « /i/... » à la place du chemin, et le référent est réduit à « - ». Ce que la page en dit est sous « dit », et scripts/assert-retention.sh le vérifie comme une durée.",
     "duree": "douze mois",
@@ -31,7 +32,64 @@
     "applique_par": [
       "la purge d'un compte supprimé efface ses blocages, de part et d'autre, et jamais l'annonce de sa suppression, qui n'est pas une preuve (#406)"
     ],
-    "$manque": "Cette purge est manuelle d'ici #423, et une suppression faite par courriel n'est jamais annoncée au service : l'exploitant doit penser à la table delivered_blocks. La page publiée n'en dit encore rien : la nouvelle version de la politique (#412) doit le dire. Cette entrée gagnera alors sa « duree », que scripts/assert-retention.sh vérifiera sur la page."
+    "$manque": "Cette purge est manuelle d'ici #423, et une suppression faite par courriel n'est jamais annoncée au service : l'exploitant doit penser à la table delivered_blocks.",
+    "duree": "tant que vos deux comptes existent",
+    "page": "/confidentialite/a-venir/"
+  },
+  "decouverte_empreinte": {
+    "$note": "L'empreinte masquée d'un numéro prouvé (#392, ADR 0014), jamais le numéro, et le compteur des numéros qu'il a fait masquer (#401). Gardés tant que le compte est trouvable, puis trente jours après la sortie : retrait, expiration, remplacement, clé retirée d'un coup, suppression du compte.",
+    "duree": "trente jours après que vous cessez d'être trouvable",
+    "jours": 30,
+    "page": "/confidentialite/a-venir/",
+    "applique_par": [
+      "services/invitations : cleanup::purge_ended_proofs, ENDED_PROOFS_KEPT_SECONDS",
+      "services/invitations : masking_quota::purge, pour le compteur, jour par jour, et la rallonge d’un changement de clé (#409)"
+    ]
+  },
+  "decouverte_sms": {
+    "$note": "Le SMS qui porte le code d'une preuve, dans l'historique d'OVHcloud (#399). Le service demande à OVHcloud de l'effacer dès que le code ne vaut plus, puis chaque heure pendant un jour s'il ne l'y trouve pas : un 404 peut dire un SMS pas encore dans l'historique ou déjà parti (sms_history.rs). La page dit ce que le service fait, pas un résultat qu'il ne peut pas garantir.",
+    "duree": "chaque heure pendant un jour",
+    "jours": 1,
+    "page": "/confidentialite/a-venir/",
+    "applique_par": [
+      "services/invitations : sms_history::erase_due, par la passe horaire de cleanup::sweep_once"
+    ],
+    "$manque": "L'effet exact d'un effacement par l'API d'OVHcloud, et ce qu'OVHcloud garde comme opérateur, ne sont pas documentés par OVHcloud (#392, « ce qui reste à vérifier »). La page dit la conservation de l'opérateur comme la sienne."
+  },
+  "decouverte_compteurs_sms": {
+    "$note": "Les compteurs des plafonds de SMS (#399) : les codes demandés par un compte, par l'heure, sans pays ; les SMS envoyés vers un pays, par jour, sans compte. Aucun numéro.",
+    "duree": "sans aucun numéro, trente jours",
+    "jours": 30,
+    "page": "/confidentialite/a-venir/",
+    "applique_par": ["services/invitations : ceilings::purge_counters"]
+  },
+  "decouverte_preuve_en_cours": {
+    "$note": "Une preuve en cours : le masque du numéro, sous chaque clé en service (#409), et une empreinte du code, jamais le code.",
+    "duree": "le temps de sa validité, dix minutes, et l'efface dans l'heure qui suit",
+    "page": "/confidentialite/a-venir/",
+    "applique_par": [
+      "services/invitations/src/handlers/discovery.rs : CODE_LIFETIME_MINUTES",
+      "services/invitations : cleanup::purge_spent_proofs, et le déclencheur pending_proof_masks_go_with_their_proof (migration 018)"
+    ]
+  },
+  "decouverte_invitations_remises": {
+    "$note": "Qui invite qui dans une invitation remise dans Messagr (#404), appris dès l'envoi, et gardé trente jours après son acceptation ou son échéance, une semaine après l'envoi ; une invitation refusée le reste jusqu'à son échéance : le même terme que le lien entre celui qui invite et celui qui entre (#392, #416). Le nom scellé que l'inviteur se donne (#405) s'efface à la réponse ou à l'échéance.",
+    "duree": "trente jours après son acceptation ou son échéance",
+    "jours": 30,
+    "page": "/confidentialite/a-venir/",
+    "applique_par": [
+      "services/invitations/src/handlers/delivered.rs : DELIVERED_LIFETIME_SECONDS, la semaine que vaut une invitation",
+      "services/invitations : cleanup::purge_delivered_invitations, au terme de EDGE_RETENTION_DAYS"
+    ]
+  },
+  "decouverte_avis": {
+    "$note": "L'avis qu'un autre compte a prouvé le numéro de ce compte (#398), ou qu'une clé retirée d'un coup a arrêté sa preuve (#409), que l'état de découverte lui dit.",
+    "duree": "ou que la clé qui masque les numéros a changé, trente jours",
+    "jours": 30,
+    "page": "/confidentialite/a-venir/",
+    "applique_par": [
+      "services/invitations : cleanup::purge_ended_proofs, pour replaced_proofs et retired_key_proofs"
+    ]
   },
   "demandes_dinvitation": {
     "$note": "Une demande ne porte ni adresse, ni nom, ni texte libre, ni adresse IP : une empreinte de code, deux horodatages, et un sceau que le service ne peut pas ouvrir. Elle est purgée quand même — une file qui ne se vide jamais finit par dire combien de gens ont demandé et quand, ce qui est une mesure d'audience, et la page n'en promet aucune.",

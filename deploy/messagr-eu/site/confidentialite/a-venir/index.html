@@ -3,7 +3,7 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Politique de confidentialité — Messagr</title>
+    <title>Politique de confidentialité à venir — Messagr</title>
     <meta
       name="description"
       content="Ce que Messagr ne vous demande pas, ce que le service ne peut pas lire, et ce que le serveur voit malgré tout." />
@@ -180,26 +180,63 @@
           height="60" />
       </a>
 
-      <h1>Politique de confidentialité</h1>
+      <h1>Politique de confidentialité à venir</h1>
       <p class="lead">
         Ce que Messagr ne vous demande pas, ce que le service ne peut pas lire,
-        et ce que le serveur voit malgré tout.
+        ce que le serveur voit malgré tout, et ce que vous choisissez de donner
+        pour être trouvable.
       </p>
-      <p class="stamp">Version du 26 septembre 2026</p>
-      <!-- a-venir -->
+      <p class="stamp">Version applicable le MESSAGR-DATE-A-VENIR</p>
 
-      <!-- #412 : l'annonce de la version à venir. `build-site.sh` retire ce
-           passage tant que la marque y est, et `version-a-venir.mjs annoncer`
-           y écrit la date que le porteur fixe. -->
       <div class="card">
+        <!-- a-venir -->
+        <!-- #412 : la version à venir, publiée trente jours avant de
+             s'appliquer. `version-a-venir.mjs annoncer` écrit la date à la
+             place de la marque ; tant qu'elle ne l'est pas, `build-site.sh`
+             ne construit pas cette page. Le jour venu, `version-a-venir.mjs
+             appliquer` en fait la version en vigueur, et remplace ce passage
+             par le renvoi à la version qu'elle remplace. -->
         <p>
-          <b>Une nouvelle version de cette politique s'appliquera le
-          MESSAGR-DATE-A-VENIR.</b>
-          <a href="/confidentialite/a-venir/">La lire, avec la liste de ce qui
-          change.</a>
+          <b>Cette version s'appliquera le MESSAGR-DATE-A-VENIR.</b> D'ici là,
+          c'est la <a href="/confidentialite/">version en vigueur</a> qui
+          s'applique. Elle arrive avec la découverte des contacts, qui permet à
+          ceux qui ont déjà votre numéro de vous trouver sur Messagr, si vous
+          le choisissez.
         </p>
+        <p>Ce qui change&nbsp;:</p>
+        <!-- /a-venir -->
+        <ul>
+          <li>
+            une section nouvelle, «&nbsp;Si vous choisissez d'être
+            trouvable&nbsp;»&nbsp;: votre numéro, OVHcloud qui envoie le SMS
+            qui le prouve, le masquage de vos contacts, les invitations remises
+            dans Messagr, les blocages, et combien de temps chacun est
+            gardé&nbsp;;
+          </li>
+          <li>
+            «&nbsp;Ce que Messagr ne vous demande pas&nbsp;» vaut pour ouvrir
+            un compte&nbsp;;
+          </li>
+          <li>
+            le nom qu'on se donne dans une invitation remise dans Messagr
+            voyage scellé, là où celui d'un lien voyage dans le lien&nbsp;;
+          </li>
+          <li>
+            ce que la recherche de vos contacts laisse sur votre
+            téléphone&nbsp;;
+          </li>
+          <li>
+            OVHcloud rejoint «&nbsp;Où vos données sont traitées&nbsp;», qui dit
+            aussi ce que la bibliothèque de Firebase envoie à Google sur
+            iPhone&nbsp;;
+          </li>
+          <li>«&nbsp;Combien de temps&nbsp;» gagne ces durées nouvelles&nbsp;;</li>
+          <li>
+            «&nbsp;Modifications&nbsp;» dit comment une nouvelle version est
+            annoncée.
+          </li>
+        </ul>
       </div>
-      <!-- /a-venir -->
 
       <h2>Qui traite vos données</h2>
       <p>
@@ -217,10 +254,7 @@
       </p>
 
       <h2>Ce que Messagr ne vous demande pas</h2>
-      <p>
-        Un compte Messagr ne porte aucune donnée d'identification que vous
-        auriez fournie, parce qu'aucune ne vous est demandée&nbsp;:
-      </p>
+      <p>Pour ouvrir un compte, rien ne vous est demandé&nbsp;:</p>
       <ul>
         <li>pas de numéro de téléphone&nbsp;;</li>
         <li>pas d'adresse électronique&nbsp;;</li>
@@ -230,8 +264,14 @@
         </li>
       </ul>
       <p>
-        L'identifiant de votre compte est tiré au hasard au moment où vous
-        entrez. Il n'est rattaché à rien d'autre que lui-même.
+        Le compte que vous ouvrez ne porte donc aucune donnée d'identification
+        que vous auriez fournie. Son identifiant est tiré au hasard au moment
+        où vous entrez, et n'est rattaché à rien d'autre que lui-même.
+      </p>
+      <p>
+        Être trouvable, plus bas, est le seul chemin par lequel un numéro de
+        téléphone nous parvient, et vous seul le prenez&nbsp;: votre compte
+        porte alors votre numéro, masqué, tant que vous restez trouvable.
       </p>
       <p>
         <strong
@@ -239,14 +279,22 @@
           téléphone.</strong
         >
         La personne qui vous invite peut choisir de se présenter par un nom,
-        librement et sans y être tenue. Ce nom voyage dans le lien lui-même,
-        dans la partie qu'un navigateur ne transmet jamais&nbsp;: nos serveurs
-        ne le reçoivent pas, ne l'enregistrent pas et ne peuvent pas le lire. Il
-        n'est attaché à aucun compte, et Messagr ne l'enregistre nulle part, ni
-        sur nos serveurs ni sur votre téléphone&nbsp;: il reste seulement, avec
-        le lien, dans le message qui l'a apporté. L'écran qui le montre dit
-        «&nbsp;Se présente comme&nbsp;»&nbsp;: c'est le nom que la personne se
-        donne, pas un nom que Messagr connaît.
+        librement et sans y être tenue. Dans un lien, ce nom voyage dans le
+        lien lui-même, dans la partie qu'un navigateur ne transmet
+        jamais&nbsp;: nos serveurs ne le reçoivent pas, ne l'enregistrent pas
+        et ne peuvent pas le lire. Il n'est attaché à aucun compte, et Messagr
+        ne l'enregistre nulle part, ni sur nos serveurs ni sur votre
+        téléphone&nbsp;: il reste seulement, avec le lien, dans le message qui
+        l'a apporté. L'écran qui le montre dit «&nbsp;Se présente
+        comme&nbsp;»&nbsp;: c'est le nom que la personne se donne, pas un nom
+        que Messagr connaît.
+      </p>
+      <p>
+        Une invitation remise dans Messagr, entre deux comptes trouvables, n'a
+        pas de lien. Le nom y voyage scellé pour le téléphone de la personne
+        invitée&nbsp;: nos serveurs le reçoivent et le gardent sans pouvoir le
+        lire, et l'effacent dès qu'elle répond, ou à l'échéance de
+        l'invitation.
       </p>
 
       <!-- #152 : demander une invitation ne demande rien non plus, et le dire
@@ -311,6 +359,109 @@
         ne servent à aucun autre usage que l'acheminement.
       </p>
 
+      <h2>Si vous choisissez d'être trouvable</h2>
+      <!-- #392, #412 : chaque durée de cette section est déclarée dans
+           `deploy/messagr-eu/retention.json`, avec sa phrase exacte, et
+           `scripts/assert-retention.sh` vérifie que la page servie la dit. -->
+      <p>
+        Rien de cette section ne vous concerne si vous ne le choisissez pas.
+        Être trouvable permet à ceux qui ont déjà votre numéro de voir que vous
+        êtes sur Messagr et de vous inviter, et à vous de chercher lesquels de
+        vos contacts y sont. Un écran le décrit avant que vous décidiez, et
+        vous vous retirez quand vous voulez, dans les Réglages&nbsp;: votre
+        numéro quitte aussitôt la découverte.
+      </p>
+      <p>
+        <b>Votre numéro, prouvé par un SMS.</b> Vous prouvez qu'un numéro est à
+        vous par un code reçu par SMS. Le numéro arrive une seule fois en clair
+        sur notre serveur, au début de la preuve&nbsp;: il sert à choisir le
+        fournisseur du pays, à envoyer le SMS et à calculer une empreinte
+        masquée, puis il est oublié. Le serveur garde cette empreinte, jamais
+        le numéro en clair. Mais il détient la clé qui masque les numéros&nbsp;:
+        il peut donc retrouver votre numéro à partir de ce qu'il garde. Du
+        code, il ne garde qu'une empreinte, le temps de sa validité, dix
+        minutes, et l'efface dans l'heure qui suit. Une preuve vaut 28 jours,
+        et se renouvelle.
+      </p>
+      <p>
+        <b>OVHcloud envoie ce SMS, pour notre compte.</b> OVH SAS, 2 rue
+        Kellermann, 59100 Roubaix, en France, est notre sous-traitant pour cet
+        envoi&nbsp;: il reçoit votre numéro et le texte du SMS, qui ne porte que
+        le code. Dans l'heure qui suit la fin de validité de ce code, nous
+        demandons à OVHcloud d'effacer le SMS de son historique, et s'il ne l'y
+        trouve pas encore, nous le lui redemandons chaque heure pendant un
+        jour.
+      </p>
+      <p>
+        <b>Ce qu'OVHcloud garde malgré tout.</b> Comme opérateur de
+        communications électroniques, OVHcloud peut être tenu par la loi de
+        conserver des données de trafic des SMS qu'il achemine, comme le
+        numéro destinataire et la date, jusqu'à un an lorsque l'État
+        l'exige. Cette conservation est la sienne et non la nôtre&nbsp;: nous
+        ne pouvons ni l'empêcher, ni l'abréger.
+      </p>
+      <p>
+        <b>Chercher vos contacts.</b> Votre carnet d'adresses n'est lu que
+        lorsque vous lancez une recherche, sur votre téléphone. Chaque numéro y
+        est masqué avant de partir, et notre serveur le traite sans pouvoir le
+        lire&nbsp;: il ne voit ni les numéros de votre carnet, ni les noms, ni
+        qui vous cherchez, ni si la recherche trouve quelqu'un. Votre téléphone
+        compare lui-même le résultat à la liste des comptes trouvables, qui est
+        la même pour tout le monde. Les noms de vos contacts ne quittent
+        jamais votre téléphone. Chaque numéro prouvé peut faire masquer au
+        plus 5&nbsp;000 numéros en trente jours, et 5&nbsp;000 de plus sous la
+        nouvelle clé quand celle qui masque les numéros change.
+      </p>
+      <p>
+        <b>Inviter un contact.</b> Inviter un contact trouvé lui remet une
+        invitation dans Messagr, qui vaut une semaine&nbsp;: notre serveur
+        apprend qui invite qui dès l'envoi, là où un lien ne le lui apprend
+        qu'au moment où quelqu'un entre. Il le garde trente jours après son
+        acceptation ou son échéance, comme le lien entre celui qui invite et
+        celui qui entre&nbsp;: une invitation refusée le reste jusqu'à son
+        échéance. Inviter un contact qui n'est pas sur
+        Messagr passe par un lien que vous envoyez vous-même, depuis votre
+        téléphone, par SMS ou par la feuille de partage&nbsp;: son numéro ne
+        nous parvient pas. Le lien vaut alors trois jours au lieu d'une heure,
+        ce qui nous dit seulement qu'il a été émis depuis une recherche, pour
+        quelqu'un qu'elle n'a pas trouvé.
+      </p>
+      <p>
+        <b>Refuser et bloquer.</b> Une invitation se refuse sans que la personne
+        qui l'envoie le sache. «&nbsp;Refuser et bloquer&nbsp;» empêche en plus
+        ce compte de vous inviter de nouveau dans Messagr&nbsp;: nous gardons ce
+        blocage tant que vos deux comptes existent, et rien ne le dit au compte
+        bloqué.
+      </p>
+      <p>
+        <b>Ce que nous gardons, et combien de temps&nbsp;:</b>
+      </p>
+      <ul>
+        <li>
+          l'empreinte masquée de votre numéro, tant que vous êtes trouvable,
+          puis, avec le compteur des numéros qu'il a fait masquer, trente jours
+          après que vous cessez d'être trouvable&nbsp;;
+        </li>
+        <li>
+          le SMS chez OVHcloud, jusqu'à ce qu'il en soit effacé&nbsp;: nous le
+          demandons dans l'heure qui suit la fin de validité de son code, puis
+          chaque heure pendant un jour&nbsp;;
+        </li>
+        <li>
+          les compteurs des SMS envoyés, sans aucun numéro, trente jours&nbsp;;
+        </li>
+        <li>
+          qui invite qui dans une invitation remise dans Messagr, trente jours
+          après son acceptation ou son échéance, et le nom scellé qu'elle
+          porte, jusqu'à la réponse ou l'échéance&nbsp;;
+        </li>
+        <li>un blocage, tant que vos deux comptes existent&nbsp;;</li>
+        <li>
+          l'avis qu'un autre compte a prouvé votre numéro, ou que la clé qui
+          masque les numéros a changé, trente jours.
+        </li>
+      </ul>
+
       <h2>Ce qui reste sur votre appareil</h2>
       <ul>
         <li>
@@ -330,6 +481,14 @@
           notifications, à l'offre de sauvegarde et aux sauvegardes qui n'ont
           pas pu être activées. Elles ne portent ni contenu ni identifiant, et
           l'application ne les envoie nulle part&nbsp;;
+        </li>
+        <li>
+          si vous cherchez vos contacts, ce que la recherche a trouvé, dans le
+          carnet chiffré de l'application&nbsp;: une empreinte de chaque
+          numéro, jamais le numéro, et le nom des fiches trouvées. Ce qu'il
+          tient d'un numéro est oublié à la recherche qui suit le départ de ce
+          numéro de votre carnet d'adresses, et le tout, quand vous retirez le
+          vôtre&nbsp;;
         </li>
         <li>
           rien d'autre.
@@ -440,12 +599,21 @@
         au sein de l'Union européenne.
       </p>
       <p>
-        Une exception&nbsp;: le signal qui réveille votre téléphone, décrit plus
-        haut, passe par Firebase Cloud Messaging (Google) sur Android et par le
-        service de notifications d'Apple sur iOS. Ces services peuvent le traiter
-        hors de l'Union. Il ne porte que l'identifiant technique de votre
-        appareil, une priorité de remise et un nombre tiré au hasard — et, sur
-        iPhone seulement, la phrase écrite d'avance décrite plus haut.
+        Si vous choisissez d'être trouvable, le SMS qui prouve votre numéro est
+        envoyé par OVHcloud, en France, puis acheminé par les opérateurs du pays
+        de ce numéro&nbsp;: hors de l'Union pour un numéro suisse ou
+        britannique, par exemple.
+      </p>
+      <p>
+        Le signal qui réveille votre téléphone, décrit plus haut, passe par
+        Firebase Cloud Messaging (Google) sur Android et par le service de
+        notifications d'Apple sur iOS. Ces services peuvent le traiter hors de
+        l'Union. Il ne porte que l'identifiant technique de votre appareil, une
+        priorité de remise et un nombre tiré au hasard — et, sur iPhone
+        seulement, la phrase écrite d'avance décrite plus haut. Sur iPhone,
+        l'identifiant d'installation et le jeton que la bibliothèque de
+        Firebase envoie à Google, décrits plus haut, peuvent aussi être traités
+        hors de l'Union.
       </p>
 
       <h2>Sur quelle base</h2>
@@ -504,6 +672,15 @@
         conservé tant que l'examen dure. Une invitation non dépensée, elle,
         expire d'elle-même et ne vaut alors plus rien.
       </p>
+      <p>
+        <b>Ce que la découverte garde a ses durées à elle</b>, dites dans
+        «&nbsp;Si vous choisissez d'être trouvable&nbsp;»&nbsp;: la preuve, 28
+        jours&nbsp;; l'empreinte masquée de votre numéro et son compteur,
+        trente jours après que vous cessez d'être trouvable&nbsp;; le SMS chez
+        OVHcloud, jusqu'à ce qu'il en soit effacé&nbsp;; qui invite qui dans une
+        invitation remise dans Messagr, trente jours après son acceptation ou
+        son échéance&nbsp;; un blocage, tant que vos deux comptes existent.
+      </p>
 
       <h2>Ce que l'effacement peut, et ce qu'il ne peut pas</h2>
       <div class="invite">
@@ -553,10 +730,13 @@
 
       <h2>Modifications</h2>
       <p>
-        Toute modification de cette politique est publiée sur cette page, avec
-        la date de version en tête. Nous ne modifions pas rétroactivement ce que
-        le service fait de vos données&nbsp;: un changement est annoncé avant
-        d'être appliqué.
+        Nous ne modifions pas rétroactivement ce que le service fait de vos
+        données&nbsp;: un changement est annoncé avant d'être appliqué. Une
+        nouvelle version paraît trente jours avant de s'appliquer, à sa
+        propre adresse, <code>/confidentialite/a-venir/</code>, datée, avec la
+        liste de ce qui change, et la version en vigueur l'annonce en tête.
+        Une fois appliquée, la version qu'elle remplace reste lisible à une
+        adresse qui porte sa date de fin.
       </p>
 
       <footer>

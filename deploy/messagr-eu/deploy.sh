@@ -119,6 +119,23 @@ MESSAGR_DEST_ANDROID_APK="$MESSAGR_DEST_ANDROID_APK" \
 
 chmod -R u=rwX,go=rX "$poussee"
 
+# THE NOTICE STARTS THE DAY THE PAGE IS SERVED, NOT THE DAY IT IS DATED (#412).
+#
+# `version-a-venir.mjs annoncer` refuses a date less than thirty days from the
+# day it writes into the repository, and LISEZ-MOI-pages-legales.md says to
+# deploy that same day. Nothing held the second half: an announcement deployed
+# a week late would give a week less than the policy promises. So an upcoming
+# version the server does not serve yet is measured here, against today,
+# before anything goes up; a short notice stops the deployment, and the date
+# is postponed first.
+for venir in "$poussee"/*/a-venir/index.html; do
+  [ -f "$venir" ] || continue
+  served="${venir#"$poussee"/}"
+  if ! ssh "$HOST" "test -f $SITE_DIR/$served"; then
+    node version-a-venir.mjs preavis "$venir"
+  fi
+done
+
 ssh "$HOST" "sudo mkdir -p $SITE_DIR/i $SITE_DIR/.well-known"
 
 # THE FILE GOES UP BEFORE THE PAGE THAT NAMES IT, AND COMES DOWN AFTER.
@@ -184,6 +201,23 @@ echo "== site → $HOST:$SITE_DIR"
 # rsync --checksum: only files actually modified are pushed.
 rsync -av --checksum --rsync-path="sudo rsync" \
   "$poussee/" "$HOST:$SITE_DIR/"
+
+# AN UPCOMING VERSION LEAVES THE BUILD, AND THEREFORE THE SERVER (#412).
+#
+# The send above deletes nothing, on purpose. But an upcoming version of a
+# legal page leaves the build the day it applies, when
+# `version-a-venir.mjs appliquer` makes it the version in force: without
+# this, `/confidentialite/a-venir/` would stay served, saying the policy
+# « s'appliquera » on the day it already does. So what the build does not
+# hold under `<page>/a-venir/` is not served either, and nothing else is
+# touched: the names come from the server, and only that shape is removed.
+for venir in $(ssh "$HOST" "cd $SITE_DIR && ls -d -- */a-venir 2>/dev/null || true"); do
+  [[ "$venir" =~ ^[a-z0-9-]+/a-venir$ ]] || continue
+  if [ ! -d "$poussee/$venir" ]; then
+    echo "== retiring $HOST:$SITE_DIR/$venir, which this build does not hold"
+    ssh "$HOST" "sudo rm -rf -- '$SITE_DIR/$venir'"
+  fi
+done
 
 if [ "$MESSAGR_APK" = "none" ]; then
   echo "== withdrawing $HOST:$SITE_DIR/$APK_NAME"

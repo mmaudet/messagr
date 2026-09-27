@@ -331,6 +331,27 @@ messages.** Somebody handed a file of keys has not received their data.
 Retired. It named one artifact when there was one; there are now three, and
 each is named above.
 
+### Legal pages
+
+**Version in force**:
+The privacy policy or the terms as they apply today, at the page's usual
+address.
+_Avoid_: Current version, which an upcoming version also is once served
+
+**Upcoming version**:
+A new version of a legal page, at its own address, with the date it applies
+and the list of what changes; the version in force announces it. It waits in
+the repository until the owner sets the date, and nothing serves it. It is
+announced at least thirty days ahead, may be postponed but never brought
+forward, and is applied on its date.
+_Avoid_: Draft, next version
+
+**Dated version**:
+A version in force that an upcoming version replaced, kept readable at an
+address carrying the date it stopped applying. The version that replaced it
+links to it.
+_Avoid_: Archive, old version
+
 ### Design
 
 **Design token**:

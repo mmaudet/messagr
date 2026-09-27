@@ -91,3 +91,106 @@ exactement ces trois requêtes — le travail de publication le lance avant de
 construire quoi que ce soit. Google suit le lien de la politique pendant
 l'examen, il va chercher la ressource de suppression, Apple visite l'URL
 d'assistance, et une 404 fait échouer sans dire clairement pourquoi.
+
+Le même contrôle connaît aussi les versions autour de celle en vigueur,
+décrites ci-dessous : une version à venir répond une fois annoncée, et pas
+avant ; une version remplacée répond à son adresse datée.
+
+## Une nouvelle version
+
+La politique promet qu'un changement est annoncé avant d'être appliqué, et
+#392 a fixé ce délai à trente jours. Une nouvelle version paraît donc à sa
+propre adresse, `/confidentialite/a-venir/` ou
+`/conditions-generales/a-venir/`, datée, avec la liste de ce qui change, et
+la version en vigueur l'annonce en tête. Le jour où elle s'applique, elle
+prend l'adresse habituelle, et celle qu'elle remplace reste lisible à une
+adresse qui porte sa date de fin, par exemple
+`/confidentialite/jusqu-au-2026-11-01/`. Décisions du porteur du 27
+septembre 2026, sur #412.
+
+Trois gestes, dans `version-a-venir.mjs`, écrivent dans le dépôt et rien
+d'autre. Chacun est suivi d'un commit et d'un déploiement
+(`deploy/messagr-eu/deploy.sh`), puis des trois contrôles :
+
+    ./scripts/assert-legal-pages.sh
+    ./scripts/assert-retention.sh
+    ./scripts/assert-push-payload.sh --live
+
+Le déploiement de messagr.eu se fait avec l'accord du porteur.
+
+### Préparer
+
+Une version à venir attend dans le dépôt tant que le porteur n'a pas fixé
+sa date. Pendant ce temps, rien d'elle n'est servi : `build-site.sh` ne
+construit pas une page qui porte la marque `MESSAGR-DATE-A-VENIR`, et
+retire de la version en vigueur le passage qui l'annonce. Un déploiement
+fait pour autre chose publie donc le site d'aujourd'hui, exactement.
+
+Pour en préparer une, à partir de la version en vigueur :
+
+1. La recopier dans `<page>/a-venir/index.html`, et y dire « à venir » dans
+   le titre (`… à venir — Messagr`) et dans le `h1`. Si elle vient d'une
+   version appliquée, retirer de la copie sa carte « Cette version s'applique
+   depuis… », entre `<!-- depuis -->` et `<!-- /depuis -->` : la version à
+   venir en porte une à elle, et `annoncer` refuse une copie qui garde
+   l'ancienne.
+2. Écrire en tête, dans le `<p class="stamp">`, « Version applicable le
+   MESSAGR-DATE-A-VENIR », puis une carte dont le début, entre
+   `<!-- a-venir -->` et `<!-- /a-venir -->`, dit « Cette version
+   s'appliquera le MESSAGR-DATE-A-VENIR. », renvoie à la version en vigueur
+   (`href="/<page>/"`) et se termine par « Ce qui change : ». La liste de ce
+   qui change suit, hors de ce passage : elle reste, sous « Ce qui a
+   changé », une fois la version appliquée.
+3. Dans la version en vigueur, juste après sa date, un passage entre les
+   mêmes marques, qui porte la marque et renvoie à `/<page>/a-venir/`.
+4. Pour une durée nouvelle, une entrée de `retention.json` avec sa phrase
+   exacte et `"page": "/confidentialite/a-venir/"` : `assert-retention.sh`
+   la vérifie à cette adresse une fois la version annoncée.
+
+`deploy/messagr-eu/tests/version-a-venir.js` prépare une version ainsi
+quand le dépôt n'en tient aucune, et mène le cycle entier deux fois.
+
+### Annoncer
+
+    node deploy/messagr-eu/version-a-venir.mjs annoncer AAAA-MM-JJ
+
+La date est celle où la version s'appliquera, trente jours au moins après
+aujourd'hui, comptés en jours du calendrier de Paris ; une date plus proche
+est refusée. Le geste l'écrit à la place de la marque, dans la version à
+venir et dans le passage qui l'annonce. Il refuse une version dont la forme
+ne permettrait pas les deux gestes suivants.
+
+Le préavis court du jour où la page est servie : le déploiement suit
+l'annonce le jour même. `deploy.sh` le mesure de nouveau avant d'envoyer une
+version à venir que le serveur ne sert pas encore
+(`version-a-venir.mjs preavis`), et s'arrête s'il reste moins de trente
+jours : la date se reporte d'abord.
+
+### Reporter
+
+    node deploy/messagr-eu/version-a-venir.mjs reporter AAAA-MM-JJ
+
+Une date annoncée peut reculer, jamais avancer : le préavis donné vaut pour
+toute date plus lointaine. Avancer demande une annonce nouvelle, avec ses
+trente jours : annuler le commit d'annonce, annoncer la nouvelle date, et
+déployer.
+
+### Appliquer
+
+    node deploy/messagr-eu/version-a-venir.mjs appliquer
+
+Le jour venu, à Paris, et pas avant. Une version annoncée pour plus tard,
+ou pas encore annoncée, attend. Pour chaque page dont la version à venir est
+annoncée pour ce jour-là ou avant :
+
+- la version en vigueur part à `<page>/jusqu-au-AAAA-MM-JJ/`, et dit
+  jusqu'à quand elle s'est appliquée, et ce qui l'a remplacée ;
+- la version à venir devient la version en vigueur, et renvoie à celle
+  qu'elle remplace ;
+- `<page>/a-venir/` disparaît du dépôt, et `retention.json` perd ses
+  `"page"`, dont les phrases se vérifient désormais sur la politique en
+  vigueur.
+
+Le déploiement retire `<page>/a-venir/` du serveur : sans cela, la page
+resterait servie, et dirait que la politique « s'appliquera » le jour où
+elle s'applique déjà.

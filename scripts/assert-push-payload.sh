@@ -43,6 +43,10 @@ ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 GATEWAY="$ROOT/services/invitations/src/handlers/wake.rs"
 PAGE_SOURCE="$ROOT/deploy/messagr-eu/site/confidentialite/index.html"
 PAGE="${MESSAGR_SITE:-https://messagr.eu}/confidentialite/"
+# The upcoming version (#412), when the repository holds one: the policy the
+# day it applies, so held to the same claims from the day it is written.
+UPCOMING_SOURCE="$ROOT/deploy/messagr-eu/site/confidentialite/a-venir/index.html"
+UPCOMING="${MESSAGR_SITE:-https://messagr.eu}/confidentialite/a-venir/"
 
 failed=0
 say_ok() { printf '  OK    %s\n' "$1"; }
@@ -278,16 +282,27 @@ MUST_SAY_4="${BLIND_FR:-Quelque chose est arrivé.}"
 MUST_SAY_5="Elle ne nomme ni votre correspondant, ni votre conversation, ni vous"
 MUST_NOT_SAY="il n'existe aucun tiers dans cette application"
 
+holds_the_claims() {
+  local where="$1" text="$2"
+  check_text "$where" "$text" "$MUST_SAY_1"
+  check_text "$where" "$text" "$MUST_SAY_2"
+  check_text "$where" "$text" "$MUST_SAY_3"
+  check_text "$where" "$text" "$MUST_SAY_4"
+  check_text "$where" "$text" "$MUST_SAY_5"
+  refute_text "$where" "$text" "$MUST_NOT_SAY"
+}
+
 source_text="$(cat "$PAGE_SOURCE" 2>/dev/null || true)"
 if [ -z "$source_text" ]; then
   say_bad "the policy page is missing from the repository: $PAGE_SOURCE"
 else
-  check_text "the page in the repository" "$source_text" "$MUST_SAY_1"
-  check_text "the page in the repository" "$source_text" "$MUST_SAY_2"
-  check_text "the page in the repository" "$source_text" "$MUST_SAY_3"
-  check_text "the page in the repository" "$source_text" "$MUST_SAY_4"
-  check_text "the page in the repository" "$source_text" "$MUST_SAY_5"
-  refute_text "the page in the repository" "$source_text" "$MUST_NOT_SAY"
+  holds_the_claims "the page in the repository" "$source_text"
+fi
+
+upcoming_announced=0
+if [ -f "$UPCOMING_SOURCE" ]; then
+  holds_the_claims "the upcoming page in the repository" "$(cat "$UPCOMING_SOURCE")"
+  grep -qF 'MESSAGR-DATE-A-VENIR' "$UPCOMING_SOURCE" || upcoming_announced=1
 fi
 
 # THE LIVE HALF IS BINDING ONLY WHEN THE BUILD IS OUT.
@@ -302,10 +317,14 @@ fi
 binding=0
 [ "${1:-}" = "--live" ] && binding=1
 
-live_text="$(curl -sSL --max-time 20 "$PAGE" 2>/dev/null || true)"
-if [ -z "$live_text" ]; then
-  printf '  SKIP  the live page could not be read at %s\n' "$PAGE"
-else
+live_half() {
+  local label="$1" url="$2"
+  local live_text behind
+  live_text="$(curl -sSL --max-time 20 "$url" 2>/dev/null || true)"
+  if [ -z "$live_text" ]; then
+    printf '  SKIP  %s could not be read at %s\n' "$label" "$url"
+    return
+  fi
   behind=0
   for phrase in "$MUST_SAY_1" "$MUST_SAY_2" "$MUST_SAY_3" "$MUST_SAY_4" \
     "$MUST_SAY_5"; do
@@ -314,12 +333,21 @@ else
   printf '%s' "$live_text" | tr -s ' \n' ' ' | grep -qF "$MUST_NOT_SAY" && behind=1
 
   if [ "$behind" -eq 0 ]; then
-    say_ok "the live page says what the repository's does"
+    say_ok "$label says what the repository's does"
   elif [ "$binding" -eq 1 ]; then
-    say_bad "the live page is behind the repository's, and this is a release"
+    say_bad "$label is behind the repository's, and this is a release"
   else
-    printf '  AHEAD the repository page is not deployed yet; deploy it with the build\n'
+    printf '  AHEAD %s is not deployed yet; deploy it with the build\n' "$label"
   fi
+}
+
+live_half "the live page" "$PAGE"
+# The upcoming version from the day it is announced, and not before: until
+# then nothing serves it, and the build refuses to.
+if [ "$upcoming_announced" -eq 1 ]; then
+  live_half "the live upcoming page" "$UPCOMING"
+elif [ -f "$UPCOMING_SOURCE" ]; then
+  printf '  ----  the upcoming page is not announced yet; its live half waits for the date\n'
 fi
 
 if [ "$failed" -ne 0 ]; then
