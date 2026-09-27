@@ -70,8 +70,7 @@ async fn sweep_discovery(st: &Arc<AppState>, now: i64) -> Result<[u64; 6]> {
     let erased = crate::sms_history::erase_due(st, now).await;
     let counters = crate::ceilings::purge_counters(&st.pool, now).await;
     let masking = crate::masking_quota::purge(&st.pool, now).await;
-    let delivered =
-        crate::handlers::delivered::purge_ended(&st.pool, now, st.cfg.edge_retention_days).await;
+    let delivered = purge_delivered_invitations(&st.pool, now, st.cfg.edge_retention_days).await;
     let credits = crate::ceilings::check_the_credits(st, now).await;
     credits?;
     Ok([spent?, ended?, erased?, counters?, masking?, delivered?])
@@ -96,6 +95,35 @@ pub async fn purge_ended_proofs(pool: &SqlitePool, now: i64) -> Result<u64> {
         .execute(pool)
         .await?;
     Ok(masks.rows_affected() + notices.rows_affected())
+}
+
+/// Les invitations remises dans Messagr (#404) : le refus d'une invitation
+/// arrivée à échéance s'oublie, et qui a invité qui s'oublie trente jours
+/// après sa fin, sa réclamation ou son échéance, la durée des liens.
+///
+/// UN REFUS NE SERT QU'AVANT L'ÉCHÉANCE : il retire l'invitation de la liste
+/// du destinataire, qui ne montre plus rien passé l'échéance. Gardé au-delà,
+/// il ne dirait qu'une chose, à qui lirait une copie de la base : que tel
+/// compte a refusé tel autre. Rendre `declined` à zéro compte parmi les lignes
+/// oubliées.
+pub async fn purge_delivered_invitations(
+    pool: &SqlitePool,
+    now: i64,
+    retention_days: i64,
+) -> Result<u64> {
+    let refusals = sqlx::query(
+        "UPDATE delivered_invitations SET declined = 0 WHERE declined = 1 AND expires_at <= ?",
+    )
+    .bind(now)
+    .execute(pool)
+    .await?;
+    let ended = sqlx::query(
+        "DELETE FROM delivered_invitations WHERE COALESCE(claimed_at, expires_at) <= ?",
+    )
+    .bind(now - retention_days * 86_400)
+    .execute(pool)
+    .await?;
+    Ok(refusals.rows_affected() + ended.rows_affected())
 }
 
 /// Qui a fait entrer qui, oublié trente jours après que l'invitation a été

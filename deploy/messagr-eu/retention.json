@@ -20,7 +20,8 @@
     "applique_par": [
       "services/invitations : EDGE_RETENTION_DAYS, défaut 30",
       "purge_after IS NULL = gelé par un signalement, jamais purgé",
-      "services/invitations : cleanup::purge_invitation_graph, même durée, pour les invitations, les comptes réservés et les attentes de comptes existants, qui portent le même lien (#416)"
+      "services/invitations : cleanup::purge_invitation_graph, même durée, pour les invitations, les comptes réservés et les attentes de comptes existants, qui portent le même lien (#416)",
+      "services/invitations : cleanup::purge_delivered_invitations, même durée, pour les invitations remises dans Messagr, dont le refus s'oublie à l'échéance (#404)"
     ],
     "$manque": "Les copies de la base de production gardées sur l'hôte portent encore ces lignes, et des arêtes de plus de trente jours, qu'aucun ménage ne touche : à purger ou supprimer avec l'accord du porteur (#416)."
   },

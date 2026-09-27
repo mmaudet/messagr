@@ -181,6 +181,9 @@ fn router(state: Arc<AppState>) -> Router {
         .route("/discovery/keys", get(handlers::discovery::public_keys))
         .route("/discovery/masks", post(handlers::discovery::mask_batch))
         .route("/discovery/directory", get(handlers::discovery::directory))
+        // INVITING A CONTACT FOUND (#404): an invitation delivered inside the
+        // application, to a reference of the directory, and its answer. The
+        // service never learns the conversation it leads to.
         .route(
             "/discovery/invitations",
             post(handlers::delivered::send).get(handlers::delivered::waiting),

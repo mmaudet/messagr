@@ -2,13 +2,17 @@
 -- trouvable invite le compte derrière la référence d'un contact trouvé,
 -- jamais son numéro. Sept jours, un seul usage.
 --
--- QUI INVITE QUI, DÈS L'ENVOI, trente jours après la fin de l'invitation
--- (sa réclamation, ou son échéance), comme pour un lien (#416). JAMAIS LA
+-- QUI INVITE QUI, DÈS L'ENVOI, y compris pour une invitation refusée ou
+-- restée sans réponse : c'est le prix que nomme l'ADR 0014, qu'un lien ne
+-- paie qu'à sa réclamation. Gardé trente jours après la fin de l'invitation
+-- (sa réclamation, ou son échéance), la durée des liens (#416). JAMAIS LA
 -- CONVERSATION VISÉE : l'appareil de l'inviteur la tient, et y invite le
 -- compte quand la réclamation arrive. Aucune colonne ne la porterait.
 --
--- Un refus se note pour le seul destinataire : l'inviteur lit l'invitation
--- en attente jusqu'à son échéance, comme une invitation que personne n'a vue.
+-- UN REFUS SE NOTE POUR LE SEUL DESTINATAIRE, sans date, et s'oublie à
+-- l'échéance : l'inviteur lit l'invitation en attente jusqu'à son échéance,
+-- comme une invitation que personne n'a vue, et une copie de la base ne dit
+-- plus rien d'un refus passé.
 CREATE TABLE delivered_invitations (
     id                TEXT    PRIMARY KEY,
     inviter_user_id   TEXT    NOT NULL,
@@ -16,7 +20,7 @@ CREATE TABLE delivered_invitations (
     sent_at           INTEGER NOT NULL,
     expires_at        INTEGER NOT NULL,
     claimed_at        INTEGER,
-    declined_at       INTEGER
+    declined          INTEGER NOT NULL DEFAULT 0
 );
 
 CREATE INDEX delivered_invitations_by_recipient

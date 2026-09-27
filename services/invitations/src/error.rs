@@ -438,7 +438,9 @@ pub enum AppError {
     UnknownReference,
     /// The reference is the caller's own (#404): the person's own number is
     /// in their address book, and an invitation to oneself leads nowhere.
-    #[error("this reference is the caller's own number")]
+    /// 422 and not 400, for `CountryClosed`'s reason: the reference is well
+    /// formed and names a findable account.
+    #[error("this reference is your own number: an invitation to yourself leads nowhere")]
     OwnReference,
     #[error(transparent)]
     Internal(#[from] anyhow::Error),
@@ -588,7 +590,7 @@ impl IntoResponse for AppError {
             AppError::UnknownMaskingKey => (StatusCode::NOT_FOUND, "MESSAGR_UNKNOWN_MASKING_KEY"),
             AppError::NotABatch => (StatusCode::BAD_REQUEST, "MESSAGR_NOT_A_BATCH"),
             AppError::UnknownReference => (StatusCode::NOT_FOUND, "MESSAGR_UNKNOWN_REFERENCE"),
-            AppError::OwnReference => (StatusCode::BAD_REQUEST, "MESSAGR_OWN_REFERENCE"),
+            AppError::OwnReference => (StatusCode::UNPROCESSABLE_ENTITY, "MESSAGR_OWN_REFERENCE"),
             AppError::MaskingQuotaReached { .. } => {
                 (StatusCode::TOO_MANY_REQUESTS, "MESSAGR_MASKING_QUOTA")
             }
@@ -917,7 +919,7 @@ mod tests {
             // INVITING A CONTACT FOUND (#404): a reference that names nobody
             // findable, and the caller's own.
             (AppError::UnknownReference, 404, "MESSAGR_UNKNOWN_REFERENCE"),
-            (AppError::OwnReference, 400, "MESSAGR_OWN_REFERENCE"),
+            (AppError::OwnReference, 422, "MESSAGR_OWN_REFERENCE"),
         ] {
             let (got, body) = render(refusal).await;
             assert_eq!(
