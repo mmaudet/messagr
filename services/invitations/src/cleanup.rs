@@ -97,22 +97,25 @@ pub async fn purge_ended_proofs(pool: &SqlitePool, now: i64) -> Result<u64> {
     Ok(masks.rows_affected() + notices.rows_affected())
 }
 
-/// Les invitations remises dans Messagr (#404) : le refus d'une invitation
-/// arrivée à échéance s'oublie, et qui a invité qui s'oublie trente jours
-/// après sa fin, sa réclamation ou son échéance, la durée des liens.
+/// Les invitations remises dans Messagr (#404) : le refus et le nom scellé
+/// d'une invitation arrivée à échéance s'oublient, et qui a invité qui
+/// s'oublie trente jours après sa fin, sa réclamation ou son échéance, la
+/// durée des liens.
 ///
 /// UN REFUS NE SERT QU'AVANT L'ÉCHÉANCE : il retire l'invitation de la liste
 /// du destinataire, qui ne montre plus rien passé l'échéance. Gardé au-delà,
 /// il ne dirait qu'une chose, à qui lirait une copie de la base : que tel
-/// compte a refusé tel autre. Rendre `declined` à zéro compte parmi les lignes
-/// oubliées.
+/// compte a refusé tel autre. LE NOM SCELLÉ NON PLUS (#405) : aucun écran ne
+/// le montre passé l'échéance. Effacer l'un ou l'autre compte parmi les
+/// lignes oubliées.
 pub async fn purge_delivered_invitations(
     pool: &SqlitePool,
     now: i64,
     retention_days: i64,
 ) -> Result<u64> {
     let refusals = sqlx::query(
-        "UPDATE delivered_invitations SET declined = 0 WHERE declined = 1 AND expires_at <= ?",
+        "UPDATE delivered_invitations SET declined = 0, sealed_name = NULL \
+         WHERE (declined = 1 OR sealed_name IS NOT NULL) AND expires_at <= ?",
     )
     .bind(now)
     .execute(pool)

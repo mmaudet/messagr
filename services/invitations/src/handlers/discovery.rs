@@ -11,9 +11,10 @@
 //! - `POST /discovery/proofs`: a number, in international form. The service
 //!   masks it, keeps the mask and a digest of a fresh code, and sends the code
 //!   by SMS. The number itself is forgotten when the request ends;
-//! - `POST /discovery/proofs/finish`: the code. Right, the account becomes
-//!   findable for 28 days, and the number stops making any other account
-//!   findable: the last proof wins, and the account it replaces is told;
+//! - `POST /discovery/proofs/finish`: the code, and the device's public
+//!   envelope key (#405). Right, the account becomes findable for 28 days,
+//!   and the number stops making any other account findable: the last proof
+//!   wins, and the account it replaces is told;
 //! - `DELETE /discovery/number`: the account stops being findable at once.
 //!   Its mask stays thirty days at the service, like that of a proof run
 //!   out (#398).
@@ -26,9 +27,11 @@
 //! - `POST /discovery/masks`: a batch of blinded elements, evaluated under
 //!   the key named, with one proof for all of them. The service cannot read
 //!   what it masks;
-//! - `GET /discovery/directory`: every current proof, as a mask and an
-//!   opaque reference, the same for everyone. The device compares its masks
-//!   with it, so the service never learns whether a contact was found.
+//! - `GET /discovery/directory`: every current proof, as a mask, an opaque
+//!   reference and the envelope key published with it, the same for everyone.
+//!   The device compares its masks with it, so the service never learns
+//!   whether a contact was found; the key is what an inviter seals its name
+//!   for (#405).
 //!
 //! # WHAT THE SERVICE KEEPS OF A NUMBER
 //!
@@ -172,7 +175,16 @@ pub async fn start_proof(
 #[derive(Deserialize)]
 pub struct FinishRequest {
     pub code: String,
+    /// The public envelope key of the device proving the number (#405):
+    /// X25519, 32 bytes, base64. An inviter seals its name for it, and the
+    /// service never holds what opens it. Absent, invitations to this account
+    /// arrive without a name.
+    #[serde(default)]
+    pub envelope_key: Option<String>,
 }
+
+/// The size of an envelope key: an X25519 public key.
+pub const ENVELOPE_KEY_BYTES: usize = 32;
 
 #[derive(Serialize)]
 pub struct Findable {
@@ -186,6 +198,11 @@ pub async fn finish_proof(
 ) -> Result<Json<Findable>, AppError> {
     let user = auth::authenticate(&st.mx, &headers).await?;
     served(&st)?;
+    let envelope_key = req
+        .envelope_key
+        .as_deref()
+        .map(|key| decoded_of_size(key, ENVELOPE_KEY_BYTES))
+        .transpose()?;
     let now = st.cfg.clock.now();
     let pending: Option<(i64, Vec<u8>, Vec<u8>, i64)> = sqlx::query_as(
         "SELECT key_id, mask, code_digest, expires_at FROM pending_proofs WHERE user_id = ?",
@@ -276,9 +293,12 @@ pub async fn finish_proof(
         .execute(&mut *tx)
         .await
         .map_err(anyhow::Error::from)?;
+    // THE ENVELOPE KEY GOES WITH THE PROOF (#405): a new proof replaces it,
+    // and one that brings none leaves the account without one.
     sqlx::query(
-        "INSERT INTO findable_numbers (key_id, mask, user_id, reference, proven_at, expires_at) \
-         VALUES (?, ?, ?, ?, ?, ?)",
+        "INSERT INTO findable_numbers \
+         (key_id, mask, user_id, reference, proven_at, expires_at, envelope_key) \
+         VALUES (?, ?, ?, ?, ?, ?, ?)",
     )
     .bind(key_id)
     .bind(&mask)
@@ -286,6 +306,7 @@ pub async fn finish_proof(
     .bind(kept_reference.unwrap_or_else(|| uuid::Uuid::new_v4().simple().to_string()))
     .bind(now)
     .bind(until)
+    .bind(envelope_key)
     .execute(&mut *tx)
     .await
     .map_err(anyhow::Error::from)?;
@@ -540,12 +561,20 @@ pub struct DirectoryEntry {
     pub mask: String,
     /// What the service knows the account by, and nobody else can link to it.
     pub reference: String,
+    /// The public envelope key published with the proof, base64 (#405).
+    /// Absent when the device published none.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub envelope_key: Option<String>,
 }
 
 #[derive(Serialize)]
 pub struct Directory {
     pub entries: Vec<DirectoryEntry>,
 }
+
+/// A directory entry as the table holds it: key number, mask, reference, and
+/// the envelope key published with the proof (#405).
+type DirectoryRow = (i64, Vec<u8>, String, Option<Vec<u8>>);
 
 /// `GET /discovery/directory`: every current proof, the same for everyone.
 ///
@@ -557,8 +586,8 @@ pub async fn directory(
     headers: HeaderMap,
 ) -> Result<Json<Directory>, AppError> {
     findable_caller(&st, &headers).await?;
-    let rows: Vec<(i64, Vec<u8>, String)> = sqlx::query_as(
-        "SELECT key_id, mask, reference FROM findable_numbers \
+    let rows: Vec<DirectoryRow> = sqlx::query_as(
+        "SELECT key_id, mask, reference, envelope_key FROM findable_numbers \
          WHERE withdrawn_at IS NULL AND expires_at > ? ORDER BY key_id, mask",
     )
     .bind(st.cfg.clock.now())
@@ -567,11 +596,12 @@ pub async fn directory(
     .map_err(anyhow::Error::from)?;
     let entries = rows
         .into_iter()
-        .map(|(key_number, mask, reference)| {
+        .map(|(key_number, mask, reference, envelope_key)| {
             Ok(DirectoryEntry {
                 key_number: u32::try_from(key_number).map_err(anyhow::Error::from)?,
                 mask: BASE64.encode(&mask),
                 reference,
+                envelope_key: envelope_key.map(|key| BASE64.encode(&key)),
             })
         })
         .collect::<Result<Vec<_>, AppError>>()?;
@@ -720,6 +750,15 @@ async fn proves_it_now(
 }
 
 /// What discovery serves with, or `DiscoveryOff` (`Config::discovery`).
+/// `text`, base64, if it decodes to exactly `size` bytes (#405).
+pub(crate) fn decoded_of_size(text: &str, size: usize) -> Result<Vec<u8>, AppError> {
+    BASE64
+        .decode(text.as_bytes())
+        .ok()
+        .filter(|bytes| bytes.len() == size)
+        .ok_or(AppError::NotAnEnvelope)
+}
+
 fn served(st: &AppState) -> Result<crate::config::Discovery<'_>, AppError> {
     st.cfg.discovery().map_err(|_| AppError::DiscoveryOff)
 }
@@ -945,10 +984,23 @@ pub(crate) mod test_support {
         who: &str,
         code: &str,
     ) -> Result<Findable, AppError> {
+        finish_with_key(st, who, code, None).await
+    }
+
+    /// The same, publishing an envelope key (#405), base64.
+    pub(crate) async fn finish_with_key(
+        st: &Arc<AppState>,
+        who: &str,
+        code: &str,
+        envelope_key: Option<&str>,
+    ) -> Result<Findable, AppError> {
         finish_proof(
             State(st.clone()),
             bearer(who),
-            Body(FinishRequest { code: code.into() }),
+            Body(FinishRequest {
+                code: code.into(),
+                envelope_key: envelope_key.map(Into::into),
+            }),
         )
         .await
         .map(|Json(r)| r)
@@ -978,6 +1030,7 @@ mod tests {
     use super::*;
     use crate::util;
     use sqlx::SqlitePool;
+    use std::collections::HashMap;
     use std::sync::Mutex;
 
     #[sqlx::test(migrations = "./migrations")]
@@ -1823,6 +1876,82 @@ mod tests {
         );
     }
 
+    /// Each reference of the directory, with the envelope key it carries.
+    async fn envelope_keys(st: &Arc<AppState>) -> HashMap<String, Option<String>> {
+        directory_of(st, "bob")
+            .await
+            .unwrap()
+            .entries
+            .into_iter()
+            .map(|e| (e.reference, e.envelope_key))
+            .collect()
+    }
+
+    #[sqlx::test(migrations = "./migrations")]
+    async fn a_proof_publishes_the_envelope_key_the_directory_carries_and_the_next_replaces(
+        pool: SqlitePool,
+    ) {
+        let (ovh, inbox) = fake_ovhcloud(false).await;
+        let st = state_with(pool.clone(), whoami_hs().await, Some(ovh));
+        let first = BASE64.encode(&[1; ENVELOPE_KEY_BYTES]);
+        let second = BASE64.encode(&[2; ENVELOPE_KEY_BYTES]);
+
+        start(&st, "alice", NUMBER).await.unwrap();
+        finish_with_key(&st, "alice", &last_code(&inbox), Some(&first))
+            .await
+            .unwrap();
+        prove(&st, &inbox, "bob", OTHER).await;
+        let alice = reference_of(&pool, "alice").await.unwrap();
+        let bob = reference_of(&pool, "bob").await.unwrap();
+
+        let listed = envelope_keys(&st).await;
+        assert_eq!(listed[&alice], Some(first));
+        assert_eq!(listed[&bob], None, "a proof that published no key");
+
+        // A RENEWAL IS A NEW PROOF, and its key replaces the last.
+        start(&st, "alice", NUMBER).await.unwrap();
+        finish_with_key(&st, "alice", &last_code(&inbox), Some(&second))
+            .await
+            .unwrap();
+        assert_eq!(envelope_keys(&st).await[&alice], Some(second));
+    }
+
+    #[sqlx::test(migrations = "./migrations")]
+    async fn an_envelope_key_of_any_other_size_is_refused_and_spends_no_attempt(pool: SqlitePool) {
+        let (ovh, inbox) = fake_ovhcloud(false).await;
+        let st = state_with(pool, whoami_hs().await, Some(ovh));
+        start(&st, "alice", NUMBER).await.unwrap();
+        let code = last_code(&inbox);
+
+        for wrong in [
+            BASE64.encode(&[1; ENVELOPE_KEY_BYTES - 1]),
+            BASE64.encode(&[1; ENVELOPE_KEY_BYTES + 1]),
+            "not base64 at all".to_string(),
+        ] {
+            assert!(matches!(
+                finish_with_key(&st, "alice", &code, Some(&wrong)).await,
+                Err(AppError::NotAnEnvelope)
+            ));
+        }
+        for _ in 0..ATTEMPTS {
+            assert!(matches!(
+                finish_with_key(&st, "alice", "000000", Some("not base64 at all")).await,
+                Err(AppError::NotAnEnvelope)
+            ));
+        }
+        assert!(
+            finish_with_key(
+                &st,
+                "alice",
+                &code,
+                Some(&BASE64.encode(&[1; ENVELOPE_KEY_BYTES]))
+            )
+            .await
+            .is_ok(),
+            "the code is still good: a key refused is not a wrong code"
+        );
+    }
+
     #[sqlx::test(migrations = "./migrations")]
     async fn the_directory_holds_the_current_proofs_and_is_the_same_for_everyone(pool: SqlitePool) {
         let (ovh, inbox) = fake_ovhcloud(false).await;
@@ -1959,16 +2088,30 @@ mod tests {
             serde_json::json!({"key_number": 1, "evaluated": ["e"], "batch_proof": "p"})
         );
         let listed = serde_json::to_value(Directory {
-            entries: vec![DirectoryEntry {
-                key_number: 1,
-                mask: "m".into(),
-                reference: "r".into(),
-            }],
+            entries: vec![
+                DirectoryEntry {
+                    key_number: 1,
+                    mask: "m".into(),
+                    reference: "r".into(),
+                    envelope_key: Some("k".into()),
+                },
+                // A PROOF THAT PUBLISHED NO ENVELOPE KEY (#405) has no field
+                // for it, rather than a null the device would have to read.
+                DirectoryEntry {
+                    key_number: 1,
+                    mask: "n".into(),
+                    reference: "s".into(),
+                    envelope_key: None,
+                },
+            ],
         })
         .unwrap();
         assert_eq!(
             listed,
-            serde_json::json!({"entries": [{"key_number": 1, "mask": "m", "reference": "r"}]})
+            serde_json::json!({"entries": [
+                {"key_number": 1, "mask": "m", "reference": "r", "envelope_key": "k"},
+                {"key_number": 1, "mask": "n", "reference": "s"},
+            ]})
         );
         let asked: MaskRequest =
             serde_json::from_value(serde_json::json!({"key_number": 2, "blinded": ["b"]})).unwrap();
