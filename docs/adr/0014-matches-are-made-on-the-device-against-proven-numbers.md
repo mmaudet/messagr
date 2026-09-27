@@ -236,7 +236,8 @@ proves a new number keeps its reference. A retirement at once changes that key
 too, and only a retirement does: the start refuses a key that served before a
 retirement, and a new one given without a retirement since the previous one
 began, and a service still running through a retirement proves nothing until
-it restarts with a new key. The accounts the retirement stopped come back
+it restarts with a new key. What came before what is read in the order of
+retirements, never from the clock. The accounts the retirement stopped come back
 under a reference nothing relates to the lost key, as the amendment above
 asks. An account the retirement did not stop keeps its reference while its
 proof lives; forgotten afterwards, it comes back under the new key's

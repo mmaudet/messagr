@@ -79,6 +79,10 @@ with (#451), 32 random bytes in base64, minted like a seed:
     one began to serve: every account whose proof is later forgotten would
     come back under a new reference, which whoever found it reads as a number
     that changed hands. Put the previous key back.
+- **Lost, or shown where it should not be**: retire at once every masking key
+  in service, below, and give `REFERENCE_KEY` a new key. That is the only way
+  it changes, and the accounts made findable come back under new references,
+  which nothing relates to the old key.
 
 ### Changing the key, once a year
 

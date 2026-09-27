@@ -166,6 +166,15 @@ where
     .execute(&mut *tx)
     .await
     .map_err(unwritten)?;
+    // AND IN THE ORDER OF RETIREMENTS (#451), which the start and every proof
+    // read to tell a reference key that served before it from one given
+    // after it: the clock cannot, two events may fall in one second.
+    sqlx::query("INSERT INTO retirements (key_id, retired_at) VALUES (?, ?)")
+        .bind(i64::from(key_id))
+        .bind(now)
+        .execute(&mut *tx)
+        .await
+        .map_err(unwritten)?;
     for erased in [
         "DELETE FROM findable_numbers WHERE key_id = ?",
         "DELETE FROM pending_proof_masks WHERE key_id = ?",
@@ -272,14 +281,8 @@ mod tests {
             .0;
         assert_eq!(listed.retired, vec![1]);
         // And the start no longer needs key #1.
-        let only_two =
-            crate::masking::MaskingKeys::new(vec![crate::masking::MaskingKey::from_seed(
-                2,
-                &[0x02; 32],
-            )
-            .unwrap()])
-            .unwrap();
-        keys_of_live_masks_are_held(&pool, Some(&only_two), st.cfg.clock.now())
+        let only_two = key_two();
+        keys_of_live_masks_are_held(&pool, Some(&*only_two), st.cfg.clock.now())
             .await
             .unwrap();
     }
