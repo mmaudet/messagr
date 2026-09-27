@@ -118,7 +118,10 @@ With the key to retire numbered `N`, in `/opt/messagr-eu`:
      and the counts of numbers masked, the extension's included. The proofs
      that had run out or been withdrawn under `N` go too, and with them what
      their accounts read of it;
-   - the date `N` was first served is forgotten.
+   - the date `N` was first served is forgotten;
+   - `N` is listed as retired at once by `GET /discovery/keys`, so that devices
+     forget what they kept under it: the accounts it stopped get new references
+     at their next proof.
 4. **Edit `MASKING_KEYS`**: remove `N`, and when `N` was the current key, add
    a new seed with a higher number, as in the planned change above.
 5. **Start the service**, `docker compose up -d --no-deps --no-build

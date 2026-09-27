@@ -216,4 +216,8 @@ devices compare under both keys and nobody drops out of the results before
 renewing. A key retired at once takes every mask and count made under it; the
 accounts it made findable read that the key changed, which the service keeps
 thirty days at most, and their next proof passes a country's ceiling and the
-budget as a renewal would.
+budget as a renewal would, under a new reference: nothing links their account
+to the masks made under the lost key any more. The service lists such a key as
+retired, and devices forget what they kept under it, where they carry onto
+the key in service the first reference each number led to under a key that
+left at the end of a planned change.

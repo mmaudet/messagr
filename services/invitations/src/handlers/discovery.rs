@@ -528,6 +528,12 @@ pub struct PublicKey {
 pub struct PublicKeys {
     /// By key number: the last one is the current key.
     pub keys: Vec<PublicKey>,
+    /// The keys retired at once (#409), by key number: a device forgets what
+    /// it kept under them rather than carrying it onto a key in service, since
+    /// the accounts they stopped get new references at their next proof. A
+    /// key that left at the end of a planned change is not listed: the
+    /// references it led to were carried onto the new key.
+    pub retired: Vec<u32>,
 }
 
 /// `GET /discovery/keys`: the public keys a device checks every masked batch
@@ -538,6 +544,10 @@ pub async fn public_keys(
 ) -> Result<Json<PublicKeys>, AppError> {
     auth::authenticate(&st.mx, &headers).await?;
     let served = served(&st)?;
+    let retired: Vec<i64> = sqlx::query_scalar("SELECT key_id FROM retired_keys ORDER BY key_id")
+        .fetch_all(&st.pool)
+        .await
+        .map_err(anyhow::Error::from)?;
     Ok(Json(PublicKeys {
         keys: served
             .keys
@@ -547,6 +557,11 @@ pub async fn public_keys(
                 public_key: BASE64.encode(&k.public_key()),
             })
             .collect(),
+        retired: retired
+            .into_iter()
+            .map(u32::try_from)
+            .collect::<Result<_, _>>()
+            .map_err(anyhow::Error::from)?,
     }))
 }
 
@@ -2285,11 +2300,15 @@ mod tests {
                 key_number: 1,
                 public_key: "pk".into(),
             }],
+            retired: vec![3],
         })
         .unwrap();
         assert_eq!(
             keys,
-            serde_json::json!({"keys": [{"key_number": 1, "public_key": "pk"}]})
+            serde_json::json!({
+                "keys": [{"key_number": 1, "public_key": "pk"}],
+                "retired": [3],
+            })
         );
         let masked = serde_json::to_value(MaskedBatch {
             key_number: 1,

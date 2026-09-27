@@ -145,6 +145,17 @@ where
         .await
         .map_err(unwritten)?
         .rows_affected();
+    // SAID TO DEVICES (#409): what they kept under N, they forget rather
+    // than carry onto a key in service.
+    sqlx::query(
+        "INSERT INTO retired_keys (key_id, retired_at) VALUES (?, ?) \
+         ON CONFLICT(key_id) DO UPDATE SET retired_at = excluded.retired_at",
+    )
+    .bind(i64::from(key_id))
+    .bind(now)
+    .execute(&mut *tx)
+    .await
+    .map_err(unwritten)?;
     for erased in [
         "DELETE FROM findable_numbers WHERE key_id = ?",
         "DELETE FROM pending_proof_masks WHERE key_id = ?",
@@ -244,6 +255,12 @@ mod tests {
                 .unwrap();
         assert_eq!(under_one, 0);
         assert_eq!(count(&pool, "pending_proofs").await, 1);
+        // And devices learn it was retired at once (#409).
+        let listed = crate::handlers::discovery::public_keys(State(st.clone()), bearer("bob"))
+            .await
+            .unwrap()
+            .0;
+        assert_eq!(listed.retired, vec![1]);
         // And the start no longer needs key #1.
         let only_two =
             crate::masking::MaskingKeys::new(vec![crate::masking::MaskingKey::from_seed(

@@ -50,3 +50,14 @@ CREATE TABLE masking_extensions (
     masked         INTEGER NOT NULL,
     PRIMARY KEY (key_id, mask, extension_key)
 );
+
+-- Les clés retirées d'un coup (#409) : `GET /discovery/keys` les liste, pour
+-- que les appareils oublient ce qu'ils tenaient sous elles au lieu de le
+-- reporter sur une clé en service. Les comptes arrêtés reçoivent une
+-- référence neuve à leur prochaine preuve : rien ne relie plus leur compte aux
+-- masques faits sous la clé perdue. Une clé partie au bout d'un changement
+-- prévu n'y figure pas, ses références ayant suivi les preuves renouvelées.
+CREATE TABLE retired_keys (
+    key_id      INTEGER PRIMARY KEY,
+    retired_at  INTEGER NOT NULL
+);
