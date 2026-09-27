@@ -30,7 +30,7 @@
 //! Then the key leaves `MASKING_KEYS`, `REFERENCE_KEY` is given a new key, and
 //! the service restarts: the operator does that, and the document says how.
 //! The start refuses a reference key that served before a retirement
-//! (`handlers::discovery::note_reference_key`, #451): the reference of a
+//! (`handlers::discovery::serving_start`, #451): the reference of a
 //! findable account follows the account, and the accounts this stops come
 //! back under one nothing relates to the lost key.
 //!
@@ -122,7 +122,8 @@ where
          Proofs in progress dropped: {pending}.\n\
          {stop_first}\
          REFERENCE_KEY must be given a new key before the service starts again: the start \
-         refuses the one that served before this retirement.\n\
+         refuses the one that served before this retirement, and a service still running \
+         proves nothing until it restarts with a new one.\n\
          Type the key number to retire it, or anything else to leave everything as it is:"
     );
     if !crate::operator::typed_back(ask(&plan).as_deref(), &key_id.to_string()) {
@@ -388,7 +389,7 @@ mod tests {
         // unfindable (#392, story 80).
         let (ovh, inbox) = fake_ovhcloud(false).await;
         let hs = whoami_hs().await;
-        let (clock, _) = crate::util::Clock::settable(T0);
+        let (clock, time) = crate::util::Clock::settable(T0);
         let st = state_from(
             pool.clone(),
             hs.clone(),
@@ -402,6 +403,11 @@ mod tests {
         );
         prove(&st, &inbox, "alice", NUMBER).await;
         run(&pool, &named("1"), None, T0, |_| Some("1".into()))
+            .await
+            .unwrap();
+        // Restarted as the guide says: key #1 gone, a new reference key.
+        set_clock(&time, T0 + 3_600);
+        let st = restarted_with_reference_key(&st, key_two(), [0x08; 32])
             .await
             .unwrap();
 
@@ -426,7 +432,7 @@ mod tests {
         let (ovh, inbox) = fake_ovhcloud(false).await;
         let (clock, time) = crate::util::Clock::settable(T0);
         let st = state_at(pool.clone(), whoami_hs().await, Some(ovh), clock);
-        crate::handlers::discovery::note_reference_key(&pool, st.cfg.reference_key.as_ref(), T0)
+        crate::handlers::discovery::serving_start(&pool, &st.cfg, T0)
             .await
             .unwrap();
         prove(&st, &inbox, "alice", NUMBER).await;
@@ -464,8 +470,12 @@ mod tests {
         })
         .await
         .unwrap();
+        // Restarted as the guide says: key #1 gone, a new reference key.
+        let restarted = restarted_with_reference_key(&st, key_two(), [0x08; 32])
+            .await
+            .unwrap();
 
-        prove(&st, &inbox, "alice", NUMBER).await;
+        prove(&restarted, &inbox, "alice", NUMBER).await;
 
         let now = reading(&st, "alice").await;
         assert!(now.findable_until.is_some());

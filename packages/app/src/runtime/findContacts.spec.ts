@@ -1078,6 +1078,31 @@ describe('looking again (#402)', () => {
     expect(names.size).toBe(0)
   })
 
+  it('reads an account back under its first reference as the same account, however long the directory went without it (#451)', async () => {
+    const proven: Record<string, string> = { [PAUL_NUMBER]: 'ref-paul' }
+    const { deps: d, page } = deps([PAUL], proven)
+    await findContacts(d)
+    // Paul lets his proof run out: the directory lists him no more, and the
+    // service forgets his proof thirty days later.
+    delete proven[PAUL_NUMBER]
+    await findContacts(d)
+    // He proves his number again, and the reference follows his account.
+    proven[PAUL_NUMBER] = 'ref-paul'
+
+    const found = await findContacts(d)
+
+    expect(found.found && found.matches).toEqual([
+      {
+        contact: PAUL,
+        reference: 'ref-paul',
+        holderChanged: false,
+        envelopeKey: null,
+      },
+    ])
+    expect(await d.results.nameOf('ref-paul')).toBe('Paul')
+    expect(page.get(`${KEY}/${PAUL_NUMBER}`)?.reference).toBe('ref-paul')
+  })
+
   it('keeps the name of each card found, and none for a number that changed hands (#407)', async () => {
     const { deps: d, names } = deps(
       [PAUL, ANNE],

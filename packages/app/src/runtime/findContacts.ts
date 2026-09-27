@@ -203,10 +203,11 @@ export interface Match {
   /**
    * The number led to another reference before, under this key or an older
    * one (#402, #409): this account inherits nothing of it, and the row says
-   * the number changed hands. The device cannot tell another person from the
-   * same one proving again more than thirty days after its proof ended, once
-   * the service has forgotten it (#398): either way the reference is new, and
-   * a month is how soon a number given up can change hands (#392, Q36).
+   * the number changed hands. The reference follows the account (#451): the
+   * same account keeps it whenever it proves a number again, even long after
+   * the service forgot its proof, so another reference is another account.
+   * Only after a masking key is retired at once may the same account come
+   * back under another one.
    */
   readonly holderChanged: boolean
   /**

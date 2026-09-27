@@ -66,13 +66,19 @@ with (#451), 32 random bytes in base64, minted like a seed:
   account proves its number, even after the thirty days the service forgets
   its proof, so that whoever found it reads the same account; another account
   gets another. The database keeps only the key's fingerprint.
+- **Kept where the other secrets of the host are kept**, nowhere else, like
+  a seed: whoever holds it can relate the references of the directory to the
+  accounts they know. The host's backup must not carry it.
 - **Absent, discovery stays off**, like `MASKING_KEYS`; malformed, the service
   refuses to start without showing it.
-- **Changed with a retirement at once, and only then** (below). The start
-  refuses a reference key that served before a masking key was retired at
-  once. Changed without one, every account whose proof is later forgotten
-  would come back under a new reference, which whoever found it reads as a
-  number that changed hands.
+- **Changed with a retirement at once, and only then** (below).
+  - The start refuses a reference key that served before a masking key was
+    retired at once. A service still running through a retirement proves
+    nothing until it restarts with a new one.
+  - The start refuses a new key given without a retirement since the previous
+    one began to serve: every account whose proof is later forgotten would
+    come back under a new reference, which whoever found it reads as a number
+    that changed hands. Put the previous key back.
 
 ### Changing the key, once a year
 

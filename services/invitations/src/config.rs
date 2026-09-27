@@ -394,23 +394,12 @@ impl Config {
     /// the reference key would give its account no reference to be known by
     /// (#451). The one place that rule is written.
     pub fn discovery(&self) -> Result<Discovery<'_>, &'static str> {
-        match (
-            &self.masking_keys,
-            &self.sms_provider,
-            &self.alert_sms_to,
-            &self.reference_key,
-        ) {
-            (Some(keys), Some(provider), Some(operator), Some(reference_key)) => Ok(Discovery {
-                keys,
-                provider,
-                operator,
-                reference_key,
-            }),
-            (None, _, _, _) => Err("MASKING_KEYS absent"),
-            (_, None, _, _) => Err("no SMS provider"),
-            (_, _, None, _) => Err("ALERT_SMS_TO absent"),
-            (_, _, _, None) => Err("REFERENCE_KEY absent"),
-        }
+        Ok(Discovery {
+            keys: self.masking_keys.as_deref().ok_or("MASKING_KEYS absent")?,
+            provider: self.sms_provider.as_ref().ok_or("no SMS provider")?,
+            operator: self.alert_sms_to.as_deref().ok_or("ALERT_SMS_TO absent")?,
+            reference_key: self.reference_key.as_ref().ok_or("REFERENCE_KEY absent")?,
+        })
     }
 }
 
@@ -526,19 +515,23 @@ mod tests {
         assert_eq!(typo, SmsCeilings::default());
     }
 
-    #[test]
-    fn without_an_operator_to_alert_discovery_is_off() {
+    /// Discovery's keys and SMS provider, and nothing else of it.
+    fn keys_and_provider() -> Config {
         let keys = crate::masking::MaskingKeys::new(vec![crate::masking::MaskingKey::from_seed(
             1, &[1; 32],
         )
         .unwrap()])
         .unwrap();
-        let provider = sms_provider(env(OVH)).unwrap();
-        let served = Config {
+        Config {
             masking_keys: Some(std::sync::Arc::new(keys)),
-            sms_provider: provider,
+            sms_provider: sms_provider(env(OVH)).unwrap(),
             ..Config::for_tests()
-        };
+        }
+    }
+
+    #[test]
+    fn without_an_operator_to_alert_discovery_is_off() {
+        let served = keys_and_provider();
         assert_eq!(served.discovery().err(), Some("ALERT_SMS_TO absent"));
         let told = Config {
             alert_sms_to: Some("+33600000000".into()),
@@ -551,16 +544,9 @@ mod tests {
     #[test]
     fn without_its_reference_key_discovery_is_off() {
         // #451: a proof would give its account no reference to be known by.
-        let keys = crate::masking::MaskingKeys::new(vec![crate::masking::MaskingKey::from_seed(
-            1, &[1; 32],
-        )
-        .unwrap()])
-        .unwrap();
         let served = Config {
-            masking_keys: Some(std::sync::Arc::new(keys)),
-            sms_provider: sms_provider(env(OVH)).unwrap(),
             alert_sms_to: Some("+33600000000".into()),
-            ..Config::for_tests()
+            ..keys_and_provider()
         };
         assert_eq!(served.discovery().err(), Some("REFERENCE_KEY absent"));
     }

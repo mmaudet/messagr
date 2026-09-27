@@ -99,6 +99,16 @@ pub async fn start_proof(
     let user = auth::authenticate(&st.mx, &headers).await?;
     let served = served(&st)?;
     let keys = served.keys;
+    // NO CODE SENT for a proof that could not finish (#451): see
+    // `reference_key_outlived`.
+    let mut conn = st.pool.acquire().await.map_err(anyhow::Error::from)?;
+    if reference_key_outlived(&mut conn, served.reference_key)
+        .await
+        .map_err(anyhow::Error::from)?
+    {
+        return Err(AppError::DiscoveryOff);
+    }
+    drop(conn);
     if !country::is_international(&req.number) {
         return Err(AppError::NotANumber);
     }
@@ -291,6 +301,11 @@ async fn finish_under_the_lock(
     let Some((key_id, mask, digest, expires_at)) = pending else {
         return Ok(Err(AppError::NoProofPending));
     };
+    // AND READ AGAIN UNDER THE LOCK (#451): a retirement between the start of
+    // the proof and its end leaves it without a reference to give.
+    if reference_key_outlived(conn, reference_key).await? {
+        return Ok(Err(AppError::DiscoveryOff));
+    }
     if expires_at <= now {
         forget_the_proof_on(conn, user).await?;
         return Ok(Err(AppError::CodeExpired));
@@ -906,44 +921,101 @@ pub async fn note_keys_served(
     Ok(())
 }
 
-/// Notes, at the start, when the reference key was first served (#451), and
-/// refuses one that served before a masking key was retired at once.
+/// Whether `key` may compute references (#451): not when a masking key was
+/// retired at once after it began to serve, or at any time for a key that
+/// was never noted. Read at each proof, on the connection that holds its
+/// lock, as well as at the start.
 ///
 /// THE REFERENCE FOLLOWS THE ACCOUNT: it is computed from the account under
 /// this key (`crypto::account_reference`), so that the same account finds it
-/// again whenever it proves its number, even after the thirty days the
-/// service forgets its proof. A retirement at once must break that link for
-/// the accounts it stops: nothing may relate their account to the masks made
+/// again whenever it proves a number, even after the thirty days the service
+/// forgets its proof. A retirement at once must break that link for the
+/// accounts it stops: nothing may relate their account to the masks made
 /// under the lost key (ADR 0014, #409). So the key changes with the
-/// retirement, and a start still holding one that served before it is
-/// refused, naming the variable and never the key. The database keeps only
-/// the key's fingerprint.
-pub async fn note_reference_key(
+/// retirement. A service still running through a retirement of a key that is
+/// not its current one holds the old reference key until it restarts: its
+/// proofs are refused until then, rather than handing a stopped account its
+/// old reference back.
+async fn reference_key_outlived(
+    conn: &mut sqlx::SqliteConnection,
+    key: &[u8; 32],
+) -> sqlx::Result<bool> {
+    sqlx::query_scalar(
+        "SELECT EXISTS (SELECT 1 FROM retired_keys WHERE retired_at > COALESCE( \
+         (SELECT since FROM reference_keys_served WHERE fingerprint = ?), -1))",
+    )
+    .bind(&crypto::key_fingerprint(key)[..])
+    .fetch_one(conn)
+    .await
+}
+
+/// What the start of the service checks and notes, after the modes of the
+/// binary have had their turn and before it serves (#409, #451). `main` and
+/// the tests that restart a service go through this one function.
+///
+/// CHECKED FIRST, NOTED AFTER: a start refused leaves nothing noted, neither
+/// a masking key served too early nor a reference key.
+pub async fn serving_start(
+    pool: &sqlx::SqlitePool,
+    cfg: &crate::config::Config,
+    now: i64,
+) -> anyhow::Result<()> {
+    reference_key_may_serve(pool, cfg.reference_key.as_ref()).await?;
+    note_keys_served(pool, cfg.masking_keys.as_deref(), now).await?;
+    if let Some(key) = cfg.reference_key.as_ref() {
+        sqlx::query(
+            "INSERT OR IGNORE INTO reference_keys_served (fingerprint, since) VALUES (?, ?)",
+        )
+        .bind(&crypto::key_fingerprint(key)[..])
+        .bind(now)
+        .execute(pool)
+        .await?;
+    }
+    Ok(())
+}
+
+/// Refuses a reference key that served before a masking key was retired at
+/// once, and a new one given without a retirement since the previous one
+/// began to serve: that change would give every account whose proof is later
+/// forgotten a new reference, read as a number that changed hands by whoever
+/// found it (#451). Both refusals name the variable and never the key; the
+/// database keeps only its fingerprint.
+async fn reference_key_may_serve(
     pool: &sqlx::SqlitePool,
     key: Option<&[u8; 32]>,
-    now: i64,
 ) -> anyhow::Result<()> {
     let Some(key) = key else {
         return Ok(());
     };
-    let fingerprint = crypto::key_fingerprint(key);
-    sqlx::query("INSERT OR IGNORE INTO reference_keys_served (fingerprint, since) VALUES (?, ?)")
-        .bind(&fingerprint[..])
-        .bind(now)
-        .execute(pool)
-        .await?;
-    let outlived: bool = sqlx::query_scalar(
-        "SELECT EXISTS (SELECT 1 FROM retired_keys, reference_keys_served \
-         WHERE fingerprint = ? AND retired_at >= since)",
+    let mut conn = pool.acquire().await?;
+    let noted: Option<i64> =
+        sqlx::query_scalar("SELECT since FROM reference_keys_served WHERE fingerprint = ?")
+            .bind(&crypto::key_fingerprint(key)[..])
+            .fetch_optional(&mut *conn)
+            .await?;
+    if noted.is_some() {
+        if reference_key_outlived(&mut conn, key).await? {
+            anyhow::bail!(
+                "REFERENCE_KEY served before a masking key was retired at once: the \
+                 accounts that retirement stopped would come back under their old \
+                 reference. Give REFERENCE_KEY a new key, as \
+                 deploy/messagr-eu-invitations.md says"
+            );
+        }
+        return Ok(());
+    }
+    let changed_without_a_retirement: bool = sqlx::query_scalar(
+        "SELECT EXISTS (SELECT 1 FROM reference_keys_served) AND NOT EXISTS ( \
+         SELECT 1 FROM retired_keys WHERE retired_at >= \
+         (SELECT MAX(since) FROM reference_keys_served))",
     )
-    .bind(&fingerprint[..])
-    .fetch_one(pool)
+    .fetch_one(&mut *conn)
     .await?;
-    if outlived {
+    if changed_without_a_retirement {
         anyhow::bail!(
-            "REFERENCE_KEY served before a masking key was retired at once: the \
-             accounts that retirement stopped would come back under their old \
-             reference. Give REFERENCE_KEY a new key, as \
+            "REFERENCE_KEY changed without a masking key retired at once: every \
+             account whose proof is forgotten would come back under a new reference. \
+             Put the previous key back; it changes only with a retirement, as \
              deploy/messagr-eu-invitations.md says"
         );
     }
@@ -1119,21 +1191,26 @@ pub(crate) mod test_support {
         (base, inbox)
     }
 
+    /// The masking keys of these key numbers, each from its own seed: the
+    /// same number is the same key in every test.
+    fn masking_keys_numbered(ids: &[u32]) -> Arc<crate::masking::MaskingKeys> {
+        let keys = ids
+            .iter()
+            .map(|&id| {
+                crate::masking::MaskingKey::from_seed(id, &[u8::try_from(id).unwrap(); 32]).unwrap()
+            })
+            .collect();
+        Arc::new(crate::masking::MaskingKeys::new(keys).unwrap())
+    }
+
     pub(crate) fn keys() -> Arc<crate::masking::MaskingKeys> {
-        let key = crate::masking::MaskingKey::from_seed(1, &[0x01; 32]).unwrap();
-        Arc::new(crate::masking::MaskingKeys::new(vec![key]).unwrap())
+        masking_keys_numbered(&[1])
     }
 
     /// Key #1, `keys()`'s, and key #2, the current one: a key change under
     /// way (#409).
     pub(crate) fn keys_one_and_two() -> Arc<crate::masking::MaskingKeys> {
-        Arc::new(
-            crate::masking::MaskingKeys::new(vec![
-                crate::masking::MaskingKey::from_seed(1, &[0x01; 32]).unwrap(),
-                crate::masking::MaskingKey::from_seed(2, &[0x02; 32]).unwrap(),
-            ])
-            .unwrap(),
-        )
+        masking_keys_numbered(&[1, 2])
     }
 
     /// The same service restarted with `keys` in `MASKING_KEYS` (#409): its
@@ -1162,14 +1239,7 @@ pub(crate) mod test_support {
 
     /// Key #2 alone: key #1 retired at once, and #2 its successor (#409).
     pub(crate) fn key_two() -> Arc<crate::masking::MaskingKeys> {
-        Arc::new(
-            crate::masking::MaskingKeys::new(vec![crate::masking::MaskingKey::from_seed(
-                2,
-                &[0x02; 32],
-            )
-            .unwrap()])
-            .unwrap(),
-        )
+        masking_keys_numbered(&[2])
     }
 
     /// The same service restarted with `keys` and `reference_key`, the start
@@ -1190,8 +1260,7 @@ pub(crate) mod test_support {
         let now = restarted.cfg.clock.now();
         keys_of_live_masks_are_held(&restarted.pool, restarted.cfg.masking_keys.as_deref(), now)
             .await?;
-        note_keys_served(&restarted.pool, restarted.cfg.masking_keys.as_deref(), now).await?;
-        note_reference_key(&restarted.pool, restarted.cfg.reference_key.as_ref(), now).await?;
+        serving_start(&restarted.pool, &restarted.cfg, now).await?;
         Ok(restarted)
     }
 
@@ -2828,38 +2897,171 @@ mod tests {
         assert_eq!(proof_of(&pool, "alice").await.map(|(key, _)| key), Some(2));
     }
 
+    /// A start of the service holding `reference_key`, as `main` makes it.
+    async fn starting_with(
+        pool: &SqlitePool,
+        reference_key: [u8; 32],
+        now: i64,
+    ) -> anyhow::Result<()> {
+        let cfg = crate::config::Config {
+            reference_key: Some(reference_key),
+            ..crate::config::Config::for_tests()
+        };
+        serving_start(pool, &cfg, now).await
+    }
+
+    async fn retire_key_one_at(pool: &SqlitePool, at: i64) {
+        crate::retire_key::run(pool, &["1".to_string()], None, at, |_| Some("1".into()))
+            .await
+            .unwrap();
+    }
+
+    /// A refusal names the variable, and no form of the key.
+    fn names_no_key(refused: &str, key: [u8; 32]) {
+        assert!(refused.contains("REFERENCE_KEY"), "{refused}");
+        for shown in [
+            BASE64.encode(&key),
+            data_encoding::HEXLOWER.encode(&key),
+            format!("{key:?}"),
+            format!("{}, {}", key[0], key[1]),
+        ] {
+            assert!(!refused.contains(&shown), "the key is shown: {refused}");
+        }
+    }
+
     #[sqlx::test(migrations = "./migrations")]
     async fn a_start_refuses_the_reference_key_a_retirement_at_once_outlived(pool: SqlitePool) {
         let old = [0x07; 32];
         let new = [0x08; 32];
-        note_reference_key(&pool, Some(&old), T0).await.unwrap();
-        note_reference_key(&pool, Some(&old), T0 + DAY)
+        starting_with(&pool, old, T0).await.unwrap();
+        starting_with(&pool, old, T0 + DAY)
             .await
             .expect("a restart is not a retirement");
-        crate::retire_key::run(&pool, &["1".to_string()], None, T0 + 2 * DAY, |_| {
-            Some("1".into())
-        })
-        .await
-        .unwrap();
+        retire_key_one_at(&pool, T0 + 2 * DAY).await;
 
-        let refused = note_reference_key(&pool, Some(&old), T0 + 3 * DAY)
-            .await
-            .unwrap_err()
-            .to_string();
-        assert!(refused.contains("REFERENCE_KEY"), "{refused}");
-        assert!(!refused.contains(&BASE64.encode(&old)), "never the key");
-        note_reference_key(&pool, Some(&new), T0 + 3 * DAY)
+        let refused = starting_with(&pool, old, T0 + 3 * DAY).await.unwrap_err();
+        names_no_key(&refused.to_string(), old);
+        starting_with(&pool, new, T0 + 3 * DAY)
             .await
             .expect("a new key starts");
-        note_reference_key(&pool, Some(&new), T0 + 4 * DAY)
+        starting_with(&pool, new, T0 + 4 * DAY)
             .await
             .expect("and restarts");
         assert!(
-            note_reference_key(&pool, Some(&old), T0 + 5 * DAY)
-                .await
-                .is_err(),
+            starting_with(&pool, old, T0 + 5 * DAY).await.is_err(),
             "the old one does not come back"
         );
+    }
+
+    #[sqlx::test(migrations = "./migrations")]
+    async fn a_start_refuses_a_reference_key_changed_without_a_retirement(pool: SqlitePool) {
+        let first = [0x07; 32];
+        let other = [0x08; 32];
+        starting_with(&pool, first, T0).await.unwrap();
+
+        let refused = starting_with(&pool, other, T0 + DAY).await.unwrap_err();
+        names_no_key(&refused.to_string(), other);
+        starting_with(&pool, first, T0 + DAY)
+            .await
+            .expect("the previous key is put back, and nothing of the other was noted");
+        retire_key_one_at(&pool, T0 + 2 * DAY).await;
+        starting_with(&pool, other, T0 + 3 * DAY)
+            .await
+            .expect("with a retirement, the key changes");
+    }
+
+    #[sqlx::test(migrations = "./migrations")]
+    async fn a_start_refused_notes_no_masking_key(pool: SqlitePool) {
+        starting_with(&pool, [0x07; 32], T0).await.unwrap();
+        let cfg = crate::config::Config {
+            masking_keys: Some(keys_one_and_two()),
+            reference_key: Some([0x08; 32]),
+            ..crate::config::Config::for_tests()
+        };
+        assert!(serving_start(&pool, &cfg, T0 + DAY).await.is_err());
+        let noted: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM masking_keys_served")
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+        assert_eq!(noted, 0, "a refused start is not a start");
+    }
+
+    #[sqlx::test(migrations = "./migrations")]
+    async fn a_running_service_proves_nothing_after_a_retirement_until_its_key_changes(
+        pool: SqlitePool,
+    ) {
+        // A retirement of a key that is not the current one may be run beside
+        // the service (#409). Until it restarts with a new reference key, a
+        // proof it finished would hand an account the retirement stopped its
+        // old reference back.
+        let (ovh, inbox) = fake_ovhcloud(false).await;
+        let (clock, time) = crate::util::Clock::settable(T0);
+        let one_key = state_at(pool.clone(), whoami_hs().await, Some(ovh), clock);
+        serving_start(&pool, &one_key.cfg, T0).await.unwrap();
+        prove(&one_key, &inbox, "alice", NUMBER).await;
+        let alices = reference_of(&pool, "alice").await.expect("a reference");
+        set_clock(&time, T0 + DAY);
+        let two_keys = restarted_with(&one_key, keys_one_and_two()).await;
+        start(&two_keys, "bob", OTHER).await.unwrap();
+
+        retire_key_one_at(&pool, T0 + DAY).await;
+
+        assert!(
+            matches!(
+                finish(&two_keys, "bob", &last_code(&inbox)).await,
+                Err(AppError::DiscoveryOff)
+            ),
+            "a proof started before the retirement does not finish"
+        );
+        assert!(matches!(
+            start(&two_keys, "alice", NUMBER).await,
+            Err(AppError::DiscoveryOff)
+        ));
+        set_clock(&time, T0 + DAY + 3_600);
+        let restarted = restarted_with_reference_key(&two_keys, key_two(), [0x08; 32])
+            .await
+            .expect("a new reference key");
+        prove(&restarted, &inbox, "alice", NUMBER).await;
+        assert_ne!(reference_of(&pool, "alice").await, Some(alices));
+    }
+
+    #[sqlx::test(migrations = "./migrations")]
+    async fn an_account_the_retirement_did_not_stop_keeps_its_reference(pool: SqlitePool) {
+        // Kept rather than computed again: computed under the new reference
+        // key, it would read as a number that changed hands (#451).
+        let (ovh, inbox) = fake_ovhcloud(false).await;
+        let (clock, time) = crate::util::Clock::settable(T0);
+        let one_key = state_at(pool.clone(), whoami_hs().await, Some(ovh), clock);
+        serving_start(&pool, &one_key.cfg, T0).await.unwrap();
+        set_clock(&time, T0 + DAY);
+        let two_keys = restarted_with(&one_key, keys_one_and_two()).await;
+        prove(&two_keys, &inbox, "bob", OTHER).await;
+        let bobs = reference_of(&pool, "bob").await.expect("a reference");
+
+        retire_key_one_at(&pool, T0 + 2 * DAY).await;
+        set_clock(&time, T0 + 3 * DAY);
+        let restarted = restarted_with_reference_key(&two_keys, key_two(), [0x08; 32])
+            .await
+            .expect("a new reference key");
+        set_clock(&time, T0 + 23 * DAY);
+        prove(&restarted, &inbox, "bob", OTHER).await;
+
+        assert_eq!(reference_of(&pool, "bob").await, Some(bobs));
+    }
+
+    #[sqlx::test(migrations = "./migrations")]
+    async fn an_account_proving_a_new_number_keeps_its_reference(pool: SqlitePool) {
+        // The reference follows the account, not the number (#451).
+        let (ovh, inbox) = fake_ovhcloud(false).await;
+        let (clock, time) = crate::util::Clock::settable(T0);
+        let st = state_at(pool.clone(), whoami_hs().await, Some(ovh), clock);
+        prove(&st, &inbox, "alice", NUMBER).await;
+        let first = reference_of(&pool, "alice").await.expect("a reference");
+
+        set_clock(&time, T0 + 2 * DAY);
+        prove(&st, &inbox, "alice", OTHER).await;
+
+        assert_eq!(reference_of(&pool, "alice").await, Some(first));
     }
 
     #[sqlx::test(migrations = "./migrations")]

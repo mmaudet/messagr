@@ -101,24 +101,12 @@ async fn main() -> anyhow::Result<()> {
         };
     }
 
-    // WHEN EACH MASKING KEY WAS FIRST SERVED (#409), noted by the start of the
-    // service and by nothing else: a mode run with an edited MASKING_KEYS
-    // before the restart would note a new key early, and the restart would
-    // then keep the proofs in progress under the old one.
-    handlers::discovery::note_keys_served(
-        &state.pool,
-        state.cfg.masking_keys.as_deref(),
-        util::now(),
-    )
-    .await?;
-    // AND THE REFERENCE KEY (#451), by the same start and nothing else, which
-    // refuses one that served before a masking key was retired at once.
-    handlers::discovery::note_reference_key(
-        &state.pool,
-        state.cfg.reference_key.as_ref(),
-        util::now(),
-    )
-    .await?;
+    // WHEN EACH MASKING KEY WAS FIRST SERVED (#409), AND THE REFERENCE KEY
+    // (#451), checked and noted by the start of the service and by nothing
+    // else: a mode run with an edited MASKING_KEYS before the restart would
+    // note a new key early, and the restart would then keep the proofs in
+    // progress under the old one.
+    handlers::discovery::serving_start(&state.pool, &state.cfg, util::now()).await?;
     tokio::spawn(cleanup::run_forever(state.clone()));
 
     let discovery = match state.cfg.discovery() {
