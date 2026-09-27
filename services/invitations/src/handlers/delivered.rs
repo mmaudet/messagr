@@ -62,11 +62,13 @@
 //! # BEFORE IT ANSWERS, THE RECIPIENT LEARNS ITS INVITER'S REFERENCE (#407)
 //!
 //! Not its account: the reference its current proof is listed by in the
-//! directory, which every findable account downloads. It tells nothing to a
-//! recipient who never found that number in its own address book, and tells
-//! one who did, from the results its device keeps, that the inviter is in it.
-//! An inviter that withdrew its number, or whose proof ran out, is listed
-//! without one.
+//! directory, which every findable account downloads. To a recipient who
+//! never found that number in its own address book, it says nobody's name;
+//! to one who did, from the results its device keeps, it says the inviter is
+//! in it. It does say, to any recipient, that two invitations came from the
+//! same inviter, since a renewal keeps it, and it goes when the inviter
+//! withdraws its number or lets its proof run out: what an inviter's own
+//! status reads say of an invitation, turned the other way.
 //!
 //! # A REFUSAL READS AS AN INVITATION NOBODY HAS SEEN
 //!
