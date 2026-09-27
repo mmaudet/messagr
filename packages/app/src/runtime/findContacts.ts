@@ -28,9 +28,18 @@
  *
  * What looking found is kept in a page of the notebook: for each number gone
  * through, its mask, the key it was made under and the reference it led to.
- * The next look masks only the numbers the page does not hold under the
- * current key, and still downloads the whole directory, since what it asks
+ * The next look masks only the numbers the page does not hold under each key
+ * in service, and still downloads the whole directory, since what it asks
  * for must not depend on what it found.
+ *
+ * # UNDER EACH KEY IN SERVICE (#409)
+ *
+ * While two keys serve, a number is masked under each and compared with the
+ * directory's entries under each: an account that has not renewed its proof
+ * is found under the old key, and one that has, under the new. The first
+ * account a number led to is judged across keys, and carried onto the key in
+ * service from a key that left at the end of a planned change; what the page
+ * held under a key retired at once is forgotten without being consulted.
  *
  * # WHAT IS INJECTED
  *
@@ -124,8 +133,9 @@ export interface Remembered {
   /** Base64, as the service lists it. */
   readonly mask: string
   /**
-   * The reference the mask first led to under that key, and kept even when
-   * it leads to another since; `null` while it has led to none.
+   * The first reference the number led to, under that key or, carried when
+   * the key was new, under an older one (#409); kept even when the number
+   * leads to another since. `null` while it has led to none.
    */
   readonly reference: string | null
 }
@@ -142,7 +152,10 @@ export interface DiscoveryResults {
     keyNumber: number,
     numbers: readonly string[],
   ) => Promise<ReadonlyMap<string, Remembered>>
-  /** Keeps what these numbers led to under this key. Whether it held. */
+  /**
+   * Keeps these numbers' masks under this key, and the first reference each
+   * led to (`Remembered`). Whether it held.
+   */
   readonly keep: (
     keyNumber: number,
     remembered: ReadonlyMap<string, Remembered>,
@@ -153,9 +166,14 @@ export interface DiscoveryResults {
    */
   readonly forgetAllBut: (numbers: readonly string[]) => Promise<boolean>
   /**
-   * Forgets everything held under a key but these, the keys in service
-   * (#409): a key retired, or gone at the end of a change, masks nothing any
-   * more. Whether it held.
+   * The keys the page holds rows under, in service or not (#409). Nothing
+   * when it cannot say.
+   */
+  readonly keyNumbersHeld: () => Promise<readonly number[]>
+  /**
+   * Forgets everything held under a key but these (#409): a key retired at
+   * once, or one gone at the end of a change once its first references are
+   * carried onto the key in service. Whether it held.
    */
   readonly forgetKeysBut: (keyNumbers: readonly number[]) => Promise<boolean>
   /**
@@ -183,12 +201,12 @@ export interface Match {
   /** What the service knows the account by, and nobody else can link to it. */
   readonly reference: string
   /**
-   * The number led to another reference before, under the same key (#402):
-   * this account inherits nothing of it, and the row says the number changed
-   * hands. The device cannot tell another person from the same one proving
-   * again more than thirty days after its proof ended, once the service has
-   * forgotten it (#398): either way the reference is new, and a month is how
-   * soon a number given up can change hands (#392, Q36).
+   * The number led to another reference before, under this key or an older
+   * one (#402, #409): this account inherits nothing of it, and the row says
+   * the number changed hands. The device cannot tell another person from the
+   * same one proving again more than thirty days after its proof ended, once
+   * the service has forgotten it (#398): either way the reference is new, and
+   * a month is how soon a number given up can change hands (#392, Q36).
    */
   readonly holderChanged: boolean
   /**
@@ -301,18 +319,21 @@ export async function findContacts(deps: FindingDeps): Promise<Findings> {
     return { found: true, matches: [], others: absent(contacts), waiting: null }
   }
 
-  const keys = await keysInService(deps.service)
-  if (typeof keys === 'string') return { found: false, refusal: keys }
+  const listedKeys = await keysOf(deps.service)
+  if (typeof listedKeys === 'string') {
+    return { found: false, refusal: listedKeys }
+  }
+  const { keys, retired } = listedKeys
 
   const numbers = [...holders.keys()]
   // UNDER EACH KEY IN SERVICE, the newest first (#409). While two serve, an
-  // account that has not renewed its proof is listed under the old key only,
+  // account that has not renewed its proof is found under the old key only,
   // and one that has, under the new one: the two are compared, and the
   // extension of the key change pays for masking the address book again
   // under the new key, once. WHAT THE LOOKS BEFORE THIS ONE MASKED under a
   // key is not masked again under it. A page that will not open recalls
   // nothing, and every number is masked as on the first look.
-  const underKeys: { readonly key: Key; readonly looked: Looked }[] = []
+  const underKeys: UnderKey[] = []
   // THE LIMIT OF #401: a batch over it is refused with how many numbers are
   // still allowed. Those are sent again, the first of the batch, and the
   // rest wait until more are allowed, under this key and the next. Nothing
@@ -345,7 +366,22 @@ export async function findContacts(deps: FindingDeps): Promise<Findings> {
       }
       batch.forEach((number, i) => masks.set(number, masked.masks[i]!))
     }
-    underKeys.push({ key, looked: { remembered, masks } })
+    underKeys.push({ key, remembered, masks })
+  }
+  // WHAT THE PAGE HELD UNDER A KEY THAT LEFT AT THE END OF A PLANNED CHANGE
+  // (#409), consulted for the first reference of each number and never
+  // masked under: the device may not have looked during the twenty-eight
+  // days both keys served. Never under a key retired at once, whose accounts
+  // proved again under new references, the owner decided on 27 September
+  // 2026: compared with the old ones, every one would read as a number that
+  // changed hands.
+  const served = new Set(keys.map(key => key.keyNumber))
+  const leftNormally = (await keysHeld(deps.results))
+    .filter(key => !served.has(key) && !retired.includes(key))
+    .sort((a, b) => a - b)
+  const history: ReadonlyMap<string, Remembered>[] = []
+  for (const keyNumber of leftNormally) {
+    history.push(await recalled(deps.results, keyNumber, numbers))
   }
 
   // THE DIRECTORY COMES DOWN WHOLE, every time (#392), even when the limit
@@ -359,31 +395,33 @@ export async function findContacts(deps: FindingDeps): Promise<Findings> {
   // none for a number that changed hands, whose new account is not the one
   // the card was found for.
   const named = new Map<string, string>()
-  for (const { key, looked } of underKeys) {
+  for (const { key, remembered, masks } of underKeys) {
     const entries = listed.get(key.keyNumber) ?? new Map<string, Listed>()
     const toKeep = new Map<string, Remembered>()
-    for (const [number, mask] of looked.masks) {
+    for (const [number, mask] of masks) {
       const entry = entries.get(mask)
       const reference = entry?.reference ?? null
-      // WHAT THE NUMBER FIRST LED TO, under this key, or, the first time it
-      // is masked under a new one, under the one before (#409): an account
-      // that renewed its proof under the new key kept its reference, and
-      // another one is a number that changed hands, across a key change as
-      // within a key.
-      const kept = looked.remembered.get(number)
-      const before = kept ?? rememberedElsewhere(underKeys, key, number)
+      // WHAT THE NUMBER FIRST LED TO, under any key the page consults, the
+      // oldest first (#409): an account that renewed its proof under a new
+      // key kept its reference, and another one is a number that changed
+      // hands, across a key change as within a key.
+      const firstReference = firstReferenceOf(
+        number,
+        underKeys,
+        history,
+        remembered,
+      )
       // THE FIRST REFERENCE A NUMBER LED TO IS THE ONE KEPT: another one
       // since is a number that changed hands, and the new account inherits
-      // nothing. Under a new key too, where the first is the old key's.
-      const first = before?.reference ?? reference
-      if (kept === undefined || (kept.reference === null && first !== null)) {
-        toKeep.set(number, { mask, reference: first })
+      // nothing. Under a new key too, where the first may be an older key's.
+      const kept = remembered.get(number)
+      const keeping = firstReference ?? reference
+      if (kept === undefined || (kept.reference === null && keeping !== null)) {
+        toKeep.set(number, { mask, reference: keeping })
       }
       if (reference === null) continue
       const holderChanged =
-        before !== undefined &&
-        before.reference !== null &&
-        before.reference !== reference
+        firstReference !== null && firstReference !== reference
       const holding = holders.get(number)!
       if (!holderChanged && holding[0] !== undefined) {
         named.set(number, holding[0].name)
@@ -409,19 +447,24 @@ export async function findContacts(deps: FindingDeps): Promise<Findings> {
     // costs the next look its numbers again.
     await quietly(() => deps.results.keep(key.keyNumber, toKeep))
   }
-  // A number that has left the address book leaves the page, and so does
-  // whatever the page holds under a key no longer served (#409).
+  // A number that has left the address book leaves the page. So does what
+  // the page holds under a key no longer served (#409): under a key retired
+  // at once, now; under one that left normally, once every number has been
+  // masked under the keys in service, which carried its first reference.
   await quietly(() => deps.results.keepNames(named))
   await quietly(() => deps.results.forgetAllBut(numbers))
   await quietly(() =>
-    deps.results.forgetKeysBut(keys.map(key => key.keyNumber)),
+    deps.results.forgetKeysBut([
+      ...served,
+      ...(freesAt === null ? [] : leftNormally),
+    ]),
   )
   // The contacts holding a number the limit left unmasked under a key in
   // service, gathered once for every number rather than once for every
   // contact.
   const unmasked = new Set<Contact>()
   for (const [number, held] of holders) {
-    if (underKeys.some(({ looked }) => !looked.masks.has(number))) {
+    if (underKeys.some(({ masks }) => !masks.has(number))) {
       held.forEach(contact => unmasked.add(contact))
     }
   }
@@ -497,6 +540,15 @@ async function recalled(
  * A write to the page, which never fails a look: what was found is shown
  * whether the page kept it or not.
  */
+/** The keys the page holds rows under; none when it cannot say. */
+async function keysHeld(results: DiscoveryResults): Promise<readonly number[]> {
+  try {
+    return await results.keyNumbersHeld()
+  } catch {
+    return []
+  }
+}
+
 async function quietly(write: () => Promise<boolean>): Promise<void> {
   try {
     await write()
@@ -508,11 +560,15 @@ async function quietly(write: () => Promise<boolean>): Promise<void> {
 /**
  * The keys in service, the newest first: the one the service lists last is
  * the current key, and a second one serves beside it during a key change
- * (#409).
+ * (#409). With them, the keys the service says were retired at once, whose
+ * rows the page forgets without consulting them.
  */
-async function keysInService(
+async function keysOf(
   service: FindingService,
-): Promise<Key[] | FindingRefusal> {
+): Promise<
+  | { readonly keys: readonly Key[]; readonly retired: readonly number[] }
+  | FindingRefusal
+> {
   const answer = await asked(() => service.keys())
   if (typeof answer === 'string') return answer
   const listed = answer.keys
@@ -527,30 +583,43 @@ async function keysInService(
     }
     keys.push({ keyNumber: one.key_number, publicKey: bytesOf(one.public_key) })
   }
-  return keys.reverse()
+  // A service from before #409 lists none.
+  const retired = Array.isArray(answer.retired)
+    ? answer.retired.filter((key): key is number => typeof key === 'number')
+    : []
+  return { keys: keys.reverse(), retired }
 }
 
-/** What the page held under one key, and each number's mask under it. */
-interface Looked {
+/** One key in service, what the page held under it, and each mask under it. */
+interface UnderKey {
+  readonly key: Key
   readonly remembered: ReadonlyMap<string, Remembered>
   readonly masks: Map<string, string>
 }
 
 /**
- * What the page holds of `number` under another key in service than `key`,
- * for a number masked under `key` for the first time (#409).
+ * The first account `number` led to, as far as the page can say (#409): the
+ * reference kept under the oldest key that holds one, among the keys that
+ * left normally and the keys in service; `null` when it has led nowhere yet.
+ * `own` is the row under the key being compared, which is always one of them.
  */
-function rememberedElsewhere(
-  underKeys: readonly { readonly key: Key; readonly looked: Looked }[],
-  key: Key,
+function firstReferenceOf(
   number: string,
-): Remembered | undefined {
-  for (const other of underKeys) {
-    if (other.key.keyNumber === key.keyNumber) continue
-    const kept = other.looked.remembered.get(number)
-    if (kept !== undefined) return kept
+  underKeys: readonly UnderKey[],
+  history: readonly ReadonlyMap<string, Remembered>[],
+  own: ReadonlyMap<string, Remembered>,
+): string | null {
+  const oldestFirst = [
+    ...history,
+    ...[...underKeys]
+      .sort((a, b) => a.key.keyNumber - b.key.keyNumber)
+      .map(under => under.remembered),
+  ]
+  for (const page of oldestFirst) {
+    const reference = page.get(number)?.reference
+    if (reference !== null && reference !== undefined) return reference
   }
-  return undefined
+  return own.get(number)?.reference ?? null
 }
 
 /**

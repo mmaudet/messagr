@@ -153,7 +153,8 @@ export interface ConversationListProps {
   /**
    * What is to be said of being findable, when anything is (#398): a proof to
    * renew, with the day it ends; one that ran out; a number that now makes
-   * another account findable. See `listNotice` in `discovery.ts`.
+   * another account findable; a proof a key retired at once ended (#409).
+   * See `listNotice` in `discovery.ts`.
    */
   readonly findableNotice?: ListNotice | null
   /** Renewing the proof, or proving the number again. */
