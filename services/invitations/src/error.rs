@@ -431,6 +431,20 @@ pub enum AppError {
     /// `frees_at`, in Unix time: more are allowed from then on.
     #[error("this batch holds more numbers than may still be masked for this number: send fewer, or try again later")]
     MaskingQuotaReached { remaining: u32, frees_at: i64 },
+    /// An invitation delivered inside Messagr to this account is still
+    /// pending (#406): one at a time between two accounts.
+    #[error("an invitation to this account is still pending")]
+    InvitationPending,
+    /// The last invitation to this account ran out unanswered less than
+    /// fourteen days ago (#406). `retry_at`, in Unix time, is when another may
+    /// leave.
+    #[error("this account was invited recently: try again later")]
+    InvitedRecently { retry_at: i64 },
+    /// This account has sent the ten invitations delivered inside Messagr a
+    /// day allows (#406). `retry_at`, in Unix time, is the start of the next
+    /// day, UTC.
+    #[error("the invitations of the day are all sent: try again tomorrow")]
+    DeliveryQuotaReached { retry_at: i64 },
     /// An envelope key or a sealed name of the wrong shape (#405): a key is
     /// 32 bytes, a sealed name always `delivered::SEALED_NAME_BYTES`, both in
     /// base64. One variant for both: either way, what was sent to be kept for
@@ -595,6 +609,17 @@ impl IntoResponse for AppError {
             AppError::NotFindable => (StatusCode::FORBIDDEN, "MESSAGR_NOT_FINDABLE"),
             AppError::UnknownMaskingKey => (StatusCode::NOT_FOUND, "MESSAGR_UNKNOWN_MASKING_KEY"),
             AppError::NotABatch => (StatusCode::BAD_REQUEST, "MESSAGR_NOT_A_BATCH"),
+            // A LIMIT THAT LIFTS BY ITSELF, at the pending invitation's
+            // deadline, like every refusal of this family: 429.
+            AppError::InvitationPending => {
+                (StatusCode::TOO_MANY_REQUESTS, "MESSAGR_INVITATION_PENDING")
+            }
+            AppError::InvitedRecently { .. } => {
+                (StatusCode::TOO_MANY_REQUESTS, "MESSAGR_INVITED_RECENTLY")
+            }
+            AppError::DeliveryQuotaReached { .. } => {
+                (StatusCode::TOO_MANY_REQUESTS, "MESSAGR_DELIVERY_QUOTA")
+            }
             AppError::MalformedEnvelope => (StatusCode::BAD_REQUEST, "MESSAGR_MALFORMED_ENVELOPE"),
             AppError::UnknownReference => (StatusCode::NOT_FOUND, "MESSAGR_UNKNOWN_REFERENCE"),
             AppError::OwnReference => (StatusCode::UNPROCESSABLE_ENTITY, "MESSAGR_OWN_REFERENCE"),
@@ -612,14 +637,18 @@ impl IntoResponse for AppError {
             other => other.to_string(),
         };
         let mut body = serde_json::json!({"errcode": errcode, "error": message});
-        // THE TWO REFUSALS WHOSE NUMBER THE APPLICATION SAYS in its own
-        // language: how many attempts a wrong code leaves, and when an account
-        // may ask for a code again (#399). Each travels as a number of its
-        // own, not only inside the text.
+        // THE REFUSALS WHOSE NUMBER THE APPLICATION SAYS in its own language:
+        // how many attempts a wrong code leaves, and when an account may ask
+        // for a code again (#399), invite that account again, or send another
+        // invitation (#406). Each travels as a number of its own, not only
+        // inside the text.
         if let AppError::CodeWrong { attempts_left } = &self {
             body["attempts_left"] = serde_json::json!(attempts_left);
         }
-        if let AppError::TooManyCodes { retry_at } = &self {
+        if let AppError::TooManyCodes { retry_at }
+        | AppError::InvitedRecently { retry_at }
+        | AppError::DeliveryQuotaReached { retry_at } = &self
+        {
             body["retry_at"] = serde_json::json!(retry_at);
         }
         // AND THE LIMIT ON MASKING (#401): how many numbers are still allowed,
@@ -949,6 +978,33 @@ mod tests {
         assert_eq!(body["errcode"], "MESSAGR_MASKING_QUOTA");
         assert_eq!(body["remaining"], 1_234);
         assert_eq!(body["frees_at"], 1_792_592_000_i64);
+
+        // THE LIMITS OF INVITATIONS DELIVERED INSIDE MESSAGR (#406): one at a
+        // time, and when the next may leave.
+        let (got, body) = render(AppError::InvitationPending).await;
+        assert_eq!(
+            (got.as_u16(), body["errcode"].as_str()),
+            (429, Some("MESSAGR_INVITATION_PENDING"))
+        );
+        for (refusal, errcode) in [
+            (
+                AppError::InvitedRecently {
+                    retry_at: 1_791_000_000,
+                },
+                "MESSAGR_INVITED_RECENTLY",
+            ),
+            (
+                AppError::DeliveryQuotaReached {
+                    retry_at: 1_791_000_000,
+                },
+                "MESSAGR_DELIVERY_QUOTA",
+            ),
+        ] {
+            let (got, body) = render(refusal).await;
+            assert_eq!(got, StatusCode::TOO_MANY_REQUESTS);
+            assert_eq!(body["errcode"], errcode);
+            assert_eq!(body["retry_at"], 1_791_000_000_i64);
+        }
     }
 
     /// Renders an error and extracts (status, JSON body) from it.

@@ -179,6 +179,14 @@ The link, established on the device, between a contact and the account whose
 proven discovery identity appears in that contact.
 _Avoid_: Hit, sync result
 
+**Block**:
+A recipient's refusal of an invitation delivered inside Messagr that also
+keeps its inviter from delivering any other. The blocked account is never
+told: its invitations are taken and run out unanswered. A block lasts as long
+as both accounts exist, and hides nobody from discovery, which only
+withdrawing one's number does.
+_Avoid_: Ban, report, mute
+
 **Trust state**:
 The product-visible signal `unverified`, `recognized` or `verified`. It
 describes what is known about another account, not what may be done with it.

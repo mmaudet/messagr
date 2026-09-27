@@ -24,7 +24,10 @@
 //! handed out, as it does for every expired invitation.
 //!
 //! AN ANNOUNCEMENT, NOT A PROOF. The deactivation comes after, and can fail.
-//! Whoever purges checks that the account is deactivated first.
+//! Whoever purges checks that the account is deactivated first. So it lifts
+//! no block either side of the account (#406): an account blocked could
+//! otherwise announce a deletion it never carries out, and be delivered
+//! again. The blocks go with the purge.
 //!
 //! # WHY THE CALLER'S OWN TOKEN
 //!
@@ -167,6 +170,35 @@ mod tests {
             .fetch_one(pool)
             .await
             .unwrap()
+    }
+
+    #[sqlx::test(migrations = "./migrations")]
+    async fn an_announcement_lifts_no_block_either_side(pool: SqlitePool) {
+        // An announcement is not a proof: a block goes with the purge of a
+        // deleted account, never with its announcement (#406).
+        for (blocker, blocked) in [
+            ("@alice:h", "@bob:h"),
+            ("@carol:h", "@alice:h"),
+            ("@bob:h", "@carol:h"),
+        ] {
+            sqlx::query(
+                "INSERT INTO delivered_blocks (blocker_user_id, blocked_user_id) VALUES (?, ?)",
+            )
+            .bind(blocker)
+            .bind(blocked)
+            .execute(&pool)
+            .await
+            .unwrap();
+        }
+
+        let st = state_with(pool.clone(), whoami_hs().await);
+        let Json(_) = announce(State(st), bearer("alice")).await.unwrap();
+
+        let left: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM delivered_blocks")
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+        assert_eq!(left, 3);
     }
 
     #[sqlx::test(migrations = "./migrations")]
