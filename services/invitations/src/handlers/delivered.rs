@@ -806,6 +806,27 @@ mod tests {
     }
 
     #[sqlx::test(migrations = "./migrations")]
+    async fn a_deletion_leaves_the_end_of_an_invitation_already_run_out(pool: SqlitePool) {
+        // #410: from that end are counted the thirty days of who invited whom
+        // (#416) and the fourteen days before inviting again (#406).
+        let (st, time, bob) = two_findable(pool).await;
+        let id = sent(&st, "alice", &bob).await.unwrap();
+        set_clock(&time, T0 + 10 * DAY);
+
+        let Json(_) = crate::handlers::deletion::announce(State(st.clone()), bearer("alice"))
+            .await
+            .unwrap();
+
+        let ends: i64 =
+            sqlx::query_scalar("SELECT expires_at FROM delivered_invitations WHERE id = ?")
+                .bind(&id)
+                .fetch_one(&st.pool)
+                .await
+                .unwrap();
+        assert_eq!(ends, T0 + 7 * DAY);
+    }
+
+    #[sqlx::test(migrations = "./migrations")]
     async fn a_findable_account_invites_a_reference_for_a_week(pool: SqlitePool) {
         let (st, _, bob) = two_findable(pool).await;
 

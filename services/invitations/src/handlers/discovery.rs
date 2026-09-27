@@ -1086,7 +1086,8 @@ fn served(st: &AppState) -> Result<crate::config::Discovery<'_>, AppError> {
     st.cfg.discovery().map_err(|_| AppError::DiscoveryOff)
 }
 
-/// The same, on the connection that holds the lock of `finish_proof`.
+/// The same, on a connection a transaction holds: the one of `finish_proof`,
+/// or the one of a withdrawal or a deletion (`withdraw_on`).
 async fn forget_the_proof_on(conn: &mut sqlx::SqliteConnection, user: &str) -> anyhow::Result<()> {
     sqlx::query("DELETE FROM pending_proofs WHERE user_id = ?")
         .bind(user)
@@ -3415,7 +3416,9 @@ mod tests {
     #[sqlx::test(migrations = "./migrations")]
     async fn the_count_of_a_deleted_account_stays_with_its_number(pool: SqlitePool) {
         // #410: a proof of the same number by another account, within the
-        // thirty days, finds the count again.
+        // thirty days, finds the count again. The count follows the number's
+        // mask, so this holds a deletion to it rather than to the withdrawal:
+        // it fails for a deletion that would purge the count.
         let (ovh, inbox) = fake_ovhcloud(false).await;
         let (clock, time) = crate::util::Clock::settable(T0);
         let st = state_at(pool, whoami_hs().await, Some(ovh), clock);
@@ -3427,6 +3430,31 @@ mod tests {
         prove(&st, &inbox, "bob", NUMBER).await;
 
         assert!(over_the_limit(&st, "bob", 1).await.is_err());
+    }
+
+    #[sqlx::test(migrations = "./migrations")]
+    async fn a_deleted_account_whose_proof_had_run_out_is_never_told_of_its_number_again(
+        pool: SqlitePool,
+    ) {
+        // #410: its proof is withdrawn too, run out or not, so that another
+        // account proving the number later writes no notice naming the
+        // deleted one, which would outlive the thirty days of its purge.
+        let (ovh, inbox) = fake_ovhcloud(false).await;
+        let (clock, time) = crate::util::Clock::settable(T0);
+        let st = state_at(pool.clone(), whoami_hs().await, Some(ovh), clock);
+        prove(&st, &inbox, "alice", NUMBER).await;
+        set_clock(&time, T0 + 29 * DAY);
+        deleted(&st, "alice").await;
+
+        set_clock(&time, T0 + 30 * DAY);
+        prove(&st, &inbox, "bob", NUMBER).await;
+
+        let notices: i64 =
+            sqlx::query_scalar("SELECT COUNT(*) FROM replaced_proofs WHERE user_id = '@alice:h'")
+                .fetch_one(&pool)
+                .await
+                .unwrap();
+        assert_eq!(notices, 0);
     }
 
     #[sqlx::test(migrations = "./migrations")]

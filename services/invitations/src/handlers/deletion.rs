@@ -104,6 +104,11 @@ pub async fn announce(
     .rows_affected();
 
     crate::handlers::discovery::withdraw_on(&mut tx, &user_id, at).await?;
+    // WAITING MEANS NEITHER JOINED NOR RUN OUT (#410). One joined is left as
+    // it is: its conversation may already be under way. One that has run out
+    // keeps its end, from which the thirty days of who invited whom (#416)
+    // and the fourteen days before inviting the same account again (#406)
+    // are counted: moved to today, they would start again.
     sqlx::query(
         "UPDATE delivered_invitations SET expires_at = ?1 \
          WHERE (recipient_user_id = ?2 OR inviter_user_id = ?2) \
