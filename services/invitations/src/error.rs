@@ -425,6 +425,12 @@ pub enum AppError {
     /// request may be, or holding something other than a blinded element.
     #[error("this is not a batch of blinded elements")]
     NotABatch,
+    /// This batch would take the caller's proven number past the 5,000
+    /// numbers it may have masked in thirty days (#401). `remaining` numbers
+    /// are still allowed, and the oldest day that counts leaves the window at
+    /// `frees_at`, in Unix time: more are allowed from then on.
+    #[error("this batch holds more numbers than may still be masked for this number: send fewer, or try again later")]
+    MaskingQuotaReached { remaining: u32, frees_at: i64 },
     #[error(transparent)]
     Internal(#[from] anyhow::Error),
 }
@@ -572,6 +578,9 @@ impl IntoResponse for AppError {
             AppError::NotFindable => (StatusCode::FORBIDDEN, "MESSAGR_NOT_FINDABLE"),
             AppError::UnknownMaskingKey => (StatusCode::NOT_FOUND, "MESSAGR_UNKNOWN_MASKING_KEY"),
             AppError::NotABatch => (StatusCode::BAD_REQUEST, "MESSAGR_NOT_A_BATCH"),
+            AppError::MaskingQuotaReached { .. } => {
+                (StatusCode::TOO_MANY_REQUESTS, "MESSAGR_MASKING_QUOTA")
+            }
             AppError::Internal(_) => (StatusCode::INTERNAL_SERVER_ERROR, "M_UNKNOWN"),
         };
         let message = match &self {
@@ -592,6 +601,16 @@ impl IntoResponse for AppError {
         }
         if let AppError::TooManyCodes { retry_at } = &self {
             body["retry_at"] = serde_json::json!(retry_at);
+        }
+        // AND THE LIMIT ON MASKING (#401): how many numbers are still allowed,
+        // and when more are, which the results screen says.
+        if let AppError::MaskingQuotaReached {
+            remaining,
+            frees_at,
+        } = &self
+        {
+            body["remaining"] = serde_json::json!(remaining);
+            body["frees_at"] = serde_json::json!(frees_at);
         }
         (code, Json(body)).into_response()
     }
@@ -891,6 +910,15 @@ mod tests {
                 (status, Some(errcode))
             );
         }
+        let (got, body) = render(AppError::MaskingQuotaReached {
+            remaining: 1_234,
+            frees_at: 1_792_592_000,
+        })
+        .await;
+        assert_eq!(got, StatusCode::TOO_MANY_REQUESTS);
+        assert_eq!(body["errcode"], "MESSAGR_MASKING_QUOTA");
+        assert_eq!(body["remaining"], 1_234);
+        assert_eq!(body["frees_at"], 1_792_592_000_i64);
     }
 
     /// Renders an error and extracts (status, JSON body) from it.

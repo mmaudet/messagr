@@ -56,21 +56,22 @@ pub async fn purge_spent_proofs(pool: &SqlitePool, now: i64) -> Result<u64> {
     Ok(r.rows_affected())
 }
 
-/// La passe de la découverte (#397, #398, #399), en une ligne du ménage :
-/// les preuves abandonnées, ce que les preuves finies laissent, les SMS à
-/// effacer chez OVHcloud, les compteurs des plafonds, et les crédits
-/// prépayés qui baissent.
+/// La passe de la découverte (#397, #398, #399, #401), en une ligne du
+/// ménage : les preuves abandonnées, ce que les preuves finies laissent, les
+/// SMS à effacer chez OVHcloud, les compteurs des plafonds, ceux de la limite
+/// de masquage, et les crédits prépayés qui baissent.
 ///
 /// CHAQUE ÉTAPE TOURNE, QUOI QUE FASSENT LES AUTRES : un échec n'en saute
 /// aucune, et il est rendu une fois toutes passées.
-async fn sweep_discovery(st: &Arc<AppState>, now: i64) -> Result<[u64; 4]> {
+async fn sweep_discovery(st: &Arc<AppState>, now: i64) -> Result<[u64; 5]> {
     let spent = purge_spent_proofs(&st.pool, now).await;
     let ended = purge_ended_proofs(&st.pool, now).await;
     let erased = crate::sms_history::erase_due(st, now).await;
     let counters = crate::ceilings::purge_counters(&st.pool, now).await;
+    let masking = crate::masking_quota::purge(&st.pool, now).await;
     let credits = crate::ceilings::check_the_credits(st, now).await;
     credits?;
-    Ok([spent?, ended?, erased?, counters?])
+    Ok([spent?, ended?, erased?, counters?, masking?])
 }
 
 /// Combien de temps le service garde ce qu'une découverte finie laisse.
@@ -526,7 +527,7 @@ pub(crate) async fn sweep_once(st: &Arc<AppState>, now: i64) -> bool {
         purge_account_deletions(&st.pool, now).await,
         sweep_discovery(st, now).await,
     ) {
-        (Ok(a), Ok(b), Ok(c), Ok(d), Ok(e), Ok(f), Ok(g), Ok(h), Ok(i), Ok([j, k, l, m])) => {
+        (Ok(a), Ok(b), Ok(c), Ok(d), Ok(e), Ok(f), Ok(g), Ok(h), Ok(i), Ok([j, k, l, m, n])) => {
             tracing::info!(
                 "cleanup: {a} edges, {b} invitations, {c} accounts, \
                                 {d} rows repaired, {e} claimed rows purged, \
@@ -534,7 +535,8 @@ pub(crate) async fn sweep_once(st: &Arc<AppState>, now: i64) -> bool {
                                 {h} inviter counters purged, \
                                 {i} deletion announcements purged; discovery: \
                                 {j} spent proofs, {k} ended proofs, \
-                                {l} SMS erased at OVHcloud, {m} SMS counters forgotten"
+                                {l} SMS erased at OVHcloud, {m} SMS counters forgotten, \
+                                {n} days of masking forgotten"
             );
             true
         }

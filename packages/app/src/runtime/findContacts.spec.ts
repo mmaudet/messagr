@@ -69,9 +69,17 @@ interface Asked {
   readonly body?: { key_number: number; blinded: string[] }
 }
 
+/** When the limit of #401 frees, as the service says it: in seconds. */
+const FREES_AT = 1_792_592_000
+
 /** The service: its keys, its evaluation, and a directory of these numbers. */
-function theService(proven: Record<string, string>, refuse?: number) {
+function theService(
+  proven: Record<string, string>,
+  refuse?: number,
+  limit = Infinity,
+) {
   const asked: Asked[] = []
+  let left = limit
   const service = {
     keys: async () => {
       asked.push({ route: 'keys' })
@@ -91,6 +99,17 @@ function theService(proven: Record<string, string>, refuse?: number) {
           body: JSON.stringify({ errcode: 'MESSAGR_NOT_FINDABLE' }),
         }
       }
+      if (request.blinded.length > left) {
+        return {
+          status: 429,
+          body: JSON.stringify({
+            errcode: 'MESSAGR_MASKING_QUOTA',
+            remaining: left,
+            frees_at: FREES_AT,
+          }),
+        }
+      }
+      left -= request.blinded.length
       return {
         status: 200,
         body: JSON.stringify({
@@ -122,10 +141,10 @@ function theService(proven: Record<string, string>, refuse?: number) {
 function deps(
   contacts: readonly Contact[],
   proven: Record<string, string>,
-  options: { verifies?: boolean; refuse?: number } = {},
+  options: { verifies?: boolean; refuse?: number; limit?: number } = {},
 ) {
   const { masking, calls } = theMasking(options.verifies)
-  const { service, asked } = theService(proven, options.refuse)
+  const { service, asked } = theService(proven, options.refuse, options.limit)
   const all: FindingDeps = {
     readAddressBook: async () => contacts,
     masking,
@@ -155,6 +174,7 @@ describe('looking for contacts', () => {
         { contact: PAUL, reference: 'ref-paul' },
       ],
       others: [ZOE],
+      waiting: null,
     })
   })
 
@@ -306,6 +326,7 @@ describe('looking for contacts', () => {
       found: true,
       matches: [],
       others: [{ name: 'Sans numéro', numbers: [] }],
+      waiting: null,
     })
     expect(asked).toEqual([])
   })
@@ -355,6 +376,7 @@ describe('the journey of looking for contacts', () => {
       stage: 'found',
       matches: [{ contact: PAUL, reference: 'ref-paul' }],
       others: [ZOE],
+      waiting: null,
     })
   })
 
@@ -495,5 +517,74 @@ describe('where « Retrouver mes contacts » leads', () => {
 
   it('to the reminder for a findable account', () => {
     expect(findContactsEntry(reading(true, NOW + 1), NOW)).toBe('look')
+  })
+})
+
+describe('the limit on masking (#401)', () => {
+  it('masks what the limit still allows, then says how many contacts wait and until when', async () => {
+    const { deps: d, asked } = deps(
+      [PAUL, ANNE, ZOE],
+      { '+33612345678': 'ref-paul', '+33698765432': 'ref-zoe' },
+      { limit: 2 },
+    )
+
+    const found = await findContacts(d)
+
+    // Ordered as the address book is: Paul, then Anne, then Zoé.
+    expect(
+      asked
+        .filter(a => a.route === 'maskBatch')
+        .map(a => a.body!.blinded.length),
+    ).toEqual([3, 2])
+    expect(found).toEqual({
+      found: true,
+      matches: [{ contact: PAUL, reference: 'ref-paul' }],
+      others: [ANNE, ZOE],
+      waiting: { count: 1, freesAt: FREES_AT * 1000 },
+    })
+  })
+
+  it('masks nothing when the limit is spent, and still downloads the whole directory', async () => {
+    const { deps: d, asked } = deps(
+      [PAUL, ZOE],
+      { '+33612345678': 'ref-paul' },
+      { limit: 0 },
+    )
+
+    const found = await findContacts(d)
+
+    expect(found).toEqual({
+      found: true,
+      matches: [],
+      others: [PAUL, ZOE],
+      waiting: { count: 2, freesAt: FREES_AT * 1000 },
+    })
+    expect(asked.map(a => a.route)).toEqual(['keys', 'maskBatch', 'directory'])
+  })
+
+  it('sends the same requests through the limit for an address book that finds somebody and one that finds nobody', async () => {
+    const proven = { '+33612345678': 'ref-paul' }
+    const LEA: Contact = { name: 'Léa', numbers: ['06 11 22 33 44'] }
+    const findsPaul = deps([PAUL, ZOE, ANNE], proven, { limit: 2 })
+    const findsNobody = deps([LEA, ZOE, ANNE], proven, { limit: 2 })
+
+    const one = await findContacts(findsPaul.deps)
+    const none = await findContacts(findsNobody.deps)
+
+    expect(one.found && one.matches).toHaveLength(1)
+    expect(none.found && none.matches).toHaveLength(0)
+    const shape = (asked: Asked[]) =>
+      asked.map(a =>
+        a.body
+          ? `${a.route}:${a.body.key_number}:${a.body.blinded.length}`
+          : a.route,
+      )
+    expect(shape(findsPaul.asked)).toEqual(shape(findsNobody.asked))
+    expect(shape(findsPaul.asked)).toEqual([
+      'keys',
+      `maskBatch:${KEY}:3`,
+      `maskBatch:${KEY}:2`,
+      'directory',
+    ])
   })
 })

@@ -3,8 +3,9 @@ import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native'
 
 import { t, type CopyKey } from '../copy'
 import { color, floors, layout, space, stroke, type } from '../design/tokens'
-import type { FindingStage } from '../runtime/findContacts'
+import type { FindingStage, Waiting } from '../runtime/findContacts'
 import { NotchedButton } from './NotchedButton'
+import { dayOf } from './whenLabel'
 
 /**
  * « Retrouver mes contacts » (#400, #392): the reminder, then the contacts
@@ -68,13 +69,14 @@ export function FindContacts({
         <Found
           matches={stage.matches.map(m => m.contact.name)}
           others={stage.others.map(c => c.name)}
+          waiting={stage.waiting}
           onDone={onClose}
         />
       )}
       {stage.stage === 'refused' && (
         <View style={styles.body}>
-          <View style={styles.refusal} testID="find-contacts-refused">
-            <Text style={styles.refusalText}>{t(REFUSED[stage.why])}</Text>
+          <View style={styles.notice} testID="find-contacts-refused">
+            <Text style={styles.noticeText}>{t(REFUSED[stage.why])}</Text>
           </View>
           <NotchedButton
             testID="find-contacts-done"
@@ -102,28 +104,46 @@ const REFUSED: Readonly<
 function Found({
   matches,
   others,
+  waiting,
   onDone,
 }: {
   readonly matches: readonly string[]
   readonly others: readonly string[]
+  /** What the limit on masking left for later (#401). */
+  readonly waiting: Waiting | null
   readonly onDone: () => void
 }) {
   return (
     <ScrollView
       contentContainerStyle={styles.body}
       testID="find-contacts-found">
-      <Text style={styles.heading}>{t('find_on_messagr')}</Text>
-      {matches.length === 0 ? (
-        <Text style={styles.hint} testID="find-contacts-nobody">
-          {t('find_nobody')}
-        </Text>
-      ) : (
-        matches.map((name, i) => (
-          <Text key={`m${i}`} style={styles.row} testID="find-contacts-match">
-            {name}
+      {waiting !== null && (
+        <View style={styles.notice} testID="find-contacts-waiting">
+          <Text style={styles.noticeText}>
+            {t(
+              'find_waiting %1$@ %2$@',
+              String(waiting.count),
+              dayOf(waiting.freesAt),
+            )}
           </Text>
-        ))
+        </View>
       )}
+      {/* Nobody found is said only when every number was compared: with
+          some left for later, the line above says how many. */}
+      {(matches.length > 0 || waiting === null) && (
+        <Text style={styles.heading}>{t('find_on_messagr')}</Text>
+      )}
+      {matches.length === 0
+        ? waiting === null && (
+            <Text style={styles.hint} testID="find-contacts-nobody">
+              {t('find_nobody')}
+            </Text>
+          )
+        : matches.map((name, i) => (
+            <Text key={`m${i}`} style={styles.row} testID="find-contacts-match">
+              {name}
+            </Text>
+          ))}
       {others.length > 0 && (
         <>
           <Text style={styles.heading}>{t('find_others')}</Text>
@@ -176,11 +196,11 @@ const styles = StyleSheet.create({
   row: { ...type.body, color: color.neutral['900'] },
   other: { ...type.body, color: color.neutral['600'] },
   actions: { gap: space.s, marginTop: space.m },
-  refusal: {
+  notice: {
     padding: space.m,
     borderLeftWidth: stroke.accent,
     backgroundColor: color.wait['100'],
     borderLeftColor: color.wait['500'],
   },
-  refusalText: { ...type.bodySm, color: color.neutral['900'] },
+  noticeText: { ...type.bodySm, color: color.neutral['900'] },
 })

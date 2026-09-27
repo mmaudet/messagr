@@ -5,6 +5,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { t } from '../copy'
 import type { Contact, FindingStage } from '../runtime/findContacts'
 import { FindContacts } from './FindContacts'
+import { dayOf } from './whenLabel'
 
 /**
  * « Retrouver mes contacts », walked rather than rendered, for the reason
@@ -125,6 +126,7 @@ describe('« Retrouver mes contacts »', () => {
         { contact: contact('Paul'), reference: 'r-paul' },
       ],
       others: [contact('Zoé')],
+      waiting: null,
     })
 
     expect(all(drawn, 'find-contacts-match').map(textIn)).toEqual([
@@ -142,6 +144,7 @@ describe('« Retrouver mes contacts »', () => {
       stage: 'found',
       matches: [{ contact: contact('Anne'), reference: 'r-anne' }],
       others: [contact('Zoé')],
+      waiting: null,
     })
 
     for (const row of [
@@ -157,9 +160,55 @@ describe('« Retrouver mes contacts »', () => {
       stage: 'found',
       matches: [],
       others: [contact('Zoé')],
+      waiting: null,
     })
 
     expect(textIn(withId(drawn, 'find-contacts-nobody'))).toBe(t('find_nobody'))
+  })
+
+  it('says how many contacts the limit left for later, and from when', () => {
+    const freesAt = new Date(2026, 9, 26, 12).getTime()
+    const drawn = show({
+      stage: 'found',
+      matches: [],
+      others: [contact('Zoé')],
+      waiting: { count: 12, freesAt },
+    })
+
+    expect(textIn(withId(drawn, 'find-contacts-waiting'))).toBe(
+      t('find_waiting %1$@ %2$@', '12', dayOf(freesAt)),
+    )
+    expect(
+      withId(
+        show({ stage: 'found', matches: [], others: [], waiting: null }),
+        'find-contacts-waiting',
+      ),
+    ).toBeUndefined()
+  })
+
+  it('says nobody is on Messagr only when every number was compared', () => {
+    const waiting = { count: 12, freesAt: new Date(2026, 9, 26, 12).getTime() }
+    const noneYet = show({
+      stage: 'found',
+      matches: [],
+      others: [contact('Zoé')],
+      waiting,
+    })
+
+    expect(withId(noneYet, 'find-contacts-nobody')).toBeUndefined()
+    expect(textIn(withId(noneYet, 'find-contacts-found'))).not.toContain(
+      t('find_on_messagr'),
+    )
+    const some = show({
+      stage: 'found',
+      matches: [{ contact: contact('Anne'), reference: 'r-anne' }],
+      others: [],
+      waiting,
+    })
+    expect(textIn(withId(some, 'find-contacts-found'))).toContain(
+      t('find_on_messagr'),
+    )
+    expect(all(some, 'find-contacts-match').map(textIn)).toEqual(['Anne'])
   })
 
   it('says why nothing is shown, and leads back', () => {

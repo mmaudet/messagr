@@ -813,4 +813,6 @@ export const es: Readonly<Record<CopyKey, string>> = {
     'El servicio no responde. Inténtelo de nuevo en un momento.',
   find_off: 'Encontrar contactos no se ofrece aquí.',
   find_not_findable: 'Para encontrar sus contactos, pruebe primero su número.',
+  'find_waiting %1$@ %2$@':
+    'Contactos pendientes: %1$@. Messagr podrá procesar más a partir del %2$@.',
 }
