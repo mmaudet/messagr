@@ -878,6 +878,8 @@ export const de: Readonly<Record<CopyKey, string>> = {
     'Ihr Nachweis ist abgelaufen: Sie sind nicht mehr auffindbar und können Ihre Kontakte nicht mehr finden.',
   list_findable_replaced:
     'Ihre Nummer macht jetzt ein anderes Konto auffindbar.',
+  list_findable_key_changed:
+    'Der Dienst hat den Schlüssel geändert, der die Nummern maskiert: Sie sind nicht mehr auffindbar und können Ihre Kontakte nicht mehr finden, bis Sie Ihre Nummer erneut nachweisen.',
   list_findable_renew_action: 'Nachweis erneuern',
   list_findable_prove_action: 'Meine Nummer nachweisen',
   'findable_too_many %1$@ %2$@':

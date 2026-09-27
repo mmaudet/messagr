@@ -283,6 +283,17 @@ describe('the sentence about being findable (#398)', () => {
     expect(withId(drawn, 'list-findable-action')).toBeUndefined()
   })
 
+  it('says the key changed, and offers to prove the number again (#409)', () => {
+    const drawn = list({
+      findableNotice: { notice: 'key-changed' },
+      onProveAgain: () => undefined,
+    })
+    expect(words(drawn)).toContain(t('list_findable_key_changed'))
+    expect(withId(drawn, 'list-findable-action')?.props.label).toBe(
+      t('list_findable_prove_action'),
+    )
+  })
+
   it('says nothing when there is nothing to say', () => {
     expect(withId(list(), 'list-findable')).toBeUndefined()
   })

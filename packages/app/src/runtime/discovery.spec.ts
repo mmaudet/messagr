@@ -159,6 +159,25 @@ describe('reading the state of discovery', () => {
     })
   })
 
+  it('reads a proof ended by a key retired at once (#409)', async () => {
+    // Without it, the whole reading of such an account was refused: no
+    // « Retrouver mes contacts », and no way back to the proof.
+    const { service } = theService({
+      state: [
+        ok({
+          on: true,
+          findable_until: null,
+          ended: 'key-changed',
+          countries: [],
+        }),
+      ],
+    })
+
+    const reading = await readDiscovery({ service, now: () => NOW })
+
+    expect(reading).toMatchObject({ read: true, ended: 'key-changed' })
+  })
+
   it('is no reading at all when the service cannot be read', async () => {
     for (const answer of [
       new Error('offline'),
@@ -668,6 +687,10 @@ describe('the sentence above the list (#398)', () => {
 
   it('says a number now makes another account findable', () => {
     expect(at({ ended: 'replaced' })).toEqual({ notice: 'replaced' })
+  })
+
+  it('says the key changed, when a key retired at once ended the proof (#409)', () => {
+    expect(at({ ended: 'key-changed' })).toEqual({ notice: 'key-changed' })
   })
 
   it('says nothing of a number withdrawn, nor when discovery is off or unread', () => {
