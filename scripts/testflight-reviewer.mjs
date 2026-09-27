@@ -5,10 +5,10 @@
 //
 // # Pourquoi l'application ne suffit pas
 //
-// Elle émet pour une heure (`TTL_SECONDS`, `issueInvitation.ts`), et
-// l'appareil émetteur ne fait entrer que pendant cette heure
-// (`STOP_ASKING_AFTER_MS`, `admitAnyoneWaiting.ts`). Une revue bêta prend en
-// général une journée.
+// Elle émet pour une heure (`LINK_TTL_SECONDS`, `issueInvitation.ts`), ou
+// trois jours pour un contact absent de Messagr (#408), et seul l'appareil
+// émetteur fait entrer, tant que vaut le lien qu'il a émis
+// (`admitAnyoneWaiting.ts`). Une revue bêta prend en général une journée.
 //
 // Une invitation plus longue ne suffit pas non plus, parce que la réclamation
 // se fait en deux appels. Le premier tire un compte et reçoit
@@ -144,7 +144,7 @@ const FOLLOW_UP_WINDOW_MS = 15_000
  * L'échéance enregistrée est prise avant l'envoi de la demande, le service
  * prend la sienne à la réception : la nôtre tombe un peu plus tôt. Large de
  * cinq minutes plutôt qu'exacte, pour la raison que donne
- * `STOP_ASKING_AFTER_MS` : s'arrêter trop tôt, c'est quelqu'un qui ne peut
+ * `admitAnyoneWaiting.ts` : s'arrêter trop tôt, c'est quelqu'un qui ne peut
  * pas entrer avec un lien encore bon ; trop tard, quelques lectures de plus.
  */
 const DEADLINE_GRACE_MS = 5 * 60_000
@@ -1426,7 +1426,7 @@ async function selfTest() {
   ])
   check(
     "la demande d'invitation a les champs de l'application",
-    /max_uses: 1,\s*ttl_seconds: TTL_SECONDS,\s*room_id: scope,/.test(app) &&
+    /max_uses: 1,\s*ttl_seconds: ttlSeconds,\s*room_id: scope,/.test(app) &&
       JSON.stringify(Object.keys(requests.mint('!r', 1, 1, 'k').body)),
     '["max_uses","ttl_seconds","room_id"]',
   )
