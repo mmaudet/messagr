@@ -100,6 +100,7 @@ export function forgetfulDiscoveryResults(): DiscoveryResults {
     recall: async () => new Map(),
     keep: async () => false,
     forgetAllBut: async () => false,
+    forgetKeysBut: async () => false,
     keepNames: async () => false,
     nameOf: async () => null,
     forgetAll: async () => false,
@@ -256,6 +257,26 @@ export async function openDiscoveryResults(
             some,
           )
         }
+        return true
+      } catch {
+        // Kept a little longer: the next look forgets them.
+        return false
+      }
+    },
+
+    forgetKeysBut: async keyNumbers => {
+      try {
+        // A KEY THAT NO LONGER SERVES masks nothing any more (#409): what the
+        // page holds under it, a mask and the account it led to, is kept for
+        // nothing. The names stay with their numbers.
+        await database.execute(
+          keyNumbers.length === 0
+            ? 'DELETE FROM discovery_results'
+            : 'DELETE FROM discovery_results WHERE key_number NOT IN (' +
+                keyNumbers.map(() => '?').join(', ') +
+                ')',
+          keyNumbers,
+        )
         return true
       } catch {
         // Kept a little longer: the next look forgets them.

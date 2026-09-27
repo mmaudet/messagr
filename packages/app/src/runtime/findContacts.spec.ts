@@ -37,8 +37,14 @@ const text = (b: Uint8Array) => String.fromCharCode(...b)
 const b64 = (b: Uint8Array) => btoa(text(b))
 const unb64 = (s: string) => bytes(atob(s))
 
-/** What the service holds as the mask of `number` under the key. */
-const maskOf = (number: string) => b64(bytes(`mask(${number})#${KEY}`))
+/** What the service holds as the mask of `number` under a key. */
+const maskUnder = (number: string, key: number) =>
+  b64(bytes(`mask(${number})#${key}`))
+const maskOf = (number: string) => maskUnder(number, KEY)
+
+/** The public key the service publishes for a key number. */
+const publicKeyOf = (key: number) =>
+  key === KEY ? PUBLIC_KEY : b64(bytes(`public-${key}`))
 
 function theMasking(verifies = true) {
   const calls: { finalized: number; blinded: string[] } = {
@@ -55,7 +61,9 @@ function theMasking(verifies = true) {
     },
     finalize: async (blinding: Blinding, evaluated, _proof, publicKey) => {
       calls.finalized += 1
-      if (!verifies || b64(publicKey) !== PUBLIC_KEY) {
+      const published =
+        b64(publicKey) === PUBLIC_KEY || text(publicKey).startsWith('public-')
+      if (!verifies || !published) {
         return 'not-the-published-key'
       }
       expect(evaluated).toHaveLength(blinding.blindedElements.length)
@@ -82,6 +90,13 @@ function theService(
   limit = Infinity,
   /** The envelope key each reference's proof published (#405), if any. */
   envelopeKeys: Record<string, string> = {},
+  /**
+   * The keys in service, oldest first, and the numbers proven under each
+   * (#409); `KEY` alone, with `proven` under it, when not said.
+   */
+  served: { readonly [key: number]: Record<string, string> } = {
+    [KEY]: proven,
+  },
 ) {
   const asked: Asked[] = []
   let left = limit
@@ -91,7 +106,10 @@ function theService(
       return {
         status: 200,
         body: JSON.stringify({
-          keys: [{ key_number: KEY, public_key: PUBLIC_KEY }],
+          keys: Object.keys(served)
+            .map(Number)
+            .sort((a, b) => a - b)
+            .map(key => ({ key_number: key, public_key: publicKeyOf(key) })),
         }),
       }
     },
@@ -131,14 +149,16 @@ function theService(
       return {
         status: 200,
         body: JSON.stringify({
-          entries: Object.entries(proven).map(([number, reference]) => ({
-            key_number: KEY,
-            mask: maskOf(number),
-            reference,
-            ...(envelopeKeys[reference] === undefined
-              ? {}
-              : { envelope_key: envelopeKeys[reference] }),
-          })),
+          entries: Object.entries(served).flatMap(([key, under]) =>
+            Object.entries(under).map(([number, reference]) => ({
+              key_number: Number(key),
+              mask: maskUnder(number, Number(key)),
+              reference,
+              ...(envelopeKeys[reference] === undefined
+                ? {}
+                : { envelope_key: envelopeKeys[reference] }),
+            })),
+          ),
         }),
       }
     },
@@ -178,6 +198,14 @@ function thePage(rows: readonly Row[] = []) {
       }
       return true
     },
+    forgetKeysBut: async keyNumbers => {
+      for (const id of [...page.keys()]) {
+        if (!keyNumbers.includes(Number(id.slice(0, id.indexOf('/'))))) {
+          page.delete(id)
+        }
+      }
+      return true
+    },
     keepNames: async named => {
       for (const [number, name] of named) names.set(number, name)
       return true
@@ -207,6 +235,8 @@ function deps(
     limit?: number
     rows?: readonly Row[]
     envelopeKeys?: Record<string, string>
+    /** The keys in service and what is proven under each (#409). */
+    served?: { readonly [key: number]: Record<string, string> }
   } = {},
 ) {
   const { masking, calls } = theMasking(options.verifies)
@@ -215,6 +245,7 @@ function deps(
     options.refuse,
     options.limit,
     options.envelopeKeys,
+    options.served,
   )
   const { results, page, names } = thePage(options.rows)
   const all: FindingDeps = {
@@ -977,7 +1008,7 @@ describe('looking again (#402)', () => {
     ])
   })
 
-  it('masks again a number kept under another key, and leaves that row as it was', async () => {
+  it('masks again a number kept under a key no longer served, and forgets that row (#409)', async () => {
     const before = row(PAUL_NUMBER, 'ref-old-key', KEY - 1)
     const { deps: d, asked, page } = deps([PAUL], {}, { rows: [before] })
 
@@ -988,7 +1019,8 @@ describe('looking again (#402)', () => {
       mask: maskOf(PAUL_NUMBER),
       reference: null,
     })
-    expect(page.get(`${KEY - 1}/${PAUL_NUMBER}`)).toEqual(before[2])
+    // A key that no longer serves masks nothing any more.
+    expect(page.get(`${KEY - 1}/${PAUL_NUMBER}`)).toBeUndefined()
   })
 
   it('says a number changed hands when it leads to another account than it first did, and keeps the first', async () => {
@@ -1187,6 +1219,9 @@ describe('looking again (#402)', () => {
       forgetAllBut: async () => {
         throw new Error('the notebook is read-only')
       },
+      forgetKeysBut: async () => {
+        throw new Error('the notebook is read-only')
+      },
       keepNames: async () => {
         throw new Error('the notebook is read-only')
       },
@@ -1209,5 +1244,180 @@ describe('looking again (#402)', () => {
         envelopeKey: null,
       },
     ])
+  })
+})
+
+describe('while two keys serve (#409)', () => {
+  const OLD = KEY
+  const NEW = KEY + 1
+  const PAUL_NUMBER = '+33612345678'
+  const ANNE_NUMBER = '+447911123456'
+  const ZOE_NUMBER = '+33698765432'
+  const shape = (asked: Asked[]) =>
+    asked.map(a =>
+      a.body
+        ? `${a.route}:${a.body.key_number}:${a.body.blinded.length}`
+        : a.route,
+    )
+  const under = (
+    key: number,
+    number: string,
+    reference: string | null,
+  ): Row => [key, number, { mask: maskUnder(number, key), reference }]
+  /** What is proven under each key, the old one first. */
+  const serving = (
+    old: Record<string, string>,
+    fresh: Record<string, string>,
+  ): Record<number, Record<string, string>> => ({ [OLD]: old, [NEW]: fresh })
+
+  it('finds an account that has not renewed under the old key, and one that has under the new', async () => {
+    const { deps: d, asked } = deps(
+      [PAUL, ANNE, ZOE],
+      {},
+      {
+        served: serving(
+          { [PAUL_NUMBER]: 'ref-paul' },
+          { [ANNE_NUMBER]: 'ref-anne' },
+        ),
+      },
+    )
+
+    const found = await findContacts(d)
+
+    expect(found.found && found.matches.map(m => m.reference)).toEqual([
+      'ref-anne',
+      'ref-paul',
+    ])
+    // Each number masked under each key, the new one first, and the
+    // directory once.
+    expect(shape(asked)).toEqual([
+      'keys',
+      `maskBatch:${NEW}:3`,
+      `maskBatch:${OLD}:3`,
+      'directory',
+    ])
+  })
+
+  it('masks under the new key what the page holds under the old one only, once', async () => {
+    const served = serving({ [PAUL_NUMBER]: 'ref-paul' }, {})
+    const first = deps(
+      [PAUL, ZOE],
+      {},
+      {
+        served,
+        rows: [
+          under(OLD, PAUL_NUMBER, 'ref-paul'),
+          under(OLD, ZOE_NUMBER, null),
+        ],
+      },
+    )
+
+    await findContacts(first.deps)
+
+    expect(shape(first.asked)).toEqual([
+      'keys',
+      `maskBatch:${NEW}:2`,
+      'directory',
+    ])
+    const again = deps(
+      [PAUL, ZOE],
+      {},
+      {
+        served,
+        rows: [...first.page].map(([id, kept]) => {
+          const [key, number] = id.split('/')
+          return [Number(key), number!, kept] as Row
+        }),
+      },
+    )
+    await findContacts(again.deps)
+    expect(shape(again.asked)).toEqual(['keys', 'directory'])
+  })
+
+  it('reads an account renewed under the new key as the same, by the reference it kept', async () => {
+    const { deps: d, page } = deps(
+      [PAUL],
+      {},
+      {
+        served: serving({}, { [PAUL_NUMBER]: 'ref-paul' }),
+        rows: [under(OLD, PAUL_NUMBER, 'ref-paul')],
+      },
+    )
+
+    const found = await findContacts(d)
+
+    expect(found.found && found.matches).toEqual([
+      {
+        contact: PAUL,
+        reference: 'ref-paul',
+        holderChanged: false,
+        envelopeKey: null,
+      },
+    ])
+    expect(page.get(`${NEW}/${PAUL_NUMBER}`)?.reference).toBe('ref-paul')
+  })
+
+  it('says a number changed hands when the account under the new key is not the one under the old', async () => {
+    const {
+      deps: d,
+      page,
+      names,
+    } = deps(
+      [PAUL],
+      {},
+      {
+        served: serving({}, { [PAUL_NUMBER]: 'ref-someone-else' }),
+        rows: [under(OLD, PAUL_NUMBER, 'ref-paul')],
+      },
+    )
+
+    const found = await findContacts(d)
+
+    expect(found.found && found.matches[0]?.holderChanged).toBe(true)
+    // The first reference the number led to is kept under the new key too,
+    // so the next look says it again, and the card gives the new account
+    // no name.
+    expect(page.get(`${NEW}/${PAUL_NUMBER}`)?.reference).toBe('ref-paul')
+    expect(names.get(PAUL_NUMBER)).toBeUndefined()
+  })
+
+  it('forgets what the page holds under a key no longer served', async () => {
+    const { deps: d, page } = deps(
+      [PAUL],
+      {},
+      {
+        served: { [NEW]: { [PAUL_NUMBER]: 'ref-paul' } },
+        rows: [under(OLD, PAUL_NUMBER, 'ref-paul')],
+      },
+    )
+
+    await findContacts(d)
+
+    expect([...page.keys()]).toEqual([`${NEW}/${PAUL_NUMBER}`])
+  })
+
+  it('sends the same requests under two keys for an address book that finds somebody and one that finds nobody', async () => {
+    const finds = deps(
+      [PAUL, ZOE],
+      {},
+      {
+        served: serving(
+          { [PAUL_NUMBER]: 'ref-paul' },
+          { [ZOE_NUMBER]: 'ref-zoe' },
+        ),
+      },
+    )
+    const findsNobody = deps(
+      [PAUL, ZOE],
+      {},
+      {
+        served: serving({}, {}),
+      },
+    )
+
+    await findContacts(finds.deps)
+    await findContacts(findsNobody.deps)
+
+    expect(shape(finds.asked)).toEqual(shape(findsNobody.asked))
   })
 })
