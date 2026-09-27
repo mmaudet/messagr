@@ -689,6 +689,7 @@ export function App({
    * again.
    */
   const readDelivered = async () => {
+    if (!mayBeInvitedHereRef.current) return
     await tellEntered()
     const waiting = await readTheWaiting(discoveryDeps.service).catch(
       () => null,
@@ -1459,6 +1460,15 @@ export function App({
   const envelopeKeys = useRef(
     envelopeKeysIn(envelopeKeySecrets, () => Date.now()),
   ).current
+  /**
+   * WHETHER AN INVITATION CAN HAVE BEEN DELIVERED HERE AT ALL: only to an
+   * account with a proof, and a device that made one holds an envelope key
+   * (#405). A device that never proved a number never asks the service for
+   * its delivered invitations, at launch or at any tick -- which is every
+   * device while discovery is off. Read from the keystore at launch, and set
+   * as soon as a proof holds.
+   */
+  const mayBeInvitedHereRef = useRef(false)
   // LOOKING FOR ONE'S CONTACTS (#400), from the « + » sheet, for a findable
   // account: the address book through the system, each number masked by the
   // crypto bridge's OPRF client, and the comparison made on this telephone.
@@ -1501,7 +1511,13 @@ export function App({
       {
         ...discoveryDeps,
         language: currentLanguage,
-        envelope: envelopeKeys,
+        envelope: {
+          toPublish: envelopeKeys.toPublish,
+          published: async pair => {
+            await envelopeKeys.published(pair)
+            mayBeInvitedHereRef.current = true
+          },
+        },
         keepNumber: async number => {
           setKeptNumber(number)
           // EMPTY IS « NONE »: `SecretStore` has no delete, so a number
@@ -3133,11 +3149,17 @@ export function App({
             // WHOSE ROOM INVITE THIS ACCOUNT AWAITS (#404), read before the
             // walk, so that a relaunch enters it as the tick would have. For
             // three seconds at most: a service slow to answer must not hold
-            // the list back, and the next tick enters it all the same.
-            await Promise.race([
-              readDelivered(),
-              new Promise<void>(resolve => setTimeout(resolve, 3_000)),
-            ])
+            // the list back, and the next tick enters it all the same. And
+            // only on a device that may have been invited this way at all:
+            // every other launch waits for nothing (`mayBeInvitedHereRef`).
+            mayBeInvitedHereRef.current =
+              (await envelopeKeys.secrets()).length > 0
+            if (mayBeInvitedHereRef.current) {
+              await Promise.race([
+                readDelivered(),
+                new Promise<void>(resolve => setTimeout(resolve, 3_000)),
+              ])
+            }
             const walkedAtLaunch = await enterAnyInvitations(
               sessionClient,
               credentials.userId,
