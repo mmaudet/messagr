@@ -433,9 +433,10 @@ pub enum AppError {
     MaskingQuotaReached { remaining: u32, frees_at: i64 },
     /// An envelope key or a sealed name of the wrong shape (#405): a key is
     /// 32 bytes, a sealed name always `delivered::SEALED_NAME_BYTES`, both in
-    /// base64.
+    /// base64. One variant for both: either way, what was sent to be kept for
+    /// the sealed name is not what a device makes.
     #[error("this is not an envelope key or a sealed name of the expected size")]
-    NotAnEnvelope,
+    MalformedEnvelope,
     /// The reference names no current proof (#404): a number withdrawn or run
     /// out since the directory was read, or no reference at all. Reading the
     /// directory again is the remedy.
@@ -594,7 +595,7 @@ impl IntoResponse for AppError {
             AppError::NotFindable => (StatusCode::FORBIDDEN, "MESSAGR_NOT_FINDABLE"),
             AppError::UnknownMaskingKey => (StatusCode::NOT_FOUND, "MESSAGR_UNKNOWN_MASKING_KEY"),
             AppError::NotABatch => (StatusCode::BAD_REQUEST, "MESSAGR_NOT_A_BATCH"),
-            AppError::NotAnEnvelope => (StatusCode::BAD_REQUEST, "MESSAGR_NOT_AN_ENVELOPE"),
+            AppError::MalformedEnvelope => (StatusCode::BAD_REQUEST, "MESSAGR_MALFORMED_ENVELOPE"),
             AppError::UnknownReference => (StatusCode::NOT_FOUND, "MESSAGR_UNKNOWN_REFERENCE"),
             AppError::OwnReference => (StatusCode::UNPROCESSABLE_ENTITY, "MESSAGR_OWN_REFERENCE"),
             AppError::MaskingQuotaReached { .. } => {
@@ -927,7 +928,11 @@ mod tests {
             (AppError::UnknownReference, 404, "MESSAGR_UNKNOWN_REFERENCE"),
             (AppError::OwnReference, 422, "MESSAGR_OWN_REFERENCE"),
             // THE NAME, SEALED (#405): a key or an envelope of the wrong size.
-            (AppError::NotAnEnvelope, 400, "MESSAGR_NOT_AN_ENVELOPE"),
+            (
+                AppError::MalformedEnvelope,
+                400,
+                "MESSAGR_MALFORMED_ENVELOPE",
+            ),
         ] {
             let (got, body) = render(refusal).await;
             assert_eq!(

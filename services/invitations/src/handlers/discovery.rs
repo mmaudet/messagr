@@ -749,16 +749,17 @@ async fn proves_it_now(
     Ok(again.as_slice() == running.mask.as_slice())
 }
 
-/// What discovery serves with, or `DiscoveryOff` (`Config::discovery`).
-/// `text`, base64, if it decodes to exactly `size` bytes (#405).
+/// `text`, base64, if it decodes to exactly `size` bytes: an envelope key or
+/// a sealed name (#405).
 pub(crate) fn decoded_of_size(text: &str, size: usize) -> Result<Vec<u8>, AppError> {
     BASE64
         .decode(text.as_bytes())
         .ok()
         .filter(|bytes| bytes.len() == size)
-        .ok_or(AppError::NotAnEnvelope)
+        .ok_or(AppError::MalformedEnvelope)
 }
 
+/// What discovery serves with, or `DiscoveryOff` (`Config::discovery`).
 fn served(st: &AppState) -> Result<crate::config::Discovery<'_>, AppError> {
     st.cfg.discovery().map_err(|_| AppError::DiscoveryOff)
 }
@@ -1930,13 +1931,13 @@ mod tests {
         ] {
             assert!(matches!(
                 finish_with_key(&st, "alice", &code, Some(&wrong)).await,
-                Err(AppError::NotAnEnvelope)
+                Err(AppError::MalformedEnvelope)
             ));
         }
         for _ in 0..ATTEMPTS {
             assert!(matches!(
                 finish_with_key(&st, "alice", "000000", Some("not base64 at all")).await,
-                Err(AppError::NotAnEnvelope)
+                Err(AppError::MalformedEnvelope)
             ));
         }
         assert!(

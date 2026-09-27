@@ -420,31 +420,22 @@ mod tests {
     }
 
     async fn sent(st: &Arc<AppState>, who: &str, reference: &str) -> Result<String, AppError> {
-        send(
-            State(st.clone()),
-            bearer(who),
-            Body(SendRequest {
-                reference: reference.into(),
-                sealed_name: None,
-            }),
-        )
-        .await
-        .map(|Json(s)| s.id)
+        sent_with(st, who, reference, None).await
     }
 
     /// The same, with a sealed name (#405), base64.
-    async fn sent_sealed(
+    async fn sent_with(
         st: &Arc<AppState>,
         who: &str,
         reference: &str,
-        sealed: &str,
+        sealed: Option<&str>,
     ) -> Result<String, AppError> {
         send(
             State(st.clone()),
             bearer(who),
             Body(SendRequest {
                 reference: reference.into(),
-                sealed_name: Some(sealed.into()),
+                sealed_name: sealed.map(Into::into),
             }),
         )
         .await
@@ -857,7 +848,7 @@ mod tests {
         let (st, _, bob) = two_findable(pool).await;
         let sealed = envelope(7);
 
-        let id = sent_sealed(&st, "alice", &bob, &sealed).await.unwrap();
+        let id = sent_with(&st, "alice", &bob, Some(&sealed)).await.unwrap();
 
         assert_eq!(
             waiting_for(&st, "bob").await,
@@ -883,8 +874,8 @@ mod tests {
             "not base64 at all".to_string(),
         ] {
             assert!(matches!(
-                sent_sealed(&st, "alice", &bob, &wrong).await,
-                Err(AppError::NotAnEnvelope)
+                sent_with(&st, "alice", &bob, Some(&wrong)).await,
+                Err(AppError::MalformedEnvelope)
             ));
         }
         assert_eq!(waiting_for(&st, "bob").await, json!([]));
@@ -895,9 +886,15 @@ mod tests {
         pool: SqlitePool,
     ) {
         let (st, time, bob) = two_findable(pool).await;
-        let joined_one = sent_sealed(&st, "alice", &bob, &envelope(1)).await.unwrap();
-        let declined_one = sent_sealed(&st, "alice", &bob, &envelope(2)).await.unwrap();
-        let unanswered = sent_sealed(&st, "alice", &bob, &envelope(3)).await.unwrap();
+        let joined_one = sent_with(&st, "alice", &bob, Some(&envelope(1)))
+            .await
+            .unwrap();
+        let declined_one = sent_with(&st, "alice", &bob, Some(&envelope(2)))
+            .await
+            .unwrap();
+        let unanswered = sent_with(&st, "alice", &bob, Some(&envelope(3)))
+            .await
+            .unwrap();
 
         joined(&st, "bob", &joined_one).await.unwrap();
         declined(&st, "bob", &declined_one).await.unwrap();
