@@ -390,14 +390,14 @@ export const en: Readonly<Record<CopyKey, string>> = {
     'How long this link lasts and how many uses it has left cannot be read here: only the account that issued it can ask.',
   invited_nothing_sent:
     'Nothing has been sent yet. Until you answer, this invitation stays where it is.',
-  invited_who_found:
-    'Someone who has your number in their address book invites you to a conversation.',
-  'invited_terms_delivered %1$@':
-    'This invitation is good until %1$@, and only once.',
-  invited_nothing_told:
-    'The person who invites you learns nothing until you join: declining tells them nothing.',
   invited_nothing_spent:
     'Nothing has been sent yet. Until you answer, this link is not spent.',
+  invited_who_delivered:
+    'Someone invites you to a conversation in Messagr, without saying who.',
+  'invited_terms_delivered %1$@':
+    'This invitation is good until %1$@, for one use only.',
+  invited_nothing_told:
+    'The person who invites you learns nothing until you have joined the conversation: declining tells them nothing.',
   'invited_behind %1$d':
     '%1$d other invitation(s) are waiting behind this one.',
   invited_join: 'Join the conversation',
@@ -624,6 +624,11 @@ export const en: Readonly<Record<CopyKey, string>> = {
   list_sent_expired: 'Invitation expired',
   list_delivered_invitation: 'Invitation in Messagr',
   'list_delivered_until %1$@': 'Good until %1$@',
+  list_delivered_joined: 'Invitation accepted',
+  list_delivered_joined_waiting: 'Waiting for the person who invited you',
+  list_delivered_expired: 'This invitation ran out before your answer.',
+  list_delivered_gone:
+    'This invitation is no longer waiting for an answer: it may have received one on another device.',
   invite_open: 'Invite someone',
   plus_invite: 'Invite someone',
   plus_close: 'Close',

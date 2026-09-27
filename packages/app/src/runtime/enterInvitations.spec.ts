@@ -20,9 +20,9 @@ function entering(over: Partial<Entering> = {}): Entering {
     // a device nobody has just invited anywhere. Every test below that expects
     // a door to open says how many links were spent for it.
     awaited: () => 0,
-    // AND NOBODY WHOSE INVITATION DELIVERED INSIDE THE APPLICATION WAS
-    // JOINED (#404), for the same reason.
-    awaitedFrom: () => new Set(),
+    // AND NO INVITATION DELIVERED INSIDE THE APPLICATION JOINED (#404), for
+    // the same reason.
+    awaitedDeliveries: () => [],
     ...over,
   }
 }
@@ -110,6 +110,7 @@ describe('enterInvitations', () => {
     expect(entered).toEqual({
       joined: [],
       doors: 0,
+      delivered: [],
       refused: [],
       collapsed: [],
       waiting: [],
@@ -281,21 +282,75 @@ describe('enterInvitations', () => {
 })
 
 describe('the room invite of an invitation delivered inside the application (#404)', () => {
-  it('is entered when it comes from an inviter whose invitation was joined, and spends no link', async () => {
+  const ALICE = { id: 'inv-alice', inviter: '@alice:x' }
+
+  it('is entered when it comes from the inviter of an invitation joined, spends no link, and answers that invitation', async () => {
     const entered = await enterInvitations(
       entering({
         invitedRooms: async () => [
           { scope: '!alice:x', from: '@alice:x' },
           { scope: '!stranger:x', from: '@carol:x' },
         ],
-        awaitedFrom: () => new Set(['@alice:x']),
+        awaitedDeliveries: () => [ALICE],
       }),
     )
 
     expect(entered.joined).toEqual(['!alice:x'])
     expect(entered.doors).toBe(0)
+    expect(entered.delivered).toEqual(['inv-alice'])
     expect(entered.waiting).toEqual([
       { scope: '!stranger:x', from: '@carol:x' },
+    ])
+  })
+
+  it('answers one invitation per room: a second room from the same inviter waits', async () => {
+    const entered = await enterInvitations(
+      entering({
+        invitedRooms: async () => [
+          { scope: '!first:x', from: '@alice:x' },
+          { scope: '!second:x', from: '@alice:x' },
+        ],
+        awaitedDeliveries: () => [ALICE],
+      }),
+    )
+
+    expect(entered.joined).toEqual(['!first:x'])
+    expect(entered.delivered).toEqual(['inv-alice'])
+    expect(entered.waiting).toEqual([{ scope: '!second:x', from: '@alice:x' }])
+  })
+
+  it('answers two invitations from the same inviter with two rooms, the oldest first', async () => {
+    const entered = await enterInvitations(
+      entering({
+        invitedRooms: async () => [
+          { scope: '!first:x', from: '@alice:x' },
+          { scope: '!second:x', from: '@alice:x' },
+        ],
+        awaitedDeliveries: () => [
+          ALICE,
+          { id: 'inv-alice-later', inviter: '@alice:x' },
+        ],
+      }),
+    )
+
+    expect(entered.joined).toEqual(['!first:x', '!second:x'])
+    expect(entered.delivered).toEqual(['inv-alice', 'inv-alice-later'])
+  })
+
+  it('answers nothing when the room would not open, so the next tick tries again', async () => {
+    const entered = await enterInvitations(
+      entering({
+        invitedRooms: async () => [{ scope: '!alice:x', from: '@alice:x' }],
+        awaitedDeliveries: () => [ALICE],
+        join: async () => {
+          throw new Error('M_FORBIDDEN')
+        },
+      }),
+    )
+
+    expect(entered.delivered).toEqual([])
+    expect(entered.refused).toEqual([
+      { scope: '!alice:x', reason: 'M_FORBIDDEN' },
     ])
   })
 
@@ -307,20 +362,21 @@ describe('the room invite of an invitation delivered inside the application (#40
           { scope: '!link:x', from: null },
         ],
         awaited: () => 1,
-        awaitedFrom: () => new Set(['@alice:x']),
+        awaitedDeliveries: () => [ALICE],
       }),
     )
 
     expect(entered.joined).toEqual(['!alice:x', '!link:x'])
     expect(entered.doors).toBe(1)
+    expect(entered.delivered).toEqual(['inv-alice'])
   })
 
-  it("declines it for somebody already in a conversation here, as a link's", async () => {
+  it("declines it for somebody already in a conversation here, as a link's, and that answers the invitation", async () => {
     const declined: string[] = []
     const entered = await enterInvitations(
       entering({
         invitedRooms: async () => [{ scope: '!alice:x', from: '@alice:x' }],
-        awaitedFrom: () => new Set(['@alice:x']),
+        awaitedDeliveries: () => [ALICE],
         alreadyWith: async () => new Set(['@alice:x']),
         decline: async (_http, scope) => {
           declined.push(scope)
@@ -331,5 +387,6 @@ describe('the room invite of an invitation delivered inside the application (#40
     expect(declined).toEqual(['!alice:x'])
     expect(entered.collapsed).toEqual([{ scope: '!alice:x', from: '@alice:x' }])
     expect(entered.doors).toBe(0)
+    expect(entered.delivered).toEqual(['inv-alice'])
   })
 })

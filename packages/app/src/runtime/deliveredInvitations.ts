@@ -28,10 +28,11 @@
  * waiting for its account (`readTheWaiting`), and shows them atop the list.
  * « Rejoindre » tells the service, which names the inviter in its answer;
  * « Refuser » tells the service alone, never the inviter. An invitation
- * joined stays in the service's list until its deadline, with its inviter:
- * the room invite that inviter's device sends is entered without asking
- * again (`enterInvitations.ts`), even after a relaunch, since the person has
- * answered already.
+ * joined stays in the service's list, with its inviter, until this device
+ * says it entered (`sayEntered`): the room invite that inviter's device
+ * sends is entered without asking again (`enterInvitations.ts`), days later
+ * or after a relaunch, since the person has answered already, and each such
+ * entry answers one invitation and no other.
  */
 import { parsed, type Answer } from './discovery'
 import { getErrorMessage } from './errors'
@@ -50,6 +51,8 @@ export interface DeliveryService {
   readonly joinInvitation: (id: string) => Promise<Answer>
   /** `POST /discovery/invitations/:id/decline`. */
   readonly declineInvitation: (id: string) => Promise<Answer>
+  /** `POST /discovery/invitations/:id/entered`. */
+  readonly enteredInvitation: (id: string) => Promise<Answer>
 }
 
 /** An invitation waiting for this account's answer. */
@@ -59,15 +62,22 @@ export interface WaitingInvitation {
   readonly expiresAt: number
 }
 
+/**
+ * An invitation this account joined and whose room it has not entered yet:
+ * the inviter's room invite is the one the person already said « Rejoindre »
+ * to.
+ */
+export interface JoinedInvitation {
+  readonly id: string
+  readonly inviter: string
+}
+
 /** What the service says is waiting for this account. */
 export interface Waiting {
   /** Invitations to answer, oldest first. */
   readonly unanswered: readonly WaitingInvitation[]
-  /**
-   * The accounts whose invitation this account joined and whose room invite
-   * it waits for: that invite is entered without asking again.
-   */
-  readonly awaitedFrom: ReadonlySet<string>
+  /** Invitations joined and not entered yet, oldest first. */
+  readonly joined: readonly JoinedInvitation[]
 }
 
 /**
@@ -77,55 +87,49 @@ export interface Waiting {
 export async function readTheWaiting(
   service: DeliveryService,
 ): Promise<Waiting | null> {
-  let answer: Answer
-  try {
-    answer = await service.waitingInvitations()
-  } catch {
-    return null
-  }
+  const answer = await asked(() => service.waitingInvitations())
+  if (answer === null) return null
   const body = parsed(answer.body)
   if (answer.status !== 200 || !Array.isArray(body?.invitations)) return null
   const unanswered: WaitingInvitation[] = []
-  const awaitedFrom = new Set<string>()
-  for (const entry of body.invitations as Record<string, unknown>[]) {
+  const joined: JoinedInvitation[] = []
+  for (const entry of body.invitations as unknown[]) {
     // Read defensively, for the reason every answer of the service is: an
-    // entry of the wrong shape is one to skip, not a list to lose.
-    const { id, expires_at: expiresAt, inviter_user_id: inviter } = entry
+    // entry of the wrong shape, `null` included, is one to skip, not a list
+    // to lose.
+    if (typeof entry !== 'object' || entry === null) continue
+    const {
+      id,
+      expires_at: expiresAt,
+      inviter_user_id: inviter,
+    } = entry as Record<string, unknown>
     if (typeof id !== 'string' || id === '' || typeof expiresAt !== 'number') {
       continue
     }
     if (typeof inviter === 'string' && inviter !== '') {
-      awaitedFrom.add(inviter)
+      joined.push({ id, inviter })
     } else {
       unanswered.push({ id, expiresAt: expiresAt * 1000 })
     }
   }
-  return { unanswered, awaitedFrom }
+  return { unanswered, joined }
 }
 
 /**
- * What answering an invitation came to: the inviter, once joined; or that it
- * ran out, is gone (declined elsewhere, joined already, or never this
- * account's), or that the service could not be reached.
+ * What answering an invitation came to: the inviter, once joined; declined;
+ * or that it ran out, is gone (declined elsewhere, or never this account's),
+ * or that the service could not be reached.
  */
 export type Answered =
-  | { readonly joined: string }
-  | { readonly declined: true }
-  | 'expired'
-  | 'gone'
-  | 'unreachable'
+  { readonly joined: string } | 'declined' | 'expired' | 'gone' | 'unreachable'
 
 /** « Rejoindre »: the service records the claim and names the inviter. */
 export async function joinDelivered(
   service: DeliveryService,
   id: string,
 ): Promise<Answered> {
-  let answer: Answer
-  try {
-    answer = await service.joinInvitation(id)
-  } catch {
-    return 'unreachable'
-  }
+  const answer = await asked(() => service.joinInvitation(id))
+  if (answer === null) return 'unreachable'
   const body = parsed(answer.body)
   const inviter = body?.inviter_user_id
   if (answer.status === 200 && typeof inviter === 'string' && inviter !== '') {
@@ -142,14 +146,36 @@ export async function declineDelivered(
   service: DeliveryService,
   id: string,
 ): Promise<Answered> {
-  let answer: Answer
-  try {
-    answer = await service.declineInvitation(id)
-  } catch {
-    return 'unreachable'
-  }
-  if (answer.status >= 200 && answer.status < 300) return { declined: true }
+  const answer = await asked(() => service.declineInvitation(id))
+  if (answer === null) return 'unreachable'
+  if (answer.status >= 200 && answer.status < 300) return 'declined'
   return refusalOf(answer.status, parsed(answer.body))
+}
+
+/**
+ * Tells the service this device entered the conversation of an invitation it
+ * joined, so that the invitation leaves its list and a later room of the same
+ * inviter is not taken for it. Whether the service heard it.
+ */
+export async function sayEntered(
+  service: DeliveryService,
+  id: string,
+): Promise<boolean> {
+  const answer = await asked(() => service.enteredInvitation(id))
+  // Gone is heard as well: the invitation is off the list either way.
+  return (
+    answer !== null &&
+    ((answer.status >= 200 && answer.status < 300) || answer.status === 404)
+  )
+}
+
+/** A request, or `null` when it did not reach the service. */
+async function asked(request: () => Promise<Answer>): Promise<Answer | null> {
+  try {
+    return await request()
+  } catch {
+    return null
+  }
 }
 
 function refusalOf(

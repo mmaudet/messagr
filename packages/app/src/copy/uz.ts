@@ -400,14 +400,14 @@ export const uz: Readonly<Record<CopyKey, string>> = {
     'Bu havola qancha amal qilishi va unga necha marta ochish qolgani bu yerda oʻqilmaydi: faqat uni bergan hisob buni soʻray oladi.',
   invited_nothing_sent:
     'Hali hech narsa yuborilmadi. Siz javob bermaguningizcha bu taklif joyida qoladi.',
-  invited_who_found:
-    'Raqamingiz manzillar kitobida bor kishi sizni suhbatga taklif qilmoqda.',
+  invited_nothing_spent:
+    'Hali hech narsa yuborilmadi. Siz javob bermaguningizcha bu havola sarflanmaydi.',
+  invited_who_delivered:
+    'Kimdir sizni Messagrda suhbatga taklif qilmoqda, kimligini aytmasdan.',
   'invited_terms_delivered %1$@':
     'Bu taklif %1$@ gacha va faqat bir marta amal qiladi.',
   invited_nothing_told:
-    'Sizni taklif qilgan kishi siz qoʻshilmaguningizcha hech narsani bilmaydi: rad etish unga hech narsa demaydi.',
-  invited_nothing_spent:
-    'Hali hech narsa yuborilmadi. Siz javob bermaguningizcha bu havola sarflanmaydi.',
+    'Sizni taklif qilgan kishi siz suhbatga qoʻshilmaguningizcha hech narsani bilmaydi: rad etish unga hech narsa demaydi.',
   'invited_behind %1$d': 'Bunisining orqasida yana %1$d taklif kutmoqda.',
   invited_join: 'Suhbatga qoʻshilish',
   invited_refuse: 'Taklifni rad etish',
@@ -635,6 +635,11 @@ export const uz: Readonly<Record<CopyKey, string>> = {
   list_sent_expired: 'Taklif muddati tugagan',
   list_delivered_invitation: 'Messagrdagi taklif',
   'list_delivered_until %1$@': '%1$@ gacha amal qiladi',
+  list_delivered_joined: 'Taklif qabul qilindi',
+  list_delivered_joined_waiting: 'Sizni taklif qilgan kishi kutilmoqda',
+  list_delivered_expired: 'Bu taklifning muddati javobingizdan oldin tugadi.',
+  list_delivered_gone:
+    'Bu taklif endi javob kutmaydi: ehtimol, unga boshqa qurilmada javob berilgan.',
   invite_open: 'Odam taklif qilish',
   plus_invite: 'Odam taklif qilish',
   plus_close: 'Yopish',

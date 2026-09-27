@@ -385,14 +385,14 @@ export const es: Readonly<Record<CopyKey, string>> = {
     'Cuánto dura este enlace y cuántos usos le quedan no se pueden leer aquí: solo la cuenta que lo emitió puede preguntarlo.',
   invited_nothing_sent:
     'Todavía no se ha enviado nada. Mientras no responda, esta invitación se queda donde está.',
-  invited_who_found:
-    'Alguien que tiene su número en su agenda le invita a una conversación.',
-  'invited_terms_delivered %1$@':
-    'Esta invitación es válida hasta el %1$@, y una sola vez.',
-  invited_nothing_told:
-    'La persona que le invita no sabe nada mientras usted no se una: rechazar no le dice nada.',
   invited_nothing_spent:
     'Todavía no se ha enviado nada. Mientras no responda, este enlace no se gasta.',
+  invited_who_delivered:
+    'Alguien le invita a una conversación en Messagr, sin decir quién.',
+  'invited_terms_delivered %1$@':
+    'Esta invitación es válida hasta el %1$@, para un solo uso.',
+  invited_nothing_told:
+    'La persona que le invita no sabe nada mientras usted no se haya unido a la conversación: rechazar no le dice nada.',
   'invited_behind %1$d': '%1$d invitación(es) más esperan detrás de esta.',
   invited_join: 'Unirse a la conversación',
   invited_refuse: 'Rechazar la invitación',
@@ -620,6 +620,11 @@ export const es: Readonly<Record<CopyKey, string>> = {
   list_sent_expired: 'Invitación caducada',
   list_delivered_invitation: 'Invitación en Messagr',
   'list_delivered_until %1$@': 'Válida hasta el %1$@',
+  list_delivered_joined: 'Invitación aceptada',
+  list_delivered_joined_waiting: 'Esperando a la persona que le invitó',
+  list_delivered_expired: 'Esta invitación caducó antes de su respuesta.',
+  list_delivered_gone:
+    'Esta invitación ya no espera respuesta: quizá la recibió en otro dispositivo.',
   invite_open: 'Invitar a alguien',
   plus_invite: 'Invitar a alguien',
   plus_close: 'Cerrar',

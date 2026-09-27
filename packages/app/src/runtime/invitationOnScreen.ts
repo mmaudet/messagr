@@ -6,7 +6,7 @@ import type { Described } from './linkOnScreen'
  * What this device can truthfully state about an invitation it is being
  * asked to decide. #329, §13.3's first screen.
  *
- * # ONE INVITATION IS MET IN TWO PLACES, AND THEY KNOW OPPOSITE THINGS
+ * # AN INVITATION IS MET IN THREE PLACES, AND THEY KNOW DIFFERENT THINGS
  *
  * A LINK, before anything is spent: it names the instance it leads to and
  * carries whatever name the inviter gave themselves, and it knows no Matrix
@@ -19,7 +19,12 @@ import type { Described } from './linkOnScreen'
  * invitation to say what its sender calls themselves, and the link that
  * would have said so was never held here.
  *
- * Neither is a degraded version of the other, so `source` says which one is
+ * AN INVITATION DELIVERED INSIDE MESSAGR (#404), before it is joined: it
+ * names nobody, since the service names the inviter only once the person
+ * joins, and no conversation exists for it on this side yet. What it carries
+ * is its deadline.
+ *
+ * None is a degraded version of another, so `source` says which one is
  * being drawn and the screen says different true things about each. The
  * alternative -- inferring it from which fields happen to be empty -- would
  * make « the link declares nobody » and « the conversation does not say who
@@ -191,10 +196,9 @@ export function whatALinkSays(described: Described): WhatIsKnown {
 
 /**
  * The same screen, for an invitation delivered inside the application
- * (#404): who sent it is unknown until the person joins, since the service
- * names the inviter only then, and the name they declared travels sealed
- * with #405. What is known is its deadline, which the service says, and
- * that its sender had this number.
+ * (#404): the inviter is unknown until the person joins, since the service
+ * names them only then, and the name they declared will travel sealed with
+ * #405. What is known is its deadline, which the service says.
  */
 export function whatADeliveredInvitationSays(expiresAt: number): WhatIsKnown {
   return {

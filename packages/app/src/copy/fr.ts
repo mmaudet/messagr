@@ -617,17 +617,24 @@ export const fr = {
     'La durée de ce lien et le nombre d’ouvertures qui lui restent ne se lisent pas ici : seul le compte qui l’a émis peut les demander.',
   invited_nothing_sent:
     'Rien n’a encore été envoyé. Tant que vous n’avez pas répondu, cette invitation reste où elle est.',
-  invited_who_found:
-    'Quelqu’un qui a votre numéro dans son carnet vous invite à une conversation.',
-  'invited_terms_delivered %1$@':
-    'Cette invitation vaut jusqu’au %1$@, pour une seule fois.',
-  invited_nothing_told:
-    'La personne qui vous invite n’apprend rien tant que vous ne rejoignez pas : refuser ne lui dit rien.',
   // PLUS FORT QUE LA PHRASE AU-DESSUS, et c'est pour ça qu'elle est à part :
   // sur le chemin par lien, non seulement rien n'est parti, mais le jeton
   // n'a pas été dépensé. Le lien est encore bon après un refus.
   invited_nothing_spent:
     'Rien n’a encore été envoyé. Tant que vous n’avez pas répondu, ce lien n’est pas dépensé.',
+  // UNE INVITATION REMISE DANS MESSAGR (#404) ne nomme personne avant
+  // d'être rejointe : le service ne dit l'inviteur qu'à ce moment-là.
+  // D'où la même franchise que `invited_who_undeclared` pour un lien.
+  invited_who_delivered:
+    'Quelqu’un vous invite à une conversation dans Messagr, sans dire qui.',
+  // « Valable », comme la ligne de la liste qui mène ici.
+  'invited_terms_delivered %1$@':
+    'Cette invitation est valable jusqu’au %1$@, pour une seule fois.',
+  // CE QUE L'INVITEUR APPREND, ET QUAND : rien avant que la conversation
+  // ne soit rejointe, pas même un refus. Rejointe, et non l'invitation,
+  // qui ne se rejoint pas.
+  invited_nothing_told:
+    'La personne qui vous invite n’apprend rien tant que vous n’avez pas rejoint la conversation : refuser ne lui dit rien.',
   'invited_behind %1$d':
     '%1$d autre(s) invitation(s) attendent derrière celle-ci.',
   invited_join: 'Rejoindre la conversation',
@@ -992,6 +999,17 @@ export const fr = {
   list_sent_expired: 'Invitation expirée',
   list_delivered_invitation: 'Invitation dans Messagr',
   'list_delivered_until %1$@': 'Valable jusqu’au %1$@',
+  // UNE INVITATION ACCEPTÉE, TANT QUE SA CONVERSATION N'EST PAS LÀ (#404) :
+  // l'appareil de l'inviteur l'ouvre quand il tourne, parfois des jours
+  // plus tard. Sans cette ligne, « Rejoindre » semblerait n'avoir rien fait.
+  list_delivered_joined: 'Invitation acceptée',
+  list_delivered_joined_waiting: 'En attente de la personne qui vous invite',
+  // UNE RÉPONSE ARRIVÉE TROP TARD : l'écran s'est fermé et la ligne est
+  // partie avec lui, donc c'est cette phrase qui dit pourquoi rien n'a
+  // suivi.
+  list_delivered_expired: 'Cette invitation a expiré avant votre réponse.',
+  list_delivered_gone:
+    'Cette invitation n’attend plus de réponse : elle en a peut-être reçu une sur un autre appareil.',
   invite_open: 'Inviter quelqu’un',
   plus_invite: 'Inviter quelqu’un',
   plus_close: 'Fermer',

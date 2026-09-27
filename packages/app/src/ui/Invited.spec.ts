@@ -382,7 +382,7 @@ describe('an invitation delivered inside Messagr (#404)', () => {
   it('says its sender had this number, when it runs out, and that nothing is told until joining', () => {
     expect(said(screen({ known: delivered }))).toEqual([
       t('invited_title'),
-      t('invited_who_found'),
+      t('invited_who_delivered'),
       t('invited_terms_delivered %1$@', dayOf(expiresAt)),
       t('invited_nothing_told'),
       t('invited_join'),

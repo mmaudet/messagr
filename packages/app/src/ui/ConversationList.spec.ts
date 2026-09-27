@@ -360,12 +360,42 @@ describe('invitations delivered inside Messagr, atop the list (#404)', () => {
     expect(said).toContain(
       t('list_delivered_until %1$@', dayOf(NOW + 3 * 86_400_000)),
     )
-    const rows = [...everything(drawn)].filter(
-      node => node.props.testID === 'list-delivered-invitation',
-    )
-    expect(rows).toHaveLength(2)
-    ;(rows[1]!.props.onPress as () => void)()
+    // One test identifier per invitation, so that each can be pressed.
+    ;(withId(drawn, 'list-delivered-b')?.props.onPress as () => void)()
     expect(opened).toEqual(['b'])
+    expect(withId(drawn, 'list-delivered-a')).toBeDefined()
+  })
+
+  it('draws those accepted until their conversation appears, with nothing to press', () => {
+    const drawn = list({
+      delivered: waiting,
+      joinedDelivered: [{ id: 'c', inviter: '@alice:x' }],
+    })
+
+    const row = withId(drawn, 'list-delivered-joined-c')
+    expect(row).toBeDefined()
+    expect(row?.props.onPress).toBeUndefined()
+    const said = words(drawn)
+    expect(said).toContain(t('list_delivered_joined'))
+    expect(said).toContain(t('list_delivered_joined_waiting'))
+    // Nothing says who, as long as the conversation has not come.
+    expect(said.join(' ')).not.toContain('alice')
+    expect(said.indexOf(t('list_delivered_invitation'))).toBeLessThan(
+      said.indexOf(t('list_delivered_joined')),
+    )
+  })
+
+  it('says why nothing followed an answer given too late', () => {
+    for (const [outcome, key] of [
+      ['expired', 'list_delivered_expired'],
+      ['gone', 'list_delivered_gone'],
+    ] as const) {
+      const drawn = list({ deliveredOutcome: outcome })
+      expect(withId(drawn, 'list-delivered-outcome')?.props.children).toBe(
+        t(key),
+      )
+    }
+    expect(withId(list(), 'list-delivered-outcome')).toBeUndefined()
   })
 
   it('leaves the first conversation its own test identifier', () => {

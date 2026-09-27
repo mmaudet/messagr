@@ -128,6 +128,7 @@ import {
   letInTheJoined,
   type Delivered,
   type DeliveryService,
+  type JoinedInvitation,
   type Letting,
   type SentInvitations,
 } from './deliveredInvitations'
@@ -567,10 +568,11 @@ export async function enterAnyInvitations(
   sessionClient: ReturnType<typeof createClient>,
   selfUserId: string,
   /**
-   * Whose invitation delivered inside the application this account joined
-   * (#404): their room invite is entered too. `enterInvitations.ts`.
+   * The invitations delivered inside the application this account joined
+   * and has not entered yet (#404): a room invite from their inviter is
+   * entered too, one per invitation. `enterInvitations.ts`.
    */
-  awaitedFrom: () => ReadonlySet<string> = () => new Set(),
+  awaitedDeliveries: () => readonly JoinedInvitation[] = () => [],
 ): Promise<Entered> {
   const http = makePumpHttp(sessionClient)
   const entered = await enterInvitations({
@@ -582,7 +584,7 @@ export async function enterAnyInvitations(
     // ONE DOOR PER LINK SPENT. Entry records a claim in the same register on
     // the other side of the launch; see `awaitedInvitations.ts`.
     awaited: theAwaitedInvitations.count,
-    awaitedFrom,
+    awaitedDeliveries,
     // ONE CALL PER CONVERSATION, and `enterInvitations` is careful about
     // when it asks: never on a tick with no invitation on it, which is
     // almost every tick. Direct conversations only -- a room of three has

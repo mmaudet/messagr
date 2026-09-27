@@ -9,6 +9,7 @@ import {
   keptThisLaunchToo,
   letInTheJoined,
   readTheWaiting,
+  sayEntered,
   type DeliveryService,
   type SentInvitation,
   type SentInvitations,
@@ -39,6 +40,8 @@ function harness(
     waiting?: Answer | Error
     /** What joining or declining answers. */
     answer?: Answer | Error
+    /** What saying a conversation was entered answers. */
+    entered?: Answer | Error
   } = {},
 ) {
   const calls: Call[] = []
@@ -107,6 +110,11 @@ function harness(
       answered.push(`decline ${id}`)
       if (options.answer instanceof Error) throw options.answer
       return options.answer ?? { status: 204, body: '' }
+    },
+    enteredInvitation: async id => {
+      answered.push(`entered ${id}`)
+      if (options.entered instanceof Error) throw options.entered
+      return options.entered ?? { status: 204, body: '' }
     },
   }
   return { http, service, calls, sent, answered }
@@ -423,7 +431,7 @@ describe('what this launch sent besides the page (#404)', () => {
 })
 
 describe('the invitations waiting for this account (#404)', () => {
-  it('reads those to answer, and the inviters whose room invite is awaited', async () => {
+  it('reads those to answer, and those joined with their inviter, skipping what it cannot read', async () => {
     const { service } = harness({
       waiting: {
         status: 200,
@@ -431,7 +439,9 @@ describe('the invitations waiting for this account (#404)', () => {
           invitations: [
             { id: 'a', expires_at: 1_790_604_800 },
             { id: 'b', expires_at: 1_790_604_900, inviter_user_id: '@alice:x' },
+            null,
             { id: 42, expires_at: 1 },
+            { id: 'c', expires_at: 1_790_605_000, inviter_user_id: '@bob:x' },
           ],
         }),
       },
@@ -439,7 +449,10 @@ describe('the invitations waiting for this account (#404)', () => {
 
     expect(await readTheWaiting(service)).toEqual({
       unanswered: [{ id: 'a', expiresAt: 1_790_604_800_000 }],
-      awaitedFrom: new Set(['@alice:x']),
+      joined: [
+        { id: 'b', inviter: '@alice:x' },
+        { id: 'c', inviter: '@bob:x' },
+      ],
     })
   })
 
@@ -462,8 +475,22 @@ describe('the invitations waiting for this account (#404)', () => {
   it('declines, and the service alone is told', async () => {
     const { service, answered } = harness()
 
-    expect(await declineDelivered(service, 'a')).toEqual({ declined: true })
+    expect(await declineDelivered(service, 'a')).toBe('declined')
     expect(answered).toEqual(['decline a'])
+  })
+
+  it('says a conversation was entered, and hears whether the service took it', async () => {
+    for (const [entered, heard] of [
+      [{ status: 204, body: '' }, true],
+      // Gone is heard as well: the invitation is off the list either way.
+      [{ status: 404, body: JSON.stringify({ errcode: 'M_NOT_FOUND' }) }, true],
+      [{ status: 502, body: 'Bad Gateway' }, false],
+      [new Error('down'), false],
+    ] as const) {
+      const { service, answered } = harness({ entered })
+      expect(await sayEntered(service, 'b')).toBe(heard)
+      expect(answered).toEqual(['entered b'])
+    }
   })
 
   it('says an invitation ran out, is gone, or could not be answered', async () => {
