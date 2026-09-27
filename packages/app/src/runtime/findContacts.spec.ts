@@ -79,6 +79,8 @@ function theService(
   proven: Record<string, string>,
   refuse?: number,
   limit = Infinity,
+  /** The envelope key each reference's proof published (#405), if any. */
+  envelopeKeys: Record<string, string> = {},
 ) {
   const asked: Asked[] = []
   let left = limit
@@ -132,6 +134,9 @@ function theService(
             key_number: KEY,
             mask: maskOf(number),
             reference,
+            ...(envelopeKeys[reference] === undefined
+              ? {}
+              : { envelope_key: envelopeKeys[reference] }),
           })),
         }),
       }
@@ -179,10 +184,16 @@ function deps(
     refuse?: number
     limit?: number
     rows?: readonly Row[]
+    envelopeKeys?: Record<string, string>
   } = {},
 ) {
   const { masking, calls } = theMasking(options.verifies)
-  const { service, asked } = theService(proven, options.refuse, options.limit)
+  const { service, asked } = theService(
+    proven,
+    options.refuse,
+    options.limit,
+    options.envelopeKeys,
+  )
   const { results, page } = thePage(options.rows)
   const all: FindingDeps = {
     readAddressBook: async () => contacts,
@@ -211,11 +222,39 @@ describe('looking for contacts', () => {
     expect(found).toEqual({
       found: true,
       matches: [
-        { contact: ANNE, reference: 'ref-anne', holderChanged: false },
-        { contact: PAUL, reference: 'ref-paul', holderChanged: false },
+        {
+          contact: ANNE,
+          reference: 'ref-anne',
+          holderChanged: false,
+          envelopeKey: null,
+        },
+        {
+          contact: PAUL,
+          reference: 'ref-paul',
+          holderChanged: false,
+          envelopeKey: null,
+        },
       ],
       others: [ZOE],
       waiting: null,
+    })
+  })
+
+  it('gives each contact found the envelope key its proof published, when it did (#405)', async () => {
+    const { deps: d } = deps(
+      [PAUL, ANNE],
+      { '+33612345678': 'ref-paul', '+447911123456': 'ref-anne' },
+      { envelopeKeys: { 'ref-paul': 'key-of-paul' } },
+    )
+
+    const found = await findContacts(d)
+
+    expect(found).toMatchObject({
+      found: true,
+      matches: [
+        { contact: ANNE, reference: 'ref-anne', envelopeKey: null },
+        { contact: PAUL, reference: 'ref-paul', envelopeKey: 'key-of-paul' },
+      ],
     })
   })
 
@@ -432,7 +471,14 @@ describe('the journey of looking for contacts', () => {
     expect(shown.map(s => s.stage)).toEqual(['reminder', 'looking', 'found'])
     expect(shown.at(-1)).toEqual({
       stage: 'found',
-      matches: [{ contact: PAUL, reference: 'ref-paul', holderChanged: false }],
+      matches: [
+        {
+          contact: PAUL,
+          reference: 'ref-paul',
+          holderChanged: false,
+          envelopeKey: null,
+        },
+      ],
       others: [ZOE],
       waiting: null,
       limited: false,
@@ -464,7 +510,14 @@ describe('the journey of looking for contacts', () => {
     expect(shown.slice(-2).map(s => s.stage)).toEqual(['looking', 'found'])
     expect(shown.at(-1)).toMatchObject({
       stage: 'found',
-      matches: [{ contact: ZOE, reference: 'ref-zoe', holderChanged: false }],
+      matches: [
+        {
+          contact: ZOE,
+          reference: 'ref-zoe',
+          holderChanged: false,
+          envelopeKey: null,
+        },
+      ],
       others: [PAUL],
       limited: true,
     })
@@ -722,7 +775,14 @@ describe('the limit on masking (#401)', () => {
     ).toEqual([3, 2])
     expect(found).toEqual({
       found: true,
-      matches: [{ contact: PAUL, reference: 'ref-paul', holderChanged: false }],
+      matches: [
+        {
+          contact: PAUL,
+          reference: 'ref-paul',
+          holderChanged: false,
+          envelopeKey: null,
+        },
+      ],
       others: [ANNE, ZOE],
       waiting: { count: 1, freesAt: FREES_AT * 1000 },
     })
@@ -820,7 +880,14 @@ describe('looking again (#402)', () => {
     expect(sentNumbers(second.asked)).toEqual([`blinded(${ANNE_NUMBER})`])
     expect(found).toEqual({
       found: true,
-      matches: [{ contact: PAUL, reference: 'ref-paul', holderChanged: false }],
+      matches: [
+        {
+          contact: PAUL,
+          reference: 'ref-paul',
+          holderChanged: false,
+          envelopeKey: null,
+        },
+      ],
       others: [ANNE, ZOE],
       waiting: null,
     })
@@ -839,7 +906,12 @@ describe('looking again (#402)', () => {
 
     expect(shape(asked)).toEqual(['keys', 'directory'])
     expect(found.found && found.matches).toEqual([
-      { contact: PAUL, reference: 'ref-paul', holderChanged: false },
+      {
+        contact: PAUL,
+        reference: 'ref-paul',
+        holderChanged: false,
+        envelopeKey: null,
+      },
     ])
   })
 
@@ -869,7 +941,12 @@ describe('looking again (#402)', () => {
     const found = await findContacts(d)
 
     expect(found.found && found.matches).toEqual([
-      { contact: PAUL, reference: 'ref-new', holderChanged: true },
+      {
+        contact: PAUL,
+        reference: 'ref-new',
+        holderChanged: true,
+        envelopeKey: null,
+      },
     ])
     expect(page.get(`${KEY}/${PAUL_NUMBER}`)?.reference).toBe('ref-first')
   })
@@ -886,7 +963,12 @@ describe('looking again (#402)', () => {
     const found = await findContacts(d)
 
     expect(found.found && found.matches).toEqual([
-      { contact: PAUL, reference: 'ref-paul', holderChanged: false },
+      {
+        contact: PAUL,
+        reference: 'ref-paul',
+        holderChanged: false,
+        envelopeKey: null,
+      },
     ])
     expect(page.get(`${KEY}/${PAUL_NUMBER}`)?.reference).toBe('ref-paul')
   })
@@ -938,7 +1020,12 @@ describe('looking again (#402)', () => {
     const found = await findContacts(d)
 
     expect(found.found && found.matches).toEqual([
-      { contact: both, reference: 'ref-same', holderChanged: false },
+      {
+        contact: both,
+        reference: 'ref-same',
+        holderChanged: false,
+        envelopeKey: null,
+      },
     ])
   })
 
@@ -981,7 +1068,14 @@ describe('looking again (#402)', () => {
     ])
     expect(found).toEqual({
       found: true,
-      matches: [{ contact: PAUL, reference: 'ref-paul', holderChanged: false }],
+      matches: [
+        {
+          contact: PAUL,
+          reference: 'ref-paul',
+          holderChanged: false,
+          envelopeKey: null,
+        },
+      ],
       others: [ANNE, ZOE],
       waiting: { count: 1, freesAt: FREES_AT * 1000 },
     })
@@ -1005,7 +1099,12 @@ describe('looking again (#402)', () => {
 
     expect(sentNumbers(asked)).toEqual([`blinded(${PAUL_NUMBER})`])
     expect(found.found && found.matches).toEqual([
-      { contact: PAUL, reference: 'ref-paul', holderChanged: false },
+      {
+        contact: PAUL,
+        reference: 'ref-paul',
+        holderChanged: false,
+        envelopeKey: null,
+      },
     ])
   })
 })

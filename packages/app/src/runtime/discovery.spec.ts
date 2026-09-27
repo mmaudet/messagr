@@ -12,6 +12,8 @@ import {
   type OpenCountry,
   type ProofStage,
 } from './discovery'
+import type { KeyPair } from './hpke'
+import { base64Of } from './receiveImage'
 
 /**
  * The discovery module, as far as proving one's number (#397), driven through
@@ -81,15 +83,38 @@ const NOT_FINDABLE: Extract<DiscoveryReading, { read: true }> = {
 
 const DAY = 86_400_000
 
+/** The envelope key pair every proof in these tests publishes (#405). */
+const PAIR: KeyPair = {
+  secretKey: new Uint8Array(32).fill(1),
+  publicKey: new Uint8Array(32).fill(7),
+}
+
+/** An envelope keyring that hands out `PAIR` and records what it keeps. */
+function envelopeKeys() {
+  const keptPairs: KeyPair[] = []
+  return {
+    envelope: {
+      fresh: () => PAIR,
+      keep: async (pair: KeyPair) => {
+        keptPairs.push(pair)
+        return true
+      },
+    },
+    keptPairs,
+  }
+}
+
 function journeyWith(answers: Partial<Record<Route, (Answer | Error)[]>>) {
   const { service, asked } = theService(answers)
   const shown: ProofStage[] = []
   const kept: (string | null)[] = []
+  const { envelope, keptPairs } = envelopeKeys()
   const journey = proofJourney(
     {
       service,
       now: () => NOW,
       language: () => 'fr',
+      envelope,
       keepNumber: async number => {
         kept.push(number)
       },
@@ -97,7 +122,7 @@ function journeyWith(answers: Partial<Record<Route, (Answer | Error)[]>>) {
     stage => shown.push(stage),
   )
   const last = () => shown[shown.length - 1]
-  return { journey, asked, shown, last, kept }
+  return { journey, asked, shown, last, kept, keptPairs }
 }
 
 describe('reading the state of discovery', () => {
@@ -209,7 +234,7 @@ describe('the journey of a proof', () => {
   })
 
   it('goes consent, number, code, proven, in that order', async () => {
-    const { journey, asked, shown, last } = journeyWith({
+    const { journey, asked, shown, last, keptPairs } = journeyWith({
       startProof: [ok({ provider: 'OVHcloud', expires_in: 600 })],
       finishProof: [ok({ findable_until: 1_792_419_200 })],
     })
@@ -232,7 +257,12 @@ describe('the journey of a proof', () => {
     })
 
     await journey.prove(' 123456 ')
-    expect(asked[1]).toEqual({ route: 'finishProof', body: { code: '123456' } })
+    // WITH THE CODE, A FRESH ENVELOPE KEY (#405), kept once the proof holds.
+    expect(asked[1]).toEqual({
+      route: 'finishProof',
+      body: { code: '123456', envelope_key: base64Of(PAIR.publicKey) },
+    })
+    expect(keptPairs).toEqual([PAIR])
     expect(last()).toEqual({
       stage: 'proven',
       findableUntil: 1_792_419_200_000,
@@ -295,7 +325,7 @@ describe('the journey of a proof', () => {
   })
 
   it('says a wrong code leaves attempts, and asks for another code after the last', async () => {
-    const { journey, last } = journeyWith({
+    const { journey, last, keptPairs } = journeyWith({
       startProof: [ok({ provider: 'OVHcloud', expires_in: 600 })],
       finishProof: [
         refused(400, 'MESSAGR_CODE_WRONG', { attempts_left: 4 }),
@@ -316,6 +346,9 @@ describe('the journey of a proof', () => {
       stage: 'code',
       refused: { why: 'wrong', attemptsLeft: 0 },
     })
+    // A REFUSED CODE KEEPS NO KEY: the one the directory lists stays the
+    // one this device opens names with (#405).
+    expect(keptPairs).toEqual([])
   })
 
   it('goes back to the number, kept, for another code', async () => {
@@ -394,6 +427,7 @@ describe('the journey of a proof', () => {
         },
         now: () => NOW,
         language: () => 'fr',
+        envelope: envelopeKeys().envelope,
         keepNumber: async () => undefined,
       },
       stage => shown.push(stage),
@@ -506,6 +540,7 @@ describe('keeping the proof, or ending it (#398)', () => {
         },
         now: () => NOW,
         language: () => 'fr',
+        envelope: envelopeKeys().envelope,
         keepNumber: async () => undefined,
       },
       stage => shown.push(stage),

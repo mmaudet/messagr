@@ -142,11 +142,13 @@ describe('« Retrouver mes contacts »', () => {
             contact: contact('Anne'),
             reference: 'r-anne',
             holderChanged: false,
+            envelopeKey: null,
           },
           {
             contact: contact('Paul'),
             reference: 'r-paul',
             holderChanged: false,
+            envelopeKey: null,
           },
         ],
         others: [contact('Zoé')],
@@ -172,11 +174,13 @@ describe('« Retrouver mes contacts »', () => {
             contact: contact('Anne'),
             reference: 'r-anne',
             holderChanged: true,
+            envelopeKey: null,
           },
           {
             contact: contact('Paul'),
             reference: 'r-paul',
             holderChanged: false,
+            envelopeKey: null,
           },
         ],
         others: [],
@@ -205,11 +209,13 @@ describe('« Retrouver mes contacts »', () => {
               contact: contact('Anne'),
               reference: 'r-anne',
               holderChanged: false,
+              envelopeKey: 'key-of-anne',
             },
             {
               contact: contact('Paul'),
               reference: 'r-paul',
               holderChanged: true,
+              envelopeKey: null,
             },
           ],
           others: [contact('Zoé')],
@@ -228,9 +234,17 @@ describe('« Retrouver mes contacts »', () => {
     )
     expect(buttons.map(textIn)).toEqual([t('find_invite'), t('find_invite')])
     ;(buttons[1]!.props.onPress as () => void)()
-    expect(invited).toEqual([{ name: '', reference: 'r-paul' }])
+    expect(invited).toEqual([
+      { name: '', reference: 'r-paul', envelopeKey: null },
+    ])
     ;(buttons[0]!.props.onPress as () => void)()
-    expect(invited.at(-1)).toEqual({ name: 'Anne', reference: 'r-anne' })
+    // And the envelope key its proof published, which the name the inviter
+    // gives itself is sealed for (#405).
+    expect(invited.at(-1)).toEqual({
+      name: 'Anne',
+      reference: 'r-anne',
+      envelopeKey: 'key-of-anne',
+    })
     for (const row of [
       ...all(drawn, 'find-contacts-match'),
       ...all(drawn, 'find-contacts-other'),
@@ -299,6 +313,7 @@ describe('« Retrouver mes contacts »', () => {
             contact: contact('Anne'),
             reference: 'r-anne',
             holderChanged: false,
+            envelopeKey: null,
           },
         ],
         others: [],

@@ -192,6 +192,21 @@ describe('delivering an invitation to a match (#404)', () => {
     ])
   })
 
+  it('sends the name the inviter gives itself as the envelope sealed for the contact, and nothing readable (#405)', async () => {
+    const { http, service, sent } = harness()
+
+    await deliverInvitation(
+      { http, service, sent: thePage().sent },
+      'ref-paul',
+      'Paul',
+      'ENVELOPE',
+    )
+
+    expect(sent).toEqual([
+      JSON.stringify({ reference: 'ref-paul', sealed_name: 'ENVELOPE' }),
+    ])
+  })
+
   it('sends nothing when the conversation could not be created', async () => {
     const { http, service, sent } = harness({ createRoom: new Error('down') })
 
@@ -442,13 +457,18 @@ describe('the invitations waiting for this account (#404)', () => {
             null,
             { id: 42, expires_at: 1 },
             { id: 'c', expires_at: 1_790_605_000, inviter_user_id: '@bob:x' },
+            { id: 'd', expires_at: 1_790_605_100, sealed_name: 'ENVELOPE' },
           ],
         }),
       },
     })
 
     expect(await readTheWaiting(service)).toEqual({
-      unanswered: [{ id: 'a', expiresAt: 1_790_604_800_000 }],
+      unanswered: [
+        { id: 'a', expiresAt: 1_790_604_800_000, sealedName: null },
+        // The name its inviter gave itself, sealed for this device (#405).
+        { id: 'd', expiresAt: 1_790_605_100_000, sealedName: 'ENVELOPE' },
+      ],
       joined: [
         { id: 'b', inviter: '@alice:x' },
         { id: 'c', inviter: '@bob:x' },

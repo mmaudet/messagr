@@ -354,6 +354,8 @@ export const en: Readonly<Record<CopyKey, string>> = {
   invite_declared: 'How do you introduce yourself?',
   invite_declared_hint:
     'Optional. This name travels in the link and nowhere else: the service does not receive it and keeps nothing of it.',
+  invite_declared_sealed_hint:
+    'Optional. This name is sealed for the person you invite: the service passes it on without being able to read it, and erases it once they answer, or at the deadline.',
   invite_working: 'Creating the conversation…',
   invite_ready:
     'Send this link to them. It is valid for an hour and works once.',

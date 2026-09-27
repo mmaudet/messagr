@@ -346,6 +346,8 @@ export const it: Readonly<Record<CopyKey, string>> = {
   invite_declared: 'Come si presenta?',
   invite_declared_hint:
     'Facoltativo. Questo nome viaggia nel link e da nessun’altra parte: il servizio non lo riceve e non ne conserva nulla.',
+  invite_declared_sealed_hint:
+    'Facoltativo. Questo nome è sigillato per la persona invitata: il servizio lo trasmette senza poterlo leggere e lo cancella appena risponde, o alla scadenza.',
   invite_working: 'Creazione della conversazione…',
   invite_ready:
     'Invii questo link a questa persona. Vale un’ora e serve una volta sola.',

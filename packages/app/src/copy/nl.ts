@@ -352,6 +352,8 @@ export const nl: Readonly<Record<CopyKey, string>> = {
   invite_declared: 'Hoe stelt u zich voor?',
   invite_declared_hint:
     'Optioneel. Deze naam reist mee in de link en nergens anders: de dienst ontvangt hem niet en bewaart er niets van.',
+  invite_declared_sealed_hint:
+    'Optioneel. Deze naam wordt verzegeld voor de persoon die u uitnodigt: de dienst geeft hem door zonder hem te kunnen lezen, en wist hem zodra die persoon antwoordt, of bij het verlopen.',
   invite_working: 'Het gesprek wordt aangemaakt…',
   invite_ready:
     'Stuur deze link naar die persoon. Hij is een uur geldig en werkt één keer.',

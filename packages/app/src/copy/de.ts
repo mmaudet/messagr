@@ -361,6 +361,8 @@ export const de: Readonly<Record<CopyKey, string>> = {
   invite_declared: 'Wie stellen Sie sich vor?',
   invite_declared_hint:
     'Optional. Dieser Name reist im Link mit und sonst nirgends: der Dienst erhält ihn nicht und behält nichts davon.',
+  invite_declared_sealed_hint:
+    'Optional. Dieser Name wird für die eingeladene Person versiegelt: Der Dienst leitet ihn weiter, ohne ihn lesen zu können, und löscht ihn, sobald sie antwortet, spätestens bei Ablauf.',
   invite_working: 'Unterhaltung wird erstellt …',
   invite_ready:
     'Senden Sie dieser Person diesen Link. Er gilt eine Stunde und funktioniert einmal.',

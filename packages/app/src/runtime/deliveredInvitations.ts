@@ -60,6 +60,11 @@ export interface WaitingInvitation {
   readonly id: string
   /** Milliseconds since the epoch. */
   readonly expiresAt: number
+  /**
+   * The name the inviter gave itself, sealed for this account's device,
+   * base64 (#405), or `null`: `sealedName.ts` opens it.
+   */
+  readonly sealedName: string | null
 }
 
 /**
@@ -102,6 +107,7 @@ export async function readTheWaiting(
       id,
       expires_at: expiresAt,
       inviter_user_id: inviter,
+      sealed_name: sealedName,
     } = entry as Record<string, unknown>
     if (typeof id !== 'string' || id === '' || typeof expiresAt !== 'number') {
       continue
@@ -109,7 +115,11 @@ export async function readTheWaiting(
     if (typeof inviter === 'string' && inviter !== '') {
       joined.push({ id, inviter })
     } else {
-      unanswered.push({ id, expiresAt: expiresAt * 1000 })
+      unanswered.push({
+        id,
+        expiresAt: expiresAt * 1000,
+        sealedName: typeof sealedName === 'string' ? sealedName : null,
+      })
     }
   }
   return { unanswered, joined }
@@ -284,8 +294,10 @@ const REFUSALS: Readonly<Record<string, DeliveryRefusal>> = {
 /**
  * Creates the conversation as for a link, sends the invitation to the
  * account behind `reference`, and keeps it on `deps.sent` with the name
- * typed. What leaves for the service is the reference and nothing else:
- * never a number, never a name, never the conversation.
+ * typed. What leaves for the service is the reference, and the name the
+ * inviter gives itself sealed for the recipient's device (#405), which the
+ * service cannot open: never a number, never a name it could read, never
+ * the conversation.
  *
  * AN INVITATION THE SERVICE REFUSED LEAVES NO CONVERSATION BEHIND. A link
  * keeps its conversation when minting fails, since somebody may be in it
@@ -300,6 +312,8 @@ export async function deliverInvitation(
   },
   reference: string,
   given: string | null,
+  /** `sealedName.ts`'s envelope, base64, or `null` for no name. */
+  sealedName: string | null = null,
 ): Promise<Delivered> {
   const conversation = await createTheConversation(deps.http)
   if (!conversation.created) {
@@ -319,7 +333,13 @@ export async function deliverInvitation(
   }
   let answer: Answer
   try {
-    answer = await deps.service.sendInvitation(JSON.stringify({ reference }))
+    answer = await deps.service.sendInvitation(
+      JSON.stringify(
+        sealedName === null
+          ? { reference }
+          : { reference, sealed_name: sealedName },
+      ),
+    )
   } catch (cause: unknown) {
     return refused(
       `the invitation could not be sent: ${getErrorMessage(cause)}`,

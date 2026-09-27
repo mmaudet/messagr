@@ -133,6 +133,7 @@ import {
   signUpSecrets,
   keepEverySecrets,
   findableNumberSecrets,
+  envelopeKeySecrets,
 } from './src/runtime/deviceSecrets'
 import {
   publishReceipts,
@@ -193,6 +194,8 @@ import {
   type SentInvitations,
   type WaitingInvitation,
 } from './src/runtime/deliveredInvitations'
+import { envelopeKeysIn } from './src/runtime/envelopeKeys'
+import { openSealedName, sealName } from './src/runtime/sealedName'
 import { admitAnyoneWaiting } from './src/runtime/admitAnyoneWaiting'
 import { displayNameFor } from './src/runtime/givenName'
 import Clipboard from '@react-native-clipboard/clipboard'
@@ -550,9 +553,13 @@ export function App({
   const inviteRef = useRef<
     ((name: string | null, declared: string | null) => void) | null
   >(null)
-  /** Inviting a contact found (#404): its own gesture, beside a link's. */
+  /**
+   * Inviting a contact found (#404): its own gesture, beside a link's, with
+   * the name the inviter gives itself, sealed for the contact (#405).
+   */
   const deliverRef = useRef<
-    ((name: string | null, to: InvitedMatch) => void) | null
+    | ((name: string | null, to: InvitedMatch, declared: string | null) => void)
+    | null
   >(null)
   const namesRef = useRef<GivenNames>(forgetfulGivenNames())
   /**
@@ -655,10 +662,43 @@ export function App({
     tellEntered().catch(() => {})
   }
   /**
+   * The names inviters gave themselves, opened on this device (#405), by
+   * invitation. Each envelope is opened once, since it does not change; one
+   * that will not open leaves its invitation without a name.
+   */
+  const [deliveredNames, setDeliveredNames] = useState<
+    ReadonlyMap<string, string>
+  >(new Map())
+  const openedNamesRef = useRef(new Map<string, string | null>())
+  const openTheNames = async (unanswered: readonly WaitingInvitation[]) => {
+    const toOpen = unanswered.filter(
+      one => one.sealedName !== null && !openedNamesRef.current.has(one.id),
+    )
+    if (toOpen.length === 0) return
+    const secrets = await envelopeKeys.secrets()
+    // A keystore that gave nothing is asked again at the next tick, rather
+    // than every envelope remembered as one that does not open.
+    if (secrets.length === 0) return
+    for (const one of toOpen) {
+      openedNamesRef.current.set(
+        one.id,
+        openSealedName(secrets, one.sealedName ?? ''),
+      )
+    }
+    setDeliveredNames(
+      new Map(
+        [...openedNamesRef.current].flatMap(([id, name]) =>
+          name === null ? [] : [[id, name] as const],
+        ),
+      ),
+    )
+  }
+  /**
    * Reads the invitations delivered inside Messagr for this account (#404),
-   * once the service has heard of the conversations entered. An answer that
-   * could not be read changes nothing: the list keeps what it showed, and
-   * the next tick asks again.
+   * once the service has heard of the conversations entered, and opens the
+   * names sealed for this device (#405). An answer that could not be read
+   * changes nothing: the list keeps what it showed, and the next tick asks
+   * again.
    */
   const readDelivered = async () => {
     await tellEntered()
@@ -669,6 +709,7 @@ export function App({
     joinedDeliveredRef.current = waiting.joined
     setDeliveredWaiting(waiting.unanswered)
     setDeliveredJoined(awaitedDeliveries())
+    await openTheNames(waiting.unanswered).catch(() => {})
   }
   /** The one open on §13.3's screen, and how its answer is going. */
   const [deliveredOnScreen, setDeliveredOnScreen] =
@@ -1423,6 +1464,13 @@ export function App({
     service: discoveryService(() => credentialsRef.current),
     now: () => Date.now(),
   }).current
+  /**
+   * This device's envelope keys (#405): one published with each proof, and
+   * what opens the names inviters seal for this account.
+   */
+  const envelopeKeys = useRef(
+    envelopeKeysIn(envelopeKeySecrets, () => Date.now()),
+  ).current
   // LOOKING FOR ONE'S CONTACTS (#400), from the « + » sheet, for a findable
   // account: the address book through the system, each number masked by the
   // crypto bridge's OPRF client, and the comparison made on this telephone.
@@ -1465,6 +1513,7 @@ export function App({
       {
         ...discoveryDeps,
         language: currentLanguage,
+        envelope: envelopeKeys,
         keepNumber: async number => {
           setKeptNumber(number)
           // EMPTY IS « NONE »: `SecretStore` has no delete, so a number
@@ -4100,16 +4149,27 @@ export function App({
             // Nothing to share and nothing to wait for here: the recipient
             // may answer in a week, and each sync tick asks
             // (`letInWhoeverJoined`, below).
-            deliverRef.current = (name: string | null, to: InvitedMatch) => {
+            deliverRef.current = (
+              name: string | null,
+              to: InvitedMatch,
+              declared: string | null,
+            ) => {
               setInvite({ stage: 'working' })
               setAdmission(null)
               const delivering = async () => {
+                // SEALED HERE, FOR THE CONTACT'S DEVICE (#405): what leaves
+                // is an envelope the service cannot open, or nothing.
+                const sealed =
+                  declared === null || to.envelopeKey === null
+                    ? null
+                    : sealName(to.envelopeKey, declared)
                 const delivered = await deliverToMatch(
                   sessionClient,
                   discoveryDeps.service,
                   sentInvitationsRef.current,
                   to.reference,
                   name,
+                  sealed,
                 )
                 if (!delivered.delivered) {
                   setInvite({
@@ -6079,7 +6139,7 @@ export function App({
                     admission={admission}
                     onInvite={(name, declared) =>
                       invite.stage === 'resting' && invite.to !== undefined
-                        ? deliverRef.current?.(name, invite.to)
+                        ? deliverRef.current?.(name, invite.to, declared)
                         : inviteRef.current?.(name, declared)
                     }
                     onClose={() => {
@@ -6572,7 +6632,10 @@ export function App({
             style={[StyleSheet.absoluteFill, styles.root]}
             edges={['top', 'bottom', 'left', 'right']}>
             <Invited
-              known={whatADeliveredInvitationSays(deliveredOnScreen.expiresAt)}
+              known={whatADeliveredInvitationSays(
+                deliveredOnScreen.expiresAt,
+                deliveredNames.get(deliveredOnScreen.id) ?? null,
+              )}
               behind={0}
               working={answeringDelivered}
               failed={deliveredFailed === deliveredOnScreen.id}

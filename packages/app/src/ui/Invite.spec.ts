@@ -85,7 +85,13 @@ function show(stage: InviteStage, onInvite = vi.fn()) {
   )
 }
 
-const PAUL = { name: 'Paul Martin', reference: 'ref-paul' }
+const PAUL = {
+  name: 'Paul Martin',
+  reference: 'ref-paul',
+  envelopeKey: 'key-of-paul',
+}
+/** A contact whose device published no envelope key (#405). */
+const ZOE = { name: 'Zoé', reference: 'ref-zoe', envelopeKey: null }
 
 describe('inviting a contact found (#404)', () => {
   it('opens « Qui invitez-vous ? » with the name of the card', () => {
@@ -94,19 +100,32 @@ describe('inviting a contact found (#404)', () => {
     expect(withId(drawn, 'invite-name')?.props.value).toBe('Paul Martin')
   })
 
-  it('asks for no declared name, which could not travel yet', () => {
+  it('asks how one presents oneself, a name that travels sealed (#405)', () => {
     const forContact = show({ stage: 'resting', to: PAUL })
     const forLink = show({ stage: 'resting' })
 
-    expect(withId(forContact, 'invite-declared')).toBeUndefined()
-    expect(withId(forLink, 'invite-declared')).toBeDefined()
+    expect(withId(forContact, 'invite-declared')).toBeDefined()
+    expect(textIn(withId(forContact, 'invite-declared-hint'))).toBe(
+      t('invite_declared_sealed_hint'),
+    )
+    expect(textIn(withId(forLink, 'invite-declared-hint'))).toBe(
+      t('invite_declared_hint'),
+    )
     expect(withId(forLink, 'invite-name')?.props.value).toBe('')
   })
 
-  it('hands the name typed over, and no declared name', () => {
+  it('asks for no declared name for a contact whose device has nothing to seal it for', () => {
+    const drawn = show({ stage: 'resting', to: ZOE })
+
+    expect(withId(drawn, 'invite-declared')).toBeUndefined()
+    expect(withId(drawn, 'invite-declared-hint')).toBeUndefined()
+  })
+
+  it('hands the name typed over, and the declared name, empty every time', () => {
     const onInvite = vi.fn()
     const drawn = show({ stage: 'resting', to: PAUL }, onInvite)
 
+    expect(withId(drawn, 'invite-declared')?.props.value).toBe('')
     ;(withId(drawn, 'invite')?.props.onPress as () => void)()
 
     expect(onInvite).toHaveBeenCalledWith('Paul Martin', null)

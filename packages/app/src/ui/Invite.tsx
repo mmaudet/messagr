@@ -85,12 +85,15 @@ const REFUSED: Readonly<Record<DeliveryRefusal, CopyKey>> = {
 
 /**
  * A match, found by looking for one's contacts (#404): the name of its card,
- * which « Qui invitez-vous ? » opens with, and the reference the invitation
- * is delivered to inside the application.
+ * which « Qui invitez-vous ? » opens with, the reference the invitation is
+ * delivered to inside the application, and the envelope key its proof
+ * published (#405), which the name the inviter gives itself is sealed for.
+ * `null` when it published none: then no name travels, and none is asked.
  */
 export interface InvitedMatch {
   readonly name: string
   readonly reference: string
+  readonly envelopeKey: string | null
 }
 
 export type InviteStage =
@@ -167,12 +170,13 @@ export function Invite({ stage, onInvite, onClose, admission }: InviteProps) {
         />
         <Text style={styles.hint}>{t('list_name_hint')}</Text>
 
-        {/* NO DECLARED NAME FOR A CONTACT FOUND, YET. Delivered inside the
-            application, an invitation has no link, and so no fragment to
-            carry the name in: it travels sealed for its recipient, which is
-            #405. Until then, asking for it would be asking for a name that
-            goes nowhere. */}
-        {stage.to === undefined && (
+        {/* FOR A CONTACT FOUND, THE DECLARED NAME TRAVELS SEALED (#405).
+            Delivered inside the application, an invitation has no link, and
+            so no fragment to carry the name in: it is sealed for the key the
+            recipient's device published with its proof. A device that
+            published none has nothing to seal it for, and asking would be
+            asking for a name that goes nowhere. */}
+        {(stage.to === undefined || stage.to.envelopeKey !== null) && (
           <>
             {/* TWO NAMES, AND THE TWO HINTS ARE THE TEACHING. #329.
             The first is what you call THEM, and it stays on this telephone.
@@ -195,7 +199,11 @@ export function Invite({ stage, onInvite, onClose, admission }: InviteProps) {
               placeholderTextColor={color.neutral['400']}
               style={styles.field}
             />
-            <Text style={styles.hint}>{t('invite_declared_hint')}</Text>
+            <Text style={styles.hint} testID="invite-declared-hint">
+              {stage.to === undefined
+                ? t('invite_declared_hint')
+                : t('invite_declared_sealed_hint')}
+            </Text>
           </>
         )}
 

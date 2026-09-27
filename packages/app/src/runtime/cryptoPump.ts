@@ -947,11 +947,13 @@ export async function deliverToMatch(
   sent: SentInvitations,
   reference: string,
   given: string | null,
+  sealedName: string | null,
 ): Promise<Delivered> {
   return deliverInvitation(
     { http: makePumpHttp(sessionClient), service, sent },
     reference,
     given,
+    sealedName,
   )
 }
 
