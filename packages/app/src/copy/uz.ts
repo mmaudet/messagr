@@ -486,7 +486,7 @@ export const uz: Readonly<Record<CopyKey, string>> = {
     'Bu ogohlantirish emas. Xabarlaringiz birinchisidan boshlab uchdan-uchgacha shifrlangan va bu quyidagilarga bogʻliq emas. Quyida shifrlash haqida emas, odamning kimligiga ishonch haqida gap boradi.',
   trust_state_nothing: 'Bu odam kimligini hali hech nima tasdiqlamaydi.',
   'trust_state_book %@':
-    'Bu hisob manzillar kitobingizdagi raqamni isbotlagan: %@ kartasidagi raqamni.',
+    'Bu hisob manzillar kitobingizdagi %@ kontaktining raqamini isbotlagan.',
   trust_state_vouched:
     'Bu yerda allaqachon boʻlgan kimdir bu odamga kafillik berdi.',
   trust_state_confirmed:
@@ -500,7 +500,7 @@ export const uz: Readonly<Record<CopyKey, string>> = {
     'Bu yerdan hech biri tasdiqlanmagan. Bu — odatdagi boshlangʻich holat.',
   trust_book_title: 'Manzillar kitobingiz',
   trust_book_means:
-    'SMS orqali olingan kod yaqinda bu hisobda shu raqam borligini koʻrsatdi. Bu hisobni bugun kim ishlatayotganini aytmaydi. Taklifiga qoʻshilganingizdan beri kartangiz qayta oʻqilmaydi.',
+    'U sizni taklif qilganda, SMS orqali olingan kod bu hisobda shu raqam borligini koʻrsatgan edi. Bu hisobni bugun kim ishlatayotganini aytmaydi. Kontakt nomi taklifni qabul qilgan kuningizdagi nom: u manzillar kitobingizdagi keyingi oʻzgarishlarga ergashmaydi.',
   trust_vouch_title: 'Kafillik nimani tasdiqlaydi',
   trust_vouch_means:
     'Bu yerda allaqachon boʻlgan kimdir kirayotgan odam kimligini bilaman deb hisobladi va eshikni ochdi. Bu — inson hukmi, undan ortigʻi emas: kriptografiya bilan hech nima tasdiqlanmagan. Hisobni oʻsha hukm bexabar qolgan holda boshqa odam ushlab turgan boʻlishi mumkin.',

@@ -483,7 +483,7 @@ export const de: Readonly<Record<CopyKey, string>> = {
     'Das ist kein Alarm. Ihre Nachrichten sind seit der ersten Ende-zu-Ende verschlüsselt, und das hängt von nichts im Folgenden ab. Es geht im Folgenden um die Gewissheit über die Person, nicht um die Verschlüsselung.',
   trust_state_nothing: 'Noch nichts belegt, wer diese Person ist.',
   'trust_state_book %@':
-    'Dieses Konto hat eine Nummer aus Ihrem Adressbuch nachgewiesen: die der Karte %@.',
+    'Dieses Konto hat die Nummer von %@ nachgewiesen, einem Kontakt in Ihrem Adressbuch.',
   trust_state_vouched:
     'Jemand, der bereits hier war, ist für diese Person eingetreten.',
   trust_state_confirmed:
@@ -497,7 +497,7 @@ export const de: Readonly<Record<CopyKey, string>> = {
     'Keines wurde von hier aus bestätigt. Das ist der normale Ausgangszustand.',
   trust_book_title: 'Ihr Adressbuch',
   trust_book_means:
-    'Ein per SMS empfangener Code hat vor Kurzem gezeigt, dass dieses Konto diese Nummer hatte. Das sagt nicht, wer dieses Konto heute nutzt. Ihre Karte wird nicht mehr gelesen, seit Sie seiner Einladung beigetreten sind.',
+    'Als es Sie eingeladen hat, hatte ein per SMS empfangener Code gezeigt, dass dieses Konto diese Nummer hatte. Das sagt nicht, wer dieses Konto heute nutzt. Der Name des Kontakts ist der vom Tag, an dem Sie die Einladung angenommen haben: Er folgt späteren Änderungen Ihres Adressbuchs nicht.',
   trust_vouch_title: 'Was das Eintreten für jemanden belegt',
   trust_vouch_means:
     'Eine bereits anwesende Person hielt sich für sicher, wer hereinkam, und hat die Tür geöffnet. Das ist ein menschliches Urteil und mehr nicht: kryptografisch wurde nichts belegt. Ein Konto kann von jemand anderem gehalten werden, ohne dass dieses Urteil davon etwas wüsste.',

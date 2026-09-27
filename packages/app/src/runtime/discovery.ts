@@ -393,6 +393,11 @@ export function proofJourney(
      * withdrawn (`null`): what the row shows, and what a renewal sends to.
      */
     readonly keepNumber: (number: string | null) => Promise<void>
+    /**
+     * Forgets what looking for contacts found on this telephone, card names
+     * included, once the number is withdrawn (#407).
+     */
+    readonly forgetWhatWasFound: () => Promise<void>
   },
   show: (stage: ProofStage) => void,
 ): ProofJourney {
@@ -473,6 +478,7 @@ export function proofJourney(
       if (withdrawn) {
         kept = null
         await deps.keepNumber(null)
+        await deps.forgetWhatWasFound()
         if (mine !== opening) return
         go({ stage: 'withdrawn' })
       } else {

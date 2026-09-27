@@ -112,7 +112,7 @@ const her: WhatIsKnown = {
   instance: 'messagr.eu',
   elsewhere: false,
   expiresAt: null,
-  inBook: null,
+  cardName: null,
 }
 
 /** The same screen, opened by a link nobody has spent yet. #329. */
@@ -126,7 +126,7 @@ const byLink: WhatIsKnown = {
   instance: 'messagr.eu',
   elsewhere: false,
   expiresAt: null,
-  inBook: null,
+  cardName: null,
 }
 
 function screen(over: Partial<Parameters<typeof Invited>[0]> = {}): Drawn[] {
@@ -233,7 +233,7 @@ describe('the invitation standing on the threshold', () => {
         instance: null,
         elsewhere: false,
         expiresAt: null,
-        inBook: null,
+        cardName: null,
       },
     })
     expect(said(drawn)).toEqual([
@@ -395,7 +395,9 @@ describe('an invitation delivered inside Messagr (#404)', () => {
 
   it('draws the name its inviter gave itself after « Se présente comme », once its envelope opened here (#405)', () => {
     const drawn = screen({
-      known: whatADeliveredInvitationSays(expiresAt, 'Nadia du club'),
+      known: whatADeliveredInvitationSays(expiresAt, {
+        declared: 'Nadia du club',
+      }),
     })
 
     expect(said(drawn)).toEqual([
@@ -503,7 +505,9 @@ describe('an invitation from somebody in the address book (#407)', () => {
 
   it('names the card, and nothing it claims under it but what it declared', () => {
     const drawn = screen({
-      known: whatADeliveredInvitationSays(expiresAt, null, 'Paul Martin'),
+      known: whatADeliveredInvitationSays(expiresAt, {
+        cardName: 'Paul Martin',
+      }),
     })
 
     expect(said(drawn).slice(0, 3)).toEqual([
@@ -517,7 +521,10 @@ describe('an invitation from somebody in the address book (#407)', () => {
 
   it('says the name its inviter declared under the card, as a claim', () => {
     const drawn = screen({
-      known: whatADeliveredInvitationSays(expiresAt, 'Popol', 'Paul Martin'),
+      known: whatADeliveredInvitationSays(expiresAt, {
+        declared: 'Popol',
+        cardName: 'Paul Martin',
+      }),
     })
 
     expect(said(drawn).slice(0, 4)).toEqual([

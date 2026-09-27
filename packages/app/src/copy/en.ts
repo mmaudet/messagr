@@ -477,7 +477,7 @@ export const en: Readonly<Record<CopyKey, string>> = {
     'This is not an alert. Your messages have been end-to-end encrypted since the first one, and that does not depend on anything below. What follows is about certainty as to the person, not about the encryption.',
   trust_state_nothing: 'Nothing establishes yet who this person is.',
   'trust_state_book %@':
-    'This account proved a number from your address book: the one on the card %@.',
+    'This account proved the number of %@, a contact in your address book.',
   trust_state_vouched: 'Someone who was already here vouched for this person.',
   trust_state_confirmed:
     'One of their devices was confirmed from this one, in person.',
@@ -490,7 +490,7 @@ export const en: Readonly<Record<CopyKey, string>> = {
     'None has been confirmed from here. That is the normal starting state.',
   trust_book_title: 'Your address book',
   trust_book_means:
-    'A code received by SMS showed, not long ago, that this account had this number. It does not say who holds this account today. Your card has not been read again since you joined its invitation.',
+    'When it invited you, a code received by SMS had shown that this account had this number. It does not say who holds this account today. The contact’s name is the one it had the day you accepted the invitation: it does not follow later changes to your address book.',
   trust_vouch_title: 'What vouching establishes',
   trust_vouch_means:
     'Someone already present judged that they knew who was coming in, and opened the door. That is a human judgement and nothing more: nothing was established by cryptography. An account can be held by somebody else without that judgement knowing anything about it.',

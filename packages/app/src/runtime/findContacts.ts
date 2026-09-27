@@ -162,6 +162,12 @@ export interface DiscoveryResults {
    * reading it again (#407).
    */
   readonly nameOf: (reference: string) => Promise<string | null>
+  /**
+   * Forgets everything the page holds, its key included: the number was
+   * withdrawn (#407, the owner's decision of 27 September 2026). Whether it
+   * held.
+   */
+  readonly forgetAll: () => Promise<boolean>
 }
 
 /** A contact whose number a findable account proved, and that account. */
@@ -256,6 +262,9 @@ export async function findContacts(deps: FindingDeps): Promise<Findings> {
   const contacts = await deps.readAddressBook()
   const holders = numbersOf(contacts, deps.region(), deps.ownNumber())
   if (holders.size === 0) {
+    // NOTHING LEFT TO FIND, AND NOTHING LEFT TO KEEP: the page follows the
+    // address book as it stands, the names of its cards included (#407).
+    await quietly(() => deps.results.forgetAllBut([]))
     return { found: true, matches: [], others: byName(contacts), waiting: null }
   }
 
@@ -325,11 +334,11 @@ export async function findContacts(deps: FindingDeps): Promise<Findings> {
       before !== undefined &&
       before.reference !== null &&
       before.reference !== reference
-    const cards = holders.get(number)!
-    if (!holderChanged && cards[0] !== undefined) {
-      named.set(number, cards[0].name)
+    const holding = holders.get(number)!
+    if (!holderChanged && holding[0] !== undefined) {
+      named.set(number, holding[0].name)
     }
-    for (const contact of cards) {
+    for (const contact of holding) {
       // A contact's number that did not change hands wins over one that did.
       const already = matched.get(contact)
       if (already === undefined || (already.holderChanged && !holderChanged)) {

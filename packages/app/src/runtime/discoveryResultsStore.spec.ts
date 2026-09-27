@@ -66,6 +66,18 @@ function fake(refuse: 'none' | 'read' | 'write' = 'none') {
         for (const fingerprint of params) names.delete(String(fingerprint))
         return { rows: [] }
       }
+      if (sql === 'DELETE FROM discovery_results') {
+        rows.clear()
+        return { rows: [] }
+      }
+      if (sql === 'DELETE FROM discovery_found_names') {
+        names.clear()
+        return { rows: [] }
+      }
+      if (sql === 'DELETE FROM discovery_fingerprint_key') {
+        key = null
+        return { rows: [] }
+      }
       if (sql.startsWith('SELECT n.name AS name FROM discovery_found_names')) {
         for (const row of rows.values()) {
           const name = names.get(row.fingerprint as string)
@@ -340,5 +352,18 @@ describe('what looking for contacts found (#402)', () => {
     )
     expect(await writing.keepNames(new Map([[PAUL, 'Paul']]))).toBe(false)
     expect(await forgetfulDiscoveryResults().nameOf('ref-paul')).toBeNull()
+  })
+
+  it('forgets everything, key included, once the number is withdrawn (#407)', async () => {
+    const { database, rows, names } = fake()
+    const page = await openDiscoveryResults(database, counting())
+    await page.keep(KEY, new Map([[PAUL, found]]))
+    await page.keepNames(new Map([[PAUL, 'Paul']]))
+
+    expect(await page.forgetAll()).toBe(true)
+
+    expect(rows.size).toBe(0)
+    expect(names.size).toBe(0)
+    expect((await page.recall(KEY, [PAUL])).size).toBe(0)
   })
 })

@@ -471,7 +471,7 @@ export const es: Readonly<Record<CopyKey, string>> = {
     'Esto no es una alerta. Sus mensajes están cifrados de extremo a extremo desde el primero, y eso no depende de nada de lo que sigue. Lo que sigue habla de la certeza sobre la persona, no del cifrado.',
   trust_state_nothing: 'Todavía nada establece quién es esta persona.',
   'trust_state_book %@':
-    'Esta cuenta ha probado un número de su agenda: el de la ficha %@.',
+    'Esta cuenta ha probado el número de %@, un contacto de su agenda.',
   trust_state_vouched:
     'Alguien que ya estaba aquí ha respondido por esta persona.',
   trust_state_confirmed:
@@ -485,7 +485,7 @@ export const es: Readonly<Record<CopyKey, string>> = {
     'Ninguno ha sido confirmado desde aquí. Es el estado de partida normal.',
   trust_book_title: 'Su agenda',
   trust_book_means:
-    'Un código recibido por SMS mostró hace poco que esta cuenta tenía este número. Eso no dice quién usa esta cuenta hoy. Su ficha ya no se vuelve a leer desde que se unió a su invitación.',
+    'Cuando le invitó, un código recibido por SMS había mostrado que esta cuenta tenía este número. Eso no dice quién usa esta cuenta hoy. El nombre del contacto es el del día en que aceptó la invitación: no sigue los cambios posteriores de su agenda.',
   trust_vouch_title: 'Lo que establece «responder por alguien»',
   trust_vouch_means:
     'Una persona ya presente ha considerado que sabía quién entraba, y le ha abierto la puerta. Es un juicio humano, y nada más: la criptografía no ha establecido nada. Una cuenta puede estar en manos de otra persona sin que ese juicio sepa nada de ello.',

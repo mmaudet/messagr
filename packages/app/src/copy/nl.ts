@@ -473,7 +473,7 @@ export const nl: Readonly<Record<CopyKey, string>> = {
     'Dit is geen waarschuwing. Uw berichten zijn end-to-end versleuteld sinds het eerste, en dat hangt van niets hieronder af. Wat volgt gaat over de zekerheid omtrent de persoon, niet over de versleuteling.',
   trust_state_nothing: 'Nog niets stelt vast wie deze persoon is.',
   'trust_state_book %@':
-    'Dit account heeft een nummer uit uw adresboek bewezen: dat van de kaart %@.',
+    'Dit account heeft het nummer van %@ bewezen, een contact in uw adresboek.',
   trust_state_vouched:
     'Iemand die er al was heeft voor deze persoon ingestaan.',
   trust_state_confirmed:
@@ -487,7 +487,7 @@ export const nl: Readonly<Record<CopyKey, string>> = {
     'Geen enkel is hier bevestigd. Dat is de normale begintoestand.',
   trust_book_title: 'Uw adresboek',
   trust_book_means:
-    'Een per sms ontvangen code liet onlangs zien dat dit account dit nummer had. Dat zegt niet wie dit account vandaag gebruikt. Uw kaart wordt niet meer gelezen sinds u op de uitnodiging bent ingegaan.',
+    'Toen het u uitnodigde, had een per sms ontvangen code laten zien dat dit account dit nummer had. Dat zegt niet wie dit account vandaag gebruikt. De naam van het contact is die van de dag waarop u de uitnodiging aannam: hij volgt latere wijzigingen in uw adresboek niet.',
   trust_vouch_title: 'Wat «voor iemand instaan» vaststelt',
   trust_vouch_means:
     'Iemand die er al was meende te weten wie binnenkwam, en heeft de deur geopend. Dat is een menselijk oordeel, en niets meer: cryptografisch is er niets vastgesteld. Een account kan door iemand anders worden gehouden zonder dat dat oordeel daar iets van weet.',

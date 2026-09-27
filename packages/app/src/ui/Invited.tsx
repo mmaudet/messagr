@@ -206,14 +206,14 @@ export function Invited({
       contentContainerStyle={styles.content}>
       <Text style={styles.title}>{t('invited_title')}</Text>
 
-      {known.inBook !== null ? (
+      {known.cardName !== null ? (
         /* « PAUL (DANS VOTRE CARNET) » (#407): the name of the card this
            device's own looks found the inviter's number on. Not a claim of
            the inviter's, so not under « se présente comme »; that one, when
            the inviter declared a name as well, comes under it. */
         <View style={styles.who} testID="invited-in-book">
           <Text style={styles.name}>
-            {t('invited_in_book %@', known.inBook)}
+            {t('invited_in_book %@', known.cardName)}
           </Text>
           {known.declared !== '' && (
             <Text style={styles.lead}>

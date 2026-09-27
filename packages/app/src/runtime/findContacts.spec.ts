@@ -188,6 +188,11 @@ function thePage(rows: readonly Row[] = []) {
       }
       return null
     },
+    forgetAll: async () => {
+      page.clear()
+      names.clear()
+      return true
+    },
   }
   return { results, page, names }
 }
@@ -967,6 +972,24 @@ describe('looking again (#402)', () => {
     expect(page.get(`${KEY}/${PAUL_NUMBER}`)?.reference).toBe('ref-first')
   })
 
+  it('forgets the page, card names included, when the address book holds no number any more (#407)', async () => {
+    const {
+      deps: d,
+      page,
+      names,
+    } = deps(
+      [{ name: 'Paul', numbers: ['not a number'] }],
+      {},
+      { rows: [row(PAUL_NUMBER, 'ref-paul')] },
+    )
+    names.set(PAUL_NUMBER, 'Paul')
+
+    await findContacts(d)
+
+    expect(page.size).toBe(0)
+    expect(names.size).toBe(0)
+  })
+
   it('keeps the name of each card found, and none for a number that changed hands (#407)', async () => {
     const { deps: d, names } = deps(
       [PAUL, ANNE],
@@ -1128,6 +1151,9 @@ describe('looking again (#402)', () => {
       },
       nameOf: async () => {
         throw new Error('the notebook is unreadable')
+      },
+      forgetAll: async () => {
+        throw new Error('the notebook is read-only')
       },
     }
 

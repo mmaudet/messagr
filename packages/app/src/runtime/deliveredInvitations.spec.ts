@@ -5,6 +5,7 @@ import {
   blockDelivered,
   cardsOfTheInviters,
   declineDelivered,
+  recognizedOnJoining,
   deliverInvitation,
   joinDelivered,
   KEPT_AFTER_DEADLINE_MS,
@@ -726,27 +727,65 @@ describe('the card each inviter came from, without reading the address book (#40
         waiting('b', 'ref-stranger'),
         waiting('c', null),
       ],
-      new Map(),
       nameOf,
     )
 
     expect(found).toEqual(new Map([['a', 'Paul Martin']]))
   })
 
-  it('keeps a card found, and asks again for one not found yet', async () => {
-    const asked: string[] = []
-    const known = new Map([['a', 'Paul Martin']])
+  it('names no card once the inviter is findable no more, and its reference gone', async () => {
+    const before = await cardsOfTheInviters([waiting('a', 'ref-paul')], nameOf)
+    const after = await cardsOfTheInviters([waiting('a', null)], nameOf)
 
-    const found = await cardsOfTheInviters(
-      [waiting('a', 'ref-paul'), waiting('b', 'ref-stranger')],
-      known,
-      async reference => {
-        asked.push(reference)
-        return nameOf(reference)
+    expect(before.get('a')).toBe('Paul Martin')
+    expect(after.size).toBe(0)
+  })
+})
+
+describe('joining an invitation from a card of the address book (#407)', () => {
+  function recognition(named: Record<string, string> = {}, fails = false) {
+    const recognized: [string, string][] = []
+    const given: [string, string][] = []
+    return {
+      deps: {
+        recognize: async (userId: string, cardName: string) => {
+          if (fails) throw new Error('the notebook is read-only')
+          recognized.push([userId, cardName])
+          return true
+        },
+        givenNames: async () => new Map(Object.entries(named)),
+        giveName: async (userId: string, name: string) => {
+          given.push([userId, name])
+        },
       },
-    )
+      recognized,
+      given,
+    }
+  }
 
-    expect(asked).toEqual(['ref-stranger'])
-    expect(found).toBe(known)
+  it('knows the inviter through the card, and gives it the card name', async () => {
+    const { deps, recognized, given } = recognition()
+
+    expect(await recognizedOnJoining(deps, '@paul:x', 'Paul Martin')).toBe(true)
+
+    expect(recognized).toEqual([['@paul:x', 'Paul Martin']])
+    expect(given).toEqual([['@paul:x', 'Paul Martin']])
+  })
+
+  it('keeps a name this device already gave the account', async () => {
+    const { deps, given } = recognition({ '@paul:x': 'Popol' })
+
+    await recognizedOnJoining(deps, '@paul:x', 'Paul Martin')
+
+    expect(given).toEqual([])
+  })
+
+  it('does not fail the answer when the notebook refuses', async () => {
+    const { deps, given } = recognition({}, true)
+
+    expect(await recognizedOnJoining(deps, '@paul:x', 'Paul Martin')).toBe(
+      false,
+    )
+    expect(given).toEqual([])
   })
 })

@@ -128,7 +128,7 @@ export interface WhatIsKnown {
    * number is on no card this device found, and for anything but an
    * invitation delivered inside Messagr.
    */
-  readonly inBook: string | null
+  readonly cardName: string | null
 }
 
 export function whatIsKnown(
@@ -148,7 +148,7 @@ export function whatIsKnown(
       instance: null,
       elsewhere: false,
       expiresAt: null,
-      inBook: null,
+      cardName: null,
     }
   }
   const given = names.get(from)
@@ -171,7 +171,7 @@ export function whatIsKnown(
       serverOf(self) !== null &&
       instance.toLowerCase() !== serverOf(self)?.toLowerCase(),
     expiresAt: null,
-    inBook: null,
+    cardName: null,
   }
 }
 
@@ -201,7 +201,7 @@ export function whatALinkSays(described: Described): WhatIsKnown {
     instance: described.instance,
     elsewhere: described.elsewhere,
     expiresAt: null,
-    inBook: null,
+    cardName: null,
   }
 }
 
@@ -216,9 +216,14 @@ export function whatALinkSays(described: Described): WhatIsKnown {
  */
 export function whatADeliveredInvitationSays(
   expiresAt: number,
-  declared: string | null = null,
-  inBook: string | null = null,
+  names: {
+    /** The name its inviter declared, opened from its envelope (#405). */
+    readonly declared?: string | null
+    /** The card this device found the inviter's number on (#407). */
+    readonly cardName?: string | null
+  } = {},
 ): WhatIsKnown {
+  const { declared = null, cardName = null } = names
   return {
     source: 'delivered',
     scope: '',
@@ -229,7 +234,7 @@ export function whatADeliveredInvitationSays(
     instance: null,
     elsewhere: false,
     expiresAt,
-    inBook,
+    cardName,
   }
 }
 

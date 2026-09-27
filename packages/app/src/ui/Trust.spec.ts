@@ -77,13 +77,13 @@ const NOTHING_YET: TrustReading = {
   vouchedFor: false,
 }
 
-function screen(reading: TrustReading, inBook?: string) {
+function screen(reading: TrustReading, cardName?: string) {
   return draw(
     createElement(Trust, {
       participant: '@paul:messagr.eu',
       given: 'Paul',
       reading,
-      ...(inBook === undefined ? {} : { inBook }),
+      ...(cardName === undefined ? {} : { cardName }),
       onBack: () => undefined,
     }),
   )

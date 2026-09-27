@@ -165,27 +165,50 @@ export async function namesSealedFor(
 
 /**
  * The card this device's own looks found each inviter's number on (#407), by
- * invitation: `known`, and every invitation of `unanswered` whose inviter
- * names a reference, looked up in the page of results with `nameOf`. A card
- * found is kept; one not found is asked again at the next reading, since a
- * look may have found it since. No address book is read: only a look the
- * person starts may do that (#392, story 30).
+ * invitation, looked up in the page of results with `nameOf` at every reading:
+ * an inviter findable no more carries no reference, and names no card any
+ * more. No address book is read: only a look the person starts may do that
+ * (#392, story 30).
  */
 export async function cardsOfTheInviters(
   unanswered: readonly WaitingInvitation[],
-  known: ReadonlyMap<string, string>,
   nameOf: (reference: string) => Promise<string | null>,
 ): Promise<ReadonlyMap<string, string>> {
-  const toLookUp = unanswered.filter(
-    one => one.inviterReference !== null && !known.has(one.id),
-  )
-  if (toLookUp.length === 0) return known
-  const found = new Map(known)
-  for (const { id, inviterReference } of toLookUp) {
-    const card = await nameOf(inviterReference ?? '')
+  const found = new Map<string, string>()
+  for (const { id, inviterReference } of unanswered) {
+    if (inviterReference === null) continue
+    const card = await nameOf(inviterReference)
     if (card !== null) found.set(id, card)
   }
-  return found.size === known.size ? known : found
+  return found
+}
+
+/**
+ * Joining an invitation from a card of the address book (#407): the inviter
+ * is known through it from now on, what the product calls « recognized »,
+ * and takes the card's name as its given name unless it has one. Once: the
+ * card is not read again for this account. Neither is the answer: a failure
+ * here leaves the invitation joined, and the account simply not known
+ * through the address book on this device.
+ */
+export async function recognizedOnJoining(
+  deps: {
+    readonly recognize: (userId: string, cardName: string) => Promise<boolean>
+    readonly givenNames: () => Promise<ReadonlyMap<string, string>>
+    readonly giveName: (userId: string, name: string) => Promise<unknown>
+  },
+  inviter: string,
+  cardName: string,
+): Promise<boolean> {
+  try {
+    const recognized = await deps.recognize(inviter, cardName)
+    if (!(await deps.givenNames()).has(inviter)) {
+      await deps.giveName(inviter, cardName)
+    }
+    return recognized
+  } catch {
+    return false
+  }
 }
 
 /**

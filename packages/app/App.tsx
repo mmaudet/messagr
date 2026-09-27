@@ -192,6 +192,7 @@ import {
   cardsOfTheInviters,
   declineDelivered,
   joinDelivered,
+  recognizedOnJoining,
   keptThisLaunchToo,
   namesSealedFor,
   readTheWaiting,
@@ -443,6 +444,16 @@ type PumpStatus =
  * why.
  */
 const backupAcceptance = acceptance()
+
+/** Whether two maps of cards by invitation say the same (#407). */
+function sameCards(
+  one: ReadonlyMap<string, string>,
+  other: ReadonlyMap<string, string>,
+): boolean {
+  if (one.size !== other.size) return false
+  for (const [id, card] of one) if (other.get(id) !== card) return false
+  return true
+}
 
 export function App({
   // Absent on any host that has not been updated to supply it (iOS has not
@@ -726,12 +737,11 @@ export function App({
     setDeliveredWaiting(waiting.unanswered)
     setDeliveredJoined(awaitedDeliveries())
     await openTheNames(waiting.unanswered).catch(() => {})
-    const cards = await cardsOfTheInviters(
-      waiting.unanswered,
-      deliveredCardsRef.current,
-      reference => discoveryResultsRef.current.nameOf(reference),
+    const cards = await cardsOfTheInviters(waiting.unanswered, reference =>
+      discoveryResultsRef.current.nameOf(reference),
     ).catch(() => deliveredCardsRef.current)
-    if (cards !== deliveredCardsRef.current) {
+    // Drawn again only when a card came or went: this runs at every tick.
+    if (!sameCards(cards, deliveredCardsRef.current)) {
       deliveredCardsRef.current = cards
       setDeliveredCards(cards)
     }
@@ -785,17 +795,20 @@ export function App({
           { id: invitation.id, inviter: answered.joined },
         ]
         setDeliveredJoined(awaitedDeliveries())
-        // FROM A CARD OF THE ADDRESS BOOK (#407): the account is known
-        // through it from now on, and takes the card's name as its given
-        // name unless it has one. Once: the card is not read again.
+        // FROM A CARD OF THE ADDRESS BOOK (#407): `recognizedOnJoining`.
         const card = deliveredCardsRef.current.get(invitation.id)
         if (card !== undefined) {
           const inviter = answered.joined
-          await recognizedRef.current.recognize(inviter, card)
-          setRecognized(held => new Map(held).set(inviter, card))
-          if (!(await namesRef.current.all()).has(inviter)) {
-            await giveName(inviter, card)
-          }
+          const held = await recognizedOnJoining(
+            {
+              recognize: recognizedRef.current.recognize,
+              givenNames: namesRef.current.all,
+              giveName,
+            },
+            inviter,
+            card,
+          )
+          if (held) setRecognized(known => new Map(known).set(inviter, card))
         }
       }
       setDeliveredOutcome(
@@ -1547,6 +1560,7 @@ export function App({
             discoveryResultsRef.current.forgetAllBut(numbers),
           keepNames: named => discoveryResultsRef.current.keepNames(named),
           nameOf: reference => discoveryResultsRef.current.nameOf(reference),
+          forgetAll: () => discoveryResultsRef.current.forgetAll(),
         },
       },
       setFinding,
@@ -1566,6 +1580,11 @@ export function App({
       {
         ...discoveryDeps,
         language: currentLanguage,
+        // THE NUMBER WITHDRAWN, WHAT LOOKS FOUND GOES (#407), card names
+        // included: no look can run without a proof to forget it later.
+        forgetWhatWasFound: async () => {
+          await discoveryResultsRef.current.forgetAll()
+        },
         envelope: {
           toPublish: envelopeKeys.toPublish,
           published: async pair => {
@@ -6225,7 +6244,7 @@ export function App({
                 <Trust
                   participant={party.other}
                   given={names.get(party.other)}
-                  inBook={recognized.get(party.other)}
+                  cardName={recognized.get(party.other)}
                   reading={trust}
                   onBack={() => setTrust(null)}
                 />
@@ -6703,11 +6722,10 @@ export function App({
             style={[StyleSheet.absoluteFill, styles.root]}
             edges={['top', 'bottom', 'left', 'right']}>
             <Invited
-              known={whatADeliveredInvitationSays(
-                deliveredOnScreen.expiresAt,
-                deliveredNames.get(deliveredOnScreen.id) ?? null,
-                deliveredCards.get(deliveredOnScreen.id) ?? null,
-              )}
+              known={whatADeliveredInvitationSays(deliveredOnScreen.expiresAt, {
+                declared: deliveredNames.get(deliveredOnScreen.id) ?? null,
+                cardName: deliveredCards.get(deliveredOnScreen.id) ?? null,
+              })}
               behind={0}
               working={answeringDelivered}
               failed={deliveredFailed === deliveredOnScreen.id}

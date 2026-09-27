@@ -113,6 +113,7 @@ function journeyWith(
   const { service, asked } = theService(answers)
   const shown: ProofStage[] = []
   const kept: (string | null)[] = []
+  const forgotten: true[] = []
   const { envelope, keptPairs } = envelopeKeys(keystoreRefuses)
   const journey = proofJourney(
     {
@@ -123,11 +124,14 @@ function journeyWith(
       keepNumber: async number => {
         kept.push(number)
       },
+      forgetWhatWasFound: async () => {
+        forgotten.push(true)
+      },
     },
     stage => shown.push(stage),
   )
   const last = () => shown[shown.length - 1]
-  return { journey, asked, shown, last, kept, keptPairs }
+  return { journey, asked, shown, last, kept, keptPairs, forgotten }
 }
 
 describe('reading the state of discovery', () => {
@@ -393,6 +397,7 @@ describe('the journey of a proof', () => {
         language: () => 'fr',
         envelope,
         keepNumber: async () => undefined,
+        forgetWhatWasFound: async () => undefined,
       },
       () => undefined,
     )
@@ -488,6 +493,7 @@ describe('the journey of a proof', () => {
         language: () => 'fr',
         envelope: envelopeKeys().envelope,
         keepNumber: async () => undefined,
+        forgetWhatWasFound: async () => undefined,
       },
       stage => shown.push(stage),
     )
@@ -570,7 +576,7 @@ describe('keeping the proof, or ending it (#398)', () => {
   })
 
   it('withdraws the number at once, and forgets it on the telephone', async () => {
-    const { journey, asked, shown, kept } = journeyWith({
+    const { journey, asked, shown, kept, forgotten } = journeyWith({
       withdraw: [{ status: 204, body: '' }],
     })
     journey.open(FINDABLE, '+33612345678')
@@ -584,6 +590,9 @@ describe('keeping the proof, or ending it (#398)', () => {
       'withdrawn',
     ])
     expect(kept).toEqual([null])
+    // AND WHAT LOOKS FOUND, CARD NAMES INCLUDED (#407): no look can run
+    // without a proof to forget it later.
+    expect(forgotten).toEqual([true])
   })
 
   it('drops a withdrawal that ends after the journey was closed', async () => {
@@ -601,6 +610,7 @@ describe('keeping the proof, or ending it (#398)', () => {
         language: () => 'fr',
         envelope: envelopeKeys().envelope,
         keepNumber: async () => undefined,
+        forgetWhatWasFound: async () => undefined,
       },
       stage => shown.push(stage),
     )

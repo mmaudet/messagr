@@ -41,7 +41,7 @@ export function Trust({
   participant,
   given,
   reading,
-  inBook,
+  cardName,
   onBack,
 }: {
   readonly participant: string | null
@@ -53,10 +53,13 @@ export function Trust({
    * what the product calls « recognized », matched through the address book
    * and never verified. `recognizedStore.ts`.
    */
-  readonly inBook?: string
+  readonly cardName?: string
   readonly onBack: () => void
 }) {
   const headline = headlineOf(reading)
+  // THE ADDRESS BOOK SAID IN THE HEADLINE when nothing stronger is known,
+  // and under its own title otherwise (#407): said once either way.
+  const bookInHeadline = headline === 'nothing-yet' && cardName !== undefined
   const tone =
     headline === 'confirmed'
       ? styles.confirmed
@@ -88,8 +91,8 @@ export function Trust({
             ? t('trust_state_confirmed')
             : headline === 'vouched'
               ? t('trust_state_vouched')
-              : inBook !== undefined
-                ? t('trust_state_book %@', inBook)
+              : bookInHeadline
+                ? t('trust_state_book %@', cardName)
                 : t('trust_state_nothing')}
         </Text>
       </View>
@@ -98,14 +101,12 @@ export function Trust({
           that a code sent by SMS showed this account had the number, not
           long ago. Only when it is so; the words are neither of the two the
           catalogue's guards refuse. */}
-      {inBook !== undefined && (
+      {cardName !== undefined && (
         <View style={styles.section} testID="trust-in-book">
           <Text style={styles.heading}>{t('trust_book_title')}</Text>
-          {/* Said here when the headline says something else, and there
-              when nothing else is known. */}
-          {headline !== 'nothing-yet' && (
+          {!bookInHeadline && (
             <Text style={styles.paragraph}>
-              {t('trust_state_book %@', inBook)}
+              {t('trust_state_book %@', cardName)}
             </Text>
           )}
           <Text style={styles.paragraph}>{t('trust_book_means')}</Text>
