@@ -110,15 +110,18 @@ pub async fn count_if_allowed(
     ceilings: &SmsCeilings,
     asked: &Asked<'_>,
 ) -> anyhow::Result<Verdict> {
-    let mut conn = pool.acquire().await?;
-    sqlx::query("BEGIN IMMEDIATE").execute(&mut *conn).await?;
-    let verdict = judge_and_count(&mut conn, ceilings, asked).await;
-    let end = if matches!(verdict, Ok(Verdict::Counted(_))) {
-        "COMMIT"
+    // A TRANSACTION SQLX KNOWS ABOUT, and not `BEGIN IMMEDIATE` sent as a
+    // statement: a request dropped while it waits for the lock (a client
+    // gone) rolls back with the transaction, where a statement sent by hand
+    // left its connection in the pool still holding the lock, and every
+    // write after it failed or went nowhere.
+    let mut tx = pool.begin_with("BEGIN IMMEDIATE").await?;
+    let verdict = judge_and_count(&mut tx, ceilings, asked).await;
+    if matches!(verdict, Ok(Verdict::Counted(_))) {
+        tx.commit().await?;
     } else {
-        "ROLLBACK"
-    };
-    sqlx::query(end).execute(&mut *conn).await?;
+        tx.rollback().await?;
+    }
     verdict
 }
 

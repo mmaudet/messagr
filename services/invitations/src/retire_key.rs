@@ -8,11 +8,13 @@
 //!
 //! # A MODE OF THE BINARY, AS THE NAMED DEACTIVATION IS
 //!
-//! `messagr-invitations --retire-masking-key <N>`, typed on the host. It binds
-//! no port and starts no sweeper, so it runs beside the live service. `main`
-//! reaches it before the start's guard (`keys_of_live_masks_are_held`), which
-//! refuses to start while live masks were made with a key `MASKING_KEYS` no
-//! longer holds: a lost key is exactly what this retires.
+//! `messagr-invitations --retire-masking-key <N>`, typed on the host while the
+//! service is stopped: a service still running would go on making proofs
+//! under N when N is its current key, and its next start would find them
+//! without their key. It binds no port and starts no sweeper. `main` reaches it
+//! before the start's guard (`keys_of_live_masks_are_held`), which refuses to
+//! start while live masks were made with a key `MASKING_KEYS` no longer
+//! holds: a lost key is exactly what this retires.
 //!
 //! # WHAT IT DOES, IN ONE TRANSACTION
 //!
@@ -21,7 +23,8 @@
 //!   thirty days at most, as ADR 0014 and #392 promise;
 //! - every mask made under N goes: the ended proofs', the proofs in progress
 //!   (dropped), the masks kept beside a proof in progress under another key,
-//!   and the counts of #401, which nothing links to a number without the key;
+//!   and the counts of #401 and of an extension, which nothing links to a
+//!   number without the key;
 //! - the date N was first served goes with it.
 //!
 //! Then the key leaves `MASKING_KEYS`, and the service restarts: the operator

@@ -15,9 +15,9 @@
 //! service, a batch under the new key is counted apart, up to `EXTENSION`
 //! numbers, once: what lets a device compare its address book again under the
 //! new key without eating into its limit (#392, story 36), which the batches
-//! under the old key still need for the accounts that have not renewed. A
-//! batch the extension cannot hold whole is counted as any other. What it
-//! counted never counts against the limit, and is forgotten once it ends.
+//! under the old key still need for the accounts that have not renewed. What
+//! the extension cannot hold of a batch goes on the limit. What it counted
+//! never counts against the limit, and is forgotten once it ends.
 //!
 //! # A DAY AT A TIME
 //!
@@ -61,20 +61,15 @@ pub struct Number<'a> {
     pub mask: &'a [u8],
 }
 
-/// What was counted, to give back if the batch is not masked after all.
+/// What was counted, to give back if the batch is not masked after all: on
+/// the extension of a key change, on the limit's day, or on both.
 pub struct Counted {
     key_id: i64,
     mask: Vec<u8>,
-    elements: i64,
-    on: Count,
-}
-
-/// Which count a batch went on.
-enum Count {
-    /// The limit's, on this calendar day.
-    Day(i64),
-    /// The extension of the change to this key.
-    Extension(i64),
+    /// The key whose change it extends, and how many went on the extension.
+    extension: Option<(i64, i64)>,
+    /// The calendar day, and how many went on the limit.
+    day: Option<(i64, i64)>,
 }
 
 pub enum Verdict {
@@ -101,15 +96,15 @@ pub async fn count_if_allowed(
     elements: i64,
     now: i64,
 ) -> anyhow::Result<Verdict> {
-    let mut conn = pool.acquire().await?;
-    sqlx::query("BEGIN IMMEDIATE").execute(&mut *conn).await?;
-    let verdict = judge_and_count(&mut conn, user, keys, batch_key, elements, now).await;
-    let end = if matches!(verdict, Ok(Verdict::Counted(_))) {
-        "COMMIT"
+    // A transaction sqlx knows about, for the reason `ceilings.rs` gives: a
+    // request dropped while it waits for the lock rolls back with it.
+    let mut tx = pool.begin_with("BEGIN IMMEDIATE").await?;
+    let verdict = judge_and_count(&mut tx, user, keys, batch_key, elements, now).await;
+    if matches!(verdict, Ok(Verdict::Counted(_))) {
+        tx.commit().await?;
     } else {
-        "ROLLBACK"
-    };
-    sqlx::query(end).execute(&mut *conn).await?;
+        tx.rollback().await?;
+    }
     verdict
 }
 
@@ -137,7 +132,11 @@ async fn judge_and_count(
         mask: &mask,
     };
 
-    let extension = match extended_key(conn, keys, batch_key, now).await? {
+    // THE EXTENSION FIRST, AS FAR AS IT GOES (#409), and the rest on the
+    // limit: a device that compares again under the new key, from a second
+    // telephone or a page that did not hold, spends what is left of the
+    // extension before the limit the batches under the old key need.
+    let (extended, room) = match extended_key(conn, keys, batch_key, now).await? {
         Some(to) => {
             let used: i64 = sqlx::query_scalar(
                 "SELECT COALESCE(SUM(masked), 0) FROM masking_extensions \
@@ -148,30 +147,12 @@ async fn judge_and_count(
             .bind(to)
             .fetch_one(&mut *conn)
             .await?;
-            if used + elements <= EXTENSION {
-                sqlx::query(
-                    "INSERT INTO masking_extensions (key_id, mask, extension_key, masked) \
-                     VALUES (?, ?, ?, ?) \
-                     ON CONFLICT(key_id, mask, extension_key) \
-                     DO UPDATE SET masked = masked + excluded.masked",
-                )
-                .bind(number.key_id)
-                .bind(number.mask)
-                .bind(to)
-                .bind(elements)
-                .execute(&mut *conn)
-                .await?;
-                return Ok(Verdict::Counted(Counted {
-                    key_id: number.key_id,
-                    mask: number.mask.to_vec(),
-                    elements,
-                    on: Count::Extension(to),
-                }));
-            }
-            Some(EXTENSION - used)
+            (Some(to), (EXTENSION - used).max(0))
         }
-        None => None,
+        None => (None, 0),
     };
+    let on_extension = elements.min(room);
+    let on_the_limit = elements - on_extension;
 
     let today = now.div_euclid(DAY_SECONDS);
     let days: Vec<(i64, i64)> = sqlx::query_as(
@@ -186,33 +167,56 @@ async fn judge_and_count(
     .fetch_all(&mut *conn)
     .await?;
     let used: i64 = days.iter().map(|(_, masked)| masked).sum();
-    if used + elements > PER_NUMBER {
+    if used + on_the_limit > PER_NUMBER {
         // With nothing counted, a batch cannot be over: the largest batch
         // (`MAX_BATCH`, `handlers/discovery.rs`) is the limit itself. The
         // oldest day is then today, at worst. What is still allowed is what
-        // the larger of the two counts can hold, so that the batch sent again
-        // fits in one.
+        // the extension and the limit can hold together, as a batch sent
+        // again is spread between them.
         let oldest = days.first().map_or(today, |(day, _)| *day);
         return Ok(Verdict::Over {
-            remaining: (PER_NUMBER - used).max(extension.unwrap_or(0)).max(0),
+            remaining: (PER_NUMBER - used).max(0) + room,
             frees_at: (oldest + WINDOW_DAYS) * DAY_SECONDS,
         });
     }
-    sqlx::query(
-        "INSERT INTO masking_counts (key_id, mask, day, masked) VALUES (?, ?, ?, ?) \
-         ON CONFLICT(key_id, mask, day) DO UPDATE SET masked = masked + excluded.masked",
-    )
-    .bind(number.key_id)
-    .bind(number.mask)
-    .bind(today)
-    .bind(elements)
-    .execute(&mut *conn)
-    .await?;
+    let extension = match extended {
+        Some(to) if on_extension > 0 => {
+            sqlx::query(
+                "INSERT INTO masking_extensions (key_id, mask, extension_key, masked) \
+                 VALUES (?, ?, ?, ?) \
+                 ON CONFLICT(key_id, mask, extension_key) \
+                 DO UPDATE SET masked = masked + excluded.masked",
+            )
+            .bind(number.key_id)
+            .bind(number.mask)
+            .bind(to)
+            .bind(on_extension)
+            .execute(&mut *conn)
+            .await?;
+            Some((to, on_extension))
+        }
+        _ => None,
+    };
+    let day = if on_the_limit > 0 {
+        sqlx::query(
+            "INSERT INTO masking_counts (key_id, mask, day, masked) VALUES (?, ?, ?, ?) \
+             ON CONFLICT(key_id, mask, day) DO UPDATE SET masked = masked + excluded.masked",
+        )
+        .bind(number.key_id)
+        .bind(number.mask)
+        .bind(today)
+        .bind(on_the_limit)
+        .execute(&mut *conn)
+        .await?;
+        Some((today, on_the_limit))
+    } else {
+        None
+    };
     Ok(Verdict::Counted(Counted {
         key_id: number.key_id,
         mask: number.mask.to_vec(),
-        elements,
-        on: Count::Day(today),
+        extension,
+        day,
     }))
 }
 
@@ -282,26 +286,30 @@ pub async fn carry(
 
 /// Gives back what a batch counted, when it was not masked after all.
 pub async fn release(pool: &SqlitePool, counted: Counted) -> anyhow::Result<()> {
-    match counted.on {
-        Count::Day(day) => sqlx::query(
-            "UPDATE masking_counts SET masked = masked - ? \
-             WHERE key_id = ? AND mask = ? AND day = ?",
-        )
-        .bind(counted.elements)
-        .bind(counted.key_id)
-        .bind(&counted.mask)
-        .bind(day),
-        Count::Extension(to) => sqlx::query(
+    if let Some((to, elements)) = counted.extension {
+        sqlx::query(
             "UPDATE masking_extensions SET masked = masked - ? \
              WHERE key_id = ? AND mask = ? AND extension_key = ?",
         )
-        .bind(counted.elements)
+        .bind(elements)
         .bind(counted.key_id)
         .bind(&counted.mask)
-        .bind(to),
+        .bind(to)
+        .execute(pool)
+        .await?;
     }
-    .execute(pool)
-    .await?;
+    if let Some((day, elements)) = counted.day {
+        sqlx::query(
+            "UPDATE masking_counts SET masked = masked - ? \
+             WHERE key_id = ? AND mask = ? AND day = ?",
+        )
+        .bind(elements)
+        .bind(counted.key_id)
+        .bind(&counted.mask)
+        .bind(day)
+        .execute(pool)
+        .await?;
+    }
     Ok(())
 }
 

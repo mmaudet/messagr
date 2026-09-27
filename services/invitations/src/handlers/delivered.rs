@@ -214,13 +214,15 @@ pub async fn send(
     // two invitations sent together would otherwise both read the counts
     // before either is written, and get past the ten a day, or the one
     // pending, together.
-    let mut conn = st.pool.acquire().await.map_err(anyhow::Error::from)?;
-    sqlx::query("BEGIN IMMEDIATE")
-        .execute(&mut *conn)
+    // A transaction sqlx knows about, for the reason `ceilings.rs` gives: a
+    // request dropped while it waits for the lock rolls back with it.
+    let mut tx = st
+        .pool
+        .begin_with("BEGIN IMMEDIATE")
         .await
         .map_err(anyhow::Error::from)?;
     let written = within_limits_then_written(
-        &mut conn,
+        &mut tx,
         &Sending {
             id: &id,
             inviter: &inviter,
@@ -231,15 +233,11 @@ pub async fn send(
         },
     )
     .await;
-    let end = if written.is_ok() {
-        "COMMIT"
+    if written.is_ok() {
+        tx.commit().await.map_err(anyhow::Error::from)?;
     } else {
-        "ROLLBACK"
-    };
-    sqlx::query(end)
-        .execute(&mut *conn)
-        .await
-        .map_err(anyhow::Error::from)?;
+        tx.rollback().await.map_err(anyhow::Error::from)?;
+    }
     written?;
     Ok(Json(DeliveredInvitation {
         id,

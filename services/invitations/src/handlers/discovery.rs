@@ -245,22 +245,20 @@ pub async fn finish_proof(
     // started again meanwhile, or another proof finishing, cannot fall
     // between the reading and the writing. What is decided is kept, a wrong
     // code's attempt as much as a proof's end; a failure to read or to write
-    // leaves nothing.
-    let mut conn = st.pool.acquire().await.map_err(anyhow::Error::from)?;
-    sqlx::query("BEGIN IMMEDIATE")
-        .execute(&mut *conn)
+    // leaves nothing. A transaction sqlx knows about, for the reason
+    // `ceilings.rs` gives: a request dropped while it waits for the lock rolls
+    // back with it.
+    let mut tx = st
+        .pool
+        .begin_with("BEGIN IMMEDIATE")
         .await
         .map_err(anyhow::Error::from)?;
-    let decided = finish_under_the_lock(&mut conn, &st, &user, &req.code, envelope_key, now).await;
-    let end = if decided.is_ok() {
-        "COMMIT"
+    let decided = finish_under_the_lock(&mut tx, &st, &user, &req.code, envelope_key, now).await;
+    if decided.is_ok() {
+        tx.commit().await.map_err(anyhow::Error::from)?;
     } else {
-        "ROLLBACK"
-    };
-    sqlx::query(end)
-        .execute(&mut *conn)
-        .await
-        .map_err(anyhow::Error::from)?;
+        tx.rollback().await.map_err(anyhow::Error::from)?;
+    }
     decided?.map(Json)
 }
 
@@ -857,21 +855,24 @@ pub async fn note_keys_served(
         return Ok(());
     };
     let current = keys.current().id();
+    // Noting a key and dropping the proofs it makes stale are one step.
+    let mut tx = pool.begin().await?;
     for key in keys.iter() {
         let noted =
             sqlx::query("INSERT OR IGNORE INTO masking_keys_served (key_id, since) VALUES (?, ?)")
                 .bind(i64::from(key.id()))
                 .bind(now)
-                .execute(pool)
+                .execute(&mut *tx)
                 .await?
                 .rows_affected();
         if noted == 1 && key.id() == current {
             sqlx::query("DELETE FROM pending_proofs WHERE key_id <> ?")
                 .bind(i64::from(current))
-                .execute(pool)
+                .execute(&mut *tx)
                 .await?;
         }
     }
+    tx.commit().await?;
     Ok(())
 }
 
@@ -2536,6 +2537,33 @@ mod tests {
     }
 
     #[sqlx::test(migrations = "./migrations")]
+    async fn a_batch_under_the_new_key_spends_what_is_left_of_the_extension_first(
+        pool: SqlitePool,
+    ) {
+        // A second device of the same number, or a page that did not hold,
+        // compares again: what the extension cannot hold goes on the limit,
+        // and only that.
+        let (ovh, inbox) = fake_ovhcloud(false).await;
+        let (clock, _) = crate::util::Clock::settable(T0);
+        let one_key = state_at(pool.clone(), whoami_hs().await, Some(ovh), clock);
+        prove(&one_key, &inbox, "alice", NUMBER).await;
+        let two_keys = restarted_with(&one_key, keys_one_and_two()).await;
+        assert_eq!(under_key(&two_keys, "alice", 2, 3_000).await, Ok(()));
+        assert_eq!(under_key(&two_keys, "alice", 2, 3_000).await, Ok(()));
+
+        assert_eq!(
+            under_key(&two_keys, "alice", 1, 4_001).await,
+            Err(4_000),
+            "2,000 of the second batch took the rest of the extension"
+        );
+        assert_eq!(
+            under_key(&two_keys, "alice", 2, 4_001).await,
+            Err(4_000),
+            "and under the new key, what is left is the limit's"
+        );
+    }
+
+    #[sqlx::test(migrations = "./migrations")]
     async fn what_the_extension_counted_never_counts_against_the_limit(pool: SqlitePool) {
         let (ovh, inbox) = fake_ovhcloud(false).await;
         let (clock, time) = crate::util::Clock::settable(T0);
@@ -2686,6 +2714,49 @@ mod tests {
         keys_of_live_masks_are_held(&pool, Some(&only_two), T0 + 28 * DAY)
             .await
             .expect("#1 can leave MASKING_KEYS");
+    }
+
+    #[sqlx::test(migrations = "./migrations")]
+    async fn a_finish_dropped_while_it_waits_for_the_lock_leaves_no_transaction_behind(
+        pool: SqlitePool,
+    ) {
+        use sqlx::Connection;
+        let (ovh, inbox) = fake_ovhcloud(false).await;
+        let st = state_with(pool.clone(), whoami_hs().await, Some(ovh));
+        start(&st, "alice", NUMBER).await.unwrap();
+        let code = last_code(&inbox);
+
+        // Another writer holds the lock, and the finish waits for it until
+        // its client goes away.
+        let holder = pool.begin_with("BEGIN IMMEDIATE").await.unwrap();
+        let waited = tokio::time::timeout(
+            std::time::Duration::from_millis(300),
+            finish(&st, "alice", &code),
+        )
+        .await;
+        assert!(waited.is_err(), "the finish was still waiting");
+        holder.rollback().await.unwrap();
+        // Time for what the dropped finish had asked of its connection to
+        // take the lock, if anything is left to take it.
+        tokio::time::sleep(std::time::Duration::from_millis(500)).await;
+
+        // No connection of the pool is left inside a transaction: every
+        // write commits, as a connection of its own sees.
+        for key in 1..=10_i64 {
+            sqlx::query("INSERT INTO masking_keys_served (key_id, since) VALUES (?, 0)")
+                .bind(key)
+                .execute(&pool)
+                .await
+                .unwrap();
+        }
+        let mut own = sqlx::SqliteConnection::connect_with(&pool.connect_options())
+            .await
+            .unwrap();
+        let kept: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM masking_keys_served")
+            .fetch_one(&mut own)
+            .await
+            .unwrap();
+        assert_eq!(kept, 10);
     }
 
     #[test]

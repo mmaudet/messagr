@@ -72,7 +72,6 @@ async fn main() -> anyhow::Result<()> {
         util::now(),
     )
     .await?;
-    handlers::discovery::note_keys_served(&pool, cfg.masking_keys.as_deref(), util::now()).await?;
     let mx = Arc::new(matrix::MatrixClient::new(
         cfg.homeserver_url.clone(),
         cfg.registration_token.clone(),
@@ -102,6 +101,16 @@ async fn main() -> anyhow::Result<()> {
         };
     }
 
+    // WHEN EACH MASKING KEY WAS FIRST SERVED (#409), noted by the start of the
+    // service and by nothing else: a mode run with an edited MASKING_KEYS
+    // before the restart would note a new key early, and the restart would
+    // then keep the proofs in progress under the old one.
+    handlers::discovery::note_keys_served(
+        &state.pool,
+        state.cfg.masking_keys.as_deref(),
+        util::now(),
+    )
+    .await?;
     tokio::spawn(cleanup::run_forever(state.clone()));
 
     let discovery = match state.cfg.discovery() {
