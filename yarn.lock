@@ -6427,6 +6427,11 @@ levn@^0.4.1:
     prelude-ls "^1.2.1"
     type-check "~0.4.0"
 
+libphonenumber-js@^1.13.14:
+  version "1.13.14"
+  resolved "https://registry.yarnpkg.com/libphonenumber-js/-/libphonenumber-js-1.13.14.tgz#cf4e4a9a9c113566fc19917adfac77f8a4adb9bf"
+  integrity sha512-llihgCcx0BFLksecLP+x1J+6JDE1GsXS1RN/LoPF6qcwpeQcnjj0lcvZxY8AzbEpYwyZWPZW/nDuqkqzm3amiw==
+
 lighthouse-logger@^1.0.0:
   version "1.4.2"
   resolved "https://registry.yarnpkg.com/lighthouse-logger/-/lighthouse-logger-1.4.2.tgz#aef90f9e97cd81db367c7634292ee22079280aaa"
@@ -7565,6 +7570,11 @@ react-is@^18.0.0:
   resolved "https://registry.yarnpkg.com/react-is/-/react-is-18.3.1.tgz#e83557dc12eae63a99e003a46388b1dcbb44db7e"
   integrity sha512-/LLMVyas0ljjAtoYiPqYiL8VWXzUUdThrmU5+n20DZv+a+ClRoevUzw5JxU+Ieh5/c87ytoTBV9G1FiKfNJdmg==
 
+react-native-contacts@8.0.10:
+  version "8.0.10"
+  resolved "https://registry.yarnpkg.com/react-native-contacts/-/react-native-contacts-8.0.10.tgz#427ac7638db134e221cfe6af0ec6537f53016d07"
+  integrity sha512-9iBRf/YLYSXQxfbPvz43DwXMv0OcHeit37W/313adYJIWz/W8SypqqxmAg9B/Lg1hzD+KYEn+UpljZnwgp78OQ==
+
 react-native-gesture-handler@3.2.1:
   version "3.2.1"
   resolved "https://registry.yarnpkg.com/react-native-gesture-handler/-/react-native-gesture-handler-3.2.1.tgz#83ee1e6f3453ed46d20cbd9c510e836a3333641d"
@@ -7595,10 +7605,10 @@ react-native-keychain@10:
   resolved "https://registry.yarnpkg.com/react-native-keychain/-/react-native-keychain-10.0.0.tgz#1de6f54d27b2376deaac4d51883c066f53b7be7b"
   integrity sha512-YzPKSAnSzGEJ12IK6CctNLU79T1W15WDrElRQ+1/FsOazGX9ucFPTQwgYe8Dy8jiSEDJKM4wkVa3g4lD2Z+Pnw==
 
-react-native-matrix-crypto@^0.7.0:
-  version "0.7.0"
-  resolved "https://registry.yarnpkg.com/react-native-matrix-crypto/-/react-native-matrix-crypto-0.7.0.tgz#d48985de22539100eada51dc7be8712bec0072e3"
-  integrity sha512-y22VJbhl0hHfoUV2tm8ERyaNYDMwPt4lpTt/5+0M2l32claV9JnAE2UgI+X95lCx4LHJvLhw5VZeYkrS9bmLeQ==
+react-native-matrix-crypto@^0.8.0:
+  version "0.8.0"
+  resolved "https://registry.yarnpkg.com/react-native-matrix-crypto/-/react-native-matrix-crypto-0.8.0.tgz#bb974dea83aba74225456b2194744b3d5892ebbb"
+  integrity sha512-BbeFaO8/V/iuTj/Hxx3J4Qu+gncO27D/3X+D9qoGUo8WBDaoFTnYVZNAYaui4ctQ4fZLuxR1gk2jHm8urYAMeQ==
   dependencies:
     "@ubjs/core" "0.31.0-5"
     uniffi-bindgen-react-native "0.31.0-5"

@@ -798,4 +798,19 @@ export const en: Readonly<Record<CopyKey, string>> = {
     'You have asked for too many codes. Try again on %1$@ at %2$@.',
   findable_later:
     'Too many codes are being asked for right now. Try again later.',
+  plus_find_contacts: 'Find my contacts',
+  find_reminder:
+    'Messagr will read the numbers in your address book to mask them on this phone. The names do not leave it.',
+  find_looking:
+    'Messagr is masking the numbers in your address book and comparing them on this phone.',
+  find_on_messagr: 'Already on Messagr',
+  find_others: 'Your other contacts',
+  find_nobody: 'None of your contacts can be found on Messagr yet.',
+  find_no_access:
+    "Messagr cannot open your address book. You can allow it in the phone's settings, and invite by link in the meantime.",
+  find_not_the_published_key:
+    "The service's answer did not come from its published key: nothing is shown. Try again later.",
+  find_unreachable: 'The service is not answering. Try again in a moment.',
+  find_off: 'Finding contacts is not offered here.',
+  find_not_findable: 'To find your contacts, prove your number first.',
 }

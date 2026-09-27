@@ -1208,6 +1208,25 @@ export const fr = {
     'Vous avez demandé trop de codes. Réessayez le %1$@ à %2$@.',
   findable_later:
     'Trop de codes sont demandés en ce moment. Réessayez plus tard.',
+  // RETROUVER SES CONTACTS (#400): the line of the « + » sheet, the
+  // reminder before the system's question, and what comes of it.
+  plus_find_contacts: 'Retrouver mes contacts',
+  find_reminder:
+    'Messagr va lire les numéros de votre carnet pour les masquer sur ce téléphone. Les noms n’en sortent pas.',
+  find_looking:
+    'Messagr masque les numéros de votre carnet et les compare sur ce téléphone.',
+  find_on_messagr: 'Déjà sur Messagr',
+  find_others: 'Vos autres contacts',
+  find_nobody:
+    'Aucun de vos contacts n’est trouvable sur Messagr pour l’instant.',
+  find_no_access:
+    'Messagr n’a pas accès à votre carnet. Vous pouvez l’autoriser dans les réglages du téléphone, et inviter par un lien en attendant.',
+  find_not_the_published_key:
+    'La réponse du service ne vient pas de sa clé publiée : rien n’est affiché. Réessayez plus tard.',
+  find_unreachable: 'Le service ne répond pas. Réessayez dans un moment.',
+  find_off: 'La découverte des contacts n’est pas proposée ici.',
+  find_not_findable:
+    'Pour retrouver vos contacts, prouvez d’abord votre numéro.',
 } as const
 
 /** Every key any screen may ask for. A typo is a compile error, not a blank. */

@@ -19,3 +19,5 @@
 "NSPhotoLibraryUsageDescription" = "Pour choisir une image à envoyer dans une conversation. L’image est chiffrée sur cet appareil avant d’être envoyée : ni le serveur ni Messagr ne peuvent la lire.";
 
 "NSPhotoLibraryAddUsageDescription" = "Pour enregistrer dans votre photothèque une photographie reçue dans une conversation, lorsque vous le demandez. Une image enregistrée quitte Messagr : elle suit ensuite les sauvegardes et les autorisations de votre photothèque.";
+
+"NSContactsUsageDescription" = "Les numéros de votre carnet sont masqués sur votre téléphone. Le service ne sait jamais qui est dans votre carnet, et les noms ne quittent pas l’appareil.";

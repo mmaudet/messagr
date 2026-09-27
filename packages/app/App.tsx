@@ -221,6 +221,17 @@ import { rememberStoreDirectory } from './src/runtime/storeDirectory'
 import { rememberTermsAccepted } from './src/runtime/termsAccepted'
 import { allowWake, wakeIsAllowed } from './src/runtime/wakeSetting'
 import { deviceLocale } from './src/runtime/deviceLocale'
+import {
+  askForTheAddressBook,
+  readAddressBook,
+} from './src/runtime/addressBook'
+import { bridgeMasking } from './src/runtime/bridgeMasking'
+import {
+  findContactsEntry,
+  findingJourney,
+  regionOf,
+  type FindingStage,
+} from './src/runtime/findContacts'
 import { pickFromLibrary } from './src/runtime/imageLibrary'
 import { sendImages } from './src/runtime/sendImages'
 import { keepLastPushkey, readLastPushkey } from './src/runtime/lastPushkey'
@@ -253,6 +264,7 @@ import type { Wants } from './src/calls/media'
 import { CallScreen } from './src/ui/CallScreen'
 import { SelectionBar } from './src/ui/SelectionBar'
 import { PlusSheet } from './src/ui/PlusSheet'
+import { FindContacts } from './src/ui/FindContacts'
 import { RemoveSheet } from './src/ui/RemoveSheet'
 import { PickConversation } from './src/ui/PickConversation'
 import { ConversationHeader } from './src/ui/ConversationHeader'
@@ -583,6 +595,9 @@ export function App({
   // account, read when Settings shows, and where a proof stands.
   const [discovery, setDiscovery] = useState<DiscoveryReading>({ read: false })
   const [proof, setProof] = useState<ProofStage>({ stage: 'shut' })
+  // « RETROUVER MES CONTACTS » (#400): what its screen shows, `shut` while
+  // the list is showing.
+  const [finding, setFinding] = useState<FindingStage>({ stage: 'shut' })
   // The number this account proved, kept on this telephone (#398): the row
   // shows it, and a renewal sends its code to it. `null` until read, and when
   // none was kept.
@@ -1209,6 +1224,28 @@ export function App({
     service: discoveryService(() => credentialsRef.current),
     now: () => Date.now(),
   }).current
+  // LOOKING FOR ONE'S CONTACTS (#400), from the « + » sheet, for a findable
+  // account: the address book through the system, each number masked by the
+  // crypto bridge's OPRF client, and the comparison made on this telephone.
+  // Nothing runs before the person continues from the reminder.
+  const findingRef = useRef(
+    findingJourney(
+      {
+        service: discoveryDeps.service,
+        readAddressBook,
+        askForTheAddressBook,
+        masking: bridgeMasking,
+        region: () => regionOf(deviceLocale()),
+      },
+      setFinding,
+    ),
+  )
+  // « RETROUVER MES CONTACTS » FROM AN ACCOUNT THAT IS NOT FINDABLE leads to
+  // the consent and the proof first (#392), and once the number is proven, on
+  // to the reminder: the person asked to look for their contacts, not to
+  // stay on the proof. Set by the « + » sheet, dropped by every way out of
+  // the proof.
+  const findAfterProofRef = useRef(false)
   // A PROOF JUST MADE IS WRITTEN INTO THE ROW FROM ITS OWN ANSWER, rather
   // than read again: closing the journey, « Pas maintenant » included, sends
   // nothing (#392). So is a number just withdrawn (#398): `readingAfter`.
@@ -1235,6 +1272,15 @@ export function App({
       stage => {
         setProof(stage)
         setDiscovery(reading => readingAfter(reading, stage))
+        if (!findAfterProofRef.current) return
+        if (stage.stage === 'proven') {
+          findAfterProofRef.current = false
+          proofRef.current.close()
+          setTab('chat')
+          findingRef.current.open()
+        } else if (stage.stage === 'shut') {
+          findAfterProofRef.current = false
+        }
       },
     ),
   )
@@ -4534,6 +4580,12 @@ export function App({
         proofRef.current.close()
         return true
       }
+      // « RETROUVER MES CONTACTS »: back is the way back to the list, at every
+      // stage. What is still running is dropped by the journey.
+      if (finding.stage !== 'shut') {
+        findingRef.current.close()
+        return true
+      }
       if (invite.stage !== 'shut') {
         setInvite({ stage: 'shut' })
         setAdmission(null)
@@ -4557,6 +4609,7 @@ export function App({
     legalOpen,
     deletion,
     proof.stage,
+    finding.stage,
     invite.stage,
     tab,
     backupPrompt,
@@ -4603,11 +4656,12 @@ export function App({
       openScope !== null ||
       tab !== 'chat' ||
       invite.stage !== 'shut' ||
+      finding.stage !== 'shut' ||
       plusOpen
     ) {
       waitingRef.current.letGo()
     }
-  }, [openScope, tab, invite.stage, plusOpen])
+  }, [openScope, tab, invite.stage, finding.stage, plusOpen])
 
   // THE SHEET THE "+" OPENS BELONGS TO THE LIST, AND GOES WITH IT (#394).
   //
@@ -4623,6 +4677,7 @@ export function App({
     tab === 'chat' &&
     inYet === true &&
     invite.stage === 'shut' &&
+    finding.stage === 'shut' &&
     otherServerQuestion === null &&
     linkDescribed === null
   useEffect(() => {
@@ -5602,10 +5657,11 @@ export function App({
 
             {/* THE LIST **OR** THE INVITATION, for the same reason as the
               conversation above: inviting is a place you go, not a form that
-              lives under the list. */}
+              lives under the list. So is looking for one's contacts (#400). */}
             {openScope === null &&
               tab === 'chat' &&
-              invite.stage === 'shut' && (
+              invite.stage === 'shut' &&
+              finding.stage === 'shut' && (
                 <View style={styles.block}>
                   <ConversationList
                     summaries={summaries}
@@ -5635,6 +5691,21 @@ export function App({
                         proofRef.current.open(discovery, keptNumber)
                       }
                     }}
+                  />
+                </View>
+              )}
+
+            {openScope === null &&
+              tab === 'chat' &&
+              invite.stage === 'shut' &&
+              finding.stage !== 'shut' && (
+                <View style={styles.block}>
+                  <FindContacts
+                    stage={finding}
+                    // Cannot fail: the journey says every refusal as a
+                    // stage.
+                    onContinue={() => findingRef.current.go()}
+                    onClose={() => findingRef.current.close()}
                   />
                 </View>
               )}
@@ -5931,7 +6002,8 @@ export function App({
             {openScope === null &&
               tab === 'chat' &&
               inYet === true &&
-              invite.stage === 'shut' && (
+              invite.stage === 'shut' &&
+              finding.stage === 'shut' && (
                 <FloatingAction
                   testID="invite-open"
                   label={t('invite_open')}
@@ -5948,6 +6020,27 @@ export function App({
                   setPlusOpen(false)
                   setInvite({ stage: 'resting' })
                 }}
+                // ONLY WHERE THIS SERVICE SERVES DISCOVERY (#400), as « Être
+                // trouvable » in Settings. An account that is not findable
+                // proves its number first: the consent, in Settings, as the
+                // row there would open it (#392), then the reminder.
+                onFindContacts={
+                  discovery.read &&
+                  findContactsEntry(discovery, Date.now()) !== 'hidden'
+                    ? () => {
+                        setPlusOpen(false)
+                        if (
+                          findContactsEntry(discovery, Date.now()) === 'look'
+                        ) {
+                          findingRef.current.open()
+                        } else {
+                          findAfterProofRef.current = true
+                          setTab('settings')
+                          proofRef.current.open(discovery, keptNumber)
+                        }
+                      }
+                    : undefined
+                }
                 onClose={() => setPlusOpen(false)}
               />
             )}
@@ -6104,7 +6197,8 @@ export function App({
         {deciding !== null &&
           openScope === null &&
           tab === 'chat' &&
-          invite.stage === 'shut' && (
+          invite.stage === 'shut' &&
+          finding.stage === 'shut' && (
             <SafeAreaView
               testID="invited-overlay"
               style={[StyleSheet.absoluteFill, styles.root]}

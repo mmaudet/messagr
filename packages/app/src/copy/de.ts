@@ -823,4 +823,21 @@ export const de: Readonly<Record<CopyKey, string>> = {
     'Sie haben zu viele Codes angefordert. Versuchen Sie es am %1$@ um %2$@ erneut.',
   findable_later:
     'Gerade werden zu viele Codes angefordert. Versuchen Sie es später erneut.',
+  plus_find_contacts: 'Meine Kontakte finden',
+  find_reminder:
+    'Messagr liest die Nummern in Ihrem Adressbuch, um sie auf diesem Telefon zu maskieren. Die Namen verlassen es nicht.',
+  find_looking:
+    'Messagr maskiert die Nummern in Ihrem Adressbuch und vergleicht sie auf diesem Telefon.',
+  find_on_messagr: 'Bereits auf Messagr',
+  find_others: 'Ihre anderen Kontakte',
+  find_nobody: 'Noch keiner Ihrer Kontakte ist auf Messagr auffindbar.',
+  find_no_access:
+    'Messagr hat keinen Zugriff auf Ihr Adressbuch. Sie können ihn in den Einstellungen des Telefons erlauben und bis dahin per Link einladen.',
+  find_not_the_published_key:
+    'Die Antwort des Dienstes stammt nicht von seinem veröffentlichten Schlüssel: Es wird nichts angezeigt. Versuchen Sie es später erneut.',
+  find_unreachable:
+    'Der Dienst antwortet nicht. Versuchen Sie es gleich noch einmal.',
+  find_off: 'Das Finden von Kontakten wird hier nicht angeboten.',
+  find_not_findable:
+    'Um Ihre Kontakte zu finden, weisen Sie zuerst Ihre Nummer nach.',
 }

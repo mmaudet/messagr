@@ -15,3 +15,5 @@
 "NSPhotoLibraryUsageDescription" = "Um ein Bild auszuwählen, das in einer Unterhaltung gesendet wird. Das Bild wird auf diesem Gerät verschlüsselt, bevor es gesendet wird: weder der Server noch Messagr kann es lesen.";
 
 "NSPhotoLibraryAddUsageDescription" = "Um ein in einer Unterhaltung empfangenes Foto in Ihrer Fotomediathek zu sichern, wenn Sie es verlangen. Ein gesichertes Bild verlässt Messagr: es folgt danach den Sicherungen und den Berechtigungen Ihrer Fotomediathek.";
+
+"NSContactsUsageDescription" = "Die Nummern in Ihrem Adressbuch werden auf Ihrem Telefon maskiert. Der Dienst erfährt nie, wer in Ihrem Adressbuch steht, und die Namen verlassen das Gerät nicht.";

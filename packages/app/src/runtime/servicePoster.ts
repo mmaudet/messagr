@@ -1,5 +1,6 @@
 import type { ServicePoster } from './claimInvitation'
 import type { DiscoveryService } from './discovery'
+import type { FindingService } from './findContacts'
 import type { InvitationService } from './issueInvitation'
 
 /**
@@ -83,8 +84,9 @@ export function invitationService(
 }
 
 /**
- * The discovery routes of the same service (#397), reached as the account
- * this launch holds.
+ * The discovery routes of the same service, reached as the account this
+ * launch holds: proving a number (#397, #398), and looking for one's
+ * contacts (#400).
  *
  * The account is read at each request rather than handed over once: the
  * journey that uses this is made when the screen mounts, before a launch has
@@ -96,7 +98,7 @@ export function discoveryService(
     readonly baseUrl: string
     readonly accessToken: string
   } | null,
-): DiscoveryService {
+): DiscoveryService & FindingService {
   const call = async (
     path: string,
     body?: string,
@@ -123,6 +125,9 @@ export function discoveryService(
     startProof: body => call('/discovery/proofs', body),
     finishProof: body => call('/discovery/proofs/finish', body),
     withdraw: () => call('/discovery/number', undefined, 'DELETE'),
+    keys: () => call('/discovery/keys'),
+    maskBatch: body => call('/discovery/masks', body),
+    directory: () => call('/discovery/directory'),
   }
 }
 

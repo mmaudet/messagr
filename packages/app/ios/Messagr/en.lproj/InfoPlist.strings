@@ -16,3 +16,5 @@
 "NSPhotoLibraryUsageDescription" = "To choose a picture to send in a conversation. The picture is encrypted on this device before it is sent: neither the server nor Messagr can read it.";
 
 "NSPhotoLibraryAddUsageDescription" = "To save a photograph received in a conversation to your photo library, when you ask for it. A saved picture leaves Messagr: it then follows the backups and the permissions of your photo library.";
+
+"NSContactsUsageDescription" = "The numbers in your address book are masked on your phone. The service never knows who is in your address book, and the names do not leave the device.";

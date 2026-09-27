@@ -814,4 +814,21 @@ export const uz: Readonly<Record<CopyKey, string>> = {
     'Siz juda koʻp kod soʻradingiz. %1$@ kuni soat %2$@ dan keyin qayta urinib koʻring.',
   findable_later:
     'Hozir juda koʻp kod soʻralmoqda. Keyinroq qayta urinib koʻring.',
+  plus_find_contacts: 'Kontaktlarimni topish',
+  find_reminder:
+    'Messagr manzillar kitobingizdagi raqamlarni shu telefonda niqoblash uchun oʻqiydi. Ismlar undan chiqmaydi.',
+  find_looking:
+    'Messagr manzillar kitobingizdagi raqamlarni niqoblab, shu telefonda solishtirmoqda.',
+  find_on_messagr: 'Allaqachon Messagrda',
+  find_others: 'Boshqa kontaktlaringiz',
+  find_nobody: 'Hozircha kontaktlaringizdan hech biri Messagrda topilmaydi.',
+  find_no_access:
+    'Messagr manzillar kitobingizni ocha olmaydi. Buni telefon sozlamalarida ruxsat berishingiz va shu orada havola orqali taklif qilishingiz mumkin.',
+  find_not_the_published_key:
+    'Xizmat javobi uning eʼlon qilingan kalitidan kelmadi: hech narsa koʻrsatilmaydi. Keyinroq qayta urinib koʻring.',
+  find_unreachable:
+    'Xizmat javob bermayapti. Birozdan soʻng qayta urinib koʻring.',
+  find_off: 'Kontaktlarni topish bu yerda taklif qilinmaydi.',
+  find_not_findable:
+    'Kontaktlaringizni topish uchun avval raqamingizni isbotlang.',
 }

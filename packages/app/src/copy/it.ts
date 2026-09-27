@@ -796,4 +796,20 @@ export const it: Readonly<Record<CopyKey, string>> = {
     'Ha chiesto troppi codici. Potrà riprovare dal giorno %1$@ alle ore %2$@.',
   findable_later:
     'In questo momento vengono chiesti troppi codici. Riprovi più tardi.',
+  plus_find_contacts: 'Ritrovare i miei contatti',
+  find_reminder:
+    'Messagr leggerà i numeri della Sua rubrica per mascherarli su questo telefono. I nomi non ne escono.',
+  find_looking:
+    'Messagr sta mascherando i numeri della Sua rubrica e li confronta su questo telefono.',
+  find_on_messagr: 'Già su Messagr',
+  find_others: 'Gli altri Suoi contatti',
+  find_nobody: 'Per ora nessuno dei Suoi contatti è trovabile su Messagr.',
+  find_no_access:
+    'Messagr non ha accesso alla Sua rubrica. Può consentirlo nelle impostazioni del telefono e, nel frattempo, invitare con un link.',
+  find_not_the_published_key:
+    'La risposta del servizio non viene dalla sua chiave pubblicata: non viene mostrato nulla. Riprovi più tardi.',
+  find_unreachable: 'Il servizio non risponde. Riprovi tra un momento.',
+  find_off: 'Ritrovare i contatti non è offerto qui.',
+  find_not_findable:
+    'Per ritrovare i Suoi contatti, provi prima il Suo numero.',
 }

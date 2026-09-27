@@ -805,4 +805,19 @@ export const nl: Readonly<Record<CopyKey, string>> = {
     'U hebt te veel codes aangevraagd. Probeer het opnieuw op %1$@ om %2$@.',
   findable_later:
     'Er worden op dit moment te veel codes aangevraagd. Probeer het later opnieuw.',
+  plus_find_contacts: 'Mijn contacten vinden',
+  find_reminder:
+    'Messagr leest de nummers in uw adresboek om ze op deze telefoon te maskeren. De namen verlaten hem niet.',
+  find_looking:
+    'Messagr maskeert de nummers in uw adresboek en vergelijkt ze op deze telefoon.',
+  find_on_messagr: 'Al op Messagr',
+  find_others: 'Uw andere contacten',
+  find_nobody: 'Nog geen van uw contacten is vindbaar op Messagr.',
+  find_no_access:
+    'Messagr heeft geen toegang tot uw adresboek. U kunt het toestaan in de instellingen van de telefoon en intussen via een link uitnodigen.',
+  find_not_the_published_key:
+    'Het antwoord van de dienst komt niet van zijn gepubliceerde sleutel: er wordt niets getoond. Probeer het later opnieuw.',
+  find_unreachable: 'De dienst antwoordt niet. Probeer het zo meteen opnieuw.',
+  find_off: 'Contacten vinden wordt hier niet aangeboden.',
+  find_not_findable: 'Om uw contacten te vinden, bewijst u eerst uw nummer.',
 }

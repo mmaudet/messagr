@@ -21,3 +21,5 @@
 "NSPhotoLibraryUsageDescription" = "Suhbatda yuborish uchun surat tanlashga. Surat yuborilishidan oldin shu qurilmada shifrlanadi: uni na server, na Messagr oʻqiy oladi.";
 
 "NSPhotoLibraryAddUsageDescription" = "Suhbatda olingan suratni, siz soʻraganingizda, suratlar kutubxonangizga saqlashga. Saqlangan surat Messagr dan chiqadi: keyin u suratlar kutubxonangizning zaxira nusxalari va ruxsatlariga boʻysunadi.";
+
+"NSContactsUsageDescription" = "Manzillar kitobingizdagi raqamlar telefoningizda niqoblanadi. Xizmat manzillar kitobingizda kim borligini hech qachon bilmaydi, ismlar esa qurilmadan chiqmaydi.";
