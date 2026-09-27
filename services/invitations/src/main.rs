@@ -181,6 +181,22 @@ fn router(state: Arc<AppState>) -> Router {
         .route("/discovery/keys", get(handlers::discovery::public_keys))
         .route("/discovery/masks", post(handlers::discovery::mask_batch))
         .route("/discovery/directory", get(handlers::discovery::directory))
+        .route(
+            "/discovery/invitations",
+            post(handlers::delivered::send).get(handlers::delivered::waiting),
+        )
+        .route(
+            "/discovery/invitations/:id",
+            get(handlers::delivered::status),
+        )
+        .route(
+            "/discovery/invitations/:id/join",
+            post(handlers::delivered::join),
+        )
+        .route(
+            "/discovery/invitations/:id/decline",
+            post(handlers::delivered::decline),
+        )
         // L'ANNONCE D'UNE SUPPRESSION DE COMPTE (#385), faite par le compte
         // lui-même juste avant qu'il soit désactivé. Sans corps : le jeton dit
         // qui. `handlers::deletion` dit ce qu'elle enregistre et ce qu'elle
@@ -458,6 +474,27 @@ mod tests {
             (
                 "download the directory",
                 http.get(format!("{base}/discovery/directory")),
+            ),
+            (
+                "invite a contact found",
+                http.post(format!("{base}/discovery/invitations"))
+                    .json(&serde_json::json!({"reference": "r"})),
+            ),
+            (
+                "list the invitations waiting",
+                http.get(format!("{base}/discovery/invitations")),
+            ),
+            (
+                "read an invitation sent",
+                http.get(format!("{base}/discovery/invitations/i")),
+            ),
+            (
+                "join an invitation",
+                http.post(format!("{base}/discovery/invitations/i/join")),
+            ),
+            (
+                "decline an invitation",
+                http.post(format!("{base}/discovery/invitations/i/decline")),
             ),
         ];
         for (name, request) in routes {

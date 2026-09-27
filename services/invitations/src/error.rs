@@ -431,6 +431,15 @@ pub enum AppError {
     /// `frees_at`, in Unix time: more are allowed from then on.
     #[error("this batch holds more numbers than may still be masked for this number: send fewer, or try again later")]
     MaskingQuotaReached { remaining: u32, frees_at: i64 },
+    /// The reference names no current proof (#404): a number withdrawn or run
+    /// out since the directory was read, or no reference at all. Reading the
+    /// directory again is the remedy.
+    #[error("this reference names no findable account: read the directory again")]
+    UnknownReference,
+    /// The reference is the caller's own (#404): the person's own number is
+    /// in their address book, and an invitation to oneself leads nowhere.
+    #[error("this reference is the caller's own number")]
+    OwnReference,
     #[error(transparent)]
     Internal(#[from] anyhow::Error),
 }
@@ -578,6 +587,8 @@ impl IntoResponse for AppError {
             AppError::NotFindable => (StatusCode::FORBIDDEN, "MESSAGR_NOT_FINDABLE"),
             AppError::UnknownMaskingKey => (StatusCode::NOT_FOUND, "MESSAGR_UNKNOWN_MASKING_KEY"),
             AppError::NotABatch => (StatusCode::BAD_REQUEST, "MESSAGR_NOT_A_BATCH"),
+            AppError::UnknownReference => (StatusCode::NOT_FOUND, "MESSAGR_UNKNOWN_REFERENCE"),
+            AppError::OwnReference => (StatusCode::BAD_REQUEST, "MESSAGR_OWN_REFERENCE"),
             AppError::MaskingQuotaReached { .. } => {
                 (StatusCode::TOO_MANY_REQUESTS, "MESSAGR_MASKING_QUOTA")
             }
@@ -903,6 +914,10 @@ mod tests {
                 "MESSAGR_UNKNOWN_MASKING_KEY",
             ),
             (AppError::NotABatch, 400, "MESSAGR_NOT_A_BATCH"),
+            // INVITING A CONTACT FOUND (#404): a reference that names nobody
+            // findable, and the caller's own.
+            (AppError::UnknownReference, 404, "MESSAGR_UNKNOWN_REFERENCE"),
+            (AppError::OwnReference, 400, "MESSAGR_OWN_REFERENCE"),
         ] {
             let (got, body) = render(refusal).await;
             assert_eq!(

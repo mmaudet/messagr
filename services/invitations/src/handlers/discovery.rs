@@ -592,7 +592,7 @@ async fn findable_caller(st: &AppState, headers: &HeaderMap) -> Result<CurrentPr
 
 /// A findable account's proven number, as the service holds it: its mask
 /// under its key.
-struct CurrentProof {
+pub(crate) struct CurrentProof {
     key_id: i64,
     mask: Vec<u8>,
 }
@@ -609,7 +609,7 @@ impl CurrentProof {
 
 /// The current proof of `user` at `now`: proven, not withdrawn and not run
 /// out. An account whose number another one proved since has no row at all.
-async fn current_proof(
+pub(crate) async fn current_proof(
     st: &AppState,
     user: &str,
     now: i64,
@@ -691,7 +691,7 @@ async fn proves_it_now(
 }
 
 /// What discovery serves with, or `DiscoveryOff` (`Config::discovery`).
-fn served(st: &AppState) -> Result<crate::config::Discovery<'_>, AppError> {
+pub(crate) fn served(st: &AppState) -> Result<crate::config::Discovery<'_>, AppError> {
     st.cfg.discovery().map_err(|_| AppError::DiscoveryOff)
 }
 
@@ -705,16 +705,16 @@ async fn forget_the_proof(st: &AppState, user: &str) -> Result<(), AppError> {
 }
 
 #[cfg(test)]
-mod tests {
+pub(crate) mod tests {
     use super::*;
     use crate::util;
     use axum::routing::{get, post};
     use sqlx::SqlitePool;
     use std::sync::Mutex;
 
-    const NUMBER: &str = "+33612345678";
+    pub(crate) const NUMBER: &str = "+33612345678";
 
-    async fn whoami_hs() -> String {
+    pub(crate) async fn whoami_hs() -> String {
         async fn whoami(headers: HeaderMap) -> Json<serde_json::Value> {
             let bearer = headers
                 .get("authorization")
@@ -733,13 +733,13 @@ mod tests {
     /// OVHcloud reduced to the one call a proof makes. It keeps what it was
     /// sent, so a test can read the code the way a phone would.
     #[derive(Default)]
-    struct Inbox {
+    pub(crate) struct Inbox {
         sent: Vec<(Vec<String>, String)>,
         /// The ids OVHcloud was asked to erase from its history (#399).
         erased: Vec<u64>,
     }
 
-    async fn fake_ovhcloud(refuse: bool) -> (String, Arc<Mutex<Inbox>>) {
+    pub(crate) async fn fake_ovhcloud(refuse: bool) -> (String, Arc<Mutex<Inbox>>) {
         fake_ovhcloud_with(refuse, 0, 1_000.0).await
     }
 
@@ -806,7 +806,7 @@ mod tests {
     }
 
     /// The same, at a time the test moves: see `crate::util::Clock::settable`.
-    fn state_at(
+    pub(crate) fn state_at(
         pool: SqlitePool,
         hs: String,
         ovh: Option<String>,
@@ -854,21 +854,26 @@ mod tests {
             .unwrap()
     }
 
-    async fn prove(st: &Arc<AppState>, inbox: &Arc<Mutex<Inbox>>, who: &str, number: &str) {
+    pub(crate) async fn prove(
+        st: &Arc<AppState>,
+        inbox: &Arc<Mutex<Inbox>>,
+        who: &str,
+        number: &str,
+    ) {
         start(st, who, number).await.unwrap();
         finish(st, who, &last_code(inbox)).await.unwrap();
     }
 
-    const DAY: i64 = 86_400;
-    const T0: i64 = 1_790_000_000;
+    pub(crate) const DAY: i64 = 86_400;
+    pub(crate) const T0: i64 = 1_790_000_000;
 
-    fn set(time: &std::sync::atomic::AtomicI64, at: i64) {
+    pub(crate) fn set(time: &std::sync::atomic::AtomicI64, at: i64) {
         time.store(at, std::sync::atomic::Ordering::SeqCst);
     }
 
     /// The reference a findable account is known by, read from the table, so
     /// that a test can name the account behind a directory entry.
-    async fn reference_of(pool: &SqlitePool, who: &str) -> Option<String> {
+    pub(crate) async fn reference_of(pool: &SqlitePool, who: &str) -> Option<String> {
         sqlx::query_scalar("SELECT reference FROM findable_numbers WHERE user_id = ?")
             .bind(format!("@{who}:h"))
             .fetch_optional(pool)
@@ -876,7 +881,7 @@ mod tests {
             .unwrap()
     }
 
-    fn bearer(who: &str) -> HeaderMap {
+    pub(crate) fn bearer(who: &str) -> HeaderMap {
         let mut h = HeaderMap::new();
         h.insert("authorization", format!("Bearer {who}").parse().unwrap());
         h
@@ -1605,7 +1610,7 @@ mod tests {
     // ---- looking for one's contacts (#400) --------------------------------
 
     /// A second number of an open country, for a second findable account.
-    const OTHER: &str = "+33687654321";
+    pub(crate) const OTHER: &str = "+33687654321";
 
     async fn public_keys_of(st: &Arc<AppState>, who: &str) -> Result<PublicKeys, AppError> {
         public_keys(State(st.clone()), bearer(who))
