@@ -567,6 +567,16 @@ export const fr = {
   invite_qr: 'Ou faites-le scanner ce code.',
   invite_qr_label: 'Code QR du lien d’invitation',
   invite_share: 'Partager le lien',
+  // UN CONTACT ABSENT DE MESSAGR (#408) : le texte rédigé que reçoit la
+  // messagerie du téléphone, ou la feuille de partage, avec un lien de trois
+  // jours. Neutre, sans tutoiement ni vouvoiement, décision du porteur du
+  // 27 septembre 2026. La personne le voit, et peut le changer avant l'envoi.
+  'invite_absent_text %1$@':
+    'Invitation à me rejoindre sur Messagr :\n%1$@\nCe lien vaut trois jours et ne sert qu’une fois.',
+  invite_ready_days:
+    'Envoyez ce lien à cette personne. Il est valable trois jours et ne sert qu’une fois.',
+  invite_sms_failed:
+    'La messagerie du téléphone ne s’est pas ouverte. Partagez le lien autrement.',
   invite_close: 'Fermer',
   'invite_sent %1$@ %2$@':
     'Votre invitation attend %1$@ dans Messagr jusqu’au %2$@.',
@@ -1310,6 +1320,9 @@ export const fr = {
   find_share_more: 'Partager d’autres contacts',
   find_invite: 'Inviter',
   find_others: 'Vos autres contacts',
+  // Sur chaque contact absent (#408) : le SMS, ou la feuille de partage.
+  find_invite_sms: 'Inviter par SMS',
+  find_invite_other: 'Autre moyen',
   find_nobody:
     'Aucun de vos contacts n’est trouvable sur Messagr pour l’instant.',
   find_no_access:

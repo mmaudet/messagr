@@ -45,23 +45,12 @@ export interface Asking {
     invitation: OutstandingInvitation,
   ) => Promise<Admitted | NotAdmitted>
   readonly now: () => number
+  /**
+   * Gives the name typed at invite time to whoever came in (#408), as the
+   * minute after issuing does. It may throw: the admission stands anyway.
+   */
+  readonly giveName: (who: string, name: string) => Promise<void>
 }
-
-/**
- * How long an invitation stays worth asking about.
- *
- * An hour, because that is what the token is good for and what
- * `invite_ready` tells the inviter. The service is the authority on expiry
- * and this is not a second opinion: it is what lets this side drop a row when
- * the service cannot be reached at all, so a link that died in August is not
- * still being asked about in December.
- *
- * Generous by a minute rather than exact, deliberately. A row dropped a tick
- * early is a person who cannot enter and a link that looked valid --
- * indistinguishable from the defect this replaces -- and a row kept a minute
- * too long costs one request that answers "no".
- */
-export const STOP_ASKING_AFTER_MS = 60 * 60 * 1000
 
 export interface AdmissionRound {
   /** Who was let in this time. Usually nobody, which is not a failure. */
@@ -78,7 +67,19 @@ export async function admitAnyoneWaiting(
   let expired = 0
 
   for (const invitation of waiting) {
-    if (asking.now() - invitation.issuedAt > STOP_ASKING_AFTER_MS) {
+    // HOW LONG AN INVITATION STAYS WORTH ASKING ABOUT: as long as its link
+    // is good for, an hour or three days (#408), as this device wrote it
+    // down. The service is the authority on expiry and this is not a second
+    // opinion: it is what lets this side drop a row when the service cannot
+    // be reached at all, so a link that died in August is not still being
+    // asked about in December.
+    //
+    // Generous rather than exact: `issuedAt` is noted once the service has
+    // answered, a little after its own clock started. A row dropped a tick
+    // early is a person who cannot enter and a link that looked valid --
+    // indistinguishable from the defect this replaces -- and a row kept a
+    // little too long costs one request that answers "no".
+    if (asking.now() - invitation.issuedAt > invitation.lifetime) {
       expired += 1
       await asking.outstanding.forget(invitation.invitationId)
       continue
@@ -92,6 +93,15 @@ export async function admitAnyoneWaiting(
         // yet claimed, a refused invite, a dropped request -- leaves the row,
         // because the next tick is what this whole file is for.
         await asking.outstanding.forget(invitation.invitationId)
+        // THE LAST ONE IN IS NAMED, not the first, for the reason the minute
+        // after issuing gives (`App.tsx`): on a link opened by somebody who
+        // already has an account, the account the service drew cedes its
+        // place to them. After the row is forgotten, so that a name which
+        // does not hold never has the same person let in twice.
+        const who = answer.entrants[answer.entrants.length - 1]
+        if (invitation.name !== null && who !== undefined) {
+          await asking.giveName(who, invitation.name)
+        }
       }
     } catch {
       // Deliberately swallowed and deliberately not reported here: the caller

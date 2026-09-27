@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest'
 
 import {
+  ABSENT_LINK_TTL_SECONDS,
   admitDrawnEntrant,
   anAdmissionIsRunning,
   issueInvitation,
@@ -235,6 +236,37 @@ describe('issueInvitation', () => {
     expect(JSON.parse(issue.mock.calls[0]?.[0] ?? '{}')).toMatchObject({
       max_uses: 1,
       room_id: '!made:x',
+    })
+  })
+
+  it('mints a link good for three days, still for one use, for a contact absent from Messagr (#408)', async () => {
+    const issue = vi.fn(async (_body: string, _key: string) => ({
+      status: 200,
+      body: JSON.stringify({ token: 'a-token', invitation_id: 'inv-1' }),
+    }))
+    const { deps } = harness()
+    await issueInvitation(
+      { ...deps, service: { ...deps.service, issue } },
+      'x',
+      null,
+      ABSENT_LINK_TTL_SECONDS,
+    )
+    expect(JSON.parse(issue.mock.calls[0]?.[0] ?? '{}')).toEqual({
+      max_uses: 1,
+      ttl_seconds: 259_200,
+      room_id: '!made:x',
+    })
+  })
+
+  it('mints any other link for an hour, as it always did', async () => {
+    const issue = vi.fn(async (_body: string, _key: string) => ({
+      status: 200,
+      body: JSON.stringify({ token: 'a-token', invitation_id: 'inv-1' }),
+    }))
+    const { deps } = harness()
+    await issueInvitation({ ...deps, service: { ...deps.service, issue } }, 'x')
+    expect(JSON.parse(issue.mock.calls[0]?.[0] ?? '{}')).toMatchObject({
+      ttl_seconds: 3600,
     })
   })
 

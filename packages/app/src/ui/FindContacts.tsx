@@ -1,10 +1,10 @@
 import React from 'react'
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native'
+import { FlatList, Pressable, StyleSheet, Text, View } from 'react-native'
 
 import { t, type CopyKey } from '../copy'
 import { color, floors, layout, space, stroke, type } from '../design/tokens'
-import type { FindingStage, Waiting } from '../runtime/findContacts'
-import type { InvitedMatch } from './Invite'
+import type { Absent, FindingStage, Waiting } from '../runtime/findContacts'
+import type { InvitedAbsent, InvitedMatch } from './Invite'
 import { NotchedButton } from './NotchedButton'
 import { dayOf } from './whenLabel'
 
@@ -26,8 +26,16 @@ import { dayOf } from './whenLabel'
  *
  * The contacts on Messagr come first, under the name of their card, each
  * with « Inviter », which opens the invitation form for that one contact
- * (#404); then the others, with no gesture yet (#408). Nothing here, now or
- * later, takes the whole address book.
+ * (#404); then the others, each with « Inviter par SMS », when its card holds
+ * a number, and « Autre moyen », which open the same form for a link of three
+ * days (#408). Nothing here, now or later, takes the whole address book.
+ *
+ * # A LIST THAT DRAWS WHAT IS ON SCREEN
+ *
+ * The others are the address book but for a few, and each row now carries
+ * two buttons, each drawn and measured for its notch: a thousand cards would
+ * be two thousand of them drawn at once. The list draws the rows as they
+ * come into view, and the rest of the page is its header and its footer.
  *
  * # SOME CARDS, OR NONE (#403)
  *
@@ -48,10 +56,12 @@ export function FindContacts({
   /** « Partager d'autres contacts », on the results of a limited access. */
   readonly onShareMore: () => void
   /**
-   * « Inviter », on a contact found (#404), with that contact; « Inviter
-   * quelqu'un », when the address book was refused, with none: a link.
+   * « Inviter », on a contact found (#404), with that contact; « Inviter par
+   * SMS » and « Autre moyen », on a contact absent (#408), with that contact;
+   * « Inviter quelqu'un », when the address book was refused, with none: a
+   * link.
    */
-  readonly onInvite: (to?: InvitedMatch) => void
+  readonly onInvite: (to?: InvitedMatch | InvitedAbsent) => void
   /** The arrow, « Terminé », and every way back to the list. */
   readonly onClose: () => void
 }) {
@@ -92,7 +102,7 @@ export function FindContacts({
             envelopeKey: m.envelopeKey,
           }))}
           onInvite={onInvite}
-          others={stage.others.map(c => c.name)}
+          others={stage.others}
           waiting={stage.waiting}
           limited={stage.limited}
           onShareMore={onShareMore}
@@ -153,19 +163,17 @@ function Found({
     /** What the inviter's name is sealed for (#405), if anything. */
     readonly envelopeKey: string | null
   }[]
-  readonly others: readonly string[]
+  readonly others: readonly Absent[]
   /** What the limit on masking left for later (#401). */
   readonly waiting: Waiting | null
   /** The system shares some cards only (#403). */
   readonly limited: boolean
   readonly onShareMore: () => void
-  readonly onInvite: (to: InvitedMatch) => void
+  readonly onInvite: (to: InvitedMatch | InvitedAbsent) => void
   readonly onDone: () => void
 }) {
-  return (
-    <ScrollView
-      contentContainerStyle={styles.body}
-      testID="find-contacts-found">
+  const header = (
+    <View style={styles.body}>
       {limited && (
         <View style={styles.notice} testID="find-contacts-limited">
           <Text style={styles.noticeText}>{t('find_limited')}</Text>
@@ -232,27 +240,66 @@ function Found({
             </View>
           ))}
       {others.length > 0 && (
-        <>
-          <Text style={styles.heading}>{t('find_others')}</Text>
-          {others.map((name, i) => (
-            <Text
-              key={`o${i}`}
-              style={styles.other}
-              testID="find-contacts-other">
-              {name}
-            </Text>
-          ))}
-        </>
+        <Text style={styles.heading}>{t('find_others')}</Text>
       )}
-      <View style={styles.actions}>
+    </View>
+  )
+  return (
+    <FlatList
+      testID="find-contacts-found"
+      data={others}
+      keyExtractor={(_, i) => `o${i}`}
+      contentContainerStyle={styles.list}
+      ListHeaderComponent={header}
+      renderItem={({ item }) => <AbsentRow absent={item} onInvite={onInvite} />}
+      ListFooterComponent={
+        <View style={styles.actions}>
+          <NotchedButton
+            testID="find-contacts-done"
+            label={t('findable_done')}
+            onPress={onDone}
+            wide
+          />
+        </View>
+      }
+    />
+  )
+}
+
+/** A contact absent from Messagr, and the two ways to invite it (#408). */
+function AbsentRow({
+  absent: { contact, number },
+  onInvite,
+}: {
+  readonly absent: Absent
+  readonly onInvite: (to: InvitedAbsent) => void
+}) {
+  return (
+    <View style={styles.absent}>
+      <Text style={styles.row} testID="find-contacts-other">
+        {contact.name}
+      </Text>
+      <View style={styles.absentActions}>
+        {number !== null && (
+          <NotchedButton
+            testID="find-contacts-invite-sms"
+            label={t('find_invite_sms')}
+            onPress={() =>
+              onInvite({ name: contact.name, absent: { by: 'sms', number } })
+            }
+            tone="quiet"
+          />
+        )}
         <NotchedButton
-          testID="find-contacts-done"
-          label={t('findable_done')}
-          onPress={onDone}
-          wide
+          testID="find-contacts-invite-other"
+          label={t('find_invite_other')}
+          onPress={() =>
+            onInvite({ name: contact.name, absent: { by: 'share' } })
+          }
+          tone="quiet"
         />
       </View>
-    </ScrollView>
+    </View>
   )
 }
 
@@ -277,13 +324,15 @@ const styles = StyleSheet.create({
     marginBottom: space.m,
   },
   body: { gap: space.m },
+  list: { gap: space.m },
   text: { ...type.body, color: color.neutral['900'] },
   hint: { ...type.bodySm, color: color.neutral['600'] },
   heading: { ...type.titleMd, color: color.neutral['900'] },
   row: { ...type.body, color: color.neutral['900'] },
   match: { flexDirection: 'row', alignItems: 'center', gap: space.s },
   matchName: { flex: 1 },
-  other: { ...type.body, color: color.neutral['600'] },
+  absent: { gap: space.s },
+  absentActions: { flexDirection: 'row', flexWrap: 'wrap', gap: space.s },
   actions: { gap: space.s, marginTop: space.m },
   notice: {
     gap: space.s,

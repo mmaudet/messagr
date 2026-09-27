@@ -83,7 +83,16 @@ export type Issued =
     }
 
 /** How long a link is good for. An hour, which is the bench's own figure. */
-const TTL_SECONDS = 3600
+export const LINK_TTL_SECONDS = 3600
+
+/**
+ * How long a link to a contact absent from Messagr is good for (#408): three
+ * days, for the contact to have time to read it, and still one use. Whether
+ * it leaves by SMS or by the share sheet, it is the same person being
+ * invited: the owner's decision of 27 September 2026. The service accepts up
+ * to thirty days (`MAX_TTL_SECONDS`).
+ */
+export const ABSENT_LINK_TTL_SECONDS = 3 * 86_400
 
 /** What a conversation of this product costs to invite into. */
 const INVITE_COST = 50
@@ -195,6 +204,8 @@ export async function issueInvitation(
    * `migrations/001_init.sql`.
    */
   declared: string | null = null,
+  /** `LINK_TTL_SECONDS`, or `ABSENT_LINK_TTL_SECONDS` (#408). */
+  ttlSeconds: number = LINK_TTL_SECONDS,
 ): Promise<Issued> {
   const conversation = await createTheConversation(deps.http)
   if (!conversation.created) {
@@ -207,7 +218,7 @@ export async function issueInvitation(
     const answer = await deps.service.issue(
       JSON.stringify({
         max_uses: 1,
-        ttl_seconds: TTL_SECONDS,
+        ttl_seconds: ttlSeconds,
         room_id: scope,
       }),
       deps.newIdempotencyKey(),

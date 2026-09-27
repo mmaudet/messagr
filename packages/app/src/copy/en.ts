@@ -362,6 +362,12 @@ export const en: Readonly<Record<CopyKey, string>> = {
   invite_qr: 'Or let them scan this code.',
   invite_qr_label: 'QR code of the invitation link',
   invite_share: 'Share the link',
+  'invite_absent_text %1$@':
+    'An invitation to join me on Messagr:\n%1$@\nThis link is valid for three days and works once.',
+  invite_ready_days:
+    'Send this link to them. It is valid for three days and works once.',
+  invite_sms_failed:
+    'The phone’s messaging app did not open. Share the link another way.',
   invite_close: 'Close',
   'invite_sent %1$@ %2$@':
     'Your invitation waits for %1$@ in Messagr until %2$@.',
@@ -863,6 +869,8 @@ export const en: Readonly<Record<CopyKey, string>> = {
   find_share_more: 'Share more contacts',
   find_invite: 'Invite',
   find_others: 'Your other contacts',
+  find_invite_sms: 'Invite by SMS',
+  find_invite_other: 'Another way',
   find_nobody: 'None of your contacts can be found on Messagr yet.',
   find_no_access:
     'Messagr cannot open your address book. To allow it later, open the phone’s settings, then Messagr’s page, and allow access to contacts. In the meantime, you can invite someone by link.',

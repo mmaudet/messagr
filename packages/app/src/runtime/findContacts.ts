@@ -42,6 +42,7 @@
 import {
   isSupportedCountry,
   parsePhoneNumberFromString,
+  type CountryCode,
 } from 'libphonenumber-js/min'
 
 import type { AddressBookAccess } from './addressBook'
@@ -192,13 +193,24 @@ export interface Match {
   readonly envelopeKey: string | null
 }
 
+/**
+ * A contact not on Messagr, or not findable, and the number an invitation by
+ * SMS goes to (#408): the first of its card's numbers that is one, in
+ * international form, and never the number this account proved. `null` when
+ * the card holds none, and then only « Autre moyen » is offered.
+ */
+export interface Absent {
+  readonly contact: Contact
+  readonly number: string | null
+}
+
 export type Findings =
   | {
       readonly found: true
       /** By name. */
       readonly matches: readonly Match[]
       /** The contacts not on Messagr, or not findable, by name. */
-      readonly others: readonly Contact[]
+      readonly others: readonly Absent[]
       /**
        * What the limit on masking left for later (#401); `null` when every
        * number was masked.
@@ -260,12 +272,27 @@ const BATCH = 5_000
 
 export async function findContacts(deps: FindingDeps): Promise<Findings> {
   const contacts = await deps.readAddressBook()
-  const holders = numbersOf(contacts, deps.region(), deps.ownNumber())
+  // A region the library does not know is no region: numbers written without
+  // their country code are then left aside, as without one.
+  const region = deps.region()
+  const known =
+    region !== undefined && isSupportedCountry(region) ? region : undefined
+  const own = deps.ownNumber()
+  const cards = new Map(
+    contacts.map(contact => [contact, numbersOfCard(contact, known, own)]),
+  )
+  const holders = holdersOf(cards)
+  /** The contacts not found, by name, each with its first number (#408). */
+  const absent = (left: readonly Contact[]): Absent[] =>
+    byName(left).map(contact => ({
+      contact,
+      number: cards.get(contact)?.[0] ?? null,
+    }))
   if (holders.size === 0) {
     // NOTHING LEFT TO FIND, AND NOTHING LEFT TO KEEP: the page follows the
     // address book as it stands, the names of its cards included (#407).
     await quietly(() => deps.results.forgetAllBut([]))
-    return { found: true, matches: [], others: byName(contacts), waiting: null }
+    return { found: true, matches: [], others: absent(contacts), waiting: null }
   }
 
   const key = await currentKey(deps.service)
@@ -369,34 +396,45 @@ export async function findContacts(deps: FindingDeps): Promise<Findings> {
   return {
     found: true,
     matches: byName([...matched.keys()]).map(contact => matched.get(contact)!),
-    others: byName(contacts.filter(contact => !matched.has(contact))),
+    others: absent(contacts.filter(contact => !matched.has(contact))),
     waiting:
       freesAt !== null && waiting > 0 ? { count: waiting, freesAt } : null,
   }
 }
 
 /**
+ * Each number of a card that is one, in international form and in the card's
+ * order, but the number this account proved: the person does not find
+ * themselves, nor invite themselves by SMS (#408).
+ */
+function numbersOfCard(
+  contact: Contact,
+  known: CountryCode | undefined,
+  own: string | null,
+): string[] {
+  const numbers: string[] = []
+  for (const written of contact.numbers) {
+    const number = parsePhoneNumberFromString(written, known)
+    if (number === undefined || !number.isValid()) continue
+    if (number.number === own) continue
+    numbers.push(number.number)
+  }
+  return numbers
+}
+
+/**
  * Every number of the address book in international form, each once, with
  * the contacts that hold it. A number that is not one is left out.
  */
-function numbersOf(
-  contacts: readonly Contact[],
-  region: string | undefined,
-  own: string | null,
+function holdersOf(
+  cards: ReadonlyMap<Contact, readonly string[]>,
 ): Map<string, Contact[]> {
-  // A region the library does not know is no region: numbers written without
-  // their country code are then left aside, as without one.
-  const known =
-    region !== undefined && isSupportedCountry(region) ? region : undefined
   const holders = new Map<string, Contact[]>()
-  for (const contact of contacts) {
-    for (const written of contact.numbers) {
-      const number = parsePhoneNumberFromString(written, known)
-      if (number === undefined || !number.isValid()) continue
-      if (number.number === own) continue
-      const held = holders.get(number.number) ?? []
+  for (const [contact, numbers] of cards) {
+    for (const number of numbers) {
+      const held = holders.get(number) ?? []
       if (!held.includes(contact)) held.push(contact)
-      holders.set(number.number, held)
+      holders.set(number, held)
     }
   }
   return holders
@@ -609,7 +647,7 @@ export type FindingStage =
   | {
       readonly stage: 'found'
       readonly matches: readonly Match[]
-      readonly others: readonly Contact[]
+      readonly others: readonly Absent[]
       readonly waiting: Waiting | null
       /**
        * The system shares some cards only, as iOS lets a person choose

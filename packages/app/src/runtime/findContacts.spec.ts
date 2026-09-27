@@ -6,6 +6,7 @@ import {
   findContactsEntry,
   findingJourney,
   regionOf,
+  type Absent,
   type Blinding,
   type Contact,
   type DiscoveryResults,
@@ -231,6 +232,14 @@ const PAUL: Contact = { name: 'Paul', numbers: ['06 12 34 56 78'] }
 const ANNE: Contact = { name: 'Anne', numbers: ['+44 7911 123456'] }
 const ZOE: Contact = { name: 'Zoé', numbers: ['+33 6 98 76 54 32'] }
 
+/** Each of those three not on Messagr, with the number an SMS goes to (#408). */
+const AWAY: ReadonlyMap<Contact, Absent> = new Map([
+  [PAUL, { contact: PAUL, number: '+33612345678' }],
+  [ANNE, { contact: ANNE, number: '+447911123456' }],
+  [ZOE, { contact: ZOE, number: '+33698765432' }],
+])
+const away = (...contacts: Contact[]) => contacts.map(one => AWAY.get(one)!)
+
 describe('looking for contacts', () => {
   it('shows the contacts found under the name of their card, then the others', async () => {
     const { deps: d } = deps([ZOE, PAUL, ANNE], {
@@ -256,7 +265,7 @@ describe('looking for contacts', () => {
           envelopeKey: null,
         },
       ],
-      others: [ZOE],
+      others: away(ZOE),
       waiting: null,
     })
   })
@@ -420,13 +429,44 @@ describe('looking for contacts', () => {
     ).toEqual([5_000, 1])
   })
 
+  it('gives each contact not on Messagr the number an SMS goes to: the first of its card that is one, in international form (#408)', async () => {
+    const zoe: Contact = {
+      name: 'Zoé',
+      numbers: ['pas un numéro', '06 98 76 54 32', '+44 7911 123456'],
+    }
+    const nobody: Contact = { name: 'Sans numéro', numbers: ['12'] }
+    const { deps: d } = deps([zoe, nobody], {})
+
+    const found = await findContacts(d)
+
+    // None for a card that holds no number: then only « Autre moyen ».
+    expect(found.found && found.others).toEqual([
+      { contact: nobody, number: null },
+      { contact: zoe, number: '+33698765432' },
+    ])
+  })
+
+  it('never offers an SMS to the number this account proved, but to the next one of the card (#408)', async () => {
+    const both: Contact = {
+      name: 'Moi et bureau',
+      numbers: ['06 12 34 56 78', '06 98 76 54 32'],
+    }
+    const { deps: d } = deps([both], {})
+
+    const found = await findContacts({ ...d, ownNumber: () => '+33612345678' })
+
+    expect(found.found && found.others).toEqual([
+      { contact: both, number: '+33698765432' },
+    ])
+  })
+
   it('asks nothing of the service for an address book without a number', async () => {
     const { deps: d, asked } = deps([{ name: 'Sans numéro', numbers: [] }], {})
 
     expect(await findContacts(d)).toEqual({
       found: true,
       matches: [],
-      others: [{ name: 'Sans numéro', numbers: [] }],
+      others: [{ contact: { name: 'Sans numéro', numbers: [] }, number: null }],
       waiting: null,
     })
     expect(asked).toEqual([])
@@ -500,7 +540,7 @@ describe('the journey of looking for contacts', () => {
           envelopeKey: null,
         },
       ],
-      others: [ZOE],
+      others: away(ZOE),
       waiting: null,
       limited: false,
     })
@@ -539,7 +579,7 @@ describe('the journey of looking for contacts', () => {
           envelopeKey: null,
         },
       ],
-      others: [PAUL],
+      others: away(PAUL),
       limited: true,
     })
   })
@@ -691,7 +731,8 @@ describe("the telephone's region", () => {
         .flatMap(a => a.body!.blinded.map(e => text(unb64(e)))),
     ).toEqual(['blinded(+33698765432)'])
     expect(found.found && found.matches.map(m => m.contact)).toEqual([ZOE])
-    expect(found.found && found.others).toEqual([me])
+    // Nor is an SMS offered to the person's own number.
+    expect(found.found && found.others).toEqual([{ contact: me, number: null }])
   })
 
   it('leaves a national number aside when there is no region', async () => {
@@ -804,7 +845,7 @@ describe('the limit on masking (#401)', () => {
           envelopeKey: null,
         },
       ],
-      others: [ANNE, ZOE],
+      others: away(ANNE, ZOE),
       waiting: { count: 1, freesAt: FREES_AT * 1000 },
     })
   })
@@ -821,7 +862,7 @@ describe('the limit on masking (#401)', () => {
     expect(found).toEqual({
       found: true,
       matches: [],
-      others: [PAUL, ZOE],
+      others: away(PAUL, ZOE),
       waiting: { count: 2, freesAt: FREES_AT * 1000 },
     })
     expect(asked.map(a => a.route)).toEqual(['keys', 'maskBatch', 'directory'])
@@ -909,7 +950,7 @@ describe('looking again (#402)', () => {
           envelopeKey: null,
         },
       ],
-      others: [ANNE, ZOE],
+      others: away(ANNE, ZOE),
       waiting: null,
     })
   })
@@ -1037,7 +1078,7 @@ describe('looking again (#402)', () => {
 
     const found = await findContacts(d)
 
-    expect(found.found && found.others).toEqual([PAUL])
+    expect(found.found && found.others).toEqual(away(PAUL))
     expect(page.get(`${KEY}/${PAUL_NUMBER}`)?.reference).toBe('ref-paul')
   })
 
@@ -1129,7 +1170,7 @@ describe('looking again (#402)', () => {
           envelopeKey: null,
         },
       ],
-      others: [ANNE, ZOE],
+      others: away(ANNE, ZOE),
       waiting: { count: 1, freesAt: FREES_AT * 1000 },
     })
   })

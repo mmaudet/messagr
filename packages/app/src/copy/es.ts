@@ -357,6 +357,12 @@ export const es: Readonly<Record<CopyKey, string>> = {
   invite_qr: 'O deja que escaneen este código.',
   invite_qr_label: 'Código QR del enlace de invitación',
   invite_share: 'Compartir el enlace',
+  'invite_absent_text %1$@':
+    'Invitación para encontrarnos en Messagr:\n%1$@\nEste enlace vale tres días y sirve una sola vez.',
+  invite_ready_days:
+    'Envíele este enlace. Vale tres días y sirve una sola vez.',
+  invite_sms_failed:
+    'La aplicación de mensajes del teléfono no se abrió. Comparta el enlace de otro modo.',
   invite_close: 'Cerrar',
   'invite_sent %1$@ %2$@':
     'Su invitación espera a %1$@ en Messagr hasta el %2$@.',
@@ -862,6 +868,8 @@ export const es: Readonly<Record<CopyKey, string>> = {
   find_share_more: 'Compartir más contactos',
   find_invite: 'Invitar',
   find_others: 'Sus otros contactos',
+  find_invite_sms: 'Invitar por SMS',
+  find_invite_other: 'Otro medio',
   find_nobody: 'Por ahora, ninguno de sus contactos es localizable en Messagr.',
   find_no_access:
     'Messagr no tiene acceso a su agenda. Para permitirlo más adelante, abra los ajustes del teléfono, luego la página de Messagr, y permita el acceso a los contactos. Mientras tanto, puede invitar a alguien con un enlace.',

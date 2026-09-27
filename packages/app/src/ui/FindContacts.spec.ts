@@ -3,7 +3,7 @@ import * as ReactNamespace from 'react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { t } from '../copy'
-import type { Contact, FindingStage } from '../runtime/findContacts'
+import type { Absent, Contact, FindingStage } from '../runtime/findContacts'
 import { FindContacts } from './FindContacts'
 import { dayOf } from './whenLabel'
 
@@ -20,6 +20,30 @@ vi.mock('react', async importOriginal => ({
 }))
 
 vi.mock('react-native', () => ({
+  // Every row drawn, header and footer included: the list draws them as the
+  // person scrolls, and a walk has no scrolling.
+  FlatList: ({
+    data,
+    renderItem,
+    ListHeaderComponent,
+    ListFooterComponent,
+    testID,
+  }: {
+    data: readonly unknown[]
+    renderItem: (row: { item: unknown; index: number }) => ReactNode
+    ListHeaderComponent: ReactNode
+    ListFooterComponent: ReactNode
+    testID?: string
+  }) =>
+    createElement(
+      'FlatList',
+      { testID },
+      ListHeaderComponent,
+      ...data.map((item, index) =>
+        createElement(Fragment, { key: index }, renderItem({ item, index })),
+      ),
+      ListFooterComponent,
+    ),
   Pressable: 'Pressable',
   ScrollView: 'ScrollView',
   StyleSheet: { absoluteFill: {}, create: (styles: object) => styles },
@@ -97,6 +121,12 @@ const press = (node: Drawn | undefined) =>
 
 const contact = (name: string): Contact => ({ name, numbers: [] })
 
+/** A contact absent from Messagr, and the number an SMS goes to (#408). */
+const absent = (name: string, number: string | null = null): Absent => ({
+  contact: contact(name),
+  number,
+})
+
 /** The results, with what a test says of them and nothing found otherwise. */
 const found = (
   over: Partial<Extract<FindingStage, { readonly stage: 'found' }>> = {},
@@ -151,7 +181,7 @@ describe('« Retrouver mes contacts »', () => {
             envelopeKey: null,
           },
         ],
-        others: [contact('Zoé')],
+        others: [absent('Zoé', '+33698765432')],
         waiting: null,
       }),
     )
@@ -197,7 +227,7 @@ describe('« Retrouver mes contacts »', () => {
     expect(line).toBeLessThan(page.indexOf('Paul'))
   })
 
-  it('puts « Inviter » on each contact found, for that contact alone, and no gesture on the others (#404)', () => {
+  it('puts « Inviter » on each contact found, for that contact alone, and no gesture on a name (#404)', () => {
     // Paul's number changed hands: the account it leads to now inherits
     // nothing of the card, not even the name the form opens with.
     const invited: unknown[] = []
@@ -218,7 +248,7 @@ describe('« Retrouver mes contacts »', () => {
               envelopeKey: null,
             },
           ],
-          others: [contact('Zoé')],
+          others: [absent('Zoé', '+33698765432')],
         }),
         onContinue: () => undefined,
         onShareMore: () => undefined,
@@ -253,11 +283,51 @@ describe('« Retrouver mes contacts »', () => {
     }
   })
 
+  it('puts « Inviter par SMS » and « Autre moyen » on each contact absent from Messagr, for that contact alone (#408)', () => {
+    const invited: unknown[] = []
+    const drawn = draw(
+      createElement(FindContacts, {
+        stage: found({
+          others: [absent('Sans numéro'), absent('Zoé', '+33698765432')],
+        }),
+        onContinue: () => undefined,
+        onShareMore: () => undefined,
+        onInvite: to => invited.push(to),
+        onClose: () => undefined,
+      }),
+    )
+    const buttons = (testID: string) =>
+      all(drawn, testID).filter(node => typeof node.type === 'function')
+
+    // No SMS for a card that holds no number: « Autre moyen » alone.
+    const sms = buttons('find-contacts-invite-sms')
+    expect(sms.map(textIn)).toEqual([t('find_invite_sms')])
+    const other = buttons('find-contacts-invite-other')
+    expect(other.map(textIn)).toEqual([
+      t('find_invite_other'),
+      t('find_invite_other'),
+    ])
+    ;(sms[0]!.props.onPress as () => void)()
+    ;(other[0]!.props.onPress as () => void)()
+    expect(invited).toEqual([
+      { name: 'Zoé', absent: { by: 'sms', number: '+33698765432' } },
+      { name: 'Sans numéro', absent: { by: 'share' } },
+    ])
+    // Each under the name of its own card.
+    const page = textIn(withId(drawn, 'find-contacts-found'))
+    expect(page.indexOf('Sans numéro')).toBeLessThan(
+      page.indexOf(t('find_invite_other')),
+    )
+    expect(page.lastIndexOf(t('find_invite_other'))).toBeGreaterThan(
+      page.indexOf('Zoé'),
+    )
+  })
+
   it('says so when no contact is on Messagr', () => {
     const drawn = show(
       found({
         matches: [],
-        others: [contact('Zoé')],
+        others: [absent('Zoé', '+33698765432')],
         waiting: null,
       }),
     )
@@ -270,7 +340,7 @@ describe('« Retrouver mes contacts »', () => {
     const drawn = show(
       found({
         matches: [],
-        others: [contact('Zoé')],
+        others: [absent('Zoé', '+33698765432')],
         waiting: { count: 12, freesAt },
       }),
     )
@@ -297,7 +367,7 @@ describe('« Retrouver mes contacts »', () => {
     const noneYet = show(
       found({
         matches: [],
-        others: [contact('Zoé')],
+        others: [absent('Zoé', '+33698765432')],
         waiting,
       }),
     )
@@ -327,14 +397,16 @@ describe('« Retrouver mes contacts »', () => {
   })
 
   it('says the look covered the shared contacts only, and offers the system choice for more (#403)', () => {
-    const limited = show(found({ others: [contact('Zoé')], limited: true }))
+    const limited = show(
+      found({ others: [absent('Zoé', '+33698765432')], limited: true }),
+    )
 
     expect(textIn(withId(limited, 'find-contacts-limited'))).toContain(
       t('find_limited'),
     )
     press(withId(limited, 'find-contacts-share-more'))
     expect(said.sharedMore).toBe(1)
-    const full = show(found({ others: [contact('Zoé')] }))
+    const full = show(found({ others: [absent('Zoé', '+33698765432')] }))
     expect(withId(full, 'find-contacts-limited')).toBeUndefined()
     expect(withId(full, 'find-contacts-share-more')).toBeUndefined()
   })

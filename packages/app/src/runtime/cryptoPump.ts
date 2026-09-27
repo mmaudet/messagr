@@ -885,6 +885,8 @@ export async function inviteSomebody(
   credentials: { readonly baseUrl: string; readonly accessToken: string },
   /** The name the inviter gave themselves, or `null`. #329. */
   declared: string | null = null,
+  /** An hour, or three days for a contact absent from Messagr (#408). */
+  ttlSeconds?: number,
 ): Promise<Issued> {
   return issueInvitation(
     {
@@ -896,6 +898,7 @@ export async function inviteSomebody(
     },
     credentials.baseUrl.replace(/^https?:\/\//, ''),
     declared,
+    ttlSeconds,
   )
 }
 

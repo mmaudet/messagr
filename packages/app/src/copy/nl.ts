@@ -360,6 +360,12 @@ export const nl: Readonly<Record<CopyKey, string>> = {
   invite_qr: 'Of laat deze code scannen.',
   invite_qr_label: 'QR-code van de uitnodigingslink',
   invite_share: 'De link delen',
+  'invite_absent_text %1$@':
+    'Uitnodiging om met mij te praten op Messagr:\n%1$@\nDeze link is drie dagen geldig en werkt één keer.',
+  invite_ready_days:
+    'Stuur deze link naar die persoon. Hij is drie dagen geldig en werkt één keer.',
+  invite_sms_failed:
+    'De berichtenapp van de telefoon ging niet open. Deel de link op een andere manier.',
   invite_close: 'Sluiten',
   'invite_sent %1$@ %2$@': 'Uw uitnodiging wacht in Messagr op %1$@ tot %2$@.',
   'invite_sent_unnamed %1$@': 'Uw uitnodiging wacht in Messagr tot %1$@.',
@@ -869,6 +875,8 @@ export const nl: Readonly<Record<CopyKey, string>> = {
   find_share_more: 'Meer contacten delen',
   find_invite: 'Uitnodigen',
   find_others: 'Uw andere contacten',
+  find_invite_sms: 'Uitnodigen via sms',
+  find_invite_other: 'Andere manier',
   find_nobody: 'Nog geen van uw contacten is vindbaar op Messagr.',
   find_no_access:
     'Messagr heeft geen toegang tot uw adresboek. Om het later toe te staan, opent u de instellingen van de telefoon, daarna de pagina van Messagr, en staat u toegang tot de contacten toe. Intussen kunt u iemand via een link uitnodigen.',
