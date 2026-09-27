@@ -27,8 +27,12 @@
 //!   number without the key;
 //! - the date N was first served goes with it.
 //!
-//! Then the key leaves `MASKING_KEYS`, and the service restarts: the operator
-//! does that, and the document says how.
+//! Then the key leaves `MASKING_KEYS`, `REFERENCE_KEY` is given a new key, and
+//! the service restarts: the operator does that, and the document says how.
+//! The start refuses a reference key that served before a retirement
+//! (`handlers::discovery::serving_start`, #451): the reference of a
+//! findable account follows the account, and the accounts this stops come
+//! back under one nothing relates to the lost key.
 //!
 //! # NOTHING IS WRITTEN BEFORE THE PLAN IS SAID AND THE KEY NUMBER TYPED BACK
 //!
@@ -107,6 +111,9 @@ where
     } else {
         String::new()
     };
+    // THE REFERENCE KEY GOES WITH IT (#451): the start refuses the one that
+    // served before this retirement, so that the accounts it stops come back
+    // under a reference nothing relates to the lost key.
     let plan = format!(
         "Retiring masking key #{key_id} at once. Every mask and count made under it is \
          erased.\n\
@@ -114,6 +121,9 @@ where
          the key changed: {findable}.\n\
          Proofs in progress dropped: {pending}.\n\
          {stop_first}\
+         REFERENCE_KEY must be given a new key before the service starts again: the start \
+         refuses the one that served before this retirement, and a service still running \
+         proves nothing until it restarts with a new one.\n\
          Type the key number to retire it, or anything else to leave everything as it is:"
     );
     if !crate::operator::typed_back(ask(&plan).as_deref(), &key_id.to_string()) {
@@ -156,6 +166,15 @@ where
     .execute(&mut *tx)
     .await
     .map_err(unwritten)?;
+    // AND IN THE ORDER OF RETIREMENTS (#451), which the start and every proof
+    // read to tell a reference key that served before it from one given
+    // after it: the clock cannot, two events may fall in one second.
+    sqlx::query("INSERT INTO retirements (key_id, retired_at) VALUES (?, ?)")
+        .bind(i64::from(key_id))
+        .bind(now)
+        .execute(&mut *tx)
+        .await
+        .map_err(unwritten)?;
     for erased in [
         "DELETE FROM findable_numbers WHERE key_id = ?",
         "DELETE FROM pending_proof_masks WHERE key_id = ?",
@@ -262,14 +281,8 @@ mod tests {
             .0;
         assert_eq!(listed.retired, vec![1]);
         // And the start no longer needs key #1.
-        let only_two =
-            crate::masking::MaskingKeys::new(vec![crate::masking::MaskingKey::from_seed(
-                2,
-                &[0x02; 32],
-            )
-            .unwrap()])
-            .unwrap();
-        keys_of_live_masks_are_held(&pool, Some(&only_two), st.cfg.clock.now())
+        let only_two = key_two();
+        keys_of_live_masks_are_held(&pool, Some(&*only_two), st.cfg.clock.now())
             .await
             .unwrap();
     }
@@ -364,6 +377,12 @@ mod tests {
             "#2 is current"
         );
         assert!(!plan_for("1").await.contains("must be stopped"));
+        // Whichever key it retires (#451).
+        for key in ["1", "2"] {
+            assert!(plan_for(key)
+                .await
+                .contains("REFERENCE_KEY must be given a new key"));
+        }
     }
 
     #[sqlx::test(migrations = "./migrations")]
@@ -373,7 +392,7 @@ mod tests {
         // unfindable (#392, story 80).
         let (ovh, inbox) = fake_ovhcloud(false).await;
         let hs = whoami_hs().await;
-        let (clock, _) = crate::util::Clock::settable(T0);
+        let (clock, time) = crate::util::Clock::settable(T0);
         let st = state_from(
             pool.clone(),
             hs.clone(),
@@ -387,6 +406,11 @@ mod tests {
         );
         prove(&st, &inbox, "alice", NUMBER).await;
         run(&pool, &named("1"), None, T0, |_| Some("1".into()))
+            .await
+            .unwrap();
+        // Restarted as the guide says: key #1 gone, a new reference key.
+        set_clock(&time, T0 + 3_600);
+        let st = restarted_with_reference_key(&st, key_two(), [0x08; 32])
             .await
             .unwrap();
 
@@ -403,6 +427,45 @@ mod tests {
     }
 
     #[sqlx::test(migrations = "./migrations")]
+    async fn an_account_the_retirement_ended_comes_back_under_another_reference(pool: SqlitePool) {
+        // ADR 0014 and #409: nothing relates the accounts a retirement stops
+        // to the masks made under the lost key. The reference follows the
+        // account (#451), so the reference key changes with the retirement,
+        // and the start refuses the one that served before it.
+        let (ovh, inbox) = fake_ovhcloud(false).await;
+        let (clock, time) = crate::util::Clock::settable(T0);
+        let st = state_at(pool.clone(), whoami_hs().await, Some(ovh), clock);
+        crate::handlers::discovery::serving_start(&pool, &st.cfg, T0)
+            .await
+            .unwrap();
+        prove(&st, &inbox, "alice", NUMBER).await;
+        let before = reference_of(&pool, "alice").await.expect("a reference");
+        run(
+            &pool,
+            &named("1"),
+            st.cfg.masking_keys.as_deref(),
+            T0 + DAY,
+            |_| Some("1".into()),
+        )
+        .await
+        .unwrap();
+
+        set_clock(&time, T0 + 2 * DAY);
+        assert!(
+            restarted_with_reference_key(&st, key_two(), st.cfg.reference_key.unwrap())
+                .await
+                .is_err(),
+            "the start refuses the reference key the retirement outlived"
+        );
+        let restarted = restarted_with_reference_key(&st, key_two(), [0x08; 32])
+            .await
+            .expect("a new reference key");
+        prove(&restarted, &inbox, "alice", NUMBER).await;
+
+        assert_ne!(reference_of(&pool, "alice").await, Some(before));
+    }
+
+    #[sqlx::test(migrations = "./migrations")]
     async fn the_next_proof_ends_what_the_retirement_said(pool: SqlitePool) {
         let (st, inbox) = a_key_change_under_way(&pool).await;
         run(&pool, &named("1"), None, st.cfg.clock.now(), |_| {
@@ -410,8 +473,12 @@ mod tests {
         })
         .await
         .unwrap();
+        // Restarted as the guide says: key #1 gone, a new reference key.
+        let restarted = restarted_with_reference_key(&st, key_two(), [0x08; 32])
+            .await
+            .unwrap();
 
-        prove(&st, &inbox, "alice", NUMBER).await;
+        prove(&restarted, &inbox, "alice", NUMBER).await;
 
         let now = reading(&st, "alice").await;
         assert!(now.findable_until.is_some());

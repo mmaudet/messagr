@@ -221,3 +221,26 @@ to the masks made under the lost key any more. The service lists such a key as
 retired, and devices forget what they kept under it, where they carry onto
 the key in service the first reference each number led to under a key that
 left at the end of a planned change.
+
+**Amended on 27 September 2026 (a reference that follows the account, #451).**
+The reference devices know a findable account by is computed from the account
+under a key of the service, `REFERENCE_KEY`, kept on the host like the masking
+keys and never in the database, where it was drawn at random, as the owner
+chose. The same account finds its reference again whenever it proves a number,
+even after the thirty days the service forgets its proof, so that whoever found
+it does not read its return as a number that changed hands; another account
+proving that number always gets another reference. The database keeps nothing
+more for it, but the service can relate a reference to its account for as long
+as the key lives, the purge of the proof notwithstanding, and an account that
+proves a new number keeps its reference. A retirement at once changes that key
+too, and only a retirement does: the start refuses a key that served before a
+retirement, and a new one given without a retirement since the previous one
+began, and a service still running through a retirement proves nothing until
+it restarts with a new key. What came before what is read in the order of
+retirements, never from the clock. The accounts the retirement stopped come back
+under a reference nothing relates to the lost key, as the amendment above
+asks. An account the retirement did not stop keeps its reference while its
+proof lives; forgotten afterwards, it comes back under the new key's
+reference, which whoever found it reads as a number that changed hands. Whoever
+held the key could relate the references of the directory to the accounts
+they know: it is kept as the masking keys are.

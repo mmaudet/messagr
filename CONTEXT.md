@@ -179,6 +179,15 @@ The link, established on the device, between a contact and the account whose
 proven discovery identity appears in that contact.
 _Avoid_: Hit, sync result
 
+**Reference**:
+What devices know a findable account by, in the directory and in an
+invitation delivered inside Messagr. It is computed from the account, so the
+same account keeps it whenever it proves a number, even long after its proof
+ended; another account proving the same number has another, which devices
+read as a number that changed hands. It changes only when a masking key is
+retired at once.
+_Avoid_: Account ID, which it never reveals; handle
+
 **Absent contact**:
 A contact no findable account matches: not on Messagr, or on it without a
 current proof. It is invited by a link sent from the telephone, by SMS or by

@@ -57,6 +57,37 @@ pub fn proof_code_digest(key: &[u8; 32], user: &str, code: &str) -> [u8; 32] {
         .into()
 }
 
+/// The reference devices know a findable account by (#451, the owner's
+/// decision of 27 September 2026): computed from the account under the
+/// service's reference key, rather than drawn at random. The same account
+/// finds it again whenever it proves its number, even after the thirty days
+/// the service forgets its proof, and whoever found it reads the same
+/// account; another account always gets another. The database keeps nothing
+/// more for it, but the service can relate a reference to its account for as
+/// long as the key lives: ADR 0014 says so. Sixteen bytes in lower-case hex,
+/// the shape the random references had.
+pub fn account_reference(key: &[u8; 32], user: &str) -> String {
+    let digest: [u8; 32] = Sha256::new()
+        .chain_update(key)
+        .chain_update(b"messagr discovery reference")
+        .chain_update([0u8])
+        .chain_update(user.as_bytes())
+        .finalize()
+        .into();
+    data_encoding::HEXLOWER.encode(&digest[..16])
+}
+
+/// What the database keeps of the reference key (#451): enough to tell it
+/// from another, and nothing of the key.
+pub fn key_fingerprint(key: &[u8; 32]) -> [u8; 32] {
+    Sha256::new()
+        .chain_update(b"messagr reference key fingerprint")
+        .chain_update([0u8])
+        .chain_update(key)
+        .finalize()
+        .into()
+}
+
 /// Whether two digests are equal, in a time that does not depend on where
 /// they differ: a code compared byte by byte would say how much of it was
 /// right.
