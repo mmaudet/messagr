@@ -359,10 +359,16 @@ export const nl: Readonly<Record<CopyKey, string>> = {
   invite_qr_label: 'QR-code van de uitnodigingslink',
   invite_share: 'De link delen',
   invite_close: 'Sluiten',
-  'invite_sent %1$@ %2$@': '%1$@ vindt uw uitnodiging in Messagr tot %2$@.',
+  'invite_sent %1$@ %2$@': 'Uw uitnodiging wacht in Messagr op %1$@ tot %2$@.',
   'invite_sent_unnamed %1$@': 'Uw uitnodiging wacht in Messagr tot %1$@.',
   invite_sent_waits:
-    'Het gesprek wacht in uw lijst tot de uitgenodigde persoon meedoet.',
+    'Het gesprek wacht in uw lijst tot de uitgenodigde persoon deelneemt.',
+  invite_refused_own:
+    'Dit is uw eigen nummer: de uitnodiging zou alleen bij u uitkomen.',
+  invite_refused_gone:
+    'Dit contact is niet meer vindbaar. Bekijk uw contacten opnieuw, of nodig het uit via een link.',
+  invite_refused_not_findable:
+    'Uw nummer is niet meer bewezen. Bewijs het opnieuw in de Instellingen om een gevonden contact uit te nodigen.',
   invite_failed: 'De uitnodiging kon niet worden aangemaakt.',
   invite_waiting: 'Nog niemand heeft de link geopend.',
   invite_admitted: 'Klaar: deze persoon kan binnenkomen.',
@@ -607,6 +613,8 @@ export const nl: Readonly<Record<CopyKey, string>> = {
   list_nobody_else: 'Verder niemand hier',
   list_participant_left: 'zit niet meer in dit gesprek',
   list_nobody_joined: 'Niemand heeft aan dit gesprek deelgenomen',
+  'list_sent_waiting %1$@': 'Uitnodiging verstuurd, wacht tot %1$@',
+  list_sent_expired: 'Uitnodiging verlopen',
   invite_open: 'Iemand uitnodigen',
   plus_invite: 'Iemand uitnodigen',
   plus_close: 'Sluiten',

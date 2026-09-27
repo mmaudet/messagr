@@ -373,10 +373,15 @@ export const uz: Readonly<Record<CopyKey, string>> = {
   invite_qr_label: 'Taklif havolasining QR kodi',
   invite_share: 'Havolani ulashish',
   invite_close: 'Yopish',
-  'invite_sent %1$@ %2$@': '%1$@ taklifingizni Messagrda %2$@ gacha topadi.',
+  'invite_sent %1$@ %2$@': 'Taklifingiz Messagrda %1$@ni %2$@ gacha kutadi.',
   'invite_sent_unnamed %1$@': 'Taklifingiz Messagrda %1$@ gacha kutadi.',
   invite_sent_waits:
     'Suhbat roʻyxatingizda taklif qilingan kishi qoʻshilishini kutadi.',
+  invite_refused_own: 'Bu sizning raqamingiz: taklif faqat sizga yetib boradi.',
+  invite_refused_gone:
+    'Bu kontaktni endi topib boʻlmaydi. Kontaktlaringizni qayta koʻrib chiqing yoki uni havola orqali taklif qiling.',
+  invite_refused_not_findable:
+    'Raqamingiz endi isbotlanmagan. Topilgan kontaktni taklif qilish uchun uni Sozlamalarda qayta isbotlang.',
   invite_failed: 'Taklifni yaratib boʻlmadi.',
   invite_waiting: 'Havolani hali hech kim ochmadi.',
   invite_admitted: 'Tayyor: bu odam kirishi mumkin.',
@@ -620,6 +625,8 @@ export const uz: Readonly<Record<CopyKey, string>> = {
   list_nobody_else: 'Bu yerda boshqa hech kim yoʻq',
   list_participant_left: 'endi bu suhbatda emas',
   list_nobody_joined: 'Bu suhbatga hech kim qoʻshilmadi',
+  'list_sent_waiting %1$@': 'Taklif yuborildi, %1$@ gacha kutilmoqda',
+  list_sent_expired: 'Taklif muddati tugagan',
   invite_open: 'Odam taklif qilish',
   plus_invite: 'Odam taklif qilish',
   plus_close: 'Yopish',

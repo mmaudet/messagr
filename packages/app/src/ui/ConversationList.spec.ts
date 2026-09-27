@@ -287,3 +287,55 @@ describe('the sentence about being findable (#398)', () => {
     expect(withId(list(), 'list-findable')).toBeUndefined()
   })
 })
+
+describe('a conversation an invitation delivered inside Messagr waits in (#404)', () => {
+  const waiting = conversation({
+    other: null,
+    others: 0,
+    preview: null,
+    lastAt: 0,
+    reason: 'nothing has been said yet',
+  })
+  const sent = (expired: boolean, given: string | null = 'Paul') =>
+    new Map([
+      [
+        waiting.scope,
+        {
+          invitationId: 'inv-1',
+          scope: waiting.scope,
+          expiresAt: NOW + 7 * 86_400_000,
+          given,
+          expired,
+        },
+      ],
+    ])
+
+  it('says whom it waits for, and until when', () => {
+    const drawn = list({ summaries: [waiting], sent: sent(false) })
+
+    expect(words(drawn)).toContain('Paul')
+    expect(words(drawn)).toContain(
+      t('list_sent_waiting %1$@', dayOf(NOW + 7 * 86_400_000)),
+    )
+    expect(words(drawn)).not.toContain(t('list_nobody_joined'))
+  })
+
+  it('then that it expired', () => {
+    const drawn = list({ summaries: [waiting], sent: sent(true) })
+
+    expect(words(drawn)).toContain(t('list_sent_expired'))
+  })
+
+  it('says nobody joined when no name was typed, as a link does', () => {
+    const drawn = list({ summaries: [waiting], sent: sent(false, null) })
+
+    expect(words(drawn)).toContain(t('list_nobody_joined'))
+  })
+
+  it('leaves a conversation somebody is in as it is', () => {
+    const drawn = list({ summaries: [conversation()], sent: sent(false) })
+
+    expect(words(drawn)).toContain('Bonjour')
+    expect(words(drawn)).not.toContain('Paul')
+  })
+})

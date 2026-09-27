@@ -8,7 +8,7 @@ import {
   View,
 } from 'react-native'
 
-import { t } from '../copy'
+import { t, type CopyKey } from '../copy'
 import {
   color,
   floors,
@@ -20,6 +20,7 @@ import {
 } from '../design/tokens'
 import { cleanDeclaredName } from '../runtime/declaredName'
 import { normaliseGivenName } from '../runtime/givenName'
+import type { DeliveryRefusal } from '../runtime/deliveredInvitations'
 import { NotchedButton } from './NotchedButton'
 import { QrCode } from './QrCode'
 import { dayOf } from './whenLabel'
@@ -75,12 +76,19 @@ import { dayOf } from './whenLabel'
  */
 const QR_SIZE = 220
 
+/** What each refusal of the service says, in a sentence of its own (#404). */
+const REFUSED: Readonly<Record<DeliveryRefusal, CopyKey>> = {
+  'own-reference': 'invite_refused_own',
+  'unknown-reference': 'invite_refused_gone',
+  'not-findable': 'invite_refused_not_findable',
+}
+
 /**
- * A contact found by looking for one's contacts (#404): the name of its card,
+ * A match, found by looking for one's contacts (#404): the name of its card,
  * which « Qui invitez-vous ? » opens with, and the reference the invitation
  * is delivered to inside the application.
  */
-export interface InvitedContact {
+export interface InvitedMatch {
   readonly name: string
   readonly reference: string
 }
@@ -92,7 +100,7 @@ export type InviteStage =
    * The form. `to`, for a contact found: the invitation is delivered inside
    * the application rather than carried by a link (#404).
    */
-  | { readonly stage: 'resting'; readonly to?: InvitedContact }
+  | { readonly stage: 'resting'; readonly to?: InvitedMatch }
   | { readonly stage: 'working' }
   | { readonly stage: 'ready'; readonly link: string }
   /**
@@ -105,7 +113,16 @@ export type InviteStage =
       /** Milliseconds since the epoch. */
       readonly expiresAt: number
     }
-  | { readonly stage: 'failed'; readonly reason: string }
+  | {
+      readonly stage: 'failed'
+      readonly reason: string
+      /**
+       * Why the service would not take an invitation delivered inside the
+       * application, when it said so (#404): a sentence of its own, rather
+       * than « L'invitation n'a pas pu être créée. ».
+       */
+      readonly refusal?: DeliveryRefusal
+    }
 
 export interface InviteProps {
   readonly stage: InviteStage
@@ -124,8 +141,8 @@ export interface InviteProps {
 
 export function Invite({ stage, onInvite, onClose, admission }: InviteProps) {
   // A CONTACT FOUND OPENS WITH THE NAME OF ITS CARD (#404), to keep or to
-  // change. `App.tsx` keys the form by the contact, so a form opened for
-  // another starts again from its card rather than from the last draft.
+  // change. The form is drawn anew each time it opens: `App.tsx` shows it
+  // only while it is not shut.
   const [draft, setDraft] = useState(
     stage.stage === 'resting' ? (stage.to?.name ?? '') : '',
   )
@@ -230,7 +247,11 @@ export function Invite({ stage, onInvite, onClose, admission }: InviteProps) {
     return (
       <View style={styles.resting}>
         <Text testID="invite-failed" style={styles.failed}>
-          {t('invite_failed')}
+          {t(
+            stage.refusal === undefined
+              ? 'invite_failed'
+              : REFUSED[stage.refusal],
+          )}
         </Text>
         {/* The reason verbatim, under the sentence rather than instead of it.
             Invariant 6 governs what a person is told; it does not require

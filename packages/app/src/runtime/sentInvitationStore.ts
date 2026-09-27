@@ -15,13 +15,15 @@ import type { EncryptedDatabase } from './givenNameStore'
  * What it holds is what the service must never learn, the conversation each
  * invitation leads to, and the name this device will give its recipient.
  * `given` is the empty string when none was typed, as `listCacheStore.ts`
- * spells `null`.
+ * spells `null`, and `expired` is 1 once the service said it ran out: the
+ * list says so, until the thirty days the service keeps it have passed.
  */
-const SCHEMA = `CREATE TABLE IF NOT EXISTS delivered_sent (
+const SCHEMA = `CREATE TABLE IF NOT EXISTS invitations_delivered_from_here (
   invitation_id TEXT PRIMARY KEY NOT NULL,
   scope TEXT NOT NULL,
   expires_at INTEGER NOT NULL,
-  given TEXT NOT NULL
+  given TEXT NOT NULL,
+  expired INTEGER NOT NULL
 )`
 
 export function forgetfulSentInvitations(): SentInvitations {
@@ -41,29 +43,30 @@ export async function openSentInvitations(
     all: async () => {
       try {
         const { rows } = await database.execute(
-          'SELECT invitation_id, scope, expires_at, given FROM delivered_sent',
+          'SELECT invitation_id, scope, expires_at, given, expired ' +
+            'FROM invitations_delivered_from_here',
         )
         const held: SentInvitation[] = []
         for (const row of rows) {
           // Read defensively, for the reason the names store gives: a row of
           // the wrong shape is a row to skip, not a tick to fail.
-          const { invitation_id, scope, expires_at, given } = row as Record<
-            string,
-            unknown
-          >
+          const { invitation_id, scope, expires_at, given, expired } =
+            row as Record<string, unknown>
           if (
             typeof invitation_id === 'string' &&
             invitation_id !== '' &&
             typeof scope === 'string' &&
             scope !== '' &&
             typeof expires_at === 'number' &&
-            typeof given === 'string'
+            typeof given === 'string' &&
+            (expired === 0 || expired === 1)
           ) {
             held.push({
               invitationId: invitation_id,
               scope,
               expiresAt: expires_at,
               given: given === '' ? null : given,
+              expired: expired === 1,
             })
           }
         }
@@ -78,14 +81,22 @@ export async function openSentInvitations(
     remember: async sent => {
       try {
         await database.execute(
-          'INSERT OR REPLACE INTO delivered_sent ' +
-            '(invitation_id, scope, expires_at, given) VALUES (?, ?, ?, ?)',
-          [sent.invitationId, sent.scope, sent.expiresAt, sent.given ?? ''],
+          'INSERT OR REPLACE INTO invitations_delivered_from_here ' +
+            '(invitation_id, scope, expires_at, given, expired) ' +
+            'VALUES (?, ?, ?, ?, ?)',
+          [
+            sent.invitationId,
+            sent.scope,
+            sent.expiresAt,
+            sent.given ?? '',
+            sent.expired ? 1 : 0,
+          ],
         )
         return true
       } catch {
-        // Reported by the caller: the invitation is good all the same, but
-        // nobody will be let in through it after a relaunch.
+        // Reported by the caller: the invitation is good all the same, and
+        // this launch still lets its recipient in (`keptThisLaunchToo`); a
+        // relaunch will not know of it.
         return false
       }
     },
@@ -93,7 +104,7 @@ export async function openSentInvitations(
     forget: async invitationId => {
       try {
         await database.execute(
-          'DELETE FROM delivered_sent WHERE invitation_id = ?',
+          'DELETE FROM invitations_delivered_from_here WHERE invitation_id = ?',
           [invitationId],
         )
         return true

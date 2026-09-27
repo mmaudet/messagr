@@ -129,6 +129,7 @@ import {
   type Delivered,
   type DeliveryService,
   type Letting,
+  type SentInvitations,
 } from './deliveredInvitations'
 import { invitationService, serviceAt } from './servicePoster'
 import {
@@ -929,21 +930,31 @@ export async function admitEntrant(
 }
 
 /**
- * Inviting a contact found (#404): the conversation as for a link, then an
+ * Inviting a contact found (#404): the conversation as for a link, an
  * invitation delivered inside the application to the account behind
- * `reference`. Pure glue: `deliveredInvitations.ts` says what leaves, and
- * what never does.
+ * `reference`, kept on `sent` with the name typed. Pure glue:
+ * `deliveredInvitations.ts` says what leaves, and what never does.
  */
-export async function deliverToContact(
+export async function deliverToMatch(
   sessionClient: ReturnType<typeof createClient>,
   service: DeliveryService,
+  sent: SentInvitations,
   reference: string,
+  given: string | null,
 ): Promise<Delivered> {
   return deliverInvitation(
-    { http: makePumpHttp(sessionClient), service },
+    { http: makePumpHttp(sessionClient), service, sent },
     reference,
+    given,
   )
 }
+
+/**
+ * The invitations whose account could not be invited, said once each for the
+ * life of the process: the round runs at every tick, and one line per tick
+ * for the same refusal would bury everything else.
+ */
+const refusalsSaid = new Set<string>()
 
 /**
  * The inviter's half of an invitation delivered inside the application
@@ -954,17 +965,22 @@ export async function letInWhoeverJoined(
   sessionClient: ReturnType<typeof createClient>,
   letting: Omit<Letting, 'http' | 'now'>,
 ): Promise<readonly string[]> {
-  const admitted = await letInTheJoined({
+  const round = await letInTheJoined({
     ...letting,
     http: makePumpHttp(sessionClient),
     now: () => Date.now(),
   })
   // Only when somebody came through: a line per tick saying « nobody yet »
   // would bury the one that matters, as `MESSAGR_ADMITTED_LATE` says.
-  if (admitted.length > 0) {
-    logEvent('info', 'MESSAGR_LET_IN', { admitted: admitted.length })
+  if (round.admitted.length > 0) {
+    logEvent('info', 'MESSAGR_LET_IN', { admitted: round.admitted.length })
   }
-  return admitted
+  for (const { invitationId, reason } of round.failed) {
+    if (refusalsSaid.has(invitationId)) continue
+    refusalsSaid.add(invitationId)
+    logEvent('warn', 'MESSAGR_LET_IN_REFUSED', { invitationId, reason })
+  }
+  return round.admitted
 }
 
 export type { Issued, Admission } from './issueInvitation'

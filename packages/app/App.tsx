@@ -36,7 +36,7 @@ import {
   sendOneEncryptedMessage,
   sendTypedMessage,
   admitEntrant,
-  deliverToContact,
+  deliverToMatch,
   inviteSomebody,
   letInWhoeverJoined,
   listConversations,
@@ -178,7 +178,11 @@ import {
   type Outstanding,
 } from './src/runtime/outstandingStore'
 import { forgetfulSentInvitations } from './src/runtime/sentInvitationStore'
-import type { SentInvitations } from './src/runtime/deliveredInvitations'
+import {
+  keptThisLaunchToo,
+  type SentInvitation,
+  type SentInvitations,
+} from './src/runtime/deliveredInvitations'
 import { admitAnyoneWaiting } from './src/runtime/admitAnyoneWaiting'
 import { displayNameFor } from './src/runtime/givenName'
 import Clipboard from '@react-native-clipboard/clipboard'
@@ -254,7 +258,7 @@ import type { EvictOutcome } from './src/runtime/evict'
 import type { HistoryClaim } from './src/runtime/claimHistory'
 import { Conversation } from './src/ui/Conversation'
 import { ConversationList } from './src/ui/ConversationList'
-import { Invite, type InvitedContact, type InviteStage } from './src/ui/Invite'
+import { Invite, type InvitedMatch, type InviteStage } from './src/ui/Invite'
 import { Invited } from './src/ui/Invited'
 import { BackupOffer } from './src/ui/BackupOffer'
 import { BackupSettings } from './src/ui/BackupSettings'
@@ -534,14 +538,27 @@ export function App({
     null,
   )
   const inviteRef = useRef<
-    | ((
-        name: string | null,
-        declared: string | null,
-        to?: InvitedContact,
-      ) => void)
-    | null
+    ((name: string | null, declared: string | null) => void) | null
+  >(null)
+  /** Inviting a contact found (#404): its own gesture, beside a link's. */
+  const deliverRef = useRef<
+    ((name: string | null, to: InvitedMatch) => void) | null
   >(null)
   const namesRef = useRef<GivenNames>(forgetfulGivenNames())
+  /**
+   * Gives `who` a name on this device and shows it, whether or not the
+   * notebook kept it, which is what it answers. The naming screen, a link's
+   * entrant and an invitation's recipient (#404) all come through here.
+   */
+  const giveName = async (who: string, name: string): Promise<boolean> => {
+    const kept = await namesRef.current.set(who, name)
+    // Shown either way. A name held only in memory is still the name on the
+    // screen, and `kept` is what says whether it will survive the next
+    // launch.
+    setNames(held => new Map(held).set(who, name))
+    if (!kept) logEvent('warn', 'MESSAGR_GIVEN_NAME_NOT_KEPT', {})
+    return kept
+  }
   // How far each conversation has been read here. Forgetful until the
   // notebook opens, and forgetful for good if it does not -- which shows
   // every conversation as unread rather than as read, since a badge that
@@ -557,10 +574,24 @@ export function App({
   const outstandingRef = useRef<Outstanding>(forgetfulOutstanding())
   /**
    * The invitations delivered inside the application from here (#404), for a
-   * week rather than a link's hour. A ref for the reason `outstandingRef` is
-   * one: a sync tick reads it.
+   * week rather than a link's hour: the notebook's page, and what this launch
+   * sent besides, should the page not hold (`keptThisLaunchToo`). Refs for
+   * the reason `outstandingRef` is one: a sync tick reads them.
    */
-  const sentRef = useRef<SentInvitations>(forgetfulSentInvitations())
+  const sentPageRef = useRef<SentInvitations>(forgetfulSentInvitations())
+  const sentInvitationsRef = useRef<SentInvitations>(
+    keptThisLaunchToo(() => sentPageRef.current),
+  )
+  /** The same, by conversation, for the list to say which wait (#404). */
+  const [sentByScope, setSentByScope] = useState<
+    ReadonlyMap<string, SentInvitation>
+  >(new Map())
+  const readSentInvitations = async () => {
+    const sent = await sentInvitationsRef.current.all()
+    setSentByScope(new Map(sent.map(one => [one.scope, one])))
+  }
+  /** The number this account proved, as the search reads it (#404). */
+  const keptNumberRef = useRef<string | null>(null)
   // The list as it was last drawn. Read once at the top of the launch and
   // written by every derivation after it. `listCacheStore.ts` says why.
   const listCacheRef = useRef<ListCache>(forgetfulListCache())
@@ -620,6 +651,9 @@ export function App({
   // shows it, and a renewal sends its code to it. `null` until read, and when
   // none was kept.
   const [keptNumber, setKeptNumber] = useState<string | null>(null)
+  useEffect(() => {
+    keptNumberRef.current = keptNumber
+  }, [keptNumber])
   // A DEVICE ITS HOMESERVER NO LONGER LETS IN (#391). See `LostAccessStage`.
   const [lostAccess, setLostAccess] = useState<LostAccessStage>({
     stage: 'none',
@@ -1262,6 +1296,7 @@ export function App({
         shareMoreCards,
         masking: bridgeMasking,
         region: () => regionOf(deviceLocale()),
+        ownNumber: () => keptNumberRef.current,
         // THROUGH THE REF, since the journey is made once and the notebook
         // is opened after it, and opened again for another account (#304).
         results: {
@@ -2360,7 +2395,8 @@ export function App({
         namesRef.current = book.names
         lastReadRef.current = book.lastRead
         outstandingRef.current = book.outstanding
-        sentRef.current = book.sent
+        sentPageRef.current = book.sentInvitations
+        readSentInvitations().catch(() => {})
         listCacheRef.current = book.list
         eventsRef.current = book.events
         hiddenRef.current = book.hidden
@@ -3817,55 +3853,9 @@ export function App({
             inviteRef.current = (
               name: string | null,
               declared: string | null,
-              to?: InvitedContact,
             ) => {
               setInvite({ stage: 'working' })
               setAdmission(null)
-              // A CONTACT FOUND (#404): the conversation as for a link, and
-              // an invitation delivered inside the application to its
-              // reference. Nothing to share and nothing to wait for here:
-              // the recipient may answer in a week, and each sync tick asks
-              // (`letInWhoeverJoined`, below).
-              if (to !== undefined) {
-                const delivering = async () => {
-                  const delivered = await deliverToContact(
-                    sessionClient,
-                    discoveryDeps.service,
-                    to.reference,
-                  )
-                  if (!delivered.delivered) {
-                    setInvite({ stage: 'failed', reason: delivered.reason })
-                    return
-                  }
-                  setInvite({
-                    stage: 'sent',
-                    name,
-                    expiresAt: delivered.expiresAt,
-                  })
-                  const kept = await sentRef.current.remember({
-                    invitationId: delivered.invitationId,
-                    scope: delivered.scope,
-                    expiresAt: delivered.expiresAt,
-                    given: name,
-                  })
-                  if (!kept) {
-                    // Not a failure of the invitation: it is good, and this
-                    // launch still lets the recipient in. What is lost is
-                    // the asking after a relaunch.
-                    logEvent('warn', 'MESSAGR_SENT_INVITATION_NOT_KEPT', {})
-                  }
-                  // The conversation exists now, so it belongs on the list,
-                  // waiting as a link's does.
-                  await refreshList().catch(() => {})
-                }
-                delivering().catch((cause: unknown) =>
-                  setInvite({
-                    stage: 'failed',
-                    reason: getErrorMessage(cause),
-                  }),
-                )
-                return
-              }
               const gesture = async () => {
                 const issued = await inviteSomebody(
                   sessionClient,
@@ -3925,15 +3915,62 @@ export function App({
                 // longer exists.
                 const who = admitted.entrants[admitted.entrants.length - 1]
                 if (name !== null && who !== undefined) {
-                  const kept = await namesRef.current.set(who, name)
-                  setNames(held => new Map(held).set(who, name))
-                  if (!kept) {
-                    logEvent('warn', 'MESSAGR_GIVEN_NAME_NOT_KEPT', {})
-                  }
+                  await giveName(who, name)
                 }
                 await refreshList().catch(() => {})
               }
               gesture().catch((cause: unknown) =>
+                setInvite({
+                  stage: 'failed',
+                  reason: getErrorMessage(cause),
+                }),
+              )
+            }
+
+            // A CONTACT FOUND (#404): the conversation as for a link, and an
+            // invitation delivered inside the application to its reference.
+            // Nothing to share and nothing to wait for here: the recipient
+            // may answer in a week, and each sync tick asks
+            // (`letInWhoeverJoined`, below).
+            deliverRef.current = (name: string | null, to: InvitedMatch) => {
+              setInvite({ stage: 'working' })
+              setAdmission(null)
+              const delivering = async () => {
+                const delivered = await deliverToMatch(
+                  sessionClient,
+                  discoveryDeps.service,
+                  sentInvitationsRef.current,
+                  to.reference,
+                  name,
+                )
+                if (!delivered.delivered) {
+                  setInvite({
+                    stage: 'failed',
+                    reason: delivered.reason,
+                    ...(delivered.refusal === undefined
+                      ? {}
+                      : { refusal: delivered.refusal }),
+                  })
+                  return
+                }
+                setInvite({
+                  stage: 'sent',
+                  name,
+                  expiresAt: delivered.expiresAt,
+                })
+                if (!delivered.kept) {
+                  // Not a failure of the invitation: it is good, and this
+                  // launch still lets the recipient in
+                  // (`keptThisLaunchToo`). What is lost is the asking after
+                  // a relaunch.
+                  logEvent('warn', 'MESSAGR_SENT_INVITATION_NOT_KEPT', {})
+                }
+                await readSentInvitations()
+                // The conversation exists now, so it belongs on the list,
+                // waiting as a link's does.
+                await refreshList().catch(() => {})
+              }
+              delivering().catch((cause: unknown) =>
                 setInvite({
                   stage: 'failed',
                   reason: getErrorMessage(cause),
@@ -4199,17 +4236,16 @@ export function App({
                   // given the name typed for them. Not awaited, for the reason
                   // above.
                   letInWhoeverJoined(sessionClient, {
-                    sent: sentRef.current,
+                    sent: sentInvitationsRef.current,
                     service: discoveryDeps.service,
-                    name: async (who, given) => {
-                      const kept = await namesRef.current.set(who, given)
-                      setNames(held => new Map(held).set(who, given))
-                      if (!kept) {
-                        logEvent('warn', 'MESSAGR_GIVEN_NAME_NOT_KEPT', {})
-                      }
+                    giveName: async (who, name) => {
+                      await giveName(who, name)
                     },
                   })
-                    .then(admitted => {
+                    .then(async admitted => {
+                      // Read again whatever happened: an invitation may have
+                      // run out, which the list says.
+                      await readSentInvitations()
                       if (admitted.length > 0) refreshList().catch(() => {})
                     })
                     .catch((cause: unknown) =>
@@ -5774,6 +5810,7 @@ export function App({
                 <View style={styles.block}>
                   <ConversationList
                     summaries={summaries}
+                    sent={sentByScope}
                     names={names}
                     invitation={linkOutcome}
                     reinstalled={reinstalled}
@@ -5837,21 +5874,12 @@ export function App({
               invite.stage !== 'shut' && (
                 <View style={styles.block}>
                   <Invite
-                    // One form per contact found: the name of its card is
-                    // where the form starts (#404).
-                    key={
-                      invite.stage === 'resting'
-                        ? (invite.to?.reference ?? 'link')
-                        : 'invite'
-                    }
                     stage={invite}
                     admission={admission}
                     onInvite={(name, declared) =>
-                      inviteRef.current?.(
-                        name,
-                        declared,
-                        invite.stage === 'resting' ? invite.to : undefined,
-                      )
+                      invite.stage === 'resting' && invite.to !== undefined
+                        ? deliverRef.current?.(name, invite.to)
+                        : inviteRef.current?.(name, declared)
                     }
                     onClose={() => {
                       setInvite({ stage: 'shut' })
@@ -6016,17 +6044,7 @@ export function App({
                 <GiveName
                   participant={party?.other ?? null}
                   given={party === null ? undefined : names.get(party.other)}
-                  onName={async (participant, name) => {
-                    const kept = await namesRef.current.set(participant, name)
-                    // Shown either way. A name held only in memory is still the
-                    // name on this screen, and `kept` is what says whether it
-                    // will survive the next launch.
-                    setNames(held => new Map(held).set(participant, name))
-                    if (!kept) {
-                      logEvent('warn', 'MESSAGR_GIVEN_NAME_NOT_KEPT', {})
-                    }
-                    return kept
-                  }}
+                  onName={(participant, name) => giveName(participant, name)}
                 />
 
                 {/* #34's gesture, and only where it means something: a

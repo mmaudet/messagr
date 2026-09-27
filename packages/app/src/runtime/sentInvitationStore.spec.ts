@@ -23,12 +23,13 @@ function fake(refuse: 'none' | 'read' | 'write' = 'none') {
       }
       if (sql.startsWith('SELECT')) return { rows: [...rows.values()] }
       if (sql.startsWith('INSERT OR REPLACE')) {
-        const [invitation_id, scope, expires_at, given] = params
+        const [invitation_id, scope, expires_at, given, expired] = params
         rows.set(String(invitation_id), {
           invitation_id,
           scope,
           expires_at,
           given,
+          expired,
         })
         return { rows: [] }
       }
@@ -47,6 +48,7 @@ const SENT = {
   scope: '!room:x',
   expiresAt: 1_790_604_800_000,
   given: 'Paul',
+  expired: false,
 }
 
 describe('the invitations this device delivered (#404)', () => {
@@ -62,6 +64,14 @@ describe('the invitations this device delivered (#404)', () => {
       SENT,
       { ...SENT, invitationId: 'inv-2', given: null },
     ])
+  })
+
+  it('keeps an invitation run out as expired', async () => {
+    const page = await openSentInvitations(fake().database)
+
+    await page.remember({ ...SENT, expired: true })
+
+    expect(await page.all()).toEqual([{ ...SENT, expired: true }])
   })
 
   it('forgets one, and keeping one twice keeps it once', async () => {
@@ -84,6 +94,7 @@ describe('the invitations this device delivered (#404)', () => {
       scope: 42,
       expires_at: 1,
       given: '',
+      expired: 0,
     })
 
     expect(await page.all()).toEqual([SENT])

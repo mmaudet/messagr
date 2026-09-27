@@ -85,7 +85,7 @@ export interface NotebookOpening {
    * The invitations delivered inside the application from here, until
    * somebody is let in through them or they run out (#404).
    */
-  readonly sent: SentInvitations
+  readonly sentInvitations: SentInvitations
   readonly opened: boolean
   /** Why it did not open, when it did not. */
   readonly reason?: string
@@ -155,7 +155,7 @@ export async function openNotebook(storeDir: string): Promise<NotebookOpening> {
       favourites: forgetfulFavourites(),
       readBy: forgetfulReadBy(),
       discoveryResults: forgetfulDiscoveryResults(),
-      sent: forgetfulSentInvitations(),
+      sentInvitations: forgetfulSentInvitations(),
       opened: false,
       reason: 'no writable directory was supplied at launch',
     }
@@ -176,7 +176,7 @@ export async function openNotebook(storeDir: string): Promise<NotebookOpening> {
       favourites: forgetfulFavourites(),
       readBy: forgetfulReadBy(),
       discoveryResults: forgetfulDiscoveryResults(),
-      sent: forgetfulSentInvitations(),
+      sentInvitations: forgetfulSentInvitations(),
       opened: false,
       reason: passphrase.reason,
     }
@@ -207,7 +207,7 @@ export async function openNotebook(storeDir: string): Promise<NotebookOpening> {
       favourites: await openFavourites(page),
       readBy: await openReadBy(page),
       discoveryResults: await openDiscoveryResults(page),
-      sent: await openSentInvitations(page),
+      sentInvitations: await openSentInvitations(page),
       opened: true,
       minted: passphrase.minted,
     }
@@ -226,7 +226,7 @@ export async function openNotebook(storeDir: string): Promise<NotebookOpening> {
       favourites: forgetfulFavourites(),
       readBy: forgetfulReadBy(),
       discoveryResults: forgetfulDiscoveryResults(),
-      sent: forgetfulSentInvitations(),
+      sentInvitations: forgetfulSentInvitations(),
       opened: false,
       reason: getErrorMessage(cause),
       minted: passphrase.minted,

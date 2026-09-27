@@ -4,7 +4,7 @@ import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native'
 import { t, type CopyKey } from '../copy'
 import { color, floors, layout, space, stroke, type } from '../design/tokens'
 import type { FindingStage, Waiting } from '../runtime/findContacts'
-import type { InvitedContact } from './Invite'
+import type { InvitedMatch } from './Invite'
 import { NotchedButton } from './NotchedButton'
 import { dayOf } from './whenLabel'
 
@@ -51,7 +51,7 @@ export function FindContacts({
    * « Inviter », on a contact found (#404), with that contact; « Inviter
    * quelqu'un », when the address book was refused, with none: a link.
    */
-  readonly onInvite: (to?: InvitedContact) => void
+  readonly onInvite: (to?: InvitedMatch) => void
   /** The arrow, « Terminé », and every way back to the list. */
   readonly onClose: () => void
 }) {
@@ -156,7 +156,7 @@ function Found({
   /** The system shares some cards only (#403). */
   readonly limited: boolean
   readonly onShareMore: () => void
-  readonly onInvite: (to: InvitedContact) => void
+  readonly onInvite: (to: InvitedMatch) => void
   readonly onDone: () => void
 }) {
   return (
@@ -214,7 +214,12 @@ function Found({
               <NotchedButton
                 testID="find-contacts-invite-contact"
                 label={t('find_invite')}
-                onPress={() => onInvite({ name, reference })}
+                // A NUMBER THAT CHANGED HANDS OFFERS NO NAME: the account it
+                // leads to now inherits nothing of the card's (#392), not
+                // even as the name the form opens with.
+                onPress={() =>
+                  onInvite({ name: holderChanged ? '' : name, reference })
+                }
                 tone="quiet"
               />
             </View>

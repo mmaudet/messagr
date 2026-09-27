@@ -194,6 +194,8 @@ describe('« Retrouver mes contacts »', () => {
   })
 
   it('puts « Inviter » on each contact found, for that contact alone, and no gesture on the others (#404)', () => {
+    // Paul's number changed hands: the account it leads to now inherits
+    // nothing of the card, not even the name the form opens with.
     const invited: unknown[] = []
     const drawn = draw(
       createElement(FindContacts, {
@@ -226,7 +228,9 @@ describe('« Retrouver mes contacts »', () => {
     )
     expect(buttons.map(textIn)).toEqual([t('find_invite'), t('find_invite')])
     ;(buttons[1]!.props.onPress as () => void)()
-    expect(invited).toEqual([{ name: 'Paul', reference: 'r-paul' }])
+    expect(invited).toEqual([{ name: '', reference: 'r-paul' }])
+    ;(buttons[0]!.props.onPress as () => void)()
+    expect(invited.at(-1)).toEqual({ name: 'Anne', reference: 'r-anne' })
     for (const row of [
       ...all(drawn, 'find-contacts-match'),
       ...all(drawn, 'find-contacts-other'),

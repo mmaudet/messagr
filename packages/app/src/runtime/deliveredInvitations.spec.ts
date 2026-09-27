@@ -3,8 +3,9 @@ import { describe, expect, it } from 'vitest'
 import type { Answer } from './discovery'
 import {
   deliverInvitation,
+  KEPT_AFTER_DEADLINE_MS,
+  keptThisLaunchToo,
   letInTheJoined,
-  STOP_ASKING_AFTER_DEADLINE_MS,
   type DeliveryService,
   type SentInvitation,
   type SentInvitations,
@@ -62,7 +63,7 @@ function harness(
   }
   const sent: string[] = []
   const service: DeliveryService = {
-    send: async body => {
+    sendInvitation: async body => {
       sent.push(body)
       if (options.send instanceof Error) throw options.send
       return (
@@ -84,12 +85,13 @@ function harness(
   return { http, service, calls, sent }
 }
 
-/** The page of the notebook, as a map. */
-function thePage(invitations: readonly SentInvitation[]) {
+/** The page of the notebook, as a map; one that will not write, on request. */
+function thePage(invitations: readonly SentInvitation[] = [], holds = true) {
   const page = new Map(invitations.map(i => [i.invitationId, i]))
   const sent: SentInvitations = {
     all: async () => [...page.values()],
     remember: async one => {
+      if (!holds) return false
       page.set(one.invitationId, one)
       return true
     },
@@ -114,54 +116,95 @@ const SENT: SentInvitation = {
   scope: '!room:x',
   expiresAt: NOW + 7 * 86_400_000,
   given: 'Paul',
+  expired: false,
 }
 
-describe('delivering an invitation to a contact found (#404)', () => {
-  it('creates the conversation as for a link, then sends the reference and nothing else', async () => {
+describe('delivering an invitation to a match (#404)', () => {
+  it('creates the conversation as for a link, sends the reference and nothing else, and keeps the invitation', async () => {
     const { http, service, calls, sent } = harness()
+    const { sent: page, page: kept } = thePage()
 
-    const delivered = await deliverInvitation({ http, service }, 'ref-paul')
+    const delivered = await deliverInvitation(
+      { http, service, sent: page },
+      'ref-paul',
+      'Paul',
+    )
 
     expect(delivered).toEqual({
       delivered: true,
       scope: '!made:x',
       invitationId: 'inv-1',
       expiresAt: 1_790_604_800_000,
+      kept: true,
     })
     expect(calls[0]?.path).toBe('/_matrix/client/v3/createRoom')
-    // The rules of a link's conversation: the cost of inviting, and
-    // encryption, among what is written before the invitation leaves.
+    // The rules of a link's conversation, among what is written before the
+    // invitation leaves: encryption, for one.
     expect(
       calls.some(
         c => c.method === 'PUT' && c.path.endsWith('/m.room.encryption'),
       ),
     ).toBe(true)
     expect(sent).toEqual([JSON.stringify({ reference: 'ref-paul' })])
-    expect(sent.join()).not.toContain('!made:x')
+    expect([...kept.values()]).toEqual([
+      {
+        invitationId: 'inv-1',
+        scope: '!made:x',
+        expiresAt: 1_790_604_800_000,
+        given: 'Paul',
+        expired: false,
+      },
+    ])
   })
 
   it('sends nothing when the conversation could not be created', async () => {
     const { http, service, sent } = harness({ createRoom: new Error('down') })
 
-    const delivered = await deliverInvitation({ http, service }, 'ref-paul')
+    const delivered = await deliverInvitation(
+      { http, service, sent: thePage().sent },
+      'ref-paul',
+      null,
+    )
 
     expect(delivered.delivered).toBe(false)
     expect(sent).toEqual([])
   })
 
-  it('says what the service refused, and which conversation it leaves', async () => {
-    const { http, service } = harness({
-      send: {
-        status: 422,
-        body: JSON.stringify({ errcode: 'MESSAGR_OWN_REFERENCE' }),
-      },
-    })
+  it('names what the service refused, and leaves the conversation nobody can enter', async () => {
+    for (const [errcode, refusal] of [
+      ['MESSAGR_OWN_REFERENCE', 'own-reference'],
+      ['MESSAGR_UNKNOWN_REFERENCE', 'unknown-reference'],
+      ['MESSAGR_NOT_FINDABLE', 'not-findable'],
+    ] as const) {
+      const { http, service, calls } = harness({
+        send: { status: 422, body: JSON.stringify({ errcode }) },
+      })
+      const { sent: page, page: kept } = thePage()
 
-    expect(await deliverInvitation({ http, service }, 'ref-me')).toEqual({
-      delivered: false,
-      scope: '!made:x',
-      reason: 'the invitation service refused it: MESSAGR_OWN_REFERENCE',
-    })
+      expect(
+        await deliverInvitation({ http, service, sent: page }, 'ref', null),
+      ).toEqual({
+        delivered: false,
+        reason: `the invitation service refused it: ${errcode}`,
+        refusal,
+      })
+      expect(calls.at(-1)?.path).toBe(
+        '/_matrix/client/v3/rooms/!made%3Ax/leave',
+      )
+      expect(kept.size).toBe(0)
+    }
+  })
+
+  it('says when the page did not keep it', async () => {
+    const { http, service } = harness()
+
+    const delivered = await deliverInvitation(
+      { http, service, sent: thePage([], false).sent },
+      'ref-paul',
+      'Paul',
+    )
+
+    expect(delivered).toMatchObject({ delivered: true, kept: false })
   })
 })
 
@@ -183,7 +226,7 @@ describe('letting in whoever joined an invitation sent (#404)', () => {
           sent,
           service,
           http,
-          name: async (who, name) => {
+          giveName: async (who, name) => {
             named.push([who, name])
           },
           now: () => now,
@@ -196,7 +239,7 @@ describe('letting in whoever joined an invitation sent (#404)', () => {
       status: { 'inv-1': claimed('@bob:x') },
     })
 
-    expect(await run()).toEqual(['@bob:x'])
+    expect(await run()).toEqual({ admitted: ['@bob:x'], failed: [] })
 
     const invite = calls.find(c => c.path.endsWith('/invite'))
     expect(invite?.path).toBe('/_matrix/client/v3/rooms/!room%3Ax/invite')
@@ -205,10 +248,29 @@ describe('letting in whoever joined an invitation sent (#404)', () => {
     expect(page.size).toBe(0)
   })
 
+  it('gives no name when none was typed', async () => {
+    const { run, named } = letting([{ ...SENT, given: null }], {
+      status: { 'inv-1': claimed('@bob:x') },
+    })
+
+    expect((await run()).admitted).toEqual(['@bob:x'])
+    expect(named).toEqual([])
+  })
+
+  it('lets in an invitation joined in time, however late it is read', async () => {
+    const { run } = letting(
+      [SENT],
+      { status: { 'inv-1': claimed('@bob:x') } },
+      SENT.expiresAt + 20 * 86_400_000,
+    )
+
+    expect((await run()).admitted).toEqual(['@bob:x'])
+  })
+
   it('asks again at the next tick while nobody has joined', async () => {
     const { run, calls, page } = letting([SENT])
 
-    expect(await run()).toEqual([])
+    expect(await run()).toEqual({ admitted: [], failed: [] })
 
     expect(calls.some(c => c.path.endsWith('/invite'))).toBe(false)
     expect(page.size).toBe(1)
@@ -220,34 +282,50 @@ describe('letting in whoever joined an invitation sent (#404)', () => {
       there: { '!room:x': ['@bob:x'] },
     })
 
-    expect(await run()).toEqual(['@bob:x'])
+    expect((await run()).admitted).toEqual(['@bob:x'])
 
     expect(calls.some(c => c.path.endsWith('/invite'))).toBe(false)
     expect(page.size).toBe(0)
   })
 
-  it('keeps the invitation when the invite fails, for the next tick', async () => {
+  it('keeps the invitation when the invite fails, and says why', async () => {
     const { run, page } = letting([SENT], {
       status: { 'inv-1': claimed('@bob:x') },
       refuseInvite: true,
     })
 
-    expect(await run()).toEqual([])
+    expect(await run()).toEqual({
+      admitted: [],
+      failed: [{ invitationId: 'inv-1', reason: 'forbidden' }],
+    })
     expect(page.size).toBe(1)
   })
 
-  it('forgets an invitation run out, or one the service no longer knows', async () => {
-    const ranOut = { ...SENT, invitationId: 'ran-out' }
+  it('keeps an invitation run out as expired, for the list, and asks no more about it', async () => {
+    const { run, page, calls } = letting([SENT], {
+      status: { 'inv-1': { status: 200, body: '{"status":"expired"}' } },
+    })
+
+    await run()
+    expect(page.get('inv-1')).toEqual({ ...SENT, expired: true })
+
+    const asked = calls.length
+    await run()
+    expect(calls.length).toBe(asked)
+  })
+
+  it('forgets one the service no longer knows, and not for any other 404', async () => {
     const unknown = { ...SENT, invitationId: 'unknown' }
-    const { run, page } = letting([ranOut, unknown], {
+    const proxied = { ...SENT, invitationId: 'proxied' }
+    const { run, page } = letting([unknown, proxied], {
       status: {
-        'ran-out': { status: 200, body: '{"status":"expired"}' },
         unknown: { status: 404, body: '{"errcode":"M_NOT_FOUND"}' },
+        proxied: { status: 404, body: '<html>Not Found</html>' },
       },
     })
 
-    expect(await run()).toEqual([])
-    expect(page.size).toBe(0)
+    await run()
+    expect([...page.keys()]).toEqual(['proxied'])
   })
 
   it('keeps an invitation the service could not answer about', async () => {
@@ -255,19 +333,64 @@ describe('letting in whoever joined an invitation sent (#404)', () => {
       status: { 'inv-1': new Error('unreachable') },
     })
 
-    expect(await run()).toEqual([])
+    expect((await run()).admitted).toEqual([])
     expect(page.size).toBe(1)
   })
 
-  it('stops asking thirty days after the deadline, when the service has forgotten it too', async () => {
+  it('forgets it thirty days after the deadline, when the service has forgotten it too', async () => {
     const { run, calls, page } = letting(
       [SENT],
       {},
-      SENT.expiresAt + STOP_ASKING_AFTER_DEADLINE_MS + 1,
+      SENT.expiresAt + KEPT_AFTER_DEADLINE_MS + 1,
     )
 
-    expect(await run()).toEqual([])
+    expect((await run()).admitted).toEqual([])
     expect(page.size).toBe(0)
     expect(calls).toEqual([])
+  })
+
+  it('runs one round at a time', async () => {
+    let answer = () => {}
+    const { http, service } = harness()
+    const slow: DeliveryService = {
+      ...service,
+      sentStatus: id =>
+        new Promise<void>(done => {
+          answer = done
+        }).then(() => service.sentStatus(id)),
+    }
+    const asking = {
+      sent: thePage([SENT]).sent,
+      service: slow,
+      http,
+      giveName: async () => undefined,
+      now: () => NOW,
+    }
+
+    const first = letInTheJoined(asking)
+    await Promise.resolve()
+    expect(await letInTheJoined(asking)).toEqual({ admitted: [], failed: [] })
+    answer()
+    await first
+  })
+})
+
+describe('what this launch sent besides the page (#404)', () => {
+  it('lets the recipient in on this launch when the page did not keep the invitation', async () => {
+    const { sent: broken } = thePage([], false)
+    const both = keptThisLaunchToo(() => broken)
+
+    expect(await both.remember(SENT)).toBe(false)
+    expect(await both.all()).toEqual([SENT])
+    await both.forget('inv-1')
+    expect(await both.all()).toEqual([])
+  })
+
+  it('reads the page as it is at each call, once the notebook has opened', async () => {
+    let current = thePage().sent
+    const both = keptThisLaunchToo(() => current)
+    current = thePage([SENT]).sent
+
+    expect(await both.all()).toEqual([SENT])
   })
 })

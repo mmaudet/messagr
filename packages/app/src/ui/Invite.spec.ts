@@ -127,4 +127,20 @@ describe('inviting a contact found (#404)', () => {
     expect(withId(named, 'invite-link')).toBeUndefined()
     expect(withId(named, 'invite-close')).toBeDefined()
   })
+
+  it('says, in a sentence of its own, why the service would not take it', () => {
+    for (const [refusal, key] of [
+      ['own-reference', 'invite_refused_own'],
+      ['unknown-reference', 'invite_refused_gone'],
+      ['not-findable', 'invite_refused_not_findable'],
+    ] as const) {
+      const drawn = show({ stage: 'failed', reason: 'refused', refusal })
+      expect(textIn(withId(drawn, 'invite-failed'))).toBe(t(key))
+    }
+    expect(
+      textIn(
+        withId(show({ stage: 'failed', reason: 'down' }), 'invite-failed'),
+      ),
+    ).toBe(t('invite_failed'))
+  })
 })

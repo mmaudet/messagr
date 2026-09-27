@@ -129,7 +129,7 @@ export function discoveryService(
     keys: () => call('/discovery/keys'),
     maskBatch: body => call('/discovery/masks', body),
     directory: () => call('/discovery/directory'),
-    send: body => call('/discovery/invitations', body),
+    sendInvitation: body => call('/discovery/invitations', body),
     sentStatus: id => call(`/discovery/invitations/${encodeURIComponent(id)}`),
   }
 }

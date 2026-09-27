@@ -564,11 +564,17 @@ export const fr = {
   invite_share: 'Partager le lien',
   invite_close: 'Fermer',
   'invite_sent %1$@ %2$@':
-    '%1$@ trouvera votre invitation dans Messagr jusqu’au %2$@.',
+    'Votre invitation attend %1$@ dans Messagr jusqu’au %2$@.',
   'invite_sent_unnamed %1$@':
     'Votre invitation attend dans Messagr jusqu’au %1$@.',
   invite_sent_waits:
     'La conversation attend dans votre liste que la personne invitée la rejoigne.',
+  invite_refused_own:
+    'C’est votre propre numéro : l’invitation ne mènerait qu’à vous.',
+  invite_refused_gone:
+    'Ce contact n’est plus trouvable. Regardez de nouveau vos contacts, ou invitez-le par un lien.',
+  invite_refused_not_findable:
+    'Votre numéro n’est plus prouvé. Prouvez-le de nouveau dans les Réglages pour inviter un contact trouvé.',
   invite_failed: 'L’invitation n’a pas pu être créée.',
   invite_waiting: 'Personne n’a encore ouvert le lien.',
   invite_admitted: 'C’est fait : cette personne peut entrer.',
@@ -976,6 +982,8 @@ export const fr = {
   // it happened -- never opened, expired, or declined because the two of
   // them already had a conversation.
   list_nobody_joined: 'Personne n’a rejoint cette conversation',
+  'list_sent_waiting %1$@': 'Invitation envoyée, en attente jusqu’au %1$@',
+  list_sent_expired: 'Invitation expirée',
   invite_open: 'Inviter quelqu’un',
   plus_invite: 'Inviter quelqu’un',
   plus_close: 'Fermer',

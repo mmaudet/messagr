@@ -13,6 +13,7 @@ import {
   type,
 } from '../design/tokens'
 import type { ConversationSummary } from '../runtime/conversationList'
+import type { SentInvitation } from '../runtime/deliveredInvitations'
 import type { ListNotice } from '../runtime/discovery'
 import { displayNameFor } from '../runtime/givenName'
 import type { PasteSaid } from '../runtime/pastedLink'
@@ -56,6 +57,12 @@ export interface ConversationListProps {
   /** Given names, keyed by participant. Absent means not named yet. */
   readonly names: ReadonlyMap<string, string>
   readonly onOpen: (scope: string) => void
+  /**
+   * The invitations delivered inside the application from here, by the
+   * conversation each leads to (#404): its row says whom it waits for and
+   * until when, then that it expired.
+   */
+  readonly sent?: ReadonlyMap<string, SentInvitation>
   /**
    * What became of an invitation this launch was opened with, when the
    * device already had an account. `null` when there was none. See
@@ -134,6 +141,7 @@ export function ConversationList({
   summaries,
   names,
   onOpen,
+  sent = new Map(),
   invitation = null,
   reinstalled = null,
   notInYet = false,
@@ -306,6 +314,7 @@ export function ConversationList({
             <Row
               summary={summary}
               name={nameOf(summary, names)}
+              sent={sent.get(summary.scope)}
               onOpen={onOpen}
               now={now}
               opening={summary.scope === opening}
@@ -351,6 +360,7 @@ function whenLabel(stamp: Stamp): string {
 function Row({
   summary,
   name,
+  sent,
   onOpen,
   now,
   opening = false,
@@ -358,6 +368,8 @@ function Row({
 }: {
   readonly summary: ConversationSummary
   readonly name: string | undefined
+  /** The invitation delivered inside the application it leads to (#404). */
+  readonly sent: SentInvitation | undefined
   readonly onOpen: (scope: string) => void
   /** Whether this row's conversation is the one a touch is waiting on. */
   readonly opening?: boolean
@@ -408,17 +420,30 @@ function Row({
   // who was here could not be read, nothing says nobody came: « personne
   // d'autre ici » is true either way.
   const person = personOf(summary)
+  const nobodyJoined =
+    person === null &&
+    summary.others === 0 &&
+    summary.lastAt === 0 &&
+    summary.preview === null &&
+    summary.membershipsUnread !== true
+  // AN INVITATION DELIVERED INSIDE THE APPLICATION WAITS FOR SOMEBODY (#404),
+  // whom the person named when they sent it: the row says whom, and until
+  // when, where a link's says nobody joined. The name is this device's, as a
+  // given name is.
+  const waitingFor = nobodyJoined ? sent : undefined
   const shown =
-    person !== null
-      ? displayNameFor(person, name)
-      : summary.others === 0
-        ? summary.lastAt === 0 &&
-          summary.preview === null &&
-          summary.membershipsUnread !== true
-          ? t('list_nobody_joined')
-          : t('list_nobody_else')
-        : summary.scope
-  const named = person !== null && name !== undefined
+    waitingFor !== undefined
+      ? (waitingFor.given ?? t('list_nobody_joined'))
+      : person !== null
+        ? displayNameFor(person, name)
+        : summary.others === 0
+          ? nobodyJoined
+            ? t('list_nobody_joined')
+            : t('list_nobody_else')
+          : summary.scope
+  const named =
+    (person !== null && name !== undefined) ||
+    (waitingFor !== undefined && waitingFor.given !== null)
   return (
     <Pressable
       // TWO IDENTIFIERS, AND THE SECOND IS FOR THE SUITE.
@@ -480,7 +505,13 @@ function Row({
           numberOfLines={1}
           style={styles.preview}
           testID={opening ? 'conversation-opening' : undefined}>
-          {opening ? t('list_opening') : previewOf(summary)}
+          {opening
+            ? t('list_opening')
+            : waitingFor !== undefined
+              ? waitingFor.expired
+                ? t('list_sent_expired')
+                : t('list_sent_waiting %1$@', dayOf(waitingFor.expiresAt))
+              : previewOf(summary)}
         </Text>
       </View>
       {/* Nothing at all for a conversation that has never moved: `0` is not a

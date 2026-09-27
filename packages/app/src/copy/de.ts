@@ -369,10 +369,16 @@ export const de: Readonly<Record<CopyKey, string>> = {
   invite_share: 'Link teilen',
   invite_close: 'Schließen',
   'invite_sent %1$@ %2$@':
-    '%1$@ findet Ihre Einladung bis zum %2$@ in Messagr.',
+    'Ihre Einladung wartet bis zum %2$@ in Messagr auf %1$@.',
   'invite_sent_unnamed %1$@': 'Ihre Einladung wartet bis zum %1$@ in Messagr.',
   invite_sent_waits:
-    'Die Unterhaltung wartet in Ihrer Liste darauf, dass die eingeladene Person beitritt.',
+    'Das Gespräch wartet in Ihrer Liste darauf, dass die eingeladene Person beitritt.',
+  invite_refused_own:
+    'Das ist Ihre eigene Nummer: Die Einladung würde nur zu Ihnen führen.',
+  invite_refused_gone:
+    'Dieser Kontakt ist nicht mehr auffindbar. Sehen Sie Ihre Kontakte erneut durch, oder laden Sie ihn per Link ein.',
+  invite_refused_not_findable:
+    'Ihre Nummer ist nicht mehr nachgewiesen. Weisen Sie sie in den Einstellungen erneut nach, um einen gefundenen Kontakt einzuladen.',
   invite_failed: 'Die Einladung konnte nicht erstellt werden.',
   invite_waiting: 'Noch niemand hat den Link geöffnet.',
   invite_admitted: 'Erledigt: diese Person kann hereinkommen.',
@@ -618,6 +624,8 @@ export const de: Readonly<Record<CopyKey, string>> = {
   list_nobody_else: 'Sonst niemand hier',
   list_participant_left: 'ist nicht mehr in dieser Unterhaltung',
   list_nobody_joined: 'Niemand ist diesem Gespräch beigetreten',
+  'list_sent_waiting %1$@': 'Einladung gesendet, wartet bis zum %1$@',
+  list_sent_expired: 'Einladung abgelaufen',
   invite_open: 'Jemanden einladen',
   plus_invite: 'Jemanden einladen',
   plus_close: 'Schließen',

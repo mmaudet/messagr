@@ -354,10 +354,16 @@ export const it: Readonly<Record<CopyKey, string>> = {
   invite_share: 'Condividere il link',
   invite_close: 'Chiudere',
   'invite_sent %1$@ %2$@':
-    '%1$@ troverà il Suo invito in Messagr fino al %2$@.',
-  'invite_sent_unnamed %1$@': 'Il Suo invito attende in Messagr fino al %1$@.',
+    'Il Suo invito attende %1$@ in Messagr. Scadenza: %2$@.',
+  'invite_sent_unnamed %1$@':
+    'Il Suo invito attende in Messagr. Scadenza: %1$@.',
   invite_sent_waits:
-    'La conversazione attende nella Sua lista che la persona invitata la raggiunga.',
+    'La conversazione attende nella Sua lista che la persona invitata si unisca.',
+  invite_refused_own: 'È il Suo numero: l’invito porterebbe solo a Lei.',
+  invite_refused_gone:
+    'Questo contatto non è più trovabile. Guardi di nuovo i Suoi contatti, o lo inviti con un link.',
+  invite_refused_not_findable:
+    'Il Suo numero non è più provato. Lo provi di nuovo nelle Impostazioni per invitare un contatto trovato.',
   invite_failed: 'Non è stato possibile creare l’invito.',
   invite_waiting: 'Nessuno ha ancora aperto il link.',
   invite_admitted: 'Fatto: questa persona può entrare.',
@@ -603,6 +609,8 @@ export const it: Readonly<Record<CopyKey, string>> = {
   list_nobody_else: 'Nessun altro qui',
   list_participant_left: 'non è più in questa conversazione',
   list_nobody_joined: 'Nessuno si è unito a questa conversazione',
+  'list_sent_waiting %1$@': 'Invito inviato. Scadenza: %1$@',
+  list_sent_expired: 'Invito scaduto',
   invite_open: 'Invitare qualcuno',
   plus_invite: 'Invitare qualcuno',
   plus_close: 'Chiudere',

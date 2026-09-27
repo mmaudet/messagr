@@ -362,10 +362,16 @@ export const en: Readonly<Record<CopyKey, string>> = {
   invite_share: 'Share the link',
   invite_close: 'Close',
   'invite_sent %1$@ %2$@':
-    '%1$@ will find your invitation in Messagr until %2$@.',
+    'Your invitation waits for %1$@ in Messagr until %2$@.',
   'invite_sent_unnamed %1$@': 'Your invitation waits in Messagr until %1$@.',
   invite_sent_waits:
     'The conversation waits in your list for the person you invited to join it.',
+  invite_refused_own:
+    'This is your own number: the invitation would lead only to you.',
+  invite_refused_gone:
+    'This contact can no longer be found. Look at your contacts again, or invite them by link.',
+  invite_refused_not_findable:
+    'Your number is no longer proved. Prove it again in Settings to invite a contact you found.',
   invite_failed: 'The invitation could not be created.',
   invite_waiting: 'Nobody has opened the link yet.',
   invite_admitted: 'Done: this person can come in.',
@@ -608,6 +614,8 @@ export const en: Readonly<Record<CopyKey, string>> = {
   list_nobody_else: 'Nobody else here',
   list_participant_left: 'is no longer in this conversation',
   list_nobody_joined: 'Nobody joined this conversation',
+  'list_sent_waiting %1$@': 'Invitation sent, waiting until %1$@',
+  list_sent_expired: 'Invitation expired',
   invite_open: 'Invite someone',
   plus_invite: 'Invite someone',
   plus_close: 'Close',
