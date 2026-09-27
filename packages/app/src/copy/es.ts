@@ -422,7 +422,7 @@ export const es: Readonly<Record<CopyKey, string>> = {
     'Messagr es un servicio de alojamiento y no una plataforma en línea; el considerando 14 del DSA excluye los servicios de comunicaciones interpersonales. Los artículos 20 y 21 no se aplican, por tanto, y este texto no pretende ofrecerlos.',
   legal_delete_title: 'Eliminar su cuenta',
   legal_delete_body:
-    'La eliminación se hace desde la aplicación: Ajustes y, luego, «Eliminar mi cuenta». La cuenta queda entonces desactivada de inmediato y sus datos se purgan; los mensajes ya enviados siguen siendo eventos de las salas donde se escribieron, y el servidor no puede retirarlos porque no puede leerlos. Sin este dispositivo, o cuando la aplicación se lo pida, la eliminación se solicita por correo electrónico a conformite@messagr.eu.',
+    'La eliminación se hace desde la aplicación: Ajustes y, luego, «Eliminar mi cuenta». La cuenta queda entonces desactivada de inmediato y sus datos se purgan en un plazo de treinta días; los mensajes ya enviados siguen siendo eventos de las salas donde se escribieron, y el servidor no puede retirarlos porque no puede leerlos. Sin este dispositivo, o cuando la aplicación se lo pida, la eliminación se solicita por correo electrónico a conformite@messagr.eu.',
   legal_delete_link: 'Sin este dispositivo: messagr.eu/aide',
   legal_full_terms: 'Condiciones generales completas: messagr.eu',
   trust_action: 'Lo que se sabe de esta persona',
