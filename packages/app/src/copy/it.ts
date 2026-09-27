@@ -382,6 +382,12 @@ export const it: Readonly<Record<CopyKey, string>> = {
     'Quanto dura questo link e quante aperture gli restano non si leggono qui: solo l’account che l’ha emesso può chiederlo.',
   invited_nothing_sent:
     'Non è ancora stato inviato nulla. Finché non risponde, questo invito resta dov’è.',
+  invited_who_found:
+    'Qualcuno che ha il Suo numero in rubrica La invita a una conversazione.',
+  'invited_terms_delivered %1$@':
+    'Questo invito vale una sola volta. Scadenza: %1$@.',
+  invited_nothing_told:
+    'Chi La invita non sa nulla finché Lei non si unisce: il rifiuto non viene comunicato.',
   invited_nothing_spent:
     'Non è ancora stato inviato nulla. Finché non risponde, questo link non è speso.',
   'invited_behind %1$d': '%1$d altro/i invito/i in attesa dietro a questo.',
@@ -611,6 +617,8 @@ export const it: Readonly<Record<CopyKey, string>> = {
   list_nobody_joined: 'Nessuno si è unito a questa conversazione',
   'list_sent_waiting %1$@': 'Invito inviato. Scadenza: %1$@',
   list_sent_expired: 'Invito scaduto',
+  list_delivered_invitation: 'Invito in Messagr',
+  'list_delivered_until %1$@': 'Scadenza: %1$@',
   invite_open: 'Invitare qualcuno',
   plus_invite: 'Invitare qualcuno',
   plus_close: 'Chiudere',

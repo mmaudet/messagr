@@ -61,6 +61,7 @@ describe('whatIsKnown', () => {
     expect(known).toMatchObject({
       instance: 'other.example',
       elsewhere: true,
+      expiresAt: null,
     })
   })
 
@@ -99,6 +100,7 @@ describe('whatIsKnown', () => {
       identifier: '',
       instance: null,
       elsewhere: false,
+      expiresAt: null,
     })
   })
 
@@ -143,6 +145,7 @@ describe('whatALinkSays', () => {
       identifier: '',
       instance: 'messagr.eu',
       elsewhere: false,
+      expiresAt: null,
     })
   })
 

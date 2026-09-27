@@ -566,6 +566,11 @@ const standing = new Set<string>()
 export async function enterAnyInvitations(
   sessionClient: ReturnType<typeof createClient>,
   selfUserId: string,
+  /**
+   * Whose invitation delivered inside the application this account joined
+   * (#404): their room invite is entered too. `enterInvitations.ts`.
+   */
+  awaitedFrom: () => ReadonlySet<string> = () => new Set(),
 ): Promise<Entered> {
   const http = makePumpHttp(sessionClient)
   const entered = await enterInvitations({
@@ -577,6 +582,7 @@ export async function enterAnyInvitations(
     // ONE DOOR PER LINK SPENT. Entry records a claim in the same register on
     // the other side of the launch; see `awaitedInvitations.ts`.
     awaited: theAwaitedInvitations.count,
+    awaitedFrom,
     // ONE CALL PER CONVERSATION, and `enterInvitations` is careful about
     // when it asks: never on a tick with no invitation on it, which is
     // almost every tick. Direct conversations only -- a room of three has
@@ -598,9 +604,7 @@ export async function enterAnyInvitations(
   // conversation declined each answer one invitation this device was waiting
   // for; a join that failed answered nothing, so the next tick is owed it
   // again.
-  theAwaitedInvitations.settled(
-    entered.joined.length + entered.collapsed.length,
-  )
+  theAwaitedInvitations.settled(entered.doors)
   const nowStanding = entered.waiting.filter(one => !standing.has(one.scope))
   for (const one of nowStanding) standing.add(one.scope)
   // Only when something happened: this runs on every sync tick, and a line

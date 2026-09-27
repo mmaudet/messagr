@@ -339,3 +339,43 @@ describe('a conversation an invitation delivered inside Messagr waits in (#404)'
     expect(words(drawn)).not.toContain('Paul')
   })
 })
+
+describe('invitations delivered inside Messagr, atop the list (#404)', () => {
+  const waiting = [
+    { id: 'a', expiresAt: NOW + 7 * 86_400_000 },
+    { id: 'b', expiresAt: NOW + 3 * 86_400_000 },
+  ]
+
+  it('draws each above the conversations, with its deadline, and opens it', () => {
+    const opened: string[] = []
+    const drawn = list({
+      delivered: waiting,
+      onOpenDelivered: invitation => opened.push(invitation.id),
+    })
+
+    const said = words(drawn)
+    expect(said.indexOf(t('list_delivered_invitation'))).toBeLessThan(
+      said.indexOf('Bonjour'),
+    )
+    expect(said).toContain(
+      t('list_delivered_until %1$@', dayOf(NOW + 3 * 86_400_000)),
+    )
+    const rows = [...everything(drawn)].filter(
+      node => node.props.testID === 'list-delivered-invitation',
+    )
+    expect(rows).toHaveLength(2)
+    ;(rows[1]!.props.onPress as () => void)()
+    expect(opened).toEqual(['b'])
+  })
+
+  it('leaves the first conversation its own test identifier', () => {
+    const drawn = list({ delivered: waiting })
+
+    expect(withId(drawn, 'first-conversation')).toBeDefined()
+    expect(
+      [...everything(drawn)].filter(
+        node => node.props.testID === 'first-conversation',
+      ),
+    ).toHaveLength(1)
+  })
+})

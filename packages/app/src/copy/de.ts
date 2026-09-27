@@ -397,6 +397,12 @@ export const de: Readonly<Record<CopyKey, string>> = {
     'Wie lange dieser Link gilt und wie viele Öffnungen ihm bleiben, lässt sich hier nicht lesen: nur das Konto, das ihn ausgestellt hat, kann danach fragen.',
   invited_nothing_sent:
     'Es wurde noch nichts gesendet. Solange Sie nicht geantwortet haben, bleibt diese Einladung, wo sie ist.',
+  invited_who_found:
+    'Jemand, der Ihre Nummer im Adressbuch hat, lädt Sie zu einem Gespräch ein.',
+  'invited_terms_delivered %1$@':
+    'Diese Einladung gilt bis zum %1$@, und nur einmal.',
+  invited_nothing_told:
+    'Die einladende Person erfährt nichts, solange Sie nicht beitreten: Ablehnen teilt ihr nichts mit.',
   invited_nothing_spent:
     'Es wurde noch nichts gesendet. Solange Sie nicht geantwortet haben, ist dieser Link nicht verbraucht.',
   'invited_behind %1$d': '%1$d weitere Einladung(en) warten dahinter.',
@@ -626,6 +632,8 @@ export const de: Readonly<Record<CopyKey, string>> = {
   list_nobody_joined: 'Niemand ist diesem Gespräch beigetreten',
   'list_sent_waiting %1$@': 'Einladung gesendet, wartet bis zum %1$@',
   list_sent_expired: 'Einladung abgelaufen',
+  list_delivered_invitation: 'Einladung in Messagr',
+  'list_delivered_until %1$@': 'Gültig bis zum %1$@',
   invite_open: 'Jemanden einladen',
   plus_invite: 'Jemanden einladen',
   plus_close: 'Schließen',

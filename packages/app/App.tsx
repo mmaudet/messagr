@@ -165,7 +165,11 @@ import {
   fetchJoinedMembers,
   type Invitation,
 } from './src/runtime/encryptedSend'
-import { whatALinkSays, whatIsKnown } from './src/runtime/invitationOnScreen'
+import {
+  whatADeliveredInvitationSays,
+  whatALinkSays,
+  whatIsKnown,
+} from './src/runtime/invitationOnScreen'
 import { linkOnScreen, type Described } from './src/runtime/linkOnScreen'
 import { sameThreshold, stillStanding } from './src/runtime/standingInvitations'
 import { theOtherMember, type VouchOutcome } from './src/runtime/vouch'
@@ -179,9 +183,13 @@ import {
 } from './src/runtime/outstandingStore'
 import { forgetfulSentInvitations } from './src/runtime/sentInvitationStore'
 import {
+  declineDelivered,
+  joinDelivered,
   keptThisLaunchToo,
+  readTheWaiting,
   type SentInvitation,
   type SentInvitations,
+  type WaitingInvitation,
 } from './src/runtime/deliveredInvitations'
 import { admitAnyoneWaiting } from './src/runtime/admitAnyoneWaiting'
 import { displayNameFor } from './src/runtime/givenName'
@@ -586,12 +594,79 @@ export function App({
   const [sentByScope, setSentByScope] = useState<
     ReadonlyMap<string, SentInvitation>
   >(new Map())
+  /**
+   * Reads the invitations delivered inside Messagr for this account (#404).
+   * An answer that could not be read changes nothing: the list keeps what it
+   * showed, and the next tick asks again.
+   */
+  const readDelivered = async () => {
+    const waiting = await readTheWaiting(discoveryDeps.service).catch(
+      () => null,
+    )
+    if (waiting === null) return
+    awaitedFromRef.current = waiting.awaitedFrom
+    setDeliveredWaiting(waiting.unanswered)
+  }
+  /**
+   * « Rejoindre » or « Refuser » on §13.3's screen for an invitation
+   * delivered inside Messagr (#404). Joined, its inviter's room invite is
+   * awaited from now on, and entered at the next tick that brings it. Run
+   * out or gone, it leaves the list all the same; only a service that could
+   * not be reached keeps the screen, and says so.
+   */
+  const answerDelivered = (
+    how: 'join' | 'refuse',
+    invitation: WaitingInvitation,
+  ) => {
+    setAnsweringDelivered(how)
+    setDeliveredFailed(false)
+    const answering = async () => {
+      const answered =
+        how === 'join'
+          ? await joinDelivered(discoveryDeps.service, invitation.id)
+          : await declineDelivered(discoveryDeps.service, invitation.id)
+      setAnsweringDelivered(null)
+      if (answered === 'unreachable') {
+        setDeliveredFailed(true)
+        return
+      }
+      if (typeof answered === 'object' && 'joined' in answered) {
+        awaitedFromRef.current = new Set([
+          ...awaitedFromRef.current,
+          answered.joined,
+        ])
+      }
+      setDeliveredWaiting(held => held.filter(one => one.id !== invitation.id))
+      setDeliveredOnScreen(null)
+    }
+    answering().catch(() => {
+      setAnsweringDelivered(null)
+      setDeliveredFailed(true)
+    })
+  }
   const readSentInvitations = async () => {
     const sent = await sentInvitationsRef.current.all()
     setSentByScope(new Map(sent.map(one => [one.scope, one])))
   }
   /** The number this account proved, as the search reads it (#404). */
   const keptNumberRef = useRef<string | null>(null)
+  /**
+   * THE INVITATIONS DELIVERED INSIDE MESSAGR FOR THIS ACCOUNT (#404): those
+   * to answer, atop the list, and whose room invite this account awaits,
+   * having joined. Read at launch and at each sync tick. The second is a ref
+   * for the reason `outstandingRef` is one: a sync tick reads it.
+   */
+  const [deliveredWaiting, setDeliveredWaiting] = useState<
+    readonly WaitingInvitation[]
+  >([])
+  const awaitedFromRef = useRef<ReadonlySet<string>>(new Set())
+  /** The one open on §13.3's screen, and how its answer is going. */
+  const [deliveredOnScreen, setDeliveredOnScreen] =
+    useState<WaitingInvitation | null>(null)
+  const [answeringDelivered, setAnsweringDelivered] = useState<
+    'join' | 'refuse' | null
+  >(null)
+  const [deliveredFailed, setDeliveredFailed] = useState(false)
   // The list as it was last drawn. Read once at the top of the launch and
   // written by every derivation after it. `listCacheStore.ts` says why.
   const listCacheRef = useRef<ListCache>(forgetfulListCache())
@@ -2935,9 +3010,13 @@ export function App({
             // Before the list rather than after: a conversation joined a
             // moment later would be derived a moment too late and only appear
             // at the next tick.
+            // WHOSE ROOM INVITE THIS ACCOUNT AWAITS (#404), read before the
+            // walk, so that a relaunch enters it as the tick would have.
+            await readDelivered()
             const walkedAtLaunch = await enterAnyInvitations(
               sessionClient,
               credentials.userId,
+              () => awaitedFromRef.current,
             )
             // WHAT STAYED ON THE THRESHOLD, PUT TO THE PERSON. #329, §13.3's
             // first screen. An invitation this launch was owed nothing for
@@ -4230,6 +4309,12 @@ export function App({
                       }),
                     )
 
+                  // AND WHAT WAITS FOR THIS ACCOUNT (#404): the invitations to
+                  // answer, atop the list, and whose room invite it awaits.
+                  // Not awaited, for the reason above; `readDelivered` never
+                  // throws.
+                  readDelivered().catch(() => {})
+
                   // AND THE INVITATIONS DELIVERED INSIDE THE APPLICATION
                   // (#404), asked about once a tick for as long as they are
                   // good: whoever joined one is let into its conversation and
@@ -4264,7 +4349,11 @@ export function App({
                   //
                   // Not awaited: nothing below depends on it, and the loop's
                   // tick must not wait on a join.
-                  enterAnyInvitations(sessionClient, credentials.userId)
+                  enterAnyInvitations(
+                    sessionClient,
+                    credentials.userId,
+                    () => awaitedFromRef.current,
+                  )
                     .then(walked => {
                       // A room joined is a row the list does not have yet.
                       // A room declined is one it may still be showing: the
@@ -4731,6 +4820,13 @@ export function App({
         findingRef.current.close()
         return true
       }
+      // AN INVITATION DELIVERED INSIDE MESSAGR, OPENED FROM ITS ROW (#404):
+      // back leaves it unanswered, on the list, where it was. Not while its
+      // answer is on its way: the screen that asked would be gone.
+      if (deliveredOnScreen !== null) {
+        if (answeringDelivered === null) setDeliveredOnScreen(null)
+        return true
+      }
       if (invite.stage !== 'shut') {
         setInvite({ stage: 'shut' })
         setAdmission(null)
@@ -4755,6 +4851,8 @@ export function App({
     deletion,
     proof.stage,
     finding.stage,
+    deliveredOnScreen,
+    answeringDelivered,
     invite.stage,
     tab,
     backupPrompt,
@@ -5811,6 +5909,11 @@ export function App({
                   <ConversationList
                     summaries={summaries}
                     sent={sentByScope}
+                    delivered={deliveredWaiting}
+                    onOpenDelivered={invitation => {
+                      setDeliveredFailed(false)
+                      setDeliveredOnScreen(invitation)
+                    }}
                     names={names}
                     invitation={linkOutcome}
                     reinstalled={reinstalled}
@@ -6361,6 +6464,32 @@ export function App({
                 failed={answerFailed === deciding.scope}
                 onJoin={() => answerTheInvitation('join', deciding.scope)}
                 onRefuse={() => answerTheInvitation('refuse', deciding.scope)}
+              />
+            </SafeAreaView>
+          )}
+
+        {/* AN INVITATION DELIVERED INSIDE MESSAGR, OPENED FROM ITS ROW (#404).
+            §13.3's first screen again, at rest as the one above, and opened by
+            a tap rather than put to the person: it waits on the list until
+            then, and back leaves it there. */}
+        {deliveredOnScreen !== null &&
+          openScope === null &&
+          tab === 'chat' &&
+          invite.stage === 'shut' &&
+          finding.stage === 'shut' && (
+            <SafeAreaView
+              testID="invited-delivered"
+              style={[StyleSheet.absoluteFill, styles.root]}
+              edges={['top', 'bottom', 'left', 'right']}>
+              <Invited
+                known={whatADeliveredInvitationSays(
+                  deliveredOnScreen.expiresAt,
+                )}
+                behind={0}
+                working={answeringDelivered}
+                failed={deliveredFailed}
+                onJoin={() => answerDelivered('join', deliveredOnScreen)}
+                onRefuse={() => answerDelivered('refuse', deliveredOnScreen)}
               />
             </SafeAreaView>
           )}

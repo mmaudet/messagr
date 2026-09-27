@@ -21,6 +21,17 @@
  * until it is joined or runs out: a week, and past its deadline for as long
  * as the service keeps it, since one joined in time must still be honoured
  * by a device that reads late.
+ *
+ * # THE RECIPIENT'S SIDE
+ *
+ * At launch and at each sync tick, the application reads the invitations
+ * waiting for its account (`readTheWaiting`), and shows them atop the list.
+ * « Rejoindre » tells the service, which names the inviter in its answer;
+ * « Refuser » tells the service alone, never the inviter. An invitation
+ * joined stays in the service's list until its deadline, with its inviter:
+ * the room invite that inviter's device sends is entered without asking
+ * again (`enterInvitations.ts`), even after a relaunch, since the person has
+ * answered already.
  */
 import { parsed, type Answer } from './discovery'
 import { getErrorMessage } from './errors'
@@ -33,6 +44,123 @@ export interface DeliveryService {
   readonly sendInvitation: (body: string) => Promise<Answer>
   /** `GET /discovery/invitations/:id`: where an invitation sent stands. */
   readonly sentStatus: (id: string) => Promise<Answer>
+  /** `GET /discovery/invitations`: those waiting for this account. */
+  readonly waitingInvitations: () => Promise<Answer>
+  /** `POST /discovery/invitations/:id/join`. */
+  readonly joinInvitation: (id: string) => Promise<Answer>
+  /** `POST /discovery/invitations/:id/decline`. */
+  readonly declineInvitation: (id: string) => Promise<Answer>
+}
+
+/** An invitation waiting for this account's answer. */
+export interface WaitingInvitation {
+  readonly id: string
+  /** Milliseconds since the epoch. */
+  readonly expiresAt: number
+}
+
+/** What the service says is waiting for this account. */
+export interface Waiting {
+  /** Invitations to answer, oldest first. */
+  readonly unanswered: readonly WaitingInvitation[]
+  /**
+   * The accounts whose invitation this account joined and whose room invite
+   * it waits for: that invite is entered without asking again.
+   */
+  readonly awaitedFrom: ReadonlySet<string>
+}
+
+/**
+ * The invitations waiting for this account, as the service lists them, or
+ * `null` when it could not be read: the list keeps what it last showed.
+ */
+export async function readTheWaiting(
+  service: DeliveryService,
+): Promise<Waiting | null> {
+  let answer: Answer
+  try {
+    answer = await service.waitingInvitations()
+  } catch {
+    return null
+  }
+  const body = parsed(answer.body)
+  if (answer.status !== 200 || !Array.isArray(body?.invitations)) return null
+  const unanswered: WaitingInvitation[] = []
+  const awaitedFrom = new Set<string>()
+  for (const entry of body.invitations as Record<string, unknown>[]) {
+    // Read defensively, for the reason every answer of the service is: an
+    // entry of the wrong shape is one to skip, not a list to lose.
+    const { id, expires_at: expiresAt, inviter_user_id: inviter } = entry
+    if (typeof id !== 'string' || id === '' || typeof expiresAt !== 'number') {
+      continue
+    }
+    if (typeof inviter === 'string' && inviter !== '') {
+      awaitedFrom.add(inviter)
+    } else {
+      unanswered.push({ id, expiresAt: expiresAt * 1000 })
+    }
+  }
+  return { unanswered, awaitedFrom }
+}
+
+/**
+ * What answering an invitation came to: the inviter, once joined; or that it
+ * ran out, is gone (declined elsewhere, joined already, or never this
+ * account's), or that the service could not be reached.
+ */
+export type Answered =
+  | { readonly joined: string }
+  | { readonly declined: true }
+  | 'expired'
+  | 'gone'
+  | 'unreachable'
+
+/** « Rejoindre »: the service records the claim and names the inviter. */
+export async function joinDelivered(
+  service: DeliveryService,
+  id: string,
+): Promise<Answered> {
+  let answer: Answer
+  try {
+    answer = await service.joinInvitation(id)
+  } catch {
+    return 'unreachable'
+  }
+  const body = parsed(answer.body)
+  const inviter = body?.inviter_user_id
+  if (answer.status === 200 && typeof inviter === 'string' && inviter !== '') {
+    return { joined: inviter }
+  }
+  return refusalOf(answer.status, body)
+}
+
+/**
+ * « Refuser »: the service takes the invitation off this account's list, and
+ * tells the inviter nothing.
+ */
+export async function declineDelivered(
+  service: DeliveryService,
+  id: string,
+): Promise<Answered> {
+  let answer: Answer
+  try {
+    answer = await service.declineInvitation(id)
+  } catch {
+    return 'unreachable'
+  }
+  if (answer.status >= 200 && answer.status < 300) return { declined: true }
+  return refusalOf(answer.status, parsed(answer.body))
+}
+
+function refusalOf(
+  status: number,
+  body: Record<string, unknown> | null,
+): Answered {
+  if (status === 410 && body?.errcode === 'MESSAGR_INVITATION_EXPIRED') {
+    return 'expired'
+  }
+  if (status === 404 && body?.errcode === 'M_NOT_FOUND') return 'gone'
+  return 'unreachable'
 }
 
 /** An invitation this device sent, that nobody has been let in through. */

@@ -2,10 +2,13 @@ import { describe, expect, it } from 'vitest'
 
 import type { Answer } from './discovery'
 import {
+  declineDelivered,
   deliverInvitation,
+  joinDelivered,
   KEPT_AFTER_DEADLINE_MS,
   keptThisLaunchToo,
   letInTheJoined,
+  readTheWaiting,
   type DeliveryService,
   type SentInvitation,
   type SentInvitations,
@@ -32,9 +35,14 @@ function harness(
     /** Who is already invited or in each conversation. */
     there?: Readonly<Record<string, readonly string[]>>
     refuseInvite?: boolean
+    /** What `GET /discovery/invitations` answers. */
+    waiting?: Answer | Error
+    /** What joining or declining answers. */
+    answer?: Answer | Error
   } = {},
 ) {
   const calls: Call[] = []
+  const answered: string[] = []
   const http: HttpRequester = {
     authedRequest: async (method, path, _query, body) => {
       calls.push({ method, path, body })
@@ -81,8 +89,27 @@ function harness(
       if (answer instanceof Error) throw answer
       return answer
     },
+    waitingInvitations: async () => {
+      if (options.waiting instanceof Error) throw options.waiting
+      return options.waiting ?? { status: 200, body: '{"invitations":[]}' }
+    },
+    joinInvitation: async id => {
+      answered.push(`join ${id}`)
+      if (options.answer instanceof Error) throw options.answer
+      return (
+        options.answer ?? {
+          status: 200,
+          body: JSON.stringify({ inviter_user_id: '@alice:x' }),
+        }
+      )
+    },
+    declineInvitation: async id => {
+      answered.push(`decline ${id}`)
+      if (options.answer instanceof Error) throw options.answer
+      return options.answer ?? { status: 204, body: '' }
+    },
   }
-  return { http, service, calls, sent }
+  return { http, service, calls, sent, answered }
 }
 
 /** The page of the notebook, as a map; one that will not write, on request. */
@@ -392,5 +419,72 @@ describe('what this launch sent besides the page (#404)', () => {
     current = thePage([SENT]).sent
 
     expect(await both.all()).toEqual([SENT])
+  })
+})
+
+describe('the invitations waiting for this account (#404)', () => {
+  it('reads those to answer, and the inviters whose room invite is awaited', async () => {
+    const { service } = harness({
+      waiting: {
+        status: 200,
+        body: JSON.stringify({
+          invitations: [
+            { id: 'a', expires_at: 1_790_604_800 },
+            { id: 'b', expires_at: 1_790_604_900, inviter_user_id: '@alice:x' },
+            { id: 42, expires_at: 1 },
+          ],
+        }),
+      },
+    })
+
+    expect(await readTheWaiting(service)).toEqual({
+      unanswered: [{ id: 'a', expiresAt: 1_790_604_800_000 }],
+      awaitedFrom: new Set(['@alice:x']),
+    })
+  })
+
+  it('says nothing it could not read, so the list keeps what it showed', async () => {
+    for (const waiting of [
+      new Error('down'),
+      { status: 502, body: 'Bad Gateway' },
+    ]) {
+      expect(await readTheWaiting(harness({ waiting }).service)).toBeNull()
+    }
+  })
+
+  it('joins, and learns the inviter', async () => {
+    const { service, answered } = harness()
+
+    expect(await joinDelivered(service, 'a')).toEqual({ joined: '@alice:x' })
+    expect(answered).toEqual(['join a'])
+  })
+
+  it('declines, and the service alone is told', async () => {
+    const { service, answered } = harness()
+
+    expect(await declineDelivered(service, 'a')).toEqual({ declined: true })
+    expect(answered).toEqual(['decline a'])
+  })
+
+  it('says an invitation ran out, is gone, or could not be answered', async () => {
+    for (const [answer, said] of [
+      [
+        {
+          status: 410,
+          body: JSON.stringify({ errcode: 'MESSAGR_INVITATION_EXPIRED' }),
+        },
+        'expired',
+      ],
+      [
+        { status: 404, body: JSON.stringify({ errcode: 'M_NOT_FOUND' }) },
+        'gone',
+      ],
+      [{ status: 502, body: 'Bad Gateway' }, 'unreachable'],
+      [new Error('down'), 'unreachable'],
+    ] as const) {
+      const { service } = harness({ answer })
+      expect(await joinDelivered(service, 'a')).toBe(said)
+      expect(await declineDelivered(service, 'a')).toBe(said)
+    }
   })
 })

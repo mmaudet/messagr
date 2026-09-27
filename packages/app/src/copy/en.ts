@@ -390,6 +390,12 @@ export const en: Readonly<Record<CopyKey, string>> = {
     'How long this link lasts and how many uses it has left cannot be read here: only the account that issued it can ask.',
   invited_nothing_sent:
     'Nothing has been sent yet. Until you answer, this invitation stays where it is.',
+  invited_who_found:
+    'Someone who has your number in their address book invites you to a conversation.',
+  'invited_terms_delivered %1$@':
+    'This invitation is good until %1$@, and only once.',
+  invited_nothing_told:
+    'The person who invites you learns nothing until you join: declining tells them nothing.',
   invited_nothing_spent:
     'Nothing has been sent yet. Until you answer, this link is not spent.',
   'invited_behind %1$d':
@@ -616,6 +622,8 @@ export const en: Readonly<Record<CopyKey, string>> = {
   list_nobody_joined: 'Nobody joined this conversation',
   'list_sent_waiting %1$@': 'Invitation sent, waiting until %1$@',
   list_sent_expired: 'Invitation expired',
+  list_delivered_invitation: 'Invitation in Messagr',
+  'list_delivered_until %1$@': 'Good until %1$@',
   invite_open: 'Invite someone',
   plus_invite: 'Invite someone',
   plus_close: 'Close',

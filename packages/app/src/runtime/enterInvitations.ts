@@ -61,6 +61,14 @@ export interface Entering {
    */
   readonly awaited: () => number
   /**
+   * The accounts whose invitation delivered inside the application this
+   * account has joined (#404): the room invite from one of them is the one
+   * the person already answered « Rejoindre » to, and is entered without
+   * spending a link's door. The service keeps the list until the deadline,
+   * so a relaunch knows it too (`deliveredInvitations.ts`).
+   */
+  readonly awaitedFrom: () => ReadonlySet<string>
+  /**
    * Everyone this account already has a direct conversation with.
    *
    * Asked for lazily, and only when there is an invitation this device may
@@ -79,6 +87,12 @@ export interface Entering {
 export interface Entered {
   /** The rooms this device joined, which is news for a conversation list. */
   readonly joined: readonly string[]
+  /**
+   * How many of the invitations owed to links this walk answered, entered
+   * or declined: what the register of `awaitedInvitations.ts` is settled
+   * with. An invitation from an awaited inviter (#404) is not one of them.
+   */
+  readonly doors: number
   /** What went wrong, per room. Empty on the ordinary path. */
   readonly refused: readonly {
     readonly scope: string
@@ -137,19 +151,28 @@ export async function enterInvitations(deps: Entering): Promise<Entered> {
   } catch (cause: unknown) {
     return {
       joined: [],
+      doors: 0,
       refused: [{ scope: '', reason: getErrorMessage(cause) }],
       collapsed: [],
       waiting: [],
     }
   }
 
-  if (invited.length === 0) return { joined, refused, collapsed, waiting }
+  if (invited.length === 0) {
+    return { joined, doors: 0, refused, collapsed, waiting }
+  }
 
-  // HOW MANY DOORS THIS WALK MAY OPEN, read once and spent as it goes. A tick
-  // that is owed nothing enters nothing, and says so without asking the
-  // homeserver a single question about rooms it will not touch.
+  // HOW MANY DOORS THIS WALK MAY OPEN, read once and spent as it goes, and
+  // whose invitations the person already said « Rejoindre » to (#404). A tick
+  // that is owed nothing and awaits nobody enters nothing, and says so
+  // without asking the homeserver a single question about rooms it will not
+  // touch.
   let owed = deps.awaited()
-  if (owed <= 0) return { joined, refused, collapsed, waiting: [...invited] }
+  const answeredFrom = deps.awaitedFrom()
+  let doors = 0
+  if (owed <= 0 && answeredFrom.size === 0) {
+    return { joined, doors, refused, collapsed, waiting: [...invited] }
+  }
 
   // ASKED ONCE, AND ONLY BECAUSE THERE IS SOMETHING TO DECIDE. Every sync
   // tick reaches this function and almost none of them carry an invitation;
@@ -170,19 +193,23 @@ export async function enterInvitations(deps: Entering): Promise<Entered> {
 
   for (const invitation of invited) {
     const { scope, from } = invitation
+    // AN INVITATION DELIVERED INSIDE THE APPLICATION, ALREADY ANSWERED (#404):
+    // its inviter's room invite is entered as a link's is, and spends no
+    // door, since no link was spent for it.
+    const answered = from !== null && answeredFrom.has(from)
     // PAST WHAT THIS DEVICE IS OWED, AN INVITATION IS LEFT WHERE IT IS.
     // Nothing is joined, nothing is declined, and nothing is asked about it:
     // the screen of §13.3 is what puts it to the person.
-    if (owed <= 0) {
+    if (!answered && owed <= 0) {
       waiting.push(invitation)
       continue
     }
     // One of the doors this walk may open, whichever way the door goes: a
     // conversation declined below answered the invitation just as a
     // conversation joined does. A join that failed spends this walk's door
-    // and no more than that -- `cryptoPump.ts` settles the register on what
-    // came back, so the next tick is owed it again.
-    owed -= 1
+    // and no more than that -- `cryptoPump.ts` settles the register on the
+    // doors that came back, so the next tick is owed it again.
+    if (!answered) owed -= 1
     // ONE DIRECT CONVERSATION PER PERSON, which is the rule this answers.
     //
     // Two people already in contact can each issue the other an invitation
@@ -199,6 +226,7 @@ export async function enterInvitations(deps: Entering): Promise<Entered> {
       try {
         await deps.decline(deps.http, scope)
         collapsed.push({ scope, from })
+        if (!answered) doors += 1
       } catch (cause: unknown) {
         // Declining is the tidy half and entering is the necessary one. A
         // refusal that cannot be sent leaves the invitation standing, which
@@ -209,10 +237,11 @@ export async function enterInvitations(deps: Entering): Promise<Entered> {
     }
     try {
       joined.push(await deps.join(deps.http, scope))
+      if (!answered) doors += 1
     } catch (cause: unknown) {
       refused.push({ scope, reason: getErrorMessage(cause) })
     }
   }
 
-  return { joined, refused, collapsed, waiting }
+  return { joined, doors, refused, collapsed, waiting }
 }

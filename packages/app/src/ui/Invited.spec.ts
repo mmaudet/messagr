@@ -3,8 +3,12 @@ import * as ReactNamespace from 'react'
 import { describe, expect, it, vi } from 'vitest'
 
 import { t } from '../copy'
-import type { WhatIsKnown } from '../runtime/invitationOnScreen'
+import {
+  whatADeliveredInvitationSays,
+  type WhatIsKnown,
+} from '../runtime/invitationOnScreen'
 import { Invited } from './Invited'
+import { dayOf } from './whenLabel'
 
 /**
  * The screen that decides an invitation nobody spent a link for.
@@ -107,6 +111,7 @@ const her: WhatIsKnown = {
   identifier: '@her:messagr.eu',
   instance: 'messagr.eu',
   elsewhere: false,
+  expiresAt: null,
 }
 
 /** The same screen, opened by a link nobody has spent yet. #329. */
@@ -119,6 +124,7 @@ const byLink: WhatIsKnown = {
   identifier: '',
   instance: 'messagr.eu',
   elsewhere: false,
+  expiresAt: null,
 }
 
 function screen(over: Partial<Parameters<typeof Invited>[0]> = {}): Drawn[] {
@@ -224,6 +230,7 @@ describe('the invitation standing on the threshold', () => {
         identifier: '',
         instance: null,
         elsewhere: false,
+        expiresAt: null,
       },
     })
     expect(said(drawn)).toEqual([
@@ -365,5 +372,36 @@ describe('the same screen, opened by a link', () => {
     expect(find(drawn, 'invited-join')?.props.disabled).toBe(true)
     expect(find(drawn, 'invited-refuse')?.props.disabled).toBe(true)
     expect(said(drawn)).toContain(t('invited_working'))
+  })
+})
+
+describe('an invitation delivered inside Messagr (#404)', () => {
+  const expiresAt = new Date(2026, 9, 4, 12).getTime()
+  const delivered = whatADeliveredInvitationSays(expiresAt)
+
+  it('says its sender had this number, when it runs out, and that nothing is told until joining', () => {
+    expect(said(screen({ known: delivered }))).toEqual([
+      t('invited_title'),
+      t('invited_who_found'),
+      t('invited_terms_delivered %1$@', dayOf(expiresAt)),
+      t('invited_nothing_told'),
+      t('invited_join'),
+      t('invited_refuse'),
+    ])
+  })
+
+  it('offers « Rejoindre » and « Refuser », of the same rank', () => {
+    const answered: string[] = []
+    const drawn = screen({
+      known: delivered,
+      onJoin: () => answered.push('join'),
+      onRefuse: () => answered.push('refuse'),
+    })
+
+    ;(find(drawn, 'invited-join')?.props.onPress as () => void)()
+    ;(find(drawn, 'invited-refuse')?.props.onPress as () => void)()
+    expect(answered).toEqual(['join', 'refuse'])
+    expect(find(drawn, 'invited-join')?.props.wide).toBe(true)
+    expect(find(drawn, 'invited-refuse')?.props.wide).toBe(true)
   })
 })

@@ -5,6 +5,7 @@ import { t } from '../copy'
 import { color, layout, space, stroke, type } from '../design/tokens'
 import type { WhatIsKnown } from '../runtime/invitationOnScreen'
 import { NotchedButton } from './NotchedButton'
+import { dayOf } from './whenLabel'
 
 /**
  * Screen 1 of §13.3 — receiving an invitation.
@@ -117,6 +118,10 @@ export function Invited({
   readonly onRefuse: () => void
 }) {
   const byLink = known.source === 'link'
+  // DELIVERED INSIDE THE APPLICATION (#404): nobody is named until the person
+  // joins, the deadline is known, and nothing is told to the sender either
+  // way until then.
+  const delivered = known.source === 'delivered'
   const nobody = known.identifier === ''
   return (
     <ScrollView
@@ -154,7 +159,11 @@ export function Invited({
               themselves, and one sentence for both would be this screen
               rounding two different facts to whichever it met first. */}
           <Text style={styles.body}>
-            {byLink ? t('invited_who_undeclared') : t('invited_who_unknown')}
+            {delivered
+              ? t('invited_who_found')
+              : byLink
+                ? t('invited_who_undeclared')
+                : t('invited_who_unknown')}
           </Text>
         </View>
       ) : (
@@ -197,7 +206,11 @@ export function Invited({
             somebody has just opened, and a screen that told them that would
             be wrong about the one thing they can see for themselves. */}
         <Text style={styles.body}>
-          {byLink ? t('invited_terms_link') : t('invited_terms_unknown')}
+          {delivered && known.expiresAt !== null
+            ? t('invited_terms_delivered %1$@', dayOf(known.expiresAt))
+            : byLink
+              ? t('invited_terms_link')
+              : t('invited_terms_unknown')}
         </Text>
       </View>
 
@@ -206,7 +219,11 @@ export function Invited({
             only has nothing been sent, the token is unspent. Which is what
             makes « Refuser » a real answer rather than a way out. */}
         <Text style={styles.body}>
-          {byLink ? t('invited_nothing_spent') : t('invited_nothing_sent')}
+          {delivered
+            ? t('invited_nothing_told')
+            : byLink
+              ? t('invited_nothing_spent')
+              : t('invited_nothing_sent')}
         </Text>
       </View>
 

@@ -131,6 +131,11 @@ export function discoveryService(
     directory: () => call('/discovery/directory'),
     sendInvitation: body => call('/discovery/invitations', body),
     sentStatus: id => call(`/discovery/invitations/${encodeURIComponent(id)}`),
+    waitingInvitations: () => call('/discovery/invitations'),
+    joinInvitation: id =>
+      call(`/discovery/invitations/${encodeURIComponent(id)}/join`, '{}'),
+    declineInvitation: id =>
+      call(`/discovery/invitations/${encodeURIComponent(id)}/decline`, '{}'),
   }
 }
 

@@ -20,6 +20,9 @@ function entering(over: Partial<Entering> = {}): Entering {
     // a device nobody has just invited anywhere. Every test below that expects
     // a door to open says how many links were spent for it.
     awaited: () => 0,
+    // AND NOBODY WHOSE INVITATION DELIVERED INSIDE THE APPLICATION WAS
+    // JOINED (#404), for the same reason.
+    awaitedFrom: () => new Set(),
     ...over,
   }
 }
@@ -106,6 +109,7 @@ describe('enterInvitations', () => {
     )
     expect(entered).toEqual({
       joined: [],
+      doors: 0,
       refused: [],
       collapsed: [],
       waiting: [],
@@ -273,5 +277,59 @@ describe('enterInvitations', () => {
       }),
     )
     expect(entered.joined).toEqual(['!real:x'])
+  })
+})
+
+describe('the room invite of an invitation delivered inside the application (#404)', () => {
+  it('is entered when it comes from an inviter whose invitation was joined, and spends no link', async () => {
+    const entered = await enterInvitations(
+      entering({
+        invitedRooms: async () => [
+          { scope: '!alice:x', from: '@alice:x' },
+          { scope: '!stranger:x', from: '@carol:x' },
+        ],
+        awaitedFrom: () => new Set(['@alice:x']),
+      }),
+    )
+
+    expect(entered.joined).toEqual(['!alice:x'])
+    expect(entered.doors).toBe(0)
+    expect(entered.waiting).toEqual([
+      { scope: '!stranger:x', from: '@carol:x' },
+    ])
+  })
+
+  it('leaves the doors of links spent to the invitations they are owed', async () => {
+    const entered = await enterInvitations(
+      entering({
+        invitedRooms: async () => [
+          { scope: '!alice:x', from: '@alice:x' },
+          { scope: '!link:x', from: null },
+        ],
+        awaited: () => 1,
+        awaitedFrom: () => new Set(['@alice:x']),
+      }),
+    )
+
+    expect(entered.joined).toEqual(['!alice:x', '!link:x'])
+    expect(entered.doors).toBe(1)
+  })
+
+  it("declines it for somebody already in a conversation here, as a link's", async () => {
+    const declined: string[] = []
+    const entered = await enterInvitations(
+      entering({
+        invitedRooms: async () => [{ scope: '!alice:x', from: '@alice:x' }],
+        awaitedFrom: () => new Set(['@alice:x']),
+        alreadyWith: async () => new Set(['@alice:x']),
+        decline: async (_http, scope) => {
+          declined.push(scope)
+        },
+      }),
+    )
+
+    expect(declined).toEqual(['!alice:x'])
+    expect(entered.collapsed).toEqual([{ scope: '!alice:x', from: '@alice:x' }])
+    expect(entered.doors).toBe(0)
   })
 })

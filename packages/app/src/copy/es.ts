@@ -385,6 +385,12 @@ export const es: Readonly<Record<CopyKey, string>> = {
     'Cuánto dura este enlace y cuántos usos le quedan no se pueden leer aquí: solo la cuenta que lo emitió puede preguntarlo.',
   invited_nothing_sent:
     'Todavía no se ha enviado nada. Mientras no responda, esta invitación se queda donde está.',
+  invited_who_found:
+    'Alguien que tiene su número en su agenda le invita a una conversación.',
+  'invited_terms_delivered %1$@':
+    'Esta invitación es válida hasta el %1$@, y una sola vez.',
+  invited_nothing_told:
+    'La persona que le invita no sabe nada mientras usted no se una: rechazar no le dice nada.',
   invited_nothing_spent:
     'Todavía no se ha enviado nada. Mientras no responda, este enlace no se gasta.',
   'invited_behind %1$d': '%1$d invitación(es) más esperan detrás de esta.',
@@ -612,6 +618,8 @@ export const es: Readonly<Record<CopyKey, string>> = {
   list_nobody_joined: 'Nadie se ha unido a esta conversación',
   'list_sent_waiting %1$@': 'Invitación enviada, en espera hasta el %1$@',
   list_sent_expired: 'Invitación caducada',
+  list_delivered_invitation: 'Invitación en Messagr',
+  'list_delivered_until %1$@': 'Válida hasta el %1$@',
   invite_open: 'Invitar a alguien',
   plus_invite: 'Invitar a alguien',
   plus_close: 'Cerrar',

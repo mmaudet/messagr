@@ -74,8 +74,12 @@ import type { Described } from './linkOnScreen'
  * themselves.
  */
 export interface WhatIsKnown {
-  /** Which of the two places this invitation is being met in. */
-  readonly source: 'link' | 'threshold'
+  /**
+   * Which of the three places this invitation is being met in: a link, a
+   * Matrix invitation standing on the threshold, or an invitation delivered
+   * inside the application by somebody who had this number (#404).
+   */
+  readonly source: 'link' | 'threshold' | 'delivered'
   /**
    * The conversation, which is what joining and refusing act on. Empty on
    * the link path: there is no conversation to act on yet, and the two
@@ -106,6 +110,12 @@ export interface WhatIsKnown {
   readonly instance: string | null
   /** Whether that server is not the one this account lives on. */
   readonly elsewhere: boolean
+  /**
+   * When the invitation runs out, in milliseconds since the epoch, where
+   * this device knows it: only an invitation delivered inside the
+   * application tells its recipient (#404). `null` elsewhere.
+   */
+  readonly expiresAt: number | null
 }
 
 export function whatIsKnown(
@@ -124,6 +134,7 @@ export function whatIsKnown(
       identifier: '',
       instance: null,
       elsewhere: false,
+      expiresAt: null,
     }
   }
   const given = names.get(from)
@@ -145,6 +156,7 @@ export function whatIsKnown(
       instance !== null &&
       serverOf(self) !== null &&
       instance.toLowerCase() !== serverOf(self)?.toLowerCase(),
+    expiresAt: null,
   }
 }
 
@@ -173,6 +185,28 @@ export function whatALinkSays(described: Described): WhatIsKnown {
     identifier: '',
     instance: described.instance,
     elsewhere: described.elsewhere,
+    expiresAt: null,
+  }
+}
+
+/**
+ * The same screen, for an invitation delivered inside the application
+ * (#404): who sent it is unknown until the person joins, since the service
+ * names the inviter only then, and the name they declared travels sealed
+ * with #405. What is known is its deadline, which the service says, and
+ * that its sender had this number.
+ */
+export function whatADeliveredInvitationSays(expiresAt: number): WhatIsKnown {
+  return {
+    source: 'delivered',
+    scope: '',
+    declared: '',
+    who: '',
+    named: false,
+    identifier: '',
+    instance: null,
+    elsewhere: false,
+    expiresAt,
   }
 }
 

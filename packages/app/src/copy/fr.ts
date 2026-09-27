@@ -617,6 +617,12 @@ export const fr = {
     'La durée de ce lien et le nombre d’ouvertures qui lui restent ne se lisent pas ici : seul le compte qui l’a émis peut les demander.',
   invited_nothing_sent:
     'Rien n’a encore été envoyé. Tant que vous n’avez pas répondu, cette invitation reste où elle est.',
+  invited_who_found:
+    'Quelqu’un qui a votre numéro dans son carnet vous invite à une conversation.',
+  'invited_terms_delivered %1$@':
+    'Cette invitation vaut jusqu’au %1$@, pour une seule fois.',
+  invited_nothing_told:
+    'La personne qui vous invite n’apprend rien tant que vous ne rejoignez pas : refuser ne lui dit rien.',
   // PLUS FORT QUE LA PHRASE AU-DESSUS, et c'est pour ça qu'elle est à part :
   // sur le chemin par lien, non seulement rien n'est parti, mais le jeton
   // n'a pas été dépensé. Le lien est encore bon après un refus.
@@ -984,6 +990,8 @@ export const fr = {
   list_nobody_joined: 'Personne n’a rejoint cette conversation',
   'list_sent_waiting %1$@': 'Invitation envoyée, en attente jusqu’au %1$@',
   list_sent_expired: 'Invitation expirée',
+  list_delivered_invitation: 'Invitation dans Messagr',
+  'list_delivered_until %1$@': 'Valable jusqu’au %1$@',
   invite_open: 'Inviter quelqu’un',
   plus_invite: 'Inviter quelqu’un',
   plus_close: 'Fermer',

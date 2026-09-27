@@ -13,7 +13,10 @@ import {
   type,
 } from '../design/tokens'
 import type { ConversationSummary } from '../runtime/conversationList'
-import type { SentInvitation } from '../runtime/deliveredInvitations'
+import type {
+  SentInvitation,
+  WaitingInvitation,
+} from '../runtime/deliveredInvitations'
 import type { ListNotice } from '../runtime/discovery'
 import { displayNameFor } from '../runtime/givenName'
 import type { PasteSaid } from '../runtime/pastedLink'
@@ -63,6 +66,13 @@ export interface ConversationListProps {
    * until when, then that it expired.
    */
   readonly sent?: ReadonlyMap<string, SentInvitation>
+  /**
+   * The invitations delivered inside the application waiting for this
+   * account's answer (#404), drawn atop the list, each opening the screen of
+   * §13.3 through `onOpenDelivered`.
+   */
+  readonly delivered?: readonly WaitingInvitation[]
+  readonly onOpenDelivered?: (invitation: WaitingInvitation) => void
   /**
    * What became of an invitation this launch was opened with, when the
    * device already had an account. `null` when there was none. See
@@ -142,6 +152,8 @@ export function ConversationList({
   names,
   onOpen,
   sent = new Map(),
+  delivered = [],
+  onOpenDelivered = () => undefined,
   invitation = null,
   reinstalled = null,
   notInYet = false,
@@ -271,6 +283,27 @@ export function ConversationList({
               : t('share_unreadable')}
         </Text>
       )}
+      {/* THE INVITATIONS DELIVERED INSIDE MESSAGR, ATOP THE LIST (#404), each
+          a row of its own that opens §13.3. Their test identifier is theirs:
+          the first conversation keeps `first-conversation`, which the
+          end-to-end suite opens the way a person does. */}
+      {delivered.map(waitingOne => (
+        <Pressable
+          key={waitingOne.id}
+          testID="list-delivered-invitation"
+          onPress={() => onOpenDelivered(waitingOne)}
+          style={styles.row}
+          accessibilityRole="button">
+          <View style={styles.said}>
+            <Text numberOfLines={1} style={styles.name}>
+              {t('list_delivered_invitation')}
+            </Text>
+            <Text numberOfLines={1} style={styles.preview}>
+              {t('list_delivered_until %1$@', dayOf(waitingOne.expiresAt))}
+            </Text>
+          </View>
+        </Pressable>
+      ))}
       {/* Plain rows rather than a `FlatList`, because this sits inside the
           screen's own scroll view. A list that scrolls inside something that
           scrolls is the defect that reports as "the list will not move", and
