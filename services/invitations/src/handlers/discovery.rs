@@ -526,18 +526,31 @@ pub async fn withdraw_number(
     headers: HeaderMap,
 ) -> Result<axum::http::StatusCode, AppError> {
     let user = auth::authenticate(&st.mx, &headers).await?;
-    let now = st.cfg.clock.now();
+    let mut conn = st.pool.acquire().await.map_err(anyhow::Error::from)?;
+    withdraw_on(&mut conn, &user, st.cfg.clock.now()).await?;
+    Ok(axum::http::StatusCode::NO_CONTENT)
+}
+
+/// Takes `user`'s number out of discovery at once: its entry leaves the
+/// directory, and a proof in progress goes. Its mask and the count of numbers
+/// it had masked stay thirty days, as ADR 0014 says, so that a proof of the
+/// same number by any account meanwhile finds the count again. The
+/// withdrawal does it, and the deletion of the account (#410), inside its
+/// own transaction.
+pub(crate) async fn withdraw_on(
+    conn: &mut sqlx::SqliteConnection,
+    user: &str,
+    now: i64,
+) -> anyhow::Result<()> {
     sqlx::query(
         "UPDATE findable_numbers SET withdrawn_at = ?1, expires_at = MIN(expires_at, ?1) \
          WHERE user_id = ?2 AND withdrawn_at IS NULL",
     )
     .bind(now)
-    .bind(&user)
-    .execute(&st.pool)
-    .await
-    .map_err(anyhow::Error::from)?;
-    forget_the_proof(&st, &user).await?;
-    Ok(axum::http::StatusCode::NO_CONTENT)
+    .bind(user)
+    .execute(&mut *conn)
+    .await?;
+    forget_the_proof_on(conn, user).await
 }
 
 #[derive(Serialize)]
@@ -1073,7 +1086,8 @@ fn served(st: &AppState) -> Result<crate::config::Discovery<'_>, AppError> {
     st.cfg.discovery().map_err(|_| AppError::DiscoveryOff)
 }
 
-/// The same, on the connection that holds the lock of `finish_proof`.
+/// The same, on a connection a transaction holds: the one of `finish_proof`,
+/// or the one of a withdrawal or a deletion (`withdraw_on`).
 async fn forget_the_proof_on(conn: &mut sqlx::SqliteConnection, user: &str) -> anyhow::Result<()> {
     sqlx::query("DELETE FROM pending_proofs WHERE user_id = ?")
         .bind(user)
@@ -3341,6 +3355,106 @@ mod tests {
         set_clock(&time, (DAY_ZERO + 30) * DAY);
         sweep(&st, (DAY_ZERO + 30) * DAY).await;
         assert_eq!(over_the_limit(&st, "bob", 5_000).await, Ok(()));
+    }
+
+    /// The application announces `who`'s deletion, just before deactivating
+    /// the account (#385).
+    async fn deleted(st: &Arc<AppState>, who: &str) {
+        let Json(_) = crate::handlers::deletion::announce(State(st.clone()), bearer(who))
+            .await
+            .unwrap();
+    }
+
+    #[sqlx::test(migrations = "./migrations")]
+    async fn a_deleted_account_leaves_discovery_at_once_and_its_mask_stays_thirty_days(
+        pool: SqlitePool,
+    ) {
+        // #410: as a withdrawal does.
+        let (ovh, inbox) = fake_ovhcloud(false).await;
+        let (clock, _) = crate::util::Clock::settable(T0);
+        let st = state_at(pool.clone(), whoami_hs().await, Some(ovh), clock);
+        prove(&st, &inbox, "alice", NUMBER).await;
+        prove(&st, &inbox, "bob", OTHER).await;
+        let alices = reference_of(&pool, "alice").await.unwrap();
+        start(&st, "alice", "+33633333333").await.unwrap();
+
+        deleted(&st, "alice").await;
+
+        let listed = directory_of(&st, "bob").await.unwrap();
+        assert!(
+            listed.entries.iter().all(|e| e.reference != alices),
+            "out of the directory, at once"
+        );
+        assert!(
+            matches!(
+                finish(&st, "alice", &last_code(&inbox)).await,
+                Err(AppError::NoProofPending)
+            ),
+            "and its proof in progress with it"
+        );
+        let masks = || async {
+            sqlx::query_scalar::<_, i64>(
+                "SELECT COUNT(*) FROM findable_numbers WHERE user_id = '@alice:h'",
+            )
+            .fetch_one(&pool)
+            .await
+            .unwrap()
+        };
+        crate::cleanup::purge_ended_proofs(
+            &pool,
+            T0 + crate::cleanup::ENDED_PROOFS_KEPT_SECONDS - 1,
+        )
+        .await
+        .unwrap();
+        assert_eq!(masks().await, 1, "the mask stays thirty days");
+        crate::cleanup::purge_ended_proofs(&pool, T0 + crate::cleanup::ENDED_PROOFS_KEPT_SECONDS)
+            .await
+            .unwrap();
+        assert_eq!(masks().await, 0, "and not a day more");
+    }
+
+    #[sqlx::test(migrations = "./migrations")]
+    async fn the_count_of_a_deleted_account_stays_with_its_number(pool: SqlitePool) {
+        // #410: a proof of the same number by another account, within the
+        // thirty days, finds the count again. The count follows the number's
+        // mask, so this holds a deletion to it rather than to the withdrawal:
+        // it fails for a deletion that would purge the count.
+        let (ovh, inbox) = fake_ovhcloud(false).await;
+        let (clock, time) = crate::util::Clock::settable(T0);
+        let st = state_at(pool, whoami_hs().await, Some(ovh), clock);
+        prove(&st, &inbox, "alice", NUMBER).await;
+        assert_eq!(over_the_limit(&st, "alice", 5_000).await, Ok(()));
+
+        deleted(&st, "alice").await;
+        set_clock(&time, T0 + 10 * DAY);
+        prove(&st, &inbox, "bob", NUMBER).await;
+
+        assert!(over_the_limit(&st, "bob", 1).await.is_err());
+    }
+
+    #[sqlx::test(migrations = "./migrations")]
+    async fn a_deleted_account_whose_proof_had_run_out_is_never_told_of_its_number_again(
+        pool: SqlitePool,
+    ) {
+        // #410: its proof is withdrawn too, run out or not, so that another
+        // account proving the number later writes no notice naming the
+        // deleted one, which would outlive the thirty days of its purge.
+        let (ovh, inbox) = fake_ovhcloud(false).await;
+        let (clock, time) = crate::util::Clock::settable(T0);
+        let st = state_at(pool.clone(), whoami_hs().await, Some(ovh), clock);
+        prove(&st, &inbox, "alice", NUMBER).await;
+        set_clock(&time, T0 + 29 * DAY);
+        deleted(&st, "alice").await;
+
+        set_clock(&time, T0 + 30 * DAY);
+        prove(&st, &inbox, "bob", NUMBER).await;
+
+        let notices: i64 =
+            sqlx::query_scalar("SELECT COUNT(*) FROM replaced_proofs WHERE user_id = '@alice:h'")
+                .fetch_one(&pool)
+                .await
+                .unwrap();
+        assert_eq!(notices, 0);
     }
 
     #[sqlx::test(migrations = "./migrations")]

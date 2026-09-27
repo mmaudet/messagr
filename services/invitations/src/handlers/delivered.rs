@@ -777,6 +777,56 @@ mod tests {
     }
 
     #[sqlx::test(migrations = "./migrations")]
+    async fn a_deleted_account_neither_waits_for_nor_is_waited_on(pool: SqlitePool) {
+        // #410: the invitations delivered to it, and those it sent, run out
+        // at once.
+        let (st, _, bob) = two_findable(pool).await;
+        let alice = reference_of(&st.pool, "alice").await.unwrap();
+        let from_alice = sent(&st, "alice", &bob).await.unwrap();
+        let to_alice = sent(&st, "bob", &alice).await.unwrap();
+
+        let Json(_) = crate::handlers::deletion::announce(State(st.clone()), bearer("alice"))
+            .await
+            .unwrap();
+
+        assert_eq!(
+            waiting_for(&st, "bob").await,
+            json!([]),
+            "nothing from Alice waits"
+        );
+        assert_eq!(
+            status_of(&st, "bob", &to_alice).await.unwrap(),
+            json!({"status": "expired"}),
+            "and Bob's invitation to her has run out"
+        );
+        assert!(matches!(
+            joined(&st, "bob", &from_alice).await,
+            Err(AppError::InvitationExpired)
+        ));
+    }
+
+    #[sqlx::test(migrations = "./migrations")]
+    async fn a_deletion_leaves_the_end_of_an_invitation_already_run_out(pool: SqlitePool) {
+        // #410: from that end are counted the thirty days of who invited whom
+        // (#416) and the fourteen days before inviting again (#406).
+        let (st, time, bob) = two_findable(pool).await;
+        let id = sent(&st, "alice", &bob).await.unwrap();
+        set_clock(&time, T0 + 10 * DAY);
+
+        let Json(_) = crate::handlers::deletion::announce(State(st.clone()), bearer("alice"))
+            .await
+            .unwrap();
+
+        let ends: i64 =
+            sqlx::query_scalar("SELECT expires_at FROM delivered_invitations WHERE id = ?")
+                .bind(&id)
+                .fetch_one(&st.pool)
+                .await
+                .unwrap();
+        assert_eq!(ends, T0 + 7 * DAY);
+    }
+
+    #[sqlx::test(migrations = "./migrations")]
     async fn a_findable_account_invites_a_reference_for_a_week(pool: SqlitePool) {
         let (st, _, bob) = two_findable(pool).await;
 
