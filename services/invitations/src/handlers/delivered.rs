@@ -58,6 +58,14 @@
 //! for it. A block is the exception: it withdraws even an invitation joined
 //! (see below).
 //!
+//! # BEFORE IT ANSWERS, THE RECIPIENT LEARNS ITS INVITER'S REFERENCE (#407)
+//!
+//! Not its account: the reference its current proof is listed by in the
+//! directory, which anybody can download. It tells nothing to a recipient who
+//! never found that number in its own address book, and tells one who did,
+//! from the results its device keeps, that the inviter is in it. An inviter
+//! that withdrew its number, or whose proof ran out, is listed without one.
+//!
 //! # A REFUSAL READS AS AN INVITATION NOBODY HAS SEEN
 //!
 //! Declining is written for the recipient alone, so that the invitation
@@ -153,6 +161,11 @@ pub struct DeliveredInvitation {
     /// recipient, while the invitation waits for its answer.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub sealed_name: Option<String>,
+    /// The reference its inviter is findable by now (#407): for the
+    /// recipient, while the invitation waits for its answer, and absent once
+    /// the inviter is findable no more. See the module.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub inviter_reference: Option<String>,
 }
 
 #[derive(Serialize)]
@@ -229,6 +242,7 @@ pub async fn send(
         expires_at,
         inviter_user_id: None,
         sealed_name: None,
+        inviter_reference: None,
     }))
 }
 
@@ -334,29 +348,43 @@ pub async fn waiting(
     headers: HeaderMap,
 ) -> Result<Json<Waiting>, AppError> {
     let recipient = auth::authenticate(&st.mx, &headers).await?;
+    // THE INVITER'S CURRENT PROOF, IF IT HAS ONE (#407): a withdrawn or
+    // lapsed one names nobody any more. One account holds one row at most.
+    let now = st.cfg.clock.now();
     let rows = sqlx::query(&format!(
-        "SELECT id, expires_at, inviter_user_id, claimed_at, sealed_name \
+        "SELECT id, delivered_invitations.expires_at AS expires_at, inviter_user_id, \
+                claimed_at, sealed_name, f.reference AS inviter_reference \
          FROM delivered_invitations \
-         WHERE recipient_user_id = ? AND declined = 0 AND entered = 0 AND {NOT_BLOCKED} \
-           AND (expires_at > ? OR claimed_at IS NOT NULL) \
+         LEFT JOIN findable_numbers f ON f.user_id = delivered_invitations.inviter_user_id \
+           AND f.withdrawn_at IS NULL AND f.expires_at > ?1 \
+         WHERE recipient_user_id = ?2 AND declined = 0 AND entered = 0 AND {NOT_BLOCKED} \
+           AND (delivered_invitations.expires_at > ?1 OR claimed_at IS NOT NULL) \
          ORDER BY sent_at, id"
     ))
+    .bind(now)
     .bind(&recipient)
-    .bind(st.cfg.clock.now())
     .fetch_all(&st.pool)
     .await
     .map_err(anyhow::Error::from)?;
     let invitations = rows
         .iter()
-        .map(|row| DeliveredInvitation {
-            id: row.get("id"),
-            expires_at: row.get("expires_at"),
-            inviter_user_id: row
-                .get::<Option<i64>, _>("claimed_at")
-                .map(|_| row.get("inviter_user_id")),
-            sealed_name: row
-                .get::<Option<Vec<u8>>, _>("sealed_name")
-                .map(|sealed| BASE64.encode(&sealed)),
+        .map(|row| {
+            let joined = row.get::<Option<i64>, _>("claimed_at").is_some();
+            DeliveredInvitation {
+                id: row.get("id"),
+                expires_at: row.get("expires_at"),
+                inviter_user_id: joined.then(|| row.get("inviter_user_id")),
+                sealed_name: row
+                    .get::<Option<Vec<u8>>, _>("sealed_name")
+                    .map(|sealed| BASE64.encode(&sealed)),
+                // Joined, the account itself is named: the reference has
+                // nothing more to say.
+                inviter_reference: if joined {
+                    None
+                } else {
+                    row.get("inviter_reference")
+                },
+            }
         })
         .collect();
     Ok(Json(Waiting { invitations }))
@@ -762,7 +790,11 @@ mod tests {
         assert_eq!(invitation.expires_at, T0 + 7 * DAY);
         assert_eq!(
             waiting_for(&st, "bob").await,
-            json!([{"id": invitation.id, "expires_at": T0 + 7 * DAY}]),
+            json!([{
+                "id": invitation.id,
+                "expires_at": T0 + 7 * DAY,
+                "inviter_reference": reference_of(&st.pool, "alice").await.unwrap(),
+            }]),
             "waiting for an answer, it names nobody"
         );
         assert_eq!(waiting_for(&st, "alice").await, json!([]));
@@ -926,7 +958,7 @@ mod tests {
 
         assert_eq!(
             waiting_for(&st, "bob").await,
-            json!([{"id": unseen, "expires_at": T0 + 7 * DAY}]),
+            json!([{"id": unseen, "expires_at": T0 + 7 * DAY, "inviter_reference": "ref-carol"}]),
             "declined, it leaves the recipient's list"
         );
         assert!(matches!(
@@ -1103,7 +1135,12 @@ mod tests {
 
         assert_eq!(
             waiting_for(&st, "bob").await,
-            json!([{"id": id, "expires_at": T0 + 7 * DAY, "sealed_name": sealed}]),
+            json!([{
+                "id": id,
+                "expires_at": T0 + 7 * DAY,
+                "sealed_name": sealed,
+                "inviter_reference": reference_of(&st.pool, "alice").await.unwrap(),
+            }]),
         );
         // ALL THE SERVICE HOLDS OF THE NAME IS THE ENVELOPE, byte for byte: it
         // never receives anything else, and nothing opens it here.
@@ -1174,7 +1211,12 @@ mod tests {
         );
         assert_eq!(
             entry(&unanswered),
-            Some(json!({"id": unanswered, "expires_at": T0 + 7 * DAY, "sealed_name": envelope(3)})),
+            Some(json!({
+                "id": unanswered,
+                "expires_at": T0 + 7 * DAY,
+                "sealed_name": envelope(3),
+                "inviter_reference": "ref-dave",
+            })),
         );
         crate::cleanup::purge_delivered_invitations(&st.pool, T0 + 7 * DAY - 1, 30)
             .await
@@ -1538,5 +1580,52 @@ mod tests {
         blocked(&st, "bob", &second).await.unwrap();
 
         assert_eq!(waiting_for(&st, "bob").await, json!([]));
+    }
+
+    #[sqlx::test(migrations = "./migrations")]
+    async fn the_recipient_learns_its_inviter_s_reference_while_the_invitation_waits(
+        pool: SqlitePool,
+    ) {
+        let (st, _, bob) = two_findable(pool).await;
+        let alice = reference_of(&st.pool, "alice").await.unwrap();
+        let id = sent(&st, "alice", &bob).await.unwrap();
+
+        assert_eq!(waiting_for(&st, "bob").await[0]["inviter_reference"], alice);
+
+        // Joined, the account is named, and the reference has nothing more to
+        // say.
+        joined(&st, "bob", &id).await.unwrap();
+        let listed_now = waiting_for(&st, "bob").await;
+        assert_eq!(listed_now[0]["inviter_user_id"], "@alice:h");
+        assert!(
+            listed_now[0].get("inviter_reference").is_none(),
+            "{listed_now}"
+        );
+    }
+
+    #[sqlx::test(migrations = "./migrations")]
+    async fn an_inviter_findable_no_more_is_listed_without_a_reference(pool: SqlitePool) {
+        let (st, time, bob) = two_findable(pool).await;
+        listed(&st, "carol").await;
+        sent(&st, "alice", &bob).await.unwrap();
+        sent(&st, "carol", &bob).await.unwrap();
+
+        crate::handlers::discovery::withdraw_number(State(st.clone()), bearer("alice"))
+            .await
+            .unwrap();
+        // Carol's proof runs out on its 28th day; the invitations, on their
+        // seventh, so the clock only moves within the week here.
+        set_clock(&time, T0 + 6 * DAY);
+        sqlx::query("UPDATE findable_numbers SET expires_at = ? WHERE user_id = '@carol:h'")
+            .bind(T0 + 6 * DAY)
+            .execute(&st.pool)
+            .await
+            .unwrap();
+
+        let listed_now = waiting_for(&st, "bob").await;
+        assert_eq!(listed_now.as_array().unwrap().len(), 2);
+        for entry in listed_now.as_array().unwrap() {
+            assert!(entry.get("inviter_reference").is_none(), "{entry}");
+        }
     }
 }
