@@ -127,7 +127,9 @@ import {
   deliverInvitation,
   letInTheJoined,
   type Delivered,
+  type DeliveredTo,
   type DeliveryService,
+  type InvitationNames,
   type JoinedInvitation,
   type Letting,
   type SentInvitations,
@@ -937,23 +939,22 @@ export async function admitEntrant(
 
 /**
  * Inviting a contact found (#404): the conversation as for a link, an
- * invitation delivered inside the application to the account behind
- * `reference`, kept on `sent` with the name typed. Pure glue:
- * `deliveredInvitations.ts` says what leaves, and what never does.
+ * invitation delivered inside the application to the account `to` names,
+ * with the declared name sealed for it (#405), kept on `sent` with the name
+ * given. Pure glue: `deliveredInvitations.ts` says what leaves, and what
+ * never does.
  */
 export async function deliverToMatch(
   sessionClient: ReturnType<typeof createClient>,
   service: DeliveryService,
   sent: SentInvitations,
-  reference: string,
-  given: string | null,
-  sealedName: string | null,
+  to: DeliveredTo,
+  names: InvitationNames,
 ): Promise<Delivered> {
   return deliverInvitation(
     { http: makePumpHttp(sessionClient), service, sent },
-    reference,
-    given,
-    sealedName,
+    to,
+    names,
   )
 }
 

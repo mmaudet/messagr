@@ -16,6 +16,9 @@ import { sha256 } from '@noble/hashes/sha2.js'
  *
  * SINGLE-SHOT: one message per encapsulation, so the nonce is the base nonce
  * itself, sequence number 0, as `SealBase` and `OpenBase` of §6.1.
+ *
+ * Outside the crypto bridge, which ADR 0001 otherwise keeps as the one place
+ * for cryptography: its amendment of 27 September 2026 says why this may be.
  */
 
 export interface KeyPair {
@@ -32,10 +35,15 @@ export interface Sealed {
 const KEM_ID = 0x0020
 const KDF_ID = 0x0001
 const AEAD_ID = 0x0003
-/** Nsecret, Nk and Nn of the suite. */
-const SECRET_BYTES = 32
-const KEY_BYTES = 32
-const NONCE_BYTES = 12
+/** The suite's sizes, by the RFC's names: Nsecret, Nsk, Nk, Nn. */
+const N_SECRET = 32
+const N_SK = 32
+const N_K = 32
+const N_N = 12
+/** Nenc: the size of an encapsulated key, which leads every envelope. */
+export const ENC_BYTES = 32
+/** Nt: the size of ChaCha20-Poly1305's tag, which ends every envelope. */
+export const TAG_BYTES = 16
 const MODE_BASE = 0x00
 const EMPTY = new Uint8Array(0)
 
@@ -104,13 +112,7 @@ function labeledExpand(
 /** §4.1: the shared secret, bound to both public keys. */
 function extractAndExpand(dh: Uint8Array, kemContext: Uint8Array): Uint8Array {
   const eaePrk = labeledExtract(KEM_SUITE, EMPTY, 'eae_prk', dh)
-  return labeledExpand(
-    KEM_SUITE,
-    eaePrk,
-    'shared_secret',
-    kemContext,
-    SECRET_BYTES,
-  )
+  return labeledExpand(KEM_SUITE, eaePrk, 'shared_secret', kemContext, N_SECRET)
 }
 
 /** §5.1, in the base mode: no pre-shared key. */
@@ -123,14 +125,8 @@ function keySchedule(
   const context = concat(Uint8Array.of(MODE_BASE), pskIdHash, infoHash)
   const secret = labeledExtract(HPKE_SUITE, sharedSecret, 'secret', EMPTY)
   return {
-    key: labeledExpand(HPKE_SUITE, secret, 'key', context, KEY_BYTES),
-    baseNonce: labeledExpand(
-      HPKE_SUITE,
-      secret,
-      'base_nonce',
-      context,
-      NONCE_BYTES,
-    ),
+    key: labeledExpand(HPKE_SUITE, secret, 'key', context, N_K),
+    baseNonce: labeledExpand(HPKE_SUITE, secret, 'base_nonce', context, N_N),
   }
 }
 
@@ -143,13 +139,18 @@ export function generateKeyPair(): KeyPair {
 /** §7.1.3: the key pair `ikm` determines. What the RFC's vectors start from. */
 export function deriveKeyPair(ikm: Uint8Array): KeyPair {
   const dkpPrk = labeledExtract(KEM_SUITE, EMPTY, 'dkp_prk', ikm)
-  const secretKey = labeledExpand(KEM_SUITE, dkpPrk, 'sk', EMPTY, KEY_BYTES)
-  return { secretKey, publicKey: x25519.getPublicKey(secretKey) }
+  const secretKey = labeledExpand(KEM_SUITE, dkpPrk, 'sk', EMPTY, N_SK)
+  return { secretKey, publicKey: publicKeyOf(secretKey) }
+}
+
+/** The public half of `secretKey`. */
+export function publicKeyOf(secretKey: Uint8Array): Uint8Array {
+  return x25519.getPublicKey(secretKey)
 }
 
 /**
- * Seals `plaintext` for `recipientPublicKey`. `ephemeral` is drawn fresh
- * unless given, which only the RFC's vectors do.
+ * Seals `plaintext` for `recipientPublicKey`, under an ephemeral key drawn
+ * for this message alone.
  *
  * Throws for a public key X25519 refuses: one of low order.
  */
@@ -158,7 +159,27 @@ export function seal(
   info: Uint8Array,
   aad: Uint8Array,
   plaintext: Uint8Array,
-  ephemeral: KeyPair = generateKeyPair(),
+): Sealed {
+  return sealWithEphemeral(
+    generateKeyPair(),
+    recipientPublicKey,
+    info,
+    aad,
+    plaintext,
+  )
+}
+
+/**
+ * `seal`, under the ephemeral key given: FOR THE RFC'S VECTORS ONLY, which fix
+ * it. The same ephemeral key used twice for the same recipient gives the same
+ * key and nonce to two messages, and gives both away.
+ */
+export function sealWithEphemeral(
+  ephemeral: KeyPair,
+  recipientPublicKey: Uint8Array,
+  info: Uint8Array,
+  aad: Uint8Array,
+  plaintext: Uint8Array,
 ): Sealed {
   const dh = x25519.getSharedSecret(ephemeral.secretKey, recipientPublicKey)
   const enc = ephemeral.publicKey
@@ -185,7 +206,7 @@ export function open(
 ): Uint8Array | null {
   try {
     const dh = x25519.getSharedSecret(recipientSecretKey, sealed.enc)
-    const recipientPublicKey = x25519.getPublicKey(recipientSecretKey)
+    const recipientPublicKey = publicKeyOf(recipientSecretKey)
     const { key, baseNonce } = keySchedule(
       extractAndExpand(dh, concat(sealed.enc, recipientPublicKey)),
       info,

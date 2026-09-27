@@ -187,6 +187,7 @@ import {
   declineDelivered,
   joinDelivered,
   keptThisLaunchToo,
+  namesSealedFor,
   readTheWaiting,
   sayEntered,
   type JoinedInvitation,
@@ -195,7 +196,6 @@ import {
   type WaitingInvitation,
 } from './src/runtime/deliveredInvitations'
 import { envelopeKeysIn } from './src/runtime/envelopeKeys'
-import { openSealedName, sealName } from './src/runtime/sealedName'
 import { admitAnyoneWaiting } from './src/runtime/admitAnyoneWaiting'
 import { displayNameFor } from './src/runtime/givenName'
 import Clipboard from '@react-native-clipboard/clipboard'
@@ -555,7 +555,8 @@ export function App({
   >(null)
   /**
    * Inviting a contact found (#404): its own gesture, beside a link's, with
-   * the name the inviter gives itself, sealed for the contact (#405).
+   * the name the inviter gives itself, sealed for the recipient's device
+   * (#405).
    */
   const deliverRef = useRef<
     | ((name: string | null, to: InvitedMatch, declared: string | null) => void)
@@ -663,35 +664,22 @@ export function App({
   }
   /**
    * The names inviters gave themselves, opened on this device (#405), by
-   * invitation. Each envelope is opened once, since it does not change; one
-   * that will not open leaves its invitation without a name.
+   * invitation: `null` for an envelope that did not open.
+   * `namesSealedFor` says when each is opened.
    */
   const [deliveredNames, setDeliveredNames] = useState<
-    ReadonlyMap<string, string>
+    ReadonlyMap<string, string | null>
   >(new Map())
-  const openedNamesRef = useRef(new Map<string, string | null>())
+  const openedNamesRef = useRef<ReadonlyMap<string, string | null>>(new Map())
   const openTheNames = async (unanswered: readonly WaitingInvitation[]) => {
-    const toOpen = unanswered.filter(
-      one => one.sealedName !== null && !openedNamesRef.current.has(one.id),
+    const opened = await namesSealedFor(
+      unanswered,
+      openedNamesRef.current,
+      envelopeKeys.secrets,
     )
-    if (toOpen.length === 0) return
-    const secrets = await envelopeKeys.secrets()
-    // A keystore that gave nothing is asked again at the next tick, rather
-    // than every envelope remembered as one that does not open.
-    if (secrets.length === 0) return
-    for (const one of toOpen) {
-      openedNamesRef.current.set(
-        one.id,
-        openSealedName(secrets, one.sealedName ?? ''),
-      )
-    }
-    setDeliveredNames(
-      new Map(
-        [...openedNamesRef.current].flatMap(([id, name]) =>
-          name === null ? [] : [[id, name] as const],
-        ),
-      ),
-    )
+    if (opened === openedNamesRef.current) return
+    openedNamesRef.current = opened
+    setDeliveredNames(opened)
   }
   /**
    * Reads the invitations delivered inside Messagr for this account (#404),
@@ -4157,19 +4145,14 @@ export function App({
               setInvite({ stage: 'working' })
               setAdmission(null)
               const delivering = async () => {
-                // SEALED HERE, FOR THE CONTACT'S DEVICE (#405): what leaves
-                // is an envelope the service cannot open, or nothing.
-                const sealed =
-                  declared === null || to.envelopeKey === null
-                    ? null
-                    : sealName(to.envelopeKey, declared)
+                // The declared name leaves sealed for the recipient's device
+                // (#405), which `deliveredInvitations.ts` does.
                 const delivered = await deliverToMatch(
                   sessionClient,
                   discoveryDeps.service,
                   sentInvitationsRef.current,
-                  to.reference,
-                  name,
-                  sealed,
+                  to,
+                  { given: name, declared },
                 )
                 if (!delivered.delivered) {
                   setInvite({

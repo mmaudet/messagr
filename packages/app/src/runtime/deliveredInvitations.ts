@@ -38,6 +38,7 @@ import { parsed, type Answer } from './discovery'
 import { getErrorMessage } from './errors'
 import { createTheConversation } from './issueInvitation'
 import type { HttpRequester } from './pump'
+import { openSealedName, sealName } from './sealedName'
 
 /** The routes of the service for invitations delivered inside Messagr. */
 export interface DeliveryService {
@@ -123,6 +124,31 @@ export async function readTheWaiting(
     }
   }
   return { unanswered, joined }
+}
+
+/**
+ * The names inviters sealed for this device (#405), by invitation: `known`,
+ * and every envelope of `unanswered` it does not hold yet, opened with the
+ * keys `secrets` gives. An envelope opens once, since it does not change; one
+ * that does not open is remembered as no name. A keystore that gives no key
+ * at all opens nothing, and the next reading asks it again.
+ */
+export async function namesSealedFor(
+  unanswered: readonly WaitingInvitation[],
+  known: ReadonlyMap<string, string | null>,
+  secrets: () => Promise<readonly Uint8Array[]>,
+): Promise<ReadonlyMap<string, string | null>> {
+  const toOpen = unanswered.filter(
+    one => one.sealedName !== null && !known.has(one.id),
+  )
+  if (toOpen.length === 0) return known
+  const keys = await secrets()
+  if (keys.length === 0) return known
+  const opened = new Map(known)
+  for (const { id, sealedName } of toOpen) {
+    opened.set(id, openSealedName(keys, sealedName ?? ''))
+  }
+  return opened
 }
 
 /**
@@ -262,6 +288,26 @@ export function keptThisLaunchToo(
 }
 
 /**
+ * The account an invitation delivered inside Messagr goes to, as a match
+ * found it: its reference, and the envelope key its proof published (#405),
+ * or `null`.
+ */
+export interface DeliveredTo {
+  readonly reference: string
+  readonly envelopeKey: string | null
+}
+
+/**
+ * The two names of an invitation, kept apart by name rather than by position
+ * (ADR 0010): the one given to the recipient, which stays on this device, and
+ * the one the inviter declares for itself, which leaves only sealed.
+ */
+export interface InvitationNames {
+  readonly given: string | null
+  readonly declared: string | null
+}
+
+/**
  * Why the service would not take an invitation, when it said so: the
  * caller's own number (`own-reference`), a contact no longer findable
  * (`unknown-reference`), or the caller no longer findable (`not-findable`).
@@ -293,11 +339,12 @@ const REFUSALS: Readonly<Record<string, DeliveryRefusal>> = {
 
 /**
  * Creates the conversation as for a link, sends the invitation to the
- * account behind `reference`, and keeps it on `deps.sent` with the name
- * typed. What leaves for the service is the reference, and the name the
- * inviter gives itself sealed for the recipient's device (#405), which the
- * service cannot open: never a number, never a name it could read, never
- * the conversation.
+ * account `to` names, and keeps it on `deps.sent` with the name given. What
+ * leaves for the service is the reference and, for an account whose proof
+ * published an envelope key, the declared name sealed for it (#405): an
+ * envelope the service cannot open, sent even when no name is declared, so
+ * that it cannot tell the two apart. Never a number, never a name it could
+ * read, never the conversation.
  *
  * AN INVITATION THE SERVICE REFUSED LEAVES NO CONVERSATION BEHIND. A link
  * keeps its conversation when minting fails, since somebody may be in it
@@ -310,11 +357,12 @@ export async function deliverInvitation(
     readonly service: DeliveryService
     readonly sent: SentInvitations
   },
-  reference: string,
-  given: string | null,
-  /** `sealedName.ts`'s envelope, base64, or `null` for no name. */
-  sealedName: string | null = null,
+  to: DeliveredTo,
+  names: InvitationNames,
 ): Promise<Delivered> {
+  const { reference } = to
+  const sealedName =
+    to.envelopeKey === null ? null : sealName(to.envelopeKey, names.declared)
   const conversation = await createTheConversation(deps.http)
   if (!conversation.created) {
     return { delivered: false, reason: conversation.reason }
@@ -361,7 +409,7 @@ export async function deliverInvitation(
     invitationId: id,
     scope,
     expiresAt: expiresAt * 1000,
-    given,
+    given: names.given,
     expired: false,
   }
   const kept = await deps.sent.remember(sent)

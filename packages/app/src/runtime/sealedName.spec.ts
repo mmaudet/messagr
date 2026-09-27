@@ -5,9 +5,7 @@ import { generateKeyPair, seal } from './hpke'
 import { base64Of } from './receiveImage'
 import { openSealedName, sealName, SEALED_NAME_BYTES } from './sealedName'
 
-const PURPOSE = Uint8Array.from('messagr declared name v1', c =>
-  c.charCodeAt(0),
-)
+const PURPOSE = new TextEncoder().encode('messagr declared name v1')
 
 function recipient() {
   const pair = generateKeyPair()
@@ -35,12 +33,21 @@ describe('the name an inviter gives itself, sealed for its recipient (#405)', ()
     expect(new Set(sizes)).toEqual(new Set([96]))
   })
 
-  it('cuts a longer name where a link cuts it, and seals nothing for no name', () => {
+  it('cuts a longer name where a link cuts it', () => {
     const bob = recipient()
 
     const long = sealName(bob.published, 'x'.repeat(60))
     expect(openSealedName([bob.secret], long!)).toBe('x'.repeat(48))
-    expect(sealName(bob.published, '   ')).toBeNull()
+  })
+
+  it('seals no name as well, at the same size, and it opens as no name', () => {
+    const bob = recipient()
+
+    for (const none of [null, '', '   ']) {
+      const sealed = sealName(bob.published, none)
+      expect(bytesOf(sealed!).length).toBe(SEALED_NAME_BYTES)
+      expect(openSealedName([bob.secret], sealed!)).toBeNull()
+    }
   })
 
   it('seals nothing for a key that is not one', () => {

@@ -21,48 +21,54 @@ function entry(refuses = false) {
 const DAY = 86_400_000
 
 describe('the envelope keys of this device (#405)', () => {
-  it('keeps nothing for a fresh pair until the proof holds', async () => {
+  it('keeps the pair before it leaves, and gives it again until a proof holds with it', async () => {
     const { store, raw } = entry()
     const keys = envelopeKeysIn(store, () => 0)
 
-    keys.fresh()
+    const first = await keys.toPublish()
+    const again = await keys.toPublish()
 
-    expect(raw()).toBeNull()
-    expect(await keys.secrets()).toEqual([])
+    expect(raw()).not.toBeNull()
+    expect(first).not.toBeNull()
+    expect(again?.publicKey).toEqual(first?.publicKey)
+    expect(await keys.secrets()).toEqual([first!.secretKey])
   })
 
-  it('opens a name sealed for the key a proof published', async () => {
+  it('opens a name sealed for a key whose proof held without this device hearing it', async () => {
     const keys = envelopeKeysIn(entry().store, () => 0)
-    const pair = keys.fresh()
+    const pair = (await keys.toPublish())!
 
-    expect(await keys.keep(pair)).toBe(true)
-
+    // The answer never came: nothing said the proof held.
     const sealed = sealName(base64Of(pair.publicKey), 'Nadia')!
+
     expect(openSealedName(await keys.secrets(), sealed)).toBe('Nadia')
   })
 
-  it('keeps the key a renewal replaced for a week, the newest first, then forgets it', async () => {
+  it('replaces the others once a proof holds, keeps them thirty days, then takes them out of the keystore', async () => {
     let now = 0
-    const keys = envelopeKeysIn(entry().store, () => now)
-    const first = keys.fresh()
-    await keys.keep(first)
+    const { store, raw } = entry()
+    const keys = envelopeKeysIn(store, () => now)
+    const first = (await keys.toPublish())!
+    await keys.published(first)
     now = 21 * DAY
-    const second = keys.fresh()
-    await keys.keep(second)
-
+    const second = (await keys.toPublish())!
+    expect(second.publicKey).not.toEqual(first.publicKey)
+    await keys.published(second)
     const sealedBefore = sealName(base64Of(first.publicKey), 'Nadia')!
+
     expect(await keys.secrets()).toEqual([second.secretKey, first.secretKey])
+    now = 21 * DAY + REPLACED_KEPT_MS - 1
     expect(openSealedName(await keys.secrets(), sealedBefore)).toBe('Nadia')
 
     now = 21 * DAY + REPLACED_KEPT_MS
     expect(await keys.secrets()).toEqual([second.secretKey])
-    expect(openSealedName(await keys.secrets(), sealedBefore)).toBeNull()
+    expect(raw()).not.toContain(base64Of(first.secretKey))
   })
 
-  it('says when the keystore would not take the key', async () => {
+  it('gives nothing to publish when the keystore will not keep the pair', async () => {
     const keys = envelopeKeysIn(entry(true).store, () => 0)
 
-    expect(await keys.keep(keys.fresh())).toBe(false)
+    expect(await keys.toPublish()).toBeNull()
   })
 
   it('reads an entry it cannot make sense of as no key at all', async () => {

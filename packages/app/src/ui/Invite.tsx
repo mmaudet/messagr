@@ -154,6 +154,8 @@ export function Invite({ stage, onInvite, onClose, admission }: InviteProps) {
   if (stage.stage === 'shut') return null
 
   if (stage.stage === 'resting') {
+    // A contact found (#404), or `undefined` for a link.
+    const { to } = stage
     return (
       <View style={styles.resting} testID="invite-panel">
         {/* The question before the field, and the action after both. The
@@ -176,7 +178,7 @@ export function Invite({ stage, onInvite, onClose, admission }: InviteProps) {
             recipient's device published with its proof. A device that
             published none has nothing to seal it for, and asking would be
             asking for a name that goes nowhere. */}
-        {(stage.to === undefined || stage.to.envelopeKey !== null) && (
+        {(to === undefined || to.envelopeKey !== null) && (
           <>
             {/* TWO NAMES, AND THE TWO HINTS ARE THE TEACHING. #329.
             The first is what you call THEM, and it stays on this telephone.
@@ -200,7 +202,7 @@ export function Invite({ stage, onInvite, onClose, admission }: InviteProps) {
               style={styles.field}
             />
             <Text style={styles.hint} testID="invite-declared-hint">
-              {stage.to === undefined
+              {to === undefined
                 ? t('invite_declared_hint')
                 : t('invite_declared_sealed_hint')}
             </Text>

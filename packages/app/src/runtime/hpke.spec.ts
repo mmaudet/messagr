@@ -1,6 +1,12 @@
 import { describe, expect, it } from 'vitest'
 
-import { deriveKeyPair, generateKeyPair, open, seal } from './hpke'
+import {
+  deriveKeyPair,
+  generateKeyPair,
+  open,
+  seal,
+  sealWithEphemeral,
+} from './hpke'
 
 /**
  * RFC 9180, appendix A.2.1: DHKEM(X25519, HKDF-SHA256), HKDF-SHA256,
@@ -50,12 +56,12 @@ describe('HPKE, against the vectors of RFC 9180 (A.2.1)', () => {
   })
 
   it('seals the first message into the ciphertext the RFC gives', () => {
-    const sealed = seal(
+    const sealed = sealWithEphemeral(
+      deriveKeyPair(bytes(A_2_1.ikmE)),
       bytes(A_2_1.pkRm),
       bytes(A_2_1.info),
       bytes(A_2_1.aad),
       bytes(A_2_1.pt),
-      deriveKeyPair(bytes(A_2_1.ikmE)),
     )
 
     expect(hex(sealed.enc)).toBe(A_2_1.enc)
