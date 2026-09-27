@@ -12,6 +12,7 @@ mod masking;
 mod masking_quota;
 mod matrix;
 mod named_deactivation;
+mod operator;
 mod retire_key;
 mod sms;
 mod sms_history;
@@ -43,8 +44,18 @@ async fn main() -> anyhow::Result<()> {
     // guard below, which refuses to start while live masks were made with a
     // key MASKING_KEYS no longer holds: a lost key is what this retires. Like
     // the named deactivation, it binds no port and starts no sweeper.
-    if let Some(named) = retire_key::selects_the_retirement(&std::env::args().collect::<Vec<_>>()) {
-        return match retire_key::run(&pool, &named, util::now(), ask_on_the_terminal).await {
+    if let Some(named) =
+        operator::named_after(&std::env::args().collect::<Vec<_>>(), retire_key::THE_FLAG)
+    {
+        return match retire_key::run(
+            &pool,
+            &named,
+            cfg.masking_keys.as_deref(),
+            util::now(),
+            ask_on_the_terminal,
+        )
+        .await
+        {
             Ok(retired) => {
                 println!("{retired:?}");
                 Ok(())
@@ -121,8 +132,8 @@ async fn main() -> anyhow::Result<()> {
 
 /// Prints the plan and reads one line back. THE ONLY caller of stdin in this
 /// binary, and it is deliberately trivial: everything worth testing about the
-/// confirmation lives in `named_deactivation::is_the_confirmation`, which takes
-/// the answer as a value.
+/// confirmation lives in `operator::typed_back`, which takes the answer as a
+/// value, for the named deactivation and for the retirement of a key.
 ///
 /// End of stdin gives `None`, which is a refusal — so a cron entry, a pipeline
 /// or a pasted runbook finds no way through.

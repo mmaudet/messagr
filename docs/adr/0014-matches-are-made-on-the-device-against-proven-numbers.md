@@ -205,11 +205,15 @@ only, and not who comes in through the link before they do, as for any link.
 **Amended on 27 September 2026 (changing the key, #409).** A proof in progress
 keeps its number's mask under every key in service, not only the current one,
 until it ends. That is how a proof renewed under a new key keeps the reference
-devices know the account by and the count of numbers its number had masked,
-and how a number proven under the new key ends a proof of it under the old one.
-While two keys serve, and for 28 days from the new one's first service, each
-proven number may have 5,000 more numbers masked under the new key, so that
+devices know the account by and the counts of numbers its number had masked,
+and how a number proven under the new key ends a proof of it under the old
+one. A proof in progress when a new key starts serving starts again. The
+extension of a key change replaces the one day of the change this ADR's
+decision named, as the owner chose: while two keys serve, and for 28 days at
+most from the new one's first service, each proven number may have 5,000 more
+numbers masked under the new key, counted apart from its limit, so that
 devices compare under both keys and nobody drops out of the results before
 renewing. A key retired at once takes every mask and count made under it; the
 accounts it made findable read that the key changed, which the service keeps
-thirty days at most.
+thirty days at most, and their next proof passes a country's ceiling and the
+budget as a renewal would.

@@ -38,3 +38,15 @@ CREATE TABLE retired_key_proofs (
     user_id     TEXT    PRIMARY KEY,
     retired_at  INTEGER NOT NULL
 );
+
+-- La rallonge d'un changement de clé, comptée à part : ce qu'un numéro prouvé
+-- a fait masquer sous la nouvelle clé, une fois, sans entamer sa limite de
+-- #401 (décision du porteur du 27 septembre 2026). Oublié quand la rallonge
+-- s'achève.
+CREATE TABLE masking_extensions (
+    key_id         INTEGER NOT NULL,
+    mask           BLOB    NOT NULL,
+    extension_key  INTEGER NOT NULL,
+    masked         INTEGER NOT NULL,
+    PRIMARY KEY (key_id, mask, extension_key)
+);

@@ -195,7 +195,7 @@ pub async fn send(
     headers: HeaderMap,
     Body(req): Body<SendRequest>,
 ) -> Result<Json<DeliveredInvitation>, AppError> {
-    let inviter = discovery::findable_caller(&st, &headers).await?.user;
+    let inviter = discovery::findable_caller(&st, &headers).await?;
     let sealed_name = req
         .sealed_name
         .as_deref()

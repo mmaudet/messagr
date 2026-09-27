@@ -115,20 +115,10 @@ pub enum Outcome {
 /// mode with zero identifiers gets it REFUSED by name (refusal 1), whereas
 /// treating it as "not the flag" would start a second service instead.
 pub fn selects_the_named_deactivation(argv: &[String]) -> Option<Vec<String>> {
-    let after_the_program = argv.iter().skip(1).collect::<Vec<_>>();
-    if !after_the_program.iter().any(|a| a.starts_with(THE_FLAG)) {
-        return None;
-    }
     // Everything that is not an option is a NAMED identifier. Options are left
     // out on purpose: `--all`, `--yes`, `--force` must arrive at refusal 1 as
     // ZERO identifiers, and be refused for naming nobody.
-    Some(
-        after_the_program
-            .into_iter()
-            .filter(|a| !a.starts_with('-'))
-            .cloned()
-            .collect(),
-    )
+    crate::operator::named_after(argv, THE_FLAG)
 }
 
 /// **REFUSAL 1 — exactly one identifier, and it must look like one.**
@@ -403,7 +393,7 @@ pub fn announce(
 /// `None` is the end of stdin, and it is a refusal: a cron entry, a pipeline or
 /// a pasted runbook finds no way through.
 pub fn is_the_confirmation(answer: Option<&str>, user_id: &str) -> bool {
-    answer.is_some_and(|typed| typed.trim() == user_id)
+    crate::operator::typed_back(answer, user_id)
 }
 
 /// The whole gesture, in the ONE order that makes each refusal worth having,

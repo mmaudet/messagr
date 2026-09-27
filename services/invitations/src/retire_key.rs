@@ -38,35 +38,16 @@
 use sqlx::SqlitePool;
 
 /// The flag that selects this mode. Anything starting with it selects it too,
-/// for the reason `named_deactivation::selects_the_named_deactivation` gives.
+/// for the reason `operator::named_after` gives.
 pub const THE_FLAG: &str = "--retire-masking-key";
 
 /// What the retirement ended, once done.
 #[derive(Debug, PartialEq, Eq)]
 pub struct Retired {
     /// The running proofs made under the key: accounts findable no more.
-    pub ended: i64,
+    pub ended: u64,
     /// The proofs in progress under the key, dropped.
-    pub dropped: i64,
-}
-
-/// Does this command line select this mode, and what does it name?
-///
-/// `None` starts the service, as every command line without the flag always
-/// has. Options are left out of what is named, so that `--yes` arrives as
-/// nothing named and is refused.
-pub fn selects_the_retirement(argv: &[String]) -> Option<Vec<String>> {
-    let after_the_program = argv.iter().skip(1).collect::<Vec<_>>();
-    if !after_the_program.iter().any(|a| a.starts_with(THE_FLAG)) {
-        return None;
-    }
-    Some(
-        after_the_program
-            .into_iter()
-            .filter(|a| !a.starts_with('-'))
-            .cloned()
-            .collect(),
-    )
+    pub dropped: u64,
 }
 
 /// The one key number named, or why not: exactly one, and a number.
@@ -81,17 +62,12 @@ fn the_one_key_number(named: &[String]) -> Result<u32, String> {
     }
 }
 
-/// The key number typed back, whitespace forgiven, and nothing else. `None`
-/// is the end of stdin, and a refusal.
-pub fn is_the_confirmation(answer: Option<&str>, key_id: u32) -> bool {
-    answer.is_some_and(|typed| typed.trim() == key_id.to_string())
-}
-
 /// The whole gesture, with the asking injected so that a test can drive it,
 /// and assert that nothing was written without it.
 pub async fn run<A>(
     pool: &SqlitePool,
     named: &[String],
+    keys: Option<&crate::masking::MaskingKeys>,
     now: i64,
     ask: A,
 ) -> Result<Retired, String>
@@ -115,15 +91,29 @@ where
         .await
         .map_err(unreadable)?;
 
+    // THE CURRENT KEY IS RETIRED WITH THE SERVICE STOPPED: while it runs, it
+    // goes on making proofs under that key, which the start would then find
+    // without their key (`deploy/messagr-eu-invitations.md`).
+    let current = keys.is_some_and(|keys| keys.current().id() == key_id);
+    let stop_first = if current {
+        format!(
+            "Key #{key_id} is the current key of MASKING_KEYS: the service must be stopped \
+             while it is retired, and MASKING_KEYS given a new key with a higher number before \
+             the service starts again.\n"
+        )
+    } else {
+        String::new()
+    };
     let plan = format!(
         "Retiring masking key #{key_id} at once. Every mask and count made under it is \
          erased.\n\
          Findable accounts that stop being findable until their next proof, and read that \
          the key changed: {findable}.\n\
          Proofs in progress dropped: {pending}.\n\
+         {stop_first}\
          Type the key number to retire it, or anything else to leave everything as it is:"
     );
-    if !is_the_confirmation(ask(&plan).as_deref(), key_id) {
+    if !crate::operator::typed_back(ask(&plan).as_deref(), &key_id.to_string()) {
         return Err(format!(
             "key #{key_id} was not retired: nothing was written"
         ));
@@ -131,7 +121,9 @@ where
 
     let unwritten = |e: sqlx::Error| format!("key #{key_id}: nothing was retired: {e}");
     let mut tx = pool.begin().await.map_err(unwritten)?;
-    sqlx::query(
+    // WHAT IS SAID AFTERWARDS IS WHAT THE TRANSACTION DID, not the plan's
+    // counts: the service may have moved in between.
+    let ended = sqlx::query(
         "INSERT INTO retired_key_proofs (user_id, retired_at) \
          SELECT user_id, ? FROM findable_numbers \
          WHERE key_id = ? AND withdrawn_at IS NULL AND expires_at > ? \
@@ -142,12 +134,19 @@ where
     .bind(now)
     .execute(&mut *tx)
     .await
-    .map_err(unwritten)?;
+    .map_err(unwritten)?
+    .rows_affected();
+    let dropped = sqlx::query("DELETE FROM pending_proofs WHERE key_id = ?")
+        .bind(i64::from(key_id))
+        .execute(&mut *tx)
+        .await
+        .map_err(unwritten)?
+        .rows_affected();
     for erased in [
         "DELETE FROM findable_numbers WHERE key_id = ?",
-        "DELETE FROM pending_proofs WHERE key_id = ?",
         "DELETE FROM pending_proof_masks WHERE key_id = ?",
         "DELETE FROM masking_counts WHERE key_id = ?",
+        "DELETE FROM masking_extensions WHERE key_id = ?1 OR extension_key = ?1",
         "DELETE FROM masking_keys_served WHERE key_id = ?",
     ] {
         sqlx::query(erased)
@@ -157,10 +156,7 @@ where
             .map_err(unwritten)?;
     }
     tx.commit().await.map_err(unwritten)?;
-    Ok(Retired {
-        ended: findable,
-        dropped: pending,
-    })
+    Ok(Retired { ended, dropped })
 }
 
 #[cfg(test)]
@@ -205,7 +201,7 @@ mod tests {
         let (st, _) = a_key_change_under_way(&pool).await;
         let asked = std::cell::Cell::new(String::new());
 
-        let retired = run(&pool, &named("1"), st.cfg.clock.now(), |plan| {
+        let retired = run(&pool, &named("1"), None, st.cfg.clock.now(), |plan| {
             asked.set(plan.to_string());
             Some("1\n".into())
         })
@@ -270,7 +266,10 @@ mod tests {
         .await
         .unwrap();
 
-        let retired = run(&pool, &named("1"), st.cfg.clock.now(), |_| Some("1".into())).await;
+        let retired = run(&pool, &named("1"), None, st.cfg.clock.now(), |_| {
+            Some("1".into())
+        })
+        .await;
 
         assert_eq!(
             retired,
@@ -289,7 +288,7 @@ mod tests {
         let (st, _) = a_key_change_under_way(&pool).await;
 
         for answer in [None, Some("yes"), Some("2"), Some("")] {
-            let refused = run(&pool, &named("1"), st.cfg.clock.now(), |_| {
+            let refused = run(&pool, &named("1"), None, st.cfg.clock.now(), |_| {
                 answer.map(Into::into)
             })
             .await;
@@ -303,28 +302,94 @@ mod tests {
     #[sqlx::test(migrations = "./migrations")]
     async fn one_key_number_is_named_and_nothing_else(pool: SqlitePool) {
         for named in [vec![], vec!["1".into(), "2".into()], vec!["un".into()]] {
-            let refused = run(&pool, &named, T0, |_| panic!("asked for {named:?}")).await;
+            let refused = run(&pool, &named, None, T0, |_| panic!("asked for {named:?}")).await;
             assert!(refused.is_err(), "{named:?}");
         }
         let argv = |line: &str| line.split(' ').map(String::from).collect::<Vec<_>>();
-        assert_eq!(selects_the_retirement(&argv("messagr-invitations")), None);
+        let selects = |line: &str| crate::operator::named_after(&argv(line), THE_FLAG);
+        assert_eq!(selects("messagr-invitations"), None);
         assert_eq!(
-            selects_the_retirement(&argv("messagr-invitations --retire-masking-key 3 --yes")),
+            selects("messagr-invitations --retire-masking-key 3 --yes"),
             Some(vec!["3".to_string()])
         );
         assert_eq!(
-            selects_the_retirement(&argv("messagr-invitations --retire-masking-key=3")),
+            selects("messagr-invitations --retire-masking-key=3"),
             Some(vec![]),
             "a near miss on the flag is refused, not started as a service"
         );
     }
 
     #[sqlx::test(migrations = "./migrations")]
-    async fn the_next_proof_ends_what_the_retirement_said(pool: SqlitePool) {
-        let (st, inbox) = a_key_change_under_way(&pool).await;
-        run(&pool, &named("1"), st.cfg.clock.now(), |_| Some("1".into()))
+    async fn the_plan_says_to_stop_the_service_before_retiring_the_current_key(pool: SqlitePool) {
+        let (st, _) = a_key_change_under_way(&pool).await;
+        let keys = keys_one_and_two();
+        let plan_for = |key: &str| {
+            let said = std::cell::RefCell::new(String::new());
+            let named = named(key);
+            let pool = pool.clone();
+            let keys = keys.clone();
+            let now = st.cfg.clock.now();
+            async move {
+                let _ = run(&pool, &named, Some(&keys), now, |plan| {
+                    *said.borrow_mut() = plan.to_string();
+                    None
+                })
+                .await;
+                said.into_inner()
+            }
+        };
+
+        assert!(
+            plan_for("2").await.contains("must be stopped"),
+            "#2 is current"
+        );
+        assert!(!plan_for("1").await.contains("must be stopped"));
+    }
+
+    #[sqlx::test(migrations = "./migrations")]
+    async fn an_account_the_retirement_ended_proves_again_as_a_renewal(pool: SqlitePool) {
+        // The owner's decision of 27 September 2026: the service stopped these
+        // proofs, and no country's ceiling nor the budget may keep them
+        // unfindable (#392, story 80).
+        let (ovh, inbox) = fake_ovhcloud(false).await;
+        let hs = whoami_hs().await;
+        let (clock, _) = crate::util::Clock::settable(T0);
+        let st = state_from(
+            pool.clone(),
+            hs.clone(),
+            crate::config::Config {
+                sms_ceilings: crate::config::SmsCeilings {
+                    per_country_day: 1,
+                    ..crate::config::SmsCeilings::default()
+                },
+                ..discovery_config(&hs, Some(ovh), clock)
+            },
+        );
+        prove(&st, &inbox, "alice", NUMBER).await;
+        run(&pool, &named("1"), None, T0, |_| Some("1".into()))
             .await
             .unwrap();
+
+        assert!(
+            matches!(
+                start(&st, "bob", OTHER).await,
+                Err(crate::error::AppError::SmsLater)
+            ),
+            "a new proof waits behind the country's ceiling"
+        );
+        start(&st, "alice", NUMBER)
+            .await
+            .expect("the account the retirement ended goes through");
+    }
+
+    #[sqlx::test(migrations = "./migrations")]
+    async fn the_next_proof_ends_what_the_retirement_said(pool: SqlitePool) {
+        let (st, inbox) = a_key_change_under_way(&pool).await;
+        run(&pool, &named("1"), None, st.cfg.clock.now(), |_| {
+            Some("1".into())
+        })
+        .await
+        .unwrap();
 
         prove(&st, &inbox, "alice", NUMBER).await;
 

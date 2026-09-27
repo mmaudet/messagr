@@ -65,49 +65,65 @@ current key numbered `1`:
    number is the key new masks are made with.
 3. **Restart** (`docker compose up -d --no-deps --no-build invitations`). The
    line after the version names two keys, the current one `#2`. The service
-   notes the date `#2` is first served; a later restart keeps that date.
+   notes the date `#2` is first served; a later restart keeps that date. The
+   proofs in progress under `#1` are dropped at that start: their number was
+   masked under `#1` alone, and they ask for another code.
 4. **For 28 days, both keys serve.**
    - Every proof renewed moves onto `#2`, with the reference devices know the
      account by and the count of numbers its number had masked.
    - Devices compare under both keys, so an account that has not renewed yet is
      still found.
-   - Each proven number may have 5,000 more numbers masked under `#2`, for a
-     device to compare its address book again, once. That extension ends 28 days
-     after `#2` was first served, whatever `MASKING_KEYS` says.
+   - Each proven number may have 5,000 more numbers masked under `#2`, counted
+     apart from its limit, for a device to compare its address book again,
+     once. That extension ends when `#1` leaves `MASKING_KEYS`, and 28 days
+     after `#2` was first served at the latest, even if `#1` is forgotten
+     there.
 5. **After those 28 days, remove `#1`** from `MASKING_KEYS` and restart. Every
-   proof made under it has run out or moved by then. If a mask still lives
-   under it, the service refuses to start and names the key: put it back and
-   wait, or retire it at once, below.
+   proof made under it has run out or moved by then. If a proof still lives
+   under it, or one in progress, the service refuses to start and names the
+   key: put it back and wait, or retire it at once, below.
 6. **Destroy the old seed** wherever it was kept.
 
 ### Retiring a key at once, after a theft or a loss
 
 The key stops serving before its masks run out, and the accounts made findable
-under it stop being findable until their next proof (#409, ADR 0014). With the
-key to retire numbered `N`:
+under it stop being findable until their next proof (#409, ADR 0014).
 
-1. **If `N` is the current key, add a new one first**, with a higher number, as
-   in step 2 above, and restart. Proofs can then go on under the new key.
-2. **Retire `N`**, in `/opt/messagr-eu`:
+**Not before the application reads « key changed ».** An application that
+does not know that reading takes the whole discovery state of such an account
+for unreadable. The application learns it with the second part of #409;
+until a version that carries it is what people run, retire a key only if
+discovery must stop at once.
+
+With the key to retire numbered `N`, in `/opt/messagr-eu`:
+
+1. **Stop the service**, `docker compose stop invitations`. Invitations wait a
+   few minutes. While it runs, it goes on making proofs under `N` when `N` is
+   the current key, and the start would then find them without their key.
+2. **Retire `N`**:
 
        docker compose run --rm invitations --retire-masking-key N
 
-   It binds no port and starts no sweeper, so it runs beside the live service,
-   and it runs even when `N` is lost and no longer in `MASKING_KEYS`. It says
-   first how many findable accounts stop being findable and how many proofs in
-   progress are dropped. Type the key number back to retire it; any other
-   answer, or none, leaves everything as it is and exits in error.
+   It binds no port and starts no sweeper, and it runs even when `N` is lost
+   and no longer in `MASKING_KEYS`. It says first how many findable accounts
+   stop being findable and how many proofs in progress are dropped, and
+   whether `N` is the current key. Type the key number back to retire it; any
+   other answer, or none, leaves everything as it is and exits in error.
 
 3. **What it did**, in one transaction:
    - every proof running under `N` ended. Its account reads that the key changed
-     until its next proof, thirty days at most, and the application says so
-     above the list;
+     until its next proof, thirty days at most, and that next proof passes the
+     ceilings of a country and the budget as a renewal would;
    - every mask made under `N` is erased, with the proofs in progress under it
-     and the counts of numbers masked;
+     and the counts of numbers masked, the extension's included. The proofs
+     that had run out or been withdrawn under `N` go too, and with them what
+     their accounts read of it;
    - the date `N` was first served is forgotten.
-4. **Remove `N` from `MASKING_KEYS`** and restart. The start no longer needs
-   it.
-5. **Destroy the seed of `N`**, if it still exists anywhere.
+4. **Edit `MASKING_KEYS`**: remove `N`, and when `N` was the current key, add
+   a new seed with a higher number, as in the planned change above.
+5. **Start the service**, `docker compose up -d --no-deps --no-build
+invitations`. The start no longer needs `N`.
+6. **Destroy the seed of `N`**, if it still exists anywhere.
 
 ## The SMS provider of address-book discovery
 
