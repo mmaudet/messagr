@@ -375,7 +375,10 @@ export async function findContacts(deps: FindingDeps): Promise<Findings> {
   // days both keys served. Never under a key retired at once, whose accounts
   // proved again under new references, the owner decided on 27 September
   // 2026: compared with the old ones, every one would read as a number that
-  // changed hands.
+  // changed hands. What a look during those days carried from it onto the
+  // key in service stays, and such an account reads as one there: nothing
+  // tells it from another account that took the number, and no account
+  // inherits a contact (#457, the owner's decision of the same day).
   const served = new Set(keys.map(key => key.keyNumber))
   const leftNormally = (await keysHeld(deps.results))
     .filter(key => !served.has(key) && !retired.includes(key))

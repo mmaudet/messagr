@@ -244,3 +244,16 @@ proof lives; forgotten afterwards, it comes back under the new key's
 reference, which whoever found it reads as a number that changed hands. Whoever
 held the key could relate the references of the directory to the accounts
 they know: it is kept as the masking keys are.
+
+**Amended on 27 September 2026 (what a key change leaves, #457).** A device
+that looked while two keys served kept under the new key the reference each
+number first led to under the old one. When the old key is then retired at
+once, what the device kept under it is forgotten, but what it carried from it
+stays: an account the retirement stopped comes back under a new reference,
+and reads on that device as a number that changed hands. The owner chose it
+over the alternative. The service cannot tell which number a stopped account
+had proved, its masks having gone with the key, and nothing may relate its
+old reference to its new one without undoing what the retirement protects;
+so no signal could tell that account from another one that took the number,
+and no account ever inherits a contact. Devices that did not look during
+those days read the account's return as a first.
