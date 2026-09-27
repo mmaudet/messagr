@@ -569,8 +569,9 @@ export interface FindingJourney {
   readonly go: () => Promise<void>
   /**
    * « Partager d'autres contacts », from the results of a limited access only
-   * (#403): the system's choice of the cards, then a look at what is shared
-   * now, the cards added included. From any other stage it does nothing.
+   * (#403): the system's choice of the cards, then, when cards were added, a
+   * look at what is shared now, and when none were, the results as they
+   * were. From any other stage it does nothing.
    */
   readonly shareMore: () => Promise<void>
   /** Every way back. What is still running is dropped. */
@@ -586,8 +587,11 @@ export function findingJourney(
   deps: FindingDeps & {
     /** The system's question: see `addressBook.ts`. */
     readonly askForTheAddressBook: () => Promise<AddressBookAccess>
-    /** The system's choice of the cards shared (#403): `addressBook.ts`. */
-    readonly shareMoreCards: () => Promise<void>
+    /**
+     * The system's choice of the cards shared (#403), and how many cards were
+     * added: `addressBook.ts`.
+     */
+    readonly shareMoreCards: () => Promise<number>
   },
   show: (stage: FindingStage) => void,
 ): FindingJourney {
@@ -646,13 +650,23 @@ export function findingJourney(
     shareMore: async () => {
       if (stage.stage !== 'found' || !stage.limited) return
       const mine = opening
+      const results = stage
+      // Leaving the results at once, so that a second press finds another
+      // stage and does nothing.
       move({ stage: 'looking' })
+      let added: number
       try {
-        await deps.shareMoreCards()
+        added = await deps.shareMoreCards()
       } catch {
-        // The look below reads what is shared either way.
+        added = 0
       }
       if (mine !== opening) return
+      // NOTHING ADDED, NOTHING TO LOOK AT AGAIN: the results as they were,
+      // and no request.
+      if (added === 0) {
+        move(results)
+        return
+      }
       await look(mine)
     },
     close: () => {

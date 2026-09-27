@@ -11,44 +11,48 @@ import UIKit
 /// shared, and this file opens the choice.
 ///
 /// **A SWIFTUI MODIFIER, HOSTED.** Apple offers the picker as a SwiftUI modifier and nothing
-/// else. It is hung on a transparent view in a hosting controller presented over the
-/// application, which goes away with the picker. What was chosen is not read here:
-/// `addressBook.ts` reads the address book again, which now holds the cards added.
+/// else. It is hung on a transparent view in a hosting controller, presented over the
+/// application by the controller on top, and that controller dismisses what it presented when
+/// the choice is over: the host and, if it is still up, the picker over it. Dismissing the
+/// host itself would close only the picker when the picker is still shown, and leave a
+/// transparent screen over the application that swallows every touch.
 ///
-/// **ONE ANSWER, WHATEVER CLOSED IT.** Apple calls the completion handler with the cards
-/// added, and closing the picker without adding any sets `isPresented` back to false. Either
-/// way the hosting controller is dismissed and JavaScript answered once: a second answer
-/// would be a promise resolved twice, and no answer a transparent sheet left over the screen.
+/// **ONE ANSWER: HOW MANY CARDS WERE ADDED.** Apple calls the completion handler with the cards
+/// chosen, and closing the picker sets `isPresented` back to false; either may come first. The
+/// answer to the closing waits one turn of the main queue, so that a completion carrying cards
+/// is the one JavaScript hears, and a flag keeps it to one answer. JavaScript looks again only
+/// when cards were added. What was chosen is not read here: `addressBook.ts` reads the address
+/// book again, which now holds them.
 @objc(MessagrContactAccess)
 final class MessagrContactAccess: NSObject {
-  /// Opens the picker, and answers once it has closed. Before iOS 18 there is no partial access
-  /// and so nothing to add: it answers at once.
+  /// Opens the picker, and answers with the number of cards added once it has closed. Before
+  /// iOS 18 there is no partial access and so nothing to add: it answers 0 at once.
   @objc func shareMore(
     _ resolve: @escaping (Any?) -> Void,
     reject: @escaping (String?, String?, Error?) -> Void
   ) {
     DispatchQueue.main.async {
       guard #available(iOS 18.0, *), let presenter = Self.topmost() else {
-        resolve(nil)
+        resolve(0)
         return
       }
       var answered = false
-      var host: UIViewController?
-      let closed = {
+      let answer = { (added: Int) in
         guard !answered else { return }
         answered = true
-        guard let shown = host else {
-          resolve(nil)
+        guard presenter.presentedViewController != nil else {
+          resolve(added)
           return
         }
-        // Let go of it here: the view it hosts holds this closure, and this closure held it.
-        host = nil
-        shown.dismiss(animated: false) { resolve(nil) }
+        presenter.dismiss(animated: false) { resolve(added) }
       }
-      let controller = UIHostingController(rootView: PickerHost(closed: closed))
+      let host = PickerHost(
+        chosen: { answer($0.count) },
+        closed: { DispatchQueue.main.async { answer(0) } }
+      )
+      let controller = UIHostingController(rootView: host)
       controller.view.backgroundColor = .clear
       controller.modalPresentationStyle = .overFullScreen
-      host = controller
       presenter.present(controller, animated: false)
     }
   }
@@ -69,12 +73,13 @@ final class MessagrContactAccess: NSObject {
 /// A transparent view whose only content is Apple's picker, shown as soon as it appears.
 @available(iOS 18.0, *)
 private struct PickerHost: View {
+  let chosen: ([String]) -> Void
   let closed: () -> Void
   @State private var isPresented = false
 
   var body: some View {
     Color.clear
-      .contactAccessPicker(isPresented: $isPresented) { _ in closed() }
+      .contactAccessPicker(isPresented: $isPresented) { chosen($0) }
       .onAppear { isPresented = true }
       .onChange(of: isPresented) { _, shown in
         if !shown { closed() }

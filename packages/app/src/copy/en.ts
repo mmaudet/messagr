@@ -810,7 +810,7 @@ export const en: Readonly<Record<CopyKey, string>> = {
   find_others: 'Your other contacts',
   find_nobody: 'None of your contacts can be found on Messagr yet.',
   find_no_access:
-    "Messagr cannot open your address book. To allow it later, open the phone's settings, then Messagr's page, and allow access to contacts. In the meantime, you can invite someone by link.",
+    'Messagr cannot open your address book. To allow it later, open the phone’s settings, then Messagr’s page, and allow access to contacts. In the meantime, you can invite someone by link.',
   find_not_the_published_key:
     "The service's answer did not come from its published key: nothing is shown. Try again later.",
   find_unreachable: 'The service is not answering. Try again in a moment.',

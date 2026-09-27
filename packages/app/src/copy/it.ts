@@ -804,7 +804,7 @@ export const it: Readonly<Record<CopyKey, string>> = {
   find_on_messagr: 'Già su Messagr',
   find_holder_changed: 'Questo numero ha cambiato titolare.',
   find_limited: 'Messagr guarda solo i contatti che ha scelto di condividere.',
-  find_share_more: 'Condividi altri contatti',
+  find_share_more: 'Condividere altri contatti',
   find_others: 'Gli altri Suoi contatti',
   find_nobody: 'Per ora nessuno dei Suoi contatti è trovabile su Messagr.',
   find_no_access:

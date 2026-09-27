@@ -382,21 +382,28 @@ describe('the journey of looking for contacts', () => {
     contacts: readonly Contact[],
     proven: Record<string, string>,
     added: readonly Contact[] = [],
+    choice: () => Promise<void> = async () => undefined,
   ) {
     const book = [...contacts]
     const { deps: d, asked } = deps(book, proven)
     const shown: FindingStage[] = []
-    const asks = { system: 0, choice: 0 }
+    const asks = { system: 0, choice: 0, reads: 0 }
     const j = findingJourney(
       {
         ...d,
+        readAddressBook: async () => {
+          asks.reads += 1
+          return book
+        },
         askForTheAddressBook: async () => {
           asks.system += 1
           return access
         },
         shareMoreCards: async () => {
           asks.choice += 1
+          await choice()
           book.push(...added)
+          return added.length
         },
       },
       stage => shown.push(stage),
@@ -462,6 +469,68 @@ describe('the journey of looking for contacts', () => {
     })
   })
 
+  it('shows the results as they were when no card was added, and asks nothing', async () => {
+    const { j, shown, asked, asks } = journey('some', [PAUL], {})
+    j.open()
+    await j.go()
+    const results = shown.at(-1)
+    const before = asked.length
+
+    await j.shareMore()
+
+    expect(asks.choice).toBe(1)
+    expect(shown.slice(-2)).toEqual([{ stage: 'looking' }, results])
+    expect(asked).toHaveLength(before)
+    expect(asks.reads).toBe(1)
+  })
+
+  it('shows the results as they were when the choice cannot open', async () => {
+    const { deps: d } = deps([PAUL], {})
+    const shown: FindingStage[] = []
+    const j = findingJourney(
+      {
+        ...d,
+        askForTheAddressBook: async () => 'some',
+        shareMoreCards: async () => {
+          throw new Error('no picker')
+        },
+      },
+      stage => shown.push(stage),
+    )
+    j.open()
+    await j.go()
+    const results = shown.at(-1)
+
+    await j.shareMore()
+
+    expect(shown.at(-1)).toBe(results)
+  })
+
+  it('drops what the choice answers after its screen was left', async () => {
+    let closeTheChoice = () => {}
+    const { j, shown, asked } = journey(
+      'some',
+      [PAUL],
+      {},
+      [ZOE],
+      () =>
+        new Promise<void>(done => {
+          closeTheChoice = done
+        }),
+    )
+    j.open()
+    await j.go()
+    const before = asked.length
+
+    const sharing = j.shareMore()
+    j.close()
+    closeTheChoice()
+    await sharing
+
+    expect(shown.at(-1)).toEqual({ stage: 'shut' })
+    expect(asked).toHaveLength(before)
+  })
+
   it('opens no choice from a full access, nor before the results', async () => {
     const { j, shown, asks } = journey('all', [PAUL], {})
     j.open()
@@ -476,12 +545,13 @@ describe('the journey of looking for contacts', () => {
   })
 
   it('reads nothing and sends nothing when the system refuses', async () => {
-    const { j, shown, asked } = journey('none', [PAUL], {})
+    const { j, shown, asked, asks } = journey('none', [PAUL], {})
 
     j.open()
     await j.go()
 
     expect(shown.at(-1)).toEqual({ stage: 'refused', why: 'no-access' })
+    expect(asks.reads).toBe(0)
     expect(asked).toEqual([])
   })
 
@@ -492,7 +562,7 @@ describe('the journey of looking for contacts', () => {
       {
         ...d,
         askForTheAddressBook: async () => 'all',
-        shareMoreCards: async () => undefined,
+        shareMoreCards: async () => 0,
       },
       stage => shown.push(stage),
     )
@@ -555,7 +625,7 @@ describe('the journey, pressed twice or refused by the system', () => {
       {
         ...d,
         askForTheAddressBook: async () => 'all',
-        shareMoreCards: async () => undefined,
+        shareMoreCards: async () => 0,
       },
       stage => shown.push(stage),
     )
@@ -576,7 +646,7 @@ describe('the journey, pressed twice or refused by the system', () => {
         askForTheAddressBook: async () => {
           throw new Error('no activity')
         },
-        shareMoreCards: async () => undefined,
+        shareMoreCards: async () => 0,
       },
       stage => shown.push(stage),
     )

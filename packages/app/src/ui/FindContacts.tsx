@@ -11,7 +11,8 @@ import { dayOf } from './whenLabel'
  * « Retrouver mes contacts » (#400, #392): the reminder, then the contacts
  * found on Messagr and the others.
  *
- * Every stage is `findContacts.ts`'s, and every gesture is handed back to it:
+ * Every stage is `findContacts.ts`'s, and every gesture is handed back to it,
+ * but « Inviter quelqu'un », which leads to the invitation form (`App.tsx`):
  * this file draws and decides nothing.
  *
  * # THE REMINDER HAS ONE BUTTON
@@ -251,6 +252,7 @@ const styles = StyleSheet.create({
   other: { ...type.body, color: color.neutral['600'] },
   actions: { gap: space.s, marginTop: space.m },
   notice: {
+    gap: space.s,
     padding: space.m,
     borderLeftWidth: stroke.accent,
     backgroundColor: color.wait['100'],
