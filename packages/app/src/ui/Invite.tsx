@@ -20,10 +20,13 @@ import {
 } from '../design/tokens'
 import { cleanDeclaredName } from '../runtime/declaredName'
 import { normaliseGivenName } from '../runtime/givenName'
-import type { DeliveryRefusal } from '../runtime/deliveredInvitations'
+import type {
+  DeliveryRefusal,
+  DeliveryWait,
+} from '../runtime/deliveredInvitations'
 import { NotchedButton } from './NotchedButton'
 import { QrCode } from './QrCode'
-import { dayOf } from './whenLabel'
+import { dayOf, timeOf } from './whenLabel'
 
 /**
  * Inviting somebody, which is the same gesture as starting a conversation
@@ -81,6 +84,18 @@ const REFUSED: Readonly<Record<DeliveryRefusal, CopyKey>> = {
   'own-reference': 'invite_refused_own',
   'unknown-reference': 'invite_refused_gone',
   'not-findable': 'invite_refused_not_findable',
+  pending: 'invite_refused_pending',
+}
+
+/** And each refusal that says when another may leave (#406), with it. */
+function sayWait({ why, retryAt }: DeliveryWait): string {
+  return t(
+    why === 'recently'
+      ? 'invite_refused_recently %1$@ %2$@'
+      : 'invite_refused_quota %1$@ %2$@',
+    dayOf(retryAt),
+    timeOf(retryAt),
+  )
 }
 
 /**
@@ -125,6 +140,8 @@ export type InviteStage =
        * than « L'invitation n'a pas pu être créée. ».
        */
       readonly refusal?: DeliveryRefusal
+      /** A refusal that lasts until a moment, and that moment (#406). */
+      readonly wait?: DeliveryWait
     }
 
 export interface InviteProps {
@@ -257,11 +274,13 @@ export function Invite({ stage, onInvite, onClose, admission }: InviteProps) {
     return (
       <View style={styles.resting}>
         <Text testID="invite-failed" style={styles.failed}>
-          {t(
-            stage.refusal === undefined
-              ? 'invite_failed'
-              : REFUSED[stage.refusal],
-          )}
+          {stage.wait !== undefined
+            ? sayWait(stage.wait)
+            : t(
+                stage.refusal === undefined
+                  ? 'invite_failed'
+                  : REFUSED[stage.refusal],
+              )}
         </Text>
         {/* The reason verbatim, under the sentence rather than instead of it.
             Invariant 6 governs what a person is told; it does not require

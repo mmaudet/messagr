@@ -381,6 +381,12 @@ export const de: Readonly<Record<CopyKey, string>> = {
     'Dieser Kontakt ist nicht mehr auffindbar. Sehen Sie Ihre Kontakte erneut durch, oder laden Sie ihn per Link ein.',
   invite_refused_not_findable:
     'Ihre Nummer ist nicht mehr nachgewiesen. Weisen Sie sie in den Einstellungen erneut nach, um einen gefundenen Kontakt einzuladen.',
+  invite_refused_pending:
+    'Eine Einladung wartet bereits in Messagr auf diese Person: immer nur eine.',
+  'invite_refused_recently %1$@ %2$@':
+    'Sie haben diese Person vor Kurzem eingeladen. Sie können sie am %1$@ um %2$@ erneut einladen.',
+  'invite_refused_quota %1$@ %2$@':
+    'Sie haben die zehn Einladungen des Tages gesendet. Die nächsten können am %1$@ um %2$@ gesendet werden.',
   invite_failed: 'Die Einladung konnte nicht erstellt werden.',
   invite_waiting: 'Noch niemand hat den Link geöffnet.',
   invite_admitted: 'Erledigt: diese Person kann hereinkommen.',
@@ -410,6 +416,14 @@ export const de: Readonly<Record<CopyKey, string>> = {
   'invited_behind %1$d': '%1$d weitere Einladung(en) warten dahinter.',
   invited_join: 'Dem Gespräch beitreten',
   invited_refuse: 'Die Einladung ablehnen',
+  invited_block: 'Ablehnen und blockieren',
+  invited_block_title: 'Dieses Konto blockieren?',
+  invited_block_does:
+    'Die Einladung wird abgelehnt, und dieses Konto kann Sie in Messagr nicht mehr einladen. Es erfährt davon nichts: Seine nächsten Einladungen bleiben unbeantwortet, als hätten Sie sie nicht gesehen.',
+  invited_block_not:
+    'Das Blockieren verbirgt Sie nicht: Wer Ihre Nummer hat, sieht weiterhin, dass Sie auf Messagr sind, und kann Ihnen auf anderem Weg einen Einladungslink schicken. Nur das Zurückziehen Ihrer Nummer in den Einstellungen verbirgt Sie.',
+  invited_block_confirm: 'Blockieren',
+  invited_block_cancel: 'Abbrechen',
   invited_working: 'Einen Moment…',
   invited_failed:
     'Nichts hat sich geändert: dieser Einladung wurde weder beigetreten noch wurde sie abgelehnt. Sie können es erneut versuchen.',

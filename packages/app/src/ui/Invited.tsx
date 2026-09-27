@@ -99,6 +99,7 @@ export function Invited({
   failed,
   onJoin,
   onRefuse,
+  block,
 }: {
   readonly known: WhatIsKnown
   /**
@@ -113,7 +114,7 @@ export function Invited({
    * Which action is under way, if either. A tap that shows nothing invites
    * another, and the second would send a refusal over a join.
    */
-  readonly working: 'join' | 'refuse' | null
+  readonly working: 'join' | 'refuse' | 'block' | null
   /**
    * Whether the answer given here did not go through. The screen stays and
    * says so: the invitation is exactly where it was, and a screen that
@@ -122,7 +123,64 @@ export function Invited({
   readonly failed: boolean
   readonly onJoin: () => void
   readonly onRefuse: () => void
+  /**
+   * « Refuser et bloquer », for an invitation delivered inside Messagr
+   * (#406), and absent everywhere else. `asking` draws the screen that says
+   * what a block does and does not do, which is where it is sent from.
+   */
+  readonly block?: {
+    readonly asking: boolean
+    readonly onAsk: () => void
+    readonly onConfirm: () => void
+    readonly onCancel: () => void
+  }
 }) {
+  // BEFORE A BLOCK, WHAT IT DOES AND WHAT IT DOES NOT (#406). A block hides
+  // nobody: anyone with the number still sees the person is on Messagr, and
+  // only withdrawing the number takes them out of discovery. Said before the
+  // block is sent rather than after, since it is what the decision rests on.
+  if (block?.asking === true) {
+    return (
+      <ScrollView
+        testID="invited-block"
+        style={styles.screen}
+        contentContainerStyle={styles.content}>
+        <Text style={styles.title}>{t('invited_block_title')}</Text>
+        <View style={[styles.card, styles.plain]}>
+          <Text style={styles.body}>{t('invited_block_does')}</Text>
+        </View>
+        <View style={[styles.card, styles.weigh]} testID="invited-block-not">
+          <Text style={styles.body}>{t('invited_block_not')}</Text>
+        </View>
+        <View style={styles.actions}>
+          <NotchedButton
+            testID="invited-block-confirm"
+            label={
+              working === 'block'
+                ? t('invited_working')
+                : t('invited_block_confirm')
+            }
+            onPress={block.onConfirm}
+            disabled={working !== null}
+            wide
+          />
+          <NotchedButton
+            testID="invited-block-cancel"
+            label={t('invited_block_cancel')}
+            onPress={block.onCancel}
+            tone="quiet"
+            disabled={working !== null}
+            wide
+          />
+          {failed && (
+            <View style={[styles.card, styles.weigh]} testID="invited-failed">
+              <Text style={styles.body}>{t('invited_failed')}</Text>
+            </View>
+          )}
+        </View>
+      </ScrollView>
+    )
+  }
   const said = SAID_BY_SOURCE[known.source]
   const nobody = known.identifier === ''
   return (
@@ -229,6 +287,16 @@ export function Invited({
           disabled={working !== null}
           wide
         />
+        {block !== undefined && (
+          <NotchedButton
+            testID="invited-block-open"
+            label={t('invited_block')}
+            onPress={block.onAsk}
+            tone="quiet"
+            disabled={working !== null}
+            wide
+          />
+        )}
         {/* Under the buttons rather than over them, for #284's reason: above,
             a card appearing would move the button just pressed out from under
             the finger. */}

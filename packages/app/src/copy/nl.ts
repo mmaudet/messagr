@@ -371,6 +371,12 @@ export const nl: Readonly<Record<CopyKey, string>> = {
     'Dit contact is niet meer vindbaar. Bekijk uw contacten opnieuw, of nodig het uit via een link.',
   invite_refused_not_findable:
     'Uw nummer is niet meer bewezen. Bewijs het opnieuw in de Instellingen om een gevonden contact uit te nodigen.',
+  invite_refused_pending:
+    'Er wacht al een uitnodiging op deze persoon in Messagr: één tegelijk.',
+  'invite_refused_recently %1$@ %2$@':
+    'U hebt deze persoon onlangs uitgenodigd. U kunt die op %1$@ om %2$@ opnieuw uitnodigen.',
+  'invite_refused_quota %1$@ %2$@':
+    'U hebt de tien uitnodigingen van vandaag verstuurd. De volgende kunnen op %1$@ om %2$@ vertrekken.',
   invite_failed: 'De uitnodiging kon niet worden aangemaakt.',
   invite_waiting: 'Nog niemand heeft de link geopend.',
   invite_admitted: 'Klaar: deze persoon kan binnenkomen.',
@@ -400,6 +406,14 @@ export const nl: Readonly<Record<CopyKey, string>> = {
   'invited_behind %1$d': 'Er wachten nog %1$d uitnodiging(en) achter deze.',
   invited_join: 'Deelnemen aan het gesprek',
   invited_refuse: 'De uitnodiging weigeren',
+  invited_block: 'Weigeren en blokkeren',
+  invited_block_title: 'Dit account blokkeren?',
+  invited_block_does:
+    'De uitnodiging wordt geweigerd, en dit account kan u in Messagr niet meer uitnodigen. Het komt dat niet te weten: zijn volgende uitnodigingen blijven onbeantwoord, alsof u ze niet had gezien.',
+  invited_block_not:
+    'Blokkeren verbergt u niet: wie uw nummer heeft, ziet nog steeds dat u op Messagr bent, en kan u op een andere manier een uitnodigingslink sturen. Alleen het intrekken van uw nummer, in Instellingen, verbergt u.',
+  invited_block_confirm: 'Blokkeren',
+  invited_block_cancel: 'Annuleren',
   invited_working: 'Een ogenblik…',
   invited_failed:
     'Er is niets veranderd: aan deze uitnodiging is niet deelgenomen en ze is niet geweigerd. U kunt het opnieuw proberen.',

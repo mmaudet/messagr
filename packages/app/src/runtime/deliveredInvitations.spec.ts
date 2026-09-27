@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 
 import type { Answer } from './discovery'
 import {
+  blockDelivered,
   declineDelivered,
   deliverInvitation,
   joinDelivered,
@@ -113,6 +114,11 @@ function harness(
     },
     declineInvitation: async id => {
       answered.push(`decline ${id}`)
+      if (options.answer instanceof Error) throw options.answer
+      return options.answer ?? { status: 204, body: '' }
+    },
+    blockInvitation: async id => {
+      answered.push(`block ${id}`)
       if (options.answer instanceof Error) throw options.answer
       return options.answer ?? { status: 204, body: '' }
     },
@@ -264,6 +270,7 @@ describe('delivering an invitation to a match (#404)', () => {
       ['MESSAGR_OWN_REFERENCE', 'own-reference'],
       ['MESSAGR_UNKNOWN_REFERENCE', 'unknown-reference'],
       ['MESSAGR_NOT_FINDABLE', 'not-findable'],
+      ['MESSAGR_INVITATION_PENDING', 'pending'],
     ] as const) {
       const { http, service, calls } = harness({
         send: { status: 422, body: JSON.stringify({ errcode }) },
@@ -285,6 +292,32 @@ describe('delivering an invitation to a match (#404)', () => {
         '/_matrix/client/v3/rooms/!made%3Ax/leave',
       )
       expect(kept.size).toBe(0)
+    }
+  })
+
+  it('says until when a refusal lasts, for those that say it (#406)', async () => {
+    for (const [errcode, why] of [
+      ['MESSAGR_INVITED_RECENTLY', 'recently'],
+      ['MESSAGR_DELIVERY_QUOTA', 'quota'],
+    ] as const) {
+      const { http, service } = harness({
+        send: {
+          status: 429,
+          body: JSON.stringify({ errcode, retry_at: 1_791_000_000 }),
+        },
+      })
+
+      expect(
+        await deliverInvitation(
+          { http, service, sent: thePage().sent },
+          NO_KEY,
+          { given: null, declared: null },
+        ),
+      ).toEqual({
+        delivered: false,
+        reason: `the invitation service refused it: ${errcode}`,
+        wait: { why, retryAt: 1_791_000_000_000 },
+      })
     }
   })
 
@@ -540,6 +573,13 @@ describe('the invitations waiting for this account (#404)', () => {
 
     expect(await declineDelivered(service, 'a')).toBe('declined')
     expect(answered).toEqual(['decline a'])
+  })
+
+  it('declines and blocks, and the service alone is told (#406)', async () => {
+    const { service, answered } = harness()
+
+    expect(await blockDelivered(service, 'a')).toBe('declined')
+    expect(answered).toEqual(['block a'])
   })
 
   it('says a conversation was entered, and hears whether the service took it', async () => {

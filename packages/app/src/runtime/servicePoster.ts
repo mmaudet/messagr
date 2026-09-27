@@ -136,6 +136,8 @@ export function discoveryService(
       call(`/discovery/invitations/${encodeURIComponent(id)}/join`, '{}'),
     declineInvitation: id =>
       call(`/discovery/invitations/${encodeURIComponent(id)}/decline`, '{}'),
+    blockInvitation: id =>
+      call(`/discovery/invitations/${encodeURIComponent(id)}/block`, '{}'),
     enteredInvitation: id =>
       call(`/discovery/invitations/${encodeURIComponent(id)}/entered`, '{}'),
   }

@@ -384,6 +384,12 @@ export const uz: Readonly<Record<CopyKey, string>> = {
     'Bu kontaktni endi topib boʻlmaydi. Kontaktlaringizni qayta koʻrib chiqing yoki uni havola orqali taklif qiling.',
   invite_refused_not_findable:
     'Raqamingiz endi isbotlanmagan. Topilgan kontaktni taklif qilish uchun uni Sozlamalarda qayta isbotlang.',
+  invite_refused_pending:
+    'Bu kishini Messagrda allaqachon bitta taklif kutmoqda: bir vaqtda faqat bittasi.',
+  'invite_refused_recently %1$@ %2$@':
+    'Siz bu kishini yaqinda taklif qilgansiz. Uni %1$@ kuni soat %2$@ da yana taklif qila olasiz.',
+  'invite_refused_quota %1$@ %2$@':
+    'Siz kunlik oʻnta taklifni yubordingiz. Keyingilari %1$@ kuni soat %2$@ da yuborilishi mumkin.',
   invite_failed: 'Taklifni yaratib boʻlmadi.',
   invite_waiting: 'Havolani hali hech kim ochmadi.',
   invite_admitted: 'Tayyor: bu odam kirishi mumkin.',
@@ -413,6 +419,14 @@ export const uz: Readonly<Record<CopyKey, string>> = {
   'invited_behind %1$d': 'Bunisining orqasida yana %1$d taklif kutmoqda.',
   invited_join: 'Suhbatga qoʻshilish',
   invited_refuse: 'Taklifni rad etish',
+  invited_block: 'Rad etish va bloklash',
+  invited_block_title: 'Bu hisob bloklansinmi?',
+  invited_block_does:
+    'Taklif rad etiladi va bu hisob sizni Messagrda boshqa taklif qila olmaydi. U buni bilmaydi: keyingi takliflari xuddi siz ularni koʻrmagandek javobsiz qoladi.',
+  invited_block_not:
+    'Bloklash sizni yashirmaydi: raqamingiz bor kishi hamon Messagrda ekaningizni koʻradi va sizga boshqa yoʻl bilan taklif havolasini yubora oladi. Faqat Sozlamalarda raqamingizni olib tashlash sizni yashiradi.',
+  invited_block_confirm: 'Bloklash',
+  invited_block_cancel: 'Bekor qilish',
   invited_working: 'Bir daqiqa…',
   invited_failed:
     'Hech narsa oʻzgarmadi: bu taklifga na qoʻshildingiz, na uni rad etdingiz. Qayta urinib koʻrishingiz mumkin.',

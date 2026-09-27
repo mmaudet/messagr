@@ -374,6 +374,12 @@ export const en: Readonly<Record<CopyKey, string>> = {
     'This contact can no longer be found. Look at your contacts again, or invite them by link.',
   invite_refused_not_findable:
     'Your number is no longer proved. Prove it again in Settings to invite a contact you found.',
+  invite_refused_pending:
+    'An invitation is already waiting for this person in Messagr: one at a time.',
+  'invite_refused_recently %1$@ %2$@':
+    'You invited this person recently. You can invite them again on %1$@ at %2$@.',
+  'invite_refused_quota %1$@ %2$@':
+    'You have sent the day’s ten invitations. The next ones can leave on %1$@ at %2$@.',
   invite_failed: 'The invitation could not be created.',
   invite_waiting: 'Nobody has opened the link yet.',
   invite_admitted: 'Done: this person can come in.',
@@ -404,6 +410,14 @@ export const en: Readonly<Record<CopyKey, string>> = {
     '%1$d other invitation(s) are waiting behind this one.',
   invited_join: 'Join the conversation',
   invited_refuse: 'Refuse the invitation',
+  invited_block: 'Decline and block',
+  invited_block_title: 'Block this account?',
+  invited_block_does:
+    'The invitation is declined, and this account can no longer invite you in Messagr. It will not know: its next invitations will go unanswered, as if you had not seen them.',
+  invited_block_not:
+    'Blocking does not hide you: anyone who has your number still sees that you are on Messagr, and can still send you an invitation link some other way. Only withdrawing your number, in Settings, hides you.',
+  invited_block_confirm: 'Block',
+  invited_block_cancel: 'Cancel',
   invited_working: 'One moment…',
   invited_failed:
     'Nothing has changed: this invitation was neither joined nor refused. You can try again.',

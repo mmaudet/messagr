@@ -184,6 +184,7 @@ import {
 } from './src/runtime/outstandingStore'
 import { forgetfulSentInvitations } from './src/runtime/sentInvitationStore'
 import {
+  blockDelivered,
   declineDelivered,
   joinDelivered,
   keptThisLaunchToo,
@@ -704,8 +705,13 @@ export function App({
   const [deliveredOnScreen, setDeliveredOnScreen] =
     useState<WaitingInvitation | null>(null)
   const [answeringDelivered, setAnsweringDelivered] = useState<
-    'join' | 'refuse' | null
+    'join' | 'refuse' | 'block' | null
   >(null)
+  /**
+   * Whether the screen that says what a block does and does not do is up,
+   * before « Bloquer » is sent (#406).
+   */
+  const [blockingDelivered, setBlockingDelivered] = useState(false)
   /**
    * The invitation whose answer did not reach the service, if one did not:
    * the invitation rather than a flag, for the reason `answerFailed` gives.
@@ -724,7 +730,7 @@ export function App({
    * reached keeps the screen, and says so.
    */
   const answerDelivered = (
-    how: 'join' | 'refuse',
+    how: 'join' | 'refuse' | 'block',
     invitation: WaitingInvitation,
   ) => {
     setAnsweringDelivered(how)
@@ -733,7 +739,9 @@ export function App({
       const answered =
         how === 'join'
           ? await joinDelivered(discoveryDeps.service, invitation.id)
-          : await declineDelivered(discoveryDeps.service, invitation.id)
+          : how === 'block'
+            ? await blockDelivered(discoveryDeps.service, invitation.id)
+            : await declineDelivered(discoveryDeps.service, invitation.id)
       if (answered === 'unreachable') {
         logEvent('warn', 'MESSAGR_DELIVERED_ANSWER_FAILED', { how })
         setDeliveredFailed(invitation.id)
@@ -750,6 +758,7 @@ export function App({
         answered === 'expired' || answered === 'gone' ? answered : null,
       )
       setDeliveredWaiting(held => held.filter(one => one.id !== invitation.id))
+      setBlockingDelivered(false)
       setDeliveredOnScreen(null)
     }
     answering()
@@ -4183,6 +4192,9 @@ export function App({
                     ...(delivered.refusal === undefined
                       ? {}
                       : { refusal: delivered.refusal }),
+                    ...(delivered.wait === undefined
+                      ? {}
+                      : { wait: delivered.wait }),
                   })
                   return
                 }
@@ -4983,7 +4995,12 @@ export function App({
       // answer is on its way: the screen that asked would be gone. Only while
       // it is drawn, which is at rest: back belongs to whatever covers it.
       if (deliveredOnScreen !== null && atRest) {
-        if (answeringDelivered === null) setDeliveredOnScreen(null)
+        // And from the screen that explains a block, back is « Annuler »
+        // (#406): the invitation is on screen again, unanswered.
+        if (answeringDelivered === null) {
+          if (blockingDelivered) setBlockingDelivered(false)
+          else setDeliveredOnScreen(null)
+        }
         return true
       }
       if (invite.stage !== 'shut') {
@@ -5012,6 +5029,7 @@ export function App({
     finding.stage,
     deliveredOnScreen,
     answeringDelivered,
+    blockingDelivered,
     atRest,
     invite.stage,
     tab,
@@ -6073,6 +6091,7 @@ export function App({
                     onOpenDelivered={invitation => {
                       setDeliveredFailed(null)
                       setDeliveredOutcome(null)
+                      setBlockingDelivered(false)
                       setDeliveredOnScreen(invitation)
                     }}
                     joinedDelivered={deliveredJoined}
@@ -6646,6 +6665,15 @@ export function App({
               failed={deliveredFailed === deliveredOnScreen.id}
               onJoin={() => answerDelivered('join', deliveredOnScreen)}
               onRefuse={() => answerDelivered('refuse', deliveredOnScreen)}
+              block={{
+                asking: blockingDelivered,
+                onAsk: () => {
+                  setDeliveredFailed(null)
+                  setBlockingDelivered(true)
+                },
+                onConfirm: () => answerDelivered('block', deliveredOnScreen),
+                onCancel: () => setBlockingDelivered(false),
+              }}
             />
           </SafeAreaView>
         )}

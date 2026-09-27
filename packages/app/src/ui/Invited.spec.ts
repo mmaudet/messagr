@@ -422,3 +422,57 @@ describe('an invitation delivered inside Messagr (#404)', () => {
     expect(find(drawn, 'invited-refuse')?.props.wide).toBe(true)
   })
 })
+
+describe('« Refuser et bloquer », for an invitation delivered inside Messagr (#406)', () => {
+  const delivered = whatADeliveredInvitationSays(
+    new Date(2026, 9, 4, 12).getTime(),
+  )
+  const block = (asking: boolean, pressed: string[] = []) => ({
+    asking,
+    onAsk: () => pressed.push('ask'),
+    onConfirm: () => pressed.push('confirm'),
+    onCancel: () => pressed.push('cancel'),
+  })
+
+  it('is a third answer, of the same rank as « Refuser », and only where it is offered', () => {
+    const pressed: string[] = []
+    const drawn = screen({ known: delivered, block: block(false, pressed) })
+
+    const button = find(drawn, 'invited-block-open')
+    expect(button?.props.tone).toBe('quiet')
+    expect(button?.props.wide).toBe(true)
+    ;(button?.props.onPress as () => void)()
+    expect(pressed).toEqual(['ask'])
+    expect(
+      find(screen({ known: delivered }), 'invited-block-open'),
+    ).toBeUndefined()
+  })
+
+  it('says, before it is sent, what a block does and what it does not', () => {
+    const pressed: string[] = []
+    const drawn = screen({ known: delivered, block: block(true, pressed) })
+
+    expect(said(drawn)).toEqual([
+      t('invited_block_title'),
+      t('invited_block_does'),
+      t('invited_block_not'),
+      t('invited_block_confirm'),
+      t('invited_block_cancel'),
+    ])
+    ;(find(drawn, 'invited-block-confirm')?.props.onPress as () => void)()
+    ;(find(drawn, 'invited-block-cancel')?.props.onPress as () => void)()
+    expect(pressed).toEqual(['confirm', 'cancel'])
+  })
+
+  it('holds both buttons while the block is on its way', () => {
+    const drawn = screen({
+      known: delivered,
+      block: block(true),
+      working: 'block',
+    })
+
+    expect(find(drawn, 'invited-block-confirm')?.props.disabled).toBe(true)
+    expect(find(drawn, 'invited-block-cancel')?.props.disabled).toBe(true)
+    expect(said(drawn)).toContain(t('invited_working'))
+  })
+})

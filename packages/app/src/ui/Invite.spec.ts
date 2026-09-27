@@ -4,7 +4,7 @@ import { describe, expect, it, vi } from 'vitest'
 
 import { t } from '../copy'
 import { Invite, type InviteStage } from './Invite'
-import { dayOf } from './whenLabel'
+import { dayOf, timeOf } from './whenLabel'
 
 /**
  * The invitation form, walked rather than rendered, for the reason
@@ -152,6 +152,7 @@ describe('inviting a contact found (#404)', () => {
       ['own-reference', 'invite_refused_own'],
       ['unknown-reference', 'invite_refused_gone'],
       ['not-findable', 'invite_refused_not_findable'],
+      ['pending', 'invite_refused_pending'],
     ] as const) {
       const drawn = show({ stage: 'failed', reason: 'refused', refusal })
       expect(textIn(withId(drawn, 'invite-failed'))).toBe(t(key))
@@ -161,5 +162,23 @@ describe('inviting a contact found (#404)', () => {
         withId(show({ stage: 'failed', reason: 'down' }), 'invite-failed'),
       ),
     ).toBe(t('invite_failed'))
+  })
+
+  it('says until when a limit holds, on the day and at the hour of the telephone (#406)', () => {
+    const retryAt = new Date(2026, 9, 12, 2, 0).getTime()
+
+    for (const [why, key] of [
+      ['recently', 'invite_refused_recently %1$@ %2$@'],
+      ['quota', 'invite_refused_quota %1$@ %2$@'],
+    ] as const) {
+      const drawn = show({
+        stage: 'failed',
+        reason: 'refused',
+        wait: { why, retryAt },
+      })
+      expect(textIn(withId(drawn, 'invite-failed'))).toBe(
+        t(key, dayOf(retryAt), timeOf(retryAt)),
+      )
+    }
   })
 })
