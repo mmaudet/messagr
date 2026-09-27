@@ -313,7 +313,7 @@ export const it: Readonly<Record<CopyKey, string>> = {
   // quanto costa un link copiato è detto dove viene chiesto.
   list_paste_lead: 'Se il link non si apre da solo, lo copi e lo incolli qui.',
   list_paste_cost:
-    'Un link copiato può essere letto dalle altre applicazioni di questo telefono. Questo vale un’ora e serve una sola volta.',
+    'Un link copiato può essere letto dalle altre applicazioni di questo telefono. Questo vale per un tempo limitato e serve una sola volta.',
   list_paste_field: 'Incolli il link di invito',
   list_paste_confirm: 'Entrare',
   list_paste_working: 'Apertura dell’invito…',
@@ -354,6 +354,12 @@ export const it: Readonly<Record<CopyKey, string>> = {
   invite_qr: 'Oppure fagli scansionare questo codice.',
   invite_qr_label: 'Codice QR del link di invito',
   invite_share: 'Condividere il link',
+  'invite_absent_text %1$@':
+    'Un invito a raggiungermi su Messagr:\n%1$@\nIl link vale tre giorni e serve una volta sola.',
+  invite_ready_days:
+    'Invii questo link a questa persona. Vale tre giorni e serve una volta sola.',
+  invite_sms_failed:
+    'L’app dei messaggi del telefono non si è aperta. Condivida il link in un altro modo.',
   invite_close: 'Chiudere',
   'invite_sent %1$@ %2$@':
     'Il suo invito attende %1$@ in Messagr. Scadenza: %2$@.',
@@ -861,6 +867,8 @@ export const it: Readonly<Record<CopyKey, string>> = {
   find_share_more: 'Condividere altri contatti',
   find_invite: 'Invitare',
   find_others: 'Gli altri Suoi contatti',
+  find_invite_sms: 'Invitare via SMS',
+  find_invite_other: 'Altro modo',
   find_nobody: 'Per ora nessuno dei Suoi contatti è trovabile su Messagr.',
   find_no_access:
     'Messagr non ha accesso alla Sua rubrica. Per consentirlo più tardi, apra le impostazioni del telefono, poi la pagina di Messagr, e consenta l’accesso ai contatti. Nel frattempo, può invitare qualcuno con un link.',

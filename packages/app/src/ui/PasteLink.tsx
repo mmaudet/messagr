@@ -39,7 +39,7 @@ import { NotchedButton } from './NotchedButton'
  *
  * And what it costs is said here, where it is asked for, rather than left for
  * somebody to work out: a copied link can be read by the other applications
- * on the telephone, and it is good for an hour and a single use.
+ * on the telephone, and it is good for a limited time and a single use.
  *
  * # THIS SCREEN DECIDES NOTHING ABOUT THE LINK
  *

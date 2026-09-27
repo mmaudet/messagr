@@ -179,6 +179,13 @@ The link, established on the device, between a contact and the account whose
 proven discovery identity appears in that contact.
 _Avoid_: Hit, sync result
 
+**Absent contact**:
+A contact no findable account matches: not on Messagr, or on it without a
+current proof. It is invited by a link sent from the telephone, by SMS or by
+the share sheet, and its number goes to the telephone's messaging application
+only.
+_Avoid_: Non-user, missing contact, lead
+
 **Block**:
 A recipient's refusal of an invitation delivered inside Messagr that also
 keeps its inviter from delivering any other. The blocked account is never

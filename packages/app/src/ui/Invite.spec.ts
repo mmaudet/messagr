@@ -1,6 +1,6 @@
 import { createElement, Fragment, isValidElement, type ReactNode } from 'react'
 import * as ReactNamespace from 'react'
-import { describe, expect, it, vi } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { t } from '../copy'
 import { Invite, type InviteStage } from './Invite'
@@ -18,9 +18,16 @@ vi.mock('react', async importOriginal => ({
   useState: (initial: unknown) => [initial, () => undefined],
 }))
 
+/** What the share sheet was handed, in order. */
+const shared = vi.hoisted(() => [] as string[])
+
 vi.mock('react-native', () => ({
   Pressable: 'Pressable',
-  Share: { share: async () => undefined },
+  Share: {
+    share: async ({ message }: { message: string }) => {
+      shared.push(message)
+    },
+  },
   StyleSheet: { absoluteFill: {}, create: (styles: object) => styles },
   Text: 'Text',
   TextInput: 'TextInput',
@@ -180,5 +187,84 @@ describe('inviting a contact found (#404)', () => {
         t(key, dayOf(retryAt), timeOf(retryAt)),
       )
     }
+  })
+})
+
+describe('inviting a contact absent from Messagr (#408)', () => {
+  const BY_SMS = {
+    name: 'Zoé',
+    channel: { by: 'sms', number: '+33698765432' },
+  } as const
+  const OTHERWISE = { name: 'Zoé', channel: { by: 'share' } } as const
+  const LINK = 'https://messagr.eu/i/a-token'
+  const DRAFTED = `Invitation à me rejoindre sur Messagr :\n${LINK}\nCe lien vaut trois jours et ne sert qu'une fois.`
+
+  beforeEach(() => {
+    shared.length = 0
+  })
+
+  it('opens « Qui invitez-vous ? » with the name of the card, and asks for a name that travels in the link', () => {
+    const drawn = show({ stage: 'resting', to: BY_SMS })
+
+    expect(withId(drawn, 'invite-name')?.props.value).toBe('Zoé')
+    expect(withId(drawn, 'invite-declared')).toBeDefined()
+    expect(textIn(withId(drawn, 'invite-declared-hint'))).toBe(
+      t('invite_declared_hint'),
+    )
+  })
+
+  it('says on its button how the link leaves', () => {
+    expect(
+      textIn(withId(show({ stage: 'resting', to: BY_SMS }), 'invite')),
+    ).toBe(t('find_invite_sms'))
+    expect(
+      textIn(withId(show({ stage: 'resting', to: OTHERWISE }), 'invite')),
+    ).toBe(t('invite_action'))
+  })
+
+  it('hands the name of the card over, and the declared name', () => {
+    const onInvite = vi.fn()
+    const drawn = show({ stage: 'resting', to: BY_SMS }, onInvite)
+
+    ;(withId(drawn, 'invite')?.props.onPress as () => void)()
+
+    expect(onInvite).toHaveBeenCalledWith('Zoé', null)
+  })
+
+  it('says the link is good for three days, and shares the drafted text rather than the link alone', async () => {
+    const drawn = show({
+      stage: 'ready',
+      link: LINK,
+      drafted: { message: DRAFTED, smsRefused: false },
+    })
+
+    expect(textIn(withId(drawn, 'invite-ready'))).toBe(t('invite_ready_days'))
+    expect(withId(drawn, 'invite-link')?.props.children).toBe(LINK)
+    ;(withId(drawn, 'invite-share')?.props.onPress as () => void)()
+    await Promise.resolve()
+    expect(shared).toEqual([DRAFTED])
+    expect(withId(drawn, 'invite-sms-failed')).toBeUndefined()
+  })
+
+  it('says when the messaging application did not open, with the link there to share', () => {
+    const drawn = show({
+      stage: 'ready',
+      link: LINK,
+      drafted: { message: DRAFTED, smsRefused: true },
+    })
+
+    expect(textIn(withId(drawn, 'invite-sms-failed'))).toBe(
+      t('invite_sms_failed'),
+    )
+    expect(withId(drawn, 'invite-share')).toBeDefined()
+  })
+
+  it('keeps its hour and shares the link alone for any other link', async () => {
+    const drawn = show({ stage: 'ready', link: LINK, drafted: null })
+
+    expect(textIn(withId(drawn, 'invite-ready'))).toBe(t('invite_ready'))
+    ;(withId(drawn, 'invite-share')?.props.onPress as () => void)()
+    await Promise.resolve()
+    expect(shared).toEqual([LINK])
   })
 })

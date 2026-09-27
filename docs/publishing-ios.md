@@ -374,7 +374,7 @@ Un testeur externe ne reçoit une build qu'après la revue bêta d'Apple, et le 
 
 ### Pourquoi l'application ne suffit pas
 
-**Une invitation de l'application vit une heure** (`TTL_SECONDS = 3600`, `issueInvitation.ts`), et le téléphone qui l'a émise ne fait entrer que pendant cette heure (`STOP_ASKING_AFTER_MS`, `admitAnyoneWaiting.ts`). La revue prend en général une journée.
+**Une invitation de l'application vit une heure** (`LINK_TTL_SECONDS`, `issueInvitation.ts`), ou trois jours pour un contact absent de Messagr (#408), et seul le téléphone qui l'a émise fait entrer, tant que vaut le lien (`admitAnyoneWaiting.ts`). La revue prend en général une journée.
 
 **Et une invitation plus longue ne suffit pas non plus**, parce que la réclamation se fait en deux appels. Le premier tire un compte et reçoit `409 MESSAGR_NOT_YET_INVITED` ; tant que l'émetteur n'invite pas ce compte dans la conversation, les suivants reçoivent la même chose. C'est l'application de l'émetteur qui fait ce geste, sans que personne le demande. Une invitation créée hors de l'application n'est donc admise par personne, quelle que soit sa durée.
 

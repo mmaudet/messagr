@@ -493,10 +493,14 @@ export const fr = {
   // porteur (ADR-0004) et un presse-papiers se lit depuis n'importe quelle
   // autre application. L'application, elle, n'y écrit que : elle ne le lit
   // jamais d'elle-même, et ce champ est le geste de la personne.
+  //
+  // COMBIEN DE TEMPS, ELLE NE LE SAIT PAS : une heure pour la plupart des
+  // liens, trois jours pour celui envoyé à un contact absent de Messagr
+  // (#408). Le lien ne le dit pas, alors la phrase ne le dit pas non plus.
   list_paste_lead:
     'Si le lien ne s’ouvre pas tout seul, copiez-le et collez-le ici.',
   list_paste_cost:
-    'Un lien copié peut être lu par les autres applications de ce téléphone. Celui-ci est valable une heure et ne sert qu’une fois.',
+    'Un lien copié peut être lu par les autres applications de ce téléphone. Celui-ci ne vaut qu’un temps, et ne sert qu’une fois.',
   list_paste_field: 'Collez le lien d’invitation',
   list_paste_confirm: 'Entrer',
   list_paste_working: 'Ouverture de l’invitation…',
@@ -567,6 +571,23 @@ export const fr = {
   invite_qr: 'Ou faites-le scanner ce code.',
   invite_qr_label: 'Code QR du lien d’invitation',
   invite_share: 'Partager le lien',
+  // UN CONTACT ABSENT DE MESSAGR (#408) : le texte rédigé que reçoit la
+  // messagerie du téléphone, ou la feuille de partage, avec un lien de trois
+  // jours. Neutre, sans tutoiement ni vouvoiement, décision du porteur du
+  // 27 septembre 2026. La personne le voit, et peut le changer avant l'envoi.
+  //
+  // L'APOSTROPHE DROITE, ET ICI SEULEMENT. La typographique n'existe pas dans
+  // l'alphabet des SMS : un seul de ces signes fait passer tout le message en
+  // UCS-2, soixante-dix caractères au lieu de cent soixante, et l'invitation
+  // partait en trois SMS, mesuré sur l'émulateur. Avec l'apostrophe droite,
+  // elle tient en un seul sans nom déclaré, ou avec un nom court comme
+  // « Michel Maudet », et en deux au-delà.
+  'invite_absent_text %1$@':
+    "Invitation à me rejoindre sur Messagr :\n%1$@\nCe lien vaut trois jours et ne sert qu'une fois.",
+  invite_ready_days:
+    'Envoyez ce lien à cette personne. Il est valable trois jours et ne sert qu’une fois.',
+  invite_sms_failed:
+    'La messagerie du téléphone ne s’est pas ouverte. Partagez le lien autrement.',
   invite_close: 'Fermer',
   'invite_sent %1$@ %2$@':
     'Votre invitation attend %1$@ dans Messagr jusqu’au %2$@.',
@@ -1310,6 +1331,9 @@ export const fr = {
   find_share_more: 'Partager d’autres contacts',
   find_invite: 'Inviter',
   find_others: 'Vos autres contacts',
+  // Sur chaque contact absent (#408) : le SMS, ou la feuille de partage.
+  find_invite_sms: 'Inviter par SMS',
+  find_invite_other: 'Autre moyen',
   find_nobody:
     'Aucun de vos contacts n’est trouvable sur Messagr pour l’instant.',
   find_no_access:

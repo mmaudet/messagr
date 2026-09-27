@@ -334,7 +334,7 @@ export const uz: Readonly<Record<CopyKey, string>> = {
   list_paste_lead:
     'Agar havola oʻzi ochilmasa, uni nusxalab, shu yerga joylashtiring.',
   list_paste_cost:
-    'Nusxalangan havolani bu telefondagi boshqa ilovalar ham oʻqiy oladi. Bu havola bir soat amal qiladi va faqat bir marta ishlaydi.',
+    'Nusxalangan havolani bu telefondagi boshqa ilovalar ham oʻqiy oladi. Bu havola cheklangan vaqt amal qiladi va faqat bir marta ishlaydi.',
   list_paste_field: 'Taklif havolasini joylashtiring',
   list_paste_confirm: 'Kirish',
   list_paste_working: 'Taklif ochilmoqda…',
@@ -374,6 +374,12 @@ export const uz: Readonly<Record<CopyKey, string>> = {
   invite_qr: 'Yoki bu kodni skanerlashsin.',
   invite_qr_label: 'Taklif havolasining QR kodi',
   invite_share: 'Havolani ulashish',
+  'invite_absent_text %1$@':
+    'Messagrda menga qoʻshilish uchun taklif:\n%1$@\nBu havola uch kun amal qiladi va bir marta ishlaydi.',
+  invite_ready_days:
+    'Bu havolani ularga yuboring. U uch kun amal qiladi va bir marta ishlaydi.',
+  invite_sms_failed:
+    'Telefonning xabarlar ilovasi ochilmadi. Havolani boshqa yoʻl bilan ulashing.',
   invite_close: 'Yopish',
   'invite_sent %1$@ %2$@': 'Taklifingiz Messagrda %1$@ni %2$@ gacha kutadi.',
   'invite_sent_unnamed %1$@': 'Taklifingiz Messagrda %1$@ gacha kutadi.',
@@ -877,6 +883,8 @@ export const uz: Readonly<Record<CopyKey, string>> = {
   find_share_more: 'Boshqa kontaktlarni ulashish',
   find_invite: 'Taklif qilish',
   find_others: 'Boshqa kontaktlaringiz',
+  find_invite_sms: 'SMS orqali taklif qilish',
+  find_invite_other: 'Boshqa usul',
   find_nobody: 'Hozircha kontaktlaringizdan hech biri Messagrda topilmaydi.',
   find_no_access:
     'Messagr manzillar kitobingizni ocha olmaydi. Keyinroq ruxsat berish uchun telefon sozlamalarini, soʻng Messagr sahifasini oching va kontaktlarga kirishga ruxsat bering. Shu orada kimnidir havola orqali taklif qilishingiz mumkin.',

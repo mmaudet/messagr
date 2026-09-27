@@ -12,8 +12,10 @@ import {
   AppState,
   BackHandler,
   Linking,
+  Platform,
   Pressable,
   ScrollView,
+  Share,
   StyleSheet,
   Text,
   View,
@@ -203,7 +205,8 @@ import {
   type WaitingInvitation,
 } from './src/runtime/deliveredInvitations'
 import { envelopeKeysIn } from './src/runtime/envelopeKeys'
-import { admitAnyoneWaiting } from './src/runtime/admitAnyoneWaiting'
+import { admitAnyoneWaiting, lastIn } from './src/runtime/admitAnyoneWaiting'
+import { inviteByLink, type LinkChannel } from './src/runtime/inviteByLink'
 import { displayNameFor } from './src/runtime/givenName'
 import Clipboard from '@react-native-clipboard/clipboard'
 import { removeMessage } from './src/runtime/cryptoPump'
@@ -278,7 +281,12 @@ import type { EvictOutcome } from './src/runtime/evict'
 import type { HistoryClaim } from './src/runtime/claimHistory'
 import { Conversation } from './src/ui/Conversation'
 import { ConversationList } from './src/ui/ConversationList'
-import { Invite, type InvitedMatch, type InviteStage } from './src/ui/Invite'
+import {
+  Invite,
+  isFound,
+  type InvitedMatch,
+  type InviteStage,
+} from './src/ui/Invite'
 import { Invited, type Answering } from './src/ui/Invited'
 import { BackupOffer } from './src/ui/BackupOffer'
 import { BackupSettings } from './src/ui/BackupSettings'
@@ -568,8 +576,17 @@ export function App({
   const [admission, setAdmission] = useState<'waiting' | 'admitted' | null>(
     null,
   )
+  /**
+   * Inviting by a link: from « Inviter quelqu'un », or a contact absent from
+   * Messagr by SMS or by the share sheet (#408).
+   */
   const inviteRef = useRef<
-    ((name: string | null, declared: string | null) => void) | null
+    | ((
+        name: string | null,
+        declared: string | null,
+        channel?: LinkChannel,
+      ) => void)
+    | null
   >(null)
   /**
    * Inviting a contact found (#404): its own gesture, beside a link's, with
@@ -610,7 +627,8 @@ export function App({
   const outstandingRef = useRef<Outstanding>(forgetfulOutstanding())
   /**
    * The invitations delivered inside the application from here (#404), for a
-   * week rather than a link's hour: the notebook's page, and what this launch
+   * week rather than a link's hour or three days: the notebook's page, and
+   * what this launch
    * sent besides, should the page not hold (`keptThisLaunchToo`). Refs for
    * the reason `outstandingRef` is one: a sync tick reads them.
    */
@@ -4156,37 +4174,61 @@ export function App({
             inviteRef.current = (
               name: string | null,
               declared: string | null,
+              channel?: LinkChannel,
             ) => {
               setInvite({ stage: 'working' })
               setAdmission(null)
               const gesture = async () => {
-                const issued = await inviteSomebody(
-                  sessionClient,
-                  credentials,
-                  declared,
+                // THREE DAYS FOR A CONTACT ABSENT FROM MESSAGR, handed to the
+                // messaging application or the share sheet; an hour for any
+                // other link (#408). `inviteByLink.ts` says why, and where
+                // the card's number goes: nowhere but the messaging
+                // application.
+                const issued = await inviteByLink(
+                  {
+                    issue: (declaredName, ttlSeconds) =>
+                      inviteSomebody(
+                        sessionClient,
+                        credentials,
+                        declaredName,
+                        ttlSeconds,
+                      ),
+                    outstanding: outstandingRef.current,
+                    now: () => Date.now(),
+                    openUrl: async url => {
+                      await Linking.openURL(url)
+                    },
+                    share: async message => {
+                      await Share.share({ message })
+                    },
+                    os: Platform.OS === 'ios' ? 'ios' : 'android',
+                  },
+                  { given: name, declared },
+                  channel,
                 )
                 if (!issued.issued) {
                   setInvite({ stage: 'failed', reason: issued.reason })
                   return
                 }
-                setInvite({ stage: 'ready', link: issued.link })
+                setInvite({
+                  stage: 'ready',
+                  link: issued.link,
+                  drafted: issued.drafted,
+                })
                 setAdmission('waiting')
-                // WRITTEN DOWN BEFORE ANYBODY IS ASKED ABOUT IT.
+                // WRITTEN DOWN BEFORE ANYBODY IS ASKED ABOUT IT, by
+                // `inviteByLink`, with how long the link lasts and the name
+                // typed.
                 //
                 // The poll below runs for a minute and then stops, which is
                 // what makes two phones on a table instant and what made
                 // every other case impossible: an invitation opened later
                 // than that could never be walked through, on this launch or
                 // any other, while the screen said the link was good for an
-                // hour (#118). Remembering it here is what lets the question
-                // be asked again -- on the next tick, and on every launch
-                // after this one.
-                const remembered = await outstandingRef.current.remember({
-                  invitationId: issued.invitationId,
-                  scope: issued.scope,
-                  issuedAt: Date.now(),
-                })
-                if (!remembered) {
+                // hour (#118). What was written down is what lets the
+                // question be asked again -- on the next tick, and on every
+                // launch after this one, for as long as the link is good.
+                if (!issued.kept) {
                   // Not a failure of the invitation: the link is valid and
                   // the minute below still runs. What is lost is the retry
                   // after a relaunch, which is worth saying rather than
@@ -4210,13 +4252,8 @@ export function App({
                 // Somebody came through inside the minute, so there is
                 // nothing left to ask about.
                 await outstandingRef.current.forget(issued.invitationId)
-                // THE LAST ONE NAMED, not the first. On a link opened by
-                // somebody who already has an account there are two: the
-                // account the service drew, which cedes its place and
-                // deactivates itself, and then the real person. Naming the
-                // drawn one would put the given name on an account that no
-                // longer exists.
-                const who = admitted.entrants[admitted.entrants.length - 1]
+                // THE LAST ONE NAMED, not the first: `lastIn` says why.
+                const who = lastIn(admitted.entrants)
                 if (name !== null && who !== undefined) {
                   await giveName(who, name)
                 }
@@ -4519,6 +4556,11 @@ export function App({
                         invitation.scope,
                       ),
                     now: () => Date.now(),
+                    // The name typed at invite time, however late whoever it
+                    // was typed for comes in (#408).
+                    giveName: async (who, name) => {
+                      await giveName(who, name)
+                    },
                   })
                     .then(round => {
                       if (round.admitted.length === 0 && round.expired === 0) {
@@ -6226,11 +6268,18 @@ export function App({
                   <Invite
                     stage={invite}
                     admission={admission}
-                    onInvite={(name, declared) =>
-                      invite.stage === 'resting' && invite.to !== undefined
-                        ? deliverRef.current?.(name, invite.to, declared)
-                        : inviteRef.current?.(name, declared)
-                    }
+                    onInvite={(name, declared) => {
+                      const to =
+                        invite.stage === 'resting' ? invite.to : undefined
+                      // A contact found is invited inside the application
+                      // (#404); a contact absent, and anybody else, by a
+                      // link (#408).
+                      if (to !== undefined && isFound(to)) {
+                        deliverRef.current?.(name, to, declared)
+                      } else {
+                        inviteRef.current?.(name, declared, to?.channel)
+                      }
+                    }}
                     onClose={() => {
                       setInvite({ stage: 'shut' })
                       setAdmission(null)

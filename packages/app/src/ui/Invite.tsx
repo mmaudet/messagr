@@ -24,6 +24,7 @@ import type {
   DeliveryRefusal,
   DeliveryWait,
 } from '../runtime/deliveredInvitations'
+import type { Drafted, LinkChannel } from '../runtime/inviteByLink'
 import { NotchedButton } from './NotchedButton'
 import { QrCode } from './QrCode'
 import { dayOf, timeOf } from './whenLabel'
@@ -113,16 +114,48 @@ export interface InvitedMatch {
   readonly envelopeKey: string | null
 }
 
+/**
+ * A contact absent from Messagr (#408): the name of its card, which « Qui
+ * invitez-vous ? » opens with, and how its link of three days leaves: by SMS
+ * to the card's number, or by the share sheet. The number goes to the
+ * telephone's messaging application, and nowhere else (`inviteByLink.ts`).
+ */
+export interface InvitedAbsent {
+  readonly name: string
+  readonly channel: LinkChannel
+}
+
+/**
+ * Whether the form invites a contact found, inside the application (#404),
+ * rather than a contact absent from Messagr, by a link (#408).
+ */
+export function isFound(to: InvitedMatch | InvitedAbsent): to is InvitedMatch {
+  return 'reference' in to
+}
+
 export type InviteStage =
   /** Nothing on screen. What a launch starts in, and what closing returns to. */
   | { readonly stage: 'shut' }
   /**
    * The form. `to`, for a contact found: the invitation is delivered inside
-   * the application rather than carried by a link (#404).
+   * the application rather than carried by a link (#404); for a contact
+   * absent from Messagr, a link of three days by SMS or by the share sheet
+   * (#408).
    */
-  | { readonly stage: 'resting'; readonly to?: InvitedMatch }
+  | {
+      readonly stage: 'resting'
+      readonly to?: InvitedMatch | InvitedAbsent
+    }
   | { readonly stage: 'working' }
-  | { readonly stage: 'ready'; readonly link: string }
+  | {
+      readonly stage: 'ready'
+      readonly link: string
+      /**
+       * For a contact absent from Messagr, whose link is good for three days
+       * (#408); `null` for any other link, good for an hour.
+       */
+      readonly drafted: Drafted | null
+    }
   /**
    * An invitation delivered inside the application: nothing to share, and
    * the conversation waits in the list. `name` is the one typed, if any.
@@ -171,8 +204,11 @@ export function Invite({ stage, onInvite, onClose, admission }: InviteProps) {
   if (stage.stage === 'shut') return null
 
   if (stage.stage === 'resting') {
-    // A contact found (#404), or `undefined` for a link.
+    // A contact found (#404), a contact absent (#408), or `undefined` for a
+    // link. Only a contact found is invited without a link.
     const { to } = stage
+    const found = to !== undefined && isFound(to) ? to : undefined
+    const channel = to !== undefined && !isFound(to) ? to.channel : undefined
     return (
       <View style={styles.resting} testID="invite-panel">
         {/* The question before the field, and the action after both. The
@@ -195,7 +231,7 @@ export function Invite({ stage, onInvite, onClose, admission }: InviteProps) {
             recipient's device published with its proof. A device that
             published none has nothing to seal it for, and asking would be
             asking for a name that goes nowhere. */}
-        {(to === undefined || to.envelopeKey !== null) && (
+        {(found === undefined || found.envelopeKey !== null) && (
           <>
             {/* TWO NAMES, AND THE TWO HINTS ARE THE TEACHING. #329.
             The first is what you call THEM, and it stays on this telephone.
@@ -219,7 +255,7 @@ export function Invite({ stage, onInvite, onClose, admission }: InviteProps) {
               style={styles.field}
             />
             <Text style={styles.hint} testID="invite-declared-hint">
-              {to === undefined
+              {found === undefined
                 ? t('invite_declared_hint')
                 : t('invite_declared_sealed_hint')}
             </Text>
@@ -227,7 +263,9 @@ export function Invite({ stage, onInvite, onClose, admission }: InviteProps) {
         )}
 
         <NotchedButton
-          label={t('invite_action')}
+          label={
+            channel?.by === 'sms' ? t('find_invite_sms') : t('invite_action')
+          }
           testID="invite"
           onPress={() =>
             onInvite(normaliseGivenName(draft), cleanDeclaredName(presented))
@@ -317,12 +355,21 @@ export function Invite({ stage, onInvite, onClose, admission }: InviteProps) {
         <Text style={styles.hint}>{t('invite_qr')}</Text>
       </View>
 
-      <Text style={styles.hint}>{t('invite_ready')}</Text>
+      {/* Three days for a contact absent from Messagr (#408), an hour for
+          any other link: the screen says what the link was minted for. */}
+      <Text style={styles.hint} testID="invite-ready">
+        {stage.drafted === null ? t('invite_ready') : t('invite_ready_days')}
+      </Text>
+      {stage.drafted?.smsRefused === true && (
+        <Text style={styles.failed} testID="invite-sms-failed">
+          {t('invite_sms_failed')}
+        </Text>
+      )}
 
       {/* The link in the mono role and selectable, then the button that
-          sends it. `invite_ready` above promises it is valid for an hour and
-          works once, and that promise belongs to the link rather than to the
-          picture. */}
+          sends it. The sentence above promises how long it is valid for and
+          that it works once, and that promise belongs to the link rather than
+          to the picture. */}
       <Text testID="invite-link" selectable style={styles.link}>
         {stage.link}
       </Text>
@@ -337,8 +384,11 @@ export function Invite({ stage, onInvite, onClose, admission }: InviteProps) {
           onPress={() => {
             // Failure is ordinary here: somebody dismissed the sheet. There
             // is nothing to report and nothing to retry -- the link is on
-            // screen.
-            Share.share({ message: stage.link }).catch(() => {})
+            // screen. For a contact absent from Messagr, the text drafted
+            // around it (#408).
+            Share.share({
+              message: stage.drafted?.message ?? stage.link,
+            }).catch(() => {})
           }}
         />
       </View>

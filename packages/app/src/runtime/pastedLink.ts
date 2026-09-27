@@ -31,7 +31,9 @@ import { parseInvitationLink } from './invitationLink'
  *
  * WHAT THAT COSTS IS SAID WHERE IT IS ASKED FOR, on the field itself
  * (`list_paste_cost`): a copied link is one other applications can read, and
- * it is good for an hour and for a single use.
+ * it is good for a limited time and for a single use. How long is not said:
+ * an hour for most links, three days for one sent to a contact absent from
+ * Messagr (#408), and nothing here can tell which.
  *
  * IT DOES NOT READ THE LINK ITSELF. `invitationLink.ts` is the one reader,
  * and a pasted link is exactly the shape it already documents -- « un lien

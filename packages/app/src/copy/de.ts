@@ -328,7 +328,7 @@ export const de: Readonly<Record<CopyKey, string>> = {
   list_paste_lead:
     'Wenn sich der Link nicht von selbst öffnet, kopieren Sie ihn und fügen Sie ihn hier ein.',
   list_paste_cost:
-    'Ein kopierter Link ist für die anderen Anwendungen auf diesem Telefon lesbar. Dieser gilt eine Stunde und nur ein einziges Mal.',
+    'Ein kopierter Link ist für die anderen Anwendungen auf diesem Telefon lesbar. Dieser gilt nur eine begrenzte Zeit und nur ein einziges Mal.',
   list_paste_field: 'Einladungslink einfügen',
   list_paste_confirm: 'Eintreten',
   list_paste_working: 'Einladung wird geöffnet…',
@@ -369,6 +369,12 @@ export const de: Readonly<Record<CopyKey, string>> = {
   invite_qr: 'Oder lassen Sie diesen Code scannen.',
   invite_qr_label: 'QR-Code des Einladungslinks',
   invite_share: 'Link teilen',
+  'invite_absent_text %1$@':
+    'Einladung, sich mir auf Messagr anzuschließen:\n%1$@\nDer Link gilt drei Tage und funktioniert einmal.',
+  invite_ready_days:
+    'Senden Sie dieser Person diesen Link. Er gilt drei Tage und funktioniert einmal.',
+  invite_sms_failed:
+    'Die Nachrichten-App des Telefons hat sich nicht geöffnet. Teilen Sie den Link auf anderem Weg.',
   invite_close: 'Schließen',
   'invite_sent %1$@ %2$@':
     'Ihre Einladung wartet bis zum %2$@ in Messagr auf %1$@.',
@@ -889,6 +895,8 @@ export const de: Readonly<Record<CopyKey, string>> = {
   find_share_more: 'Weitere Kontakte freigeben',
   find_invite: 'Einladen',
   find_others: 'Ihre anderen Kontakte',
+  find_invite_sms: 'Per SMS einladen',
+  find_invite_other: 'Anderer Weg',
   find_nobody: 'Noch keiner Ihrer Kontakte ist auf Messagr auffindbar.',
   find_no_access:
     'Messagr hat keinen Zugriff auf Ihr Adressbuch. Um ihn später zu erlauben, öffnen Sie die Einstellungen des Telefons, dann die Seite von Messagr, und erlauben Sie den Zugriff auf die Kontakte. Bis dahin können Sie jemanden per Link einladen.',

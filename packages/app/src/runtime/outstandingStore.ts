@@ -49,6 +49,16 @@ export interface OutstandingInvitation {
   readonly scope: string
   /** When it was issued, so an expired one can be dropped without asking. */
   readonly issuedAt: number
+  /**
+   * How long its link is good for, in milliseconds as `issuedAt` is: an
+   * hour, or three days for a contact absent from Messagr (#408).
+   */
+  readonly lifetime: number
+  /**
+   * The name typed in « Qui invitez-vous ? », or `null`: given to whoever
+   * walks through it when they are let in, however late that is (#408).
+   */
+  readonly given: string | null
 }
 
 /**
@@ -56,8 +66,8 @@ export interface OutstandingInvitation {
  *
  * `issuedAt` is stored rather than derived because the service is the
  * authority on expiry and this side needs an answer when the service cannot
- * be reached -- a row nobody can ask about and that is a day old is a row to
- * drop, not one to keep asking about forever.
+ * be reached -- a row nobody can ask about and whose link has run out is a
+ * row to drop, not one to keep asking about forever.
  */
 const SCHEMA = `CREATE TABLE IF NOT EXISTS outstanding_invitations (
   invitation_id TEXT PRIMARY KEY NOT NULL,
@@ -65,15 +75,32 @@ const SCHEMA = `CREATE TABLE IF NOT EXISTS outstanding_invitations (
   issued_at INTEGER NOT NULL
 )`
 
+/**
+ * The two columns added for #408, migrated as `callLogStore.ts`'s are: run
+ * unguarded, and their failure swallowed, since the only reason either fails
+ * is that the column is already there.
+ *
+ * Each default is the truth about every row written before it. Every link
+ * issued until then was good for an hour, and no name was kept: the name
+ * typed for whoever came was given only if they came within the minute
+ * after issuing, and lost otherwise. A three-day link is nearly always
+ * walked through later than that.
+ */
+const ADD_LIFETIME = `ALTER TABLE outstanding_invitations ADD COLUMN lifetime INTEGER NOT NULL DEFAULT 3600000`
+const ADD_GIVEN_NAME = `ALTER TABLE outstanding_invitations ADD COLUMN given_name TEXT NOT NULL DEFAULT ''`
+
 export async function openOutstanding(
   database: EncryptedDatabase,
 ): Promise<Outstanding> {
   await database.execute(SCHEMA)
+  await database.execute(ADD_LIFETIME).catch(() => undefined)
+  await database.execute(ADD_GIVEN_NAME).catch(() => undefined)
 
   return {
     all: async () => {
       const { rows } = await database.execute(
-        'SELECT invitation_id, scope, issued_at FROM outstanding_invitations',
+        'SELECT invitation_id, scope, issued_at, lifetime, given_name ' +
+          'FROM outstanding_invitations',
       )
       const held: OutstandingInvitation[] = []
       for (const row of rows) {
@@ -83,12 +110,16 @@ export async function openOutstanding(
         if (
           typeof row.invitation_id === 'string' &&
           typeof row.scope === 'string' &&
-          typeof row.issued_at === 'number'
+          typeof row.issued_at === 'number' &&
+          typeof row.lifetime === 'number' &&
+          typeof row.given_name === 'string'
         ) {
           held.push({
             invitationId: row.invitation_id,
             scope: row.scope,
             issuedAt: row.issued_at,
+            lifetime: row.lifetime,
+            given: row.given_name === '' ? null : row.given_name,
           })
         }
       }
@@ -102,8 +133,16 @@ export async function openOutstanding(
         // would make the same person admitted twice.
         await database.execute(
           `INSERT OR REPLACE INTO outstanding_invitations
-             (invitation_id, scope, issued_at) VALUES (?, ?, ?)`,
-          [invitation.invitationId, invitation.scope, invitation.issuedAt],
+             (invitation_id, scope, issued_at, lifetime, given_name)
+             VALUES (?, ?, ?, ?, ?)`,
+          [
+            invitation.invitationId,
+            invitation.scope,
+            invitation.issuedAt,
+            invitation.lifetime,
+            // Strings and numbers only, as `listCacheStore.ts` says.
+            invitation.given ?? '',
+          ],
         )
         return true
       } catch {

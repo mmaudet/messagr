@@ -16,11 +16,11 @@
  * at level 0 as any entrant (ADR 0004), and gives it the name typed in
  * « Qui invitez-vous ? ».
  *
- * A link is asked about at every tick for the hour it is good
- * (`admitAnyoneWaiting.ts`). A sent invitation is asked about at every tick
- * until it is joined or runs out: a week, and past its deadline for as long
- * as the service keeps it, since one joined in time must still be honoured
- * by a device that reads late.
+ * A link is asked about at every tick for as long as it is good, an hour or
+ * three days (`admitAnyoneWaiting.ts`). A sent invitation is asked about at
+ * every tick until it is joined or runs out: a week, and past its deadline
+ * for as long as the service keeps it, since one joined in time must still
+ * be honoured by a device that reads late.
  *
  * # THE RECIPIENT'S SIDE
  *
