@@ -153,11 +153,21 @@ export interface ConversationListProps {
   /**
    * What is to be said of being findable, when anything is (#398): a proof to
    * renew, with the day it ends; one that ran out; a number that now makes
-   * another account findable. See `listNotice` in `discovery.ts`.
+   * another account findable; a proof a key retired at once ended (#409).
+   * See `listNotice` in `discovery.ts`.
    */
   readonly findableNotice?: ListNotice | null
   /** Renewing the proof, or proving the number again. */
   readonly onProveAgain?: (() => void) | null
+}
+
+/** What each end of being findable says above the list (#398, #409). */
+const ENDED_SAYS: Readonly<
+  Record<Exclude<ListNotice['notice'], 'renew'>, CopyKey>
+> = {
+  expired: 'list_findable_expired',
+  replaced: 'list_findable_replaced',
+  'key-changed': 'list_findable_key_changed',
 }
 
 export function ConversationList({
@@ -188,15 +198,14 @@ export function ConversationList({
           proves the number again. A number another account proved since is
           said without a gesture: proving it back would take it from whoever
           holds it now, and that is a decision for Settings, not for a tap on
-          the list. */}
+          the list. A proof a key retired at once ended (#409) is said with
+          the gesture that proves the number again, as one that ran out. */}
       {findableNotice !== null && (
         <View style={styles.findable} testID="list-findable">
           <Text style={styles.findableSaid}>
             {findableNotice.notice === 'renew'
               ? t('list_findable_renew %@', dayOf(findableNotice.until))
-              : findableNotice.notice === 'replaced'
-                ? t('list_findable_replaced')
-                : t('list_findable_expired')}
+              : t(ENDED_SAYS[findableNotice.notice])}
           </Text>
           {findableNotice.notice !== 'replaced' && onProveAgain !== null && (
             <NotchedButton

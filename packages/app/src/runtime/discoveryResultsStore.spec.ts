@@ -103,6 +103,14 @@ function fake(refuse: 'none' | 'read' | 'write' = 'none') {
         return { rows: [] }
       }
       if (
+        sql.startsWith('DELETE FROM discovery_results WHERE key_number NOT IN')
+      ) {
+        for (const [id, row] of rows) {
+          if (!params.includes(row.key_number as number)) rows.delete(id)
+        }
+        return { rows: [] }
+      }
+      if (
         sql.startsWith('DELETE FROM discovery_results WHERE fingerprint IN')
       ) {
         for (const [id, row] of rows) {
@@ -231,6 +239,23 @@ describe('what looking for contacts found (#402)', () => {
 
     expect([...(await page.recall(KEY, [PAUL, ZOE])).keys()]).toEqual([PAUL])
     expect((await page.recall(KEY + 1, [PAUL, ZOE])).size).toBe(0)
+  })
+
+  it('forgets what it holds under a key no longer served (#409)', async () => {
+    const page = await openDiscoveryResults(fake().database, counting())
+    await page.keep(KEY, new Map([[PAUL, found]]))
+    await page.keep(KEY + 1, new Map([[PAUL, found]]))
+
+    expect(await page.forgetKeysBut([KEY + 1])).toBe(true)
+
+    expect((await page.recall(KEY, [PAUL])).size).toBe(0)
+    expect([...(await page.recall(KEY + 1, [PAUL])).keys()]).toEqual([PAUL])
+  })
+
+  it('says a write did not hold when it cannot forget a key', async () => {
+    const page = await openDiscoveryResults(fake('write').database, counting())
+    expect(await page.forgetKeysBut([KEY])).toBe(false)
+    expect(await forgetfulDiscoveryResults().forgetKeysBut([KEY])).toBe(false)
   })
 
   it('writes five thousand numbers in a few statements, not one each', async () => {

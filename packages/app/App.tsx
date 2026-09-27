@@ -1576,6 +1576,9 @@ export function App({
             discoveryResultsRef.current.keep(keyNumber, found),
           forgetAllBut: numbers =>
             discoveryResultsRef.current.forgetAllBut(numbers),
+          keyNumbersHeld: () => discoveryResultsRef.current.keyNumbersHeld(),
+          forgetKeysBut: keyNumbers =>
+            discoveryResultsRef.current.forgetKeysBut(keyNumbers),
           keepNames: named => discoveryResultsRef.current.keepNames(named),
           nameOf: reference => discoveryResultsRef.current.nameOf(reference),
           forgetAll: () => discoveryResultsRef.current.forgetAll(),

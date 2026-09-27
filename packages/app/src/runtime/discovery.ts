@@ -88,12 +88,15 @@ export type DiscoveryReading =
     }
 
 /**
- * How being findable ended: the proof ran out, the number was withdrawn, or
- * another account proved it since.
+ * How being findable ended: the proof ran out, the number was withdrawn,
+ * another account proved it since, or the key its number was masked under
+ * was retired at once (#409). An ending this list does not know makes the
+ * whole reading unread, so a new one reaches the application before the
+ * service says it.
  */
-export type Ended = 'expired' | 'withdrawn' | 'replaced'
+const ENDINGS = ['expired', 'withdrawn', 'replaced', 'key-changed'] as const
 
-const ENDINGS: readonly Ended[] = ['expired', 'withdrawn', 'replaced']
+export type Ended = (typeof ENDINGS)[number]
 
 export async function readDiscovery(
   deps: DiscoveryDeps,
@@ -111,7 +114,10 @@ export async function readDiscovery(
     !(
       body.findable_until === null || typeof body.findable_until === 'number'
     ) ||
-    !(body.ended === null || ENDINGS.includes(body.ended as Ended)) ||
+    !(
+      body.ended === null ||
+      (ENDINGS as readonly unknown[]).includes(body.ended)
+    ) ||
     !Array.isArray(body.countries) ||
     !body.countries.every(isOpenCountry)
   ) {
@@ -133,18 +139,19 @@ const RENEW_FROM_MS = 7 * 86_400_000
 /**
  * The sentence above the conversation list (#398): a proof to renew, with the
  * day it ends; one that ran out; a number that now makes another account
- * findable.
+ * findable; a proof a key retired at once ended (#409).
  */
 export type ListNotice =
   | { readonly notice: 'renew'; readonly until: number }
   | { readonly notice: 'expired' }
   | { readonly notice: 'replaced' }
+  | { readonly notice: 'key-changed' }
 
 /**
  * Which sentence, if any: a proof to renew from its 21st day and at every
- * opening, one that ran out, a number another account proved since. A number
- * withdrawn is said where it was withdrawn, and nothing is said while
- * discovery is off or unread.
+ * opening, one that ran out, a number another account proved since, a key
+ * retired at once (#409). A number withdrawn is said where it was withdrawn,
+ * and nothing is said while discovery is off or unread.
  *
  * A PROOF WHOSE DAY HAS PASSED HAS RUN OUT, whatever the last reading said:
  * the reading is taken once a launch, and a telephone left on across the
@@ -161,7 +168,7 @@ export function listNotice(
       ? { notice: 'renew', until: reading.findableUntil }
       : null
   }
-  return reading.ended === 'expired' || reading.ended === 'replaced'
+  return reading.ended !== null && reading.ended !== 'withdrawn'
     ? { notice: reading.ended }
     : null
 }

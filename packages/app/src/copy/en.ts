@@ -852,6 +852,8 @@ export const en: Readonly<Record<CopyKey, string>> = {
   list_findable_expired:
     'Your proof has run out: you are no longer findable, and you can no longer look for your contacts.',
   list_findable_replaced: 'Your number now makes another account findable.',
+  list_findable_key_changed:
+    'The service changed the key that masks numbers: you are no longer findable, and you can no longer look for your contacts, until you prove your number again.',
   list_findable_renew_action: 'Renew the proof',
   list_findable_prove_action: 'Prove my number',
   'findable_too_many %1$@ %2$@':

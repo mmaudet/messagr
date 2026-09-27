@@ -1310,6 +1310,10 @@ export const fr = {
     'Votre preuve a expiré : vous n’êtes plus trouvable, et vous ne pouvez plus chercher vos contacts.',
   list_findable_replaced:
     'Votre numéro rend maintenant trouvable un autre compte.',
+  // UNE CLÉ RETIRÉE D'UN COUP (#409), après un vol ou une perte : la preuve
+  // s'arrête, et la personne la refait.
+  list_findable_key_changed:
+    'Le service a changé la clé qui masque les numéros : vous n’êtes plus trouvable, et vous ne pouvez plus chercher vos contacts, jusqu’à ce que vous prouviez de nouveau votre numéro.',
   list_findable_renew_action: 'Renouveler la preuve',
   list_findable_prove_action: 'Prouver mon numéro',
   // LES PLAFONDS DE SMS (#399).

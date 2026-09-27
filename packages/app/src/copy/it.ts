@@ -850,6 +850,8 @@ export const it: Readonly<Record<CopyKey, string>> = {
   list_findable_expired:
     'La Sua prova è scaduta: non è più trovabile e non può più trovare i Suoi contatti.',
   list_findable_replaced: 'Il Suo numero rende ora trovabile un altro account.',
+  list_findable_key_changed:
+    'Il servizio ha cambiato la chiave che maschera i numeri: non è più trovabile e non può più trovare i Suoi contatti finché non prova di nuovo il Suo numero.',
   list_findable_renew_action: 'Rinnovare la prova',
   list_findable_prove_action: 'Provare il mio numero',
   'findable_too_many %1$@ %2$@':

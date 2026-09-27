@@ -866,6 +866,8 @@ export const uz: Readonly<Record<CopyKey, string>> = {
   list_findable_expired:
     'Isbotingiz muddati tugadi: siz endi topiladigan emassiz va kontaktlaringizni topa olmaysiz.',
   list_findable_replaced: 'Raqamingiz endi boshqa hisobni topiladigan qiladi.',
+  list_findable_key_changed:
+    'Xizmat raqamlarni niqoblaydigan kalitni oʻzgartirdi: raqamingizni qayta isbotlamaguningizcha siz topiladigan emassiz va kontaktlaringizni topa olmaysiz.',
   list_findable_renew_action: 'Isbotni yangilash',
   list_findable_prove_action: 'Raqamimni isbotlash',
   'findable_too_many %1$@ %2$@':

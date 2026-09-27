@@ -24,8 +24,9 @@ import { base64Of } from './receiveImage'
  * `ThisDeviceOnly` passphrase is what answers it.
  *
  * Beside each fingerprint, the key number, the mask under that key, and the
- * reference the mask led to, or none. The service, which holds the key, could
- * tell which number a mask is; the page alone cannot.
+ * first reference the number led to, or none: under that key, or carried from
+ * an older one when the key was new (#409). The service, which holds the key,
+ * could tell which number a mask is; the page alone cannot.
  *
  * # THE NAME OF A CARD FOUND, AND NOTHING ELSE OF IT
  *
@@ -40,7 +41,10 @@ import { base64Of } from './receiveImage'
  * # ONE ROW PER NUMBER AND PER KEY
  *
  * While two keys serve (#409), a number has a mask under each, and a row
- * under one key never overwrites the row under another.
+ * under one key never overwrites the row under another. A key no longer
+ * served is forgotten (`forgetKeysBut`): at once when it was retired at once,
+ * and otherwise once a look has carried its first references onto the key in
+ * service, which `keyNumbersHeld` lets it find.
  *
  * # THE ADDRESS BOOK AS IT STANDS
  *
@@ -100,6 +104,8 @@ export function forgetfulDiscoveryResults(): DiscoveryResults {
     recall: async () => new Map(),
     keep: async () => false,
     forgetAllBut: async () => false,
+    keyNumbersHeld: async () => [],
+    forgetKeysBut: async () => false,
     keepNames: async () => false,
     nameOf: async () => null,
     forgetAll: async () => false,
@@ -256,6 +262,41 @@ export async function openDiscoveryResults(
             some,
           )
         }
+        return true
+      } catch {
+        // Kept a little longer: the next look forgets them.
+        return false
+      }
+    },
+
+    keyNumbersHeld: async () => {
+      try {
+        const { rows } = await database.execute(
+          'SELECT DISTINCT key_number FROM discovery_results',
+        )
+        return rows
+          .map(row => (row as Record<string, unknown>).key_number)
+          .filter((key): key is number => typeof key === 'number')
+      } catch {
+        return []
+      }
+    },
+
+    forgetKeysBut: async keyNumbers => {
+      try {
+        // A KEY THAT NO LONGER SERVES masks nothing any more (#409): once the
+        // first reference of each number held under it has been carried onto
+        // the key in service, or at once for a key retired at once, what the
+        // page holds under it is kept for nothing. The names stay with their
+        // numbers.
+        await database.execute(
+          keyNumbers.length === 0
+            ? 'DELETE FROM discovery_results'
+            : 'DELETE FROM discovery_results WHERE key_number NOT IN (' +
+                keyNumbers.map(() => '?').join(', ') +
+                ')',
+          keyNumbers,
+        )
         return true
       } catch {
         // Kept a little longer: the next look forgets them.

@@ -858,6 +858,8 @@ export const nl: Readonly<Record<CopyKey, string>> = {
   list_findable_expired:
     'Uw bewijs is verlopen: u bent niet meer vindbaar en kunt uw contacten niet meer vinden.',
   list_findable_replaced: 'Uw nummer maakt nu een ander account vindbaar.',
+  list_findable_key_changed:
+    'De dienst heeft de sleutel gewijzigd die de nummers maskeert: u bent niet meer vindbaar en kunt uw contacten niet meer vinden, tot u uw nummer opnieuw bewijst.',
   list_findable_renew_action: 'Het bewijs vernieuwen',
   list_findable_prove_action: 'Mijn nummer bewijzen',
   'findable_too_many %1$@ %2$@':
