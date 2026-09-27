@@ -457,7 +457,7 @@ pub async fn mask_batch(
     headers: HeaderMap,
     Body(req): Body<MaskRequest>,
 ) -> Result<Json<MaskedBatch>, AppError> {
-    let proof = findable_caller(&st, &headers).await?;
+    let proof = findable_caller(&st, &headers).await?.proof;
     let keys = st.cfg.masking_keys.clone().ok_or(AppError::DiscoveryOff)?;
     if req.blinded.is_empty() || req.blinded.len() > MAX_BATCH {
         return Err(AppError::NotABatch);
@@ -578,21 +578,31 @@ pub async fn directory(
     Ok(Json(Directory { entries }))
 }
 
-/// The current proof of the account asking, when it may look for its
-/// contacts: discovery is served here, and the account is findable. What
-/// masking a batch and downloading the directory both require, before
-/// anything else.
-async fn findable_caller(st: &AppState, headers: &HeaderMap) -> Result<CurrentProof, AppError> {
+/// The account asking and its current proof, when it may look for its
+/// contacts or invite one it found: discovery is served here, and the account
+/// is findable. What masking a batch, downloading the directory and sending
+/// an invitation (`delivered.rs`) all require, before anything else.
+pub(crate) async fn findable_caller(
+    st: &AppState,
+    headers: &HeaderMap,
+) -> Result<FindableCaller, AppError> {
     let user = auth::authenticate(&st.mx, headers).await?;
     served(st)?;
-    current_proof(st, &user, st.cfg.clock.now())
+    let proof = current_proof(st, &user, st.cfg.clock.now())
         .await?
-        .ok_or(AppError::NotFindable)
+        .ok_or(AppError::NotFindable)?;
+    Ok(FindableCaller { user, proof })
+}
+
+/// A findable account asking: who it is, and its current proof.
+pub(crate) struct FindableCaller {
+    pub(crate) user: String,
+    pub(crate) proof: CurrentProof,
 }
 
 /// A findable account's proven number, as the service holds it: its mask
 /// under its key.
-struct CurrentProof {
+pub(crate) struct CurrentProof {
     key_id: i64,
     mask: Vec<u8>,
 }
@@ -624,6 +634,25 @@ async fn current_proof(
     .await
     .map_err(anyhow::Error::from)?;
     Ok(proof.map(|(key_id, mask)| CurrentProof { key_id, mask }))
+}
+
+/// The account whose current proof `reference` names at `now`, if any: the
+/// predicate of `current_proof`, reached by the reference the directory lists
+/// rather than by the account (#404).
+pub(crate) async fn account_behind(
+    st: &AppState,
+    reference: &str,
+    now: i64,
+) -> Result<Option<String>, AppError> {
+    Ok(sqlx::query_scalar(
+        "SELECT user_id FROM findable_numbers \
+         WHERE reference = ? AND withdrawn_at IS NULL AND expires_at > ?",
+    )
+    .bind(reference)
+    .bind(now)
+    .fetch_optional(&st.pool)
+    .await
+    .map_err(anyhow::Error::from)?)
 }
 
 /// Refuses when a mask still in service was made with a key that
@@ -704,17 +733,20 @@ async fn forget_the_proof(st: &AppState, user: &str) -> Result<(), AppError> {
     Ok(())
 }
 
+/// What the tests of discovery, and of the invitations it delivers
+/// (`delivered.rs`), set up alike: a homeserver that says whose a token is,
+/// OVHcloud reduced to its calls, a service at a time the test moves, and a
+/// proof made the way a telephone makes one.
 #[cfg(test)]
-mod tests {
+pub(crate) mod test_support {
     use super::*;
-    use crate::util;
     use axum::routing::{get, post};
     use sqlx::SqlitePool;
     use std::sync::Mutex;
 
-    const NUMBER: &str = "+33612345678";
+    pub(crate) const NUMBER: &str = "+33612345678";
 
-    async fn whoami_hs() -> String {
+    pub(crate) async fn whoami_hs() -> String {
         async fn whoami(headers: HeaderMap) -> Json<serde_json::Value> {
             let bearer = headers
                 .get("authorization")
@@ -733,19 +765,19 @@ mod tests {
     /// OVHcloud reduced to the one call a proof makes. It keeps what it was
     /// sent, so a test can read the code the way a phone would.
     #[derive(Default)]
-    struct Inbox {
-        sent: Vec<(Vec<String>, String)>,
+    pub(crate) struct Inbox {
+        pub(crate) sent: Vec<(Vec<String>, String)>,
         /// The ids OVHcloud was asked to erase from its history (#399).
-        erased: Vec<u64>,
+        pub(crate) erased: Vec<u64>,
     }
 
-    async fn fake_ovhcloud(refuse: bool) -> (String, Arc<Mutex<Inbox>>) {
+    pub(crate) async fn fake_ovhcloud(refuse: bool) -> (String, Arc<Mutex<Inbox>>) {
         fake_ovhcloud_with(refuse, 0, 1_000.0).await
     }
 
     /// The same, answering each SMS after `delay_ms`, and saying
     /// `credits_left` of the account.
-    async fn fake_ovhcloud_with(
+    pub(crate) async fn fake_ovhcloud_with(
         refuse: bool,
         delay_ms: u64,
         credits_left: f64,
@@ -796,17 +828,17 @@ mod tests {
         (base, inbox)
     }
 
-    fn keys() -> Arc<crate::masking::MaskingKeys> {
+    pub(crate) fn keys() -> Arc<crate::masking::MaskingKeys> {
         let key = crate::masking::MaskingKey::from_seed(1, &[0x01; 32]).unwrap();
         Arc::new(crate::masking::MaskingKeys::new(vec![key]).unwrap())
     }
 
-    fn state_with(pool: SqlitePool, hs: String, ovh: Option<String>) -> Arc<AppState> {
+    pub(crate) fn state_with(pool: SqlitePool, hs: String, ovh: Option<String>) -> Arc<AppState> {
         state_at(pool, hs, ovh, crate::util::Clock::system())
     }
 
     /// The same, at a time the test moves: see `crate::util::Clock::settable`.
-    fn state_at(
+    pub(crate) fn state_at(
         pool: SqlitePool,
         hs: String,
         ovh: Option<String>,
@@ -816,7 +848,11 @@ mod tests {
         state_from(pool, hs, cfg)
     }
 
-    fn state_from(pool: SqlitePool, hs: String, cfg: crate::config::Config) -> Arc<AppState> {
+    pub(crate) fn state_from(
+        pool: SqlitePool,
+        hs: String,
+        cfg: crate::config::Config,
+    ) -> Arc<AppState> {
         Arc::new(AppState {
             pool,
             mx: Arc::new(crate::matrix::MatrixClient::new(hs, "token".into())),
@@ -825,7 +861,7 @@ mod tests {
     }
 
     /// Discovery served through a fake OVHcloud at `ovh`, when there is one.
-    fn discovery_config(
+    pub(crate) fn discovery_config(
         hs: &str,
         ovh: Option<String>,
         clock: crate::util::Clock,
@@ -847,28 +883,33 @@ mod tests {
         }
     }
 
-    async fn reading(st: &Arc<AppState>, who: &str) -> DiscoveryState {
+    pub(crate) async fn reading(st: &Arc<AppState>, who: &str) -> DiscoveryState {
         state(State(st.clone()), bearer(who))
             .await
             .map(|Json(s)| s)
             .unwrap()
     }
 
-    async fn prove(st: &Arc<AppState>, inbox: &Arc<Mutex<Inbox>>, who: &str, number: &str) {
+    pub(crate) async fn prove(
+        st: &Arc<AppState>,
+        inbox: &Arc<Mutex<Inbox>>,
+        who: &str,
+        number: &str,
+    ) {
         start(st, who, number).await.unwrap();
         finish(st, who, &last_code(inbox)).await.unwrap();
     }
 
-    const DAY: i64 = 86_400;
-    const T0: i64 = 1_790_000_000;
+    pub(crate) const DAY: i64 = 86_400;
+    pub(crate) const T0: i64 = 1_790_000_000;
 
-    fn set(time: &std::sync::atomic::AtomicI64, at: i64) {
+    pub(crate) fn set_clock(time: &std::sync::atomic::AtomicI64, at: i64) {
         time.store(at, std::sync::atomic::Ordering::SeqCst);
     }
 
     /// The reference a findable account is known by, read from the table, so
     /// that a test can name the account behind a directory entry.
-    async fn reference_of(pool: &SqlitePool, who: &str) -> Option<String> {
+    pub(crate) async fn reference_of(pool: &SqlitePool, who: &str) -> Option<String> {
         sqlx::query_scalar("SELECT reference FROM findable_numbers WHERE user_id = ?")
             .bind(format!("@{who}:h"))
             .fetch_optional(pool)
@@ -876,13 +917,17 @@ mod tests {
             .unwrap()
     }
 
-    fn bearer(who: &str) -> HeaderMap {
+    pub(crate) fn bearer(who: &str) -> HeaderMap {
         let mut h = HeaderMap::new();
         h.insert("authorization", format!("Bearer {who}").parse().unwrap());
         h
     }
 
-    async fn start(st: &Arc<AppState>, who: &str, number: &str) -> Result<Started, AppError> {
+    pub(crate) async fn start(
+        st: &Arc<AppState>,
+        who: &str,
+        number: &str,
+    ) -> Result<Started, AppError> {
         start_proof(
             State(st.clone()),
             bearer(who),
@@ -895,7 +940,11 @@ mod tests {
         .map(|Json(r)| r)
     }
 
-    async fn finish(st: &Arc<AppState>, who: &str, code: &str) -> Result<Findable, AppError> {
+    pub(crate) async fn finish(
+        st: &Arc<AppState>,
+        who: &str,
+        code: &str,
+    ) -> Result<Findable, AppError> {
         finish_proof(
             State(st.clone()),
             bearer(who),
@@ -906,16 +955,30 @@ mod tests {
     }
 
     /// The code the last SMS carried, read from its last line as iOS reads it.
-    fn last_code(inbox: &Arc<Mutex<Inbox>>) -> String {
+    pub(crate) fn last_code(inbox: &Arc<Mutex<Inbox>>) -> String {
         let inbox = inbox.lock().unwrap();
         let (_, message) = inbox.sent.last().expect("an SMS was sent");
         let last = message.lines().last().unwrap();
         last.strip_prefix("@messagr.eu #").unwrap().to_string()
     }
 
-    async fn findable_until(st: &Arc<AppState>, who: &str) -> Option<i64> {
+    pub(crate) async fn findable_until(st: &Arc<AppState>, who: &str) -> Option<i64> {
         reading(st, who).await.findable_until
     }
+
+    pub(crate) const ALERT: &str = "+33600000000";
+
+    /// A second number of an open country, for a second findable account.
+    pub(crate) const OTHER: &str = "+33687654321";
+}
+
+#[cfg(test)]
+mod tests {
+    use super::test_support::*;
+    use super::*;
+    use crate::util;
+    use sqlx::SqlitePool;
+    use std::sync::Mutex;
 
     #[sqlx::test(migrations = "./migrations")]
     async fn the_number_screen_learns_the_open_countries_and_their_provider(pool: SqlitePool) {
@@ -1154,13 +1217,13 @@ mod tests {
         let st = state_at(pool, whoami_hs().await, Some(ovh), clock);
         prove(&st, &inbox, "alice", NUMBER).await;
 
-        set(&time, T0 + 28 * DAY - 1);
+        set_clock(&time, T0 + 28 * DAY - 1);
         assert_eq!(
             reading(&st, "alice").await.findable_until,
             Some(T0 + 28 * DAY)
         );
 
-        set(&time, T0 + 28 * DAY);
+        set_clock(&time, T0 + 28 * DAY);
         let ran_out = reading(&st, "alice").await;
         assert_eq!(ran_out.findable_until, None);
         assert_eq!(ran_out.ended, Some(Ended::Expired));
@@ -1173,7 +1236,7 @@ mod tests {
         let st = state_at(pool, whoami_hs().await, Some(ovh), clock);
         prove(&st, &inbox, "alice", NUMBER).await;
 
-        set(&time, T0 + 22 * DAY);
+        set_clock(&time, T0 + 22 * DAY);
         prove(&st, &inbox, "alice", NUMBER).await;
 
         let renewed = reading(&st, "alice").await;
@@ -1187,7 +1250,7 @@ mod tests {
         let (clock, time) = crate::util::Clock::settable(T0);
         let st = state_at(pool, whoami_hs().await, Some(ovh), clock);
         prove(&st, &inbox, "alice", NUMBER).await;
-        set(&time, T0 + DAY);
+        set_clock(&time, T0 + DAY);
         prove(&st, &inbox, "bob", NUMBER).await;
 
         let alice = reading(&st, "alice").await;
@@ -1197,7 +1260,7 @@ mod tests {
 
         // Proving again, alice takes the number back, and is told nothing
         // more: bob is the one replaced now.
-        set(&time, T0 + 2 * DAY);
+        set_clock(&time, T0 + 2 * DAY);
         prove(&st, &inbox, "alice", NUMBER).await;
         assert_eq!(reading(&st, "alice").await.ended, None);
         assert_eq!(reading(&st, "bob").await.ended, Some(Ended::Replaced));
@@ -1211,7 +1274,7 @@ mod tests {
         prove(&st, &inbox, "alice", NUMBER).await;
         let first = reference_of(&pool, "alice").await.expect("a reference");
 
-        set(&time, T0 + 22 * DAY);
+        set_clock(&time, T0 + 22 * DAY);
         prove(&st, &inbox, "alice", NUMBER).await;
 
         // The same account, the same number: whoever found it already must
@@ -1228,14 +1291,12 @@ mod tests {
         let st = state_at(pool, whoami_hs().await, Some(ovh), clock);
         prove(&st, &inbox, "alice", NUMBER).await;
 
-        set(&time, T0 + 29 * DAY);
+        set_clock(&time, T0 + 29 * DAY);
         assert_eq!(reading(&st, "alice").await.ended, Some(Ended::Expired));
         prove(&st, &inbox, "bob", NUMBER).await;
 
         assert_eq!(reading(&st, "alice").await.ended, Some(Ended::Replaced));
     }
-
-    const ALERT: &str = "+33600000000";
 
     fn sent_to(inbox: &Arc<Mutex<Inbox>>, number: &str) -> usize {
         inbox
@@ -1261,12 +1322,12 @@ mod tests {
             other => panic!("the fourth code of the day: {:?}", other.err()),
         }
         for day in 1..=2 {
-            set(&time, T0 + day * DAY);
+            set_clock(&time, T0 + day * DAY);
             for _ in 0..3 {
                 start(&st, "alice", NUMBER).await.unwrap();
             }
         }
-        set(&time, T0 + 3 * DAY);
+        set_clock(&time, T0 + 3 * DAY);
         start(&st, "alice", NUMBER)
             .await
             .expect("the tenth code in thirty days");
@@ -1335,7 +1396,7 @@ mod tests {
 
         let day0 = T0.div_euclid(DAY);
         prove(&st, &inbox, "alice", "+33612345678").await;
-        set(&time, T0 + 5 * DAY);
+        set_clock(&time, T0 + 5 * DAY);
         start(&st, "bob", "+4915123456789")
             .await
             .expect("the second SMS of the month");
@@ -1351,12 +1412,12 @@ mod tests {
         // A renewal goes through, and still spends: the budget, counted by
         // calendar days, frees itself once the fifth day, bob's SMS and
         // alice's, leaves its thirty days.
-        set(&time, (day0 + 35) * DAY - 1);
+        set_clock(&time, (day0 + 35) * DAY - 1);
         assert!(matches!(
             start(&st, "carol", "+33612345670").await,
             Err(AppError::SmsLater)
         ));
-        set(&time, (day0 + 35) * DAY);
+        set_clock(&time, (day0 + 35) * DAY);
         start(&st, "carol", "+33612345670")
             .await
             .expect("the budget frees itself with the window");
@@ -1419,7 +1480,7 @@ mod tests {
             .expect("a renewal of a number proved under the older key passes");
 
         // Bob's proof ran out: proving his number again is a new proof.
-        set(&time, T0 + 28 * DAY);
+        set_clock(&time, T0 + 28 * DAY);
         assert!(matches!(
             start(&later, "bob", "+33612345679").await,
             Err(AppError::SmsLater)
@@ -1604,9 +1665,6 @@ mod tests {
 
     // ---- looking for one's contacts (#400) --------------------------------
 
-    /// A second number of an open country, for a second findable account.
-    const OTHER: &str = "+33687654321";
-
     async fn public_keys_of(st: &Arc<AppState>, who: &str) -> Result<PublicKeys, AppError> {
         public_keys(State(st.clone()), bearer(who))
             .await
@@ -1758,7 +1816,7 @@ mod tests {
         );
         assert!(may_look_for_contacts(&st, "carol").await);
 
-        set(&time, T0 + PROOF_LIFETIME_SECONDS);
+        set_clock(&time, T0 + PROOF_LIFETIME_SECONDS);
         assert!(
             !may_look_for_contacts(&st, "carol").await,
             "run out on the 28th day"
@@ -1771,7 +1829,7 @@ mod tests {
         let (clock, time) = crate::util::Clock::settable(T0);
         let st = state_at(pool.clone(), whoami_hs().await, Some(ovh), clock);
         prove(&st, &inbox, "dave", "+33611111111").await;
-        set(&time, T0 + DAY);
+        set_clock(&time, T0 + DAY);
         prove(&st, &inbox, "alice", NUMBER).await;
         prove(&st, &inbox, "bob", OTHER).await;
         prove(&st, &inbox, "carol", "+33622222222").await;
@@ -1781,7 +1839,7 @@ mod tests {
         prove(&st, &inbox, "erin", "+33633333333").await;
         prove(&st, &inbox, "frank", "+33633333333").await;
         // Dave's proof, a day older than the others, runs out first.
-        set(&time, T0 + PROOF_LIFETIME_SECONDS);
+        set_clock(&time, T0 + PROOF_LIFETIME_SECONDS);
 
         let for_alice = directory_of(&st, "alice").await.unwrap();
         let for_bob = directory_of(&st, "bob").await.unwrap();
@@ -2015,7 +2073,7 @@ mod tests {
         prove(&st, &inbox, "alice", NUMBER).await;
 
         assert_eq!(over_the_limit(&st, "alice", 3_000).await, Ok(()));
-        set(&time, T0 + DAY);
+        set_clock(&time, T0 + DAY);
         assert_eq!(over_the_limit(&st, "alice", 2_000).await, Ok(()));
         assert_eq!(
             over_the_limit(&st, "alice", 1).await,
@@ -2023,16 +2081,16 @@ mod tests {
         );
         // Renewed on the 20th day, so that the account is still findable
         // when the first day leaves the window.
-        set(&time, T0 + 20 * DAY);
+        set_clock(&time, T0 + 20 * DAY);
         prove(&st, &inbox, "alice", NUMBER).await;
 
-        set(&time, (DAY_ZERO + 30) * DAY - 1);
+        set_clock(&time, (DAY_ZERO + 30) * DAY - 1);
         assert_eq!(
             over_the_limit(&st, "alice", 1).await,
             Err((0, (DAY_ZERO + 30) * DAY)),
             "a second before the first day leaves"
         );
-        set(&time, (DAY_ZERO + 30) * DAY);
+        set_clock(&time, (DAY_ZERO + 30) * DAY);
         assert_eq!(
             over_the_limit(&st, "alice", 3_001).await,
             Err((3_000, (DAY_ZERO + 31) * DAY)),
@@ -2094,7 +2152,7 @@ mod tests {
             Err(AppError::NotABatch)
         ));
 
-        set(&time, T0 + 5 * DAY);
+        set_clock(&time, T0 + 5 * DAY);
         assert_eq!(over_the_limit(&st, "alice", 5_000).await, Ok(()));
         assert_eq!(
             over_the_limit(&st, "alice", 1).await,
@@ -2123,7 +2181,7 @@ mod tests {
             .await
             .unwrap();
 
-        set(&time, (DAY_ZERO + 30) * DAY - 1);
+        set_clock(&time, (DAY_ZERO + 30) * DAY - 1);
         sweep(&st, (DAY_ZERO + 30) * DAY - 1).await;
         prove(&st, &inbox, "bob", NUMBER).await;
         assert_eq!(
@@ -2132,7 +2190,7 @@ mod tests {
             "a second before the thirtieth day, the sweep has kept the count"
         );
 
-        set(&time, (DAY_ZERO + 30) * DAY);
+        set_clock(&time, (DAY_ZERO + 30) * DAY);
         sweep(&st, (DAY_ZERO + 30) * DAY).await;
         assert_eq!(over_the_limit(&st, "bob", 5_000).await, Ok(()));
     }
@@ -2146,9 +2204,9 @@ mod tests {
         assert_eq!(over_the_limit(&st, "alice", 5_000).await, Ok(()));
 
         // The proof runs out on the 28th day, and alice is no longer findable.
-        set(&time, T0 + PROOF_LIFETIME_SECONDS);
+        set_clock(&time, T0 + PROOF_LIFETIME_SECONDS);
         assert!(!may_look_for_contacts(&st, "alice").await);
-        set(&time, (DAY_ZERO + 30) * DAY - 1);
+        set_clock(&time, (DAY_ZERO + 30) * DAY - 1);
         sweep(&st, (DAY_ZERO + 30) * DAY - 1).await;
         prove(&st, &inbox, "alice", NUMBER).await;
         assert_eq!(
@@ -2157,7 +2215,7 @@ mod tests {
             "proved again after running out, the number keeps its count"
         );
 
-        set(&time, (DAY_ZERO + 30) * DAY);
+        set_clock(&time, (DAY_ZERO + 30) * DAY);
         sweep(&st, (DAY_ZERO + 30) * DAY).await;
         assert_eq!(over_the_limit(&st, "alice", 5_000).await, Ok(()));
     }
