@@ -426,9 +426,11 @@ pub enum AppError {
     #[error("this is not a batch of blinded elements")]
     NotABatch,
     /// This batch would take the caller's proven number past the 5,000
-    /// numbers it may have masked in thirty days (#401). `remaining` numbers
-    /// are still allowed, and the oldest day that counts leaves the window at
-    /// `frees_at`, in Unix time: more are allowed from then on.
+    /// numbers it may have masked in thirty days (#401), and past what the
+    /// extension of a key change still holds, when it has one (#409).
+    /// `remaining` numbers are still allowed, in one count or the other, and
+    /// the oldest day that counts leaves the window at `frees_at`, in Unix
+    /// time: more are allowed from then on.
     #[error("this batch holds more numbers than may still be masked for this number: send fewer, or try again later")]
     MaskingQuotaReached { remaining: u32, frees_at: i64 },
     /// An invitation delivered inside Messagr to this account is still

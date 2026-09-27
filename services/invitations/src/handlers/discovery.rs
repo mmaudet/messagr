@@ -36,9 +36,12 @@
 //! # WHAT THE SERVICE KEEPS OF A NUMBER
 //!
 //! Its mask under the current key and, under that mask, how many numbers
-//! were masked for it each day, kept thirty days (#401). Nothing else: not
-//! the number, not the code, not the SMS. The number leaves the service once,
-//! towards the SMS provider named on the number screen.
+//! were masked for it each day, kept thirty days (#401), and what the
+//! extension of a key change let it mask (#409). While a proof is in
+//! progress, its mask under every other key in service too, so that its end
+//! finds the number under the key it was proven under before (#409). Nothing
+//! else: not the number, not the code, not the SMS. The number leaves the
+//! service once, towards the SMS provider named on the number screen.
 
 use std::sync::Arc;
 
@@ -62,7 +65,9 @@ const ATTEMPTS: u32 = 5;
 pub const PROOF_LIFETIME_SECONDS: i64 = 28 * 86_400;
 /// The most blinded elements one request may carry: the most numbers one
 /// proven number may have masked in thirty days (#401), so that no single
-/// request asks for more than a whole allowance.
+/// request asks for more than a whole allowance. The extension of a key
+/// change is as large (#409), and a batch goes whole on one count or the
+/// other (`masking_quota.rs`).
 const MAX_BATCH: usize = masking_quota::PER_NUMBER as usize;
 
 #[derive(Serialize)]
@@ -108,6 +113,19 @@ pub async fn start_proof(
     let mask = key
         .mask(req.number.as_bytes())
         .map_err(|e| anyhow::anyhow!("masking a number: {e}"))?;
+    // THE SAME NUMBER UNDER EVERY OTHER KEY IN SERVICE (#409), while it is
+    // in clear: what the end of the proof finds it by under a key it was
+    // proven under before. Nothing but masks is kept, as for the proof.
+    let under_other_keys = keys
+        .iter()
+        .filter(|other| other.id() != key.id())
+        .map(|other| {
+            other
+                .mask(req.number.as_bytes())
+                .map(|masked| (other.id(), masked))
+        })
+        .collect::<Result<Vec<_>, _>>()
+        .map_err(|e| anyhow::anyhow!("masking a number: {e}"))?;
     let code = crypto::proof_code();
     let now = st.cfg.clock.now();
 
@@ -118,7 +136,8 @@ pub async fn start_proof(
     let asked = ceilings::Asked {
         user: &user,
         country: &open.code,
-        renewal: proves_it_now(&st, keys, &user, &req.number, now).await?,
+        renewal: proves_it_now(&st, keys, &user, &req.number, now).await?
+            || ended_by_a_retired_key(&st, &user).await?,
         at: now,
     };
     let counted = match ceilings::count_if_allowed(&st.pool, &st.cfg.sms_ceilings, &asked).await? {
@@ -131,7 +150,8 @@ pub async fn start_proof(
     };
 
     // ONE PROOF IN PROGRESS PER ACCOUNT: asking again replaces the code, and
-    // the attempts start over with it.
+    // the attempts start over with it, as do the masks under the other keys.
+    let mut tx = st.pool.begin().await.map_err(anyhow::Error::from)?;
     sqlx::query(
         "INSERT INTO pending_proofs (user_id, key_id, mask, code_digest, attempts, expires_at) \
          VALUES (?, ?, ?, ?, 0, ?) \
@@ -143,9 +163,24 @@ pub async fn start_proof(
     .bind(mask.to_vec())
     .bind(crypto::proof_code_digest(&st.cfg.encryption_key, &user, &code).to_vec())
     .bind(now + CODE_LIFETIME_SECONDS)
-    .execute(&st.pool)
+    .execute(&mut *tx)
     .await
     .map_err(anyhow::Error::from)?;
+    sqlx::query("DELETE FROM pending_proof_masks WHERE user_id = ?")
+        .bind(&user)
+        .execute(&mut *tx)
+        .await
+        .map_err(anyhow::Error::from)?;
+    for (other, masked) in &under_other_keys {
+        sqlx::query("INSERT INTO pending_proof_masks (user_id, key_id, mask) VALUES (?, ?, ?)")
+            .bind(&user)
+            .bind(i64::from(*other))
+            .bind(masked.to_vec())
+            .execute(&mut *tx)
+            .await
+            .map_err(anyhow::Error::from)?;
+    }
+    tx.commit().await.map_err(anyhow::Error::from)?;
 
     // THE ONE PLACE THE NUMBER LEAVES THE SERVICE. A refused or lost send
     // withdraws the proof it was for: nobody holds its code. The job's id,
@@ -204,21 +239,53 @@ pub async fn finish_proof(
         .map(|key| decoded_of_size(key, ENVELOPE_KEY_BYTES))
         .transpose()?;
     let now = st.cfg.clock.now();
+    // ONE LOCK FOR THE WHOLE ANSWER (#409). The proof in progress, its masks
+    // under the other keys, and what they end are read and written in one
+    // immediate transaction, as the limits are (`masking_quota.rs`): a proof
+    // started again meanwhile, or another proof finishing, cannot fall
+    // between the reading and the writing. What is decided is kept, a wrong
+    // code's attempt as much as a proof's end; a failure to read or to write
+    // leaves nothing. A transaction sqlx knows about, for the reason
+    // `ceilings.rs` gives: a request dropped while it waits for the lock rolls
+    // back with it.
+    let mut tx = st
+        .pool
+        .begin_with("BEGIN IMMEDIATE")
+        .await
+        .map_err(anyhow::Error::from)?;
+    let decided = finish_under_the_lock(&mut tx, &st, &user, &req.code, envelope_key, now).await;
+    if decided.is_ok() {
+        tx.commit().await.map_err(anyhow::Error::from)?;
+    } else {
+        tx.rollback().await.map_err(anyhow::Error::from)?;
+    }
+    decided?.map(Json)
+}
+
+/// The answer to a code, under the lock `finish_proof` holds: a refusal or
+/// the account made findable, both to keep; or a failure, to roll back.
+async fn finish_under_the_lock(
+    conn: &mut sqlx::SqliteConnection,
+    st: &AppState,
+    user: &str,
+    code: &str,
+    envelope_key: Option<Vec<u8>>,
+    now: i64,
+) -> anyhow::Result<Result<Findable, AppError>> {
     let pending: Option<(i64, Vec<u8>, Vec<u8>, i64)> = sqlx::query_as(
         "SELECT key_id, mask, code_digest, expires_at FROM pending_proofs WHERE user_id = ?",
     )
-    .bind(&user)
-    .fetch_optional(&st.pool)
-    .await
-    .map_err(anyhow::Error::from)?;
+    .bind(user)
+    .fetch_optional(&mut *conn)
+    .await?;
     let Some((key_id, mask, digest, expires_at)) = pending else {
-        return Err(AppError::NoProofPending);
+        return Ok(Err(AppError::NoProofPending));
     };
     if expires_at <= now {
-        forget_the_proof(&st, &user).await?;
-        return Err(AppError::CodeExpired);
+        forget_the_proof_on(conn, user).await?;
+        return Ok(Err(AppError::CodeExpired));
     }
-    let given = crypto::proof_code_digest(&st.cfg.encryption_key, &user, req.code.trim());
+    let given = crypto::proof_code_digest(&st.cfg.encryption_key, user, code.trim());
     if !crypto::equal_in_constant_time(&digest, &given) {
         // COUNTED IN ONE STATEMENT, so two answers sent together cannot both
         // read the same count.
@@ -226,73 +293,106 @@ pub async fn finish_proof(
             "UPDATE pending_proofs SET attempts = attempts + 1 WHERE user_id = ? \
              RETURNING attempts",
         )
-        .bind(&user)
-        .fetch_one(&st.pool)
-        .await
-        .map_err(anyhow::Error::from)?;
+        .bind(user)
+        .fetch_one(&mut *conn)
+        .await?;
         let left = i64::from(ATTEMPTS) - used;
         if left <= 0 {
-            forget_the_proof(&st, &user).await?;
+            forget_the_proof_on(conn, user).await?;
         }
-        return Err(AppError::CodeWrong {
+        return Ok(Err(AppError::CodeWrong {
             attempts_left: u32::try_from(left.max(0)).unwrap_or(0),
-        });
+        }));
     }
 
     // THE LAST PROOF WINS. The number stops making anybody else findable, and
     // this account stops being findable by any other number. The account it
     // made findable until now is told, at its next reading (#398).
     let until = now + PROOF_LIFETIME_SECONDS;
-    let mut tx = st.pool.begin().await.map_err(anyhow::Error::from)?;
-    // A NUMBER HOLDS ONE ROW, whoever proved it (the table's key), so there
-    // is at most one account to tell. Told whether its proof was still
-    // running or had run out: either way, the number now leads to somebody
-    // else. An account that withdrew its number has nothing to be told.
-    let replaced: Option<String> = sqlx::query_scalar(
-        "SELECT user_id FROM findable_numbers WHERE key_id = ? AND mask = ? \
-         AND user_id <> ? AND withdrawn_at IS NULL",
-    )
-    .bind(key_id)
-    .bind(&mask)
-    .bind(&user)
-    .fetch_optional(&mut *tx)
-    .await
-    .map_err(anyhow::Error::from)?;
-    if let Some(other) = replaced {
-        sqlx::query(
-            "INSERT INTO replaced_proofs (user_id, replaced_at) VALUES (?, ?) \
-             ON CONFLICT(user_id) DO UPDATE SET replaced_at = excluded.replaced_at",
+    // THE NUMBER UNDER EACH KEY IN SERVICE (#409): under the key this proof is
+    // made under first, then under the others, as the start of the proof
+    // masked it while it was in clear.
+    let proven = Masked { key_id, mask };
+    let mut the_number = vec![Masked {
+        key_id,
+        mask: proven.mask.clone(),
+    }];
+    the_number.extend(
+        sqlx::query_as::<_, (i64, Vec<u8>)>(
+            "SELECT key_id, mask FROM pending_proof_masks WHERE user_id = ? ORDER BY key_id",
         )
-        .bind(other)
-        .bind(now)
-        .execute(&mut *tx)
-        .await
-        .map_err(anyhow::Error::from)?;
+        .bind(user)
+        .fetch_all(&mut *conn)
+        .await?
+        .into_iter()
+        .map(|(key_id, mask)| Masked { key_id, mask }),
+    );
+    let mut kept_reference: Option<String> = None;
+    for masked in &the_number {
+        // A NUMBER HOLDS ONE ROW UNDER A KEY, whoever proved it (the table's
+        // key), and one row in all, since a proof under one key ends every
+        // proof of it under another, and a proof in progress when a new key
+        // starts serving starts again (`note_keys_served`). Its account is
+        // told whether its proof was still running or had run out: either
+        // way, the number now leads to somebody else. An account that
+        // withdrew it has nothing to be told.
+        let replaced: Option<String> = sqlx::query_scalar(
+            "SELECT user_id FROM findable_numbers WHERE key_id = ? AND mask = ? \
+             AND user_id <> ? AND withdrawn_at IS NULL",
+        )
+        .bind(masked.key_id)
+        .bind(&masked.mask)
+        .bind(user)
+        .fetch_optional(&mut *conn)
+        .await?;
+        if let Some(other_account) = replaced {
+            sqlx::query(
+                "INSERT INTO replaced_proofs (user_id, replaced_at) VALUES (?, ?) \
+                 ON CONFLICT(user_id) DO UPDATE SET replaced_at = excluded.replaced_at",
+            )
+            .bind(other_account)
+            .bind(now)
+            .execute(&mut *conn)
+            .await?;
+        }
+        // THE SAME ACCOUNT PROVING THE SAME NUMBER KEEPS ITS REFERENCE, under
+        // this key or the one before (#409). Whoever already found it must
+        // not read a renewal as a number that changed hands (#392, #407);
+        // another number, or another account, gets a new one.
+        if kept_reference.is_none() {
+            kept_reference = sqlx::query_scalar(
+                "SELECT reference FROM findable_numbers \
+                 WHERE key_id = ? AND mask = ? AND user_id = ?",
+            )
+            .bind(masked.key_id)
+            .bind(&masked.mask)
+            .bind(user)
+            .fetch_optional(&mut *conn)
+            .await?;
+        }
+        sqlx::query("DELETE FROM findable_numbers WHERE key_id = ? AND mask = ?")
+            .bind(masked.key_id)
+            .bind(&masked.mask)
+            .execute(&mut *conn)
+            .await?;
+        // THE COUNTS OF #401 FOLLOW THE NUMBER onto the key it is proven
+        // under now (#409): a change of key never starts them afresh.
+        if masked.key_id != proven.key_id {
+            masking_quota::carry(conn, &masked.number(), &proven.number()).await?;
+        }
     }
-    // THE SAME ACCOUNT PROVING THE SAME NUMBER KEEPS ITS REFERENCE. Whoever
-    // already found it must not read a renewal as a number that changed
-    // hands (#392, #407); another number, or another account, gets a new one.
-    let kept_reference: Option<String> = sqlx::query_scalar(
-        "SELECT reference FROM findable_numbers WHERE key_id = ? AND mask = ? AND user_id = ?",
-    )
-    .bind(key_id)
-    .bind(&mask)
-    .bind(&user)
-    .fetch_optional(&mut *tx)
-    .await
-    .map_err(anyhow::Error::from)?;
     sqlx::query("DELETE FROM replaced_proofs WHERE user_id = ?")
-        .bind(&user)
-        .execute(&mut *tx)
-        .await
-        .map_err(anyhow::Error::from)?;
-    sqlx::query("DELETE FROM findable_numbers WHERE (key_id = ? AND mask = ?) OR user_id = ?")
-        .bind(key_id)
-        .bind(&mask)
-        .bind(&user)
-        .execute(&mut *tx)
-        .await
-        .map_err(anyhow::Error::from)?;
+        .bind(user)
+        .execute(&mut *conn)
+        .await?;
+    sqlx::query("DELETE FROM retired_key_proofs WHERE user_id = ?")
+        .bind(user)
+        .execute(&mut *conn)
+        .await?;
+    sqlx::query("DELETE FROM findable_numbers WHERE user_id = ?")
+        .bind(user)
+        .execute(&mut *conn)
+        .await?;
     // THE ENVELOPE KEY GOES WITH THE PROOF (#405): a new proof replaces it,
     // and one that brings none leaves the account without one.
     sqlx::query(
@@ -300,23 +400,20 @@ pub async fn finish_proof(
          (key_id, mask, user_id, reference, proven_at, expires_at, envelope_key) \
          VALUES (?, ?, ?, ?, ?, ?, ?)",
     )
-    .bind(key_id)
-    .bind(&mask)
-    .bind(&user)
+    .bind(proven.key_id)
+    .bind(&proven.mask)
+    .bind(user)
     .bind(kept_reference.unwrap_or_else(|| uuid::Uuid::new_v4().simple().to_string()))
     .bind(now)
     .bind(until)
     .bind(envelope_key)
-    .execute(&mut *tx)
-    .await
-    .map_err(anyhow::Error::from)?;
+    .execute(&mut *conn)
+    .await?;
     sqlx::query("DELETE FROM pending_proofs WHERE user_id = ?")
-        .bind(&user)
-        .execute(&mut *tx)
-        .await
-        .map_err(anyhow::Error::from)?;
-    tx.commit().await.map_err(anyhow::Error::from)?;
-    Ok(Json(Findable {
+        .bind(user)
+        .execute(&mut *conn)
+        .await?;
+    Ok(Ok(Findable {
         findable_until: until,
     }))
 }
@@ -332,14 +429,17 @@ pub struct DiscoveryState {
     pub countries: Vec<OpenCountry>,
 }
 
-/// How being findable ended: the proof ran out, the number was withdrawn, or
-/// another account proved it since.
+/// How being findable ended: the proof ran out, the number was withdrawn,
+/// another account proved it since, or the key it was masked under was
+/// retired at once (#409).
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "lowercase")]
 pub enum Ended {
     Expired,
     Withdrawn,
     Replaced,
+    #[serde(rename = "key-changed")]
+    KeyChanged,
 }
 
 pub async fn state(
@@ -360,11 +460,18 @@ pub async fn state(
             .fetch_one(&st.pool)
             .await
             .map_err(anyhow::Error::from)?;
+    let retired: bool =
+        sqlx::query_scalar("SELECT EXISTS (SELECT 1 FROM retired_key_proofs WHERE user_id = ?)")
+            .bind(&user)
+            .fetch_one(&st.pool)
+            .await
+            .map_err(anyhow::Error::from)?;
     let (findable_until, ended) = match proof {
         Some((until, None)) if until > now => (Some(until), None),
         Some((_, Some(_))) => (None, Some(Ended::Withdrawn)),
         Some((_, None)) => (None, Some(Ended::Expired)),
         None if replaced => (None, Some(Ended::Replaced)),
+        None if retired => (None, Some(Ended::KeyChanged)),
         None => (None, None),
     };
     Ok(Json(DiscoveryState {
@@ -421,6 +528,12 @@ pub struct PublicKey {
 pub struct PublicKeys {
     /// By key number: the last one is the current key.
     pub keys: Vec<PublicKey>,
+    /// The keys retired at once (#409), by key number: a device forgets what
+    /// it kept under them rather than carrying it onto a key in service, since
+    /// the accounts they stopped get new references at their next proof. A
+    /// key that left at the end of a planned change is not listed: the
+    /// references it led to were carried onto the new key.
+    pub retired: Vec<u32>,
 }
 
 /// `GET /discovery/keys`: the public keys a device checks every masked batch
@@ -431,6 +544,10 @@ pub async fn public_keys(
 ) -> Result<Json<PublicKeys>, AppError> {
     auth::authenticate(&st.mx, &headers).await?;
     let served = served(&st)?;
+    let retired: Vec<i64> = sqlx::query_scalar("SELECT key_id FROM retired_keys ORDER BY key_id")
+        .fetch_all(&st.pool)
+        .await
+        .map_err(anyhow::Error::from)?;
     Ok(Json(PublicKeys {
         keys: served
             .keys
@@ -440,6 +557,11 @@ pub async fn public_keys(
                 public_key: BASE64.encode(&k.public_key()),
             })
             .collect(),
+        retired: retired
+            .into_iter()
+            .map(u32::try_from)
+            .collect::<Result<_, _>>()
+            .map_err(anyhow::Error::from)?,
     }))
 }
 
@@ -478,7 +600,7 @@ pub async fn mask_batch(
     headers: HeaderMap,
     Body(req): Body<MaskRequest>,
 ) -> Result<Json<MaskedBatch>, AppError> {
-    let proof = findable_caller(&st, &headers).await?.proof;
+    let user = findable_caller(&st, &headers).await?;
     let keys = st.cfg.masking_keys.clone().ok_or(AppError::DiscoveryOff)?;
     if req.blinded.is_empty() || req.blinded.len() > MAX_BATCH {
         return Err(AppError::NotABatch);
@@ -495,17 +617,22 @@ pub async fn mask_batch(
     }
 
     // THE LIMIT OF #401, counted on the caller's proven number before the
-    // work, and given back when the batch turns out not to be one.
+    // work, and given back when the batch turns out not to be one; or the
+    // extension of a key change (#409), for a batch under the new key.
     let elements = i64::try_from(blinded.len()).map_err(anyhow::Error::from)?;
     let counted = match masking_quota::count_if_allowed(
         &st.pool,
-        &proof.number(),
+        &user,
+        &keys,
+        key_number,
         elements,
         st.cfg.clock.now(),
     )
     .await?
     {
         masking_quota::Verdict::Counted(counted) => counted,
+        // Its proof ended since it was asked: as if it had asked then.
+        masking_quota::Verdict::NotFindable => return Err(AppError::NotFindable),
         masking_quota::Verdict::Over {
             remaining,
             frees_at,
@@ -608,26 +735,21 @@ pub async fn directory(
     Ok(Json(Directory { entries }))
 }
 
-/// The account asking and its current proof, when it may look for its
-/// contacts or invite one it found: discovery is served here, and the account
-/// is findable. What masking a batch, downloading the directory and sending
-/// an invitation (`delivered.rs`) all require, before anything else.
+/// The account asking, when it may look for its contacts or invite one it
+/// found: discovery is served here, and the account is findable. What masking
+/// a batch, downloading the directory and sending an invitation
+/// (`delivered.rs`) all require, before anything else. The limit of #401 reads
+/// its proof again, under its own lock (`masking_quota.rs`).
 pub(crate) async fn findable_caller(
     st: &AppState,
     headers: &HeaderMap,
-) -> Result<FindableCaller, AppError> {
+) -> Result<String, AppError> {
     let user = auth::authenticate(&st.mx, headers).await?;
     served(st)?;
-    let proof = current_proof(st, &user, st.cfg.clock.now())
+    current_proof(st, &user, st.cfg.clock.now())
         .await?
         .ok_or(AppError::NotFindable)?;
-    Ok(FindableCaller { user, proof })
-}
-
-/// A findable account asking: who it is, and its current proof.
-pub(crate) struct FindableCaller {
-    pub(crate) user: String,
-    pub(crate) proof: CurrentProof,
+    Ok(user)
 }
 
 /// A findable account's proven number, as the service holds it: its mask
@@ -637,8 +759,14 @@ pub(crate) struct CurrentProof {
     mask: Vec<u8>,
 }
 
-impl CurrentProof {
-    /// The number, as the limit of #401 counts it.
+/// A number as one key masks it: what a table knows it by under that key.
+struct Masked {
+    key_id: i64,
+    mask: Vec<u8>,
+}
+
+impl Masked {
+    /// The number, as the counts of #401 know it.
     fn number(&self) -> masking_quota::Number<'_> {
         masking_quota::Number {
             key_id: self.key_id,
@@ -724,6 +852,61 @@ pub async fn keys_of_live_masks_are_held(
     Ok(())
 }
 
+/// Notes, at the start, when each key in `MASKING_KEYS` was first served
+/// (#409). A key already noted keeps its date: a restart is not a new key.
+///
+/// A NEW CURRENT KEY DROPS THE PROOFS IN PROGRESS made under another: their
+/// number was masked, while it was in clear, under the keys served then, and
+/// never under this one. Finished now, such a proof could make its account
+/// findable under the old key while another account proved the same number
+/// under the new one. Proofs last ten minutes and keys change once a year:
+/// asking for another code is the whole cost.
+pub async fn note_keys_served(
+    pool: &sqlx::SqlitePool,
+    keys: Option<&crate::masking::MaskingKeys>,
+    now: i64,
+) -> anyhow::Result<()> {
+    let Some(keys) = keys else {
+        return Ok(());
+    };
+    let current = keys.current().id();
+    // Noting a key and dropping the proofs it makes stale are one step.
+    let mut tx = pool.begin().await?;
+    for key in keys.iter() {
+        let noted =
+            sqlx::query("INSERT OR IGNORE INTO masking_keys_served (key_id, since) VALUES (?, ?)")
+                .bind(i64::from(key.id()))
+                .bind(now)
+                .execute(&mut *tx)
+                .await?
+                .rows_affected();
+        if noted == 1 && key.id() == current {
+            sqlx::query("DELETE FROM pending_proofs WHERE key_id <> ?")
+                .bind(i64::from(current))
+                .execute(&mut *tx)
+                .await?;
+        }
+    }
+    tx.commit().await?;
+    Ok(())
+}
+
+/// Whether the retirement of a masking key ended `user`'s proof, less than
+/// thirty days ago, while its reading says so (#409). Its next proof is then a
+/// renewal for the ceilings of #399: the service stopped it, and neither a
+/// country's ceiling nor the budget may keep it unfindable, the owner decided
+/// on 27 September 2026. Its number cannot be compared with the one it
+/// proved, whose masks went with the key: the account is what counts.
+async fn ended_by_a_retired_key(st: &AppState, user: &str) -> Result<bool, AppError> {
+    Ok(
+        sqlx::query_scalar("SELECT EXISTS (SELECT 1 FROM retired_key_proofs WHERE user_id = ?)")
+            .bind(user)
+            .fetch_one(&st.pool)
+            .await
+            .map_err(anyhow::Error::from)?,
+    )
+}
+
 /// Whether `user` proves `number` now: a running proof of that number, made
 /// under any key still in service. A proof that ran out, or was withdrawn, is
 /// not one: proving the number again is a new proof.
@@ -762,6 +945,15 @@ pub(crate) fn decoded_of_size(text: &str, size: usize) -> Result<Vec<u8>, AppErr
 /// What discovery serves with, or `DiscoveryOff` (`Config::discovery`).
 fn served(st: &AppState) -> Result<crate::config::Discovery<'_>, AppError> {
     st.cfg.discovery().map_err(|_| AppError::DiscoveryOff)
+}
+
+/// The same, on the connection that holds the lock of `finish_proof`.
+async fn forget_the_proof_on(conn: &mut sqlx::SqliteConnection, user: &str) -> anyhow::Result<()> {
+    sqlx::query("DELETE FROM pending_proofs WHERE user_id = ?")
+        .bind(user)
+        .execute(&mut *conn)
+        .await?;
+    Ok(())
 }
 
 async fn forget_the_proof(st: &AppState, user: &str) -> Result<(), AppError> {
@@ -871,6 +1063,42 @@ pub(crate) mod test_support {
     pub(crate) fn keys() -> Arc<crate::masking::MaskingKeys> {
         let key = crate::masking::MaskingKey::from_seed(1, &[0x01; 32]).unwrap();
         Arc::new(crate::masking::MaskingKeys::new(vec![key]).unwrap())
+    }
+
+    /// Key #1, `keys()`'s, and key #2, the current one: a key change under
+    /// way (#409).
+    pub(crate) fn keys_one_and_two() -> Arc<crate::masking::MaskingKeys> {
+        Arc::new(
+            crate::masking::MaskingKeys::new(vec![
+                crate::masking::MaskingKey::from_seed(1, &[0x01; 32]).unwrap(),
+                crate::masking::MaskingKey::from_seed(2, &[0x02; 32]).unwrap(),
+            ])
+            .unwrap(),
+        )
+    }
+
+    /// The same service restarted with `keys` in `MASKING_KEYS` (#409): its
+    /// database, its homeserver, its provider and its clock, and the start
+    /// noting when each key was first served, as `main` does.
+    pub(crate) async fn restarted_with(
+        st: &Arc<AppState>,
+        keys: Arc<crate::masking::MaskingKeys>,
+    ) -> Arc<AppState> {
+        let mut cfg = st.cfg.clone();
+        cfg.masking_keys = Some(keys);
+        let restarted = Arc::new(AppState {
+            pool: st.pool.clone(),
+            mx: st.mx.clone(),
+            cfg,
+        });
+        note_keys_served(
+            &restarted.pool,
+            restarted.cfg.masking_keys.as_deref(),
+            restarted.cfg.clock.now(),
+        )
+        .await
+        .unwrap();
+        restarted
     }
 
     pub(crate) fn state_with(pool: SqlitePool, hs: String, ovh: Option<String>) -> Arc<AppState> {
@@ -2072,11 +2300,15 @@ mod tests {
                 key_number: 1,
                 public_key: "pk".into(),
             }],
+            retired: vec![3],
         })
         .unwrap();
         assert_eq!(
             keys,
-            serde_json::json!({"keys": [{"key_number": 1, "public_key": "pk"}]})
+            serde_json::json!({
+                "keys": [{"key_number": 1, "public_key": "pk"}],
+                "retired": [3],
+            })
         );
         let masked = serde_json::to_value(MaskedBatch {
             key_number: 1,
@@ -2168,6 +2400,390 @@ mod tests {
             let reference = reference_of(&two_keys.pool, who).await.unwrap();
             assert_eq!(found, vec![(key.key_number, reference.as_str())], "{who}");
         }
+    }
+
+    // ---- changing the key (#409) -----------------------------------------
+
+    /// The key number and the mask of `who`'s proof, as the table holds them.
+    async fn proof_of(pool: &SqlitePool, who: &str) -> Option<(i64, Vec<u8>)> {
+        sqlx::query_as("SELECT key_id, mask FROM findable_numbers WHERE user_id = ?")
+            .bind(format!("@{who}:h"))
+            .fetch_optional(pool)
+            .await
+            .unwrap()
+    }
+
+    #[sqlx::test(migrations = "./migrations")]
+    async fn renewing_under_the_new_key_keeps_the_reference_and_moves_the_proof_to_it(
+        pool: SqlitePool,
+    ) {
+        let (ovh, inbox) = fake_ovhcloud(false).await;
+        let (clock, time) = crate::util::Clock::settable(T0);
+        let one_key = state_at(pool.clone(), whoami_hs().await, Some(ovh), clock);
+        prove(&one_key, &inbox, "alice", NUMBER).await;
+        let first = reference_of(&pool, "alice").await.expect("a reference");
+
+        set_clock(&time, T0 + 21 * DAY);
+        let two_keys = restarted_with(&one_key, keys_one_and_two()).await;
+        prove(&two_keys, &inbox, "alice", NUMBER).await;
+
+        // Whoever found this account under the first key reads the same
+        // account under the second (#402, #407), and one entry only.
+        assert_eq!(reference_of(&pool, "alice").await, Some(first.clone()));
+        assert_eq!(proof_of(&pool, "alice").await.map(|(key, _)| key), Some(2));
+        let listed = directory_of(&two_keys, "alice").await.unwrap();
+        assert_eq!(
+            listed
+                .entries
+                .iter()
+                .map(|e| (e.key_number, e.reference.as_str()))
+                .collect::<Vec<_>>(),
+            vec![(2, first.as_str())]
+        );
+    }
+
+    #[sqlx::test(migrations = "./migrations")]
+    async fn a_number_proven_under_the_new_key_by_another_account_ends_the_proof_under_the_old(
+        pool: SqlitePool,
+    ) {
+        let (ovh, inbox) = fake_ovhcloud(false).await;
+        let (clock, time) = crate::util::Clock::settable(T0);
+        let one_key = state_at(pool.clone(), whoami_hs().await, Some(ovh), clock);
+        prove(&one_key, &inbox, "alice", NUMBER).await;
+        let alices = reference_of(&pool, "alice").await.expect("a reference");
+
+        set_clock(&time, T0 + DAY);
+        let two_keys = restarted_with(&one_key, keys_one_and_two()).await;
+        prove(&two_keys, &inbox, "bob", NUMBER).await;
+
+        // THE LAST PROOF WINS, under whichever key the first was made: one
+        // number never makes two accounts findable, even for a day.
+        assert_eq!(proof_of(&pool, "alice").await, None);
+        assert_eq!(
+            reading(&two_keys, "alice").await.ended,
+            Some(Ended::Replaced)
+        );
+        let listed = directory_of(&two_keys, "bob").await.unwrap();
+        assert_eq!(listed.entries.len(), 1);
+        assert_eq!(listed.entries[0].key_number, 2);
+        assert_ne!(listed.entries[0].reference, alices, "another account");
+    }
+
+    #[sqlx::test(migrations = "./migrations")]
+    async fn the_masking_count_follows_a_renewal_under_the_new_key(pool: SqlitePool) {
+        let (ovh, inbox) = fake_ovhcloud(false).await;
+        let (clock, time) = crate::util::Clock::settable(T0);
+        let one_key = state_at(pool.clone(), whoami_hs().await, Some(ovh), clock);
+        prove(&one_key, &inbox, "alice", NUMBER).await;
+        assert_eq!(over_the_limit(&one_key, "alice", 4_000).await, Ok(()));
+
+        set_clock(&time, T0 + 21 * DAY);
+        let two_keys = restarted_with(&one_key, keys_one_and_two()).await;
+        prove(&two_keys, &inbox, "alice", NUMBER).await;
+
+        assert_eq!(
+            over_the_limit(&two_keys, "alice", 1_001).await,
+            Err((1_000, (DAY_ZERO + 30) * DAY)),
+            "the 4,000 masked under the first key count under the second"
+        );
+    }
+
+    #[sqlx::test(migrations = "./migrations")]
+    async fn while_two_keys_serve_five_thousand_more_numbers_may_be_masked_under_the_new_one(
+        pool: SqlitePool,
+    ) {
+        let (ovh, inbox) = fake_ovhcloud(false).await;
+        let (clock, time) = crate::util::Clock::settable(T0);
+        let one_key = state_at(pool.clone(), whoami_hs().await, Some(ovh), clock);
+        prove(&one_key, &inbox, "alice", NUMBER).await;
+        assert_eq!(over_the_limit(&one_key, "alice", 5_000).await, Ok(()));
+
+        set_clock(&time, T0 + DAY);
+        let two_keys = restarted_with(&one_key, keys_one_and_two()).await;
+        let under = |key: u32, n: usize| {
+            let st = two_keys.clone();
+            async move {
+                match send_batch(&st, "alice", key, batch_of(n)).await {
+                    Ok(_) => Ok(()),
+                    Err(AppError::MaskingQuotaReached { remaining, .. }) => Err(remaining),
+                    Err(other) => panic!("{other}"),
+                }
+            }
+        };
+
+        assert_eq!(under(1, 1).await, Err(0), "under the old key, the limit");
+        assert_eq!(
+            under(2, 5_000).await,
+            Ok(()),
+            "under the new one, 5,000 more"
+        );
+        assert_eq!(under(2, 1).await, Err(0), "and not one more");
+    }
+
+    /// A batch of `n` under `key` for `who`: allowed, or how many numbers
+    /// still are.
+    async fn under_key(st: &Arc<AppState>, who: &str, key: u32, n: usize) -> Result<(), u32> {
+        match send_batch(st, who, key, batch_of(n)).await {
+            Ok(_) => Ok(()),
+            Err(AppError::MaskingQuotaReached { remaining, .. }) => Err(remaining),
+            Err(other) => panic!("{n} numbers under #{key}: {other}"),
+        }
+    }
+
+    #[sqlx::test(migrations = "./migrations")]
+    async fn comparing_again_under_the_new_key_leaves_the_limit_to_the_old_one(pool: SqlitePool) {
+        // #392, story 36: « sans entamer ma limite ». The batches under the
+        // old key still find the accounts that have not renewed.
+        let (ovh, inbox) = fake_ovhcloud(false).await;
+        let (clock, time) = crate::util::Clock::settable(T0);
+        let one_key = state_at(pool.clone(), whoami_hs().await, Some(ovh), clock);
+        prove(&one_key, &inbox, "alice", NUMBER).await;
+        assert_eq!(under_key(&one_key, "alice", 1, 3_000).await, Ok(()));
+        set_clock(&time, T0 + DAY);
+        let two_keys = restarted_with(&one_key, keys_one_and_two()).await;
+
+        assert_eq!(
+            under_key(&two_keys, "alice", 2, 3_000).await,
+            Ok(()),
+            "again"
+        );
+        assert_eq!(
+            under_key(&two_keys, "alice", 1, 2_000).await,
+            Ok(()),
+            "new ones"
+        );
+        assert_eq!(under_key(&two_keys, "alice", 1, 1).await, Err(0));
+    }
+
+    #[sqlx::test(migrations = "./migrations")]
+    async fn a_batch_under_the_new_key_spends_what_is_left_of_the_extension_first(
+        pool: SqlitePool,
+    ) {
+        // A second device of the same number, or a page that did not hold,
+        // compares again: what the extension cannot hold goes on the limit,
+        // and only that.
+        let (ovh, inbox) = fake_ovhcloud(false).await;
+        let (clock, _) = crate::util::Clock::settable(T0);
+        let one_key = state_at(pool.clone(), whoami_hs().await, Some(ovh), clock);
+        prove(&one_key, &inbox, "alice", NUMBER).await;
+        let two_keys = restarted_with(&one_key, keys_one_and_two()).await;
+        assert_eq!(under_key(&two_keys, "alice", 2, 3_000).await, Ok(()));
+        assert_eq!(under_key(&two_keys, "alice", 2, 3_000).await, Ok(()));
+
+        assert_eq!(
+            under_key(&two_keys, "alice", 1, 4_001).await,
+            Err(4_000),
+            "2,000 of the second batch took the rest of the extension"
+        );
+        assert_eq!(
+            under_key(&two_keys, "alice", 2, 4_001).await,
+            Err(4_000),
+            "and under the new key, what is left is the limit's"
+        );
+    }
+
+    #[sqlx::test(migrations = "./migrations")]
+    async fn what_the_extension_counted_never_counts_against_the_limit(pool: SqlitePool) {
+        let (ovh, inbox) = fake_ovhcloud(false).await;
+        let (clock, time) = crate::util::Clock::settable(T0);
+        let one_key = state_at(pool.clone(), whoami_hs().await, Some(ovh), clock);
+        prove(&one_key, &inbox, "alice", NUMBER).await;
+        let two_keys = restarted_with(&one_key, keys_one_and_two()).await;
+        assert_eq!(under_key(&two_keys, "alice", 2, 4_000).await, Ok(()));
+        set_clock(&time, T0 + 20 * DAY);
+        prove(&two_keys, &inbox, "alice", NUMBER).await;
+
+        // The extension over, the limit is whole.
+        set_clock(&time, T0 + 28 * DAY);
+        assert_eq!(under_key(&two_keys, "alice", 2, 5_000).await, Ok(()));
+    }
+
+    #[sqlx::test(migrations = "./migrations")]
+    async fn a_renewal_carries_what_the_extension_counted(pool: SqlitePool) {
+        let (ovh, inbox) = fake_ovhcloud(false).await;
+        let (clock, time) = crate::util::Clock::settable(T0);
+        let one_key = state_at(pool.clone(), whoami_hs().await, Some(ovh), clock);
+        prove(&one_key, &inbox, "alice", NUMBER).await;
+        let two_keys = restarted_with(&one_key, keys_one_and_two()).await;
+        assert_eq!(under_key(&two_keys, "alice", 2, 4_000).await, Ok(()));
+
+        set_clock(&time, T0 + 21 * DAY);
+        prove(&two_keys, &inbox, "alice", NUMBER).await;
+
+        // 1,000 left in the extension, and the limit whole: 5,000 fit in the
+        // limit, and then 2,000 fit nowhere.
+        assert_eq!(under_key(&two_keys, "alice", 2, 5_000).await, Ok(()));
+        assert_eq!(under_key(&two_keys, "alice", 2, 2_000).await, Err(1_000));
+    }
+
+    #[sqlx::test(migrations = "./migrations")]
+    async fn the_extension_ends_28_days_after_the_new_key_was_first_served(pool: SqlitePool) {
+        let (ovh, inbox) = fake_ovhcloud(false).await;
+        let (clock, time) = crate::util::Clock::settable(T0);
+        let one_key = state_at(pool.clone(), whoami_hs().await, Some(ovh), clock);
+        prove(&one_key, &inbox, "alice", NUMBER).await;
+        assert_eq!(over_the_limit(&one_key, "alice", 5_000).await, Ok(()));
+        set_clock(&time, T0 + DAY);
+        let two_keys = restarted_with(&one_key, keys_one_and_two()).await;
+        // Renewed under the new key, so that the account is still findable
+        // 28 days after the new key's first service.
+        set_clock(&time, T0 + 20 * DAY);
+        prove(&two_keys, &inbox, "alice", NUMBER).await;
+
+        // A restart does not make the key new again, and an old key left in
+        // MASKING_KEYS does not make the extension last.
+        set_clock(&time, T0 + DAY + 28 * DAY);
+        let restarted = restarted_with(&two_keys, keys_one_and_two()).await;
+        assert!(
+            matches!(
+                send_batch(&restarted, "alice", 2, batch_of(1)).await,
+                Err(AppError::MaskingQuotaReached { .. })
+            ),
+            "5,000 masked on the first day still count, and nothing extends them"
+        );
+    }
+
+    #[sqlx::test(migrations = "./migrations")]
+    async fn the_masks_under_the_other_keys_go_with_their_proof_in_progress(pool: SqlitePool) {
+        let (ovh, _) = fake_ovhcloud(false).await;
+        let one_key = state_with(pool.clone(), whoami_hs().await, Some(ovh));
+        let two_keys = restarted_with(&one_key, keys_one_and_two()).await;
+        let kept = || async {
+            sqlx::query_as::<_, (String, i64)>("SELECT user_id, key_id FROM pending_proof_masks")
+                .fetch_all(&pool)
+                .await
+                .unwrap()
+        };
+
+        start(&two_keys, "alice", NUMBER).await.unwrap();
+        assert_eq!(kept().await, vec![("@alice:h".to_string(), 1)], "under #1");
+        withdraw_number(State(two_keys.clone()), bearer("alice"))
+            .await
+            .unwrap();
+
+        assert_eq!(kept().await, vec![], "gone with the proof");
+    }
+
+    #[sqlx::test(migrations = "./migrations")]
+    async fn a_proof_started_before_a_new_key_serves_starts_again_under_it(pool: SqlitePool) {
+        let (ovh, inbox) = fake_ovhcloud(false).await;
+        let (clock, _) = crate::util::Clock::settable(T0);
+        let one_key = state_at(pool.clone(), whoami_hs().await, Some(ovh), clock);
+        start(&one_key, "alice", NUMBER).await.unwrap();
+        let code = last_code(&inbox);
+
+        // Its number is known under #1 only: finished under #2's service, it
+        // could make a second account findable by a number already proven
+        // under #2 in the meantime.
+        let two_keys = restarted_with(&one_key, keys_one_and_two()).await;
+
+        assert!(matches!(
+            finish(&two_keys, "alice", &code).await,
+            Err(AppError::NoProofPending)
+        ));
+        prove(&two_keys, &inbox, "alice", NUMBER).await;
+        assert_eq!(proof_of(&pool, "alice").await.map(|(key, _)| key), Some(2));
+    }
+
+    #[sqlx::test(migrations = "./migrations")]
+    async fn a_restart_with_the_same_keys_keeps_the_proofs_in_progress(pool: SqlitePool) {
+        let (ovh, inbox) = fake_ovhcloud(false).await;
+        let (clock, _) = crate::util::Clock::settable(T0);
+        let one_key = state_at(pool.clone(), whoami_hs().await, Some(ovh), clock);
+        let two_keys = restarted_with(&one_key, keys_one_and_two()).await;
+        start(&two_keys, "alice", NUMBER).await.unwrap();
+
+        let again = restarted_with(&two_keys, keys_one_and_two()).await;
+
+        finish(&again, "alice", &last_code(&inbox)).await.unwrap();
+    }
+
+    #[sqlx::test(migrations = "./migrations")]
+    async fn a_planned_change_ends_with_the_old_key_left_by_every_proof(pool: SqlitePool) {
+        // #409: « Au bout de 28 jours, l'ancienne clé est détruite, et ses
+        // entrées quittent l'annuaire ». Alice renews, Bob does not.
+        let (ovh, inbox) = fake_ovhcloud(false).await;
+        let (clock, time) = crate::util::Clock::settable(T0);
+        let one_key = state_at(pool.clone(), whoami_hs().await, Some(ovh), clock);
+        prove(&one_key, &inbox, "alice", NUMBER).await;
+        prove(&one_key, &inbox, "bob", OTHER).await;
+        set_clock(&time, T0 + DAY);
+        let two_keys = restarted_with(&one_key, keys_one_and_two()).await;
+        set_clock(&time, T0 + 21 * DAY);
+        prove(&two_keys, &inbox, "alice", NUMBER).await;
+
+        set_clock(&time, T0 + 28 * DAY);
+        let listed = directory_of(&two_keys, "alice").await.unwrap();
+        assert_eq!(
+            listed
+                .entries
+                .iter()
+                .map(|e| e.key_number)
+                .collect::<Vec<_>>(),
+            vec![2],
+            "Bob's proof under #1 ran out, and only Alice's under #2 is left"
+        );
+        let only_two =
+            crate::masking::MaskingKeys::new(vec![crate::masking::MaskingKey::from_seed(
+                2,
+                &[0x02; 32],
+            )
+            .unwrap()])
+            .unwrap();
+        keys_of_live_masks_are_held(&pool, Some(&only_two), T0 + 28 * DAY)
+            .await
+            .expect("#1 can leave MASKING_KEYS");
+    }
+
+    #[sqlx::test(migrations = "./migrations")]
+    async fn a_finish_dropped_while_it_waits_for_the_lock_leaves_no_transaction_behind(
+        pool: SqlitePool,
+    ) {
+        use sqlx::Connection;
+        let (ovh, inbox) = fake_ovhcloud(false).await;
+        let st = state_with(pool.clone(), whoami_hs().await, Some(ovh));
+        start(&st, "alice", NUMBER).await.unwrap();
+        let code = last_code(&inbox);
+
+        // Another writer holds the lock, and the finish waits for it until
+        // its client goes away.
+        let holder = pool.begin_with("BEGIN IMMEDIATE").await.unwrap();
+        let waited = tokio::time::timeout(
+            std::time::Duration::from_millis(300),
+            finish(&st, "alice", &code),
+        )
+        .await;
+        assert!(waited.is_err(), "the finish was still waiting");
+        holder.rollback().await.unwrap();
+        // Time for what the dropped finish had asked of its connection to
+        // take the lock, if anything is left to take it.
+        tokio::time::sleep(std::time::Duration::from_millis(500)).await;
+
+        // No connection of the pool is left inside a transaction: every
+        // write commits, as a connection of its own sees.
+        for key in 1..=10_i64 {
+            sqlx::query("INSERT INTO masking_keys_served (key_id, since) VALUES (?, 0)")
+                .bind(key)
+                .execute(&pool)
+                .await
+                .unwrap();
+        }
+        let mut own = sqlx::SqliteConnection::connect_with(&pool.connect_options())
+            .await
+            .unwrap();
+        let kept: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM masking_keys_served")
+            .fetch_one(&mut own)
+            .await
+            .unwrap();
+        assert_eq!(kept, 10);
+    }
+
+    #[test]
+    fn a_key_retired_at_once_reads_as_key_changed() {
+        assert_eq!(
+            serde_json::to_value(Ended::KeyChanged).unwrap(),
+            serde_json::json!("key-changed")
+        );
     }
 
     // ---- the limit on masking (#401) --------------------------------------
