@@ -428,7 +428,7 @@ export const en: Readonly<Record<CopyKey, string>> = {
     'Messagr is a hosting service and not an online platform, recital 14 of the DSA excluding interpersonal messaging services. Articles 20 and 21 therefore do not apply, and this text does not claim to offer them.',
   legal_delete_title: 'Delete your account',
   legal_delete_body:
-    'Deletion is done from inside the application: Settings, then “Delete my account”. The account is then deactivated at once and its data purged; messages already sent remain events of the rooms they were written in, and the server cannot take them back, since it cannot read them. Without this device, or when the application asks you to, deletion is requested by e-mail at conformite@messagr.eu.',
+    'Deletion is done from inside the application: Settings, then “Delete my account”. The account is then deactivated at once and its data purged within thirty days; messages already sent remain events of the rooms they were written in, and the server cannot take them back, since it cannot read them. Without this device, or when the application asks you to, deletion is requested by e-mail at conformite@messagr.eu.',
   legal_delete_link: 'Without this device: messagr.eu/aide',
   legal_full_terms: 'Full terms and conditions: messagr.eu',
   trust_action: 'What is known about this person',

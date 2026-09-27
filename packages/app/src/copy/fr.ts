@@ -692,7 +692,7 @@ export const fr = {
   // dépend : aucune build qui affiche ce texte ne sort avant la page.
   legal_delete_title: 'Supprimer votre compte',
   legal_delete_body:
-    'La suppression se fait depuis l’application : Réglages, puis « Supprimer mon compte ». Le compte est alors désactivé aussitôt et ses données sont purgées ; les messages déjà envoyés restent des événements des salons où ils ont été écrits, et le serveur ne peut pas les en retirer puisqu’il ne peut pas les lire. Sans cet appareil, ou quand l’application le demande, la suppression se demande par courriel à conformite@messagr.eu.',
+    'La suppression se fait depuis l’application : Réglages, puis « Supprimer mon compte ». Le compte est alors désactivé aussitôt et ses données sont purgées sous trente jours ; les messages déjà envoyés restent des événements des salons où ils ont été écrits, et le serveur ne peut pas les en retirer puisqu’il ne peut pas les lire. Sans cet appareil, ou quand l’application le demande, la suppression se demande par courriel à conformite@messagr.eu.',
   legal_delete_link: 'Sans cet appareil : messagr.eu/aide',
   legal_full_terms: 'Conditions générales complètes : messagr.eu',
 

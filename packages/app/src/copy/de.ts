@@ -434,7 +434,7 @@ export const de: Readonly<Record<CopyKey, string>> = {
     'Messagr ist ein Hostingdienst und keine Online-Plattform; Erwägungsgrund 14 des DSA nimmt interpersonelle Kommunikationsdienste aus. Die Artikel 20 und 21 gelten daher nicht, und dieser Text beansprucht nicht, sie zu bieten.',
   legal_delete_title: 'Ihr Konto löschen',
   legal_delete_body:
-    'Die Löschung erfolgt in der Anwendung: Einstellungen, dann „Mein Konto löschen“. Das Konto wird dann sofort deaktiviert und seine Daten werden gelöscht; bereits gesendete Nachrichten bleiben Ereignisse der Räume, in denen sie geschrieben wurden, und der Server kann sie nicht entfernen, da er sie nicht lesen kann. Ohne dieses Gerät, oder wenn die Anwendung Sie darum bittet, wird die Löschung per E-Mail an conformite@messagr.eu beantragt.',
+    'Die Löschung erfolgt in der Anwendung: Einstellungen, dann „Mein Konto löschen“. Das Konto wird dann sofort deaktiviert und seine Daten werden innerhalb von dreißig Tagen gelöscht; bereits gesendete Nachrichten bleiben Ereignisse der Räume, in denen sie geschrieben wurden, und der Server kann sie nicht entfernen, da er sie nicht lesen kann. Ohne dieses Gerät, oder wenn die Anwendung Sie darum bittet, wird die Löschung per E-Mail an conformite@messagr.eu beantragt.',
   legal_delete_link: 'Ohne dieses Gerät: messagr.eu/aide',
   legal_full_terms: 'Vollständige Bedingungen: messagr.eu',
   trust_action: 'Was über diese Person bekannt ist',
