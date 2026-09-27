@@ -84,6 +84,7 @@ const MOIS = [
   'novembre',
   'décembre',
 ]
+const SITE_PAR_DEFAUT = join(dirname(fileURLToPath(import.meta.url)), 'site')
 const PASSAGE = /<!-- a-venir -->[\s\S]*?<!-- \/a-venir -->/g
 const DATES = /<time datetime="([^"]*)">/g
 
@@ -209,6 +210,7 @@ function dateAnnoncee({ nom, venir }) {
       `${nom}/a-venir/ ne porte ni la marque ni une date annoncée, une seule`,
     )
   }
+  exigerUneDate(uniques[0])
   return uniques[0]
 }
 
@@ -298,6 +300,7 @@ function preavis(page) {
   if (dates.length !== 1 || lire(page).includes(MARQUE)) {
     throw new Refus(`${page} ne porte pas une date annoncée, une seule`)
   }
+  exigerUneDate(dates[0])
   const jours = joursEntre(aujourdhuiAParis(new Date()), dates[0])
   if (jours < PREAVIS_JOURS) {
     throw new Refus(
@@ -313,7 +316,7 @@ function remplacerLePassage(texte, remplacement) {
 }
 
 /** La version en vigueur, telle qu'elle reste lisible à son adresse datée. */
-function archive(texte, nom, date) {
+function versionDatee(texte, nom, date) {
   return remplacerLePassage(
     texte,
     `<!-- jusqu-au -->
@@ -422,7 +425,7 @@ export function appliquer(
       {
         dossier: adresseDatee,
         page: join(adresseDatee, 'index.html'),
-        texte: archive(lire(enVigueur), nom, date),
+        texte: versionDatee(lire(enVigueur), nom, date),
       },
       { page: enVigueur, texte: enVigueurDepuis(lire(venir), nom, date) },
     )
@@ -452,20 +455,22 @@ export function appliquer(
 }
 
 const SUITE = 'puis à lancer les contrôles de LISEZ-MOI-pages-legales.md.'
+
+/** Chaque geste, avec ses arguments tels que la ligne de commande les donne. */
 const GESTES = {
-  annoncer: (date, site) => ({
+  annoncer: ([date, site = SITE_PAR_DEFAUT]) => ({
     touchees: annoncer(date, site),
     suite: `la version à venir s’appliquera le ${enFrancais(date)}. Reste à commiter et à déployer aujourd’hui, le préavis courant du jour où la page est servie, ${SUITE}`,
   }),
-  reporter: (date, site) => ({
+  reporter: ([date, site = SITE_PAR_DEFAUT]) => ({
     touchees: reporter(date, site),
     suite: `la version à venir s’appliquera le ${enFrancais(date)}. Reste à commiter et à déployer aujourd’hui, la page servie disant l’ancienne date d’ici là, ${SUITE}`,
   }),
-  appliquer: site => ({
+  appliquer: ([site = SITE_PAR_DEFAUT]) => ({
     touchees: appliquer(site),
     suite: `la version à venir est en vigueur. Reste à commiter, à déployer, ${SUITE}`,
   }),
-  preavis: page => ({
+  preavis: ([page]) => ({
     touchees: [],
     suite: `servie aujourd’hui, ${page} donne ${preavis(page)} jours de préavis`,
   }),
@@ -478,20 +483,13 @@ if (
   realpathSync(process.argv[1]) === fileURLToPath(import.meta.url)
 ) {
   const [nom, ...reste] = process.argv.slice(2)
-  const siteParDefaut = join(dirname(fileURLToPath(import.meta.url)), 'site')
   try {
-    const geste = Object.hasOwn(GESTES, nom) ? GESTES[nom] : null
-    if (geste === null) {
+    if (!Object.hasOwn(GESTES, nom)) {
       throw new Refus(
         'annoncer AAAA-MM-JJ, reporter AAAA-MM-JJ, appliquer ou preavis <page>',
       )
     }
-    const { touchees, suite } =
-      nom === 'appliquer'
-        ? geste(reste[0] ?? siteParDefaut)
-        : nom === 'preavis'
-          ? geste(reste[0])
-          : geste(reste[0], reste[1] ?? siteParDefaut)
+    const { touchees, suite } = GESTES[nom](reste)
     for (const page of touchees) console.log(`version-a-venir : ${page}`)
     console.log(`version-a-venir : ${suite}`)
   } catch (e) {

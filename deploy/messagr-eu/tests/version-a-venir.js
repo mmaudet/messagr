@@ -227,52 +227,56 @@ if (PAGES.length === 0) {
   fail('no page of the site has an upcoming or a dated version: nothing here is exercised');
 }
 
-// ── 1. Le dépôt, tel qu'il est ───────────────────────────────────────────
-(function () {
-  var site = built(siteDir);
+// ── 1. Le dépôt, tel qu'il est, et chaque état qu'il peut prendre ──────
+//
+// Rejoué plus bas sur des copies : annoncée, appliquée, et préparée de
+// nouveau après une application. Le dépôt passera par chacun.
+function checkState(source, retentionPath, label) {
+  var site = built(source);
   if (site.result.code !== 0) {
-    fail('the committed site does not build: ' + site.result.err);
+    fail(label + ': the site does not build: ' + site.result.err);
     return;
   }
   PAGES.forEach(function (page) {
-    var upcoming = path.join(siteDir, page, 'a-venir', 'index.html');
-    var source = read(path.join(siteDir, page, 'index.html'));
+    var upcoming = path.join(source, page, 'a-venir', 'index.html');
+    var inForce = read(path.join(source, page, 'index.html'));
     var served = read(path.join(site.out, page, 'index.html'));
+    var announces = 'href="/' + page + '/a-venir/"';
     if (!exists(upcoming)) {
-      if (source.indexOf('<!-- a-venir -->') !== -1) {
-        fail(page + ' announces an upcoming version the repository does not hold');
+      if (inForce.indexOf('<!-- a-venir -->') !== -1) {
+        fail(label + ': ' + page + ' announces an upcoming version the site does not hold');
       }
       return;
     }
     if (read(upcoming).indexOf(MARQUE) === -1) {
       if (!exists(path.join(site.out, page, 'a-venir', 'index.html')) ||
-          served.indexOf('href="/' + page + '/a-venir/"') === -1) {
-        fail(page + '/a-venir/ is announced and not built, or not announced by ' + page);
+          served.indexOf(announces) === -1) {
+        fail(label + ': ' + page + '/a-venir/ is announced and not built, or not announced by ' + page);
       }
       return;
     }
     if (exists(path.join(site.out, page, 'a-venir'))) {
-      fail(page + '/a-venir/ is built before it is announced');
+      fail(label + ': ' + page + '/a-venir/ is built before it is announced');
     }
     if (served.indexOf(MARQUE) !== -1) {
-      fail(page + ' is built with the mark in it');
+      fail(label + ': ' + page + ' is built with the mark in it');
     }
-    if (served.indexOf('/' + page + '/a-venir/') !== -1) {
-      fail(page + ' announces an upcoming version nobody has dated');
+    if (served.indexOf(announces) !== -1) {
+      fail(label + ': ' + page + ' announces an upcoming version nobody has dated');
     }
     // Rien d'autre ne change : la page servie est la source, sans le passage.
-    var withoutPassage = source.replace(
+    var withoutPassage = inForce.replace(
       / {6}<!-- a-venir -->\n[\s\S]*? {6}<!-- \/a-venir -->\n/, '');
     if (served !== withoutPassage) {
-      fail(page + ' is built with more than its announcement taken out');
+      fail(label + ': ' + page + ' is built with more than its announcement taken out');
     }
   });
 
-  // Les durées : chaque « page » nomme une version à venir que le dépôt
+  // Les durées : chaque « page » nomme une version à venir que le site
   // tient, et la version à venir de la politique dit chaque durée déclarée,
   // puisqu'elle deviendra la politique.
-  var retention = JSON.parse(read(retentionFile));
-  var policy = path.join(siteDir, 'confidentialite', 'a-venir', 'index.html');
+  var retention = JSON.parse(read(retentionPath));
+  var policy = path.join(source, 'confidentialite', 'a-venir', 'index.html');
   var upcomingText = exists(policy) ? textOf(read(policy)) : null;
   Object.keys(retention).forEach(function (key) {
     var entry = retention[key];
@@ -280,19 +284,20 @@ if (PAGES.length === 0) {
       return;
     }
     if (entry.page !== undefined &&
-        !exists(path.join(siteDir, entry.page.replace(/^\//, ''), 'index.html'))) {
-      fail('retention.json checks ' + key + ' at ' + entry.page + ', which the repository does not hold');
+        !exists(path.join(source, entry.page.replace(/^\//, ''), 'index.html'))) {
+      fail(label + ': retention.json checks ' + key + ' at ' + entry.page + ', which the site does not hold');
     }
     if (upcomingText === null) {
       return;
     }
     (entry.duree === undefined ? [] : [entry.duree]).concat(entry.dit || []).forEach(function (phrase) {
       if (upcomingText.indexOf(phrase) === -1) {
-        fail('the upcoming policy never says "' + phrase + '" (' + key + ')');
+        fail(label + ': the upcoming policy never says "' + phrase + '" (' + key + ')');
       }
     });
   });
-})();
+}
+checkState(siteDir, retentionFile, 'the repository');
 
 // ── 2. Une fois annoncée, les deux versions, avec la date ────────────────
 (function () {
@@ -303,6 +308,7 @@ if (PAGES.length === 0) {
     fail('announcing ' + date + ' was refused: ' + announced.err);
     return;
   }
+  checkState(copy.site, copy.retention, 'an announced copy');
   var site = built(copy.site);
   if (site.result.code !== 0) {
     fail('the announced site does not build: ' + site.result.err);
@@ -339,9 +345,17 @@ if (PAGES.length === 0) {
     [[29, false], [30, true]].forEach(function (days) {
       var late = path.join(site.out, page, 'a-venir', 'tard.html');
       fs.writeFileSync(late, text.split(date).join(inDays(days[0])));
-      if ((gesture(['preavis', late]).code === 0) !== days[1]) {
+      var measured = gesture(['preavis', late]);
+      if (days[1] ? measured.code !== 0 : !refused(measured)) {
         fail(page + '/a-venir/ served ' + days[0] + ' days before it applies was ' +
           (days[1] ? 'refused' : 'let through'));
+      }
+    });
+    ['2026-11-1', '', date.slice(0, 8) + '32'].forEach(function (bad) {
+      var wrong = path.join(site.out, page, 'a-venir', 'mal-datee.html');
+      fs.writeFileSync(wrong, text.split(date).join(bad));
+      if (!refused(gesture(['preavis', wrong]))) {
+        fail(page + '/a-venir/ dated "' + bad + '" was let through by the notice');
       }
     });
   });
@@ -401,8 +415,8 @@ if (PAGES.length === 0) {
   if (gesture(['annoncer', inDays(30), copy.site]).code !== 0) {
     fail('thirty days exactly, the notice promised, was refused');
   }
-  if (gesture(['annoncer', inDays(31), copy.site]).code === 0) {
-    fail('a second announcement was accepted with nothing left to date');
+  if (!refused(gesture(['annoncer', inDays(31), copy.site]))) {
+    fail('a second announcement was not refused with nothing left to date');
   }
 })();
 
@@ -432,14 +446,14 @@ if (PAGES.length === 0) {
 // ── 5. Une date annoncée recule, et n'avance pas ─────────────────────────
 (function () {
   var copy = aCopy();
-  if (gesture(['reporter', inDays(50), copy.site]).code === 0) {
-    fail('a version nobody announced was postponed');
+  if (!refused(gesture(['reporter', inDays(50), copy.site]))) {
+    fail('postponing a version nobody announced was not refused');
   }
   var first = inDays(40);
   gesture(['annoncer', first, copy.site]);
   [first, inDays(39)].forEach(function (earlier) {
-    if (gesture(['reporter', earlier, copy.site]).code === 0) {
-      fail('an announced date moved from ' + first + ' to ' + earlier);
+    if (!refused(gesture(['reporter', earlier, copy.site]))) {
+      fail('moving an announced date from ' + first + ' to ' + earlier + ' was not refused');
     }
   });
   var later = inDays(47);
@@ -464,8 +478,8 @@ if (PAGES.length === 0) {
   var before = PAGES.map(function (page) {
     return read(path.join(copy.site, page, 'a-venir', 'index.html'));
   });
-  if (gesture(['reporter', inDays(55), copy.site]).code === 0) {
-    fail('a postponement that could not rewrite ' + PAGES[0] + ' was accepted');
+  if (!refused(gesture(['reporter', inDays(55), copy.site]))) {
+    fail('a postponement that could not rewrite ' + PAGES[0] + ' was not refused');
   }
   PAGES.forEach(function (page, i) {
     if (read(path.join(copy.site, page, 'a-venir', 'index.html')) !== before[i]) {
@@ -485,10 +499,12 @@ if (PAGES.length === 0) {
 
   [inDays(40), inDays(80)].forEach(function (date, cycle) {
     if (cycle === 1) {
+      checkState(copy.site, copy.retention, 'an applied copy');
       PAGES.forEach(function (page) {
         before[page] = read(path.join(copy.site, page, 'index.html'));
         prepare(copy.site, page);
       });
+      checkState(copy.site, copy.retention, 'a version prepared after an application');
     }
     var upcoming = {};
     gesture(['annoncer', date, copy.site]);
@@ -496,11 +512,11 @@ if (PAGES.length === 0) {
       upcoming[page] = read(path.join(copy.site, page, 'a-venir', 'index.html'));
     });
 
-    if (gesture(['appliquer', copy.site]).code === 0) {
-      fail('cycle ' + (cycle + 1) + ': applied today, before ' + date);
+    if (!refused(gesture(['appliquer', copy.site]))) {
+      fail('cycle ' + (cycle + 1) + ': applying today, before ' + date + ', was not refused');
     }
-    if (applyAt(copy, parisMidnight(date, 1)).code === 0) {
-      fail('cycle ' + (cycle + 1) + ': applied at 23:59 in Paris, the evening before ' + date);
+    if (!refused(applyAt(copy, parisMidnight(date, 1)))) {
+      fail('cycle ' + (cycle + 1) + ': applying at 23:59 in Paris, the evening before ' + date + ', was not refused');
     }
     var applied = applyAt(copy, parisMidnight(date, 0));
     if (applied.code !== 0) {
@@ -573,8 +589,8 @@ if (PAGES.length === 0) {
         fail('cycle ' + (cycle + 1) + ': ' + page + ' is not built as applied');
       }
     });
-    if (applyAt(copy, parisMidnight(date, -60)).code === 0) {
-      fail('cycle ' + (cycle + 1) + ': a second application was accepted with nothing upcoming');
+    if (!refused(applyAt(copy, parisMidnight(date, -60)))) {
+      fail('cycle ' + (cycle + 1) + ': a second application was not refused with nothing upcoming');
     }
   });
 })();
@@ -620,6 +636,18 @@ if (PAGES.length === 0) {
       fail('a refused application wrote into ' + page);
     }
   });
+})();
+
+// ── 9. Lancé par un lien symbolique, le geste se fait ────────────────────
+(function () {
+  var copy = aCopy();
+  var date = inDays(40);
+  var link = path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'a-venir-lien-')), 'version-a-venir.mjs');
+  fs.symlinkSync(tool, link);
+  var launched = run('node', [link, 'annoncer', date, copy.site]);
+  if (launched.code !== 0 || read(path.join(copy.site, PAGES[0], 'a-venir', 'index.html')).indexOf(MARQUE) !== -1) {
+    fail('run through a symbolic link, the announcement did not happen: ' + launched.out + launched.err);
+  }
 })();
 
 if (status === 0) {

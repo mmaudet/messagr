@@ -73,8 +73,8 @@
     ]
   },
   "decouverte_invitations_remises": {
-    "$note": "Qui invite qui dans une invitation remise dans Messagr (#404), appris dès l'envoi, et gardé trente jours après la réponse ou l'échéance de l'invitation, qui vaut une semaine : le même terme que le lien entre celui qui invite et celui qui entre (#392, #416). Le nom scellé que l'inviteur se donne (#405) s'efface à la réponse ou à l'échéance.",
-    "duree": "trente jours après la réponse ou l'échéance",
+    "$note": "Qui invite qui dans une invitation remise dans Messagr (#404), appris dès l'envoi, et gardé trente jours après son acceptation ou son échéance, une semaine après l'envoi ; une invitation refusée le reste jusqu'à son échéance : le même terme que le lien entre celui qui invite et celui qui entre (#392, #416). Le nom scellé que l'inviteur se donne (#405) s'efface à la réponse ou à l'échéance.",
+    "duree": "trente jours après son acceptation ou son échéance",
     "jours": 30,
     "page": "/confidentialite/a-venir/",
     "applique_par": [

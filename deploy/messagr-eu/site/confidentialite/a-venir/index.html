@@ -225,7 +225,11 @@
             ce que la recherche de vos contacts laisse sur votre
             téléphone&nbsp;;
           </li>
-          <li>OVHcloud rejoint «&nbsp;Où vos données sont traitées&nbsp;»&nbsp;;</li>
+          <li>
+            OVHcloud rejoint «&nbsp;Où vos données sont traitées&nbsp;», qui dit
+            aussi ce que la bibliothèque de Firebase envoie à Google sur
+            iPhone&nbsp;;
+          </li>
           <li>«&nbsp;Combien de temps&nbsp;» gagne ces durées nouvelles&nbsp;;</li>
           <li>
             «&nbsp;Modifications&nbsp;» dit comment une nouvelle version est
@@ -383,9 +387,10 @@
         <b>OVHcloud envoie ce SMS, pour notre compte.</b> OVH SAS, 2 rue
         Kellermann, 59100 Roubaix, en France, est notre sous-traitant pour cet
         envoi&nbsp;: il reçoit votre numéro et le texte du SMS, qui ne porte que
-        le code. Dès que ce code ne vaut plus, nous demandons à OVHcloud
-        d'effacer le SMS de son historique, et s'il ne l'y trouve pas encore,
-        nous le lui redemandons chaque heure pendant un jour.
+        le code. Dans l'heure qui suit la fin de validité de ce code, nous
+        demandons à OVHcloud d'effacer le SMS de son historique, et s'il ne l'y
+        trouve pas encore, nous le lui redemandons chaque heure pendant un
+        jour.
       </p>
       <p>
         <b>Ce qu'OVHcloud garde malgré tout.</b> Comme opérateur de
@@ -411,9 +416,10 @@
         <b>Inviter un contact.</b> Inviter un contact trouvé lui remet une
         invitation dans Messagr, qui vaut une semaine&nbsp;: notre serveur
         apprend qui invite qui dès l'envoi, là où un lien ne le lui apprend
-        qu'au moment où quelqu'un entre. Il le garde trente jours après la
-        réponse ou l'échéance de l'invitation, comme le lien entre celui qui
-        invite et celui qui entre. Inviter un contact qui n'est pas sur
+        qu'au moment où quelqu'un entre. Il le garde trente jours après son
+        acceptation ou son échéance, comme le lien entre celui qui invite et
+        celui qui entre&nbsp;: une invitation refusée le reste jusqu'à son
+        échéance. Inviter un contact qui n'est pas sur
         Messagr passe par un lien que vous envoyez vous-même, depuis votre
         téléphone, par SMS ou par la feuille de partage&nbsp;: son numéro ne
         nous parvient pas. Le lien vaut alors trois jours au lieu d'une heure,
@@ -438,16 +444,16 @@
         </li>
         <li>
           le SMS chez OVHcloud, jusqu'à ce qu'il en soit effacé&nbsp;: nous le
-          demandons dès que son code ne vaut plus, puis chaque heure pendant un
-          jour&nbsp;;
+          demandons dans l'heure qui suit la fin de validité de son code, puis
+          chaque heure pendant un jour&nbsp;;
         </li>
         <li>
           les compteurs des SMS envoyés, sans aucun numéro, trente jours&nbsp;;
         </li>
         <li>
           qui invite qui dans une invitation remise dans Messagr, trente jours
-          après la réponse ou l'échéance, et le nom scellé qu'elle porte,
-          jusqu'à la réponse ou l'échéance&nbsp;;
+          après son acceptation ou son échéance, et le nom scellé qu'elle
+          porte, jusqu'à la réponse ou l'échéance&nbsp;;
         </li>
         <li>un blocage, tant que vos deux comptes existent&nbsp;;</li>
         <li>
@@ -590,8 +596,7 @@
       <h2>Où vos données sont traitées</h2>
       <p>
         Le serveur est hébergé par Hetzner Online GmbH, à Helsinki, en Finlande,
-        au sein de l'Union européenne. Deux choses peuvent être traitées hors
-        de l'Union.
+        au sein de l'Union européenne.
       </p>
       <p>
         Si vous choisissez d'être trouvable, le SMS qui prouve votre numéro est
@@ -600,11 +605,15 @@
         britannique, par exemple.
       </p>
       <p>
-        Le signal qui réveille votre téléphone, décrit plus haut, passe par Firebase Cloud Messaging (Google) sur Android et par le
-        service de notifications d'Apple sur iOS. Ces services peuvent le traiter
-        hors de l'Union. Il ne porte que l'identifiant technique de votre
-        appareil, une priorité de remise et un nombre tiré au hasard — et, sur
-        iPhone seulement, la phrase écrite d'avance décrite plus haut.
+        Le signal qui réveille votre téléphone, décrit plus haut, passe par
+        Firebase Cloud Messaging (Google) sur Android et par le service de
+        notifications d'Apple sur iOS. Ces services peuvent le traiter hors de
+        l'Union. Il ne porte que l'identifiant technique de votre appareil, une
+        priorité de remise et un nombre tiré au hasard — et, sur iPhone
+        seulement, la phrase écrite d'avance décrite plus haut. Sur iPhone,
+        l'identifiant d'installation et le jeton que la bibliothèque de
+        Firebase envoie à Google, décrits plus haut, peuvent aussi être traités
+        hors de l'Union.
       </p>
 
       <h2>Sur quelle base</h2>
@@ -669,8 +678,8 @@
         jours&nbsp;; l'empreinte masquée de votre numéro et son compteur,
         trente jours après que vous cessez d'être trouvable&nbsp;; le SMS chez
         OVHcloud, jusqu'à ce qu'il en soit effacé&nbsp;; qui invite qui dans une
-        invitation remise dans Messagr, trente jours après la réponse ou
-        l'échéance&nbsp;; un blocage, tant que vos deux comptes existent.
+        invitation remise dans Messagr, trente jours après son acceptation ou
+        son échéance&nbsp;; un blocage, tant que vos deux comptes existent.
       </p>
 
       <h2>Ce que l'effacement peut, et ce qu'il ne peut pas</h2>

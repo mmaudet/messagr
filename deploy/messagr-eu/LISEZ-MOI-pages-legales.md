@@ -179,8 +179,9 @@ déployer.
 
     node deploy/messagr-eu/version-a-venir.mjs appliquer
 
-Le jour venu, à Paris, et pas avant. Pour chaque page qui a une version à
-venir :
+Le jour venu, à Paris, et pas avant. Une version annoncée pour plus tard,
+ou pas encore annoncée, attend. Pour chaque page dont la version à venir est
+annoncée pour ce jour-là ou avant :
 
 - la version en vigueur part à `<page>/jusqu-au-AAAA-MM-JJ/`, et dit
   jusqu'à quand elle s'est appliquée, et ce qui l'a remplacée ;
