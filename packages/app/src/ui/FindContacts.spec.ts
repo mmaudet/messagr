@@ -193,21 +193,44 @@ describe('« Retrouver mes contacts »', () => {
     expect(line).toBeLessThan(page.indexOf('Paul'))
   })
 
-  it('puts no gesture on a contact', () => {
-    const drawn = show(
-      found({
-        matches: [
-          {
-            contact: contact('Anne'),
-            reference: 'r-anne',
-            holderChanged: false,
-          },
-        ],
-        others: [contact('Zoé')],
-        waiting: null,
+  it('puts « Inviter » on each contact found, for that contact alone, and no gesture on the others (#404)', () => {
+    // Paul's number changed hands: the account it leads to now inherits
+    // nothing of the card, not even the name the form opens with.
+    const invited: unknown[] = []
+    const drawn = draw(
+      createElement(FindContacts, {
+        stage: found({
+          matches: [
+            {
+              contact: contact('Anne'),
+              reference: 'r-anne',
+              holderChanged: false,
+            },
+            {
+              contact: contact('Paul'),
+              reference: 'r-paul',
+              holderChanged: true,
+            },
+          ],
+          others: [contact('Zoé')],
+        }),
+        onContinue: () => undefined,
+        onShareMore: () => undefined,
+        onInvite: to => invited.push(to),
+        onClose: () => undefined,
       }),
     )
 
+    // A button is drawn as its component and the `Pressable` inside it, both
+    // under one test id: the component is the button.
+    const buttons = all(drawn, 'find-contacts-invite-contact').filter(
+      node => typeof node.type === 'function',
+    )
+    expect(buttons.map(textIn)).toEqual([t('find_invite'), t('find_invite')])
+    ;(buttons[1]!.props.onPress as () => void)()
+    expect(invited).toEqual([{ name: '', reference: 'r-paul' }])
+    ;(buttons[0]!.props.onPress as () => void)()
+    expect(invited.at(-1)).toEqual({ name: 'Anne', reference: 'r-anne' })
     for (const row of [
       ...all(drawn, 'find-contacts-match'),
       ...all(drawn, 'find-contacts-other'),

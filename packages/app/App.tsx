@@ -36,7 +36,9 @@ import {
   sendOneEncryptedMessage,
   sendTypedMessage,
   admitEntrant,
+  deliverToMatch,
   inviteSomebody,
+  letInWhoeverJoined,
   listConversations,
   openPhotograph,
   reactToMessage,
@@ -163,7 +165,11 @@ import {
   fetchJoinedMembers,
   type Invitation,
 } from './src/runtime/encryptedSend'
-import { whatALinkSays, whatIsKnown } from './src/runtime/invitationOnScreen'
+import {
+  whatADeliveredInvitationSays,
+  whatALinkSays,
+  whatIsKnown,
+} from './src/runtime/invitationOnScreen'
 import { linkOnScreen, type Described } from './src/runtime/linkOnScreen'
 import { sameThreshold, stillStanding } from './src/runtime/standingInvitations'
 import { theOtherMember, type VouchOutcome } from './src/runtime/vouch'
@@ -175,6 +181,18 @@ import {
   forgetfulOutstanding,
   type Outstanding,
 } from './src/runtime/outstandingStore'
+import { forgetfulSentInvitations } from './src/runtime/sentInvitationStore'
+import {
+  declineDelivered,
+  joinDelivered,
+  keptThisLaunchToo,
+  readTheWaiting,
+  sayEntered,
+  type JoinedInvitation,
+  type SentInvitation,
+  type SentInvitations,
+  type WaitingInvitation,
+} from './src/runtime/deliveredInvitations'
 import { admitAnyoneWaiting } from './src/runtime/admitAnyoneWaiting'
 import { displayNameFor } from './src/runtime/givenName'
 import Clipboard from '@react-native-clipboard/clipboard'
@@ -250,7 +268,7 @@ import type { EvictOutcome } from './src/runtime/evict'
 import type { HistoryClaim } from './src/runtime/claimHistory'
 import { Conversation } from './src/ui/Conversation'
 import { ConversationList } from './src/ui/ConversationList'
-import { Invite, type InviteStage } from './src/ui/Invite'
+import { Invite, type InvitedMatch, type InviteStage } from './src/ui/Invite'
 import { Invited } from './src/ui/Invited'
 import { BackupOffer } from './src/ui/BackupOffer'
 import { BackupSettings } from './src/ui/BackupSettings'
@@ -532,7 +550,25 @@ export function App({
   const inviteRef = useRef<
     ((name: string | null, declared: string | null) => void) | null
   >(null)
+  /** Inviting a contact found (#404): its own gesture, beside a link's. */
+  const deliverRef = useRef<
+    ((name: string | null, to: InvitedMatch) => void) | null
+  >(null)
   const namesRef = useRef<GivenNames>(forgetfulGivenNames())
+  /**
+   * Gives `who` a name on this device and shows it, whether or not the
+   * notebook kept it, which is what it answers. The naming screen, a link's
+   * entrant and an invitation's recipient (#404) all come through here.
+   */
+  const giveName = async (who: string, name: string): Promise<boolean> => {
+    const kept = await namesRef.current.set(who, name)
+    // Shown either way. A name held only in memory is still the name on the
+    // screen, and `kept` is what says whether it will survive the next
+    // launch.
+    setNames(held => new Map(held).set(who, name))
+    if (!kept) logEvent('warn', 'MESSAGR_GIVEN_NAME_NOT_KEPT', {})
+    return kept
+  }
   // How far each conversation has been read here. Forgetful until the
   // notebook opens, and forgetful for good if it does not -- which shows
   // every conversation as unread rather than as read, since a badge that
@@ -546,6 +582,156 @@ export function App({
    * re-render per poll.
    */
   const outstandingRef = useRef<Outstanding>(forgetfulOutstanding())
+  /**
+   * The invitations delivered inside the application from here (#404), for a
+   * week rather than a link's hour: the notebook's page, and what this launch
+   * sent besides, should the page not hold (`keptThisLaunchToo`). Refs for
+   * the reason `outstandingRef` is one: a sync tick reads them.
+   */
+  const sentPageRef = useRef<SentInvitations>(forgetfulSentInvitations())
+  const sentInvitationsRef = useRef<SentInvitations>(
+    keptThisLaunchToo(() => sentPageRef.current),
+  )
+  /** The same, by conversation, for the list to say which wait (#404). */
+  const [sentByScope, setSentByScope] = useState<
+    ReadonlyMap<string, SentInvitation>
+  >(new Map())
+  const readSentInvitations = async () => {
+    const sent = await sentInvitationsRef.current.all()
+    setSentByScope(new Map(sent.map(one => [one.scope, one])))
+  }
+  /** The number this account proved, as the search reads it (#404). */
+  const keptNumberRef = useRef<string | null>(null)
+  /**
+   * THE INVITATIONS DELIVERED INSIDE MESSAGR FOR THIS ACCOUNT (#404), as the
+   * service last listed them: those to answer, atop the list, and those
+   * joined whose conversation has not opened to this account yet, under
+   * them. Read at launch and at each sync tick.
+   */
+  const [deliveredWaiting, setDeliveredWaiting] = useState<
+    readonly WaitingInvitation[]
+  >([])
+  const [deliveredJoined, setDeliveredJoined] = useState<
+    readonly JoinedInvitation[]
+  >([])
+  /**
+   * The joined ones again, for the entry walk that a sync tick runs: a ref
+   * for the reason `outstandingRef` is one.
+   */
+  const joinedDeliveredRef = useRef<readonly JoinedInvitation[]>([])
+  /**
+   * The joined invitations whose conversation this run entered, and those of
+   * them the service has not heard of yet (`sayEntered`), told again at each
+   * tick until it has. Entered is answered here at once, whatever the
+   * service knows: while it is out of reach, it still lists the invitation,
+   * and a later conversation from the same inviter must not be taken for it.
+   */
+  const enteredDeliveredRef = useRef<Set<string>>(new Set())
+  const untoldEnteredRef = useRef<Set<string>>(new Set())
+  /** Those still waiting for their conversation, as the entry walk reads them. */
+  const awaitedDeliveries = () =>
+    joinedDeliveredRef.current.filter(
+      one => !enteredDeliveredRef.current.has(one.id),
+    )
+  /** Tells the service of the conversations entered it has not heard of. */
+  const tellEntered = async () => {
+    for (const id of [...untoldEnteredRef.current]) {
+      if (await sayEntered(discoveryDeps.service, id)) {
+        untoldEnteredRef.current.delete(id)
+      }
+    }
+  }
+  /**
+   * What an entry walk answered of the joined invitations: each leaves the
+   * list, and the service is told.
+   */
+  const enteredDelivered = (ids: readonly string[]) => {
+    if (ids.length === 0) return
+    for (const id of ids) {
+      enteredDeliveredRef.current.add(id)
+      untoldEnteredRef.current.add(id)
+    }
+    setDeliveredJoined(awaitedDeliveries())
+    tellEntered().catch(() => {})
+  }
+  /**
+   * Reads the invitations delivered inside Messagr for this account (#404),
+   * once the service has heard of the conversations entered. An answer that
+   * could not be read changes nothing: the list keeps what it showed, and
+   * the next tick asks again.
+   */
+  const readDelivered = async () => {
+    await tellEntered()
+    const waiting = await readTheWaiting(discoveryDeps.service).catch(
+      () => null,
+    )
+    if (waiting === null) return
+    joinedDeliveredRef.current = waiting.joined
+    setDeliveredWaiting(waiting.unanswered)
+    setDeliveredJoined(awaitedDeliveries())
+  }
+  /** The one open on §13.3's screen, and how its answer is going. */
+  const [deliveredOnScreen, setDeliveredOnScreen] =
+    useState<WaitingInvitation | null>(null)
+  const [answeringDelivered, setAnsweringDelivered] = useState<
+    'join' | 'refuse' | null
+  >(null)
+  /**
+   * The invitation whose answer did not reach the service, if one did not:
+   * the invitation rather than a flag, for the reason `answerFailed` gives.
+   */
+  const [deliveredFailed, setDeliveredFailed] = useState<string | null>(null)
+  /** What became of one answered too late, for the list to say. */
+  const [deliveredOutcome, setDeliveredOutcome] = useState<
+    'expired' | 'gone' | null
+  >(null)
+  /**
+   * « Rejoindre » or « Refuser » on §13.3's screen for an invitation
+   * delivered inside Messagr (#404). Joined, it waits on the list for its
+   * conversation, which is entered at the tick that brings it, on this run
+   * or a later one. Declined, it leaves the list. Run out or gone, it leaves
+   * the list too, and the list says why; only a service that could not be
+   * reached keeps the screen, and says so.
+   */
+  const answerDelivered = (
+    how: 'join' | 'refuse',
+    invitation: WaitingInvitation,
+  ) => {
+    setAnsweringDelivered(how)
+    setDeliveredFailed(null)
+    const answering = async () => {
+      const answered =
+        how === 'join'
+          ? await joinDelivered(discoveryDeps.service, invitation.id)
+          : await declineDelivered(discoveryDeps.service, invitation.id)
+      if (answered === 'unreachable') {
+        logEvent('warn', 'MESSAGR_DELIVERED_ANSWER_FAILED', { how })
+        setDeliveredFailed(invitation.id)
+        return
+      }
+      if (typeof answered === 'object') {
+        joinedDeliveredRef.current = [
+          ...joinedDeliveredRef.current.filter(one => one.id !== invitation.id),
+          { id: invitation.id, inviter: answered.joined },
+        ]
+        setDeliveredJoined(awaitedDeliveries())
+      }
+      setDeliveredOutcome(
+        answered === 'expired' || answered === 'gone' ? answered : null,
+      )
+      setDeliveredWaiting(held => held.filter(one => one.id !== invitation.id))
+      setDeliveredOnScreen(null)
+    }
+    answering()
+      .catch((cause: unknown) => {
+        logEvent('warn', 'MESSAGR_DELIVERED_ANSWER_FAILED', {
+          how,
+          reason: getErrorMessage(cause),
+        })
+        setDeliveredFailed(invitation.id)
+      })
+      .finally(() => setAnsweringDelivered(null))
+  }
   // The list as it was last drawn. Read once at the top of the launch and
   // written by every derivation after it. `listCacheStore.ts` says why.
   const listCacheRef = useRef<ListCache>(forgetfulListCache())
@@ -605,6 +791,9 @@ export function App({
   // shows it, and a renewal sends its code to it. `null` until read, and when
   // none was kept.
   const [keptNumber, setKeptNumber] = useState<string | null>(null)
+  useEffect(() => {
+    keptNumberRef.current = keptNumber
+  }, [keptNumber])
   // A DEVICE ITS HOMESERVER NO LONGER LETS IN (#391). See `LostAccessStage`.
   const [lostAccess, setLostAccess] = useState<LostAccessStage>({
     stage: 'none',
@@ -1247,6 +1436,7 @@ export function App({
         shareMoreCards,
         masking: bridgeMasking,
         region: () => regionOf(deviceLocale()),
+        ownNumber: () => keptNumberRef.current,
         // THROUGH THE REF, since the journey is made once and the notebook
         // is opened after it, and opened again for another account (#304).
         results: {
@@ -1607,7 +1797,10 @@ export function App({
    * they are still only invited to -- the same defect #284 found in the
    * backup offer, which used to close on a failure and say nothing.
    */
-  const answerTheInvitation = (kind: 'join' | 'refuse', scope: string) => {
+  const answerTheInvitation = (
+    kind: 'join' | 'refuse',
+    { scope, from }: Invitation,
+  ) => {
     const session = sessionClientRef.current
     if (session === null) {
       setAnswerFailed(scope)
@@ -1626,6 +1819,12 @@ export function App({
         // A conversation joined is a row the list does not have yet. A
         // refusal changes nothing it draws.
         if (kind === 'join') refreshListRef.current?.().catch(() => {})
+        // AND A CONVERSATION FROM THE INVITER OF AN INVITATION DELIVERED
+        // INSIDE MESSAGR AND ACCEPTED (#404) answers it, whichever way, as it
+        // would have in the entry walk: a launch whose list the service was
+        // slow to give puts that conversation here instead.
+        const delivered = awaitedDeliveries().find(one => one.inviter === from)
+        if (delivered !== undefined) enteredDelivered([delivered.id])
       })
       .catch((cause: unknown) => {
         logEvent('warn', 'MESSAGR_INVITATION_ANSWER_FAILED', {
@@ -1644,6 +1843,15 @@ export function App({
    * believes they have finished when the next one appears.
    */
   const deciding = threshold[0] ?? null
+  /**
+   * The conversation list with nothing open on it: where an invitation is put
+   * to the person, and nowhere else. The overlay of §13.3's screen says why.
+   */
+  const atRest =
+    openScope === null &&
+    tab === 'chat' &&
+    invite.stage === 'shut' &&
+    finding.stage === 'shut'
   /**
    * The question a link into another server puts, while it is being put.
    * #304, and `entry.ts` says why it is a question.
@@ -2345,6 +2553,8 @@ export function App({
         namesRef.current = book.names
         lastReadRef.current = book.lastRead
         outstandingRef.current = book.outstanding
+        sentPageRef.current = book.sentInvitations
+        readSentInvitations().catch(() => {})
         listCacheRef.current = book.list
         eventsRef.current = book.events
         hiddenRef.current = book.hidden
@@ -2883,10 +3093,20 @@ export function App({
             // Before the list rather than after: a conversation joined a
             // moment later would be derived a moment too late and only appear
             // at the next tick.
+            // WHOSE ROOM INVITE THIS ACCOUNT AWAITS (#404), read before the
+            // walk, so that a relaunch enters it as the tick would have. For
+            // three seconds at most: a service slow to answer must not hold
+            // the list back, and the next tick enters it all the same.
+            await Promise.race([
+              readDelivered(),
+              new Promise<void>(resolve => setTimeout(resolve, 3_000)),
+            ])
             const walkedAtLaunch = await enterAnyInvitations(
               sessionClient,
               credentials.userId,
+              awaitedDeliveries,
             )
+            enteredDelivered(walkedAtLaunch.delivered)
             // WHAT STAYED ON THE THRESHOLD, PUT TO THE PERSON. #329, §13.3's
             // first screen. An invitation this launch was owed nothing for
             // is one nobody spent a link for -- or one whose link was spent
@@ -3863,15 +4083,62 @@ export function App({
                 // longer exists.
                 const who = admitted.entrants[admitted.entrants.length - 1]
                 if (name !== null && who !== undefined) {
-                  const kept = await namesRef.current.set(who, name)
-                  setNames(held => new Map(held).set(who, name))
-                  if (!kept) {
-                    logEvent('warn', 'MESSAGR_GIVEN_NAME_NOT_KEPT', {})
-                  }
+                  await giveName(who, name)
                 }
                 await refreshList().catch(() => {})
               }
               gesture().catch((cause: unknown) =>
+                setInvite({
+                  stage: 'failed',
+                  reason: getErrorMessage(cause),
+                }),
+              )
+            }
+
+            // A CONTACT FOUND (#404): the conversation as for a link, and an
+            // invitation delivered inside the application to its reference.
+            // Nothing to share and nothing to wait for here: the recipient
+            // may answer in a week, and each sync tick asks
+            // (`letInWhoeverJoined`, below).
+            deliverRef.current = (name: string | null, to: InvitedMatch) => {
+              setInvite({ stage: 'working' })
+              setAdmission(null)
+              const delivering = async () => {
+                const delivered = await deliverToMatch(
+                  sessionClient,
+                  discoveryDeps.service,
+                  sentInvitationsRef.current,
+                  to.reference,
+                  name,
+                )
+                if (!delivered.delivered) {
+                  setInvite({
+                    stage: 'failed',
+                    reason: delivered.reason,
+                    ...(delivered.refusal === undefined
+                      ? {}
+                      : { refusal: delivered.refusal }),
+                  })
+                  return
+                }
+                setInvite({
+                  stage: 'sent',
+                  name,
+                  expiresAt: delivered.expiresAt,
+                })
+                if (!delivered.kept) {
+                  // Not a failure of the invitation: it is good, and this
+                  // launch still lets the recipient in
+                  // (`keptThisLaunchToo`). What is lost is the asking after
+                  // a relaunch.
+                  logEvent('warn', 'MESSAGR_SENT_INVITATION_NOT_KEPT', {})
+                }
+                await readSentInvitations()
+                // The conversation exists now, so it belongs on the list,
+                // waiting as a link's does.
+                await refreshList().catch(() => {})
+              }
+              delivering().catch((cause: unknown) =>
                 setInvite({
                   stage: 'failed',
                   reason: getErrorMessage(cause),
@@ -4131,6 +4398,36 @@ export function App({
                       }),
                     )
 
+                  // AND WHAT WAITS FOR THIS ACCOUNT (#404): the invitations to
+                  // answer, atop the list, and whose room invite it awaits.
+                  // Not awaited, for the reason above; `readDelivered` never
+                  // throws.
+                  readDelivered().catch(() => {})
+
+                  // AND THE INVITATIONS DELIVERED INSIDE THE APPLICATION
+                  // (#404), asked about once a tick for as long as they are
+                  // good: whoever joined one is let into its conversation and
+                  // given the name typed for them. Not awaited, for the reason
+                  // above.
+                  letInWhoeverJoined(sessionClient, {
+                    sent: sentInvitationsRef.current,
+                    service: discoveryDeps.service,
+                    giveName: async (who, name) => {
+                      await giveName(who, name)
+                    },
+                  })
+                    .then(async admitted => {
+                      // Read again whatever happened: an invitation may have
+                      // run out, which the list says.
+                      await readSentInvitations()
+                      if (admitted.length > 0) refreshList().catch(() => {})
+                    })
+                    .catch((cause: unknown) =>
+                      logEvent('warn', 'MESSAGR_LET_IN_FAILED', {
+                        reason: getErrorMessage(cause),
+                      }),
+                    )
+
                   // AND ON EVERY TICK, BECAUSE ADMISSION IS NOT LAUNCH.
                   //
                   // The entrant claims a link, and the issuer admits them a
@@ -4141,8 +4438,16 @@ export function App({
                   //
                   // Not awaited: nothing below depends on it, and the loop's
                   // tick must not wait on a join.
-                  enterAnyInvitations(sessionClient, credentials.userId)
+                  enterAnyInvitations(
+                    sessionClient,
+                    credentials.userId,
+                    awaitedDeliveries,
+                  )
                     .then(walked => {
+                      // The invitations delivered inside Messagr this walk
+                      // answered (#404): off the list, and told to the
+                      // service.
+                      enteredDelivered(walked.delivered)
                       // A room joined is a row the list does not have yet.
                       // A room declined is one it may still be showing: the
                       // issuer's second conversation was refused, and the
@@ -4608,6 +4913,14 @@ export function App({
         findingRef.current.close()
         return true
       }
+      // AN INVITATION DELIVERED INSIDE MESSAGR, OPENED FROM ITS ROW (#404):
+      // back leaves it unanswered, on the list, where it was. Not while its
+      // answer is on its way: the screen that asked would be gone. Only while
+      // it is drawn, which is at rest: back belongs to whatever covers it.
+      if (deliveredOnScreen !== null && atRest) {
+        if (answeringDelivered === null) setDeliveredOnScreen(null)
+        return true
+      }
       if (invite.stage !== 'shut') {
         setInvite({ stage: 'shut' })
         setAdmission(null)
@@ -4632,6 +4945,9 @@ export function App({
     deletion,
     proof.stage,
     finding.stage,
+    deliveredOnScreen,
+    answeringDelivered,
+    atRest,
     invite.stage,
     tab,
     backupPrompt,
@@ -5687,6 +6003,15 @@ export function App({
                 <View style={styles.block}>
                   <ConversationList
                     summaries={summaries}
+                    sent={sentByScope}
+                    delivered={deliveredWaiting}
+                    onOpenDelivered={invitation => {
+                      setDeliveredFailed(null)
+                      setDeliveredOutcome(null)
+                      setDeliveredOnScreen(invitation)
+                    }}
+                    joinedDelivered={deliveredJoined}
+                    deliveredOutcome={deliveredOutcome}
                     names={names}
                     invitation={linkOutcome}
                     reinstalled={reinstalled}
@@ -5728,11 +6053,17 @@ export function App({
                     // stage.
                     onContinue={() => findingRef.current.go()}
                     onShareMore={() => findingRef.current.shareMore()}
-                    // THE INVITATION FORM, AS FROM THE « + » SHEET: the
-                    // address book was refused, and a link needs none (#403).
-                    onInvite={() => {
+                    // THE INVITATION FORM, AS FROM THE « + » SHEET: for a
+                    // contact found, delivered inside the application
+                    // (#404); when the address book was refused, a link,
+                    // which needs none (#403).
+                    onInvite={to => {
                       findingRef.current.close()
-                      setInvite({ stage: 'resting' })
+                      setInvite(
+                        to === undefined
+                          ? { stage: 'resting' }
+                          : { stage: 'resting', to },
+                      )
                     }}
                     onClose={() => findingRef.current.close()}
                   />
@@ -5747,7 +6078,9 @@ export function App({
                     stage={invite}
                     admission={admission}
                     onInvite={(name, declared) =>
-                      inviteRef.current?.(name, declared)
+                      invite.stage === 'resting' && invite.to !== undefined
+                        ? deliverRef.current?.(name, invite.to)
+                        : inviteRef.current?.(name, declared)
                     }
                     onClose={() => {
                       setInvite({ stage: 'shut' })
@@ -5912,17 +6245,7 @@ export function App({
                 <GiveName
                   participant={party?.other ?? null}
                   given={party === null ? undefined : names.get(party.other)}
-                  onName={async (participant, name) => {
-                    const kept = await namesRef.current.set(participant, name)
-                    // Shown either way. A name held only in memory is still the
-                    // name on this screen, and `kept` is what says whether it
-                    // will survive the next launch.
-                    setNames(held => new Map(held).set(participant, name))
-                    if (!kept) {
-                      logEvent('warn', 'MESSAGR_GIVEN_NAME_NOT_KEPT', {})
-                    }
-                    return kept
-                  }}
+                  onName={(participant, name) => giveName(participant, name)}
                 />
 
                 {/* #34's gesture, and only where it means something: a
@@ -6213,35 +6536,51 @@ export function App({
             it, because each of those is either a secret shown once or
             somebody already speaking.
 
-            AT REST, AND NOT IN THE MIDDLE OF A SENTENCE. `openScope === null
-            && tab === 'chat' && invite.stage === 'shut'` is the application's
-            own expression for the conversation list with nothing open on it,
-            and it is the condition the waiting-to-open guard already uses.
+            AT REST, AND NOT IN THE MIDDLE OF A SENTENCE. `atRest` is the
+            application's own expression for the conversation list with
+            nothing open on it, and the waiting-to-open guard lets go
+            whenever it is false.
             An invitation is not urgent: it has stood on the homeserver and
             will still be standing in a minute. Covering somebody's composer
             with a stranger's invitation, every sync tick until they answer,
             would make this screen a nuisance surface rather than the
             product's entry point -- and a decision taken to get a screen out
             of the way is not the decision §13.3 is asking for. */}
-        {deciding !== null &&
-          openScope === null &&
-          tab === 'chat' &&
-          invite.stage === 'shut' &&
-          finding.stage === 'shut' && (
-            <SafeAreaView
-              testID="invited-overlay"
-              style={[StyleSheet.absoluteFill, styles.root]}
-              edges={['top', 'bottom', 'left', 'right']}>
-              <Invited
-                known={whatIsKnown(deciding, selfUserId, names)}
-                behind={threshold.length - 1}
-                working={answering}
-                failed={answerFailed === deciding.scope}
-                onJoin={() => answerTheInvitation('join', deciding.scope)}
-                onRefuse={() => answerTheInvitation('refuse', deciding.scope)}
-              />
-            </SafeAreaView>
-          )}
+        {deciding !== null && atRest && (
+          <SafeAreaView
+            testID="invited-overlay"
+            style={[StyleSheet.absoluteFill, styles.root]}
+            edges={['top', 'bottom', 'left', 'right']}>
+            <Invited
+              known={whatIsKnown(deciding, selfUserId, names)}
+              behind={threshold.length - 1}
+              working={answering}
+              failed={answerFailed === deciding.scope}
+              onJoin={() => answerTheInvitation('join', deciding)}
+              onRefuse={() => answerTheInvitation('refuse', deciding)}
+            />
+          </SafeAreaView>
+        )}
+
+        {/* AN INVITATION DELIVERED INSIDE MESSAGR, OPENED FROM ITS ROW (#404).
+            §13.3's first screen again, at rest as the one above, and opened by
+            a tap rather than put to the person: it waits on the list until
+            then, and back leaves it there. */}
+        {deliveredOnScreen !== null && atRest && (
+          <SafeAreaView
+            testID="invited-delivered"
+            style={[StyleSheet.absoluteFill, styles.root]}
+            edges={['top', 'bottom', 'left', 'right']}>
+            <Invited
+              known={whatADeliveredInvitationSays(deliveredOnScreen.expiresAt)}
+              behind={0}
+              working={answeringDelivered}
+              failed={deliveredFailed === deliveredOnScreen.id}
+              onJoin={() => answerDelivered('join', deliveredOnScreen)}
+              onRefuse={() => answerDelivered('refuse', deliveredOnScreen)}
+            />
+          </SafeAreaView>
+        )}
 
         {/* THE ONE TIME THIS PRODUCT ASKS SOMEBODY TO KEEP A SECRET, AND
             THE LAST CHILD OF THE ROOT SO THAT NOTHING CAN PAINT OVER IT.

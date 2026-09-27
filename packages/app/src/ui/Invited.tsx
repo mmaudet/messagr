@@ -1,15 +1,16 @@
 import React from 'react'
 import { ScrollView, StyleSheet, Text, View } from 'react-native'
 
-import { t } from '../copy'
+import { t, type CopyKey } from '../copy'
 import { color, layout, space, stroke, type } from '../design/tokens'
 import type { WhatIsKnown } from '../runtime/invitationOnScreen'
 import { NotchedButton } from './NotchedButton'
+import { dayOf } from './whenLabel'
 
 /**
  * Screen 1 of §13.3 — receiving an invitation.
  *
- * # WHAT REACHES THIS SCREEN, AND IT IS NOW BOTH WAYS IN
+ * # WHAT REACHES THIS SCREEN: THREE WAYS IN
  *
  * **A LINK, BEFORE ANYTHING IS SPENT.** *« Toute invitation par lien ouvre
  * l'écran 1 de §13.3 avant toute décision. »* Until #329's second half, a
@@ -27,12 +28,18 @@ import { NotchedButton } from './NotchedButton'
  * sync tick that crosses the door, and a relaunch whose register is empty —
  * `awaitedInvitations.ts` lives for the life of the process.
  *
- * THE TWO KNOW OPPOSITE THINGS, and `invitationOnScreen.ts` argues why that
- * is structural rather than unfinished. A link carries the name its writer
- * gave themselves and no Matrix identifier; an invitation on the threshold
- * carries the identifier and no declared name. `known.source` says which is
- * being drawn, and four sentences differ between them — because the same
- * sentence would be false on one of the two paths.
+ * **AN INVITATION DELIVERED INSIDE MESSAGR** (#404), opened from its row on
+ * the list. No conversation exists for it on this side yet: its inviter's
+ * device invites this account only once it has joined.
+ *
+ * THE THREE KNOW DIFFERENT THINGS, and `invitationOnScreen.ts` argues why
+ * that is structural rather than unfinished. A link carries the name its
+ * writer gave themselves and no Matrix identifier; an invitation on the
+ * threshold carries the identifier and no declared name; one delivered
+ * inside Messagr carries neither until it is joined, and its deadline.
+ * `known.source` says which is being drawn, and the sentences that differ
+ * between them are one table, `SAID_BY_SOURCE` — because the same sentence
+ * would be false on another path.
  *
  * # THE LINK DESCRIBED BEFORE ANY DECISION, AS FAR AS THIS DEVICE CAN
  *
@@ -116,7 +123,7 @@ export function Invited({
   readonly onJoin: () => void
   readonly onRefuse: () => void
 }) {
-  const byLink = known.source === 'link'
+  const said = SAID_BY_SOURCE[known.source]
   const nobody = known.identifier === ''
   return (
     <ScrollView
@@ -153,9 +160,7 @@ export function Invited({
               who created it is not a link whose writer chose not to name
               themselves, and one sentence for both would be this screen
               rounding two different facts to whichever it met first. */}
-          <Text style={styles.body}>
-            {byLink ? t('invited_who_undeclared') : t('invited_who_unknown')}
-          </Text>
+          <Text style={styles.body}>{t(said.nobody)}</Text>
         </View>
       ) : (
         <View style={styles.who} testID="invited-who">
@@ -196,18 +201,14 @@ export function Invited({
             « aucun lien n'a été ouvert ici » is plainly false of a link
             somebody has just opened, and a screen that told them that would
             be wrong about the one thing they can see for themselves. */}
-        <Text style={styles.body}>
-          {byLink ? t('invited_terms_link') : t('invited_terms_unknown')}
-        </Text>
+        <Text style={styles.body}>{said.terms(known)}</Text>
       </View>
 
       <View style={[styles.card, styles.plain]} testID="invited-nothing-sent">
         {/* And on the link path the stronger statement is available: not
             only has nothing been sent, the token is unspent. Which is what
             makes « Refuser » a real answer rather than a way out. */}
-        <Text style={styles.body}>
-          {byLink ? t('invited_nothing_spent') : t('invited_nothing_sent')}
-        </Text>
+        <Text style={styles.body}>{t(said.nothing)}</Text>
       </View>
 
       <View style={styles.actions}>
@@ -244,6 +245,51 @@ export function Invited({
       </View>
     </ScrollView>
   )
+}
+
+/**
+ * WHAT DIFFERS BY THE WAY IN, one row per way, each sentence true of its own
+ * path and false of at least one other.
+ *
+ * - **link**: its writer may not have named themselves; its terms are read
+ *   only by the account that issued it; refusing leaves the link unspent.
+ * - **threshold**: the conversation may not say who created it; no link was
+ *   opened here for it; nothing has been sent.
+ * - **delivered** (#404): nobody is named until the person joins, its
+ *   deadline is known, and the inviter learns nothing until then, a refusal
+ *   included.
+ */
+const SAID_BY_SOURCE: Readonly<
+  Record<
+    WhatIsKnown['source'],
+    {
+      /** Who invites, when nobody can be named. */
+      readonly nobody: CopyKey
+      /** How long it is good for, as far as this device can say. */
+      readonly terms: (known: WhatIsKnown) => string
+      /** What has been sent or told so far. */
+      readonly nothing: CopyKey
+    }
+  >
+> = {
+  link: {
+    nobody: 'invited_who_undeclared',
+    terms: () => t('invited_terms_link'),
+    nothing: 'invited_nothing_spent',
+  },
+  threshold: {
+    nobody: 'invited_who_unknown',
+    terms: () => t('invited_terms_unknown'),
+    nothing: 'invited_nothing_sent',
+  },
+  delivered: {
+    nobody: 'invited_who_delivered',
+    terms: known =>
+      known.expiresAt === null
+        ? t('invited_terms_unknown')
+        : t('invited_terms_delivered %1$@', dayOf(known.expiresAt)),
+    nothing: 'invited_nothing_told',
+  },
 }
 
 const styles = StyleSheet.create({

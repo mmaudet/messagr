@@ -36,9 +36,14 @@ import {
   openFavourites,
   type Favourites,
 } from './favouriteStore'
+import type { SentInvitations } from './deliveredInvitations'
 import type { DiscoveryResults } from './findContacts'
 import { forgetfulHidden, openHidden, type Hidden } from './hiddenStore'
 import { forgetfulReadBy, openReadBy, type ReadBy } from './readByStore'
+import {
+  forgetfulSentInvitations,
+  openSentInvitations,
+} from './sentInvitationStore'
 import { openStorePassphrase } from './storePassphrase'
 
 /** What became of the notebook on this launch. Reported, not assumed. */
@@ -76,6 +81,11 @@ export interface NotebookOpening {
    * never the number: the next look masks only the new ones (#402).
    */
   readonly discoveryResults: DiscoveryResults
+  /**
+   * The invitations delivered inside the application from here, until
+   * somebody is let in through them or they run out (#404).
+   */
+  readonly sentInvitations: SentInvitations
   readonly opened: boolean
   /** Why it did not open, when it did not. */
   readonly reason?: string
@@ -145,6 +155,7 @@ export async function openNotebook(storeDir: string): Promise<NotebookOpening> {
       favourites: forgetfulFavourites(),
       readBy: forgetfulReadBy(),
       discoveryResults: forgetfulDiscoveryResults(),
+      sentInvitations: forgetfulSentInvitations(),
       opened: false,
       reason: 'no writable directory was supplied at launch',
     }
@@ -165,6 +176,7 @@ export async function openNotebook(storeDir: string): Promise<NotebookOpening> {
       favourites: forgetfulFavourites(),
       readBy: forgetfulReadBy(),
       discoveryResults: forgetfulDiscoveryResults(),
+      sentInvitations: forgetfulSentInvitations(),
       opened: false,
       reason: passphrase.reason,
     }
@@ -195,6 +207,7 @@ export async function openNotebook(storeDir: string): Promise<NotebookOpening> {
       favourites: await openFavourites(page),
       readBy: await openReadBy(page),
       discoveryResults: await openDiscoveryResults(page),
+      sentInvitations: await openSentInvitations(page),
       opened: true,
       minted: passphrase.minted,
     }
@@ -213,6 +226,7 @@ export async function openNotebook(storeDir: string): Promise<NotebookOpening> {
       favourites: forgetfulFavourites(),
       readBy: forgetfulReadBy(),
       discoveryResults: forgetfulDiscoveryResults(),
+      sentInvitations: forgetfulSentInvitations(),
       opened: false,
       reason: getErrorMessage(cause),
       minted: passphrase.minted,

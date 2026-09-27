@@ -368,6 +368,17 @@ export const de: Readonly<Record<CopyKey, string>> = {
   invite_qr_label: 'QR-Code des Einladungslinks',
   invite_share: 'Link teilen',
   invite_close: 'Schließen',
+  'invite_sent %1$@ %2$@':
+    'Ihre Einladung wartet bis zum %2$@ in Messagr auf %1$@.',
+  'invite_sent_unnamed %1$@': 'Ihre Einladung wartet bis zum %1$@ in Messagr.',
+  invite_sent_waits:
+    'Das Gespräch wartet in Ihrer Liste darauf, dass die eingeladene Person beitritt.',
+  invite_refused_own:
+    'Das ist Ihre eigene Nummer: Die Einladung würde nur zu Ihnen führen.',
+  invite_refused_gone:
+    'Dieser Kontakt ist nicht mehr auffindbar. Sehen Sie Ihre Kontakte erneut durch, oder laden Sie ihn per Link ein.',
+  invite_refused_not_findable:
+    'Ihre Nummer ist nicht mehr nachgewiesen. Weisen Sie sie in den Einstellungen erneut nach, um einen gefundenen Kontakt einzuladen.',
   invite_failed: 'Die Einladung konnte nicht erstellt werden.',
   invite_waiting: 'Noch niemand hat den Link geöffnet.',
   invite_admitted: 'Erledigt: diese Person kann hereinkommen.',
@@ -388,6 +399,12 @@ export const de: Readonly<Record<CopyKey, string>> = {
     'Es wurde noch nichts gesendet. Solange Sie nicht geantwortet haben, bleibt diese Einladung, wo sie ist.',
   invited_nothing_spent:
     'Es wurde noch nichts gesendet. Solange Sie nicht geantwortet haben, ist dieser Link nicht verbraucht.',
+  invited_who_delivered:
+    'Jemand lädt Sie zu einem Gespräch in Messagr ein, ohne zu sagen, wer.',
+  'invited_terms_delivered %1$@':
+    'Diese Einladung ist bis zum %1$@ gültig und nur einmal verwendbar.',
+  invited_nothing_told:
+    'Die einladende Person erfährt nichts, solange Sie dem Gespräch nicht beigetreten sind: Ablehnen teilt ihr nichts mit.',
   'invited_behind %1$d': '%1$d weitere Einladung(en) warten dahinter.',
   invited_join: 'Dem Gespräch beitreten',
   invited_refuse: 'Die Einladung ablehnen',
@@ -613,6 +630,16 @@ export const de: Readonly<Record<CopyKey, string>> = {
   list_nobody_else: 'Sonst niemand hier',
   list_participant_left: 'ist nicht mehr in dieser Unterhaltung',
   list_nobody_joined: 'Niemand ist diesem Gespräch beigetreten',
+  'list_sent_waiting %1$@': 'Einladung gesendet, wartet bis zum %1$@',
+  list_sent_expired: 'Einladung abgelaufen',
+  list_delivered_invitation: 'Einladung in Messagr',
+  'list_delivered_until %1$@': 'Gültig bis zum %1$@',
+  list_delivered_joined: 'Einladung angenommen',
+  list_delivered_joined_waiting:
+    'Wartet auf die Person, die Sie eingeladen hat',
+  list_delivered_expired: 'Diese Einladung ist vor Ihrer Antwort abgelaufen.',
+  list_delivered_gone:
+    'Diese Einladung wartet auf keine Antwort mehr: Vielleicht wurde sie auf einem anderen Gerät beantwortet.',
   invite_open: 'Jemanden einladen',
   plus_invite: 'Jemanden einladen',
   plus_close: 'Schließen',
@@ -832,6 +859,7 @@ export const de: Readonly<Record<CopyKey, string>> = {
   find_holder_changed: 'Diese Nummer hat den Inhaber gewechselt.',
   find_limited: 'Messagr sieht nur die Kontakte, die Sie freigegeben haben.',
   find_share_more: 'Weitere Kontakte freigeben',
+  find_invite: 'Einladen',
   find_others: 'Ihre anderen Kontakte',
   find_nobody: 'Noch keiner Ihrer Kontakte ist auf Messagr auffindbar.',
   find_no_access:

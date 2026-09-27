@@ -361,6 +361,17 @@ export const en: Readonly<Record<CopyKey, string>> = {
   invite_qr_label: 'QR code of the invitation link',
   invite_share: 'Share the link',
   invite_close: 'Close',
+  'invite_sent %1$@ %2$@':
+    'Your invitation waits for %1$@ in Messagr until %2$@.',
+  'invite_sent_unnamed %1$@': 'Your invitation waits in Messagr until %1$@.',
+  invite_sent_waits:
+    'The conversation waits in your list for the person you invited to join it.',
+  invite_refused_own:
+    'This is your own number: the invitation would lead only to you.',
+  invite_refused_gone:
+    'This contact can no longer be found. Look at your contacts again, or invite them by link.',
+  invite_refused_not_findable:
+    'Your number is no longer proved. Prove it again in Settings to invite a contact you found.',
   invite_failed: 'The invitation could not be created.',
   invite_waiting: 'Nobody has opened the link yet.',
   invite_admitted: 'Done: this person can come in.',
@@ -381,6 +392,12 @@ export const en: Readonly<Record<CopyKey, string>> = {
     'Nothing has been sent yet. Until you answer, this invitation stays where it is.',
   invited_nothing_spent:
     'Nothing has been sent yet. Until you answer, this link is not spent.',
+  invited_who_delivered:
+    'Someone invites you to a conversation in Messagr, without saying who.',
+  'invited_terms_delivered %1$@':
+    'This invitation is good until %1$@, for one use only.',
+  invited_nothing_told:
+    'The person who invites you learns nothing until you have joined the conversation: declining tells them nothing.',
   'invited_behind %1$d':
     '%1$d other invitation(s) are waiting behind this one.',
   invited_join: 'Join the conversation',
@@ -603,6 +620,15 @@ export const en: Readonly<Record<CopyKey, string>> = {
   list_nobody_else: 'Nobody else here',
   list_participant_left: 'is no longer in this conversation',
   list_nobody_joined: 'Nobody joined this conversation',
+  'list_sent_waiting %1$@': 'Invitation sent, waiting until %1$@',
+  list_sent_expired: 'Invitation expired',
+  list_delivered_invitation: 'Invitation in Messagr',
+  'list_delivered_until %1$@': 'Good until %1$@',
+  list_delivered_joined: 'Invitation accepted',
+  list_delivered_joined_waiting: 'Waiting for the person who invited you',
+  list_delivered_expired: 'This invitation ran out before your answer.',
+  list_delivered_gone:
+    'This invitation is no longer waiting for an answer: it may have received one on another device.',
   invite_open: 'Invite someone',
   plus_invite: 'Invite someone',
   plus_close: 'Close',
@@ -807,6 +833,7 @@ export const en: Readonly<Record<CopyKey, string>> = {
   find_holder_changed: 'This number has changed hands.',
   find_limited: 'Messagr only looks at the contacts you chose to share.',
   find_share_more: 'Share more contacts',
+  find_invite: 'Invite',
   find_others: 'Your other contacts',
   find_nobody: 'None of your contacts can be found on Messagr yet.',
   find_no_access:

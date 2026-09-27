@@ -123,6 +123,15 @@ import {
   type Admission,
   type Issued,
 } from './issueInvitation'
+import {
+  deliverInvitation,
+  letInTheJoined,
+  type Delivered,
+  type DeliveryService,
+  type JoinedInvitation,
+  type Letting,
+  type SentInvitations,
+} from './deliveredInvitations'
 import { invitationService, serviceAt } from './servicePoster'
 import {
   startSyncLoop,
@@ -558,6 +567,12 @@ const standing = new Set<string>()
 export async function enterAnyInvitations(
   sessionClient: ReturnType<typeof createClient>,
   selfUserId: string,
+  /**
+   * The invitations delivered inside the application this account joined
+   * and has not entered yet (#404): a room invite from their inviter is
+   * entered too, one per invitation. `enterInvitations.ts`.
+   */
+  awaitedDeliveries: () => readonly JoinedInvitation[] = () => [],
 ): Promise<Entered> {
   const http = makePumpHttp(sessionClient)
   const entered = await enterInvitations({
@@ -569,6 +584,7 @@ export async function enterAnyInvitations(
     // ONE DOOR PER LINK SPENT. Entry records a claim in the same register on
     // the other side of the launch; see `awaitedInvitations.ts`.
     awaited: theAwaitedInvitations.count,
+    awaitedDeliveries,
     // ONE CALL PER CONVERSATION, and `enterInvitations` is careful about
     // when it asks: never on a tick with no invitation on it, which is
     // almost every tick. Direct conversations only -- a room of three has
@@ -590,9 +606,7 @@ export async function enterAnyInvitations(
   // conversation declined each answer one invitation this device was waiting
   // for; a join that failed answered nothing, so the next tick is owed it
   // again.
-  theAwaitedInvitations.settled(
-    entered.joined.length + entered.collapsed.length,
-  )
+  theAwaitedInvitations.settled(entered.doors)
   const nowStanding = entered.waiting.filter(one => !standing.has(one.scope))
   for (const one of nowStanding) standing.add(one.scope)
   // Only when something happened: this runs on every sync tick, and a line
@@ -919,6 +933,60 @@ export async function admitEntrant(
     joined,
   })
   return admission
+}
+
+/**
+ * Inviting a contact found (#404): the conversation as for a link, an
+ * invitation delivered inside the application to the account behind
+ * `reference`, kept on `sent` with the name typed. Pure glue:
+ * `deliveredInvitations.ts` says what leaves, and what never does.
+ */
+export async function deliverToMatch(
+  sessionClient: ReturnType<typeof createClient>,
+  service: DeliveryService,
+  sent: SentInvitations,
+  reference: string,
+  given: string | null,
+): Promise<Delivered> {
+  return deliverInvitation(
+    { http: makePumpHttp(sessionClient), service, sent },
+    reference,
+    given,
+  )
+}
+
+/**
+ * The invitations whose account could not be invited, said once each for the
+ * life of the process: the round runs at every tick, and one line per tick
+ * for the same refusal would bury everything else.
+ */
+const refusalsSaid = new Set<string>()
+
+/**
+ * The inviter's half of an invitation delivered inside the application
+ * (#404), at each sync tick: whoever joined one is let into its
+ * conversation. `deliveredInvitations.ts`.
+ */
+export async function letInWhoeverJoined(
+  sessionClient: ReturnType<typeof createClient>,
+  letting: Omit<Letting, 'http' | 'now'>,
+): Promise<readonly string[]> {
+  const round = await letInTheJoined({
+    ...letting,
+    http: makePumpHttp(sessionClient),
+    now: () => Date.now(),
+  })
+  // Only when somebody came through: a line per tick saying « nobody yet »
+  // would bury the one that matters, as `MESSAGR_ADMITTED_LATE` says.
+  if (round.admitted.length > 0) {
+    logEvent('info', 'MESSAGR_LET_IN', { admitted: round.admitted.length })
+  }
+  for (const { invitationId, reason } of round.failed) {
+    if (refusalsSaid.has(invitationId)) continue
+    refusalsSaid.add(invitationId)
+    logEvent('warn', 'MESSAGR_LET_IN_REFUSED', { invitationId, reason })
+  }
+  return round.admitted
 }
 
 export type { Issued, Admission } from './issueInvitation'

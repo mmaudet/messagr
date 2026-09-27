@@ -353,6 +353,17 @@ export const it: Readonly<Record<CopyKey, string>> = {
   invite_qr_label: 'Codice QR del link di invito',
   invite_share: 'Condividere il link',
   invite_close: 'Chiudere',
+  'invite_sent %1$@ %2$@':
+    'Il suo invito attende %1$@ in Messagr. Scadenza: %2$@.',
+  'invite_sent_unnamed %1$@':
+    'Il suo invito attende in Messagr. Scadenza: %1$@.',
+  invite_sent_waits:
+    'La conversazione attende nella sua lista che la persona invitata si unisca.',
+  invite_refused_own: 'È il suo numero: l’invito porterebbe solo a lei.',
+  invite_refused_gone:
+    'Questo contatto non è più trovabile. Guardi di nuovo i suoi contatti, o lo inviti con un link.',
+  invite_refused_not_findable:
+    'Il suo numero non è più provato. Lo provi di nuovo nelle Impostazioni per invitare un contatto trovato.',
   invite_failed: 'Non è stato possibile creare l’invito.',
   invite_waiting: 'Nessuno ha ancora aperto il link.',
   invite_admitted: 'Fatto: questa persona può entrare.',
@@ -373,6 +384,12 @@ export const it: Readonly<Record<CopyKey, string>> = {
     'Non è ancora stato inviato nulla. Finché non risponde, questo invito resta dov’è.',
   invited_nothing_spent:
     'Non è ancora stato inviato nulla. Finché non risponde, questo link non è speso.',
+  invited_who_delivered:
+    'Qualcuno la invita a una conversazione in Messagr, senza dire chi.',
+  'invited_terms_delivered %1$@':
+    'Questo invito vale una sola volta. Scadenza: %1$@.',
+  invited_nothing_told:
+    'Chi la invita non sa nulla finché lei non entra nella conversazione: il rifiuto non viene comunicato.',
   'invited_behind %1$d': '%1$d altro/i invito/i in attesa dietro a questo.',
   invited_join: 'Entrare nella conversazione',
   invited_refuse: 'Rifiutare l’invito',
@@ -598,6 +615,15 @@ export const it: Readonly<Record<CopyKey, string>> = {
   list_nobody_else: 'Nessun altro qui',
   list_participant_left: 'non è più in questa conversazione',
   list_nobody_joined: 'Nessuno si è unito a questa conversazione',
+  'list_sent_waiting %1$@': 'Invito inviato. Scadenza: %1$@',
+  list_sent_expired: 'Invito scaduto',
+  list_delivered_invitation: 'Invito in Messagr',
+  'list_delivered_until %1$@': 'Scadenza: %1$@',
+  list_delivered_joined: 'Invito accettato',
+  list_delivered_joined_waiting: 'In attesa della persona che l’ha invitata',
+  list_delivered_expired: 'Questo invito è scaduto prima della sua risposta.',
+  list_delivered_gone:
+    'Questo invito non attende più una risposta: forse l’ha già ricevuta su un altro dispositivo.',
   invite_open: 'Invitare qualcuno',
   plus_invite: 'Invitare qualcuno',
   plus_close: 'Chiudere',
@@ -805,6 +831,7 @@ export const it: Readonly<Record<CopyKey, string>> = {
   find_holder_changed: 'Questo numero ha cambiato titolare.',
   find_limited: 'Messagr guarda solo i contatti che ha scelto di condividere.',
   find_share_more: 'Condividere altri contatti',
+  find_invite: 'Invitare',
   find_others: 'Gli altri Suoi contatti',
   find_nobody: 'Per ora nessuno dei Suoi contatti è trovabile su Messagr.',
   find_no_access:

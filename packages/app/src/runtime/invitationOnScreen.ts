@@ -6,7 +6,7 @@ import type { Described } from './linkOnScreen'
  * What this device can truthfully state about an invitation it is being
  * asked to decide. #329, §13.3's first screen.
  *
- * # ONE INVITATION IS MET IN TWO PLACES, AND THEY KNOW OPPOSITE THINGS
+ * # AN INVITATION IS MET IN THREE PLACES, AND THEY KNOW DIFFERENT THINGS
  *
  * A LINK, before anything is spent: it names the instance it leads to and
  * carries whatever name the inviter gave themselves, and it knows no Matrix
@@ -19,7 +19,12 @@ import type { Described } from './linkOnScreen'
  * invitation to say what its sender calls themselves, and the link that
  * would have said so was never held here.
  *
- * Neither is a degraded version of the other, so `source` says which one is
+ * AN INVITATION DELIVERED INSIDE MESSAGR (#404), before it is joined: it
+ * names nobody, since the service names the inviter only once the person
+ * joins, and no conversation exists for it on this side yet. What it carries
+ * is its deadline.
+ *
+ * None is a degraded version of another, so `source` says which one is
  * being drawn and the screen says different true things about each. The
  * alternative -- inferring it from which fields happen to be empty -- would
  * make « the link declares nobody » and « the conversation does not say who
@@ -74,8 +79,12 @@ import type { Described } from './linkOnScreen'
  * themselves.
  */
 export interface WhatIsKnown {
-  /** Which of the two places this invitation is being met in. */
-  readonly source: 'link' | 'threshold'
+  /**
+   * Which of the three places this invitation is being met in: a link, a
+   * Matrix invitation standing on the threshold, or an invitation delivered
+   * inside the application by somebody who had this number (#404).
+   */
+  readonly source: 'link' | 'threshold' | 'delivered'
   /**
    * The conversation, which is what joining and refusing act on. Empty on
    * the link path: there is no conversation to act on yet, and the two
@@ -106,6 +115,12 @@ export interface WhatIsKnown {
   readonly instance: string | null
   /** Whether that server is not the one this account lives on. */
   readonly elsewhere: boolean
+  /**
+   * When the invitation runs out, in milliseconds since the epoch, where
+   * this device knows it: only an invitation delivered inside the
+   * application tells its recipient (#404). `null` elsewhere.
+   */
+  readonly expiresAt: number | null
 }
 
 export function whatIsKnown(
@@ -124,6 +139,7 @@ export function whatIsKnown(
       identifier: '',
       instance: null,
       elsewhere: false,
+      expiresAt: null,
     }
   }
   const given = names.get(from)
@@ -145,6 +161,7 @@ export function whatIsKnown(
       instance !== null &&
       serverOf(self) !== null &&
       instance.toLowerCase() !== serverOf(self)?.toLowerCase(),
+    expiresAt: null,
   }
 }
 
@@ -173,6 +190,27 @@ export function whatALinkSays(described: Described): WhatIsKnown {
     identifier: '',
     instance: described.instance,
     elsewhere: described.elsewhere,
+    expiresAt: null,
+  }
+}
+
+/**
+ * The same screen, for an invitation delivered inside the application
+ * (#404): the inviter is unknown until the person joins, since the service
+ * names them only then, and the name they declared will travel sealed with
+ * #405. What is known is its deadline, which the service says.
+ */
+export function whatADeliveredInvitationSays(expiresAt: number): WhatIsKnown {
+  return {
+    source: 'delivered',
+    scope: '',
+    declared: '',
+    who: '',
+    named: false,
+    identifier: '',
+    instance: null,
+    elsewhere: false,
+    expiresAt,
   }
 }
 

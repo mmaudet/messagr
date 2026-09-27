@@ -13,6 +13,11 @@ import {
   type,
 } from '../design/tokens'
 import type { ConversationSummary } from '../runtime/conversationList'
+import type {
+  JoinedInvitation,
+  SentInvitation,
+  WaitingInvitation,
+} from '../runtime/deliveredInvitations'
 import type { ListNotice } from '../runtime/discovery'
 import { displayNameFor } from '../runtime/givenName'
 import type { PasteSaid } from '../runtime/pastedLink'
@@ -56,6 +61,31 @@ export interface ConversationListProps {
   /** Given names, keyed by participant. Absent means not named yet. */
   readonly names: ReadonlyMap<string, string>
   readonly onOpen: (scope: string) => void
+  /**
+   * The invitations delivered inside the application from here, by the
+   * conversation each leads to (#404): its row says whom it waits for and
+   * until when, then that it expired.
+   */
+  readonly sent?: ReadonlyMap<string, SentInvitation>
+  /**
+   * The invitations delivered inside the application waiting for this
+   * account's answer (#404), drawn atop the list, each opening the screen of
+   * §13.3 through `onOpenDelivered`.
+   */
+  readonly delivered?: readonly WaitingInvitation[]
+  readonly onOpenDelivered?: (invitation: WaitingInvitation) => void
+  /**
+   * The invitations delivered inside the application this account joined,
+   * whose conversation its inviter's device has not opened to it yet (#404):
+   * a row each, under those to answer, until the conversation appears.
+   */
+  readonly joinedDelivered?: readonly JoinedInvitation[]
+  /**
+   * What became of an invitation delivered inside the application answered
+   * too late: it ran out, or it is no longer there. `null` when nothing is
+   * to be said.
+   */
+  readonly deliveredOutcome?: 'expired' | 'gone' | null
   /**
    * What became of an invitation this launch was opened with, when the
    * device already had an account. `null` when there was none. See
@@ -134,6 +164,11 @@ export function ConversationList({
   summaries,
   names,
   onOpen,
+  sent = new Map(),
+  delivered = [],
+  onOpenDelivered = () => undefined,
+  joinedDelivered = [],
+  deliveredOutcome = null,
   invitation = null,
   reinstalled = null,
   notInYet = false,
@@ -263,6 +298,57 @@ export function ConversationList({
               : t('share_unreadable')}
         </Text>
       )}
+      {/* AN INVITATION DELIVERED INSIDE MESSAGR, ANSWERED TOO LATE (#404):
+          the screen that asked has closed, and the row has gone with it, so
+          this is what says why nothing followed. */}
+      {deliveredOutcome !== null && (
+        <Text style={styles.ignored} testID="list-delivered-outcome">
+          {deliveredOutcome === 'expired'
+            ? t('list_delivered_expired')
+            : t('list_delivered_gone')}
+        </Text>
+      )}
+      {/* THE INVITATIONS DELIVERED INSIDE MESSAGR, ATOP THE LIST (#404), each
+          a row of its own that opens §13.3. Their test identifiers are
+          theirs, one per invitation: the first conversation keeps
+          `first-conversation`, which the end-to-end suite opens the way a
+          person does. */}
+      {delivered.map(waitingOne => (
+        <Pressable
+          key={waitingOne.id}
+          testID={`list-delivered-${waitingOne.id}`}
+          onPress={() => onOpenDelivered(waitingOne)}
+          style={styles.row}
+          accessibilityRole="button">
+          <View style={styles.said}>
+            <Text numberOfLines={1} style={styles.name}>
+              {t('list_delivered_invitation')}
+            </Text>
+            <Text numberOfLines={1} style={styles.preview}>
+              {t('list_delivered_until %1$@', dayOf(waitingOne.expiresAt))}
+            </Text>
+          </View>
+        </Pressable>
+      ))}
+      {/* AND THOSE JOINED, UNTIL THEIR CONVERSATION APPEARS. It opens when
+          the inviter's device next runs, which may be days away: a row that
+          vanished on « Rejoindre » would leave the person believing nothing
+          had happened. Nothing to press: there is nothing left to decide. */}
+      {joinedDelivered.map(joinedOne => (
+        <View
+          key={joinedOne.id}
+          testID={`list-delivered-joined-${joinedOne.id}`}
+          style={styles.row}>
+          <View style={styles.said}>
+            <Text numberOfLines={1} style={styles.name}>
+              {t('list_delivered_joined')}
+            </Text>
+            <Text numberOfLines={1} style={styles.preview}>
+              {t('list_delivered_joined_waiting')}
+            </Text>
+          </View>
+        </View>
+      ))}
       {/* Plain rows rather than a `FlatList`, because this sits inside the
           screen's own scroll view. A list that scrolls inside something that
           scrolls is the defect that reports as "the list will not move", and
@@ -306,6 +392,7 @@ export function ConversationList({
             <Row
               summary={summary}
               name={nameOf(summary, names)}
+              sent={sent.get(summary.scope)}
               onOpen={onOpen}
               now={now}
               opening={summary.scope === opening}
@@ -351,6 +438,7 @@ function whenLabel(stamp: Stamp): string {
 function Row({
   summary,
   name,
+  sent,
   onOpen,
   now,
   opening = false,
@@ -358,6 +446,8 @@ function Row({
 }: {
   readonly summary: ConversationSummary
   readonly name: string | undefined
+  /** The invitation delivered inside the application it leads to (#404). */
+  readonly sent: SentInvitation | undefined
   readonly onOpen: (scope: string) => void
   /** Whether this row's conversation is the one a touch is waiting on. */
   readonly opening?: boolean
@@ -408,17 +498,30 @@ function Row({
   // who was here could not be read, nothing says nobody came: « personne
   // d'autre ici » is true either way.
   const person = personOf(summary)
+  const nobodyJoined =
+    person === null &&
+    summary.others === 0 &&
+    summary.lastAt === 0 &&
+    summary.preview === null &&
+    summary.membershipsUnread !== true
+  // AN INVITATION DELIVERED INSIDE THE APPLICATION WAITS FOR SOMEBODY (#404),
+  // whom the person named when they sent it: the row says whom, and until
+  // when, where a link's says nobody joined. The name is this device's, as a
+  // given name is.
+  const waitingFor = nobodyJoined ? sent : undefined
   const shown =
-    person !== null
-      ? displayNameFor(person, name)
-      : summary.others === 0
-        ? summary.lastAt === 0 &&
-          summary.preview === null &&
-          summary.membershipsUnread !== true
-          ? t('list_nobody_joined')
-          : t('list_nobody_else')
-        : summary.scope
-  const named = person !== null && name !== undefined
+    waitingFor !== undefined
+      ? (waitingFor.given ?? t('list_nobody_joined'))
+      : person !== null
+        ? displayNameFor(person, name)
+        : summary.others === 0
+          ? nobodyJoined
+            ? t('list_nobody_joined')
+            : t('list_nobody_else')
+          : summary.scope
+  const named =
+    (person !== null && name !== undefined) ||
+    (waitingFor !== undefined && waitingFor.given !== null)
   return (
     <Pressable
       // TWO IDENTIFIERS, AND THE SECOND IS FOR THE SUITE.
@@ -480,7 +583,13 @@ function Row({
           numberOfLines={1}
           style={styles.preview}
           testID={opening ? 'conversation-opening' : undefined}>
-          {opening ? t('list_opening') : previewOf(summary)}
+          {opening
+            ? t('list_opening')
+            : waitingFor !== undefined
+              ? waitingFor.expired
+                ? t('list_sent_expired')
+                : t('list_sent_waiting %1$@', dayOf(waitingFor.expiresAt))
+              : previewOf(summary)}
         </Text>
       </View>
       {/* Nothing at all for a conversation that has never moved: `0` is not a

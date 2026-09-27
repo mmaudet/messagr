@@ -287,3 +287,125 @@ describe('the sentence about being findable (#398)', () => {
     expect(withId(list(), 'list-findable')).toBeUndefined()
   })
 })
+
+describe('a conversation an invitation delivered inside Messagr waits in (#404)', () => {
+  const waiting = conversation({
+    other: null,
+    others: 0,
+    preview: null,
+    lastAt: 0,
+    reason: 'nothing has been said yet',
+  })
+  const sent = (expired: boolean, given: string | null = 'Paul') =>
+    new Map([
+      [
+        waiting.scope,
+        {
+          invitationId: 'inv-1',
+          scope: waiting.scope,
+          expiresAt: NOW + 7 * 86_400_000,
+          given,
+          expired,
+        },
+      ],
+    ])
+
+  it('says whom it waits for, and until when', () => {
+    const drawn = list({ summaries: [waiting], sent: sent(false) })
+
+    expect(words(drawn)).toContain('Paul')
+    expect(words(drawn)).toContain(
+      t('list_sent_waiting %1$@', dayOf(NOW + 7 * 86_400_000)),
+    )
+    expect(words(drawn)).not.toContain(t('list_nobody_joined'))
+  })
+
+  it('then that it expired', () => {
+    const drawn = list({ summaries: [waiting], sent: sent(true) })
+
+    expect(words(drawn)).toContain(t('list_sent_expired'))
+  })
+
+  it('says nobody joined when no name was typed, as a link does', () => {
+    const drawn = list({ summaries: [waiting], sent: sent(false, null) })
+
+    expect(words(drawn)).toContain(t('list_nobody_joined'))
+  })
+
+  it('leaves a conversation somebody is in as it is', () => {
+    const drawn = list({ summaries: [conversation()], sent: sent(false) })
+
+    expect(words(drawn)).toContain('Bonjour')
+    expect(words(drawn)).not.toContain('Paul')
+  })
+})
+
+describe('invitations delivered inside Messagr, atop the list (#404)', () => {
+  const waiting = [
+    { id: 'a', expiresAt: NOW + 7 * 86_400_000 },
+    { id: 'b', expiresAt: NOW + 3 * 86_400_000 },
+  ]
+
+  it('draws each above the conversations, with its deadline, and opens it', () => {
+    const opened: string[] = []
+    const drawn = list({
+      delivered: waiting,
+      onOpenDelivered: invitation => opened.push(invitation.id),
+    })
+
+    const said = words(drawn)
+    expect(said.indexOf(t('list_delivered_invitation'))).toBeLessThan(
+      said.indexOf('Bonjour'),
+    )
+    expect(said).toContain(
+      t('list_delivered_until %1$@', dayOf(NOW + 3 * 86_400_000)),
+    )
+    // One test identifier per invitation, so that each can be pressed.
+    ;(withId(drawn, 'list-delivered-b')?.props.onPress as () => void)()
+    expect(opened).toEqual(['b'])
+    expect(withId(drawn, 'list-delivered-a')).toBeDefined()
+  })
+
+  it('draws those accepted until their conversation appears, with nothing to press', () => {
+    const drawn = list({
+      delivered: waiting,
+      joinedDelivered: [{ id: 'c', inviter: '@alice:x' }],
+    })
+
+    const row = withId(drawn, 'list-delivered-joined-c')
+    expect(row).toBeDefined()
+    expect(row?.props.onPress).toBeUndefined()
+    const said = words(drawn)
+    expect(said).toContain(t('list_delivered_joined'))
+    expect(said).toContain(t('list_delivered_joined_waiting'))
+    // Nothing says who, as long as the conversation has not come.
+    expect(said.join(' ')).not.toContain('alice')
+    expect(said.indexOf(t('list_delivered_invitation'))).toBeLessThan(
+      said.indexOf(t('list_delivered_joined')),
+    )
+  })
+
+  it('says why nothing followed an answer given too late', () => {
+    for (const [outcome, key] of [
+      ['expired', 'list_delivered_expired'],
+      ['gone', 'list_delivered_gone'],
+    ] as const) {
+      const drawn = list({ deliveredOutcome: outcome })
+      expect(withId(drawn, 'list-delivered-outcome')?.props.children).toBe(
+        t(key),
+      )
+    }
+    expect(withId(list(), 'list-delivered-outcome')).toBeUndefined()
+  })
+
+  it('leaves the first conversation its own test identifier', () => {
+    const drawn = list({ delivered: waiting })
+
+    expect(withId(drawn, 'first-conversation')).toBeDefined()
+    expect(
+      [...everything(drawn)].filter(
+        node => node.props.testID === 'first-conversation',
+      ),
+    ).toHaveLength(1)
+  })
+})

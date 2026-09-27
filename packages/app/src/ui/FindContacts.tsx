@@ -4,6 +4,7 @@ import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native'
 import { t, type CopyKey } from '../copy'
 import { color, floors, layout, space, stroke, type } from '../design/tokens'
 import type { FindingStage, Waiting } from '../runtime/findContacts'
+import type { InvitedMatch } from './Invite'
 import { NotchedButton } from './NotchedButton'
 import { dayOf } from './whenLabel'
 
@@ -21,11 +22,12 @@ import { dayOf } from './whenLabel'
  * and Apple wants a screen in that place to lead to the question and nowhere
  * else. The way back is the arrow above it, as on every screen.
  *
- * # NOTHING HERE ACTS ON A CONTACT YET
+ * # ONE CONTACT AT A TIME
  *
- * The contacts on Messagr come first, under the name of their card, then the
- * others. Inviting one comes with #404 and #408, one contact at a time: no
- * gesture here, now or then, takes the whole address book.
+ * The contacts on Messagr come first, under the name of their card, each
+ * with « Inviter », which opens the invitation form for that one contact
+ * (#404); then the others, with no gesture yet (#408). Nothing here, now or
+ * later, takes the whole address book.
  *
  * # SOME CARDS, OR NONE (#403)
  *
@@ -45,8 +47,11 @@ export function FindContacts({
   readonly onContinue: () => void
   /** « Partager d'autres contacts », on the results of a limited access. */
   readonly onShareMore: () => void
-  /** « Inviter quelqu'un », when the address book was refused. */
-  readonly onInvite: () => void
+  /**
+   * « Inviter », on a contact found (#404), with that contact; « Inviter
+   * quelqu'un », when the address book was refused, with none: a link.
+   */
+  readonly onInvite: (to?: InvitedMatch) => void
   /** The arrow, « Terminé », and every way back to the list. */
   readonly onClose: () => void
 }) {
@@ -82,8 +87,10 @@ export function FindContacts({
         <Found
           matches={stage.matches.map(m => ({
             name: m.contact.name,
+            reference: m.reference,
             holderChanged: m.holderChanged,
           }))}
+          onInvite={onInvite}
           others={stage.others.map(c => c.name)}
           waiting={stage.waiting}
           limited={stage.limited}
@@ -100,7 +107,7 @@ export function FindContacts({
             <NotchedButton
               testID="find-contacts-invite"
               label={t('plus_invite')}
-              onPress={onInvite}
+              onPress={() => onInvite()}
               wide
             />
           )}
@@ -134,10 +141,12 @@ function Found({
   waiting,
   limited,
   onShareMore,
+  onInvite,
   onDone,
 }: {
   readonly matches: readonly {
     readonly name: string
+    readonly reference: string
     /** The number led to another account before (#402). */
     readonly holderChanged: boolean
   }[]
@@ -147,6 +156,7 @@ function Found({
   /** The system shares some cards only (#403). */
   readonly limited: boolean
   readonly onShareMore: () => void
+  readonly onInvite: (to: InvitedMatch) => void
   readonly onDone: () => void
 }) {
   return (
@@ -187,16 +197,31 @@ function Found({
               {t('find_nobody')}
             </Text>
           )
-        : matches.map(({ name, holderChanged }, i) => (
-            <View key={`m${i}`}>
-              <Text style={styles.row} testID="find-contacts-match">
-                {name}
-              </Text>
-              {holderChanged && (
-                <Text style={styles.hint} testID="find-contacts-holder-changed">
-                  {t('find_holder_changed')}
+        : matches.map(({ name, reference, holderChanged }, i) => (
+            <View key={`m${i}`} style={styles.match}>
+              <View style={styles.matchName}>
+                <Text style={styles.row} testID="find-contacts-match">
+                  {name}
                 </Text>
-              )}
+                {holderChanged && (
+                  <Text
+                    style={styles.hint}
+                    testID="find-contacts-holder-changed">
+                    {t('find_holder_changed')}
+                  </Text>
+                )}
+              </View>
+              <NotchedButton
+                testID="find-contacts-invite-contact"
+                label={t('find_invite')}
+                // A NUMBER THAT CHANGED HANDS OFFERS NO NAME: the account it
+                // leads to now inherits nothing of the card's (#392), not
+                // even as the name the form opens with.
+                onPress={() =>
+                  onInvite({ name: holderChanged ? '' : name, reference })
+                }
+                tone="quiet"
+              />
             </View>
           ))}
       {others.length > 0 && (
@@ -249,6 +274,8 @@ const styles = StyleSheet.create({
   hint: { ...type.bodySm, color: color.neutral['600'] },
   heading: { ...type.titleMd, color: color.neutral['900'] },
   row: { ...type.body, color: color.neutral['900'] },
+  match: { flexDirection: 'row', alignItems: 'center', gap: space.s },
+  matchName: { flex: 1 },
   other: { ...type.body, color: color.neutral['600'] },
   actions: { gap: space.s, marginTop: space.m },
   notice: {

@@ -109,6 +109,13 @@ export interface FindingDeps {
   readonly region: () => string | undefined
   /** What the looks before this one found (#402). */
   readonly results: DiscoveryResults
+  /**
+   * The number this account proved, in international form, as this device
+   * keeps it (#398); `null` when none is kept. Left out of the address book:
+   * the person's own card would find the person, and « Inviter » would lead
+   * to themselves (#404).
+   */
+  readonly ownNumber: () => string | null
 }
 
 /** What looking found for one number under one key (#402). */
@@ -230,7 +237,7 @@ const BATCH = 5_000
 
 export async function findContacts(deps: FindingDeps): Promise<Findings> {
   const contacts = await deps.readAddressBook()
-  const holders = numbersOf(contacts, deps.region())
+  const holders = numbersOf(contacts, deps.region(), deps.ownNumber())
   if (holders.size === 0) {
     return { found: true, matches: [], others: byName(contacts), waiting: null }
   }
@@ -333,6 +340,7 @@ export async function findContacts(deps: FindingDeps): Promise<Findings> {
 function numbersOf(
   contacts: readonly Contact[],
   region: string | undefined,
+  own: string | null,
 ): Map<string, Contact[]> {
   // A region the library does not know is no region: numbers written without
   // their country code are then left aside, as without one.
@@ -343,6 +351,7 @@ function numbersOf(
     for (const written of contact.numbers) {
       const number = parsePhoneNumberFromString(written, known)
       if (number === undefined || !number.isValid()) continue
+      if (number.number === own) continue
       const held = holders.get(number.number) ?? []
       if (!held.includes(contact)) held.push(contact)
       holders.set(number.number, held)

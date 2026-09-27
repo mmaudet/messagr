@@ -359,6 +359,16 @@ export const nl: Readonly<Record<CopyKey, string>> = {
   invite_qr_label: 'QR-code van de uitnodigingslink',
   invite_share: 'De link delen',
   invite_close: 'Sluiten',
+  'invite_sent %1$@ %2$@': 'Uw uitnodiging wacht in Messagr op %1$@ tot %2$@.',
+  'invite_sent_unnamed %1$@': 'Uw uitnodiging wacht in Messagr tot %1$@.',
+  invite_sent_waits:
+    'Het gesprek wacht in uw lijst tot de uitgenodigde persoon deelneemt.',
+  invite_refused_own:
+    'Dit is uw eigen nummer: de uitnodiging zou alleen bij u uitkomen.',
+  invite_refused_gone:
+    'Dit contact is niet meer vindbaar. Bekijk uw contacten opnieuw, of nodig het uit via een link.',
+  invite_refused_not_findable:
+    'Uw nummer is niet meer bewezen. Bewijs het opnieuw in de Instellingen om een gevonden contact uit te nodigen.',
   invite_failed: 'De uitnodiging kon niet worden aangemaakt.',
   invite_waiting: 'Nog niemand heeft de link geopend.',
   invite_admitted: 'Klaar: deze persoon kan binnenkomen.',
@@ -379,6 +389,12 @@ export const nl: Readonly<Record<CopyKey, string>> = {
     'Er is nog niets verzonden. Zolang u niet antwoordt, blijft deze uitnodiging waar ze is.',
   invited_nothing_spent:
     'Er is nog niets verzonden. Zolang u niet antwoordt, is deze link niet verbruikt.',
+  invited_who_delivered:
+    'Iemand nodigt u uit voor een gesprek in Messagr, zonder te zeggen wie.',
+  'invited_terms_delivered %1$@':
+    'Deze uitnodiging is geldig tot %1$@, voor één keer.',
+  invited_nothing_told:
+    'Wie u uitnodigt, komt niets te weten zolang u niet aan het gesprek deelneemt: een weigering wordt die persoon niet gemeld.',
   'invited_behind %1$d': 'Er wachten nog %1$d uitnodiging(en) achter deze.',
   invited_join: 'Deelnemen aan het gesprek',
   invited_refuse: 'De uitnodiging weigeren',
@@ -603,6 +619,15 @@ export const nl: Readonly<Record<CopyKey, string>> = {
   list_nobody_else: 'Verder niemand hier',
   list_participant_left: 'zit niet meer in dit gesprek',
   list_nobody_joined: 'Niemand heeft aan dit gesprek deelgenomen',
+  'list_sent_waiting %1$@': 'Uitnodiging verstuurd, wacht tot %1$@',
+  list_sent_expired: 'Uitnodiging verlopen',
+  list_delivered_invitation: 'Uitnodiging in Messagr',
+  'list_delivered_until %1$@': 'Geldig tot %1$@',
+  list_delivered_joined: 'Uitnodiging aangenomen',
+  list_delivered_joined_waiting: 'Wacht op wie u heeft uitgenodigd',
+  list_delivered_expired: 'Deze uitnodiging is verlopen voordat u antwoordde.',
+  list_delivered_gone:
+    'Deze uitnodiging wacht niet meer op een antwoord: misschien is ze op een ander apparaat beantwoord.',
   invite_open: 'Iemand uitnodigen',
   plus_invite: 'Iemand uitnodigen',
   plus_close: 'Sluiten',
@@ -814,6 +839,7 @@ export const nl: Readonly<Record<CopyKey, string>> = {
   find_holder_changed: 'Dit nummer is van houder veranderd.',
   find_limited: 'Messagr bekijkt alleen de contacten die u hebt gedeeld.',
   find_share_more: 'Meer contacten delen',
+  find_invite: 'Uitnodigen',
   find_others: 'Uw andere contacten',
   find_nobody: 'Nog geen van uw contacten is vindbaar op Messagr.',
   find_no_access:

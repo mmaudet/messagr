@@ -190,6 +190,7 @@ function deps(
     service,
     region: () => 'FR',
     results,
+    ownNumber: () => null,
   }
   return { deps: all, asked, calls, page }
 }
@@ -599,6 +600,24 @@ describe("the telephone's region", () => {
   it('is nothing when the locale names none: no calling code is guessed', () => {
     expect(regionOf('fr')).toBeUndefined()
     expect(regionOf('')).toBeUndefined()
+  })
+
+  it('leaves out the number this account proved: the person does not find themselves', async () => {
+    const me: Contact = { name: 'Moi', numbers: ['06 12 34 56 78'] }
+    const { deps: d, asked } = deps([me, ZOE], {
+      '+33612345678': 'ref-me',
+      '+33698765432': 'ref-zoe',
+    })
+
+    const found = await findContacts({ ...d, ownNumber: () => '+33612345678' })
+
+    expect(
+      asked
+        .filter(a => a.route === 'maskBatch')
+        .flatMap(a => a.body!.blinded.map(e => text(unb64(e)))),
+    ).toEqual(['blinded(+33698765432)'])
+    expect(found.found && found.matches.map(m => m.contact)).toEqual([ZOE])
+    expect(found.found && found.others).toEqual([me])
   })
 
   it('leaves a national number aside when there is no region', async () => {

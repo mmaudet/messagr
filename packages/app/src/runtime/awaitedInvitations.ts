@@ -16,6 +16,12 @@
  * for the screen of §13.3, which describes it before any decision and offers
  * two symmetric actions, join and refuse.
  *
+ * An invitation delivered inside Messagr and joined on that screen (#404) is
+ * owed a room too, and is not counted here: its inviter is known, so the room
+ * it answers is the one that inviter's device sends, and the service lists it
+ * until this device says it entered (`deliveredInvitations.ts`), which
+ * outlives the process.
+ *
  * # WHY A COUNT AND NOT A CONVERSATION
  *
  * Nothing in a claim names the conversation the link was for: the service

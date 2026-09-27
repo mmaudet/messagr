@@ -1,4 +1,5 @@
 import type { ServicePoster } from './claimInvitation'
+import type { DeliveryService } from './deliveredInvitations'
 import type { DiscoveryService } from './discovery'
 import type { FindingService } from './findContacts'
 import type { InvitationService } from './issueInvitation'
@@ -98,7 +99,7 @@ export function discoveryService(
     readonly baseUrl: string
     readonly accessToken: string
   } | null,
-): DiscoveryService & FindingService {
+): DiscoveryService & FindingService & DeliveryService {
   const call = async (
     path: string,
     body?: string,
@@ -128,6 +129,15 @@ export function discoveryService(
     keys: () => call('/discovery/keys'),
     maskBatch: body => call('/discovery/masks', body),
     directory: () => call('/discovery/directory'),
+    sendInvitation: body => call('/discovery/invitations', body),
+    sentStatus: id => call(`/discovery/invitations/${encodeURIComponent(id)}`),
+    waitingInvitations: () => call('/discovery/invitations'),
+    joinInvitation: id =>
+      call(`/discovery/invitations/${encodeURIComponent(id)}/join`, '{}'),
+    declineInvitation: id =>
+      call(`/discovery/invitations/${encodeURIComponent(id)}/decline`, '{}'),
+    enteredInvitation: id =>
+      call(`/discovery/invitations/${encodeURIComponent(id)}/entered`, '{}'),
   }
 }
 
