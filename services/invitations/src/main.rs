@@ -111,6 +111,14 @@ async fn main() -> anyhow::Result<()> {
         util::now(),
     )
     .await?;
+    // AND THE REFERENCE KEY (#451), by the same start and nothing else, which
+    // refuses one that served before a masking key was retired at once.
+    handlers::discovery::note_reference_key(
+        &state.pool,
+        state.cfg.reference_key.as_ref(),
+        util::now(),
+    )
+    .await?;
     tokio::spawn(cleanup::run_forever(state.clone()));
 
     let discovery = match state.cfg.discovery() {

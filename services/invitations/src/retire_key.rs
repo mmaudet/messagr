@@ -27,8 +27,12 @@
 //!   number without the key;
 //! - the date N was first served goes with it.
 //!
-//! Then the key leaves `MASKING_KEYS`, and the service restarts: the operator
-//! does that, and the document says how.
+//! Then the key leaves `MASKING_KEYS`, `REFERENCE_KEY` is given a new key, and
+//! the service restarts: the operator does that, and the document says how.
+//! The start refuses a reference key that served before a retirement
+//! (`handlers::discovery::note_reference_key`, #451): the reference of a
+//! findable account follows the account, and the accounts this stops come
+//! back under one nothing relates to the lost key.
 //!
 //! # NOTHING IS WRITTEN BEFORE THE PLAN IS SAID AND THE KEY NUMBER TYPED BACK
 //!
@@ -107,6 +111,9 @@ where
     } else {
         String::new()
     };
+    // THE REFERENCE KEY GOES WITH IT (#451): the start refuses the one that
+    // served before this retirement, so that the accounts it stops come back
+    // under a reference nothing relates to the lost key.
     let plan = format!(
         "Retiring masking key #{key_id} at once. Every mask and count made under it is \
          erased.\n\
@@ -114,6 +121,8 @@ where
          the key changed: {findable}.\n\
          Proofs in progress dropped: {pending}.\n\
          {stop_first}\
+         REFERENCE_KEY must be given a new key before the service starts again: the start \
+         refuses the one that served before this retirement.\n\
          Type the key number to retire it, or anything else to leave everything as it is:"
     );
     if !crate::operator::typed_back(ask(&plan).as_deref(), &key_id.to_string()) {
@@ -364,6 +373,12 @@ mod tests {
             "#2 is current"
         );
         assert!(!plan_for("1").await.contains("must be stopped"));
+        // Whichever key it retires (#451).
+        for key in ["1", "2"] {
+            assert!(plan_for(key)
+                .await
+                .contains("REFERENCE_KEY must be given a new key"));
+        }
     }
 
     #[sqlx::test(migrations = "./migrations")]
@@ -400,6 +415,45 @@ mod tests {
         start(&st, "alice", NUMBER)
             .await
             .expect("the account the retirement ended goes through");
+    }
+
+    #[sqlx::test(migrations = "./migrations")]
+    async fn an_account_the_retirement_ended_comes_back_under_another_reference(pool: SqlitePool) {
+        // ADR 0014 and #409: nothing relates the accounts a retirement stops
+        // to the masks made under the lost key. The reference follows the
+        // account (#451), so the reference key changes with the retirement,
+        // and the start refuses the one that served before it.
+        let (ovh, inbox) = fake_ovhcloud(false).await;
+        let (clock, time) = crate::util::Clock::settable(T0);
+        let st = state_at(pool.clone(), whoami_hs().await, Some(ovh), clock);
+        crate::handlers::discovery::note_reference_key(&pool, st.cfg.reference_key.as_ref(), T0)
+            .await
+            .unwrap();
+        prove(&st, &inbox, "alice", NUMBER).await;
+        let before = reference_of(&pool, "alice").await.expect("a reference");
+        run(
+            &pool,
+            &named("1"),
+            st.cfg.masking_keys.as_deref(),
+            T0 + DAY,
+            |_| Some("1".into()),
+        )
+        .await
+        .unwrap();
+
+        set_clock(&time, T0 + 2 * DAY);
+        assert!(
+            restarted_with_reference_key(&st, key_two(), st.cfg.reference_key.unwrap())
+                .await
+                .is_err(),
+            "the start refuses the reference key the retirement outlived"
+        );
+        let restarted = restarted_with_reference_key(&st, key_two(), [0x08; 32])
+            .await
+            .expect("a new reference key");
+        prove(&restarted, &inbox, "alice", NUMBER).await;
+
+        assert_ne!(reference_of(&pool, "alice").await, Some(before));
     }
 
     #[sqlx::test(migrations = "./migrations")]

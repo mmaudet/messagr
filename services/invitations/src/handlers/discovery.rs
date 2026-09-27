@@ -232,7 +232,7 @@ pub async fn finish_proof(
     Body(req): Body<FinishRequest>,
 ) -> Result<Json<Findable>, AppError> {
     let user = auth::authenticate(&st.mx, &headers).await?;
-    served(&st)?;
+    let reference_key = *served(&st)?.reference_key;
     let envelope_key = req
         .envelope_key
         .as_deref()
@@ -253,7 +253,16 @@ pub async fn finish_proof(
         .begin_with("BEGIN IMMEDIATE")
         .await
         .map_err(anyhow::Error::from)?;
-    let decided = finish_under_the_lock(&mut tx, &st, &user, &req.code, envelope_key, now).await;
+    let decided = finish_under_the_lock(
+        &mut tx,
+        &st,
+        &reference_key,
+        &user,
+        &req.code,
+        envelope_key,
+        now,
+    )
+    .await;
     if decided.is_ok() {
         tx.commit().await.map_err(anyhow::Error::from)?;
     } else {
@@ -267,6 +276,7 @@ pub async fn finish_proof(
 async fn finish_under_the_lock(
     conn: &mut sqlx::SqliteConnection,
     st: &AppState,
+    reference_key: &[u8; 32],
     user: &str,
     code: &str,
     envelope_key: Option<Vec<u8>>,
@@ -357,8 +367,10 @@ async fn finish_under_the_lock(
         }
         // THE SAME ACCOUNT PROVING THE SAME NUMBER KEEPS ITS REFERENCE, under
         // this key or the one before (#409). Whoever already found it must
-        // not read a renewal as a number that changed hands (#392, #407);
-        // another number, or another account, gets a new one.
+        // not read a renewal as a number that changed hands (#392, #407).
+        // Kept rather than computed again: a reference computed under a
+        // reference key a retirement replaced stays the account's until its
+        // proof is forgotten (#451).
         if kept_reference.is_none() {
             kept_reference = sqlx::query_scalar(
                 "SELECT reference FROM findable_numbers \
@@ -403,7 +415,10 @@ async fn finish_under_the_lock(
     .bind(proven.key_id)
     .bind(&proven.mask)
     .bind(user)
-    .bind(kept_reference.unwrap_or_else(|| uuid::Uuid::new_v4().simple().to_string()))
+    // THE REFERENCE FOLLOWS THE ACCOUNT (#451): computed from it, so that
+    // the same account comes back as itself after the thirty days its proof
+    // is forgotten, and another account never reads as it.
+    .bind(kept_reference.unwrap_or_else(|| crypto::account_reference(reference_key, user)))
     .bind(now)
     .bind(until)
     .bind(envelope_key)
@@ -891,6 +906,50 @@ pub async fn note_keys_served(
     Ok(())
 }
 
+/// Notes, at the start, when the reference key was first served (#451), and
+/// refuses one that served before a masking key was retired at once.
+///
+/// THE REFERENCE FOLLOWS THE ACCOUNT: it is computed from the account under
+/// this key (`crypto::account_reference`), so that the same account finds it
+/// again whenever it proves its number, even after the thirty days the
+/// service forgets its proof. A retirement at once must break that link for
+/// the accounts it stops: nothing may relate their account to the masks made
+/// under the lost key (ADR 0014, #409). So the key changes with the
+/// retirement, and a start still holding one that served before it is
+/// refused, naming the variable and never the key. The database keeps only
+/// the key's fingerprint.
+pub async fn note_reference_key(
+    pool: &sqlx::SqlitePool,
+    key: Option<&[u8; 32]>,
+    now: i64,
+) -> anyhow::Result<()> {
+    let Some(key) = key else {
+        return Ok(());
+    };
+    let fingerprint = crypto::key_fingerprint(key);
+    sqlx::query("INSERT OR IGNORE INTO reference_keys_served (fingerprint, since) VALUES (?, ?)")
+        .bind(&fingerprint[..])
+        .bind(now)
+        .execute(pool)
+        .await?;
+    let outlived: bool = sqlx::query_scalar(
+        "SELECT EXISTS (SELECT 1 FROM retired_keys, reference_keys_served \
+         WHERE fingerprint = ? AND retired_at >= since)",
+    )
+    .bind(&fingerprint[..])
+    .fetch_one(pool)
+    .await?;
+    if outlived {
+        anyhow::bail!(
+            "REFERENCE_KEY served before a masking key was retired at once: the \
+             accounts that retirement stopped would come back under their old \
+             reference. Give REFERENCE_KEY a new key, as \
+             deploy/messagr-eu-invitations.md says"
+        );
+    }
+    Ok(())
+}
+
 /// Whether the retirement of a masking key ended `user`'s proof, less than
 /// thirty days ago, while its reading says so (#409). Its next proof is then a
 /// renewal for the ceilings of #399: the service stopped it, and neither a
@@ -1101,6 +1160,41 @@ pub(crate) mod test_support {
         restarted
     }
 
+    /// Key #2 alone: key #1 retired at once, and #2 its successor (#409).
+    pub(crate) fn key_two() -> Arc<crate::masking::MaskingKeys> {
+        Arc::new(
+            crate::masking::MaskingKeys::new(vec![crate::masking::MaskingKey::from_seed(
+                2,
+                &[0x02; 32],
+            )
+            .unwrap()])
+            .unwrap(),
+        )
+    }
+
+    /// The same service restarted with `keys` and `reference_key`, the start
+    /// noting both as `main` does, or refusing as `main` would (#451).
+    pub(crate) async fn restarted_with_reference_key(
+        st: &Arc<AppState>,
+        keys: Arc<crate::masking::MaskingKeys>,
+        reference_key: [u8; 32],
+    ) -> anyhow::Result<Arc<AppState>> {
+        let mut cfg = st.cfg.clone();
+        cfg.masking_keys = Some(keys);
+        cfg.reference_key = Some(reference_key);
+        let restarted = Arc::new(AppState {
+            pool: st.pool.clone(),
+            mx: st.mx.clone(),
+            cfg,
+        });
+        let now = restarted.cfg.clock.now();
+        keys_of_live_masks_are_held(&restarted.pool, restarted.cfg.masking_keys.as_deref(), now)
+            .await?;
+        note_keys_served(&restarted.pool, restarted.cfg.masking_keys.as_deref(), now).await?;
+        note_reference_key(&restarted.pool, restarted.cfg.reference_key.as_ref(), now).await?;
+        Ok(restarted)
+    }
+
     pub(crate) fn state_with(pool: SqlitePool, hs: String, ovh: Option<String>) -> Arc<AppState> {
         state_at(pool, hs, ovh, crate::util::Clock::system())
     }
@@ -1138,6 +1232,7 @@ pub(crate) mod test_support {
             homeserver_url: hs.to_string(),
             alert_sms_to: ovh.as_ref().map(|_| ALERT.to_string()),
             masking_keys: ovh.as_ref().map(|_| keys()),
+            reference_key: ovh.as_ref().map(|_| [0x07; 32]),
             sms_provider: ovh.map(|base_url| sms::Ovhcloud {
                 base_url,
                 application_key: "ak".into(),
@@ -1562,6 +1657,54 @@ mod tests {
         // The same account, the same number: whoever found it already must
         // not read the renewal as a number that changed hands (#392, #407).
         assert_eq!(reference_of(&pool, "alice").await, Some(first));
+    }
+
+    /// Its proof run out, and the thirty days after it gone with everything
+    /// the service kept of it.
+    async fn forgotten(st: &Arc<AppState>, time: &std::sync::atomic::AtomicI64) {
+        let later = T0 + PROOF_LIFETIME_SECONDS + crate::cleanup::ENDED_PROOFS_KEPT_SECONDS;
+        set_clock(time, later);
+        crate::cleanup::purge_ended_proofs(&st.pool, later)
+            .await
+            .unwrap();
+    }
+
+    #[sqlx::test(migrations = "./migrations")]
+    async fn proving_again_after_the_thirty_days_gives_the_same_reference_back(pool: SqlitePool) {
+        // #451, the owner's decision of 27 September 2026: whoever found the
+        // account must not read its return as a number that changed hands,
+        // and the database keeps nothing more for it.
+        let (ovh, inbox) = fake_ovhcloud(false).await;
+        let (clock, time) = crate::util::Clock::settable(T0);
+        let st = state_at(pool.clone(), whoami_hs().await, Some(ovh), clock);
+        prove(&st, &inbox, "alice", NUMBER).await;
+        let first = reference_of(&pool, "alice").await.expect("a reference");
+
+        forgotten(&st, &time).await;
+        assert_eq!(
+            reference_of(&pool, "alice").await,
+            None,
+            "nothing of it is kept"
+        );
+        prove(&st, &inbox, "alice", NUMBER).await;
+
+        assert_eq!(reference_of(&pool, "alice").await, Some(first));
+    }
+
+    #[sqlx::test(migrations = "./migrations")]
+    async fn another_account_proving_the_number_is_known_by_another_reference(pool: SqlitePool) {
+        let (ovh, inbox) = fake_ovhcloud(false).await;
+        let (clock, time) = crate::util::Clock::settable(T0);
+        let st = state_at(pool.clone(), whoami_hs().await, Some(ovh), clock);
+        prove(&st, &inbox, "alice", NUMBER).await;
+        let alices = reference_of(&pool, "alice").await.expect("a reference");
+
+        forgotten(&st, &time).await;
+        prove(&st, &inbox, "bob", NUMBER).await;
+
+        // A number that changed hands still reads as one (#392, story 37).
+        let bobs = reference_of(&pool, "bob").await.expect("a reference");
+        assert_ne!(bobs, alices);
     }
 
     #[sqlx::test(migrations = "./migrations")]
@@ -2683,6 +2826,40 @@ mod tests {
         ));
         prove(&two_keys, &inbox, "alice", NUMBER).await;
         assert_eq!(proof_of(&pool, "alice").await.map(|(key, _)| key), Some(2));
+    }
+
+    #[sqlx::test(migrations = "./migrations")]
+    async fn a_start_refuses_the_reference_key_a_retirement_at_once_outlived(pool: SqlitePool) {
+        let old = [0x07; 32];
+        let new = [0x08; 32];
+        note_reference_key(&pool, Some(&old), T0).await.unwrap();
+        note_reference_key(&pool, Some(&old), T0 + DAY)
+            .await
+            .expect("a restart is not a retirement");
+        crate::retire_key::run(&pool, &["1".to_string()], None, T0 + 2 * DAY, |_| {
+            Some("1".into())
+        })
+        .await
+        .unwrap();
+
+        let refused = note_reference_key(&pool, Some(&old), T0 + 3 * DAY)
+            .await
+            .unwrap_err()
+            .to_string();
+        assert!(refused.contains("REFERENCE_KEY"), "{refused}");
+        assert!(!refused.contains(&BASE64.encode(&old)), "never the key");
+        note_reference_key(&pool, Some(&new), T0 + 3 * DAY)
+            .await
+            .expect("a new key starts");
+        note_reference_key(&pool, Some(&new), T0 + 4 * DAY)
+            .await
+            .expect("and restarts");
+        assert!(
+            note_reference_key(&pool, Some(&old), T0 + 5 * DAY)
+                .await
+                .is_err(),
+            "the old one does not come back"
+        );
     }
 
     #[sqlx::test(migrations = "./migrations")]

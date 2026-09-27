@@ -23,7 +23,8 @@ production stopped building the prototype (#289).
   - optional, all four or none: `OVH_APPLICATION_KEY`,
     `OVH_APPLICATION_SECRET`, `OVH_CONSUMER_KEY`, `OVH_SMS_SERVICE`, with
     `SMS_SENDER` beside them;
-  - for discovery, `ALERT_SMS_TO`, without which it stays off;
+  - for discovery, `ALERT_SMS_TO` and `REFERENCE_KEY`, without which it stays
+    off;
   - optional: `DISCOVERY_COUNTRIES`, `SMS_CEILING_PER_COUNTRY_PER_DAY`,
     `SMS_BUDGET_PER_MONTH`, `SMS_CREDITS_ALERT_BELOW`.
 - **The networks.** `default`, and `sygnal` (the external network
@@ -52,6 +53,26 @@ two serve together while one replaces the other. A seed is 32 random bytes:
   was made with, so a key dropped or renumbered while this file is edited
   stops the start, naming the key number, until it is back or until the masks
   made with it have run out, 28 days after their proof.
+
+### The reference key
+
+`REFERENCE_KEY` is the key the reference of a findable account is computed
+with (#451), 32 random bytes in base64, minted like a seed:
+
+    openssl rand -base64 32
+
+- **The reference follows the account.** Devices know a findable account by
+  its reference. Computed from the account, it is the same whenever the
+  account proves its number, even after the thirty days the service forgets
+  its proof, so that whoever found it reads the same account; another account
+  gets another. The database keeps only the key's fingerprint.
+- **Absent, discovery stays off**, like `MASKING_KEYS`; malformed, the service
+  refuses to start without showing it.
+- **Changed with a retirement at once, and only then** (below). The start
+  refuses a reference key that served before a masking key was retired at
+  once. Changed without one, every account whose proof is later forgotten
+  would come back under a new reference, which whoever found it reads as a
+  number that changed hands.
 
 ### Changing the key, once a year
 
@@ -124,9 +145,13 @@ With the key to retire numbered `N`, in `/opt/messagr-eu`:
      at their next proof.
 4. **Edit `MASKING_KEYS`**: remove `N`, and when `N` was the current key, add
    a new seed with a higher number, as in the planned change above.
-5. **Start the service**, `docker compose up -d --no-deps --no-build
+5. **Give `REFERENCE_KEY` a new key**, `openssl rand -base64 32` (#451). The
+   start refuses the one that served before the retirement: the accounts it
+   stopped come back under references nothing relates to the lost key.
+6. **Start the service**, `docker compose up -d --no-deps --no-build
 invitations`. The start no longer needs `N`.
-6. **Destroy the seed of `N`**, if it still exists anywhere.
+7. **Destroy the seed of `N`**, if it still exists anywhere, and the old
+   reference key.
 
 ## The SMS provider of address-book discovery
 

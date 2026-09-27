@@ -18,6 +18,8 @@ pub enum ConfigError {
     InvalidCountries(&'static str),
     #[error("ALERT_SMS_TO is not a number in international form (+ then 8 to 15 digits)")]
     InvalidAlertNumber,
+    #[error("REFERENCE_KEY must be exactly 32 bytes of base64 once decoded")]
+    InvalidReferenceKey,
 }
 
 /// Default ceiling on accounts reserved simultaneously in the charge of a
@@ -51,6 +53,10 @@ pub struct Config {
     /// `None` while a deployment has not been given them: discovery stays off
     /// and the log says so. See `masking_keys`.
     pub masking_keys: Option<std::sync::Arc<crate::masking::MaskingKeys>>,
+    /// The key the reference of a findable account is computed with, from
+    /// `REFERENCE_KEY` (#451), or nothing, which leaves discovery off. See
+    /// `reference_key`.
+    pub reference_key: Option<[u8; 32]>,
     /// Who sends the SMS that proves a number (#397). `None` while a
     /// deployment has not been given an OVHcloud account: discovery stays
     /// off. See `sms_provider`.
@@ -183,6 +189,20 @@ pub fn masking_keys(
     MaskingKeys::new(keys)
         .map(|keys| Some(std::sync::Arc::new(keys)))
         .ok_or(unusable("it names no key"))
+}
+
+/// The key the reference of a findable account is computed with, from
+/// `REFERENCE_KEY`: 32 bytes of base64 (#451). Or nothing, with the same two
+/// answers as `masking_keys`: absent or blank, discovery stays off; present
+/// but malformed, the service refuses to start, naming the variable and never
+/// a piece of the value.
+pub fn reference_key(raw: Option<String>) -> Result<Option<[u8; 32]>, ConfigError> {
+    let Some(value) = raw.filter(|v| !v.trim().is_empty()) else {
+        return Ok(None);
+    };
+    Config::parse_key(value.trim())
+        .map(Some)
+        .map_err(|_| ConfigError::InvalidReferenceKey)
 }
 
 /// The OVHcloud account that sends proofs, or nothing, read through `var` so
@@ -323,6 +343,7 @@ impl Config {
             // a thing to guess.
             push_gateway_url: usable_gateway(std::env::var("PUSH_GATEWAY_URL").ok()),
             masking_keys: masking_keys(std::env::var("MASKING_KEYS").ok())?,
+            reference_key: reference_key(std::env::var("REFERENCE_KEY").ok())?,
             sms_provider: sms_provider(|key| std::env::var(key).ok())?,
             countries: discovery_countries(std::env::var("DISCOVERY_COUNTRIES").ok())?,
             clock: crate::util::Clock::system(),
@@ -355,6 +376,7 @@ impl Config {
             max_reserved_accounts_per_inviter: DEFAULT_RESERVED_ACCOUNTS_CEILING,
             push_gateway_url: None,
             masking_keys: None,
+            reference_key: None,
             sms_provider: None,
             countries: crate::countries::launch_list(),
             clock: crate::util::Clock::system(),
@@ -364,21 +386,30 @@ impl Config {
     }
 
     /// What address-book discovery serves with, or what is missing. It
-    /// serves with its keys, its SMS provider and an operator to alert, or not
-    /// at all: keys without a provider would mask numbers nobody can prove, a
-    /// provider without keys would prove numbers nobody can mask, and either
-    /// without an operator would spend SMS with nobody told when a ceiling is
-    /// reached (#399). The one place that rule is written.
+    /// serves with its keys, its SMS provider, an operator to alert and the
+    /// key of its references, or not at all: keys without a provider would
+    /// mask numbers nobody can prove, a provider without keys would prove
+    /// numbers nobody can mask, either without an operator would spend SMS
+    /// with nobody told when a ceiling is reached (#399), and a proof without
+    /// the reference key would give its account no reference to be known by
+    /// (#451). The one place that rule is written.
     pub fn discovery(&self) -> Result<Discovery<'_>, &'static str> {
-        match (&self.masking_keys, &self.sms_provider, &self.alert_sms_to) {
-            (Some(keys), Some(provider), Some(operator)) => Ok(Discovery {
+        match (
+            &self.masking_keys,
+            &self.sms_provider,
+            &self.alert_sms_to,
+            &self.reference_key,
+        ) {
+            (Some(keys), Some(provider), Some(operator), Some(reference_key)) => Ok(Discovery {
                 keys,
                 provider,
                 operator,
+                reference_key,
             }),
-            (None, _, _) => Err("MASKING_KEYS absent"),
-            (_, None, _) => Err("no SMS provider"),
-            (_, _, None) => Err("ALERT_SMS_TO absent"),
+            (None, _, _, _) => Err("MASKING_KEYS absent"),
+            (_, None, _, _) => Err("no SMS provider"),
+            (_, _, None, _) => Err("ALERT_SMS_TO absent"),
+            (_, _, _, None) => Err("REFERENCE_KEY absent"),
         }
     }
 }
@@ -389,6 +420,8 @@ pub struct Discovery<'a> {
     pub provider: &'a crate::sms::Ovhcloud,
     /// The operator's number, told when a ceiling is reached.
     pub operator: &'a str,
+    /// What the reference of a findable account is computed with (#451).
+    pub reference_key: &'a [u8; 32],
 }
 
 #[cfg(test)]
@@ -509,9 +542,42 @@ mod tests {
         assert_eq!(served.discovery().err(), Some("ALERT_SMS_TO absent"));
         let told = Config {
             alert_sms_to: Some("+33600000000".into()),
+            reference_key: Some([7; 32]),
             ..served
         };
         assert!(told.discovery().is_ok());
+    }
+
+    #[test]
+    fn without_its_reference_key_discovery_is_off() {
+        // #451: a proof would give its account no reference to be known by.
+        let keys = crate::masking::MaskingKeys::new(vec![crate::masking::MaskingKey::from_seed(
+            1, &[1; 32],
+        )
+        .unwrap()])
+        .unwrap();
+        let served = Config {
+            masking_keys: Some(std::sync::Arc::new(keys)),
+            sms_provider: sms_provider(env(OVH)).unwrap(),
+            alert_sms_to: Some("+33600000000".into()),
+            ..Config::for_tests()
+        };
+        assert_eq!(served.discovery().err(), Some("REFERENCE_KEY absent"));
+    }
+
+    #[test]
+    fn a_malformed_reference_key_stops_the_start_without_showing_it() {
+        assert_eq!(reference_key(None).unwrap(), None);
+        assert_eq!(reference_key(Some("  ".into())).unwrap(), None);
+        let refused = reference_key(Some("dGVzdA==".into()))
+            .unwrap_err()
+            .to_string();
+        assert!(refused.contains("REFERENCE_KEY"));
+        assert!(!refused.contains("dGVzdA=="));
+        assert_eq!(
+            reference_key(Some(STANDARD.encode([9u8; 32]))).unwrap(),
+            Some([9u8; 32])
+        );
     }
 
     #[test]

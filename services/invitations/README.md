@@ -25,7 +25,7 @@ preserved than rewritten from memory.
 ## Running it
 
 ```
-cargo test          # 362 tests, no network, about a second
+cargo test          # 368 tests, no network, about a second
 cargo clippy --all-targets -- -D warnings
 cargo fmt --check
 ```
@@ -36,10 +36,10 @@ rather than on every commit.
 
 ## Configuration
 
-Twenty-one variables, four of them mandatory: `DATABASE_URL`, `HOMESERVER_URL`,
+Twenty-two variables, four of them mandatory: `DATABASE_URL`, `HOMESERVER_URL`,
 `REGISTRATION_TOKEN`, `ENCRYPTION_KEY`, plus optional `EDGE_RETENTION_DAYS`,
 `BIND_ADDR`, `MAX_RESERVED_ACCOUNTS_PER_INVITER`, `PUSH_GATEWAY_URL`,
-`MASKING_KEYS`, and the SMS provider's: `OVH_APPLICATION_KEY`,
+`MASKING_KEYS`, `REFERENCE_KEY`, and the SMS provider's: `OVH_APPLICATION_KEY`,
 `OVH_APPLICATION_SECRET`, `OVH_CONSUMER_KEY`, `OVH_SMS_SERVICE`, `SMS_SENDER`,
 `OVH_API_URL` and `SMS_PROVIDER_FOR_TESTS`, the countries open to discovery,
 `DISCOVERY_COUNTRIES`, and the ceilings on its SMS,
@@ -53,6 +53,12 @@ discovery stays off and the service starts; malformed, it refuses to start
 without showing the value; missing a key that masks still in service were
 made with, it refuses to start too. Its format, and the three places a key
 lives on the host, are in `deploy/messagr-eu-invitations.md`.
+
+`REFERENCE_KEY` is the key the reference of a findable account is computed
+with, so that the same account keeps it whenever it proves its number (#451).
+Absent, discovery stays off; malformed, the service refuses to start; one that
+served before a masking key was retired at once, it refuses to start too. The
+same guide says when it changes.
 
 The SMS provider sends the code that proves a number, through OVHcloud's
 European API and no other outside the bench. All four of its credentials, or
