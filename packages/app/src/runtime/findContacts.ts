@@ -534,7 +534,7 @@ function byName<T extends Contact>(contacts: readonly T[]): T[] {
  *   which Apple wants on a screen of its own;
  * - `looking`: masking and comparing;
  * - `found`: the contacts on Messagr under the name of their card, then the
- *   others;
+ *   others; `limited` when the system shares some cards only (#403);
  * - `refused`: why nothing is shown, `no-access` when the system refused the
  *   address book.
  */
@@ -547,6 +547,11 @@ export type FindingStage =
       readonly matches: readonly Match[]
       readonly others: readonly Contact[]
       readonly waiting: Waiting | null
+      /**
+       * The system shares some cards only, as iOS lets a person choose
+       * (#403): what was looked at is those cards.
+       */
+      readonly limited: boolean
     }
   | {
       readonly stage: 'refused'
@@ -562,6 +567,13 @@ export interface FindingJourney {
    * does nothing, so the address book is never masked twice for one press.
    */
   readonly go: () => Promise<void>
+  /**
+   * « Partager d'autres contacts », from the results of a limited access only
+   * (#403): the system's choice of the cards, then, when cards were added, a
+   * look at what is shared now, and when none were, the results as they
+   * were. From any other stage it does nothing.
+   */
+  readonly shareMore: () => Promise<void>
   /** Every way back. What is still running is dropped. */
   readonly close: () => void
 }
@@ -575,6 +587,11 @@ export function findingJourney(
   deps: FindingDeps & {
     /** The system's question: see `addressBook.ts`. */
     readonly askForTheAddressBook: () => Promise<AddressBookAccess>
+    /**
+     * The system's choice of the cards shared (#403), and how many cards were
+     * added: `addressBook.ts`.
+     */
+    readonly shareMoreCards: () => Promise<number>
   },
   show: (stage: FindingStage) => void,
 ): FindingJourney {
@@ -586,6 +603,38 @@ export function findingJourney(
   // Which opening an answer belongs to: closing moves it on, and what ends
   // after its screen was left shows nothing.
   let opening = 0
+  /** The system's question, then the look, for the opening `mine`. */
+  const look = async (mine: number) => {
+    let access: AddressBookAccess
+    try {
+      access = await deps.askForTheAddressBook()
+    } catch {
+      access = 'none'
+    }
+    if (mine !== opening) return
+    if (access === 'none') {
+      move({ stage: 'refused', why: 'no-access' })
+      return
+    }
+    let findings: Findings
+    try {
+      findings = await findContacts(deps)
+    } catch {
+      findings = { found: false, refusal: 'unreachable' }
+    }
+    if (mine !== opening) return
+    move(
+      findings.found
+        ? {
+            stage: 'found',
+            matches: findings.matches,
+            others: findings.others,
+            waiting: findings.waiting,
+            limited: access === 'some',
+          }
+        : { stage: 'refused', why: findings.refusal },
+    )
+  }
   return {
     open: () => {
       opening += 1
@@ -593,38 +642,32 @@ export function findingJourney(
     },
     go: async () => {
       if (stage.stage !== 'reminder') return
-      const mine = opening
       // Leaving the reminder at once, so that a second press finds another
       // stage and does nothing.
       move({ stage: 'looking' })
-      let access: AddressBookAccess
+      await look(opening)
+    },
+    shareMore: async () => {
+      if (stage.stage !== 'found' || !stage.limited) return
+      const mine = opening
+      const results = stage
+      // Leaving the results at once, so that a second press finds another
+      // stage and does nothing.
+      move({ stage: 'looking' })
+      let added: number
       try {
-        access = await deps.askForTheAddressBook()
+        added = await deps.shareMoreCards()
       } catch {
-        access = 'none'
+        added = 0
       }
       if (mine !== opening) return
-      if (access === 'none') {
-        move({ stage: 'refused', why: 'no-access' })
+      // NOTHING ADDED, NOTHING TO LOOK AT AGAIN: the results as they were,
+      // and no request.
+      if (added === 0) {
+        move(results)
         return
       }
-      let findings: Findings
-      try {
-        findings = await findContacts(deps)
-      } catch {
-        findings = { found: false, refusal: 'unreachable' }
-      }
-      if (mine !== opening) return
-      move(
-        findings.found
-          ? {
-              stage: 'found',
-              matches: findings.matches,
-              others: findings.others,
-              waiting: findings.waiting,
-            }
-          : { stage: 'refused', why: findings.refusal },
-      )
+      await look(mine)
     },
     close: () => {
       opening += 1

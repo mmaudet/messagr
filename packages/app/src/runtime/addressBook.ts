@@ -15,13 +15,18 @@
  * version that carries discovery (#414). Until then Android answers « no » at
  * once, without asking the person, and the screen says so.
  *
+ * Since iOS 18 a person may share some cards rather than all of them: the
+ * system answers « limited », what is read is those cards, and
+ * `shareMoreCards` opens Apple's own choice to add more (#403).
+ *
  * What leaves this module is a name and numbers as written in each card.
  * `findContacts.ts` says what leaves the telephone: masks, and never a name.
  */
-import { PermissionsAndroid, Platform } from 'react-native'
+import { PermissionsAndroid, Platform, TurboModuleRegistry } from 'react-native'
 import Contacts from 'react-native-contacts'
 
 import type { Contact } from './findContacts'
+import { logEvent } from './log'
 
 /**
  * What the system allows: the whole address book, the cards the person chose
@@ -43,6 +48,37 @@ export async function askForTheAddressBook(): Promise<AddressBookAccess> {
     : answer === 'limited'
       ? 'some'
       : 'none'
+}
+
+/** The native half of `shareMoreCards`: `MessagrContactAccess.swift`. */
+interface ContactAccess {
+  /** Opens Apple's picker, and answers how many cards were added. */
+  readonly shareMore: () => Promise<unknown>
+}
+
+/**
+ * Apple's choice of the cards Messagr may read, for a person who shared only
+ * some (#403). Answers how many cards were added once the choice is closed,
+ * and 0 at once where there is no such choice, on Android or before iOS 18.
+ *
+ * Looked up as `applePushToken.ts` looks up its own module, untyped and read
+ * afterwards, for the reason given there; and a choice that cannot open says
+ * why in the trace, as that module's absence does.
+ */
+export async function shareMoreCards(): Promise<number> {
+  if (Platform.OS !== 'ios') return 0
+  const found = TurboModuleRegistry.get('MessagrContactAccess')
+  if (found == null) {
+    logEvent('warn', 'MESSAGR_CONTACT_ACCESS_UNREAD', { unread: 'noModule' })
+    return 0
+  }
+  try {
+    const added = await (found as ContactAccess).shareMore()
+    return typeof added === 'number' && added > 0 ? added : 0
+  } catch {
+    logEvent('warn', 'MESSAGR_CONTACT_ACCESS_UNREAD', { unread: 'threw' })
+    return 0
+  }
 }
 
 /** The cards the system shares, each as a name and its numbers. */

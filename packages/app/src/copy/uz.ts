@@ -821,10 +821,12 @@ export const uz: Readonly<Record<CopyKey, string>> = {
     'Messagr manzillar kitobingizdagi raqamlarni niqoblab, shu telefonda solishtirmoqda.',
   find_on_messagr: 'Allaqachon Messagrda',
   find_holder_changed: 'Bu raqamning egasi oʻzgargan.',
+  find_limited: 'Messagr faqat siz ulashishni tanlagan kontaktlarni koʻradi.',
+  find_share_more: 'Boshqa kontaktlarni ulashish',
   find_others: 'Boshqa kontaktlaringiz',
   find_nobody: 'Hozircha kontaktlaringizdan hech biri Messagrda topilmaydi.',
   find_no_access:
-    'Messagr manzillar kitobingizni ocha olmaydi. Buni telefon sozlamalarida ruxsat berishingiz va shu orada havola orqali taklif qilishingiz mumkin.',
+    'Messagr manzillar kitobingizni ocha olmaydi. Keyinroq ruxsat berish uchun telefon sozlamalarini, soʻng Messagr sahifasini oching va kontaktlarga kirishga ruxsat bering. Shu orada kimnidir havola orqali taklif qilishingiz mumkin.',
   find_not_the_published_key:
     'Xizmat javobi uning eʼlon qilingan kalitidan kelmadi: hech narsa koʻrsatilmaydi. Keyinroq qayta urinib koʻring.',
   find_unreachable:

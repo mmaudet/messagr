@@ -830,10 +830,12 @@ export const de: Readonly<Record<CopyKey, string>> = {
     'Messagr maskiert die Nummern in Ihrem Adressbuch und vergleicht sie auf diesem Telefon.',
   find_on_messagr: 'Bereits auf Messagr',
   find_holder_changed: 'Diese Nummer hat den Inhaber gewechselt.',
+  find_limited: 'Messagr sieht nur die Kontakte, die Sie freigegeben haben.',
+  find_share_more: 'Weitere Kontakte freigeben',
   find_others: 'Ihre anderen Kontakte',
   find_nobody: 'Noch keiner Ihrer Kontakte ist auf Messagr auffindbar.',
   find_no_access:
-    'Messagr hat keinen Zugriff auf Ihr Adressbuch. Sie können ihn in den Einstellungen des Telefons erlauben und bis dahin per Link einladen.',
+    'Messagr hat keinen Zugriff auf Ihr Adressbuch. Um ihn später zu erlauben, öffnen Sie die Einstellungen des Telefons, dann die Seite von Messagr, und erlauben Sie den Zugriff auf die Kontakte. Bis dahin können Sie jemanden per Link einladen.',
   find_not_the_published_key:
     'Die Antwort des Dienstes stammt nicht von seinem veröffentlichten Schlüssel: Es wird nichts angezeigt. Versuchen Sie es später erneut.',
   find_unreachable:

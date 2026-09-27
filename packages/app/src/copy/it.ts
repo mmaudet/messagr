@@ -803,10 +803,12 @@ export const it: Readonly<Record<CopyKey, string>> = {
     'Messagr sta mascherando i numeri della Sua rubrica e li confronta su questo telefono.',
   find_on_messagr: 'Già su Messagr',
   find_holder_changed: 'Questo numero ha cambiato titolare.',
+  find_limited: 'Messagr guarda solo i contatti che ha scelto di condividere.',
+  find_share_more: 'Condividere altri contatti',
   find_others: 'Gli altri Suoi contatti',
   find_nobody: 'Per ora nessuno dei Suoi contatti è trovabile su Messagr.',
   find_no_access:
-    'Messagr non ha accesso alla Sua rubrica. Può consentirlo nelle impostazioni del telefono e, nel frattempo, invitare con un link.',
+    'Messagr non ha accesso alla Sua rubrica. Per consentirlo più tardi, apra le impostazioni del telefono, poi la pagina di Messagr, e consenta l’accesso ai contatti. Nel frattempo, può invitare qualcuno con un link.',
   find_not_the_published_key:
     'La risposta del servizio non viene dalla sua chiave pubblicata: non viene mostrato nulla. Riprovi più tardi.',
   find_unreachable: 'Il servizio non risponde. Riprovi tra un momento.',

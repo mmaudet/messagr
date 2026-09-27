@@ -11,7 +11,8 @@ import { dayOf } from './whenLabel'
  * « Retrouver mes contacts » (#400, #392): the reminder, then the contacts
  * found on Messagr and the others.
  *
- * Every stage is `findContacts.ts`'s, and every gesture is handed back to it:
+ * Every stage is `findContacts.ts`'s, and every gesture is handed back to it,
+ * but « Inviter quelqu'un », which leads to the invitation form (`App.tsx`):
  * this file draws and decides nothing.
  *
  * # THE REMINDER HAS ONE BUTTON
@@ -25,15 +26,27 @@ import { dayOf } from './whenLabel'
  * The contacts on Messagr come first, under the name of their card, then the
  * others. Inviting one comes with #404 and #408, one contact at a time: no
  * gesture here, now or then, takes the whole address book.
+ *
+ * # SOME CARDS, OR NONE (#403)
+ *
+ * When the system shares some cards only, the results say so and offer the
+ * system's choice to share more. When it shares none, the screen says how to
+ * allow it later, and offers to invite somebody by a link in the meantime.
  */
 export function FindContacts({
   stage,
   onContinue,
+  onShareMore,
+  onInvite,
   onClose,
 }: {
   readonly stage: Exclude<FindingStage, { readonly stage: 'shut' }>
   /** « Continuer », on the reminder. */
   readonly onContinue: () => void
+  /** « Partager d'autres contacts », on the results of a limited access. */
+  readonly onShareMore: () => void
+  /** « Inviter quelqu'un », when the address book was refused. */
+  readonly onInvite: () => void
   /** The arrow, « Terminé », and every way back to the list. */
   readonly onClose: () => void
 }) {
@@ -73,6 +86,8 @@ export function FindContacts({
           }))}
           others={stage.others.map(c => c.name)}
           waiting={stage.waiting}
+          limited={stage.limited}
+          onShareMore={onShareMore}
           onDone={onClose}
         />
       )}
@@ -81,10 +96,19 @@ export function FindContacts({
           <View style={styles.notice} testID="find-contacts-refused">
             <Text style={styles.noticeText}>{t(REFUSED[stage.why])}</Text>
           </View>
+          {stage.why === 'no-access' && (
+            <NotchedButton
+              testID="find-contacts-invite"
+              label={t('plus_invite')}
+              onPress={onInvite}
+              wide
+            />
+          )}
           <NotchedButton
             testID="find-contacts-done"
             label={t('findable_done')}
             onPress={onClose}
+            tone={stage.why === 'no-access' ? 'quiet' : 'brand'}
             wide
           />
         </View>
@@ -108,6 +132,8 @@ function Found({
   matches,
   others,
   waiting,
+  limited,
+  onShareMore,
   onDone,
 }: {
   readonly matches: readonly {
@@ -118,12 +144,27 @@ function Found({
   readonly others: readonly string[]
   /** What the limit on masking left for later (#401). */
   readonly waiting: Waiting | null
+  /** The system shares some cards only (#403). */
+  readonly limited: boolean
+  readonly onShareMore: () => void
   readonly onDone: () => void
 }) {
   return (
     <ScrollView
       contentContainerStyle={styles.body}
       testID="find-contacts-found">
+      {limited && (
+        <View style={styles.notice} testID="find-contacts-limited">
+          <Text style={styles.noticeText}>{t('find_limited')}</Text>
+          <NotchedButton
+            testID="find-contacts-share-more"
+            label={t('find_share_more')}
+            onPress={onShareMore}
+            tone="quiet"
+            wide
+          />
+        </View>
+      )}
       {waiting !== null && (
         <View style={styles.notice} testID="find-contacts-waiting">
           <Text style={styles.noticeText}>
@@ -211,6 +252,7 @@ const styles = StyleSheet.create({
   other: { ...type.body, color: color.neutral['600'] },
   actions: { gap: space.s, marginTop: space.m },
   notice: {
+    gap: space.s,
     padding: space.m,
     borderLeftWidth: stroke.accent,
     backgroundColor: color.wait['100'],

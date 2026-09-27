@@ -155,6 +155,11 @@ const TRACE = new Map<string, Shape>([
   // itself is never carried -- only which platform was asked and how the
   // reading failed, both of which name nobody.
   ['MESSAGR_DEVICE_LOCALE_UNREAD', { platform: 'words', unread: 'words' }],
+  // Why Apple's choice of the contacts shared could not open (#403): a build
+  // without the native half, or a call that failed. Without it the button
+  // would only show the same results again, and say nothing of why. It
+  // names nobody: one word.
+  ['MESSAGR_CONTACT_ACCESS_UNREAD', { unread: 'words' }],
 ])
 
 /**
