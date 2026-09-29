@@ -5,9 +5,12 @@ import {
   isOpenWithTheBlocked,
   listWithoutTheBlocked,
   NOTHING_LEFT_TO_SHOW,
+  openConversationOf,
   scopesWithTheBlocked,
+  scopesWithWordsOfTheBlocked,
   type ConversationListDeps,
   type ConversationSummary,
+  type RowMessage,
 } from './conversationList'
 import { mergeSummaries } from './mergeSummaries'
 import type { NotShown } from './notShown'
@@ -785,5 +788,86 @@ describe('the conversation open, once an account is blocked (#472, #494)', () =>
         new Set(),
       ),
     ).toBe(false)
+  })
+
+  it('knows the other person only when it was found for the conversation open', () => {
+    // Found for the conversation open before this one, and not yet for this
+    // one: that person is not this conversation's.
+    expect(
+      openConversationOf('!with-her:x', { scope: '!with-her:x', other: HER }),
+    ).toEqual({ scope: '!with-her:x', other: HER })
+    expect(
+      openConversationOf('!three-of-us:x', {
+        scope: '!with-them:x',
+        other: BLOCKED,
+      }),
+    ).toEqual({ scope: '!three-of-us:x', other: null })
+    expect(openConversationOf('!three-of-us:x', null)).toEqual({
+      scope: '!three-of-us:x',
+      other: null,
+    })
+  })
+})
+
+describe('the notifications that may show what a blocked account wrote (#472)', () => {
+  // A conversation's notification says what arrived last, which nothing
+  // here can read back: every conversation of more than two whose messages
+  // hold one of the blocked account's has its notification taken down. The
+  // conversation with that account has all of its own taken down already
+  // (`scopesWithTheBlocked`).
+  const BLOCKED = '@bothers:example.org'
+  const HER = '@her:example.org'
+
+  function said(sender: string): RowMessage {
+    return { sender, sentAt: 1, body: 'hello', unread: false }
+  }
+
+  it('names the conversations whose messages hold one of the blocked account’s', () => {
+    const rows: ConversationSummary[] = [
+      {
+        scope: '!they-spoke:x',
+        other: null,
+        others: 2,
+        preview: 'hello',
+        lastAt: 2,
+        unread: 0,
+        window: [said(HER), said(BLOCKED)],
+      },
+      {
+        scope: '!she-spoke:x',
+        other: null,
+        others: 2,
+        preview: 'hello',
+        lastAt: 1,
+        unread: 0,
+        window: [said(HER)],
+      },
+      // Kept from an earlier launch: only its opening says who wrote it.
+      {
+        scope: '!kept:x',
+        other: null,
+        others: 2,
+        preview: 'hello',
+        previewBy: BLOCKED,
+        lastAt: 1,
+        unread: 0,
+      },
+      // The conversation with that account, taken down whole elsewhere.
+      {
+        scope: '!with-them:x',
+        other: BLOCKED,
+        others: 1,
+        preview: 'hello',
+        lastAt: 1,
+        unread: 0,
+        window: [said(BLOCKED)],
+      },
+    ]
+
+    expect(scopesWithWordsOfTheBlocked(rows, new Set([BLOCKED]))).toEqual([
+      '!they-spoke:x',
+      '!kept:x',
+    ])
+    expect(scopesWithWordsOfTheBlocked(rows, new Set())).toEqual([])
   })
 })

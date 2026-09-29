@@ -218,6 +218,19 @@ export interface OpenConversation {
 }
 
 /**
+ * The conversation `scope`, open, with the other person the screen found:
+ * that person only when it was found for this conversation. The screen's
+ * finding is the conversation open before this one's until this one has
+ * asked who is in it.
+ */
+export function openConversationOf(
+  scope: string,
+  found: { readonly scope: string; readonly other: string } | null,
+): OpenConversation {
+  return { scope, other: found?.scope === scope ? found.other : null }
+}
+
+/**
  * Whether the conversation open is one with a blocked account (#472, #494),
  * which the list no longer draws. It closes then, whichever device made the
  * block: open, what is written in it would still leave. A conversation of
@@ -244,6 +257,29 @@ export function scopesWithTheBlocked(
 ): readonly string[] {
   return rows
     .filter(row => isWithTheBlocked(row, blocked))
+    .map(row => row.scope)
+}
+
+/**
+ * The other conversations whose notification may show what a blocked
+ * account wrote (#472): those of more than two, which stay, whose messages
+ * as this device last derived them hold one of its own, or whose opening it
+ * wrote. A notification says what arrived last, which nothing here can read
+ * back, so each of them goes with the block: what that account wrote leaves
+ * every screen.
+ */
+export function scopesWithWordsOfTheBlocked(
+  rows: readonly ConversationSummary[],
+  blocked: ReadonlySet<string>,
+): readonly string[] {
+  if (blocked.size === 0) return []
+  return rows
+    .filter(
+      row =>
+        !isWithTheBlocked(row, blocked) &&
+        ((row.previewBy !== undefined && blocked.has(row.previewBy)) ||
+          (row.window?.some(one => blocked.has(one.sender)) ?? false)),
+    )
     .map(row => row.scope)
 }
 

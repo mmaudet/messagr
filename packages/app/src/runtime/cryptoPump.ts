@@ -529,8 +529,9 @@ export async function loadConversation(
     events,
   )
   // Both, from one pass. ADR-0011: reactions come out of the same door the
-  // messages do, and the aggregation the server would have done happens on
-  // the screen, at each draw (`reactionsShown`).
+  // messages do, and the aggregation the server would have done happens
+  // where they are read: at each draw (`reactionsShown`), and where a
+  // reaction just sent is waited for.
   return { entries, reactions }
 }
 

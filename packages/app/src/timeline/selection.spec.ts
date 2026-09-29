@@ -543,7 +543,7 @@ describe('whom « Bloquer l’expéditeur » blocks (#472)', () => {
     expect(blockable(new Set(['$p', '$u', '$g', '$h1']), held, ME)).toBe(HER)
   })
 
-  it('names nobody, so it is absent, when two people wrote them', () => {
+  it('names nobody, so it is absent, when two participants wrote them', () => {
     // The conversation of three the App Store reviewer is in: one message of
     // each of the two others names neither.
     expect(blockable(new Set(['$h1', '$b1']), [HERS, HIS], ME)).toBeNull()

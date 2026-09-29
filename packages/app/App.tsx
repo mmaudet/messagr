@@ -294,7 +294,9 @@ import {
 import {
   isOpenWithTheBlocked,
   listWithoutTheBlocked,
+  openConversationOf,
   scopesWithTheBlocked,
+  scopesWithWordsOfTheBlocked,
 } from './src/runtime/conversationList'
 import {
   forgetfulIgnoredList,
@@ -302,7 +304,10 @@ import {
 } from './src/runtime/ignoredListStore'
 import { reactionsShown, shownOf, type NotShown } from './src/runtime/notShown'
 import { tallyReactions } from './src/timeline/reactions'
-import { takeDownNotificationsOf } from './src/runtime/showNotification'
+import {
+  takeDownMessageNotificationOf,
+  takeDownNotificationsOf,
+} from './src/runtime/showNotification'
 import {
   forgetfulUntoldBlocks,
   type UntoldBlocks,
@@ -598,9 +603,9 @@ export function App({
   /**
    * Holds the list the homeserver said, or the notebook's copy of it: what
    * every screen draws from, the copy kept up to date, the notifications
-   * this application drew for a conversation with an account now blocked
-   * taken down, and the conversation open with one of them closed,
-   * whichever device made the block.
+   * this application drew that may show an account now blocked taken down,
+   * and the conversation open with one of them closed, whichever device made
+   * the block.
    */
   const holdIgnored = (
     next: ReadonlySet<string>,
@@ -613,26 +618,25 @@ export function App({
       ignoredListRef.current.keep(next).catch(() => {})
     }
     const newly = new Set([...next].filter(account => !before.has(account)))
-    for (const scope of scopesWithTheBlocked(
-      derivedSummariesRef.current,
-      newly,
-    )) {
+    const rows = derivedSummariesRef.current
+    for (const scope of scopesWithTheBlocked(rows, newly)) {
       takeDownNotificationsOf(scope).catch(() => {})
+    }
+    // AND IN A CONVERSATION OF MORE THAN TWO, which stays (#472), the one
+    // notification that may show what that account wrote last.
+    for (const scope of scopesWithWordsOfTheBlocked(rows, newly)) {
+      takeDownMessageNotificationOf(scope).catch(() => {})
     }
     // THE CONVERSATION OPEN WITH AN ACCOUNT NOW BLOCKED CLOSES (#494), as the
     // one blocked from does, and from here whichever device made the block:
     // left open, what is written in it would still leave. One of more than
     // two stays open, without that account's messages (#472).
     const open = openScopeRef.current
-    const withWhom = partyRef.current
     if (
       open !== null &&
       isOpenWithTheBlocked(
-        {
-          scope: open,
-          other: withWhom?.scope === open ? withWhom.other : null,
-        },
-        derivedSummariesRef.current,
+        openConversationOf(open, partyRef.current),
+        rows,
         next,
       )
     ) {
@@ -2328,13 +2332,13 @@ export function App({
    * selection (#472): whom, and how far it got. A block that holds takes the
    * person back to the list, or leaves them in the conversation of more than
    * two it was made from, and the screen they are on says what is done
-   * (`blockNotice`); only a failure stays where the gesture was made.
+   * (`blockSaid`); only a failure stays where the gesture was made.
    */
   const [blocking, setBlocking] = useState<{
     readonly who: string
     readonly state: 'working' | 'failed'
   } | null>(null)
-  const [blockNotice, setBlockNotice] = useState<BlockSaid | null>(null)
+  const [blockSaid, setBlockSaid] = useState<BlockSaid | null>(null)
   /**
    * « Bloquer l'expéditeur » (#472), while its sheet is up: whom, taken from
    * the selection when the action was pressed, as a report's messages are,
@@ -2389,10 +2393,10 @@ export function App({
     const held = credentialsRef.current
     if (blockingAs === null || held === null) return
     setBlocking({ who, state: 'working' })
-    setBlockNotice(null)
-    // The conversation blocked from, when it stays: known once the list is
-    // written, and where what the service answers is said too.
-    let stays: string | null = null
+    setBlockSaid(null)
+    // The conversation blocked from, when the person stays in it: known once
+    // the list is written, and where what the service answers is said too.
+    let stayingIn: string | null = null
     blockAccount(
       {
         http: makePumpHttp(blockingAs),
@@ -2417,12 +2421,12 @@ export function App({
           // THE PANEL IS A CONVERSATION OF TWO'S, and its block goes back to
           // the list whatever the list knows of that conversation yet.
           if (from === 'the panel') leaveTheConversation()
-          stays = openScopeRef.current
+          stayingIn = openScopeRef.current
           setBlockingSender(null)
           // The messages selected are gone from the screen with their author.
           setSelected(new Set())
           setBlocking(null)
-          setBlockNotice({ notice: 'blocked', stays })
+          setBlockSaid({ notice: 'blocked', stayingIn })
           // And the homeserver asked again, which now holds that account's
           // messages back.
           refreshListRef.current?.().catch(() => {})
@@ -2451,7 +2455,7 @@ export function App({
           return
         }
         const notice = noticeOf(outcome)
-        if (notice !== null) setBlockNotice({ notice, stays })
+        if (notice !== null) setBlockSaid({ notice, stayingIn })
       },
       () => setBlocking({ who, state: 'failed' }),
     )
@@ -5848,12 +5852,16 @@ export function App({
     selected.size > 0
       ? reportable(selected, conversation ?? [], selfUserId)
       : null
+  // THIS ACCOUNT, AS THE SESSION HOLDS IT (#472, #494). `selfUserId` waits
+  // for a launch that found a room, and a conversation joined after such a
+  // launch would have no messages of this account's own: « Bloquer
+  // l'expéditeur » would offer to block it, and its reactions would not be
+  // its own.
+  const selfNow = credentialsRef.current?.userId ?? selfUserId
   // WHOM « BLOQUER L'EXPÉDITEUR » WOULD BLOCK (#472), read once too: it
   // offers the action, and it is whom the action opens the screen for.
   const blockableNow =
-    selected.size > 0
-      ? blockable(selected, conversation ?? [], selfUserId)
-      : null
+    selected.size > 0 ? blockable(selected, conversation ?? [], selfNow) : null
   // WHAT THIS DEVICE DOES NOT DRAW, NOW (#469, #494): one value, which the
   // conversation's messages and their reactions are both drawn from, so a
   // block takes both off in the same render.
@@ -5965,11 +5973,7 @@ export function App({
             findable={findableAsFarAsKnown()}
             stays={
               !isOpenWithTheBlocked(
-                {
-                  scope: blockingSender.scope,
-                  other:
-                    party?.scope === blockingSender.scope ? party.other : null,
-                },
+                openConversationOf(blockingSender.scope, party),
                 derivedSummaries,
                 new Set([blockingSender.who]),
               )
@@ -6747,7 +6751,7 @@ export function App({
                     }}
                     joinedDelivered={deliveredJoined}
                     deliveredOutcome={deliveredOutcome}
-                    blocked={blockNotice}
+                    blockSaid={blockSaid}
                     names={names}
                     invitation={linkOutcome}
                     reinstalled={reinstalled}
@@ -6758,7 +6762,7 @@ export function App({
                     opening={waitingOn}
                     onOpen={scope => {
                       // Said once, on the list the block came back to.
-                      setBlockNotice(null)
+                      setBlockSaid(null)
                       openConversation(scope)
                     }}
                     findableNotice={listNotice(discovery, Date.now())}
@@ -6871,14 +6875,10 @@ export function App({
                     // TALLIED FROM THOSE DRAWN, by the filter of the messages
                     // below and from the same value: a blocked account's
                     // reactions leave with its messages (#494). Which are
-                    // this account's own is read from the session, as the
-                    // reading of the conversation read it when it tallied:
-                    // `selfUserId` waits for a launch that found a room.
-                    reactions={reactionsShown(
-                      reactions,
-                      notShownNow,
-                      credentialsRef.current?.userId ?? selfUserId,
-                    )}
+                    // this account's own is read from the session (`selfNow`),
+                    // as the reading of the conversation read it when it
+                    // tallied.
+                    reactions={reactionsShown(reactions, notShownNow, selfNow)}
                     read={readHere}
                     onReact={(target, key, own) =>
                       reactRef.current?.(target, key, own)
@@ -6915,11 +6915,11 @@ export function App({
                     of more than two, which stays: what it wrote is gone from
                     above, and this says so, and what still waits, as the
                     list says it of a conversation that left it. */}
-                  {blockNotice !== null && blockNotice.stays === openScope && (
+                  {blockSaid !== null && blockSaid.stayingIn === openScope && (
                     <Text
-                      testID={blockSays(blockNotice).testID}
+                      testID={blockSays(blockSaid).testID}
                       style={styles.blockedHere}>
-                      {t(blockSays(blockNotice).key)}
+                      {t(blockSays(blockSaid).key)}
                     </Text>
                   )}
                   {/* What the passive half found, when it found anything. A

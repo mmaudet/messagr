@@ -101,13 +101,17 @@ export type BlockOutcome =
 export type BlockNotice = 'blocked' | 'waiting' | 'not-kept'
 
 /**
- * What the screens say after a block (#469, #472): how it ended, and the
- * conversation it was made from when that one stays, in the list and open,
- * which a conversation of more than two does. `null` when it left the list.
+ * What the screens say after a block (#469, #472): how it ended, and where
+ * the person stays.
  */
 export interface BlockSaid {
   readonly notice: BlockNotice
-  readonly stays: string | null
+  /**
+   * The conversation the block was made from, when the person stays in it:
+   * one of more than two, which stays in the list and open. `null` when it
+   * left the list, and the person with it.
+   */
+  readonly stayingIn: string | null
 }
 
 /**
@@ -125,6 +129,12 @@ export async function blockAccount(
   deps: Blocking,
   blocked: string,
 ): Promise<BlockOutcome> {
+  // NEVER THIS ACCOUNT ITSELF, whatever a screen hands this: a block does
+  // not lift, and an account that ignored itself would hide its own words
+  // on every one of its devices for good.
+  if (blocked === deps.selfUserId) {
+    return { blocked: false, reason: 'an account does not block itself' }
+  }
   let ignored: ReadonlySet<string>
   try {
     ignored = await ignoredWith(deps.http, deps.selfUserId, blocked)
@@ -210,24 +220,41 @@ export function keptWithoutTheBlocked(
   kept: readonly KeptMessage[],
   blocked: ReadonlySet<string>,
 ): readonly KeptMessage[] {
-  if (blocked.size === 0) return kept
-  return kept.filter(
-    one => one.entry === null || !blocked.has(one.entry.claimedSender),
+  return withoutTheBlocked(
+    kept,
+    blocked,
+    one => one.entry?.claimedSender ?? null,
   )
 }
 
 /**
  * The calls tab without the calls of a blocked account (#494), whichever way
  * they went: what it wrote leaves every screen, and a row of the tab is also
- * a « Rappeler » that would ring it. The same list, handed back, when nobody
- * is blocked.
+ * a « Rappeler » that would ring it.
  */
 export function callsWithoutTheBlocked(
   calls: readonly CallRecord[],
   blocked: ReadonlySet<string>,
 ): readonly CallRecord[] {
-  if (blocked.size === 0) return calls
-  return calls.filter(call => !blocked.has(call.peerUserId))
+  return withoutTheBlocked(calls, blocked, call => call.peerUserId)
+}
+
+/**
+ * `items` without those of a blocked account, `whose` saying which account
+ * each is of, or `null` when nothing says: the one rule of the screens that
+ * are not a conversation's (a conversation's is `notShown.ts`). The same
+ * list, handed back, when nobody is blocked.
+ */
+function withoutTheBlocked<T>(
+  items: readonly T[],
+  blocked: ReadonlySet<string>,
+  whose: (item: T) => string | null,
+): readonly T[] {
+  if (blocked.size === 0) return items
+  return items.filter(item => {
+    const account = whose(item)
+    return account === null || !blocked.has(account)
+  })
 }
 
 /**

@@ -97,7 +97,7 @@ export interface ConversationListProps {
    * blocked from left this list or stays in it (`blockSays.ts`). `null` when
    * nothing is to be said.
    */
-  readonly blocked?: BlockSaid | null
+  readonly blockSaid?: BlockSaid | null
   /**
    * What became of an invitation this launch was opened with, when the
    * device already had an account. `null` when there was none. See
@@ -191,7 +191,7 @@ export function ConversationList({
   onOpenDelivered = () => undefined,
   joinedDelivered = [],
   deliveredOutcome = null,
-  blocked = null,
+  blockSaid = null,
   invitation = null,
   reinstalled = null,
   notInYet = false,
@@ -334,9 +334,9 @@ export function ConversationList({
           rows below, and this says so, and what still waits. Or, blocked
           from a conversation of more than two, which is still below, that
           what it wrote is gone from them (#472). */}
-      {blocked !== null && (
-        <Text style={styles.notice} testID={blockSays(blocked).testID}>
-          {t(blockSays(blocked).key)}
+      {blockSaid !== null && (
+        <Text style={styles.notice} testID={blockSays(blockSaid).testID}>
+          {t(blockSays(blockSaid).key)}
         </Text>
       )}
       {/* THE INVITATIONS DELIVERED INSIDE MESSAGR, ATOP THE LIST (#404), each

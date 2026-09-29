@@ -12,10 +12,11 @@ import type { BlockNotice, BlockSaid } from '../runtime/block'
  * on the list it came back to: the panel of the person, and the selection
  * in a conversation of two. One made from a conversation of more than two,
  * which stays, says only that what the account wrote left the conversations:
- * in that conversation, then on the list, where no conversation left.
+ * in that conversation, then on the list, where that conversation still is.
  *
- * Its own module, and not `Block.tsx`'s: the list reads it too, and a screen
- * spec that walks the list stands in for nothing a sheet needs.
+ * A module of its own, which both the list and the conversation read: the
+ * list's spec walks the list without standing in for the sheet a block is
+ * made in (`Block.tsx`).
  */
 const SAYS: Readonly<
   Record<
@@ -51,5 +52,5 @@ export function blockSays(said: BlockSaid): {
   readonly key: CopyKey
   readonly testID: string
 } {
-  return SAYS[said.stays === null ? 'left' : 'stays'][said.notice]
+  return SAYS[said.stayingIn === null ? 'left' : 'stays'][said.notice]
 }

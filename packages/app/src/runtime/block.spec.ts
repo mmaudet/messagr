@@ -267,6 +267,21 @@ describe('blocking an account from the panel of the person', () => {
     expect([...g.untold.held]).toEqual([])
   })
 
+  it('never blocks this account itself, and changes nothing', async () => {
+    // A block does not lift: whatever a screen hands it, this account is
+    // not an account it holds back from itself (#472).
+    const g = gesture()
+
+    const outcome = await blockAccount(g.deps, ME)
+
+    expect(outcome.blocked).toBe(false)
+    expect(g.log).toEqual([])
+    expect(g.server.state.writes).toEqual([])
+    expect(g.shown).toEqual([])
+    expect(g.told).toEqual([])
+    expect([...g.untold.held]).toEqual([])
+  })
+
   it('changes nothing when the list cannot be read', async () => {
     // A list read wrong and written back would lose somebody else's block.
     // Nor does a 404 without `M_NOT_FOUND` say there is no list: a proxy's
@@ -467,7 +482,7 @@ describe('the list and the conversations, derived from the homeserver’s ignore
     ).toEqual(['$mine'])
   })
 
-  it('closes the conversation open with the blocked account on that other device, and keeps one of more than two open (#494)', () => {
+  it('says the conversation open with the blocked account on that other device is to close, and one of more than two is not (#494)', () => {
     // Left open, what is written in it would still leave: it closes, as the
     // conversation blocked from does, when the list its sync carries arrives.
     const sync = {
@@ -652,9 +667,10 @@ describe('the calls, once an account is blocked (#494)', () => {
     expect(callsWithoutTheBlocked(calls, new Set())).toBe(calls)
   })
 
-  it('never calls a blocked account, whatever the gesture', () => {
-    // « Rappeler », a conversation's header: whatever is on the screen, the
-    // call is not placed, and the blocked account's telephone never rings.
+  it('refuses a call to a blocked account, in the guard every gesture goes through', () => {
+    // « Rappeler » and a conversation's header place a call by one path,
+    // which asks this first: whatever is on the screen, the call is not
+    // placed, and the blocked account's telephone does not ring.
     expect(mayCall(BLOCKED, new Set([BLOCKED]))).toBe(false)
     expect(mayCall(FRIEND, new Set([BLOCKED]))).toBe(true)
     expect(mayCall(BLOCKED, new Set())).toBe(true)
