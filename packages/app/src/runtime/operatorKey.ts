@@ -13,4 +13,4 @@
  */
 
 /** X25519, 32 bytes, in standard base64. */
-export const OPERATOR_KEY = 'mD3vxUbnchoghIM22hYScz6J+lmbQuZTjX22y4FoSDY='
+export const OPERATOR_KEY = '3bqCxFzEReMLGqqnxmJcBUSFcBNSbvALzniZdgGvyGU='
