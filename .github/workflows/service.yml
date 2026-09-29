@@ -7,13 +7,18 @@ name: Service
 # `paths` rather than `paths-ignore` here, unlike the device workflow, and the
 # asymmetry is deliberate. The device suite errs toward running because a
 # change anywhere might reach a device; this service is self-contained, so
-# nothing outside its own directory can change what it does.
+# nothing outside its own directory can change what it does. Its tests read
+# two files outside it (#473): the report sealed for the test key, and its
+# export, which the opening tool's suite opens too. A change to either runs
+# them.
 on:
   push:
     branches: [master]
     paths: &owned
       - 'services/invitations/**'
       - '.github/workflows/service.yml'
+      - 'scripts/fixtures/signalement-de-test.json'
+      - 'scripts/fixtures/signalement-exporte-de-test.json'
   pull_request:
     paths: *owned
 

@@ -92,6 +92,14 @@ jobs:
       - name: Assert the iOS screenshot sizes are the ones Apple accepts
         run: node scripts/assert-ios-captures.mjs --self-test
 
+      # LE SCRIPT QUI RETIRE, SUSPEND ET FERME SUR LE HOMESERVER (#473) ne
+      # s'essaie jamais contre le vrai. Il porte ses cas, comme les autres :
+      # chaque geste et chaque garde (le compte d'exploitation, la cible tapée
+      # en retour, rien de posté sans elles) contre un homeserver factice,
+      # local, et un répertoire personnel temporaire.
+      - name: Assert the homeserver's administration script keeps its guards
+        run: scripts/admin-messagr.sh --self-test
+
       - run: yarn lint
       - run: yarn format
       - run: yarn typecheck
