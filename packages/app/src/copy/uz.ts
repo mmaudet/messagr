@@ -204,8 +204,8 @@ export const uz: Readonly<Record<CopyKey, string>> = {
   report_reason_required: 'Avval sababni tanlang.',
   report_what_heading: 'Bu telefondan nima ketadi',
   report_what:
-    'Tanlangan xabarlar, siz ularni qanday oʻqisangiz shunday, muallifi va vaqti bilan. Suhbatdan boshqa hech narsa ketmaydi.',
-  'report_author %@': 'Muallif: %@',
+    'Tanlangan xabarlar, siz ularni qanday oʻqisangiz shunday, muallifi va vaqti, suhbat va har bir xabarning identifikatori hamda shikoyat vaqti bilan. Suhbatdan boshqa hech narsa ketmaydi.',
+  'report_author %@': 'Server maʼlumotiga koʻra muallif: %@',
   'report_when %1$@ %2$@': '%1$@, soat %2$@',
   'report_account %@': 'Hisobingiz nomidan yuboriladi: %@',
   report_operator_only:
@@ -213,8 +213,10 @@ export const uz: Readonly<Record<CopyKey, string>> = {
   report_send: 'Yuborish',
   report_sending: 'Yuborilmoqda…',
   report_cancel: 'Bekor qilish',
-  report_failed:
-    'Shikoyat ketmadi: hech narsa yuborilmadi. Qaytadan urinib koʻrishingiz mumkin.',
+  report_unconfirmed:
+    'Shikoyat tasdiqlanmadi: u ketgan boʻlishi ham, ketmagan boʻlishi ham mumkin. Qayta urinish uni faqat bir marta yuboradi.',
+  report_too_long:
+    'Bu xabarlar bitta shikoyat uchun juda uzun: yoping va kamroq xabar tanlang.',
   report_sent_title: 'Shikoyat yuborildi',
   'report_sent_number %@': 'Shikoyat raqami: %@',
   report_sent_decision:

@@ -40,7 +40,12 @@ interface RawEvent {
   event_id?: unknown
   sender?: unknown
   origin_server_ts?: unknown
-  content?: { body?: unknown }
+  content?: { body?: unknown; msgtype?: unknown }
+}
+
+/** An entry's `msgtype`, when its content states one: see `TimelineEntry`. */
+function kindOf(msgtype: unknown): { readonly msgtype?: string } {
+  return typeof msgtype === 'string' ? { msgtype } : {}
 }
 
 /**
@@ -133,7 +138,13 @@ export async function toTimelineEntries(
       // reason that has nothing to do with what happened.
       const body = event.content?.body
       if (typeof body === 'string') {
-        entries.push({ eventId, claimedSender: sender, sentAt, body })
+        entries.push({
+          eventId,
+          claimedSender: sender,
+          sentAt,
+          body,
+          ...kindOf(event.content?.msgtype),
+        })
       }
       continue
     }
@@ -196,6 +207,7 @@ export async function toTimelineEntries(
 
       const content = JSON.parse(decodeUtf8(envelope.ciphertext)) as {
         body?: unknown
+        msgtype?: unknown
       }
 
       // A reaction before a message, because a reaction has a body of its own
@@ -242,6 +254,11 @@ export async function toTimelineEntries(
         claimedSender: sender,
         sentAt,
         body: typeof content.body === 'string' ? content.body : null,
+        // A message's kind, and only a message's: a sticker's content may
+        // state one, and it is still not a message.
+        ...(envelope.eventType === 'm.room.message'
+          ? kindOf(content.msgtype)
+          : {}),
         ...(image === null ? {} : { image }),
         ...(document === null ? {} : { document }),
         ...(typeof content.body === 'string' ||

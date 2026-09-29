@@ -185,17 +185,19 @@ export const it: Readonly<Record<CopyKey, string>> = {
   report_reason_required: 'Scelga prima un motivo.',
   report_what_heading: 'Ciò che lascia questo telefono',
   report_what:
-    'I messaggi scelti, così come lei li legge, con il loro autore e il loro orario. Nient’altro della conversazione.',
-  'report_author %@': 'Autore: %@',
+    'I messaggi scelti, così come lei li legge, con il loro autore e il loro orario, l’identificativo della conversazione e quello di ogni messaggio, e il momento della segnalazione. Nient’altro della conversazione.',
+  'report_author %@': 'Attribuiti dal server a %@',
   'report_when %1$@ %2$@': '%1$@ alle %2$@',
   'report_account %@': 'Inviata a nome del suo account: %@',
   report_operator_only:
-    'Solo chi gestisce il servizio potrà aprirla: il server che la riceve non può leggerla.',
+    'Solo chi gestisce il servizio potrà aprirla: il servizio che la riceve non può leggerla.',
   report_send: 'Inviare',
   report_sending: 'Invio…',
   report_cancel: 'Annullare',
-  report_failed:
-    'La segnalazione non è partita: non è stato inviato nulla. Può riprovare.',
+  report_unconfirmed:
+    'La segnalazione non è confermata: forse è partita, forse no. Riprovare la invierà una sola volta.',
+  report_too_long:
+    'Questi messaggi sono troppo lunghi per una sola segnalazione: chiuda e ne scelga meno.',
   report_sent_title: 'Segnalazione inviata',
   'report_sent_number %@': 'Numero di segnalazione: %@',
   report_sent_decision:

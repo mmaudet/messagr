@@ -1,5 +1,6 @@
 import type { EnvelopeKeys } from './envelopeKeys'
 import { base64Of } from './receiveImage'
+import { parsed, type Answer } from './serviceAnswer'
 
 /**
  * Address-book discovery, as far as proving one's number and keeping it
@@ -28,12 +29,6 @@ import { base64Of } from './receiveImage'
  * tests stand them in and record every request, which is the seam #392
  * agreed for the application.
  */
-
-/** An answer of the service: its status and its body, read as text. */
-export interface Answer {
-  readonly status: number
-  readonly body: string
-}
 
 /**
  * The discovery routes of the invitation service, each authenticated by the
@@ -684,18 +679,6 @@ export function isFindable(
   readonly findableUntil: number
 } {
   return reading.findableUntil !== null && reading.findableUntil > now
-}
-
-/** A JSON object, or `null` for anything else a body may hold. */
-export function parsed(text: string): Record<string, unknown> | null {
-  try {
-    const value: unknown = JSON.parse(text)
-    return typeof value === 'object' && value !== null && !Array.isArray(value)
-      ? (value as Record<string, unknown>)
-      : null
-  } catch {
-    return null
-  }
 }
 
 function isOpenCountry(value: unknown): value is OpenCountry {

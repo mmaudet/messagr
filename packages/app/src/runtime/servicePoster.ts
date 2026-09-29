@@ -4,6 +4,7 @@ import type { DiscoveryService } from './discovery'
 import type { FindingService } from './findContacts'
 import type { InvitationService } from './issueInvitation'
 import type { ReportService } from './reportMessages'
+import type { Answer } from './serviceAnswer'
 
 /**
  * The poster the invitation service's claim endpoint is reached with.
@@ -86,29 +87,35 @@ export function invitationService(
 }
 
 /**
- * The discovery routes of the same service, reached as the account this
- * launch holds: proving a number (#397, #398), and looking for one's
- * contacts (#400).
+ * The account the service is reached as, read at each request: `null` while
+ * this launch holds none.
  *
- * The account is read at each request rather than handed over once: the
- * journey that uses this is made when the screen mounts, before a launch has
- * bound any account, and a request made without one fails like a service
- * that cannot be reached.
+ * Read at each request rather than handed over once: the journeys that use
+ * the service are made when their screen mounts, before a launch has bound
+ * any account.
  */
-export function discoveryService(
-  account: () => {
-    readonly baseUrl: string
-    readonly accessToken: string
-  } | null,
-): DiscoveryService & FindingService & DeliveryService {
-  const call = async (
+export type HeldAccount = () => {
+  readonly baseUrl: string
+  readonly accessToken: string
+} | null
+
+/**
+ * A request to the service as the account `account` holds, answered whole. A
+ * launch holding no account fails like a service that cannot be reached.
+ */
+function asTheAccount(account: HeldAccount) {
+  return async (
     path: string,
     body?: string,
     method: 'GET' | 'POST' | 'DELETE' = body === undefined ? 'GET' : 'POST',
-  ) => {
+    headers: Readonly<Record<string, string>> = {},
+  ): Promise<Answer> => {
     const held = account()
     if (held === null) throw new Error('this launch holds no account')
-    const authorised = { Authorization: `Bearer ${held.accessToken}` }
+    const authorised = {
+      ...headers,
+      Authorization: `Bearer ${held.accessToken}`,
+    }
     return answered(
       await fetch(
         `${serviceAt(held.baseUrl)}${path}`,
@@ -122,6 +129,17 @@ export function discoveryService(
       ),
     )
   }
+}
+
+/**
+ * The discovery routes of the same service, reached as the account this
+ * launch holds: proving a number (#397, #398), and looking for one's
+ * contacts (#400).
+ */
+export function discoveryService(
+  account: HeldAccount,
+): DiscoveryService & FindingService & DeliveryService {
+  const call = asTheAccount(account)
   return {
     state: () => call('/discovery/state'),
     startProof: body => call('/discovery/proofs', body),
@@ -153,7 +171,7 @@ export function serviceAt(baseUrl: string): string {
 }
 
 /** An answer read whole, whatever its status: a refusal is an answer too. */
-async function answered(response: Response) {
+async function answered(response: Response): Promise<Answer> {
   return { status: response.status, body: await response.text() }
 }
 
@@ -179,33 +197,15 @@ export async function announceDeletion(
 
 /**
  * The report route of the same service (#468), reached as the account this
- * launch holds: the reason's code and the sealed report go, a report number
- * comes back. The token says who reports; what the report carries is sealed
- * for the operator key (`reportMessages.ts`).
- *
- * The account is read at each request, as `discoveryService` reads it, and a
- * launch holding none fails like a service nobody reached.
+ * launch holds: the reason's code and the sealed report go, under the
+ * report's idempotency key, and a report number comes back. The token says
+ * who reports; what the report carries is sealed for the operator key
+ * (`reportMessages.ts`).
  */
-export function reportService(
-  account: () => {
-    readonly baseUrl: string
-    readonly accessToken: string
-  } | null,
-): ReportService {
+export function reportService(account: HeldAccount): ReportService {
+  const call = asTheAccount(account)
   return {
-    send: async body => {
-      const held = account()
-      if (held === null) throw new Error('this launch holds no account')
-      return answered(
-        await fetch(`${serviceAt(held.baseUrl)}/reports`, {
-          method: 'POST',
-          headers: {
-            Authorization: `Bearer ${held.accessToken}`,
-            'Content-Type': 'application/json',
-          },
-          body,
-        }),
-      )
-    },
+    send: (body, idempotencyKey) =>
+      call('/reports', body, 'POST', { 'idempotency-key': idempotencyKey }),
   }
 }

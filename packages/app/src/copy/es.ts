@@ -187,17 +187,19 @@ export const es: Readonly<Record<CopyKey, string>> = {
   report_reason_required: 'Elija primero un motivo.',
   report_what_heading: 'Lo que sale de este teléfono',
   report_what:
-    'Los mensajes elegidos, tal como usted los lee, con su autor y su hora. Nada más de la conversación.',
-  'report_author %@': 'Autor: %@',
+    'Los mensajes elegidos, tal como usted los lee, con su autor y su hora, el identificador de la conversación y el de cada mensaje, y el momento de la denuncia. Nada más de la conversación.',
+  'report_author %@': 'Atribuidos por el servidor a %@',
   'report_when %1$@ %2$@': '%1$@ a las %2$@',
   'report_account %@': 'Enviada en nombre de su cuenta: %@',
   report_operator_only:
-    'Solo quien explota el servicio podrá abrirla: el servidor que la recibe no puede leerla.',
+    'Solo quien explota el servicio podrá abrirla: el servicio que la recibe no puede leerla.',
   report_send: 'Enviar',
   report_sending: 'Enviando…',
   report_cancel: 'Cancelar',
-  report_failed:
-    'La denuncia no ha salido: no se ha enviado nada. Puede intentarlo de nuevo.',
+  report_unconfirmed:
+    'La denuncia no está confirmada: quizá haya salido, quizá no. Volver a intentarlo solo la enviará una vez.',
+  report_too_long:
+    'Estos mensajes son demasiado largos para una sola denuncia: cierre y elija menos.',
   report_sent_title: 'Denuncia enviada',
   'report_sent_number %@': 'Número de denuncia: %@',
   report_sent_decision:

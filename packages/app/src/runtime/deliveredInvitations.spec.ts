@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import type { Answer } from './discovery'
+import type { Answer } from './serviceAnswer'
 import {
   blockDelivered,
   cardsOfTheInviters,

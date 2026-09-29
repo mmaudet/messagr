@@ -34,7 +34,7 @@
  * or after a relaunch, since the person has answered already, and each such
  * entry answers one invitation and no other.
  */
-import { parsed, type Answer } from './discovery'
+import { parsed, type Answer } from './serviceAnswer'
 import { getErrorMessage } from './errors'
 import { createTheConversation } from './issueInvitation'
 import type { HttpRequester } from './pump'

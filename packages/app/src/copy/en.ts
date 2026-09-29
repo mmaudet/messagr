@@ -192,8 +192,8 @@ export const en: Readonly<Record<CopyKey, string>> = {
   report_reason_required: 'Choose a reason first.',
   report_what_heading: 'What leaves this phone',
   report_what:
-    'The messages you chose, as you read them, with their author and their time. Nothing else from the conversation.',
-  'report_author %@': 'Author: %@',
+    'The messages you chose, as you read them, with their author and their time, the identifier of the conversation and of each message, and the moment of the report. Nothing else from the conversation.',
+  'report_author %@': 'Attributed by the server to %@',
   'report_when %1$@ %2$@': '%1$@ at %2$@',
   'report_account %@': 'Sent in the name of your account: %@',
   report_operator_only:
@@ -201,8 +201,10 @@ export const en: Readonly<Record<CopyKey, string>> = {
   report_send: 'Send',
   report_sending: 'Sending…',
   report_cancel: 'Cancel',
-  report_failed:
-    'The report did not leave: nothing was sent. You can try again.',
+  report_unconfirmed:
+    'The report is not confirmed: it may have left, or not. Trying again sends it only once.',
+  report_too_long:
+    'These messages are too long for a single report: close, then choose fewer.',
   report_sent_title: 'Report sent',
   'report_sent_number %@': 'Report number: %@',
   report_sent_decision:

@@ -1,3 +1,4 @@
+import type { ReportedMessage } from '../runtime/reportFormat'
 import type { TimelineEntry } from './mergeTimeline'
 
 /**
@@ -91,42 +92,69 @@ export function canRemoveForEveryone(
 }
 
 /**
- * Whose messages the selection would report (#468): the one other
- * participant who wrote every selected message, when each is a text this
- * device could read. `null` otherwise, and « Signaler » is then absent.
+ * The kinds of message a report carries (#468): words, as a person writes
+ * them. A photograph or a document goes as the key to its encrypted copy,
+ * which #471 adds; a video, a voice message, a place or a sticker is not
+ * carried at all.
+ */
+const WORDS: ReadonlySet<string> = new Set(['m.text', 'm.notice', 'm.emote'])
+
+/** What a report of a selection carries: one author, and their messages. */
+export interface Reportable {
+  /** The account the homeserver attributes every message to. */
+  readonly author: string
+  /** In the order the conversation reads them. */
+  readonly messages: readonly ReportedMessage[]
+}
+
+/**
+ * What a report of the selection would carry (#468), or `null` when the
+ * selection cannot be reported, and « Signaler » is then absent.
+ *
+ * THE ONE DEFINITION, which the bar reads to offer « Signaler », the sheet
+ * to show what leaves, and `reportMessages` to seal it: so nothing leaves
+ * that was not shown.
  *
  * ONE AUTHOR, BECAUSE A REPORT NAMES ONE. What the operator decides, it
  * decides about an account (#462): a selection mixing two people would ask
  * it to take down a message somebody else wrote. And never this account's
  * own messages, which nobody reports to have them removed.
  *
- * TEXT ONLY, FOR NOW. A photograph or a document goes as the key to its
- * encrypted copy, which #471 adds; until then a selection holding one is not
- * a report at all, rather than a report quietly missing a picture. A message
- * this device could not open, or one removed, has nothing readable to send.
+ * WORDS ONLY (`WORDS`): a selection holding anything else is not a report
+ * at all, rather than a report quietly missing it. A message this device
+ * could not open, or one removed, has nothing readable to send.
  *
  * A selected event the conversation no longer carries makes it `null` too,
  * as for removing: nothing can say what would be sent.
  */
-export function reportedAuthor(
+export function reportable(
   selected: ReadonlySet<string>,
   entries: readonly TimelineEntry[],
   selfUserId: string,
-): string | null {
+): Reportable | null {
   const found = chosen(selected, entries)
   const author = found[0]?.claimedSender
   if (author === undefined || author === selfUserId) return null
   if (found.length !== selected.size) return null
-  return found.every(
-    entry =>
-      entry.claimedSender === author &&
-      entry.body !== null &&
-      entry.image === undefined &&
-      entry.document === undefined &&
-      entry.removed !== true,
-  )
-    ? author
-    : null
+  const messages: ReportedMessage[] = []
+  for (const entry of found) {
+    if (
+      entry.claimedSender !== author ||
+      entry.body === null ||
+      entry.removed === true ||
+      entry.msgtype === undefined ||
+      !WORDS.has(entry.msgtype)
+    ) {
+      return null
+    }
+    messages.push({
+      eventId: entry.eventId,
+      sentAt: entry.sentAt,
+      sender: author,
+      text: entry.body,
+    })
+  }
+  return { author, messages }
 }
 
 /**

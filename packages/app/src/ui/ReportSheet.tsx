@@ -10,9 +10,13 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 
 import { t, type CopyKey } from '../copy'
-import { color, floors, radius, space, type } from '../design/tokens'
-import type { ReportedMessage } from '../runtime/reportFormat'
-import { REPORT_REASONS, type ReportReason } from '../runtime/reportFormat'
+import { color, floors, layout, radius, space, type } from '../design/tokens'
+import {
+  REPORT_REASONS,
+  type ReportedMessage,
+  type ReportReason,
+} from '../runtime/reportFormat'
+import type { Reported } from '../runtime/reportMessages'
 import { NotchedButton } from './NotchedButton'
 import { dayOf, timeOf } from './whenLabel'
 
@@ -24,31 +28,58 @@ import { dayOf, timeOf } from './whenLabel'
  *
  * The report is a gesture somebody makes rarely, of their own accord, and
  * the sheet has to hold three things for it to stay one (#462): the account
- * that sends it, named (`report_account`); what leaves, said and shown, the
- * messages exactly as they read them with their author and their time, and
- * nothing else of the conversation; and a sending that is wanted every time,
- * which is why no reason is chosen in advance and « Envoyer » sends nothing
- * until one is.
+ * that sends it, named (`report_account`); what leaves, said and shown: the
+ * messages exactly as they read them with their author and their time, the
+ * identifiers of the conversation and of each message, the moment of the
+ * report, and nothing else of the conversation; and a sending that is wanted
+ * every time, which is why no reason is chosen in advance and « Envoyer »
+ * sends nothing until one is.
+ *
+ * # THE AUTHOR IS THE ACCOUNT THE SERVER ATTRIBUTES THE MESSAGES TO
+ *
+ * Decrypting a message does not establish who wrote it (ADR 0001, « What
+ * the seam does not give »): the sender is what the event says, as the
+ * homeserver relays it, which the timeline calls `claimedSender`. That is
+ * the account the report names, because it is the one a takedown and a
+ * suspension act on: the homeserver acts on its own attribution. So the
+ * sheet says the messages are attributed to it by the server, and names it
+ * the way the conversation does, a given name or the account's own form,
+ * without the server's suffix (`product-spec.md` §7.1), rather than as a
+ * proof of authorship.
  *
  * # « ENVOYER » IS NEVER GREYED
  *
  * Without a reason it says what is missing rather than looking dead, as the
  * first launch's own action does: a greyed button gives no reason.
  *
- * # TWO OUTCOMES
+ * # WHAT BECOMES OF IT
  *
- * Sent, with the report number and how to learn the decision; or not sent,
- * saying that nothing left, with the form still there to send again. The
- * reported messages stay in the conversation either way: reporting removes
- * nothing.
+ * Sent, with the report number and how to learn the decision. Too long, and
+ * fewer messages are to be chosen. Or unconfirmed: nothing came back, which
+ * cannot tell a report never sent from one whose answer was lost, so the
+ * sheet says so, and that sending again sends it once (`reportMessages.ts`).
+ * The sheet closes at any time, the sending one included: the report goes
+ * on without it, and sent again it is kept once. The reported messages stay
+ * in the conversation whatever happens: reporting removes nothing.
+ *
+ * Its shape is `RemoveSheet.tsx`'s, the ground, the scrim and the sheet: the
+ * product has no bottom sheet of its own to borrow.
  */
 
 /** Where a report stands, as the sheet shows it. */
 export type ReportStage =
   | { readonly stage: 'choosing' }
   | { readonly stage: 'sending' }
-  | { readonly stage: 'failed' }
   | { readonly stage: 'sent'; readonly number: string }
+  | { readonly stage: 'too-long' }
+  | { readonly stage: 'unconfirmed' }
+
+/** The stage a report's outcome puts the sheet at. */
+export function stageAfter(reported: Reported): ReportStage {
+  return reported.outcome === 'sent'
+    ? { stage: 'sent', number: reported.number }
+    : { stage: reported.outcome }
+}
 
 /** Each reason of the terms, in the words of the catalogue. */
 const REASON_LABELS: Readonly<Record<ReportReason, CopyKey>> = {
@@ -70,36 +101,33 @@ export function ReportSheet({
   onSend,
   onClose,
 }: {
-  /** The account every message is from, which the report names. */
+  /**
+   * The account the messages are attributed to, as the conversation names
+   * it: a given name, or the account's own form without its server.
+   */
   readonly author: string
-  /** The account this device holds, which sends the report. */
+  /** The account this device holds, which sends the report, named alike. */
   readonly reporter: string
   /**
    * What leaves: the selected messages, in the order the conversation reads
-   * them (`reportedMessages`, the reading the report itself is made from).
+   * them (`reportable`, the reading the report itself is made from).
    */
   readonly messages: readonly ReportedMessage[]
   readonly stage: ReportStage
   readonly onSend: (reason: ReportReason) => void
-  /** Closes the sheet. Never called while the report is being sent. */
   readonly onClose: () => void
 }) {
   const [reason, setReason] = useState<ReportReason | null>(null)
   const [missing, setMissing] = useState(false)
   const insets = useSafeAreaInsets()
   const sending = stage.stage === 'sending'
-  // WHILE IT IS BEING SENT, IT STAYS. Leaving then would leave the person
-  // without the number, or without knowing that nothing left.
-  const close = () => {
-    if (!sending) onClose()
-  }
 
   return (
     <Modal
       visible
       transparent
       animationType="fade"
-      onRequestClose={close}
+      onRequestClose={onClose}
       testID="report-sheet">
       <View style={styles.over}>
         <Pressable
@@ -107,9 +135,9 @@ export function ReportSheet({
           style={styles.scrim}
           accessibilityRole="button"
           accessibilityLabel={t(
-            stage.stage === 'sent' ? 'report_close' : 'report_cancel',
+            stage.stage === 'choosing' ? 'report_cancel' : 'report_close',
           )}
-          onPress={close}
+          onPress={onClose}
         />
         <View
           style={[styles.sheet, { paddingBottom: space.m + insets.bottom }]}>
@@ -170,7 +198,7 @@ export function ReportSheet({
                 <Text style={styles.heading}>{t('report_what_heading')}</Text>
                 <Text style={styles.body}>{t('report_what')}</Text>
                 <View style={styles.leaving} testID="report-messages">
-                  <Text style={styles.identifier}>
+                  <Text style={styles.attributed} testID="report-author">
                     {t('report_author %@', author)}
                   </Text>
                   {messages.map(message => (
@@ -203,35 +231,48 @@ export function ReportSheet({
                   {t('report_reason_required')}
                 </Text>
               )}
-              {stage.stage === 'failed' && (
-                <Text style={styles.waiting} testID="report-failed">
-                  {t('report_failed')}
+              {stage.stage === 'unconfirmed' && (
+                <Text style={styles.waiting} testID="report-unconfirmed">
+                  {t('report_unconfirmed')}
+                </Text>
+              )}
+              {stage.stage === 'too-long' && (
+                <Text style={styles.waiting} testID="report-too-long">
+                  {t('report_too_long')}
                 </Text>
               )}
 
               <View style={styles.actions}>
-                <NotchedButton
-                  wide
-                  label={t(sending ? 'report_sending' : 'report_send')}
-                  testID="report-send"
-                  onPress={() => {
-                    if (sending) return
-                    if (reason === null) {
-                      setMissing(true)
-                      return
-                    }
-                    onSend(reason)
-                  }}
-                />
-                {!sending && (
+                {/* TOO LONG, SENDING AGAIN CANNOT HELP: absent, like every
+                    action here that cannot do what it says. */}
+                {stage.stage !== 'too-long' && (
                   <NotchedButton
                     wide
-                    tone="quiet"
-                    label={t('report_cancel')}
-                    testID="report-cancel"
-                    onPress={onClose}
+                    label={t(sending ? 'report_sending' : 'report_send')}
+                    testID="report-send"
+                    onPress={() => {
+                      if (sending) return
+                      if (reason === null) {
+                        setMissing(true)
+                        return
+                      }
+                      onSend(reason)
+                    }}
                   />
                 )}
+                {/* « FERMER » ONCE IT HAS BEEN SENT: closing then cancels
+                    nothing, and the word must not say it does. */}
+                <NotchedButton
+                  wide
+                  tone="quiet"
+                  label={t(
+                    stage.stage === 'choosing'
+                      ? 'report_cancel'
+                      : 'report_close',
+                  )}
+                  testID="report-cancel"
+                  onPress={onClose}
+                />
               </View>
             </ScrollView>
           )}
@@ -253,7 +294,7 @@ const styles = StyleSheet.create({
   // Bounded, so that a long selection scrolls inside the sheet rather than
   // pushing its actions off the screen.
   sheet: {
-    maxHeight: '92%',
+    maxHeight: layout.sheetMaxHeight,
     backgroundColor: color.surface.paper,
     borderTopLeftRadius: radius.bubble,
     borderTopRightRadius: radius.bubble,
@@ -285,7 +326,7 @@ const styles = StyleSheet.create({
     padding: space.s,
     gap: space.s,
   },
-  identifier: { ...type.monoId, color: color.neutral['600'] },
+  attributed: { ...type.caption, color: color.neutral['600'] },
   message: {
     backgroundColor: color.surface.raised,
     borderRadius: radius.bubble,
@@ -297,7 +338,8 @@ const styles = StyleSheet.create({
   text: { ...type.body, color: color.neutral['900'] },
   number: { ...type.titleMono, color: color.neutral['900'] },
   // `wait.700`, the palette's text for what waits on a human gesture or on
-  // the network: a reason to choose, or a report to send again.
+  // the network: a reason to choose, a report to send again, fewer messages
+  // to choose.
   waiting: { ...type.bodySm, color: color.wait['700'] },
   actions: { gap: space.s },
 })

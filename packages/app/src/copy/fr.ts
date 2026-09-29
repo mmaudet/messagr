@@ -240,8 +240,10 @@ export const fr = {
   report_reason_required: 'Choisissez d’abord un motif.',
   report_what_heading: 'Ce qui part de ce téléphone',
   report_what:
-    'Les messages choisis, tels que vous les lisez, avec leur auteur et leur heure. Rien d’autre de la conversation.',
-  'report_author %@': 'Auteur : %@',
+    'Les messages choisis, tels que vous les lisez, avec leur auteur et leur heure, l’identifiant de la conversation et celui de chaque message, et le moment du signalement. Rien d’autre de la conversation.',
+  // ATTRIBUÉS, ET PAR LE SERVEUR : déchiffrer un message ne dit pas qui l'a
+  // écrit (ADR 0001), et l'auteur nommé est celui que le serveur lui donne.
+  'report_author %@': 'Attribués par le serveur à %@',
   'report_when %1$@ %2$@': '%1$@ à %2$@',
   'report_account %@': 'Envoyé au nom de votre compte : %@',
   report_operator_only:
@@ -249,8 +251,13 @@ export const fr = {
   report_send: 'Envoyer',
   report_sending: 'Envoi…',
   report_cancel: 'Annuler',
-  report_failed:
-    'Le signalement n’est pas parti : rien n’a été envoyé. Vous pouvez réessayer.',
+  // VRAIE DANS TOUS LES CAS : une réponse perdue ne se distingue pas d'un
+  // envoi qui n'est jamais parti, et la clé d'idempotence fait qu'un nouvel
+  // envoi du même signalement ne le garde qu'une fois.
+  report_unconfirmed:
+    'Le signalement n’est pas confirmé : il est peut-être parti, peut-être pas. Réessayer ne l’enverra qu’une fois.',
+  report_too_long:
+    'Ces messages sont trop longs pour un seul signalement : fermez, puis choisissez-en moins.',
   report_sent_title: 'Signalement envoyé',
   'report_sent_number %@': 'Numéro de signalement : %@',
   report_sent_decision:

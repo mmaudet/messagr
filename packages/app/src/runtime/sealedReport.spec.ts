@@ -489,6 +489,7 @@ describe("The operator's opening tool, as it is run", () => {
     const sent: string[] = []
     const reported = await reportMessages(
       {
+        whoami: async () => '@alice:example.org',
         seal: (payload, binding) =>
           sealReportWithEphemeral(
             generateKeyPair(),
@@ -496,6 +497,7 @@ describe("The operator's opening tool, as it is run", () => {
             binding,
             TEST_KEY.public_key,
           ),
+        keyOf: () => 'report-key-1',
         service: {
           send: async body => {
             sent.push(body)
@@ -503,9 +505,10 @@ describe("The operator's opening tool, as it is run", () => {
           },
         },
         now: () => 1_790_000_060_000,
+        after: () => new Promise(() => {}),
       },
       {
-        reporter: '@alice:example.org',
+        self: '@alice:example.org',
         roomId: '!room:example.org',
         reason: 'harassment',
         selected: new Set(['$first', '$second']),
@@ -515,23 +518,26 @@ describe("The operator's opening tool, as it is run", () => {
             claimedSender: '@bob:example.org',
             sentAt: 1_790_000_010_000,
             body: 'Tu vas le regretter.',
+            msgtype: 'm.text',
           },
           {
             eventId: '$between',
             claimedSender: '@alice:example.org',
             sentAt: 1_790_000_015_000,
             body: 'Arrête.',
+            msgtype: 'm.text',
           },
           {
             eventId: '$second',
             claimedSender: '@bob:example.org',
             sentAt: 1_790_000_020_000,
             body: 'Réponds.\nMaintenant.',
+            msgtype: 'm.text',
           },
         ],
       },
     )
-    expect(reported).toEqual({ sent: true, number: 'K7QM-4ZT2' })
+    expect(reported).toEqual({ outcome: 'sent', number: 'K7QM-4ZT2' })
     const { reason, sealed } = JSON.parse(sent[0]!) as {
       readonly reason: string
       readonly sealed: string

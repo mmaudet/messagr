@@ -24,6 +24,14 @@ export interface TimelineEntry {
   readonly sentAt: number
   /** `null` when this device could not read it. */
   readonly body: string | null
+  /**
+   * The message's kind, its `msgtype`, when the event is an `m.room.message`
+   * this device read: `m.text`, `m.notice`, `m.emote`, `m.image`, `m.video`
+   * and the others. Absent for any other event, a sticker included. A video,
+   * a voice message or a place has a `body` too, and this is what tells them
+   * from words: what a report may carry is read from it (#468).
+   */
+  readonly msgtype?: string
   /** Why it could not be read, when it could not. */
   readonly reason?: string
   /**

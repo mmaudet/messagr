@@ -8,7 +8,7 @@ import {
   canRemoveForEveryone,
   copyText,
   onlyPhotograph,
-  reportedAuthor,
+  reportable,
   toggle,
 } from './selection'
 
@@ -241,44 +241,95 @@ describe('what can be kept as a favourite', () => {
   })
 })
 
-describe('what can be reported (#468)', () => {
-  const HIS = said('$b1', '@him:x', 'et toi')
-  const HERS_TOO = said('$h2', HER, 'encore')
+describe('what a report carries (#468)', () => {
+  /** A message of `kind` that this device read. */
+  function wrote(
+    eventId: string,
+    sender: string,
+    sentAt: number,
+    body: string,
+    msgtype = 'm.text',
+  ): TimelineEntry {
+    return { eventId, claimedSender: sender, sentAt, body, msgtype }
+  }
 
-  it('names the one other participant who wrote every text selected', () => {
-    // #462: « Signaler » only on the messages of one other participant,
-    // several of them if they wrote several.
-    const held = [MINE, HERS, HIS, HERS_TOO]
-    expect(reportedAuthor(new Set(['$h1']), held, ME)).toBe(HER)
-    expect(reportedAuthor(new Set(['$h1', '$h2']), held, ME)).toBe(HER)
+  const HERS_FIRST = wrote('$h1', HER, 1000, 'salut')
+  const HERS_THEN = wrote('$h2', HER, 2000, 'encore')
+  const HIS = wrote('$b1', '@him:x', 1500, 'et toi')
+  const MY_WORDS = wrote('$m1', ME, 500, 'bonjour')
+
+  it('carries every text selected, from the one other participant who wrote them, in the conversation’s order', () => {
+    // #462: « Signaler » on the messages of one other participant, several
+    // of them if they wrote several, whatever order they were chosen in.
+    const held = [MY_WORDS, HERS_FIRST, HIS, HERS_THEN]
+    expect(reportable(new Set(['$h2', '$h1']), held, ME)).toEqual({
+      author: HER,
+      messages: [
+        { eventId: '$h1', sentAt: 1000, sender: HER, text: 'salut' },
+        { eventId: '$h2', sentAt: 2000, sender: HER, text: 'encore' },
+      ],
+    })
   })
 
-  it('names nobody, so « Signaler » is absent, when two people wrote them', () => {
-    const held = [HERS, HIS]
-    expect(reportedAuthor(new Set(['$h1', '$b1']), held, ME)).toBeNull()
+  it('carries words of every kind a person writes: a text, a notice, an emote', () => {
+    const held = [
+      wrote('$n', HER, 1, 'avis', 'm.notice'),
+      wrote('$e', HER, 2, 'salue', 'm.emote'),
+    ]
+    expect(reportable(new Set(['$n', '$e']), held, ME)?.messages).toHaveLength(
+      2,
+    )
   })
 
-  it('names nobody when one of them is this account’s own', () => {
-    const held = [MINE, HERS]
-    expect(reportedAuthor(new Set(['$m1']), held, ME)).toBeNull()
-    expect(reportedAuthor(new Set(['$m1', '$h1']), held, ME)).toBeNull()
+  it('carries nothing, so « Signaler » is absent, when two people wrote them', () => {
+    const held = [HERS_FIRST, HIS]
+    expect(reportable(new Set(['$h1', '$b1']), held, ME)).toBeNull()
   })
 
-  it('names nobody for a photograph or a document, which are #471’s', () => {
-    const document: TimelineEntry = {
-      eventId: '$d1',
+  it('carries nothing when one of them is this account’s own', () => {
+    const held = [MY_WORDS, HERS_FIRST]
+    expect(reportable(new Set(['$m1']), held, ME)).toBeNull()
+    expect(reportable(new Set(['$m1', '$h1']), held, ME)).toBeNull()
+  })
+
+  it('carries nothing but words: a video, a voice message, a place, a sticker, a photograph or a document', () => {
+    // Photographs and documents are #471's; the others are not carried at
+    // all, and a selection holding one is not a report rather than a report
+    // quietly missing it.
+    const sticker: TimelineEntry = {
+      eventId: '$s',
       claimedSender: HER,
-      sentAt: 0,
+      sentAt: 5,
+      body: 'un chat',
+    }
+    const photograph: TimelineEntry = {
+      ...shown('$p', HER),
+      msgtype: 'm.image',
+    }
+    const document: TimelineEntry = {
+      eventId: '$d',
+      claimedSender: HER,
+      sentAt: 7,
       body: 'contrat.pdf',
+      msgtype: 'm.file',
       document: {} as TimelineEntry['document'],
     }
-    const held = [HERS, shown('$p1', HER), document]
-    expect(reportedAuthor(new Set(['$p1']), held, ME)).toBeNull()
-    expect(reportedAuthor(new Set(['$h1', '$p1']), held, ME)).toBeNull()
-    expect(reportedAuthor(new Set(['$d1']), held, ME)).toBeNull()
+    const held = [
+      HERS_FIRST,
+      wrote('$v', HER, 2, 'film.mp4', 'm.video'),
+      wrote('$a', HER, 3, 'voix.ogg', 'm.audio'),
+      wrote('$l', HER, 4, 'Ici', 'm.location'),
+      sticker,
+      photograph,
+      document,
+    ]
+    for (const other of ['$v', '$a', '$l', '$s', '$p', '$d']) {
+      expect(reportable(new Set([other]), held, ME), other).toBeNull()
+      expect(reportable(new Set(['$h1', other]), held, ME), other).toBeNull()
+    }
   })
 
-  it('names nobody for a message this device could not open, or one removed', () => {
+  it('carries nothing for a message this device could not open, or one removed', () => {
     // Nothing readable to send: a report carries the messages as read.
     const unreadable: TimelineEntry = {
       eventId: '$u',
@@ -294,13 +345,13 @@ describe('what can be reported (#468)', () => {
       body: null,
       removed: true,
     }
-    const held = [HERS, unreadable, gone]
-    expect(reportedAuthor(new Set(['$h1', '$u']), held, ME)).toBeNull()
-    expect(reportedAuthor(new Set(['$g']), held, ME)).toBeNull()
+    const held = [HERS_FIRST, unreadable, gone]
+    expect(reportable(new Set(['$h1', '$u']), held, ME)).toBeNull()
+    expect(reportable(new Set(['$g']), held, ME)).toBeNull()
   })
 
-  it('names nobody for a selection the conversation no longer carries', () => {
-    expect(reportedAuthor(new Set(['$h1', '$gone']), [HERS], ME)).toBeNull()
-    expect(reportedAuthor(new Set(), [HERS], ME)).toBeNull()
+  it('carries nothing for a selection the conversation no longer holds, or none', () => {
+    expect(reportable(new Set(['$h1', '$gone']), [HERS_FIRST], ME)).toBeNull()
+    expect(reportable(new Set(), [HERS_FIRST], ME)).toBeNull()
   })
 })

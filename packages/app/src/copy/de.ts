@@ -191,8 +191,8 @@ export const de: Readonly<Record<CopyKey, string>> = {
   report_reason_required: 'Wählen Sie zuerst einen Grund.',
   report_what_heading: 'Was dieses Telefon verlässt',
   report_what:
-    'Die ausgewählten Nachrichten, so wie Sie sie lesen, mit ihrem Verfasser und ihrer Uhrzeit. Nichts sonst aus der Unterhaltung.',
-  'report_author %@': 'Verfasser: %@',
+    'Die ausgewählten Nachrichten, so wie Sie sie lesen, mit ihrem Verfasser und ihrer Uhrzeit, der Kennung der Unterhaltung und jeder Nachricht sowie dem Zeitpunkt der Meldung. Nichts sonst aus der Unterhaltung.',
+  'report_author %@': 'Laut Server verfasst von %@',
   'report_when %1$@ %2$@': '%1$@ um %2$@',
   'report_account %@': 'Gesendet im Namen Ihres Kontos: %@',
   report_operator_only:
@@ -200,8 +200,10 @@ export const de: Readonly<Record<CopyKey, string>> = {
   report_send: 'Senden',
   report_sending: 'Wird gesendet …',
   report_cancel: 'Abbrechen',
-  report_failed:
-    'Die Meldung ist nicht hinausgegangen: Es wurde nichts gesendet. Sie können es erneut versuchen.',
+  report_unconfirmed:
+    'Die Meldung ist nicht bestätigt: Sie ist vielleicht hinausgegangen, vielleicht nicht. Ein erneuter Versuch sendet sie nur einmal.',
+  report_too_long:
+    'Diese Nachrichten sind für eine einzige Meldung zu lang: Schließen Sie und wählen Sie weniger aus.',
   report_sent_title: 'Meldung gesendet',
   'report_sent_number %@': 'Meldungsnummer: %@',
   report_sent_decision:

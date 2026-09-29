@@ -295,7 +295,52 @@ describe('toTimelineEntries', () => {
         },
       ],
     )
-    expect(entry).toMatchObject({ eventId: '$p', body: 'en clair' })
+    expect(entry).toMatchObject({
+      eventId: '$p',
+      body: 'en clair',
+      msgtype: 'm.text',
+    })
+  })
+
+  it('says what kind of message each is, and no kind for anything else', async () => {
+    // #468: a report carries text messages only, and a video, a voice
+    // message, a place or a sticker have a body too. Their kind is what
+    // tells them from words.
+    const contents: Record<string, object> = {
+      $text: { msgtype: 'm.text', body: 'bonjour' },
+      $notice: { msgtype: 'm.notice', body: 'avis' },
+      $emote: { msgtype: 'm.emote', body: 'salue' },
+      $video: { msgtype: 'm.video', body: 'film.mp4' },
+      $voice: { msgtype: 'm.audio', body: 'voix.ogg' },
+      $place: { msgtype: 'm.location', body: 'Ici', geo_uri: 'geo:48.8,2.3' },
+      $sticker: { body: 'un chat' },
+    }
+    const kinds: TimelineMachine = {
+      decryptEvent: async (_scope, rawEvent) => {
+        const id = (rawEvent as { event_id: string }).event_id
+        return {
+          eventType: id === '$sticker' ? 'm.sticker' : 'm.room.message',
+          ciphertext: encode(JSON.stringify(contents[id])),
+        }
+      },
+    }
+
+    const entries = await entriesOf(
+      kinds,
+      decodeUtf8,
+      '!room:messagr.eu',
+      Object.keys(contents).map((id, at) => encrypted(id, at)),
+    )
+
+    expect(entries.map(entry => [entry.eventId, entry.msgtype])).toEqual([
+      ['$text', 'm.text'],
+      ['$notice', 'm.notice'],
+      ['$emote', 'm.emote'],
+      ['$video', 'm.video'],
+      ['$voice', 'm.audio'],
+      ['$place', 'm.location'],
+      ['$sticker', undefined],
+    ])
   })
 
   it('skips an event that is neither a message nor encrypted', async () => {

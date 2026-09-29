@@ -183,8 +183,8 @@ export const nl: Readonly<Record<CopyKey, string>> = {
   report_reason_required: 'Kies eerst een reden.',
   report_what_heading: 'Wat deze telefoon verlaat',
   report_what:
-    'De gekozen berichten, zoals u ze leest, met hun afzender en hun tijdstip. Verder niets uit het gesprek.',
-  'report_author %@': 'Afzender: %@',
+    'De gekozen berichten, zoals u ze leest, met hun afzender en hun tijdstip, de identificatie van het gesprek en van elk bericht, en het moment van de melding. Verder niets uit het gesprek.',
+  'report_author %@': 'Door de server toegeschreven aan %@',
   'report_when %1$@ %2$@': '%1$@ om %2$@',
   'report_account %@': 'Verstuurd namens uw account: %@',
   report_operator_only:
@@ -192,8 +192,10 @@ export const nl: Readonly<Record<CopyKey, string>> = {
   report_send: 'Versturen',
   report_sending: 'Versturen…',
   report_cancel: 'Annuleren',
-  report_failed:
-    'De melding is niet vertrokken: er is niets verstuurd. U kunt het opnieuw proberen.',
+  report_unconfirmed:
+    'De melding is niet bevestigd: ze is misschien vertrokken, misschien niet. Opnieuw proberen verstuurt haar maar één keer.',
+  report_too_long:
+    'Deze berichten zijn te lang voor één melding: sluit en kies er minder.',
   report_sent_title: 'Melding verstuurd',
   'report_sent_number %@': 'Meldingsnummer: %@',
   report_sent_decision:

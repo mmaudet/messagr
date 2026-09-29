@@ -56,13 +56,9 @@ import {
 
 import type { AddressBookAccess } from './addressBook'
 import { bytesOf } from './base64'
-import {
-  isFindable,
-  parsed,
-  type Answer,
-  type DiscoveryReading,
-} from './discovery'
+import { isFindable, type DiscoveryReading } from './discovery'
 import { base64Of } from './receiveImage'
+import { parsed, type Answer } from './serviceAnswer'
 
 /** An entry of the address book, as the system gives it. */
 export interface Contact {
