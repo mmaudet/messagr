@@ -10,6 +10,7 @@ mod db;
 mod error;
 mod extract;
 mod handlers;
+mod idempotency;
 mod masking;
 mod masking_quota;
 mod matrix;
