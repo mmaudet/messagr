@@ -51,6 +51,7 @@ export function SelectionBar({
   canKeep: keepable,
   canFavourite: favouritable,
   canReport: reportable,
+  canBlock: blockable,
   alreadyFavourite,
   onClear,
   onCopy,
@@ -58,6 +59,7 @@ export function SelectionBar({
   onForward,
   onKeep,
   onReport,
+  onBlock,
   onRemove,
 }: {
   readonly count: number
@@ -83,12 +85,19 @@ export function SelectionBar({
    * nobody can predict.
    */
   readonly alreadyFavourite: boolean
+  /**
+   * Whether every message chosen comes from one and the same other
+   * participant, whom « Bloquer l’expéditeur » would block (#472,
+   * `blockable`).
+   */
+  readonly canBlock: boolean
   readonly onClear: () => void
   readonly onFavourite: () => void
   readonly onCopy: () => void
   readonly onForward: () => void
   readonly onKeep: () => void
   readonly onReport: () => void
+  readonly onBlock: () => void
   readonly onRemove: () => void
 }) {
   return (
@@ -126,6 +135,7 @@ export function SelectionBar({
           onPress={onCopy}
           accessibilityRole="button"
           accessibilityLabel={t('selection_copy')}
+          hitSlop={SLOP}
           style={({ pressed }) => [styles.action, pressed && styles.pressed]}>
           <TabIcon glyph="copy" tint={color.surface.paper} />
         </Pressable>
@@ -137,6 +147,7 @@ export function SelectionBar({
           onPress={onForward}
           accessibilityRole="button"
           accessibilityLabel={t('selection_forward')}
+          hitSlop={SLOP}
           style={({ pressed }) => [styles.action, pressed && styles.pressed]}>
           <TabIcon glyph="forward" tint={color.surface.paper} />
         </Pressable>
@@ -158,6 +169,7 @@ export function SelectionBar({
               ? t('selection_unfavourite')
               : t('selection_favourite')
           }
+          hitSlop={SLOP}
           style={({ pressed }) => [styles.action, pressed && styles.pressed]}>
           {/* FULL AGAINST EMPTY, not one colour against another. The star
               says which way the gesture goes, and §13 refuses a state
@@ -183,6 +195,7 @@ export function SelectionBar({
           onPress={onKeep}
           accessibilityRole="button"
           accessibilityLabel={t('selection_keep')}
+          hitSlop={SLOP}
           style={({ pressed }) => [styles.action, pressed && styles.pressed]}>
           <TabIcon glyph="save" tint={color.surface.paper} />
         </Pressable>
@@ -201,8 +214,28 @@ export function SelectionBar({
           onPress={onReport}
           accessibilityRole="button"
           accessibilityLabel={t('selection_report')}
+          hitSlop={SLOP}
           style={({ pressed }) => [styles.action, pressed && styles.pressed]}>
           <TabIcon glyph="flag" tint={color.surface.paper} />
+        </Pressable>
+      )}
+
+      {/* ONLY ON ONE OTHER PERSON'S MESSAGES (#472), whatever they hold: a
+          block names one account, so a selection mixing two people or
+          holding one of this account's own has no « Bloquer l'expéditeur »,
+          absent and never greyed, as everything here. In a conversation of
+          more than two it is the only way to block anybody. What it opens is
+          the screen of the panel of the person, which says what the block
+          does and does not do before anything is done: `Block.tsx`. */}
+      {blockable && (
+        <Pressable
+          testID="selection-block"
+          onPress={onBlock}
+          accessibilityRole="button"
+          accessibilityLabel={t('selection_block')}
+          hitSlop={SLOP}
+          style={({ pressed }) => [styles.action, pressed && styles.pressed]}>
+          <TabIcon glyph="block" tint={color.surface.paper} />
         </Pressable>
       )}
 
@@ -215,6 +248,7 @@ export function SelectionBar({
         onPress={onRemove}
         accessibilityRole="button"
         accessibilityLabel={t('selection_remove')}
+        hitSlop={SLOP}
         style={({ pressed }) => [styles.action, pressed && styles.pressed]}>
         {/* The one that keeps its colour. Red on a dark green ground is
             unreadable as text, which is why this used to be a word placed
@@ -225,6 +259,13 @@ export function SelectionBar({
     </View>
   )
 }
+
+/**
+ * What an action is touched by beyond what it draws: the half of the gap on
+ * either side, so the actions sit closer without being any harder to hit,
+ * and no two of them claim the same point.
+ */
+const SLOP = { left: space.xs, right: space.xs }
 
 const styles = StyleSheet.create({
   // No ground and no inset: the band around it has both. See the note above
@@ -247,10 +288,17 @@ const styles = StyleSheet.create({
   // how it becomes a column.
   count: { ...type.titleMd, color: color.surface.paper, flexShrink: 0 },
   spacer: { flex: 1 },
+  // SEVEN ACTIONS, ON ONE LINE (#472). With « Bloquer l'expéditeur », and a
+  // photograph that can be reported (#471), a photograph of somebody else
+  // offers seven. At `space.s` a side, the row adds up to some 412 points,
+  // the gutters, the ✕ and the count included: past the edge of a 393-point
+  // iPhone, and the bin with it. At `space.xs`, to some 356, inside a
+  // 360-point Android; `SLOP` gives each action back the width it had to be
+  // touched.
   action: {
     minHeight: floors.touchTargetMin,
     justifyContent: 'center',
-    paddingHorizontal: space.s,
+    paddingHorizontal: space.xs,
   },
   actionLabel: { ...type.action, color: color.surface.paper },
   // Red on a dark green ground would be unreadable, so the destructive one

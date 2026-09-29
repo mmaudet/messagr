@@ -430,3 +430,30 @@ describe('invitations delivered inside Messagr, atop the list (#404)', () => {
     ).toHaveLength(1)
   })
 })
+
+describe('an account just blocked, above the list (#469, #472)', () => {
+  it('says the conversation left the list when the one blocked from did', () => {
+    const drawn = list({ blocked: { notice: 'waiting', stays: null } })
+
+    expect(withId(drawn, 'list-blocked-waiting')?.props.children).toBe(
+      t('list_blocked_waiting'),
+    )
+  })
+
+  it('does not say a conversation left it when the one blocked from stays', () => {
+    // Blocked from the selection in a conversation of more than two, which
+    // is still in the list below.
+    const drawn = list({ blocked: { notice: 'blocked', stays: '!a:x' } })
+
+    expect(withId(drawn, 'blocked-several')?.props.children).toBe(
+      t('blocked_several'),
+    )
+    expect(words(drawn)).not.toContain(t('list_blocked'))
+  })
+
+  it('says nothing when nothing was blocked', () => {
+    const said = words(list())
+    expect(said).not.toContain(t('list_blocked'))
+    expect(said).not.toContain(t('blocked_several'))
+  })
+})

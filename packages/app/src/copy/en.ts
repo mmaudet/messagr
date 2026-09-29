@@ -507,6 +507,15 @@ export const en: Readonly<Record<CopyKey, string>> = {
     'This account is blocked, and your conversation with it has left the list: its messages and calls will no longer reach you. The operator has not been told yet, and until then an invitation in Messagr from this account can still reach you. The app will try again at every launch until it is.',
   list_blocked_not_kept:
     'This account is blocked, and your conversation with it has left the list: its messages and calls will no longer reach you. The operator has not been told, and this device could not note it to try again: an invitation in Messagr from this account can still reach you.',
+  selection_block: 'Block sender',
+  block_explain_gone_several:
+    'Its messages disappear from all your conversations, those already received included. This conversation stays in your list, without them, and your direct conversation with this account, if you have one, leaves it. You leave none of them: this account sees nothing change.',
+  blocked_several:
+    'This account is blocked: nothing from it will reach you any more, and what it wrote has left your conversations.',
+  blocked_several_waiting:
+    'This account is blocked, and what it wrote has left your conversations: its messages and calls will no longer reach you. The operator has not been told yet, and until then an invitation in Messagr from this account can still reach you. The app will try again at every launch until it is.',
+  blocked_several_not_kept:
+    'This account is blocked, and what it wrote has left your conversations: its messages and calls will no longer reach you. The operator has not been told, and this device could not note it to try again: an invitation in Messagr from this account can still reach you.',
   invited_working: 'One moment…',
   invited_failed:
     'Nothing has changed: this invitation was neither joined nor refused. You can try again.',

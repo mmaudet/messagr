@@ -811,6 +811,22 @@ export const fr = {
     'Ce compte est bloqué, et votre conversation avec lui a quitté la liste : ses messages et ses appels ne vous parviendront plus. L’exploitant n’en est pas encore informé, et d’ici là, une invitation remise dans Messagr par ce compte peut encore vous parvenir. L’application réessaiera à chaque lancement, jusqu’à ce qu’il le soit.',
   list_blocked_not_kept:
     'Ce compte est bloqué, et votre conversation avec lui a quitté la liste : ses messages et ses appels ne vous parviendront plus. L’exploitant n’en a pas été informé, et cet appareil n’a pas pu le noter pour réessayer : une invitation remise dans Messagr par ce compte peut encore vous parvenir.',
+  // « BLOQUER L'EXPÉDITEUR », DEPUIS LA SÉLECTION (#472). Le même geste et le
+  // même écran que le panneau de la personne, et la seule entrée dans une
+  // conversation à plusieurs, où ce panneau n'existe pas. Là, la conversation
+  // reste dans la liste et seuls les messages du compte bloqué la quittent :
+  // l'écran le dit à la place de « cette conversation quitte votre liste »,
+  // puis la conversation dit ce qui est fait et ce qui attend, et la liste
+  // ensuite, sans prétendre qu'une conversation l'a quittée.
+  selection_block: 'Bloquer l’expéditeur',
+  block_explain_gone_several:
+    'Ses messages disparaissent de toutes vos conversations, ceux déjà reçus compris. Cette conversation reste dans votre liste, sans eux, et votre conversation à deux avec ce compte, si vous en avez une, la quitte. Vous ne sortez d’aucune : ce compte ne voit rien changer.',
+  blocked_several:
+    'Ce compte est bloqué : plus rien de lui ne vous parviendra, et ce qu’il a écrit a quitté vos conversations.',
+  blocked_several_waiting:
+    'Ce compte est bloqué, et ce qu’il a écrit a quitté vos conversations : ses messages et ses appels ne vous parviendront plus. L’exploitant n’en est pas encore informé, et d’ici là, une invitation remise dans Messagr par ce compte peut encore vous parvenir. L’application réessaiera à chaque lancement, jusqu’à ce qu’il le soit.',
+  blocked_several_not_kept:
+    'Ce compte est bloqué, et ce qu’il a écrit a quitté vos conversations : ses messages et ses appels ne vous parviendront plus. L’exploitant n’en a pas été informé, et cet appareil n’a pas pu le noter pour réessayer : une invitation remise dans Messagr par ce compte peut encore vous parvenir.',
   invited_working: 'Un instant…',
   invited_failed:
     'Rien n’a changé : cette invitation n’a été ni rejointe ni refusée. Vous pouvez réessayer.',

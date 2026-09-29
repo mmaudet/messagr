@@ -519,6 +519,15 @@ export const uz: Readonly<Record<CopyKey, string>> = {
     'Bu hisob bloklandi va u bilan suhbatingiz roʻyxatdan chiqdi: uning xabarlari va qoʻngʻiroqlari endi sizga yetib kelmaydi. Operatorga hali xabar berilmagan va shu vaqtgacha bu hisobdan Messagrdagi taklif sizga hali yetib kelishi mumkin. Ilova bu amalga oshmaguncha har safar ishga tushganda qayta urinadi.',
   list_blocked_not_kept:
     'Bu hisob bloklandi va u bilan suhbatingiz roʻyxatdan chiqdi: uning xabarlari va qoʻngʻiroqlari endi sizga yetib kelmaydi. Operatorga xabar berilmadi va bu qurilma qayta urinish uchun buni yozib qoʻya olmadi: bu hisobdan Messagrdagi taklif sizga hali yetib kelishi mumkin.',
+  selection_block: 'Joʻnatuvchini bloklash',
+  block_explain_gone_several:
+    'Uning xabarlari barcha suhbatlaringizdan, allaqachon olinganlari ham, yoʻqoladi. Bu suhbat ularsiz roʻyxatingizda qoladi, bu hisob bilan ikki kishilik suhbatingiz esa, agar bor boʻlsa, roʻyxatdan chiqadi. Siz hech biridan chiqmaysiz: bu hisob hech qanday oʻzgarishni koʻrmaydi.',
+  blocked_several:
+    'Bu hisob bloklandi: undan sizga boshqa hech narsa yetib kelmaydi va u yozgan narsalar suhbatlaringizdan chiqdi.',
+  blocked_several_waiting:
+    'Bu hisob bloklandi va u yozgan narsalar suhbatlaringizdan chiqdi: uning xabarlari va qoʻngʻiroqlari endi sizga yetib kelmaydi. Operatorga hali xabar berilmagan va shu vaqtgacha bu hisobdan Messagrdagi taklif sizga hali yetib kelishi mumkin. Ilova bu amalga oshmaguncha har safar ishga tushganda qayta urinadi.',
+  blocked_several_not_kept:
+    'Bu hisob bloklandi va u yozgan narsalar suhbatlaringizdan chiqdi: uning xabarlari va qoʻngʻiroqlari endi sizga yetib kelmaydi. Operatorga xabar berilmadi va bu qurilma qayta urinish uchun buni yozib qoʻya olmadi: bu hisobdan Messagrdagi taklif sizga hali yetib kelishi mumkin.',
   invited_working: 'Bir daqiqa…',
   invited_failed:
     'Hech narsa oʻzgarmadi: bu taklifga na qoʻshildingiz, na uni rad etdingiz. Qayta urinib koʻrishingiz mumkin.',

@@ -109,6 +109,12 @@ export type TabGlyph =
   // attente »: a control and a state drawn alike would be two things nobody
   // can tell apart.
   | 'flag'
+  // A CIRCLE STRUCK THROUGH, for « Bloquer l'expéditeur » in the selection
+  // bar (#472), by the flag's door and on the same rules: the identity has
+  // no sign for a refusal of somebody, because until a block could be made
+  // from a message there was nothing to draw one for. It is the shape a
+  // block has had in every messenger since the first one.
+  | 'block'
 
 const STROKE = {
   fill: 'none' as const,
@@ -242,6 +248,15 @@ export function TabIcon({
         <>
           <Path d="M6 20.5v-17" stroke={tint} {...STROKE} />
           <Path d="M6 4.5h11.5l-2.8 4.2 2.8 4.2H6" stroke={tint} {...STROKE} />
+        </>
+      )}
+
+      {/* A circle, and the stroke across it from corner to corner, ending on
+          the circle itself. */}
+      {glyph === 'block' && (
+        <>
+          <Circle cx={12} cy={12} r={8.5} stroke={tint} {...STROKE} />
+          <Path d="m6 6 12 12" stroke={tint} {...STROKE} />
         </>
       )}
 

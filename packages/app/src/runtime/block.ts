@@ -101,6 +101,16 @@ export type BlockOutcome =
 export type BlockNotice = 'blocked' | 'waiting' | 'not-kept'
 
 /**
+ * What the screens say after a block (#469, #472): how it ended, and the
+ * conversation it was made from when that one stays, in the list and open,
+ * which a conversation of more than two does. `null` when it left the list.
+ */
+export interface BlockSaid {
+  readonly notice: BlockNotice
+  readonly stays: string | null
+}
+
+/**
  * The list's sentence for an outcome, or `null` when nothing changed: the
  * panel says that one, where the gesture was made.
  */

@@ -500,6 +500,15 @@ export const es: Readonly<Record<CopyKey, string>> = {
     'Esta cuenta está bloqueada, y su conversación con ella ha salido de la lista: sus mensajes y sus llamadas ya no le llegarán. Quien explota el servicio aún no lo sabe, y hasta entonces una invitación en Messagr de esta cuenta todavía puede llegarle. La aplicación volverá a intentarlo en cada inicio, hasta que lo sepa.',
   list_blocked_not_kept:
     'Esta cuenta está bloqueada, y su conversación con ella ha salido de la lista: sus mensajes y sus llamadas ya no le llegarán. Quien explota el servicio no lo sabe, y este dispositivo no ha podido anotarlo para volver a intentarlo: una invitación en Messagr de esta cuenta todavía puede llegarle.',
+  selection_block: 'Bloquear al remitente',
+  block_explain_gone_several:
+    'Sus mensajes desaparecen de todas sus conversaciones, incluidos los ya recibidos. Esta conversación sigue en su lista, sin ellos, y su conversación directa con esta cuenta, si tiene una, sale de ella. Usted no sale de ninguna: esta cuenta no ve ningún cambio.',
+  blocked_several:
+    'Esta cuenta está bloqueada: ya no le llegará nada de ella, y lo que escribió ha salido de sus conversaciones.',
+  blocked_several_waiting:
+    'Esta cuenta está bloqueada, y lo que escribió ha salido de sus conversaciones: sus mensajes y sus llamadas ya no le llegarán. Quien explota el servicio aún no lo sabe, y hasta entonces una invitación en Messagr de esta cuenta todavía puede llegarle. La aplicación volverá a intentarlo en cada inicio, hasta que lo sepa.',
+  blocked_several_not_kept:
+    'Esta cuenta está bloqueada, y lo que escribió ha salido de sus conversaciones: sus mensajes y sus llamadas ya no le llegarán. Quien explota el servicio no lo sabe, y este dispositivo no ha podido anotarlo para volver a intentarlo: una invitación en Messagr de esta cuenta todavía puede llegarle.',
   invited_working: 'Un momento…',
   invited_failed:
     'Nada ha cambiado: esta invitación no se ha aceptado ni rechazado. Puede intentarlo de nuevo.',

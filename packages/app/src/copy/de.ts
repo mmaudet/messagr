@@ -515,6 +515,15 @@ export const de: Readonly<Record<CopyKey, string>> = {
     'Dieses Konto ist blockiert, und Ihre Unterhaltung mit ihm ist aus der Liste verschwunden: Seine Nachrichten und Anrufe erreichen Sie nicht mehr. Der Betreiber ist noch nicht informiert, und bis dahin kann Sie eine Einladung in Messagr von diesem Konto noch erreichen. Die App versucht es bei jedem Start erneut, bis es gelingt.',
   list_blocked_not_kept:
     'Dieses Konto ist blockiert, und Ihre Unterhaltung mit ihm ist aus der Liste verschwunden: Seine Nachrichten und Anrufe erreichen Sie nicht mehr. Der Betreiber wurde nicht informiert, und dieses Gerät konnte es nicht festhalten, um es erneut zu versuchen: Eine Einladung in Messagr von diesem Konto kann Sie noch erreichen.',
+  selection_block: 'Absender blockieren',
+  block_explain_gone_several:
+    'Seine Nachrichten verschwinden aus allen Ihren Unterhaltungen, auch die bereits empfangenen. Diese Unterhaltung bleibt ohne sie in Ihrer Liste, und Ihre Unterhaltung zu zweit mit diesem Konto verschwindet daraus, falls Sie eine haben. Sie verlassen keine davon: Dieses Konto sieht keine Veränderung.',
+  blocked_several:
+    'Dieses Konto ist blockiert: Von ihm erreicht Sie nichts mehr, und was es geschrieben hat, ist aus Ihren Unterhaltungen verschwunden.',
+  blocked_several_waiting:
+    'Dieses Konto ist blockiert, und was es geschrieben hat, ist aus Ihren Unterhaltungen verschwunden: Seine Nachrichten und Anrufe erreichen Sie nicht mehr. Der Betreiber ist noch nicht informiert, und bis dahin kann Sie eine Einladung in Messagr von diesem Konto noch erreichen. Die App versucht es bei jedem Start erneut, bis es gelingt.',
+  blocked_several_not_kept:
+    'Dieses Konto ist blockiert, und was es geschrieben hat, ist aus Ihren Unterhaltungen verschwunden: Seine Nachrichten und Anrufe erreichen Sie nicht mehr. Der Betreiber wurde nicht informiert, und dieses Gerät konnte es nicht festhalten, um es erneut zu versuchen: Eine Einladung in Messagr von diesem Konto kann Sie noch erreichen.',
   invited_working: 'Einen Moment…',
   invited_failed:
     'Nichts hat sich geändert: dieser Einladung wurde weder beigetreten noch wurde sie abgelehnt. Sie können es erneut versuchen.',
