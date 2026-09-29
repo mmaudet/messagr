@@ -195,14 +195,6 @@ the share sheet, and its number goes to the telephone's messaging application
 only.
 _Avoid_: Non-user, missing contact, lead
 
-**Block**:
-A recipient's refusal of an invitation delivered inside Messagr that also
-keeps its inviter from delivering any other. The blocked account is never
-told: its invitations are taken and run out unanswered. A block lasts as long
-as both accounts exist, and hides nobody from discovery, which only
-withdrawing one's number does.
-_Avoid_: Ban, report, mute
-
 **Trust state**:
 The product-visible signal `unverified`, `recognized` or `verified`. It
 describes what is known about another account, not what may be done with it.
@@ -245,6 +237,71 @@ It answers what verification cannot. Verification proves which account and
 which device; vouching proves which person holds them — an inviter's stolen
 telephone produces an invitation that verifies perfectly.
 _Avoid_: Recognition, validation, approval, confirmation
+
+### Moderation
+
+**Operator**:
+The company that runs a Messagr instance, and the people who administer it on
+its behalf. It holds messages it cannot read, and it answers for what the
+instance keeps and for what it decides about an account.
+_Avoid_: Developer (Apple's word for it), administrator, moderator, Messagr
+
+**Block**:
+A recipient's lasting refusal of another account, whether made on an
+invitation delivered inside Messagr or from a conversation: nothing that
+account sends reaches them any more, what it already wrote leaves their
+screens, and it can deliver them no invitation. The blocked account is never
+told. The operator is told who blocked whom, never what was said. A block
+lasts as long as both accounts exist, and hides nobody from discovery, which
+only withdrawing one's number does.
+_Avoid_: Ban, report, mute, ignore (the Matrix mechanism, not the gesture)
+
+**Report**:
+A recipient's forwarding to the operator of messages they received, chosen by
+them and sent readable, with a reason. It is the only way anything readable
+reaches the operator, and what the operator reads of a conversation is never
+more than a report carries.
+_Avoid_: Flag, complaint, notice (the DSA's word), block
+
+**Report number**:
+The identifier a report receives when it is sent, shown to the person who sent
+it, and quoted to learn or to contest the decision on it.
+_Avoid_: Reference (discovery's word for a findable account), ticket, case
+number
+
+**Operator key**:
+The key pair a report is sealed for, so that only the operator can open it.
+Its public half is built into the application, where the service cannot swap
+it; its private half lives on the operator's own machine, with one offline
+copy, and never on the host.
+_Avoid_: Admin key, moderation key, server key
+
+**Takedown**:
+The operator's removal, for everyone, of messages a report carried. Each one
+leaves a line saying the operator took it down: a takedown is never a silent
+disappearance.
+_Avoid_: Removal and deletion (the author's own gestures), redaction (the
+Matrix mechanism), eviction
+
+**Suspension**:
+The operator's provisional measure against the author of reported messages,
+taken before any decision: the account can do nothing, but keeps its devices,
+its keys and its conversations, and the suspension is lifted if the decision
+clears it.
+_Avoid_: Lock and suspend (the homeserver's two mechanisms: a suspension uses
+lock), ban
+
+**Decision**:
+The operator's reasoned conclusion on a report, which confirms or lifts a
+suspension and can be contested.
+_Avoid_: Verdict, ruling, sanction
+
+**Termination**:
+The operator's final measure against an account, once a decision confirms its
+suspension: the account stops for good, as a deletion would, without its
+holder having chosen it.
+_Avoid_: Account deletion (the holder's own gesture), deactivation (the
+mechanism), ban, ejection, eviction
 
 ### Agents and capabilities
 
@@ -303,7 +360,8 @@ A device whose server no longer accepts it for the account it holds. The
 device cannot tell why: the account may be deleted, or this device taken off
 an account that goes on existing. It says so, and it offers to forget the
 account, or to come back as a new device when it kept the password. It never
-comes back on its own.
+comes back on its own. A suspension is not lost access: the device can tell
+that one, says so, and remembers it if a termination follows.
 _Avoid_: Logged out, recognised, revoked (one cause among several)
 
 **Recovery key**:
@@ -356,9 +414,10 @@ forward, and is applied on its date.
 _Avoid_: Draft, next version
 
 **Dated version**:
-A version in force that an upcoming version replaced, kept readable at an
-address carrying the date it stopped applying. The version that replaced it
-links to it.
+A version in force that a newer one replaced, kept readable at an address
+carrying the date it stopped applying. The version that replaced it links to
+it. The newer one is usually an upcoming version; it may instead apply from
+the day it is published, where the version in force sets no notice period.
 _Avoid_: Archive, old version
 
 ### Design

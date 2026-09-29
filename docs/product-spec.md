@@ -297,7 +297,8 @@ Federation is invisible in ordinary UX but explicitly handled internally.
 - remove a federated participant;
 - freeze a `LinkedDevice`;
 - escalate an external action failure for human review;
-- mark an agent as degraded or untrusted.
+- mark an agent as degraded or untrusted;
+- for the operator, on what a report shows (ADR-0015): take the reported messages down, suspend their author within 24 hours, and terminate the account once a decision confirms the suspension.
 
 ### 8.3 Consent and approval
 
@@ -581,9 +582,9 @@ The V3 briefing identified seven ambiguities to resolve. All are closed and mate
 
 ### 13.8 Individual moderation (§8.1)
 
-**Screen 15 — Report content.** Three destinations, ordered from most local (default) to most exposing. Local report contacts no server. Escalating to administrators or the instance is explicit, with its consequence stated.
+**Screen 15 — Report content.** One destination: the operator, the only party that can open a report (ADR-0015). It opens from the selection of messages, on messages of one other participant only. The sheet offers one reason per item the terms forbid, states exactly what leaves the phone (the selected messages as they are read, their author and their time, and nothing else of the conversation), names the reporting account, and says that only the operator can open it. The report is sealed on the device for the operator key. The person receives a report number and learns the decision by writing to the operator with it. The reported messages stay on screen until a takedown replaces each of them with a line saying the operator took it down. There is no local report and no escalation ladder: the moderation of channels and communities by their own administrators is outside this screen.
 
-**Screen 16 — Block an account.** Effects table that states what blocking does and, importantly, does not do. No notification to the blocked person. Current block list on the same screen: blocking is not a point of no return. For a findable account, it also says that whoever has the number still sees the account is on Messagr, and that only withdrawing the number hides it.
+**Screen 16 — Block an account.** A block is one lasting relation between two accounts, whether it is made here, from the selection of messages (« Bloquer l'expéditeur »), or on an invitation delivered inside Messagr (§13.3). The screen states what blocking does: nothing that account sends arrives any more, what it already wrote leaves the screens, a direct conversation leaves the list, and it can deliver no invitation. It states what blocking does not do: the blocked account is not told, blocking hides nobody from discovery (whoever has the number still sees that the account is on Messagr, and only withdrawing the number hides it), and a block does not lift. It says that the operator learns who blocked whom, never what was said. There is no block list and no unblocking: a block lasts as long as both accounts exist.
 
 ### 13.9 Companion device handling (§4.6, §9.2)
 

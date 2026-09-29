@@ -171,3 +171,18 @@ masking into the bridge, does not argue for it here: one seal per invitation
 sent, one opening per invitation received. The assembly is checked against
 the vectors of the RFC's appendix A.2.1. Anything that would seal more than
 that one self-declared name belongs in the bridge.
+
+**Amended on 29 September 2026 (a report sealed for the operator).** A report
+(ADR-0015) carries the messages a recipient chose, readable by the operator
+alone: the device seals it for the operator key, whose public half is built
+into the application. That seal touches messages, which the previous
+amendment keeps out of TypeScript, so it belongs in the bridge: one call that
+seals a payload for a given X25519 public key, with the same HPKE suite as
+the declared name and a label of its own. The scope opens to that seal and no
+further. Until a release of the bridge carries it, and only until then, the
+application seals in TypeScript with the assembly of the declared name, in
+the same format: an exception dated 29 September 2026, chosen so that the
+first release after Apple's refusal does not wait on the bridge, and lifted
+by the ticket that moves the seal. Either way, nothing in the application
+holds a key of the operator's beyond the public one, and nothing in it opens
+a report: reports are opened on the operator's own machine.
