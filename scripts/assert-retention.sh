@@ -47,21 +47,27 @@ SITE="${MESSAGR_SITE:-https://messagr.eu}"
 # Empty names no server at all: the configuration half is left out, and said.
 HOST="${MESSAGR_HOST-hermes}"
 
+# Which version is served is the rule assert-legal-pages.sh applies too (#467).
+# shellcheck source=lib/versions-legales.sh
+. "$ROOT/scripts/lib/versions-legales.sh"
+
 failed=0
 
 # ── Each page says what the source declares ───────────────────────────────
 while IFS= read -r where; do
-  # The upcoming version only: the policy in force carries the same mark in
-  # the passage that will announce it, and is checked all the same.
-  if [[ "$where" == */a-venir/ ]] &&
-    grep -qF 'MESSAGR-DATE-A-VENIR' "$SITE_SOURCE${where}index.html" 2>/dev/null; then
-    printf '  ----  %s is not announced yet; what it will say is not checked\n' "$where"
-    continue
-  fi
-  if [[ "$where" == */a-publier/ ]] && [ -f "$SITE_SOURCE${where}index.html" ]; then
-    printf '  ----  %s is not published yet; what it will say is not checked\n' "$where"
-    continue
-  fi
+  # A version nothing serves yet. The policy in force is not one of them,
+  # although it carries the upcoming version's mark in the passage that will
+  # announce it: it is checked all the same.
+  case "$(etat_version "$SITE_SOURCE" "$where")" in
+    annonce-attendue)
+      printf '  ----  %s is not announced yet; what it will say is not checked\n' "$where"
+      continue
+      ;;
+    publication-attendue)
+      printf '  ----  %s is not published yet; what it will say is not checked\n' "$where"
+      continue
+      ;;
+  esac
   page="$(curl -sSL --fail --max-time 20 "$SITE$where" 2>/dev/null || true)"
   if [ -z "$page" ]; then
     echo "FAIL  the policy page could not be read at $SITE$where" >&2

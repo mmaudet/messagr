@@ -32,6 +32,7 @@ var fs = require('fs');
 var os = require('os');
 var path = require('path');
 var child = require('child_process');
+var legales = require('./lib/versions-legales.js');
 
 var root = path.join(__dirname, '..');
 var repository = path.join(root, '..', '..');
@@ -209,15 +210,20 @@ function checkPages(server, source) {
   return run(pagesCheck, [], { MESSAGR_SITE: server.base, MESSAGR_SITE_SOURCE: source });
 }
 
+/** Le retention.json voisin d'une copie du site, comme dans le dépôt. */
+function retentionOf(source) {
+  return path.join(source, '..', 'retention.json');
+}
+
 /**
  * `assert-retention.sh` contre le site servi ici, avec le `retention.json`
  * voisin de la copie, et aucun hôte à joindre : `MESSAGR_HOST` vide.
  */
-function checkRetention(server, source, retention) {
+function checkRetention(server, source) {
   return run(retentionCheck, [], {
     MESSAGR_SITE: server.base,
     MESSAGR_SITE_SOURCE: source,
-    MESSAGR_RETENTION: retention || path.join(source, '..', 'retention.json'),
+    MESSAGR_RETENTION: retentionOf(source),
     MESSAGR_HOST: '',
   });
 }
@@ -303,7 +309,7 @@ function translatedAddresses(site) {
       fail('the legal pages check refuses a site where a version waits, unserved: ' + passed.out + passed.err);
     }
     PAGES.forEach(function (page) {
-      var address = '/' + page + '/a-publier/';
+      var address = legales.aPublier(page);
       if (passed.out.indexOf(server.base + address + ' is not served (404)') === -1) {
         fail('the legal pages check does not make sure ' + address + ' is not served: ' + passed.out);
       }
@@ -462,14 +468,8 @@ function translatedAddresses(site) {
   // Tant qu'elle attend : chaque page légale tient une version à publier, et
   // chacune reçoit une durée qu'elle seule dit, par-dessus celles du dépôt.
   var source = aWaitingCopy();
-  var retention = path.join(source, '..', 'retention.json');
-  var waiting = PAGES.map(function (page) { return '/' + page + '/a-publier/'; });
-  fs.writeFileSync(retention, read(retention).replace(/\n}\s*$/, ',\n' + waiting.map(function (address, i) {
-    return '  "essai_' + i + '": {\n' +
-      '    "duree": "une durée que seule la version à publier dit",\n' +
-      '    "page": "' + address + '"\n' +
-      '  }';
-  }).join(',\n') + '\n}\n'));
+  var waiting = PAGES.map(legales.aPublier);
+  legales.withTrialDurations(retentionOf(source), waiting);
   var out = built(source);
   var server = serve(out);
   try {
@@ -499,13 +499,13 @@ function translatedAddresses(site) {
   // politique en vigueur, chaque durée comme chaque phrase de « dit », et la
   // politique qui en perd une est refusée, en la nommant.
   var source = aPublishedCopy();
-  var retention = path.join(source, '..', 'retention.json');
-  var inForce = entriesOf(retention).filter(function (e) {
+  var inForce = entriesOf(retentionOf(source)).filter(function (e) {
     return e.entry.page === undefined && phrasesOf(e.entry).length > 0;
   });
   // Ce que le dépôt attend de publier est du nombre.
+  var waiting = PAGES.map(legales.aPublier);
   entriesOf(retentionFile).forEach(function (e) {
-    if (/^\/confidentialite\/a-publier\/$/.test(e.entry.page || '') &&
+    if (waiting.indexOf(e.entry.page) !== -1 &&
         !inForce.some(function (f) { return f.key === e.key; })) {
       fail('retention.json ' + e.key + ' is not checked on the policy in force once it is published');
     }
