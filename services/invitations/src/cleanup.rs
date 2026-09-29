@@ -62,6 +62,10 @@ pub async fn purge_spent_proofs(pool: &SqlitePool, now: i64) -> Result<u64> {
 /// de masquage, les invitations remises finies depuis trente jours, et les
 /// crédits prépayés qui baissent.
 ///
+/// Les SMS à effacer et les crédits ne sont pas qu'à la découverte : les
+/// alertes de l'exploitant partent aussi quand elle est éteinte (#464), et
+/// ces deux étapes tournent dès qu'un fournisseur est configuré.
+///
 /// CHAQUE ÉTAPE TOURNE, QUOI QUE FASSENT LES AUTRES : un échec n'en saute
 /// aucune, et il est rendu une fois toutes passées.
 async fn sweep_discovery(st: &Arc<AppState>, now: i64) -> Result<[u64; 6]> {

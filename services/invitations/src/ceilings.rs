@@ -4,9 +4,11 @@
 //! every request, renewals included. A country's in a calendar day, and the
 //! service's budget over thirty calendar days: beyond either, new proofs wait
 //! and renewals go through, and the operator is told by SMS, once a day and
-//! per ceiling. So is a prepaid balance running low at OVHcloud, which the
-//! sweep checks: the budget counts SMS, OVHcloud bills credits, and a proof
-//! that cannot be paid for is one nobody receives.
+//! per ceiling (`alert`). So is a prepaid balance running low at OVHcloud,
+//! which the sweep checks: the budget counts SMS, OVHcloud bills credits, and
+//! a proof that cannot be paid for is one nobody receives. So is an alert
+//! (#464): the balance is checked whenever there is a provider, discovery on
+//! or off.
 //!
 //! # COUNTED BEFORE THE SMS LEAVES
 //!
@@ -26,13 +28,11 @@ use std::sync::Arc;
 
 use sqlx::SqlitePool;
 
-use crate::{config::SmsCeilings, sms, sms_history, AppState};
+use crate::{alert, config::SmsCeilings, AppState};
 
 const DAY_SECONDS: i64 = 86_400;
 /// The window of an account's monthly ceiling and of the budget.
 pub const THIRTY_DAYS_SECONDS: i64 = 30 * DAY_SECONDS;
-/// How long an alert is worth delivering: it is still news the next day.
-const ALERT_VALID_MINUTES: i64 = 24 * 60;
 
 /// A request for a code, as the ceilings see it.
 pub struct Asked<'a> {
@@ -95,11 +95,19 @@ impl Reached {
                  Les nouvelles preuves attendent, les renouvellements passent.",
                 ceilings.budget
             ),
+            // Whether discovery is on or not (#464): with it off, what stops
+            // is the operator's alerts.
             Reached::Credits(left) => format!(
-                "Messagr : il reste {left} crédits SMS chez OVHcloud. Sans recharge, les \
-                 preuves et leurs renouvellements s'arrêteront."
+                "Messagr : il reste {left} crédits SMS chez OVHcloud. Sans recharge, plus \
+                 aucun SMS ne partira, ces alertes comprises."
             ),
         }
+    }
+
+    /// Tells the operator, by SMS once a day per ceiling (`alert`).
+    pub async fn tell_the_operator(&self, st: &AppState, now: i64) {
+        let message = self.message(&st.cfg.sms_ceilings);
+        alert::tell_the_operator_once_a_day(st, &self.subject(), &message, now).await;
     }
 }
 
@@ -213,79 +221,17 @@ pub async fn release(pool: &SqlitePool, counted: Counted) -> anyhow::Result<()> 
     Ok(())
 }
 
-/// Tells the operator by SMS, once a day per subject. Nothing here refuses
-/// anything: an alert that could not leave is written in the log.
-pub async fn tell_the_operator(
-    st: &AppState,
-    sender: &sms::Ovhcloud,
-    operator: &str,
-    reached: &Reached,
-    now: i64,
-) {
-    tracing::warn!("told to the operator: {reached:?}");
-    match first_alert_of_the_day(&st.pool, reached, now).await {
-        Ok(true) => {}
-        Ok(false) => return,
-        Err(e) => {
-            tracing::warn!("the alert could not be recorded: {e}");
-            return;
-        }
-    }
-    let message = reached.message(&st.cfg.sms_ceilings);
-    match sender
-        .send(operator, &message, ALERT_VALID_MINUTES, now)
-        .await
-    {
-        Ok(message_id) => {
-            let erase_after = now + ALERT_VALID_MINUTES * 60;
-            if let Err(e) = sms_history::remember(&st.pool, message_id, erase_after).await {
-                tracing::warn!("the alert will not be erased at OVHcloud: {e}");
-            }
-        }
-        Err(e) => tracing::warn!("the alert could not be sent: {e}"),
-    }
-}
-
-async fn first_alert_of_the_day(
-    pool: &SqlitePool,
-    reached: &Reached,
-    now: i64,
-) -> anyhow::Result<bool> {
-    let subject = reached.subject();
-    let last: Option<i64> = sqlx::query_scalar("SELECT sent_at FROM sms_alerts WHERE ceiling = ?")
-        .bind(&subject)
-        .fetch_optional(pool)
-        .await?;
-    if last.is_some_and(|at| at > now - DAY_SECONDS) {
-        return Ok(false);
-    }
-    sqlx::query(
-        "INSERT INTO sms_alerts (ceiling, sent_at) VALUES (?, ?) \
-         ON CONFLICT(ceiling) DO UPDATE SET sent_at = excluded.sent_at",
-    )
-    .bind(&subject)
-    .bind(now)
-    .execute(pool)
-    .await?;
-    Ok(true)
-}
-
 /// Tells the operator when the prepaid balance at OVHcloud falls under
-/// `SMS_CREDITS_ALERT_BELOW`. Run by the sweep, while discovery is served.
+/// `SMS_CREDITS_ALERT_BELOW`. Run by the sweep whenever there is a provider,
+/// discovery on or off (#464): the operator's alerts spend the same credits
+/// as the proofs.
 pub async fn check_the_credits(st: &Arc<AppState>, now: i64) -> anyhow::Result<()> {
-    let Ok(served) = st.cfg.discovery() else {
+    let Some(provider) = st.cfg.sms.provider.as_ref() else {
         return Ok(());
     };
-    let left = served.provider.credits_left(now).await?;
+    let left = provider.credits_left(now).await?;
     if left < st.cfg.sms_ceilings.credits_alert_below as f64 {
-        tell_the_operator(
-            st,
-            served.provider,
-            served.operator,
-            &Reached::Credits(left),
-            now,
-        )
-        .await;
+        Reached::Credits(left).tell_the_operator(st, now).await;
     }
     Ok(())
 }

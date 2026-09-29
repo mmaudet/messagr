@@ -57,10 +57,9 @@ pub struct Config {
     /// `REFERENCE_KEY` (#451), or nothing, which leaves discovery off. See
     /// `reference_key`.
     pub reference_key: Option<[u8; 32]>,
-    /// Who sends the SMS that proves a number (#397). `None` while a
-    /// deployment has not been given an OVHcloud account: discovery stays
-    /// off. See `sms_provider`.
-    pub sms_provider: Option<crate::sms::Ovhcloud>,
+    /// The SMS provider and the operator's number (#464), the service's own
+    /// whether discovery is on or not. See `Sms`.
+    pub sms: Sms,
     /// The countries whose numbers can be proved, each with its provider
     /// (#397). See `discovery_countries`.
     pub countries: Vec<crate::countries::Country>,
@@ -68,9 +67,46 @@ pub struct Config {
     pub clock: crate::util::Clock,
     /// How many SMS may prove numbers (#399). See `SmsCeilings`.
     pub sms_ceilings: SmsCeilings,
-    /// Who is told by SMS when a country's ceiling or the budget is reached
-    /// (#399): the operator's own number, or nobody but the log.
-    pub alert_sms_to: Option<String>,
+}
+
+/// Who sends the service's SMS, and the operator's number (#464): a
+/// configuration of their own, read from their own variables, whether
+/// discovery is configured or not.
+///
+/// Discovery sends a proof's code through the provider, and serves only with
+/// both (`Config::discovery`). The operator's alerts go by SMS with both, and
+/// are only written in the log without either (`alert`): the service starts
+/// all the same, as production does until it is given both.
+///
+/// No `Debug`: the number is nobody's business in a log line.
+#[derive(Clone, Default)]
+pub struct Sms {
+    /// OVHcloud, from its four credentials and `SMS_SENDER`
+    /// (`sms_provider`), or nobody.
+    pub provider: Option<crate::sms::Ovhcloud>,
+    /// The operator's own number, from `ALERT_SMS_TO` (`alert_sms_to`), or
+    /// nobody but the log.
+    pub operator: Option<String>,
+}
+
+impl Sms {
+    /// Both, read through `var`. Either may be absent; a provider half given
+    /// or a malformed number stops the start, naming what is wrong.
+    pub fn from_vars(var: impl Fn(&str) -> Option<String>) -> Result<Sms, ConfigError> {
+        Ok(Sms {
+            provider: sms_provider(&var)?,
+            operator: alert_sms_to(var("ALERT_SMS_TO"))?,
+        })
+    }
+
+    /// What sends the operator's alerts, and to what number, or what is
+    /// missing for them to go by SMS.
+    pub fn to_the_operator(&self) -> Result<(&crate::sms::Ovhcloud, &str), &'static str> {
+        Ok((
+            self.provider.as_ref().ok_or("no SMS provider")?,
+            self.operator.as_deref().ok_or("ALERT_SMS_TO absent")?,
+        ))
+    }
 }
 
 /// The ceilings on the SMS that prove numbers (#399, Q37 of #38).
@@ -120,8 +156,8 @@ pub fn sms_ceilings(
     }
 }
 
-/// The operator's number for the ceilings' alerts, or nobody. A malformed one
-/// stops the start: an alert that cannot leave is not a choice to hear
+/// The operator's number for its alerts (#399, #464), or nobody. A malformed
+/// one stops the start: an alert that cannot leave is not a choice to hear
 /// nothing.
 pub fn alert_sms_to(raw: Option<String>) -> Result<Option<String>, ConfigError> {
     match raw.map(|v| v.trim().to_string()).filter(|v| !v.is_empty()) {
@@ -205,13 +241,15 @@ pub fn reference_key(raw: Option<String>) -> Result<Option<[u8; 32]>, ConfigErro
         .map_err(|_| ConfigError::InvalidReferenceKey)
 }
 
-/// The OVHcloud account that sends proofs, or nothing, read through `var` so
-/// that it can be tested without touching the process's environment.
+/// The OVHcloud account that sends proofs and alerts, or nothing, read
+/// through `var` so that it can be tested without touching the process's
+/// environment.
 ///
-/// All four of its credentials, or none: none leaves discovery off, some of
-/// them stop the start, naming the first one missing, since a half-given
-/// account is a deployment mistake and not a choice. The address is
-/// OVHcloud's European API; another one (the bench's fake provider) is taken
+/// All four of its credentials, or none: none leaves discovery off and the
+/// operator's alerts in the log alone, some of them stop the start, naming
+/// the first one missing, since a half-given account is a deployment mistake
+/// and not a choice, whether discovery is meant to serve or not. The address
+/// is OVHcloud's European API; another one (the bench's fake provider) is taken
 /// only when `SMS_PROVIDER_FOR_TESTS=1` says so, and only on this host
 /// (`stays_on_the_host`).
 pub fn sms_provider(
@@ -322,37 +360,40 @@ impl Config {
     }
 
     pub fn from_env() -> Result<Self, ConfigError> {
-        fn var(k: &'static str) -> Result<String, ConfigError> {
-            std::env::var(k).map_err(|_| ConfigError::Missing(k))
-        }
+        Self::from_vars(|key| std::env::var(key).ok())
+    }
+
+    /// The configuration, read through `var` rather than the process's
+    /// environment, so that a test can start from a deployment's variables
+    /// (#464).
+    pub fn from_vars(var: impl Fn(&str) -> Option<String>) -> Result<Self, ConfigError> {
+        let required = |key: &'static str| var(key).ok_or(ConfigError::Missing(key));
         Ok(Config {
-            database_url: var("DATABASE_URL")?,
-            homeserver_url: var("HOMESERVER_URL")?,
-            registration_token: var("REGISTRATION_TOKEN")?,
-            encryption_key: Self::parse_key(&var("ENCRYPTION_KEY")?)?,
-            edge_retention_days: std::env::var("EDGE_RETENTION_DAYS")
-                .ok()
+            database_url: required("DATABASE_URL")?,
+            homeserver_url: required("HOMESERVER_URL")?,
+            registration_token: required("REGISTRATION_TOKEN")?,
+            encryption_key: Self::parse_key(&required("ENCRYPTION_KEY")?)?,
+            edge_retention_days: var("EDGE_RETENTION_DAYS")
                 .and_then(|v| v.parse().ok())
                 .unwrap_or(30),
-            bind_addr: std::env::var("BIND_ADDR").unwrap_or_else(|_| "127.0.0.1:8090".into()),
-            max_reserved_accounts_per_inviter: reserved_accounts_ceiling(
-                std::env::var("MAX_RESERVED_ACCOUNTS_PER_INVITER").ok(),
-            ),
+            bind_addr: var("BIND_ADDR").unwrap_or_else(|| "127.0.0.1:8090".into()),
+            max_reserved_accounts_per_inviter: reserved_accounts_ceiling(var(
+                "MAX_RESERVED_ACCOUNTS_PER_INVITER",
+            )),
             // Absent rather than defaulted. A default would point this at
             // somewhere, and the somewhere a push gateway forwards to is not
             // a thing to guess.
-            push_gateway_url: usable_gateway(std::env::var("PUSH_GATEWAY_URL").ok()),
-            masking_keys: masking_keys(std::env::var("MASKING_KEYS").ok())?,
-            reference_key: reference_key(std::env::var("REFERENCE_KEY").ok())?,
-            sms_provider: sms_provider(|key| std::env::var(key).ok())?,
-            countries: discovery_countries(std::env::var("DISCOVERY_COUNTRIES").ok())?,
+            push_gateway_url: usable_gateway(var("PUSH_GATEWAY_URL")),
+            masking_keys: masking_keys(var("MASKING_KEYS"))?,
+            reference_key: reference_key(var("REFERENCE_KEY"))?,
+            sms: Sms::from_vars(&var)?,
+            countries: discovery_countries(var("DISCOVERY_COUNTRIES"))?,
             clock: crate::util::Clock::system(),
             sms_ceilings: sms_ceilings(
-                std::env::var("SMS_CEILING_PER_COUNTRY_PER_DAY").ok(),
-                std::env::var("SMS_BUDGET_PER_MONTH").ok(),
-                std::env::var("SMS_CREDITS_ALERT_BELOW").ok(),
+                var("SMS_CEILING_PER_COUNTRY_PER_DAY"),
+                var("SMS_BUDGET_PER_MONTH"),
+                var("SMS_CREDITS_ALERT_BELOW"),
             ),
-            alert_sms_to: alert_sms_to(std::env::var("ALERT_SMS_TO").ok())?,
         })
     }
 
@@ -377,11 +418,10 @@ impl Config {
             push_gateway_url: None,
             masking_keys: None,
             reference_key: None,
-            sms_provider: None,
+            sms: Sms::default(),
             countries: crate::countries::launch_list(),
             clock: crate::util::Clock::system(),
             sms_ceilings: SmsCeilings::default(),
-            alert_sms_to: None,
         }
     }
 
@@ -393,22 +433,25 @@ impl Config {
     /// with nobody told when a ceiling is reached (#399), and a proof without
     /// the reference key would give its account no reference to be known by
     /// (#451). The one place that rule is written.
+    ///
+    /// The provider and the operator's number are not discovery's own
+    /// (#464): they tell the operator with discovery off as well (`Sms`).
     pub fn discovery(&self) -> Result<Discovery<'_>, &'static str> {
+        let keys = self.masking_keys.as_deref().ok_or("MASKING_KEYS absent")?;
+        let (provider, _operator) = self.sms.to_the_operator()?;
         Ok(Discovery {
-            keys: self.masking_keys.as_deref().ok_or("MASKING_KEYS absent")?,
-            provider: self.sms_provider.as_ref().ok_or("no SMS provider")?,
-            operator: self.alert_sms_to.as_deref().ok_or("ALERT_SMS_TO absent")?,
+            keys,
+            provider,
             reference_key: self.reference_key.as_ref().ok_or("REFERENCE_KEY absent")?,
         })
     }
 }
 
-/// What discovery serves with: see `Config::discovery`.
+/// What discovery serves with: see `Config::discovery`. The operator it
+/// needs is told through `alert`, which reads the number itself.
 pub struct Discovery<'a> {
     pub keys: &'a crate::masking::MaskingKeys,
     pub provider: &'a crate::sms::Ovhcloud,
-    /// The operator's number, told when a ceiling is reached.
-    pub operator: &'a str,
     /// What the reference of a findable account is computed with (#451).
     pub reference_key: &'a [u8; 32],
 }
@@ -434,6 +477,43 @@ mod tests {
         ("OVH_SMS_SERVICE", "sms-ab12345-1"),
     ];
 
+    /// What every deployment gives, without which the service never starts.
+    const REQUIRED: &[(&str, &str)] = &[
+        ("DATABASE_URL", "sqlite::memory:"),
+        ("HOMESERVER_URL", "http://127.0.0.1:1"),
+        ("REGISTRATION_TOKEN", "token"),
+        (
+            "ENCRYPTION_KEY",
+            "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=",
+        ),
+    ];
+
+    const OPERATOR: &[(&str, &str)] = &[("ALERT_SMS_TO", "+33600000000")];
+
+    /// A deployment's variables: `REQUIRED`, and `more`.
+    fn deployment(more: &[&[(&str, &str)]]) -> impl Fn(&str) -> Option<String> {
+        let mut given = REQUIRED.to_vec();
+        for group in more {
+            given.extend_from_slice(group);
+        }
+        env(&given)
+    }
+
+    #[test]
+    fn the_provider_and_the_operator_s_number_serve_without_discovery() {
+        // #464: production's configuration once it is given both, and no
+        // masking key.
+        let Ok(cfg) = Config::from_vars(deployment(&[OVH, OPERATOR])) else {
+            panic!("the service starts");
+        };
+        assert_eq!(cfg.discovery().err(), Some("MASKING_KEYS absent"));
+        let Ok((provider, number)) = cfg.sms.to_the_operator() else {
+            panic!("the operator can be told by SMS");
+        };
+        assert_eq!(provider.service_name, "sms-ab12345-1");
+        assert_eq!(number, "+33600000000");
+    }
+
     #[test]
     fn no_sms_provider_leaves_discovery_off() {
         assert!(sms_provider(env(&[])).unwrap().is_none());
@@ -451,8 +531,38 @@ mod tests {
 
     #[test]
     fn half_a_provider_stops_the_start_and_names_what_is_missing() {
-        let refused = sms_provider(env(&OVH[..3])).expect_err("half a provider is refused");
-        assert!(refused.to_string().contains("OVH_SMS_SERVICE"), "{refused}");
+        // With the operator's number and without discovery as well (#464):
+        // half an account is a mistake whatever it was given for.
+        for missing in [
+            "OVH_APPLICATION_KEY",
+            "OVH_APPLICATION_SECRET",
+            "OVH_CONSUMER_KEY",
+            "OVH_SMS_SERVICE",
+        ] {
+            let rest: Vec<(&str, &str)> =
+                OVH.iter().copied().filter(|(k, _)| *k != missing).collect();
+            let Err(refused) = Config::from_vars(deployment(&[&rest, OPERATOR])) else {
+                panic!("the start goes on without {missing}");
+            };
+            assert!(refused.to_string().contains(missing), "{refused}");
+        }
+    }
+
+    #[test]
+    fn without_a_provider_or_a_number_the_service_starts_all_the_same() {
+        // Production's configuration when #464 was written had neither: its
+        // alerts are only written in the log (`alert`).
+        for (given, missing) in [
+            (deployment(&[]), "no SMS provider"),
+            (deployment(&[OPERATOR]), "no SMS provider"),
+            (deployment(&[OVH]), "ALERT_SMS_TO absent"),
+        ] {
+            let Ok(cfg) = Config::from_vars(given) else {
+                panic!("the service starts without {missing}");
+            };
+            assert_eq!(cfg.sms.to_the_operator().err(), Some(missing));
+            assert!(cfg.discovery().is_err());
+        }
     }
 
     #[test]
@@ -524,8 +634,22 @@ mod tests {
         .unwrap();
         Config {
             masking_keys: Some(std::sync::Arc::new(keys)),
-            sms_provider: sms_provider(env(OVH)).unwrap(),
+            sms: Sms {
+                provider: sms_provider(env(OVH)).unwrap(),
+                operator: None,
+            },
             ..Config::for_tests()
+        }
+    }
+
+    /// `cfg`, with the operator's number beside its provider.
+    fn with_the_operator(cfg: Config) -> Config {
+        Config {
+            sms: Sms {
+                operator: Some("+33600000000".into()),
+                ..cfg.sms.clone()
+            },
+            ..cfg
         }
     }
 
@@ -534,9 +658,8 @@ mod tests {
         let served = keys_and_provider();
         assert_eq!(served.discovery().err(), Some("ALERT_SMS_TO absent"));
         let told = Config {
-            alert_sms_to: Some("+33600000000".into()),
             reference_key: Some([7; 32]),
-            ..served
+            ..with_the_operator(served)
         };
         assert!(told.discovery().is_ok());
     }
@@ -544,10 +667,7 @@ mod tests {
     #[test]
     fn without_its_reference_key_discovery_is_off() {
         // #451: a proof would give its account no reference to be known by.
-        let served = Config {
-            alert_sms_to: Some("+33600000000".into()),
-            ..keys_and_provider()
-        };
+        let served = with_the_operator(keys_and_provider());
         assert_eq!(served.discovery().err(), Some("REFERENCE_KEY absent"));
     }
 

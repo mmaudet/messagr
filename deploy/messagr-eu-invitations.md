@@ -19,12 +19,15 @@ production stopped building the prototype (#289).
   - required, or the service refuses to start: `DATABASE_URL`, `HOMESERVER_URL`,
     `REGISTRATION_TOKEN`, `ENCRYPTION_KEY`;
   - optional: `EDGE_RETENTION_DAYS`, `BIND_ADDR`,
-    `MAX_RESERVED_ACCOUNTS_PER_INVITER`, `PUSH_GATEWAY_URL`, `MASKING_KEYS`;
-  - optional, all four or none: `OVH_APPLICATION_KEY`,
+    `MAX_RESERVED_ACCOUNTS_PER_INVITER`, `PUSH_GATEWAY_URL`;
+  - the SMS provider, all four or none: `OVH_APPLICATION_KEY`,
     `OVH_APPLICATION_SECRET`, `OVH_CONSUMER_KEY`, `OVH_SMS_SERVICE`, with
     `SMS_SENDER` beside them;
-  - for discovery, `ALERT_SMS_TO` and `REFERENCE_KEY`, without which it stays
-    off;
+  - the operator's number, `ALERT_SMS_TO`. With the provider, the operator's
+    alerts go by SMS, whether discovery is on or off; without either, they
+    are only written in the log;
+  - for discovery, `MASKING_KEYS` and `REFERENCE_KEY`, beside the provider
+    and `ALERT_SMS_TO`: without any one of them, it stays off;
   - optional: `DISCOVERY_COUNTRIES`, `SMS_CEILING_PER_COUNTRY_PER_DAY`,
     `SMS_BUDGET_PER_MONTH`, `SMS_CREDITS_ALERT_BELOW`.
 - **The networks.** `default`, and `sygnal` (the external network
@@ -163,11 +166,13 @@ invitations`. The start no longer needs `N`.
 7. **Destroy the seed of `N`**, if it still exists anywhere, and the old
    reference key.
 
-## The SMS provider of address-book discovery
+## The SMS provider
 
-A proof sends a code by SMS to the number being proved, through OVHcloud's
-European API (#397). The number leaves the service there, and only there: the
-service keeps its mask, and OVHcloud sees it pass, as the consent screen says.
+The service sends two kinds of SMS through OVHcloud's European API: the code
+that proves a number, while discovery is on (#397), and the operator's
+alerts, whether discovery is on or off (#464, below). A number being proved
+leaves the service there, and only there: the service keeps its mask, and
+OVHcloud sees it pass, as the consent screen says.
 
 - `OVH_APPLICATION_KEY`, `OVH_APPLICATION_SECRET`, `OVH_CONSUMER_KEY`: an API
   application of the OVHcloud account and its consumer key, created at
@@ -183,11 +188,12 @@ service keeps its mask, and OVHcloud sees it pass, as the consent screen says.
 
 What the service does with them:
 
-- **None of the four, discovery stays off**, like without the masking keys:
-  discovery serves with both or not at all, and the line after the version
-  says which one is missing.
+- **None of the four, no SMS leaves.** Discovery stays off, like without the
+  masking keys, and the operator's alerts are only written in the log. The
+  two lines after the version say so.
 - **Some of them, the service refuses to start**, naming the first one
-  missing: half an account is a mistake, not a choice.
+  missing, whether discovery is meant to serve or not: half an account is a
+  mistake, not a choice.
 - **Only OVHcloud's European API.** `OVH_API_URL` is refused unless it is
   `https://eu.api.ovh.com/1.0`. The bench alone may point it at its fake
   provider, with `SMS_PROVIDER_FOR_TESTS=1`, which never goes in this file,
@@ -195,6 +201,32 @@ What the service does with them:
   a container's name on a Docker network.
 - **The secret and the consumer key are never printed.** The log names the
   endpoint, the SMS account and the sender, nothing else.
+
+## The operator's alerts
+
+The service tells the operator (#399, #464) in its log, with a warning that
+starts `told to the operator:`, and by SMS at `ALERT_SMS_TO`, in
+international form, when the provider is given too. Neither needs
+discovery: production is to be given both without `MASKING_KEYS`, so that
+its alerts go by SMS while discovery stays off (#462).
+
+- **Without the provider or `ALERT_SMS_TO`, the log alone.** The service
+  starts, and the line after discovery's says what is missing, such as
+  `ALERT_SMS_TO absent: the operator's alerts are only written in the log`.
+  With both, it names the provider, never the number. A malformed number
+  stops the start.
+- **Once a day**: a country's ceiling or the budget reached, and the prepaid
+  balance under `SMS_CREDITS_ALERT_BELOW` (below). The hourly sweep reads
+  the balance whenever the provider is given, discovery on or off: the
+  alerts spend the same credits as the proofs.
+- **At each call**, without a daily limit: what the reports and the blocks
+  of #462 are to tell the operator.
+- **No SMS names an account, or carries anything that was said.** An alert
+  that names an account is held back: no SMS leaves, and the log says only
+  that an alert was held back.
+- **Each alert is erased from OVHcloud's history** a day after it left, and
+  **none leaves until OVHcloud has validated the sender**: until then the
+  log says `the alert could not be sent` (below).
 
 ## The ceilings on the SMS that prove numbers
 
@@ -224,12 +256,13 @@ its SMS does not leave.
   `ALERT_SMS_TO` (international form): once a day for each ceiling reached,
   and once a day while the prepaid balance is under
   `SMS_CREDITS_ALERT_BELOW` credits (100 unless set), which the hourly sweep
-  reads. **Discovery stays off without `ALERT_SMS_TO`**, and a malformed one
-  stops the start.
+  reads whenever the provider is given, discovery on or off (above).
+  **Discovery stays off without `ALERT_SMS_TO`**, and a malformed one stops
+  the start.
 - **The credits are prepaid, with automatic re-crediting off**, so that a
   swollen traffic can cost nothing beyond them. OVHcloud bills credits, not
   SMS, and a number abroad can cost more than one: the balance alert is what
-  says when to buy more, before proofs and renewals stop.
+  says when to buy more, before proofs, renewals and alerts stop.
 - **The service keeps counters, never the number, and no link between an
   account and a country**: the codes an account asked for, by time, without
   a country; the SMS sent to each country, by calendar day, without an
@@ -337,7 +370,8 @@ this repository on its own.
 
 6. **Check production itself.** `https://messagr.eu/_messagr/health` answers
    200, `POST http://127.0.0.1:8095/_matrix/push/v1/notify` with `{}` answers
-   422 and not 404, and the first log line names the version.
+   422 and not 404, and the first log line names the version. The next two
+   say whether discovery is on, and whether the operator's alerts go by SMS.
 
 ## Rolling back to the prototype
 

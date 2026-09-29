@@ -154,7 +154,7 @@ pub async fn start_proof(
         ceilings::Verdict::Counted(counted) => counted,
         ceilings::Verdict::TooMany { retry_at } => return Err(AppError::TooManyCodes { retry_at }),
         ceilings::Verdict::Later(reached) => {
-            ceilings::tell_the_operator(&st, sender, served.operator, &reached, now).await;
+            reached.tell_the_operator(&st, now).await;
             return Err(AppError::SmsLater);
         }
     };
@@ -1304,19 +1304,27 @@ pub(crate) mod test_support {
     ) -> crate::config::Config {
         crate::config::Config {
             homeserver_url: hs.to_string(),
-            alert_sms_to: ovh.as_ref().map(|_| ALERT.to_string()),
             masking_keys: ovh.as_ref().map(|_| keys()),
             reference_key: ovh.as_ref().map(|_| [0x07; 32]),
-            sms_provider: ovh.map(|base_url| sms::Ovhcloud {
-                base_url,
+            sms: ovh.map(sms_through).unwrap_or_default(),
+            clock,
+            ..crate::config::Config::for_tests()
+        }
+    }
+
+    /// The service's SMS through a fake OVHcloud at `ovh`, to the operator's
+    /// number `ALERT` (#464).
+    pub(crate) fn sms_through(ovh: String) -> crate::config::Sms {
+        crate::config::Sms {
+            provider: Some(sms::Ovhcloud {
+                base_url: ovh,
                 application_key: "ak".into(),
                 application_secret: "as".into(),
                 consumer_key: "ck".into(),
                 service_name: "sms-test-1".into(),
                 sender: "Messagr".into(),
             }),
-            clock,
-            ..crate::config::Config::for_tests()
+            operator: Some(ALERT.to_string()),
         }
     }
 
@@ -1420,6 +1428,17 @@ pub(crate) mod test_support {
 
     /// A second number of an open country, for a second findable account.
     pub(crate) const OTHER: &str = "+33687654321";
+
+    /// How many SMS reached `number`.
+    pub(crate) fn sent_to(inbox: &Arc<Mutex<Inbox>>, number: &str) -> usize {
+        inbox
+            .lock()
+            .unwrap()
+            .sent
+            .iter()
+            .filter(|(receivers, _)| receivers.iter().any(|r| r == number))
+            .count()
+    }
 }
 
 #[cfg(test)]
@@ -1429,7 +1448,6 @@ mod tests {
     use crate::util;
     use sqlx::SqlitePool;
     use std::collections::HashMap;
-    use std::sync::Mutex;
 
     #[sqlx::test(migrations = "./migrations")]
     async fn the_number_screen_learns_the_open_countries_and_their_provider(pool: SqlitePool) {
@@ -1797,16 +1815,6 @@ mod tests {
         assert_eq!(reading(&st, "alice").await.ended, Some(Ended::Replaced));
     }
 
-    fn sent_to(inbox: &Arc<Mutex<Inbox>>, number: &str) -> usize {
-        inbox
-            .lock()
-            .unwrap()
-            .sent
-            .iter()
-            .filter(|(receivers, _)| receivers.iter().any(|r| r == number))
-            .count()
-    }
-
     #[sqlx::test(migrations = "./migrations")]
     async fn an_account_gets_three_codes_a_day_and_ten_in_thirty_days(pool: SqlitePool) {
         let (ovh, _) = fake_ovhcloud(false).await;
@@ -1833,6 +1841,38 @@ mod tests {
         match start(&st, "alice", NUMBER).await {
             Err(AppError::TooManyCodes { retry_at }) => assert_eq!(retry_at, T0 + 30 * DAY),
             other => panic!("the eleventh code in thirty days: {:?}", other.err()),
+        }
+    }
+
+    #[sqlx::test(migrations = "./migrations")]
+    async fn the_alert_of_a_ceiling_names_neither_the_account_nor_its_number(pool: SqlitePool) {
+        // #464: no SMS to the operator carries an account.
+        let (ovh, inbox) = fake_ovhcloud(false).await;
+        let hs = whoami_hs().await;
+        let (clock, _) = crate::util::Clock::settable(T0);
+        let st = state_from(
+            pool,
+            hs.clone(),
+            crate::config::Config {
+                sms_ceilings: crate::config::SmsCeilings {
+                    per_country_day: 0,
+                    ..crate::config::SmsCeilings::default()
+                },
+                ..discovery_config(&hs, Some(ovh), clock)
+            },
+        );
+        assert!(matches!(
+            start(&st, "carol", NUMBER).await,
+            Err(AppError::SmsLater)
+        ));
+
+        let inbox = inbox.lock().unwrap();
+        let [(to, told)] = inbox.sent.as_slice() else {
+            panic!("one SMS, to the operator: {:?}", inbox.sent);
+        };
+        assert_eq!(to, &[ALERT]);
+        for named in ["@carol:h", "carol", NUMBER] {
+            assert!(!told.contains(named), "{named}: {told}");
         }
     }
 
