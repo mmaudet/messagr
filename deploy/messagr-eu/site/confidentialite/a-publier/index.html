@@ -241,7 +241,8 @@
           </li>
           <li>
             «&nbsp;Ce qui reste sur votre appareil&nbsp;» dit ce qu'un blocage y
-            laisse, le temps de le dire au service&nbsp;;
+            laisse&nbsp;: la liste des comptes bloqués, et un blocage que le
+            service n'a pas encore reçu&nbsp;;
           </li>
           <li>
             OVHcloud rejoint «&nbsp;Où vos données sont traitées&nbsp;», pour
@@ -493,8 +494,8 @@
         <b>Les SMS qui préviennent l'exploitant.</b> Pour que l'exploitant lise
         un signalement dans les vingt-quatre heures que les conditions
         générales promettent, il est prévenu par SMS des signalements reçus,
-        et, une fois par jour, du nombre de blocages faits depuis le décompte
-        précédent. Ces SMS ne portent ni contenu ni identifiant de
+        et, une fois par jour, du nombre de blocages faits depuis le dernier
+        décompte. Ces SMS ne portent ni contenu ni identifiant de
         compte&nbsp;: les numéros des signalements et leurs motifs, ou un
         nombre de blocages. OVHcloud les envoie à son numéro, pour le compte de
         l'exploitant&nbsp;: OVH SAS, 2 rue Kellermann, 59100 Roubaix, en
@@ -524,13 +525,23 @@
           pas pu être activées. Elles ne portent ni contenu ni identifiant, et
           l'application ne les envoie nulle part&nbsp;;
         </li>
-        <!-- #467, #469 : un blocage que le service d'invitations n'a pas pu
-             recevoir attend dans le carnet chiffré de l'application, qui le
-             lui redit à chaque lancement et l'oublie une fois reçu. -->
+        <!-- #467, #469 : deux pages du carnet chiffré de l'application.
+             La liste des comptes ignorés, telle que le serveur de messagerie
+             l'a dite en dernier et remplacée entière à chaque fois, qu'un
+             lancement lit pour cacher ce qu'un compte bloqué a écrit avant que
+             le serveur réponde (`ignoredListStore.ts`) ; et un blocage que le
+             service d'invitations n'a pas encore reçu, redit à chaque
+             lancement puis oublié (`untoldBlocksStore.ts`). -->
+        <li>
+          si vous avez bloqué des comptes, leur liste, telle que le serveur de
+          messagerie l'a dite en dernier, dans le carnet chiffré de
+          l'application, pour que ce qu'ils ont écrit reste caché dès le
+          lancement&nbsp;;
+        </li>
         <li>
           si un blocage n'a pas encore pu être dit au service d'invitations, le
-          compte bloqué, dans le carnet chiffré de l'application, jusqu'à ce que
-          le service l'ait reçu&nbsp;;
+          compte bloqué, dans ce même carnet, jusqu'à ce que le service l'ait
+          reçu&nbsp;;
         </li>
         <li>
           rien d'autre.
