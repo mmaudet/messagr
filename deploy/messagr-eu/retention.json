@@ -118,7 +118,7 @@
     "duree": "douze mois après la décision",
     "page": "/confidentialite/a-publier/",
     "applique_par": [],
-    "$manque": "Rien ne l'efface encore. #473 : le ménage horaire efface l'enregistrement au plus tard douze mois après la décision (365 jours ne dépassent jamais douze mois), et jamais tant que le signalement est retenu pour les autorités ; puis sa fonction et sa durée se nomment sous « applique_par », et ce « $manque » part."
+    "$manque": "Rien ne l'efface encore. #473 : le ménage horaire efface l'enregistrement au plus tard douze mois après la décision (365 jours ne dépassent jamais douze mois), et jamais tant que le signalement est retenu pour les autorités ; puis sa fonction et sa durée se nomment sous « applique_par », et ce « $manque » part. La motivation que l'exploitant note ne recopie rien de ce qui a été dit : c'est ce qui permet de la garder six mois de plus que le contenu (ADR 0015). Un signalement sans décision n'est effacé par aucune des deux règles : les conditions promettent la décision sous trente jours, et le mode qui liste ceux qui attendent doit le montrer."
   },
   "sms_de_lexploitant": {
     "$note": "Les SMS qui préviennent l'exploitant (#464) : les signalements reçus, avec leurs numéros et leurs motifs, et le décompte quotidien des blocages. Chaque texte est écrit par le service à partir de chiffres typés, dans une liste fermée : aucun contenu ni aucun identifiant de compte n'y entre. OVHcloud les envoie au numéro de l'exploitant ; le service lui demande de les effacer de son historique un jour après l'envoi, puis chaque heure pendant un jour s'il ne les y trouve pas encore (sms_history.rs). Ce que la page en dit est sous « dit », et scripts/assert-retention.sh le vérifie comme une durée.",
