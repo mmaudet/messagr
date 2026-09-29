@@ -24,6 +24,7 @@ import {
 import { BrandMark } from './BrandMark'
 import { LanguagePicker } from './LanguagePicker'
 import { NotchedButton } from './NotchedButton'
+import { termsFor } from './terms'
 
 /**
  * The promise, shown before anything is asked.
@@ -51,7 +52,11 @@ import { NotchedButton } from './NotchedButton'
  * that can be walked past is not a gate. The conditions themselves are one tap
  * away, at the address the published page and `assert-legal-screen.sh` already
  * agree on — the acceptance is of a text somebody can read, not of a sentence
- * about a text.
+ * about a text. The box says what those terms refuse (#466): no forbidden
+ * content, no abusive behaviour. Apple's guideline 1.2 asks for terms that
+ * say so, accepted before anything else, and this is where they are
+ * accepted. The link opens the page a reader of the chosen language can read,
+ * which `terms.ts` decides: French in French, English otherwise.
  *
  * THE DARK GROUND IS THE MARK'S, NOT A THEME. `ink900` is the token for "fond
  * des frontières de sécurité", and the prototype puts this screen among the
@@ -67,9 +72,6 @@ const POINTS: readonly CopyKey[] = [
   'promise_point_agents',
   'promise_point_invitation',
 ]
-
-/** Where the conditions are published. The one `assert-legal-screen.sh` reads. */
-const TERMS = 'https://messagr.eu/conditions-generales/'
 
 export function FirstLaunch({
   onBegin,
@@ -172,7 +174,7 @@ export function FirstLaunch({
             onPress={() => {
               // Failure is ordinary: no browser, or somebody dismissed it.
               // There is nothing to report and nothing to retry.
-              Linking.openURL(TERMS).catch(() => {})
+              Linking.openURL(termsFor(language)).catch(() => {})
             }}
             accessibilityRole="link"
             style={styles.linkRow}>

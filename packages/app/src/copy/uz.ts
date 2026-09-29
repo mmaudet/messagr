@@ -25,8 +25,11 @@ import type { CopyKey } from './fr'
  * languages were produced the same way, but this one is further from the
  * translator’s own and from the languages the product was designed in. Before
  * it is offered to anybody outside the project, somebody who speaks Uzbek has
- * to read it — particularly the legal section, where two strings name an
- * article of a European regulation and a deadline the operator is bound by.
+ * to read it — particularly the legal section, where three strings name an
+ * article of a European regulation and deadlines the operator is bound by,
+ * and where « suiisteʼmol » stands for the abusive behaviour the terms
+ * refuse (#466): a word chosen broad on purpose, which a speaker should
+ * confirm.
  *
  * The build enforces that every key is present. It cannot enforce that a
  * sentence is right, and nothing here should be mistaken for that.
@@ -458,34 +461,40 @@ export const uz: Readonly<Record<CopyKey, string>> = {
     'Ilova koʻrsatayotgan narsa — amal qiladigan narsa. messagr.eu da eʼlon qilingan shartlar quyidagini takrorlaydi va ekran sigʻdira olmaydigan narsani qoʻshadi: xizmatni kim yuritadi va qaysi qonun boʻyicha.',
   legal_forbidden_title: 'Nima taqiqlangan',
   legal_forbidden_body:
-    'Bolalarni jinsiy suiisteʼmol qilish materiallari, odamning hayoti yoki xavfsizligiga tahdid, taʼqib, oʻzgalar nomidan ish koʻrish va Fransiya yoki Yevropa qonuniga koʻra noqonuniy boʻlgan har qanday boshqa mazmun.',
+    'Bolalarni jinsiy suiisteʼmol qilish materiallari, odamning hayoti yoki xavfsizligiga tahdid, taʼqib, oʻzgalar nomidan ish koʻrish, nafrat uygʻotuvchi mazmun, soʻramagan odamga majburan yuborilgan jinsiy mazmun va rozilik olinmay tarqatilgan intim tasvirlar, soʻralmagan reklama va targʻibot hamda Fransiya yoki Yevropa qonuniga koʻra noqonuniy boʻlgan har qanday boshqa mazmun.',
+  legal_forbidden_zero:
+    'Operator ushbu shartlar taqiqlagan hech qanday mazmunga ham, hech qanday suiisteʼmolga ham yoʻl qoʻymaydi: u mazmunni olib tashlaydi, muallifining hisobini toʻxtatib turadi, soʻng qaror buni tasdiqlasa, hisobni yopadi.',
   legal_forbidden_entry:
     'Bu yerga faqat nomli taklif bilan kiriladi. Taklif shaxsiy, foydalanish soni cheklangan va qayta sotilmaydi. Eng kichik yosh — oʻn besh.',
   legal_moderation_title: 'Moderatsiya aslida qanday ishlaydi',
   legal_moderation_human:
-    'Moderatsiyani server maʼmurlari bajaradi. Ular — odamlar. Har bir qaror odam tomonidan qabul qilinadi, hech qachon avtomatika tomonidan emas.',
-  legal_moderation_no_tools:
-    'Avtomatik aniqlash vositasi, filtr yoki mazmun tahlili yoʻq va boʻlishi ham mumkin emas: mazmun uchdan-uchgacha shifrlangan va operator oʻzi kriptografik jihatdan oʻqiy olmaydigan xabarlarni saqlaydi.',
-  legal_moderation_reported:
-    'Odam shikoyat qilmagan hech narsa koʻrib chiqilmaydi. Umumiy kuzatuv, oldindan aniqlash va algoritmik saralash yoʻq.',
+    'Moderatsiyani operator, yaʼni odamlar bajaradi. Har bir qaror odam tomonidan qabul qilinadi, hech qachon avtomatika tomonidan emas.',
+  legal_moderation_filter:
+    'Filtrlovchi narsa — xizmatning oʻz tuzilishi: faqat taklifni qabul qilgan odamga yozish mumkin, taklifni esa rad etish mumkin. Server esa mazmunni filtrlamaydi: u uchdan-uchgacha shifrlangan va operator oʻzi kriptografik jihatdan oʻqiy olmaydigan xabarlarni saqlaydi.',
+  legal_moderation_block:
+    'Har qanday hisobni suhbat ichidan bloklash mumkin: u yuboradigan hech narsa sizga endi yetib kelmaydi, u allaqachon yozgan narsalar ekranlaringizdan yoʻqoladi va u sizni Messagrda boshqa taklif qila olmaydi. Unga bu haqda xabar berilmaydi va bloklash olib tashlanmaydi. Operator kim kimni bloklaganini biladi, lekin nima deyilganini hech qachon bilmaydi.',
+  legal_moderation_reads:
+    'Operator faqat shikoyatda bor narsani oʻqiydi: odam olgan va unga yuborishni tanlagan xabarlarni, suhbatdan boshqa hech narsani emas. Odam shikoyat qilmagan hech narsa koʻrib chiqilmaydi. Umumiy kuzatuv, oldindan aniqlash va algoritmik saralash yoʻq.',
   legal_moderation_can:
-    'Operator oʻqimasdan nimani hal qila oladi: hisobni toʻxtatib turish, uning taklif berish imkonini olib qoʻyish, uni guruhdan chiqarish, takliflar tarmogʻining bir shoxini bekor qilish.',
+    'Shikoyat koʻrsatgan narsaga qarab operator quyidagilarni hal qila oladi: shikoyat qilingan xabarlarni hamma uchun olib tashlash, ularning muallifi hisobini toʻxtatib turish va qaror buni tasdiqlasa, hisobni yopish. Olib tashlangan xabar oʻrnida buni aytadigan qator qoladi. Hech narsani oʻqimasdan u hisobning taklif berish imkonini olib qoʻyishi, uni guruhdan chiqarishi yoki takliflar tarmogʻining bir shoxini bekor qilishi ham mumkin.',
   legal_moderation_cannot:
-    'Nimani qila olmaydi: muayyan bir xabarni oʻchirish, mazmunga baho berish yoki oʻqib turib qoida buzilganini aniqlash.',
+    'Nimani qila olmaydi: suhbatni oʻqish yoki hech bir shikoyat unga koʻrsatmagan xabarga baho berish. Hisobga nisbatan chora oʻqimasdan aniqlanadigan faktlarga yoki shikoyat koʻrsatgan narsaga asoslanadi, hech qachon faqat shikoyatchining gapiga emas.',
   legal_report_title: 'Shikoyat va undan keyin nima boʻladi',
   legal_report_how:
-    'Shikoyatlar conformite@messagr.eu manziliga elektron pochta orqali yuboriladi. Ilova ichidan shikoyat qilish hali yoʻq va buni aytish uni vaʼda qilishdan yaxshiroq.',
+    'Shikoyat ilovaning oʻzidan qilinadi: suhbatda bir odamning xabarlarini belgilang, keyin «Shikoyat qilish»ni bosing va sababni tanlang. Yuborishdan oldin ilova nima ketishini aniq aytadi va shikoyatni faqat operator ocha oladi. Har bir shikoyatga shikoyat raqami beriladi.',
   legal_report_delay:
-    'Shikoyat raqam oladi. Avval qabul qilingani tasdiqlanadi, keyin kelib tushganidan boshlab koʻpi bilan oʻttiz kun ichida asoslangan qaror va unga eʼtiroz bildirish yoʻli beriladi. Hayot yoki xavfsizlikka tahdid haqida hokimiyat organlariga xabar berish bu muddatni kutmaydi: u darhol ketadi.',
+    'Yigirma toʻrt soat ichida operator shikoyatni ochadi va u koʻrsatgan narsa ushbu shartlarni buzsa, shikoyat qilingan xabarlarni olib tashlaydi, soʻng ularning muallifi hisobini toʻxtatib turadi. Shikoyat kelib tushganidan boshlab koʻpi bilan oʻttiz kun ichida asoslangan qaror chiqariladi; u toʻxtatib turishni tasdiqlasa, hisob yopiladi. Hayot yoki xavfsizlikka tahdid haqida hokimiyat organlariga xabar berish bu muddatlarni kutmaydi: u darhol ketadi.',
+  legal_report_decision:
+    'Qarorni bilish uchun shikoyat raqamini koʻrsatib, conformite@messagr.eu manziliga yozing. Ilovasiz ham xuddi shu manzilga yoziladi: xatning qabul qilingani tasdiqlanadi, keyin kelib tushganidan boshlab koʻpi bilan oʻttiz kun ichida asoslangan qaror beriladi.',
   legal_report_review:
-    'Qarorga raqamini koʻrsatgan holda conformite@messagr.eu orqali eʼtiroz bildirish mumkin. Tashkilot imkon bergan har holatda uni qaror qabul qilgan odamdan boshqa birov qayta koʻrib chiqadi. Bir-ikki kishi yuritadigan xizmatda bu shart doim bajarilmaydi va buni yozib qoʻyish mavjud boʻlmagan ajratmani vaʼda qilishdan yaxshiroq.',
+    'Qarorga shikoyat qilgan odam ham (shikoyat raqamini koʻrsatib), chora koʻrilgan odam ham conformite@messagr.eu orqali eʼtiroz bildirishi mumkin. Tashkilot imkon bergan har holatda uni qaror qabul qilgan odamdan boshqa birov qayta koʻrib chiqadi. Bir-ikki kishi yuritadigan xizmatda bu shart doim bajarilmaydi va buni yozib qoʻyish mavjud boʻlmagan ajratmani vaʼda qilishdan yaxshiroq.',
   legal_report_scope:
     'Messagr — hosting xizmati, onlayn platforma emas: DSA ning 14-bandi shaxslararo xabar almashish xizmatlarini bundan chiqaradi. Demak 20- va 21-moddalar qoʻllanmaydi va bu matn ularni taklif qilayotgani yoʻq.',
   legal_delete_title: 'Hisobingizni oʻchirish',
   legal_delete_body:
-    'Oʻchirish ilovaning oʻzida amalga oshiriladi: Sozlamalar, keyin «Hisobimni oʻchirish». Shunda hisob darhol oʻchiriladi va uning maʼlumotlari oʻttiz kun ichida tozalanadi; allaqachon yuborilgan xabarlar ular yozilgan xonalarning hodisalari boʻlib qoladi, server ularni oʻqiy olmagani uchun olib tashlay olmaydi. Bu qurilmasiz yoki ilova shuni soʻraganda, oʻchirish conformite@messagr.eu manziliga elektron xat orqali soʻraladi.',
+    'Oʻchirish ilovaning oʻzida amalga oshiriladi: Sozlamalar, keyin «Hisobimni oʻchirish». Shunda hisob darhol oʻchiriladi va uning maʼlumotlari oʻttiz kun ichida tozalanadi; allaqachon yuborilgan xabarlar ular yozilgan suhbatlarning hodisalari boʻlib qoladi, hisobni oʻchirish esa ularni u yerdan olib tashlamaydi. Bu qurilmasiz yoki ilova shuni soʻraganda, oʻchirish conformite@messagr.eu manziliga elektron xat orqali soʻraladi.',
   legal_delete_link: 'Bu qurilmasiz: messagr.eu/aide',
-  legal_full_terms: 'Toʻliq foydalanish shartlari: messagr.eu',
+  'legal_full_terms %@': 'Toʻliq foydalanish shartlari: %@',
   trust_action: 'Bu odam haqida nima maʼlum',
   trust_title: 'Bu odam haqida nima maʼlum',
   trust_calm:
@@ -640,7 +649,8 @@ export const uz: Readonly<Record<CopyKey, string>> = {
   settings_keep_every_not_kept:
     'Bu tanlovni saqlab boʻlmadi: keyingi ishga tushirishda u avvalgi holatiga qaytadi.',
   promise_language: 'Tilingizni tanlang',
-  promise_terms: 'Men Messagr foydalanish shartlarini qabul qilaman.',
+  promise_terms:
+    'Men Messagr foydalanish shartlarini qabul qilaman: ular hech qanday taqiqlangan mazmunga ham, hech qanday suiisteʼmolga ham yoʻl qoʻymaydi.',
   promise_terms_link: 'Shartlarni oʻqish',
   promise_terms_required:
     'Davom etish uchun katakchani belgilang. Undan oldin hech nima boshlanmaydi.',

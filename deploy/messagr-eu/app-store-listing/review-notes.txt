@@ -4,7 +4,7 @@ Messagr can only be joined by invitation: there is no sign-up form, no user name
 
 <LINK>
 
-1. Open Messagr, tick "I accept Messagr's terms and conditions of use.", scroll down if needed and tap "Begin".
+1. Open Messagr, tick "I accept Messagr's terms of use, which tolerate no forbidden content and no abusive behaviour.", scroll down if needed and tap "Begin".
 2. On "You are not in yet", paste the link in the field "Paste the invitation link" and tap "Enter" (if you type it, keep the capital letters). Scanning the QR code the page shows on a computer, or tapping the link in Notes or Mail, works too. Typing it into Safari's address bar only shows the web page.
 3. After about twenty seconds, a conversation named "@mmaudet" appears. If "You are not in yet" comes back, open the link once more.
 

@@ -1,0 +1,475 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Terms of use — Messagr</title>
+    <meta
+      name="description"
+      content="Who operates Messagr, what is forbidden, how to report, how moderation decides, and how to contest a decision." />
+    <style>
+      :root {
+        --ground: #f7f5ef;
+        --surface: #ffffff;
+        --ink: #0c1f19;
+        --soft: #5a6b63;
+        --accent: #06614a;
+        --mark: #12b76a;
+        --bubble: #c9f2dc;
+        --rule: #e2ded2;
+      }
+      * {
+        box-sizing: border-box;
+      }
+      html,
+      body {
+        margin: 0;
+      }
+      body {
+        background: var(--ground);
+        color: var(--ink);
+        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+        line-height: 1.6;
+        -webkit-font-smoothing: antialiased;
+      }
+      main {
+        max-width: 640px;
+        margin: 0 auto;
+        padding: 56px 24px 80px;
+      }
+      .mark {
+        display: block;
+        margin-bottom: 40px;
+        width: max-content;
+      }
+      .mark:focus-visible {
+        outline: 3px solid var(--mark);
+        outline-offset: 4px;
+      }
+      .logotype {
+        display: block;
+        width: min(260px, 62vw);
+        height: auto;
+      }
+      .logotype.dark {
+        display: none;
+      }
+      h1 {
+        font-size: clamp(28px, 6vw, 38px);
+        line-height: 1.14;
+        letter-spacing: -0.025em;
+        font-weight: 650;
+        margin: 0 0 18px;
+        text-wrap: balance;
+      }
+      h2 {
+        font-size: 20px;
+        line-height: 1.25;
+        letter-spacing: -0.015em;
+        font-weight: 640;
+        margin: 38px 0 12px;
+      }
+      .lead {
+        font-size: 18px;
+        color: var(--soft);
+        margin: 0 0 8px;
+        text-wrap: pretty;
+      }
+      .stamp {
+        font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+        font-size: 11px;
+        letter-spacing: 0.13em;
+        text-transform: uppercase;
+        color: var(--soft);
+        margin: 0 0 34px;
+      }
+      p {
+        margin: 0 0 14px;
+      }
+      ul {
+        list-style: none;
+        padding: 0;
+        margin: 0 0 18px;
+        display: flex;
+        flex-direction: column;
+        gap: 9px;
+      }
+      li {
+        display: flex;
+        gap: 11px;
+        align-items: baseline;
+        font-size: 16px;
+      }
+      li::before {
+        content: '◆';
+        color: var(--mark);
+        font-size: 12px;
+        flex: 0 0 auto;
+      }
+      .card {
+        background: var(--surface);
+        border: 1px solid var(--rule);
+        border-radius: 4px;
+        padding: 22px 24px;
+        margin: 22px 0;
+      }
+      .card p:last-child {
+        margin-bottom: 0;
+      }
+      .invite {
+        background: var(--bubble);
+        border-radius: 4px;
+        padding: 18px 20px;
+        font-size: 15.5px;
+        margin: 22px 0;
+      }
+      .invite b {
+        font-weight: 640;
+      }
+      code {
+        font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+        font-size: 14px;
+        background: var(--surface);
+        border: 1px solid var(--rule);
+        border-radius: 3px;
+        padding: 1px 5px;
+      }
+      a {
+        color: var(--accent);
+      }
+      footer {
+        margin-top: 46px;
+        padding-top: 20px;
+        border-top: 1px solid var(--rule);
+        font-size: 13.5px;
+        color: var(--soft);
+      }
+      @media (prefers-color-scheme: dark) {
+        :root {
+          --ground: #0b1a15;
+          --surface: #11241d;
+          --ink: #e9f1ec;
+          --soft: #93a89e;
+          --accent: #4fd39b;
+          --rule: #23392f;
+          --bubble: #1c3d30;
+        }
+        .logotype.light {
+          display: none;
+        }
+        .logotype.dark {
+          display: block;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <a class="mark" href="/en/" aria-label="Messagr">
+        <img
+          class="logotype light"
+          src="/messagr-logotype-vert.svg"
+          alt="Messagr"
+          width="260"
+          height="60" />
+        <img
+          class="logotype dark"
+          src="/messagr-logotype-vert-inverse.svg"
+          alt="Messagr"
+          width="260"
+          height="60" />
+      </a>
+
+      <h1>Terms of use</h1>
+      <p class="lead">
+        Article 14 of Regulation (EU) 2022/2065. Short, because the service is
+        small and a text nobody reads informs nobody.
+      </p>
+      <p class="stamp">Version of MESSAGR-DATE-DE-PUBLICATION</p>
+
+      <div class="card">
+        <p>
+          <b>This page is a translation.</b> The
+          <a href="/conditions-generales/">French text of these terms</a> is
+          authoritative: where the two would differ, the French one applies.
+        </p>
+        <!-- depuis -->
+        <!-- #466 : `version-a-venir.mjs publier` écrit le jour de la
+             publication à la place de la marque, ici comme dans le texte
+             français. -->
+        <p>
+          <b
+            >This version has been in force since
+            MESSAGR-DATE-DE-PUBLICATION.</b
+          >
+          The
+          <a href="/conditions-generales/jusqu-au-MESSAGR-DATE-DE-PUBLICATION/"
+            >version it replaces</a
+          >, which exists in French only, remains readable.
+        </p>
+        <p>What changed:</p>
+        <!-- /depuis -->
+        <ul>
+          <li>
+            what is forbidden now includes hateful content, sexual content
+            imposed on people and intimate images shared without consent, and
+            solicitation, and the operator tolerates no forbidden content and
+            no abusive behaviour;
+          </li>
+          <li>
+            reporting is done from inside the application, and each report
+            receives a number;
+          </li>
+          <li>
+            within twenty-four hours, the operator takes down reported messages
+            that break these terms and suspends their author, whose account is
+            terminated if the decision confirms the suspension;
+          </li>
+          <li>any account can be blocked from a conversation;</li>
+          <li>
+            these terms have an English translation, and the French text is
+            authoritative.
+          </li>
+        </ul>
+      </div>
+
+      <p>
+        What the application shows is authoritative for its user: the three
+        points article 14 requires are carried by the “Legal information”
+        screen, reached from Settings. This page restates them and adds what a
+        screen cannot carry: who operates the service, and under which law.
+      </p>
+
+      <h2>1. Who operates the service</h2>
+      <p>
+        Messagr is operated by <b>RV Myriagone Holding</b>, whose registered
+        office is at 22 rue de la Garenne, 78130 Chapet, France, a
+        single-member limited liability company (société à responsabilité
+        limitée à associé unique) with a share capital of
+        5,087,000&nbsp;euros, registered with the Versailles trade and
+        companies register under number <b>894&nbsp;754&nbsp;548</b>,
+        represented by its manager, Michel-Marie Maudet.
+      </p>
+      <p>
+        Point of contact:
+        <a href="mailto:conformite@messagr.eu">conformite@messagr.eu</a>.
+      </p>
+      <p>
+        The applicable law is French law, and Regulation 2022/2065 for what
+        concerns digital services.
+      </p>
+
+      <h2>2. What is forbidden</h2>
+      <ul>
+        <li>
+          child sexual abuse material, within the meaning of articles 3 to 7 of
+          Directive 2011/93/EU and of article 227-23 of the French Criminal
+          Code;
+        </li>
+        <li>threats against a person's life or safety;</li>
+        <li>harassment;</li>
+        <li>impersonation;</li>
+        <li>
+          hateful content, attacking a person or a group because of their
+          origin, religion, sex, sexual orientation, gender identity or
+          disability;
+        </li>
+        <li>
+          sexual content imposed on people who did not ask for it, and intimate
+          images of a person shared without their consent;
+        </li>
+        <li>
+          solicitation, commercial or otherwise, of people who did not ask for
+          it;
+        </li>
+        <li>any other content illegal under French or European law.</li>
+      </ul>
+      <div class="invite">
+        <b
+          >The operator tolerates no content forbidden by these terms and no
+          abusive behaviour: it takes the content down, suspends its author's
+          account, then terminates it if the decision confirms it.</b
+        >
+        Section 3 says by what means, and section 5 within what time.
+      </div>
+      <p>
+        <b>Entry to Messagr is by named invitation only.</b> An invitation is
+        personal, limited in use, and not for resale. Whoever issued it can
+        revoke it, and that revocation cannot be undone from the application.
+      </p>
+      <p>
+        <b
+          >A weekly invitation quota applies to every account in the same
+          way.</b
+        >
+        It exists to keep an invitation from being used for solicitation, and
+        it targets no account in particular.
+      </p>
+      <p>
+        <b>The minimum age is fifteen in France</b>, the age of digital consent
+        set by article 45 of the French Data Protection Act (loi Informatique et
+        Libertés). Between fifteen and the age of majority, opening an account
+        requires the joint consent of the minor and of one of their legal
+        representatives.
+      </p>
+
+      <h2>3. The means of moderation actually employed</h2>
+      <p>
+        <b>Moderation is done by the operator, that is, by people.</b> They
+        read of a conversation only what a report passes on to them.
+      </p>
+      <div class="invite">
+        <b>What filters is the very shape of the service.</b> You only write to
+        someone who has accepted the invitation: nobody receives a message in a
+        conversation they have not accepted, and an invitation can be declined.
+        And any account can be blocked from a conversation: nothing it sends
+        reaches you any more, what it has already written leaves your screens,
+        and it can no longer invite you in Messagr. It is not told, and a block
+        cannot be lifted. The operator learns who blocked whom, never what was
+        said.
+      </div>
+      <p>
+        <b
+          >The server, for its part, does not filter content: it cannot read
+          it.</b
+        >
+        Content is end-to-end encrypted, the keys exist only on the devices of
+        a conversation's members, and the operator holds messages it is
+        <b>cryptographically unable</b> to read. There is no general
+        monitoring, no proactive detection and no algorithmic ranking, since
+        there is nothing to rank: no news feed, no recommendation, no
+        directory.
+      </p>
+      <p>
+        <b>The operator reads only what a report carries.</b> A report is the
+        only way anything readable reaches it: messages a person received and
+        chooses to pass on to it, and nothing else of the conversation. Nothing
+        is examined that a person has not reported.
+      </p>
+      <p>
+        <b>What the operator can decide on what a report shows</b>: take the
+        reported messages down for everyone, suspend their author's account,
+        then terminate it if the decision confirms the suspension.
+        <b>Without reading anything</b>, it can also take away an account's
+        ability to issue invitations, remove it from a group, or revoke a
+        branch of invitations.
+      </p>
+      <p>
+        A message taken down leaves a line in its place saying that the
+        operator took it down: a takedown is never a silent disappearance. A
+        suspended account can do nothing more, but keeps its devices, its keys
+        and its conversations, and the suspension is lifted if the decision
+        does not confirm it. A terminated account is closed for good, as a
+        deleted one is, without its holder having chosen it.
+      </p>
+      <p>
+        <b>What it cannot do</b>: read a conversation, or judge a message no
+        report has shown it. A measure against an account is taken on facts
+        that can be established without reading, or on what the report shows,
+        never on a reporter's word alone, or reporting would become a weapon.
+      </p>
+
+      <h2>4. Human review</h2>
+      <p>
+        <b>Every decision is taken by a person, never by an automatism.</b>
+        There is therefore no automated decision to review, and the guarantee
+        article 14 attaches to human review is secured here by construction
+        rather than by procedure.
+      </p>
+      <p>
+        <b>A decision can be contested</b> at
+        <a href="mailto:conformite@messagr.eu">conformite@messagr.eu</a>, by the
+        person who reported, quoting the report number, as well as by the
+        person the measure concerns. It is then re-examined by someone other
+        than whoever took it, whenever the organisation allows. On a service run
+        by one or two people that condition cannot always be met, and writing
+        this down is better than promising a separation that would not exist.
+      </p>
+      <p>
+        <b>Messagr is a hosting service and not an online platform</b>, recital
+        14 of the DSA excluding interpersonal messaging services. Articles 20
+        and 21, which require an internal complaint-handling system and
+        information on out-of-court dispute settlement, therefore do not apply.
+        This document does not claim to offer them.
+      </p>
+
+      <h2>5. Reporting, deciding, and within what time</h2>
+      <p>
+        <b>Reporting is done from inside the application.</b> In a
+        conversation, you select one or more messages from the same person,
+        then choose “Report” and a reason among what these terms forbid. Before
+        anything is sent, the application says exactly what leaves: the chosen
+        messages as you read them, their author and their time, and nothing
+        else of the conversation. A photo or a document reported goes with
+        them. Only the operator can open a report, and reporting tells nobody
+        else.
+      </p>
+      <p>
+        <b>Each report receives a report number</b>, shown to the person who
+        sends it. The decision is obtained by writing to
+        <a href="mailto:conformite@messagr.eu">conformite@messagr.eu</a> with
+        that number: the application does not follow a report once it is sent.
+      </p>
+      <div class="card">
+        <p>
+          <b>Within twenty-four hours</b> of its receipt, the operator opens the
+          report and, if what it shows breaks these terms, takes the reported
+          messages down, then suspends their author's account.
+        </p>
+        <p>
+          <b
+            >A reasoned decision follows, within thirty days of the report's
+            receipt at the latest.</b
+          >
+          If it confirms the suspension, the account is terminated; otherwise
+          it lifts it. It can be contested, as section 4 says.
+        </p>
+      </div>
+      <p>
+        <b
+          >Reporting a threat to life or safety to the authorities is not bound
+          by these deadlines</b
+        >: it goes out without waiting for the outcome of the review.
+      </p>
+      <p>
+        <b>Without the application</b>, or for content you did not receive
+        yourself, you write to
+        <a href="mailto:conformite@messagr.eu">conformite@messagr.eu</a>. That
+        e-mail receives an acknowledgement, then a reasoned decision within
+        thirty days of its receipt at the latest, with the route to contest it.
+      </p>
+
+      <h2>6. Points of contact</h2>
+      <p>
+        <b>For recipients of the service</b> (article 12), two channels.
+        <b>Reporting from inside the application</b>, for content received in
+        Messagr, as section 5 says. And
+        <a href="mailto:conformite@messagr.eu">conformite@messagr.eu</a>,
+        electronically, in French or in English, for everything else, and to
+        learn or contest a decision. There is no other.
+      </p>
+      <p>
+        <b
+          >For the authorities of the Member States, the European Commission and
+          the European Board for Digital Services</b
+        >
+        (article 11): the same address, in French or in English. Requests from
+        the authorities take priority over any other correspondence.
+      </p>
+
+      <h2>7. Changes</h2>
+      <p>
+        Any change to these terms is brought to the attention of the recipients
+        of the service. The date at the head of this page is that of the latest
+        version.
+      </p>
+
+      <footer>
+        <a href="/en/">Messagr</a> ·
+        <a href="/confidentialite">Privacy policy, in French</a> ·
+        <a href="/conditions-generales/">Français</a> ·
+        <a href="mailto:conformite@messagr.eu">conformite@messagr.eu</a>
+      </footer>
+    </main>
+  </body>
+</html>

@@ -1,8 +1,9 @@
 import React from 'react'
 import { Linking, Pressable, StyleSheet, Text, View } from 'react-native'
 
-import { t, type CopyKey } from '../copy'
+import { currentLanguage, t, type CopyKey } from '../copy'
 import { color, floors, layout, space, type } from '../design/tokens'
+import { termsShown } from './terms'
 
 /**
  * The legal information screen the published terms already promise.
@@ -33,12 +34,26 @@ import { color, floors, layout, space, type } from '../design/tokens'
  *
  * # What this screen says that a marketing page would not
  *
- * That reporting from inside the application **does not exist yet**. The
- * published page says the same, and says why it says it: an earlier version
- * announced a report *"accessible depuis l'application, sur chaque message
- * reçu"*, and confronted with the code, nothing of the sort existed. The two
- * texts say the same thing now, and `scripts/assert-legal-screen.sh` is what
- * keeps them saying it.
+ * Its limits. Until #466 it said that reporting from inside the application
+ * **did not exist yet**, because an earlier version of the terms had announced
+ * a report *"accessible depuis l'application, sur chaque message reçu"* and,
+ * confronted with the code, nothing of the sort existed. Apple read that
+ * honesty, with "no filter" and "cannot take down a particular message", as
+ * safeguards missing, and refused build 27 under guideline 1.2.
+ *
+ * It now says what ADR 0015 decided: no tolerance for forbidden content or
+ * abusive behaviour; a filter in the shape of the service (one writes only to
+ * whoever accepted the invitation, and any account can be blocked) rather than
+ * on a server that cannot read; a report made from the application, which is
+ * the only thing the operator reads; takedown and suspension within
+ * twenty-four hours; a reasoned decision within thirty days. And still its
+ * limits: the operator reads no conversation, and judges nothing a report did
+ * not show it. The reporting and blocking gestures themselves are #468 and
+ * #469; this screen describes them as #462 defines them.
+ *
+ * The published terms say the same, in French and in English, and
+ * `scripts/assert-legal-screen.sh` is what keeps the seven languages of this
+ * screen saying it.
  */
 
 /**
@@ -52,14 +67,19 @@ const SECTIONS: readonly {
 }[] = [
   {
     heading: 'legal_forbidden_title',
-    paragraphs: ['legal_forbidden_body', 'legal_forbidden_entry'],
+    paragraphs: [
+      'legal_forbidden_body',
+      'legal_forbidden_zero',
+      'legal_forbidden_entry',
+    ],
   },
   {
     heading: 'legal_moderation_title',
     paragraphs: [
       'legal_moderation_human',
-      'legal_moderation_no_tools',
-      'legal_moderation_reported',
+      'legal_moderation_filter',
+      'legal_moderation_block',
+      'legal_moderation_reads',
       'legal_moderation_can',
       'legal_moderation_cannot',
     ],
@@ -69,6 +89,7 @@ const SECTIONS: readonly {
     paragraphs: [
       'legal_report_how',
       'legal_report_delay',
+      'legal_report_decision',
       'legal_report_review',
       'legal_report_scope',
     ],
@@ -150,9 +171,12 @@ export function Legal({ onBack }: { readonly onBack: () => void }) {
           leaves the application, and this one has nowhere to come back to
           yet; the address is readable and that is enough for a page a person
           consults once. The deletion link above is the exception, and the
-          comment there says why it had to be one. */}
+          comment there says why it had to be one.
+
+          The address is the one the first screen's link opens for this
+          language (#466), and `terms.ts` alone decides which it is. */}
       <Text testID="legal-terms" selectable style={styles.terms}>
-        {t('legal_full_terms')}
+        {t('legal_full_terms %@', termsShown(currentLanguage()))}
       </Text>
     </View>
   )

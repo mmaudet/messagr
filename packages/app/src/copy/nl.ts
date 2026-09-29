@@ -9,7 +9,7 @@ import type { CopyKey } from './fr'
  *
  * `u` throughout, as the French uses `vous`.
  *
- * The two legal strings want a lawyer’s eye before the store listing goes
+ * The three legal strings want a lawyer’s eye before the store listing goes
  * out; `en.ts` says the same and for the same reason.
  */
 export const nl: Readonly<Record<CopyKey, string>> = {
@@ -445,34 +445,40 @@ export const nl: Readonly<Record<CopyKey, string>> = {
     'Wat deze app toont, is wat geldt. De op messagr.eu gepubliceerde voorwaarden nemen het onderstaande over en voegen toe wat een scherm niet kan dragen: wie de dienst exploiteert, en onder welk recht.',
   legal_forbidden_title: 'Wat verboden is',
   legal_forbidden_body:
-    'Materiaal van seksueel kindermisbruik, bedreigingen tegen het leven of de veiligheid van een persoon, intimidatie, identiteitsmisbruik, en elke andere inhoud die onwettig is naar Frans of Europees recht.',
+    'Materiaal van seksueel kindermisbruik, bedreigingen tegen het leven of de veiligheid van een persoon, intimidatie, identiteitsmisbruik, haatdragende inhoud, seksuele inhoud die wordt opgedrongen aan wie er niet om vroeg en intieme beelden die zonder toestemming worden verspreid, ongevraagde reclame en werving, en elke andere inhoud die onwettig is naar Frans of Europees recht.',
+  legal_forbidden_zero:
+    'De exploitant tolereert geen enkele inhoud die deze voorwaarden verbieden en geen enkel grensoverschrijdend gedrag: hij verwijdert de inhoud, schort het account van de afzender op en sluit het als de beslissing dat bevestigt.',
   legal_forbidden_entry:
     'Men komt uitsluitend binnen op naam en op uitnodiging. Een uitnodiging is persoonlijk, beperkt in gebruik, en wordt niet doorverkocht. De minimumleeftijd is vijftien jaar.',
   legal_moderation_title: 'Hoe de moderatie werkelijk werkt',
   legal_moderation_human:
-    'De moderatie is die van de beheerders van de server. Dat zijn mensen. Elke beslissing wordt door een mens genomen, nooit door een automatisme.',
-  legal_moderation_no_tools:
-    'Er bestaat geen automatisch detectiehulpmiddel, geen filter, geen inhoudsanalyse, en die kan er ook niet zijn: de inhoud is end-to-end versleuteld en de exploitant houdt berichten die hij cryptografisch onmogelijk kan lezen.',
-  legal_moderation_reported:
-    'Er wordt niets onderzocht dat niet door een mens is gemeld. Er is geen algemeen toezicht, geen proactieve detectie en geen algoritmische rangschikking.',
+    'De moderatie wordt gedaan door de exploitant, dat wil zeggen door mensen. Elke beslissing wordt door een mens genomen, nooit door een automatisme.',
+  legal_moderation_filter:
+    'Wat filtert, is de vorm van de dienst zelf: men schrijft alleen aan wie de uitnodiging heeft aanvaard, en een uitnodiging kan worden geweigerd. De server zelf filtert geen inhoud: die is end-to-end versleuteld, en de exploitant houdt berichten die hij cryptografisch onmogelijk kan lezen.',
+  legal_moderation_block:
+    'Elk account kan vanuit een gesprek worden geblokkeerd: niets van wat het verstuurt bereikt u nog, wat het al schreef verdwijnt van uw schermen, en het kan u in Messagr niet meer uitnodigen. Het krijgt dat niet te horen, en een blokkering wordt niet opgeheven. De exploitant verneemt wie wie heeft geblokkeerd, nooit wat er werd gezegd.',
+  legal_moderation_reads:
+    'De exploitant leest alleen wat een melding bevat: de berichten die iemand heeft ontvangen en hem wil doorgeven, en verder niets uit het gesprek. Er wordt niets onderzocht dat niet door een mens is gemeld. Er is geen algemeen toezicht, geen proactieve detectie en geen algoritmische rangschikking.',
   legal_moderation_can:
-    'Wat de exploitant kan beslissen zonder te lezen: een account opschorten, het de mogelijkheid ontnemen uitnodigingen te versturen, het uit een groep zetten, een uitnodigingstak intrekken.',
+    'Wat de exploitant kan beslissen op grond van wat een melding toont: de gemelde berichten voor iedereen verwijderen, het account van de afzender opschorten, en het sluiten als de beslissing de opschorting bevestigt. Een verwijderd bericht laat op zijn plaats een regel achter die dat zegt. Zonder iets te lezen kan hij een account ook de mogelijkheid ontnemen uitnodigingen te versturen, het uit een groep zetten of een uitnodigingstak intrekken.',
   legal_moderation_cannot:
-    'Wat hij niet kan: een bepaald bericht verwijderen, inhoud kwalificeren, of door te lezen vaststellen dat een regel is geschonden.',
+    'Wat hij niet kan: een gesprek lezen, of een bericht beoordelen dat geen melding hem heeft getoond. Een maatregel tegen een account berust op feiten die zonder lezen vast te stellen zijn, of op wat de melding toont, nooit op de loutere bewering van wie meldt.',
   legal_report_title: 'Melden, en wat daarop volgt',
   legal_report_how:
-    'Melden gaat per e-mail naar conformite@messagr.eu. Het gebaar vanuit de app bestaat nog niet, en dat zeggen is beter dan het beloven.',
+    'Melden gaat vanuit de app: selecteer in een gesprek berichten van dezelfde persoon, dan „Melden”, en kies een reden. Voor het versturen zegt de app precies wat er vertrekt, en alleen de exploitant kan een melding openen. Elke melding krijgt een meldingsnummer.',
   legal_report_delay:
-    'Een melding levert een referentie op. Zij krijgt een ontvangstbevestiging, en daarna uiterlijk dertig dagen na ontvangst een met redenen omklede beslissing, met de weg om die aan te vechten. Het melden aan de autoriteiten van een bedreiging voor het leven of de veiligheid volgt die termijn niet: dat gaat onmiddellijk weg.',
+    'Binnen vierentwintig uur opent de exploitant de melding en, als wat die toont deze voorwaarden schendt, verwijdert hij de gemelde berichten en schort hij daarna het account van de afzender op. Uiterlijk dertig dagen na ontvangst van de melding volgt een met redenen omklede beslissing; bevestigt die de opschorting, dan wordt het account gesloten. Het melden aan de autoriteiten van een bedreiging voor het leven of de veiligheid volgt deze termijnen niet: dat gaat onmiddellijk weg.',
+  legal_report_decision:
+    'De beslissing krijgt u door met het meldingsnummer te schrijven naar conformite@messagr.eu. Zonder de app schrijft men naar hetzelfde adres: de e-mail krijgt een ontvangstbevestiging, en daarna uiterlijk dertig dagen na ontvangst een met redenen omklede beslissing.',
   legal_report_review:
-    'Tegen een beslissing kan bezwaar worden gemaakt bij conformite@messagr.eu, met vermelding van de referentie. Zij wordt opnieuw beoordeeld door iemand anders dan degene die haar nam, telkens wanneer de organisatie dat toelaat. Bij een dienst die door één of twee mensen wordt geëxploiteerd kan aan die voorwaarde niet altijd worden voldaan, en dat opschrijven is beter dan een scheiding beloven die niet zou bestaan.',
+    'Tegen een beslissing kan bezwaar worden gemaakt bij conformite@messagr.eu, door wie heeft gemeld, met vermelding van het meldingsnummer, en door wie de maatregel treft. Zij wordt opnieuw beoordeeld door iemand anders dan degene die haar nam, telkens wanneer de organisatie dat toelaat. Bij een dienst die door één of twee mensen wordt geëxploiteerd kan aan die voorwaarde niet altijd worden voldaan, en dat opschrijven is beter dan een scheiding beloven die niet zou bestaan.',
   legal_report_scope:
     'Messagr is een hostingdienst en geen onlineplatform; overweging 14 van de DSA sluit interpersoonlijke communicatiediensten uit. De artikelen 20 en 21 zijn dus niet van toepassing, en deze tekst beweert niet ze te bieden.',
   legal_delete_title: 'Uw account verwijderen',
   legal_delete_body:
-    'Verwijderen gebeurt in de applicatie: Instellingen, dan „Mijn account verwijderen”. Het account wordt dan meteen gedeactiveerd en zijn gegevens worden binnen dertig dagen gewist; reeds verstuurde berichten blijven gebeurtenissen van de ruimtes waarin ze zijn geschreven, en de server kan ze niet weghalen omdat hij ze niet kan lezen. Zonder dit apparaat, of wanneer de applicatie daarom vraagt, vraagt u de verwijdering per e-mail aan bij conformite@messagr.eu.',
+    'Verwijderen gebeurt in de applicatie: Instellingen, dan „Mijn account verwijderen”. Het account wordt dan meteen gedeactiveerd en zijn gegevens worden binnen dertig dagen gewist; reeds verstuurde berichten blijven gebeurtenissen van de gesprekken waarin ze zijn geschreven, en het verwijderen van het account haalt ze daar niet weg. Zonder dit apparaat, of wanneer de applicatie daarom vraagt, vraagt u de verwijdering per e-mail aan bij conformite@messagr.eu.',
   legal_delete_link: 'Zonder dit apparaat: messagr.eu/aide',
-  legal_full_terms: 'Volledige algemene voorwaarden: messagr.eu',
+  'legal_full_terms %@': 'Volledige gebruiksvoorwaarden: %@',
   trust_action: 'Wat er van deze persoon bekend is',
   trust_title: 'Wat er van deze persoon bekend is',
   trust_calm:
@@ -628,7 +634,8 @@ export const nl: Readonly<Record<CopyKey, string>> = {
   settings_keep_every_not_kept:
     'Deze keuze kon niet worden bewaard: bij de volgende start geldt weer de vorige toestand.',
   promise_language: 'Kies uw taal',
-  promise_terms: 'Ik aanvaard de algemene gebruiksvoorwaarden van Messagr.',
+  promise_terms:
+    'Ik aanvaard de gebruiksvoorwaarden van Messagr, die geen enkele verboden inhoud en geen enkel grensoverschrijdend gedrag tolereren.',
   promise_terms_link: 'De voorwaarden lezen',
   promise_terms_required:
     'Vink het vakje aan om verder te gaan. Daarvoor start er niets.',

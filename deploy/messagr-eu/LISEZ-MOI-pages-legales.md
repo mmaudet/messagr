@@ -94,7 +94,18 @@ d'assistance, et une 404 fait échouer sans dire clairement pourquoi.
 
 Le même contrôle connaît aussi les versions autour de celle en vigueur,
 décrites ci-dessous : une version à venir répond une fois annoncée, et pas
-avant ; une version remplacée répond à son adresse datée.
+avant ; une version remplacée répond à son adresse datée ; une traduction
+répond à la sienne, `/conditions-generales/en/` ; une version qui attend
+d'être publiée ne répond pas, ni sa traduction.
+
+`scripts/assert-legal-screen.sh` va chercher les conditions, en français et
+en anglais, et vérifie que l'écran « Informations légales » dit les mêmes
+engagements dans chaque langue que l'application déclare (`languages.ts`,
+sept aujourd'hui), et qu'aucune ne garde les trois phrases retirées par
+#466. Le travail de publication d'une build le
+lance aussi : tant que les conditions publiées ne disent pas ce que l'écran
+dit, aucune build ne part. `deploy/messagr-eu/tests/controles-legaux.js` mène
+ces deux contrôles contre le site construit, à chaque changement.
 
 ## Une nouvelle version
 
@@ -194,3 +205,92 @@ annoncée pour ce jour-là ou avant :
 Le déploiement retire `<page>/a-venir/` du serveur : sans cela, la page
 resterait servie, et dirait que la politique « s'appliquera » le jour où
 elle s'applique déjà.
+
+## Une version qui s'applique le jour où elle est publiée
+
+Quand la version en vigueur ne fixe aucun préavis, une nouvelle version
+s'applique le jour où elle paraît : c'est le cas des conditions générales du
+5 septembre 2026, dont la clause 7 dit seulement que « toute modification de
+ces conditions est portée à la connaissance des destinataires du service ».
+La version qui les remplace (#466) dit la tolérance zéro, après le refus
+d'Apple en 1.2 le 29 septembre 2026. Ce jour-là, c'est la publication qui le
+fixe, avec le déploiement en production (#474) : il n'existe pas avant.
+
+La version attend donc dans `<page>/a-publier/index.html`, écrite telle
+qu'elle s'appliquera, et sa traduction à côté, dans
+`<page>/a-publier/en/index.html`. `build-site.sh` n'en construit rien : un
+déploiement fait pour autre chose publie le site d'aujourd'hui, exactement,
+sans les conditions d'avance ni leur traduction.
+
+### Préparer
+
+À partir de la version en vigueur, recopiée dans `<page>/a-publier/` :
+
+1. Écrire en tête, dans le `<p class="stamp">`, « Version du
+   MESSAGR-DATE-DE-PUBLICATION », puis une carte dont le début, entre
+   `<!-- depuis -->` et `<!-- /depuis -->`, dit « Cette version s'applique
+   depuis le MESSAGR-DATE-DE-PUBLICATION. », renvoie à
+   `href="/<page>/jusqu-au-MESSAGR-DATE-DE-PUBLICATION/"` et se termine par
+   « Ce qui a changé : ». La liste de ce qui change suit, hors de ce passage.
+2. Garder l'annonce de la version à venir, s'il y en a une : la version à
+   venir s'annoncera depuis la version publiée.
+3. Pour la traduction, la même chose dans sa langue, avec `<html lang="en">`,
+   un renvoi au texte français, `href="/<page>/"`, qui dit qu'il fait foi, et
+   le texte français qui renvoie à `/<page>/en/`.
+
+`publier` refuse une version dont la forme ne permettrait pas de la dater
+partout, et n'écrit rien alors.
+
+### Publier
+
+    node deploy/messagr-eu/version-a-venir.mjs publier
+
+Le jour de la mise en production, à Paris. La date est celle du jour, et
+aucune autre : le geste l'écrit à la place de la marque, dans la version et
+dans sa traduction (« 30 septembre 2026 », « 30 September 2026 »), puis :
+
+- la version en vigueur part à `<page>/jusqu-au-AAAA-MM-JJ/`, et dit
+  jusqu'à quand elle s'est appliquée, et ce qui l'a remplacée ;
+- la version qui attendait devient la version en vigueur, et renvoie à celle
+  qu'elle remplace ;
+- sa traduction devient `<page>/en/index.html`, sa propre adresse ;
+- `<page>/a-publier/` disparaît du dépôt.
+
+Puis commiter, et déployer **le jour même** (`deploy/messagr-eu/deploy.sh`,
+avec l'accord du porteur) : la date écrite dit depuis quand les conditions
+s'appliquent, et elles ne s'appliquent que servies. Un déploiement qui
+glisserait au lendemain ferait dire à la page qu'elle s'applique depuis la
+veille : annuler alors le commit de publication, et publier de nouveau.
+Enfin les contrôles :
+
+    ./scripts/assert-legal-pages.sh
+    ./scripts/assert-legal-screen.sh
+
+Le premier attend les pages française et anglaise, et la version remplacée
+à son adresse datée ; le second, que l'écran « Informations légales » dise
+dans chaque langue ce que disent les conditions publiées. Avant la
+publication, le second échoue : c'est l'ordre voulu, puisqu'une build qui
+signale ne part pas avant les conditions qui le disent.
+
+### Une traduction
+
+Depuis #466, les conditions générales ont une traduction anglaise, à
+`/conditions-generales/en/`, que l'application ouvre quand elle n'est pas en
+français. Une traduction traduit la version en vigueur, et aucune autre.
+
+**Une version à venir n'en porte pas encore.** L'annoncer, puis l'appliquer,
+laisserait la traduction publiée traduire une version remplacée : sur une
+page traduite, la version à venir attend donc, et les trois gestes
+(`annoncer`, `reporter`, `appliquer`) le disent, en nommant ce qui lui
+manque. Les autres pages avancent : la version à venir de la politique de
+confidentialité s'annonce et s'applique sans attendre celle des conditions.
+
+C'est le cas de la version à venir des conditions générales, celle de la
+découverte (#392) : avant de l'annoncer, il faut sa traduction anglaise, et
+apprendre aux trois gestes à la dater, à la servir avec elle et à ranger
+l'ancienne à l'adresse datée. Ce n'est pas fait, et rien ne le fera en
+silence. D'ici là, elle ne dit rien d'une traduction.
+
+**Tant qu'une version attend d'être publiée** sur une page, sa version à
+venir attend aussi, de la même façon : elle est écrite par-dessus la version
+qui attend, et ce qu'elle dit changer se lit contre elle.

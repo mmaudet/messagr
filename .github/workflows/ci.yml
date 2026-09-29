@@ -66,7 +66,8 @@ jobs:
       # this is what makes them run. `scripts/` has no harness of its own:
       # the only scripts with a test file are the operator's tools, whose
       # specs sit in `packages/app` beside the modules they load (#465), and
-      # run with `yarn test` below.
+      # run with `yarn test` below; the two legal checks are driven by a site
+      # test, below (#466).
       - name: Assert the release notes are built the way they are meant to be
         run: node scripts/release-notes.mjs --self-test
 
@@ -255,6 +256,12 @@ jobs:
       # written the way it is: its response is byte-identical for every token,
       # valid or not, so the page cannot reveal whether an invitation exists;
       # and it never claims the token itself.
+      #
+      # Among these tests, `controles-legaux.js` drives
+      # `scripts/assert-legal-pages.sh` and `scripts/assert-legal-screen.sh`
+      # against a built copy of the site, through the environment variables
+      # they take (#466): both run against messagr.eu only when publishing, and
+      # a check never seen refusing proves nothing.
       - name: Build the site and hold it to its own doctrine
         run: |
           rm -rf /tmp/messagr-site

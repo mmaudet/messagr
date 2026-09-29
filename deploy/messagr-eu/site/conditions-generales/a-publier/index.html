@@ -3,7 +3,7 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Conditions générales à venir — Messagr</title>
+    <title>Conditions générales — Messagr</title>
     <meta
       name="description"
       content="Qui exploite Messagr, ce qui est interdit, comment signaler, comment la modération décide, et comment contester une décision." />
@@ -180,39 +180,64 @@
           height="60" />
       </a>
 
-      <h1>Conditions générales d'utilisation à venir</h1>
+      <h1>Conditions générales d'utilisation</h1>
       <p class="lead">
         Article 14 du règlement (UE) 2022/2065. Court, parce que le service est
         petit et qu'un texte que personne ne lit ne renseigne personne.
       </p>
-      <p class="stamp">Version applicable le MESSAGR-DATE-A-VENIR</p>
+      <p class="stamp">Version du MESSAGR-DATE-DE-PUBLICATION</p>
+      <!-- a-venir -->
+
+      <!-- #412 : l'annonce de la version à venir. `build-site.sh` retire ce
+           passage tant que la marque y est, et `version-a-venir.mjs annoncer`
+           y écrit la date que le porteur fixe. -->
       <div class="card">
-        <!-- a-venir -->
-        <!-- #412 : la version à venir, publiée trente jours avant de
-             s'appliquer. `version-a-venir.mjs annoncer` écrit la date à la
-             place de la marque ; tant qu'elle ne l'est pas, `build-site.sh`
-             ne construit pas cette page. Le jour venu, `version-a-venir.mjs
-             appliquer` en fait la version en vigueur, et remplace ce passage
-             par le renvoi à la version qu'elle remplace. -->
         <p>
-          <b>Cette version s'appliquera le MESSAGR-DATE-A-VENIR.</b> D'ici là,
-          ce sont les <a href="/conditions-generales/">conditions en vigueur</a>
-          qui s'appliquent. Elle arrive avec la découverte des contacts, qui
-          permet à ceux qui ont déjà votre numéro de vous trouver sur Messagr,
-          si vous le choisissez.
+          <b>Une nouvelle version de ces conditions s'appliquera le
+          MESSAGR-DATE-A-VENIR.</b>
+          <a href="/conditions-generales/a-venir/">La lire, avec la liste de ce
+          qui change.</a>
         </p>
-        <p>Ce qui change&nbsp;:</p>
-        <!-- /a-venir -->
+      </div>
+      <!-- /a-venir -->
+
+      <div class="card">
+        <!-- depuis -->
+        <!-- #466 : cette version s'applique le jour où elle est publiée, celle
+             qu'elle remplace ne fixant aucun préavis. `version-a-venir.mjs
+             publier` écrit ce jour à la place de la marque, ici, en tête et
+             dans la traduction anglaise, et range la version remplacée à son
+             adresse datée. -->
+        <p>
+          <b>Cette version s'applique depuis le MESSAGR-DATE-DE-PUBLICATION.</b>
+          La
+          <a href="/conditions-generales/jusqu-au-MESSAGR-DATE-DE-PUBLICATION/"
+            >version qu'elle remplace</a
+          >
+          reste lisible.
+        </p>
+        <p>Ce qui a changé&nbsp;:</p>
+        <!-- /depuis -->
         <ul>
           <li>
-            «&nbsp;aucun annuaire&nbsp;» devient «&nbsp;aucun annuaire qu'on
-            puisse parcourir&nbsp;»&nbsp;: les comptes trouvables forment une
-            liste que chacun ne compare qu'à ses propres contacts, sur son
-            téléphone, et pour un nombre borné de numéros&nbsp;;
+            ce qui est interdit s'étend aux contenus haineux, aux contenus
+            sexuels imposés et aux images intimes diffusées sans accord, et au
+            démarchage, et l'exploitant ne tolère aucun contenu interdit ni
+            aucun comportement abusif&nbsp;;
           </li>
           <li>
-            «&nbsp;Modification&nbsp;» dit comment une nouvelle version est
-            annoncée.
+            le signalement se fait depuis l'application, et chaque signalement
+            reçoit un numéro&nbsp;;
+          </li>
+          <li>
+            sous vingt-quatre heures, l'exploitant retire les messages signalés
+            qui enfreignent ces conditions et suspend leur auteur, dont le
+            compte est fermé si la décision confirme la suspension&nbsp;;
+          </li>
+          <li>tout compte peut être bloqué depuis une conversation&nbsp;;</li>
+          <li>
+            ces conditions ont une traduction anglaise, et le texte français
+            fait foi.
           </li>
         </ul>
       </div>
@@ -224,10 +249,11 @@
         Cette page les reprend et ajoute ce qu'un écran ne peut pas porter — qui
         exploite le service, et sous quel droit.
       </p>
-      <!-- #466 : pas de traduction anglaise ici. La traduction publiée
-           traduit la version en vigueur, et aucune autre ; celle de cette
-           version reste à écrire, avant qu'elle puisse être annoncée
-           (LISEZ-MOI-pages-legales.md, « Une traduction »). -->
+      <p>
+        Ces conditions ont une
+        <a href="/conditions-generales/en/">traduction anglaise</a>. Là où les
+        deux textes différeraient, le texte français fait foi.
+      </p>
 
       <h2>1. Qui exploite le service</h2>
       <p>
@@ -326,8 +352,7 @@
         détient des messages qu'il lui est <b>cryptographiquement impossible</b>
         de lire. Il n'y a ni surveillance générale, ni détection proactive, ni
         classement algorithmique, puisqu'il n'y a rien à classer&nbsp;: aucun
-        fil d'actualité, aucune recommandation, aucun annuaire qu'on
-        puisse parcourir.
+        fil d'actualité, aucune recommandation, aucun annuaire.
       </p>
       <p>
         <b>L'exploitant ne lit que ce qu'un signalement porte.</b> Un
@@ -460,18 +485,14 @@
       <h2>7. Modification</h2>
       <p>
         Toute modification de ces conditions est portée à la connaissance des
-        destinataires du service. Une nouvelle version paraît trente jours
-        avant de s'appliquer, à sa propre adresse,
-        <code>/conditions-generales/a-venir/</code>, datée, avec la liste de ce
-        qui change, et la version en vigueur l'annonce en tête. Une fois
-        appliquée, la version qu'elle remplace reste lisible à une adresse qui
-        porte sa date de fin. La date en tête de cette page est celle où elle
-        s'applique.
+        destinataires du service. La date en tête de cette page est celle de la
+        dernière version.
       </p>
 
       <footer>
         <a href="/">Messagr</a> ·
         <a href="/confidentialite">Politique de confidentialité</a> ·
+        <a href="/conditions-generales/en/">English</a> ·
         <a href="mailto:conformite@messagr.eu">conformite@messagr.eu</a>
       </footer>
     </main>
