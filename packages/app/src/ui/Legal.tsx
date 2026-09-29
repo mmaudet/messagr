@@ -1,8 +1,9 @@
 import React from 'react'
 import { Linking, Pressable, StyleSheet, Text, View } from 'react-native'
 
-import { t, type CopyKey } from '../copy'
+import { currentLanguage, t, type CopyKey } from '../copy'
 import { color, floors, layout, space, type } from '../design/tokens'
+import { termsShown } from './terms'
 
 /**
  * The legal information screen the published terms already promise.
@@ -170,9 +171,12 @@ export function Legal({ onBack }: { readonly onBack: () => void }) {
           leaves the application, and this one has nowhere to come back to
           yet; the address is readable and that is enough for a page a person
           consults once. The deletion link above is the exception, and the
-          comment there says why it had to be one. */}
+          comment there says why it had to be one.
+
+          The address is the one the first screen's link opens for this
+          language (#466), and `terms.ts` alone decides which it is. */}
       <Text testID="legal-terms" selectable style={styles.terms}>
-        {t('legal_full_terms')}
+        {t('legal_full_terms %@', termsShown(currentLanguage()))}
       </Text>
     </View>
   )

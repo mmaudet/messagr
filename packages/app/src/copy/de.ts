@@ -7,8 +7,9 @@ import type { CopyKey } from './fr'
  * strings are arguments rather than labels, and they are translated as
  * arguments: the same claim, made as plainly in German as it is in French.
  *
- * The two legal strings (`legal_report_delay`, `legal_report_scope`) name a
- * deadline the operator is bound by and an article of a European regulation.
+ * The three legal strings (`legal_report_delay`, `legal_report_decision`,
+ * `legal_report_scope`) name deadlines the operator is bound by and an article
+ * of a European regulation.
  * They want a lawyer’s eye before the store listing goes out; see `en.ts`,
  * which says the same and for the same reason.
  *
@@ -455,9 +456,9 @@ export const de: Readonly<Record<CopyKey, string>> = {
     'Was diese App anzeigt, ist maßgeblich. Die auf messagr.eu veröffentlichten Bedingungen geben das Folgende wieder und ergänzen, was ein Bildschirm nicht tragen kann: wer den Dienst betreibt, und nach welchem Recht.',
   legal_forbidden_title: 'Was verboten ist',
   legal_forbidden_body:
-    'Darstellungen sexuellen Kindesmissbrauchs, Drohungen gegen Leben oder Sicherheit einer Person, Belästigung, Identitätsmissbrauch, hasserfüllte Inhalte, sexuelle Inhalte, die jemandem aufgedrängt werden, der sie nicht verlangt hat, und intime Bilder, die ohne Einwilligung verbreitet werden, unerbetene Werbung und jeder andere nach französischem oder europäischem Recht rechtswidrige Inhalt.',
+    'Darstellungen sexuellen Kindesmissbrauchs, Drohungen gegen Leben oder Sicherheit einer Person, Belästigung, Identitätsmissbrauch, hasserfüllte Inhalte, sexuelle Inhalte, die jemandem aufgedrängt werden, der sie nicht verlangt hat, und intime Bilder, die ohne Einwilligung verbreitet werden, unerbetene Werbung und Anwerbung, ob kommerziell oder nicht, und jeder andere nach französischem oder europäischem Recht rechtswidrige Inhalt.',
   legal_forbidden_zero:
-    'Messagr duldet keine durch diese Bedingungen verbotenen Inhalte und kein missbräuchliches Verhalten: Der Inhalt wird entfernt, und wer ihn verfasst hat, wird ausgeschlossen.',
+    'Der Betreiber duldet keine durch diese Bedingungen verbotenen Inhalte und kein missbräuchliches Verhalten: Er entfernt den Inhalt, sperrt das Konto, von dem er stammt, und schließt es, wenn die Entscheidung dies bestätigt.',
   legal_forbidden_entry:
     'Der Zugang erfolgt ausschließlich über eine namentliche Einladung. Eine Einladung ist persönlich, in der Nutzung begrenzt und nicht weiterverkäuflich. Das Mindestalter beträgt fünfzehn Jahre.',
   legal_moderation_title: 'Wie die Moderation tatsächlich arbeitet',
@@ -486,10 +487,9 @@ export const de: Readonly<Record<CopyKey, string>> = {
     'Messagr ist ein Hostingdienst und keine Online-Plattform; Erwägungsgrund 14 des DSA nimmt interpersonelle Kommunikationsdienste aus. Die Artikel 20 und 21 gelten daher nicht, und dieser Text beansprucht nicht, sie zu bieten.',
   legal_delete_title: 'Ihr Konto löschen',
   legal_delete_body:
-    'Die Löschung erfolgt in der Anwendung: Einstellungen, dann „Mein Konto löschen“. Das Konto wird dann sofort deaktiviert und seine Daten werden innerhalb von dreißig Tagen gelöscht; bereits gesendete Nachrichten bleiben Ereignisse der Räume, in denen sie geschrieben wurden, und das Löschen des Kontos entfernt sie nicht daraus. Ohne dieses Gerät, oder wenn die Anwendung Sie darum bittet, wird die Löschung per E-Mail an conformite@messagr.eu beantragt.',
+    'Die Löschung erfolgt in der Anwendung: Einstellungen, dann „Mein Konto löschen“. Das Konto wird dann sofort deaktiviert und seine Daten werden innerhalb von dreißig Tagen gelöscht; bereits gesendete Nachrichten bleiben Ereignisse der Unterhaltungen, in denen sie geschrieben wurden, und das Löschen des Kontos entfernt sie nicht daraus. Ohne dieses Gerät, oder wenn die Anwendung Sie darum bittet, wird die Löschung per E-Mail an conformite@messagr.eu beantragt.',
   legal_delete_link: 'Ohne dieses Gerät: messagr.eu/aide',
-  legal_full_terms:
-    'Vollständige Nutzungsbedingungen, auf Englisch: messagr.eu/conditions-generales/en',
+  'legal_full_terms %@': 'Vollständige Nutzungsbedingungen: %@',
   trust_action: 'Was über diese Person bekannt ist',
   trust_title: 'Was über diese Person bekannt ist',
   trust_calm:

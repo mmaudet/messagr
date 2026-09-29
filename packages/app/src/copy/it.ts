@@ -9,7 +9,7 @@ import type { CopyKey } from './fr'
  *
  * `lei` throughout, as the French uses `vous`.
  *
- * The two legal strings want a lawyer’s eye before the store listing goes
+ * The three legal strings want a lawyer’s eye before the store listing goes
  * out; `en.ts` says the same and for the same reason.
  */
 export const it: Readonly<Record<CopyKey, string>> = {
@@ -442,7 +442,7 @@ export const it: Readonly<Record<CopyKey, string>> = {
   legal_forbidden_body:
     'I contenuti pedopornografici, le minacce contro la vita o la sicurezza di una persona, le molestie, l’usurpazione d’identità, i contenuti d’odio, i contenuti sessuali imposti a chi non li ha chiesti e le immagini intime diffuse senza consenso, le sollecitazioni commerciali o di altro tipo non richieste, e ogni altro contenuto illecito secondo il diritto francese o europeo.',
   legal_forbidden_zero:
-    'Messagr non tollera alcun contenuto vietato da queste condizioni né alcun comportamento abusivo: il contenuto viene rimosso e il suo autore escluso.',
+    'Chi gestisce il servizio non tollera alcun contenuto vietato da queste condizioni né alcun comportamento abusivo: rimuove il contenuto, sospende l’account del suo autore, poi lo chiude se la decisione lo conferma.',
   legal_forbidden_entry:
     'Si entra soltanto su invito nominativo. Un invito è personale, a uso limitato, e non si rivende. L’età minima è di quindici anni.',
   legal_moderation_title: 'Come funziona realmente la moderazione',
@@ -471,10 +471,9 @@ export const it: Readonly<Record<CopyKey, string>> = {
     'Messagr è un servizio di hosting e non una piattaforma online, poiché il considerando 14 del DSA esclude i servizi di comunicazione interpersonale. Gli articoli 20 e 21 non si applicano quindi, e questo testo non pretende di offrirli.',
   legal_delete_title: 'Eliminare il tuo account',
   legal_delete_body:
-    'L’eliminazione si fa dall’applicazione: Impostazioni, poi «Eliminare il mio account». L’account viene allora disattivato subito e i suoi dati cancellati entro trenta giorni; i messaggi già inviati restano eventi delle stanze in cui sono stati scritti, ed eliminare l’account non li toglie da lì. Senza questo dispositivo, o quando l’applicazione te lo chiede, l’eliminazione si chiede per posta elettronica a conformite@messagr.eu.',
+    'L’eliminazione si fa dall’applicazione: Impostazioni, poi «Eliminare il mio account». L’account viene allora disattivato subito e i suoi dati cancellati entro trenta giorni; i messaggi già inviati restano eventi delle conversazioni in cui sono stati scritti, ed eliminare l’account non li toglie da lì. Senza questo dispositivo, o quando l’applicazione glielo chiede, l’eliminazione si chiede per posta elettronica a conformite@messagr.eu.',
   legal_delete_link: 'Senza questo dispositivo: messagr.eu/aide',
-  legal_full_terms:
-    'Condizioni d’uso complete, in inglese: messagr.eu/conditions-generales/en',
+  'legal_full_terms %@': 'Condizioni d’uso complete: %@',
   trust_action: 'Ciò che si sa di questa persona',
   trust_title: 'Ciò che si sa di questa persona',
   trust_calm:

@@ -323,59 +323,75 @@ function translatedAddresses(site) {
     fs.writeFileSync(copy, change(read(file)));
     return copy;
   }
+  // Chaque engagement, et non ses mots : une page qui le perd est refusée,
+  // même si le mot qui le porte reste ailleurs dans la page.
   [
-    ['a French page that no longer commits to twenty-four hours', function () {
-      return checkScreen(altered(french, function (html) {
-        return html.split('vingt-quatre heures').join('quarante-huit heures');
-      }), english);
-    }],
-    ['an English page that no longer commits to twenty-four hours', function () {
-      return checkScreen(french, altered(english, function (html) {
-        return html.split('twenty-four hours').join('forty-eight hours');
-      }));
-    }],
-    ['a French page that says again that reporting does not exist', function () {
-      return checkScreen(altered(french, function (html) {
-        return html.replace('</main>', "<p>Le geste depuis l'application n'existe pas encore.</p></main>");
-      }), english);
-    }],
-    ['an English page that says again the operator cannot take a message down', function () {
-      return checkScreen(french, altered(english, function (html) {
-        return html.replace('</main>', '<p>What it cannot do: take down a particular message.</p></main>');
-      }));
-    }],
+    { what: 'a French page that no longer suspends within twenty-four hours', french: function (html) {
+      return html.replace(/retire\s+les messages signalés, puis suspend le compte de leur auteur/, 'retire les messages signalés');
+    } },
+    { what: 'a French page where the decision no longer terminates the account', french: function (html) {
+      return html.split('le compte est fermé').join('le compte est examiné');
+    } },
+    { what: 'an English page that tolerates again what it forbids', english: function (html) {
+      return html.split('The operator tolerates no content').join('The operator discourages content');
+    } },
+    { what: 'an English page without the report number', english: function (html) {
+      return html.split('Each report receives a report number').join('Each report is received');
+    } },
+    { what: 'a French page that says again that reporting does not exist', french: function (html) {
+      return html.replace('</main>', "<p>Le geste depuis l'application n'existe pas encore.</p></main>");
+    } },
+    { what: 'an English page that says again the operator cannot take a message down', english: function (html) {
+      return html.replace('</main>', '<p>What it cannot do: take down a particular message.</p></main>');
+    } },
   ].forEach(function (flaw) {
-    if (flaw[1]().code === 0) {
-      fail('the legal screen check passes ' + flaw[0]);
+    var refused = checkScreen(
+      flaw.french ? altered(french, flaw.french) : french,
+      flaw.english ? altered(english, flaw.english) : english);
+    if (refused.code === 0) {
+      fail('the legal screen check passes ' + flaw.what);
     }
   });
 
-  // Les sept langues de l'écran : chacune porte chaque fait, et aucune ne
-  // garde une ancienne phrase. Ce qui compte est ce que l'écran affiche, pas
-  // les commentaires du catalogue, qui citent les anciens textes exprès.
-  function catalogues(lang, change) {
+  // Chaque langue de l'écran porte chaque engagement, et aucune ne garde une
+  // ancienne phrase. Ce qui compte est ce que l'écran affiche, pas les
+  // commentaires du catalogue, qui citent les anciens textes exprès.
+  function copyOfCatalogues() {
     var dir = fs.mkdtempSync(path.join(os.tmpdir(), 'controles-copy-'));
     fs.readdirSync(copyDir).forEach(function (name) {
       fs.copyFileSync(path.join(copyDir, name), path.join(dir, name));
     });
+    return dir;
+  }
+  function catalogues(lang, change) {
+    var dir = copyOfCatalogues();
     var file = path.join(dir, lang + '.ts');
     fs.writeFileSync(file, change(read(file)));
     return dir;
   }
   [
-    ['uz', 'an Uzbek screen that lost the twenty-four hours', function (ts) {
+    { lang: 'fr', what: 'a French screen without the zero tolerance', change: function (ts) {
+      return ts.replace(/(legal_forbidden_zero:\s*')[^']*'/, "$1Merci de rester courtois.'");
+    } },
+    { lang: 'fr', what: 'a French screen where the decision no longer terminates the account', change: function (ts) {
+      return ts.split('le compte est fermé').join('le compte est examiné');
+    } },
+    { lang: 'en', what: 'an English screen without the block', change: function (ts) {
+      return ts.replace(/(legal_moderation_block:\s*')[^']*'/, "$1Blocking is coming.'");
+    } },
+    { lang: 'uz', what: 'an Uzbek screen that lost the twenty-four hours', change: function (ts) {
       return ts.split('Yigirma toʻrt soat').join('Qirq sakkiz soat');
-    }, 'uz'],
-    ['de', 'a German screen that says again that reporting does not exist yet', function (ts) {
+    } },
+    { lang: 'de', what: 'a German screen that says again that reporting does not exist yet', change: function (ts) {
       return ts.replace(/(legal_report_how:\s*')/, '$1Das Melden aus der App heraus gibt es noch nicht. ');
-    }, 'de'],
-    ['es', 'a Spanish screen that lost the report number', function (ts) {
+    } },
+    { lang: 'es', what: 'a Spanish screen that lost the report number', change: function (ts) {
       return ts.split('número de denuncia').join('referencia');
-    }, 'es'],
+    } },
   ].forEach(function (flaw) {
-    var refused = checkScreen(french, english, catalogues(flaw[0], flaw[2]));
-    if (refused.code === 0 || (refused.out + refused.err).indexOf('[' + flaw[3] + ']') === -1) {
-      fail('the legal screen check passes ' + flaw[1] + ', or does not name the language: ' + refused.out);
+    var refused = checkScreen(french, english, catalogues(flaw.lang, flaw.change));
+    if (refused.code === 0 || (refused.out + refused.err).indexOf('[' + flaw.lang + ']') === -1) {
+      fail('the legal screen check passes ' + flaw.what + ', or does not name the language: ' + refused.out);
     }
   });
   var commented = checkScreen(french, english, catalogues('fr', function (ts) {
@@ -383,6 +399,17 @@ function translatedAddresses(site) {
   }));
   if (commented.code !== 0) {
     fail('the legal screen check reads a comment of the catalogue as if the screen displayed it: ' + commented.out + commented.err);
+  }
+
+  // Une huitième langue déclarée, et rien d'écrit pour elle : refusée, en la
+  // nommant, plutôt que passée sous silence.
+  var eighth = copyOfCatalogues();
+  fs.writeFileSync(path.join(eighth, 'languages.ts'), read(path.join(eighth, 'languages.ts'))
+    .replace('] as const', "  { code: 'pl', flag: 'PL', endonym: 'Polski' },\n] as const"));
+  fs.copyFileSync(path.join(eighth, 'en.ts'), path.join(eighth, 'pl.ts'));
+  var unchecked = checkScreen(french, english, eighth);
+  if (unchecked.code === 0 || unchecked.err.indexOf(' pl,') === -1) {
+    fail('the legal screen check passes a language the application declares and nothing here checks: ' + unchecked.out + unchecked.err);
   }
 })();
 

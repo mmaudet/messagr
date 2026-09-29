@@ -10,10 +10,11 @@ import type { CopyKey } from './fr'
  * why a receipt is public. Those are translated as arguments: the same claim,
  * made as plainly in English as it is in French, rather than word for word.
  *
- * # Two of them are legal text
+ * # Three of them are legal text
  *
  * `legal_report_scope` names an article of a European regulation, and
- * `legal_report_delay` states a deadline the operator is bound by. They are
+ * `legal_report_delay` and `legal_report_decision` state deadlines the
+ * operator is bound by (#466: twenty-four hours, thirty days). They are
  * translated from the French, which is the authoritative version — the screen
  * says as much — and they should have a lawyer’s eye before the store listing
  * goes out. Recorded here so it is a scheduled check rather than a surprise.
@@ -451,7 +452,7 @@ export const en: Readonly<Record<CopyKey, string>> = {
   legal_forbidden_body:
     'Child sexual abuse material, threats against a person’s life or safety, harassment, impersonation, hateful content, sexual content imposed on people who did not ask for it and intimate images shared without consent, solicitation, and any other content illegal under French or European law.',
   legal_forbidden_zero:
-    'Messagr tolerates no content forbidden by these terms and no abusive behaviour: the content is taken down and its author excluded.',
+    'The operator tolerates no content forbidden by these terms and no abusive behaviour: it takes the content down, suspends its author’s account, then terminates it if the decision confirms it.',
   legal_forbidden_entry:
     'Entry is by named invitation only. An invitation is personal, limited in use, and not for resale. The minimum age is fifteen.',
   legal_moderation_title: 'How moderation actually works',
@@ -471,7 +472,7 @@ export const en: Readonly<Record<CopyKey, string>> = {
   legal_report_how:
     'Reporting is done from inside the application: in a conversation, select messages from the same person, then “Report”, and choose a reason. Before anything is sent, the application says exactly what leaves, and only the operator can open a report. Each report receives a report number.',
   legal_report_delay:
-    'Within twenty-four hours, the operator opens the report and, if what it shows breaks these terms, takes the reported messages down, then suspends their author’s account. A reasoned decision follows within thirty days of the report’s receipt at the latest; if it confirms the suspension, the account is terminated. Reporting a threat to life or safety to the authorities does not wait for these deadlines: it goes immediately.',
+    'Within twenty-four hours of its receipt, the operator opens the report and, if what it shows breaks these terms, takes the reported messages down, then suspends their author’s account. A reasoned decision follows, within thirty days of the report’s receipt at the latest; if it confirms the suspension, the account is terminated. Reporting a threat to life or safety to the authorities does not wait for these deadlines: it goes immediately.',
   legal_report_decision:
     'The decision is obtained by writing to conformite@messagr.eu with the report number. Without the application, you write to the same address: the e-mail receives an acknowledgement, then a reasoned decision within thirty days of its receipt at the latest.',
   legal_report_review:
@@ -480,9 +481,9 @@ export const en: Readonly<Record<CopyKey, string>> = {
     'Messagr is a hosting service and not an online platform, recital 14 of the DSA excluding interpersonal messaging services. Articles 20 and 21 therefore do not apply, and this text does not claim to offer them.',
   legal_delete_title: 'Delete your account',
   legal_delete_body:
-    'Deletion is done from inside the application: Settings, then “Delete my account”. The account is then deactivated at once and its data purged within thirty days; messages already sent remain events of the rooms they were written in, and deleting the account does not take them out. Without this device, or when the application asks you to, deletion is requested by e-mail at conformite@messagr.eu.',
+    'Deletion is done from inside the application: Settings, then “Delete my account”. The account is then deactivated at once and its data purged within thirty days; messages already sent remain events of the conversations they were written in, and deleting the account does not take them out. Without this device, or when the application asks you to, deletion is requested by e-mail at conformite@messagr.eu.',
   legal_delete_link: 'Without this device: messagr.eu/aide',
-  legal_full_terms: 'Full terms of use: messagr.eu/conditions-generales/en',
+  'legal_full_terms %@': 'Full terms of use: %@',
   trust_action: 'What is known about this person',
   trust_title: 'What is known about this person',
   trust_calm:

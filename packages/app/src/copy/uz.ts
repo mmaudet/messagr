@@ -25,8 +25,11 @@ import type { CopyKey } from './fr'
  * languages were produced the same way, but this one is further from the
  * translator’s own and from the languages the product was designed in. Before
  * it is offered to anybody outside the project, somebody who speaks Uzbek has
- * to read it — particularly the legal section, where two strings name an
- * article of a European regulation and a deadline the operator is bound by.
+ * to read it — particularly the legal section, where three strings name an
+ * article of a European regulation and deadlines the operator is bound by,
+ * and where « suiisteʼmol » stands for the abusive behaviour the terms
+ * refuse (#466): a word chosen broad on purpose, which a speaker should
+ * confirm.
  *
  * The build enforces that every key is present. It cannot enforce that a
  * sentence is right, and nothing here should be mistaken for that.
@@ -460,7 +463,7 @@ export const uz: Readonly<Record<CopyKey, string>> = {
   legal_forbidden_body:
     'Bolalarni jinsiy suiisteʼmol qilish materiallari, odamning hayoti yoki xavfsizligiga tahdid, taʼqib, oʻzgalar nomidan ish koʻrish, nafrat uygʻotuvchi mazmun, soʻramagan odamga majburan yuborilgan jinsiy mazmun va rozilik olinmay tarqatilgan intim tasvirlar, soʻralmagan reklama va targʻibot hamda Fransiya yoki Yevropa qonuniga koʻra noqonuniy boʻlgan har qanday boshqa mazmun.',
   legal_forbidden_zero:
-    'Messagr ushbu shartlar taqiqlagan hech qanday mazmunga ham, hech qanday haqoratli xatti-harakatga ham yoʻl qoʻymaydi: bunday mazmun olib tashlanadi, muallifi esa chetlatiladi.',
+    'Operator ushbu shartlar taqiqlagan hech qanday mazmunga ham, hech qanday suiisteʼmolga ham yoʻl qoʻymaydi: u mazmunni olib tashlaydi, muallifining hisobini toʻxtatib turadi, soʻng qaror buni tasdiqlasa, hisobni yopadi.',
   legal_forbidden_entry:
     'Bu yerga faqat nomli taklif bilan kiriladi. Taklif shaxsiy, foydalanish soni cheklangan va qayta sotilmaydi. Eng kichik yosh — oʻn besh.',
   legal_moderation_title: 'Moderatsiya aslida qanday ishlaydi',
@@ -489,10 +492,9 @@ export const uz: Readonly<Record<CopyKey, string>> = {
     'Messagr — hosting xizmati, onlayn platforma emas: DSA ning 14-bandi shaxslararo xabar almashish xizmatlarini bundan chiqaradi. Demak 20- va 21-moddalar qoʻllanmaydi va bu matn ularni taklif qilayotgani yoʻq.',
   legal_delete_title: 'Hisobingizni oʻchirish',
   legal_delete_body:
-    'Oʻchirish ilovaning oʻzida amalga oshiriladi: Sozlamalar, keyin «Hisobimni oʻchirish». Shunda hisob darhol oʻchiriladi va uning maʼlumotlari oʻttiz kun ichida tozalanadi; allaqachon yuborilgan xabarlar ular yozilgan xonalarning hodisalari boʻlib qoladi, hisobni oʻchirish esa ularni u yerdan olib tashlamaydi. Bu qurilmasiz yoki ilova shuni soʻraganda, oʻchirish conformite@messagr.eu manziliga elektron xat orqali soʻraladi.',
+    'Oʻchirish ilovaning oʻzida amalga oshiriladi: Sozlamalar, keyin «Hisobimni oʻchirish». Shunda hisob darhol oʻchiriladi va uning maʼlumotlari oʻttiz kun ichida tozalanadi; allaqachon yuborilgan xabarlar ular yozilgan suhbatlarning hodisalari boʻlib qoladi, hisobni oʻchirish esa ularni u yerdan olib tashlamaydi. Bu qurilmasiz yoki ilova shuni soʻraganda, oʻchirish conformite@messagr.eu manziliga elektron xat orqali soʻraladi.',
   legal_delete_link: 'Bu qurilmasiz: messagr.eu/aide',
-  legal_full_terms:
-    'Toʻliq foydalanish shartlari, ingliz tilida: messagr.eu/conditions-generales/en',
+  'legal_full_terms %@': 'Toʻliq foydalanish shartlari: %@',
   trust_action: 'Bu odam haqida nima maʼlum',
   trust_title: 'Bu odam haqida nima maʼlum',
   trust_calm:
@@ -648,7 +650,7 @@ export const uz: Readonly<Record<CopyKey, string>> = {
     'Bu tanlovni saqlab boʻlmadi: keyingi ishga tushirishda u avvalgi holatiga qaytadi.',
   promise_language: 'Tilingizni tanlang',
   promise_terms:
-    'Men Messagr foydalanish shartlarini qabul qilaman: ular hech qanday taqiqlangan mazmunga ham, hech qanday haqoratli xatti-harakatga ham yoʻl qoʻymaydi.',
+    'Men Messagr foydalanish shartlarini qabul qilaman: ular hech qanday taqiqlangan mazmunga ham, hech qanday suiisteʼmolga ham yoʻl qoʻymaydi.',
   promise_terms_link: 'Shartlarni oʻqish',
   promise_terms_required:
     'Davom etish uchun katakchani belgilang. Undan oldin hech nima boshlanmaydi.',

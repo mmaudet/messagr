@@ -421,6 +421,20 @@ it. The newer one is usually an upcoming version; it may instead apply from
 the day it is published, where the version in force sets no notice period.
 _Avoid_: Archive, old version
 
+**Version awaiting publication**:
+A new version of a legal page that applies from the day it is published,
+where the version in force sets no notice period. It waits in the repository,
+written as it will apply and with its translation, until the owner publishes
+it; publishing writes that day's date, and nothing serves it before.
+_Avoid_: Upcoming version (announced thirty days ahead), draft
+
+**Translation**:
+A legal page in another language than French, at its own address beside the
+version it translates, which says that the French text is authoritative. It
+translates the version in force and no other, so an upcoming version waits
+while its page has a translation it does not carry.
+_Avoid_: Version (a translation is not one), localisation
+
 ### Design
 
 **Design token**:

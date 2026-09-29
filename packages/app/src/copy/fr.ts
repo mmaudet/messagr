@@ -743,7 +743,7 @@ export const fr = {
   legal_forbidden_body:
     'Les contenus pédocriminels, les menaces contre la vie ou la sécurité d’une personne, le harcèlement, l’usurpation d’identité, les contenus haineux, les contenus sexuels imposés à qui ne les a pas demandés et les images intimes diffusées sans accord, le démarchage, et tout autre contenu illégal au regard du droit français ou européen.',
   legal_forbidden_zero:
-    'Messagr ne tolère aucun contenu interdit par ces conditions ni aucun comportement abusif : le contenu est retiré et son auteur exclu.',
+    'L’exploitant ne tolère aucun contenu interdit par ces conditions ni aucun comportement abusif : il retire le contenu, suspend le compte de son auteur, puis le ferme si la décision le confirme.',
   legal_forbidden_entry:
     'On n’entre que sur invitation nominative. Une invitation est personnelle, à usage limité, et elle ne se revend pas. L’âge minimum est de quinze ans.',
 
@@ -765,7 +765,7 @@ export const fr = {
   legal_report_how:
     'Le signalement se fait depuis l’application : dans une conversation, sélectionnez des messages d’une même personne, puis « Signaler », et choisissez un motif. Avant l’envoi, l’application dit exactement ce qui part, et seul l’exploitant peut ouvrir un signalement. Chaque signalement reçoit un numéro de signalement.',
   legal_report_delay:
-    'Sous vingt-quatre heures, l’exploitant ouvre le signalement et, si ce qu’il montre enfreint ces conditions, retire les messages signalés, puis suspend le compte de leur auteur. Une décision motivée suit au plus tard trente jours après la réception du signalement ; si elle confirme la suspension, le compte est fermé. Le signalement d’une menace pour la vie ou la sécurité aux autorités ne suit pas ces délais : il part sans attendre.',
+    'Dans les vingt-quatre heures qui suivent sa réception, l’exploitant ouvre le signalement et, si ce qu’il montre enfreint ces conditions, retire les messages signalés, puis suspend le compte de leur auteur. Une décision motivée suit, au plus tard trente jours après la réception du signalement ; si elle confirme la suspension, le compte est fermé. Le signalement d’une menace pour la vie ou la sécurité aux autorités ne suit pas ces délais : il part sans attendre.',
   legal_report_decision:
     'La décision s’obtient en écrivant à conformite@messagr.eu avec le numéro de signalement. Sans l’application, on écrit à la même adresse : le courriel reçoit un accusé de réception, puis une décision motivée au plus tard trente jours après sa réception.',
   legal_report_review:
@@ -792,10 +792,9 @@ export const fr = {
   // dépend : aucune build qui affiche ce texte ne sort avant la page.
   legal_delete_title: 'Supprimer votre compte',
   legal_delete_body:
-    'La suppression se fait depuis l’application : Réglages, puis « Supprimer mon compte ». Le compte est alors désactivé aussitôt et ses données sont purgées sous trente jours ; les messages déjà envoyés restent des événements des salons où ils ont été écrits, et supprimer le compte ne les en retire pas. Sans cet appareil, ou quand l’application le demande, la suppression se demande par courriel à conformite@messagr.eu.',
+    'La suppression se fait depuis l’application : Réglages, puis « Supprimer mon compte ». Le compte est alors désactivé aussitôt et ses données sont purgées sous trente jours ; les messages déjà envoyés restent des événements des conversations où ils ont été écrits, et supprimer le compte ne les en retire pas. Sans cet appareil, ou quand l’application le demande, la suppression se demande par courriel à conformite@messagr.eu.',
   legal_delete_link: 'Sans cet appareil : messagr.eu/aide',
-  legal_full_terms:
-    'Conditions générales complètes : messagr.eu/conditions-generales',
+  'legal_full_terms %@': 'Conditions générales complètes : %@',
 
   // LA CONFIANCE, EXPLIQUÉE PLUTÔT QUE SIGNALÉE.
   //

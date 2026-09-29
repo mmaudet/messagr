@@ -21,12 +21,13 @@
 # and cannot read. Those are the sentences somebody could quietly drop from
 # one side while leaving the other claiming it.
 #
-# SEVEN LANGUAGES, TWO PAGES (#466). The terms are published in French, which
-# is authoritative, and in English at their own address. The screen speaks
-# seven languages. So each fact is written below once per language: in French
-# and in English it must appear on the published page AND on the screen; in
-# German, Spanish, Italian, Dutch and Uzbek, which have no page, it must
-# appear on the screen, which is the text a person in that language reads.
+# EVERY LANGUAGE OF THE SCREEN, TWO PAGES (#466). The terms are published in
+# French, which is authoritative, and in English at their own address. The
+# screen speaks every language `languages.ts` declares, seven today. So each
+# fact is written below once per language: in French and in English it must
+# appear on the published page AND on the screen; in the others, which have
+# no page, it must appear on the screen, which is the text a person in that
+# language reads. A language declared with no facts written here fails.
 #
 # AND WHAT MUST NO LONGER BE SAID ANYWHERE. Until #466 the terms and the
 # screen said that no filter could exist, that the operator could not take a
@@ -52,8 +53,16 @@ set -euo pipefail
 TERMS="${MESSAGR_TERMS_URL:-https://messagr.eu/conditions-generales/}"
 TERMS_EN="${MESSAGR_TERMS_EN_URL:-https://messagr.eu/conditions-generales/en/}"
 COPY_DIR="${MESSAGR_COPY_DIR:-packages/app/src/copy}"
-LANGUAGES="fr en de es it nl uz"
 
+# THE LANGUAGES ARE THE APPLICATION'S, read where it declares them
+# (`languages.ts`), and not listed here: an eighth catalogue is checked, or
+# refused for want of facts written below, rather than skipped in silence.
+LANGUAGES="$(python3 -c '
+import re, sys
+declared = open(sys.argv[1], encoding="utf-8").read()
+print(" ".join(re.findall(r"code: \x27([a-z]{2})\x27", declared)))
+' "$COPY_DIR/languages.ts")"
+[ -n "$LANGUAGES" ] || { echo "no language declared in $COPY_DIR/languages.ts" >&2; exit 1; }
 for lang in $LANGUAGES; do
   [ -f "$COPY_DIR/$lang.ts" ] || { echo "no copy catalogue at $COPY_DIR/$lang.ts" >&2; exit 1; }
 done
@@ -114,110 +123,131 @@ page_en="$(fetch "$TERMS_EN")"
 # Each fact, as it must read, per language. Written with straight apostrophes,
 # which is what `flatten` normalises the pages and the screen to. `all` is a
 # fact every language carries as it is.
+#
+# THE COMMITMENTS THEMSELVES, NOT THEIR KEYWORDS (#466). « vingt-quatre heures »
+# alone would stay true of a screen that dropped the takedown and kept a
+# stray mention of the delay. So the zero tolerance, the takedown and
+# suspension within twenty-four hours, the reasoned decision within thirty
+# days, the termination it can confirm, the report number and the block are
+# each checked as the sentence that commits to them.
 FACTS="
 all|conformite@messagr.eu
-fr|Messagr ne tolère aucun contenu interdit par ces conditions ni aucun comportement abusif
-fr|vingt-quatre heures
-fr|trente jours
-fr|numéro de signalement
+fr|L'exploitant ne tolère aucun contenu interdit par ces conditions ni aucun comportement abusif : il retire le contenu, suspend le compte de son auteur, puis le ferme si la décision le confirme
+fr|Dans les vingt-quatre heures qui suivent sa réception, l'exploitant ouvre le signalement et, si ce qu'il montre enfreint ces conditions, retire les messages signalés, puis suspend le compte de leur auteur
+fr|Une décision motivée suit, au plus tard trente jours après la réception du signalement
+fr|elle confirme la suspension, le compte est fermé
+fr|Chaque signalement reçoit un numéro de signalement
+fr|compte peut être bloqué depuis une conversation : plus rien de ce qu'il envoie ne vous parvient, ce qu'il a déjà écrit disparaît de vos écrans, et il ne peut plus vous inviter dans Messagr
 fr|Le signalement se fait depuis l'application
+fr|L'exploitant ne lit que ce qu'un signalement porte
 fr|sur ce que le signalement montre, jamais sur la seule affirmation d'un signalant
-fr|cryptographiquement impossible
-fr|bloqué depuis une conversation
 fr|qui a bloqué qui, jamais ce qui a été dit
+fr|cryptographiquement impossible
 fr|contenus haineux
 fr|images intimes
 fr|démarchage
 fr|quinze ans
 fr|invitation nominative
 fr|considérant 14
-en|Messagr tolerates no content forbidden by these terms and no abusive behaviour
-en|twenty-four hours
-en|thirty days
-en|report number
+en|The operator tolerates no content forbidden by these terms and no abusive behaviour: it takes the content down, suspends its author's account, then terminates it if the decision confirms it
+en|Within twenty-four hours of its receipt, the operator opens the report and, if what it shows breaks these terms, takes the reported messages down, then suspends their author's account
+en|A reasoned decision follows, within thirty days of the report's receipt at the latest
+en|it confirms the suspension, the account is terminated
+en|Each report receives a report number
+en|account can be blocked from a conversation: nothing it sends reaches you any more, what it has already written leaves your screens, and it can no longer invite you in Messagr
 en|Reporting is done from inside the application
+en|The operator reads only what a report carries
 en|on what the report shows, never on a reporter's word alone
-en|cryptographically unable
-en|blocked from a conversation
 en|who blocked whom, never what was said
+en|cryptographically unable
 en|hateful content
 en|intimate images
 en|solicitation
 en|fifteen
 en|named invitation
 en|recital 14
-de|Messagr duldet keine durch diese Bedingungen verbotenen Inhalte und kein missbräuchliches Verhalten
-de|vierundzwanzig Stunden
-de|dreißig Tage
-de|Meldungsnummer
+de|Der Betreiber duldet keine durch diese Bedingungen verbotenen Inhalte und kein missbräuchliches Verhalten: Er entfernt den Inhalt, sperrt das Konto, von dem er stammt, und schließt es, wenn die Entscheidung dies bestätigt
+de|Innerhalb von vierundzwanzig Stunden öffnet der Betreiber die Meldung und entfernt, wenn das, was sie zeigt, gegen diese Bedingungen verstößt, die gemeldeten Nachrichten und sperrt danach das Konto, von dem sie stammen
+de|Spätestens dreißig Tage nach Eingang der Meldung folgt eine begründete Entscheidung
+de|bestätigt sie die Sperre, wird das Konto geschlossen
+de|Jede Meldung erhält eine Meldungsnummer
+de|Jedes Konto kann aus einer Unterhaltung heraus blockiert werden: Nichts, was es sendet, erreicht Sie mehr; was es bereits geschrieben hat, verschwindet von Ihren Bildschirmen; und es kann Sie in Messagr nicht mehr einladen
 de|Gemeldet wird aus der App heraus
-de|oder auf das, was die Meldung zeigt, nie auf die bloße Behauptung
-de|kryptografisch nicht lesen
-de|aus einer Unterhaltung heraus blockiert
+de|Der Betreiber liest nur, was eine Meldung enthält
+de|oder auf das, was die Meldung zeigt, nie auf die bloße Behauptung einer meldenden Person
 de|wer wen blockiert hat, nie, was gesagt wurde
+de|kryptografisch nicht lesen
 de|hasserfüllte Inhalte
 de|intime Bilder
-de|unerbetene Werbung
+de|unerbetene Werbung und Anwerbung, ob kommerziell oder nicht
 de|fünfzehn
 de|namentliche Einladung
 de|Erwägungsgrund 14
-es|Messagr no tolera ningún contenido prohibido por estas condiciones ni ningún comportamiento abusivo
-es|veinticuatro horas
-es|treinta días
-es|número de denuncia
+es|Quien explota el servicio no tolera ningún contenido prohibido por estas condiciones ni ningún comportamiento abusivo: retira el contenido, suspende la cuenta de su autor y después la cierra si la decisión lo confirma
+es|En un plazo de veinticuatro horas, quien explota el servicio abre la denuncia y, si lo que muestra infringe estas condiciones, retira los mensajes denunciados y después suspende la cuenta de su autor
+es|A más tardar treinta días después de la recepción de la denuncia llega una decisión motivada
+es|si confirma la suspensión, la cuenta se cierra
+es|Cada denuncia recibe un número de denuncia
+es|Cualquier cuenta puede bloquearse desde una conversación: nada de lo que envía le llega, lo que ya escribió desaparece de sus pantallas y no puede volver a invitarle en Messagr
 es|La denuncia se hace desde la aplicación
-es|o sobre lo que muestra la denuncia, nunca sobre la sola afirmación
-es|criptográficamente imposible
-es|bloquearse desde una conversación
+es|Quien explota el servicio solo lee lo que lleva una denuncia
+es|o sobre lo que muestra la denuncia, nunca sobre la sola afirmación de quien denuncia
 es|quién bloqueó a quién, nunca lo que se dijo
+es|criptográficamente imposible
 es|contenidos de odio
 es|imágenes íntimas
-es|no solicitadas
+es|la captación y la publicidad no solicitadas
 es|quince años
 es|invitación nominativa
 es|considerando 14
-it|Messagr non tollera alcun contenuto vietato da queste condizioni né alcun comportamento abusivo
-it|ventiquattro ore
-it|trenta giorni
-it|numero di segnalazione
+it|Chi gestisce il servizio non tollera alcun contenuto vietato da queste condizioni né alcun comportamento abusivo: rimuove il contenuto, sospende l'account del suo autore, poi lo chiude se la decisione lo conferma
+it|Entro ventiquattro ore, chi gestisce il servizio apre la segnalazione e, se ciò che mostra viola queste condizioni, rimuove i messaggi segnalati, poi sospende l'account del loro autore
+it|Al più tardi trenta giorni dopo il ricevimento della segnalazione arriva una decisione motivata
+it|se conferma la sospensione, l'account viene chiuso
+it|Ogni segnalazione riceve un numero di segnalazione
+it|Qualsiasi account può essere bloccato da una conversazione: nulla di ciò che invia le arriva più, ciò che ha già scritto scompare dai suoi schermi, e non può più invitarla in Messagr
 it|La segnalazione si fa dall'applicazione
-it|o su ciò che la segnalazione mostra, mai sulla sola affermazione
-it|crittograficamente impossibile
-it|bloccato da una conversazione
+it|Chi gestisce il servizio legge solo ciò che una segnalazione porta
+it|o su ciò che la segnalazione mostra, mai sulla sola affermazione di chi segnala
 it|chi ha bloccato chi, mai ciò che è stato detto
+it|crittograficamente impossibile
 it|contenuti d'odio
 it|immagini intime
-it|non richieste
+it|le sollecitazioni commerciali o di altro tipo non richieste
 it|quindici anni
 it|invito nominativo
 it|considerando 14
-nl|Messagr tolereert geen enkele inhoud die deze voorwaarden verbieden en geen enkel grensoverschrijdend gedrag
-nl|vierentwintig uur
-nl|dertig dagen
-nl|meldingsnummer
+nl|De exploitant tolereert geen enkele inhoud die deze voorwaarden verbieden en geen enkel grensoverschrijdend gedrag: hij verwijdert de inhoud, schort het account van de afzender op en sluit het als de beslissing dat bevestigt
+nl|Binnen vierentwintig uur opent de exploitant de melding en, als wat die toont deze voorwaarden schendt, verwijdert hij de gemelde berichten en schort hij daarna het account van de afzender op
+nl|Uiterlijk dertig dagen na ontvangst van de melding volgt een met redenen omklede beslissing
+nl|bevestigt die de opschorting, dan wordt het account gesloten
+nl|Elke melding krijgt een meldingsnummer
+nl|Elk account kan vanuit een gesprek worden geblokkeerd: niets van wat het verstuurt bereikt u nog, wat het al schreef verdwijnt van uw schermen, en het kan u in Messagr niet meer uitnodigen
 nl|Melden gaat vanuit de app
-nl|of op wat de melding toont, nooit op de loutere bewering
-nl|cryptografisch onmogelijk
-nl|vanuit een gesprek worden geblokkeerd
+nl|De exploitant leest alleen wat een melding bevat
+nl|of op wat de melding toont, nooit op de loutere bewering van wie meldt
 nl|wie wie heeft geblokkeerd, nooit wat er werd gezegd
+nl|cryptografisch onmogelijk
 nl|haatdragende inhoud
 nl|intieme beelden
-nl|ongevraagde reclame
+nl|ongevraagde reclame en werving
 nl|vijftien jaar
 nl|op naam en op uitnodiging
 nl|overweging 14
-uz|ushbu shartlar taqiqlagan hech qanday mazmunga ham, hech qanday haqoratli xatti-harakatga ham yoʻl qoʻymaydi
-uz|Yigirma toʻrt soat
-uz|oʻttiz kun
-uz|shikoyat raqami
+uz|Operator ushbu shartlar taqiqlagan hech qanday mazmunga ham, hech qanday suiisteʼmolga ham yoʻl qoʻymaydi: u mazmunni olib tashlaydi, muallifining hisobini toʻxtatib turadi, soʻng qaror buni tasdiqlasa, hisobni yopadi
+uz|Yigirma toʻrt soat ichida operator shikoyatni ochadi va u koʻrsatgan narsa ushbu shartlarni buzsa, shikoyat qilingan xabarlarni olib tashlaydi, soʻng ularning muallifi hisobini toʻxtatib turadi
+uz|Shikoyat kelib tushganidan boshlab koʻpi bilan oʻttiz kun ichida asoslangan qaror chiqariladi
+uz|u toʻxtatib turishni tasdiqlasa, hisob yopiladi
+uz|Har bir shikoyatga shikoyat raqami beriladi
+uz|Har qanday hisobni suhbat ichidan bloklash mumkin: u yuboradigan hech narsa sizga endi yetib kelmaydi, u allaqachon yozgan narsalar ekranlaringizdan yoʻqoladi va u sizni Messagrda boshqa taklif qila olmaydi
 uz|Shikoyat ilovaning oʻzidan qilinadi
+uz|Operator faqat shikoyatda bor narsani oʻqiydi
 uz|shikoyat koʻrsatgan narsaga asoslanadi, hech qachon faqat shikoyatchining gapiga emas
-uz|kriptografik jihatdan oʻqiy olmaydigan
-uz|suhbat ichidan bloklash
 uz|kim kimni bloklaganini
+uz|kriptografik jihatdan oʻqiy olmaydigan
 uz|nafrat uygʻotuvchi
 uz|intim tasvirlar
-uz|soʻralmagan reklama
+uz|soʻralmagan reklama va targʻibot
 uz|oʻn besh
 uz|nomli taklif
 uz|14-bandi
@@ -248,6 +278,30 @@ uz|hali yoʻq
 uz|boʻlishi ham mumkin emas
 uz|muayyan bir xabarni oʻchirish
 "
+
+# Every language the application offers has facts and retired sentences
+# written here, and no other language has any. Matched with `case` rather
+# than a pipe into `grep -q`, which `pipefail` reads as a failure the moment
+# grep stops reading.
+newline='
+'
+for lang in $LANGUAGES; do
+  case "$FACTS" in *"$newline$lang|"*) ;; *)
+    echo "no fact is written here for $lang, a language the application offers: its legal screen would be checked for nothing" >&2
+    exit 1 ;;
+  esac
+  case "$RETIRED" in *"$newline$lang|"*) ;; *)
+    echo "no retired sentence is written here for $lang, a language the application offers" >&2
+    exit 1 ;;
+  esac
+done
+for who in $(printf '%s\n%s\n' "$FACTS" "$RETIRED" | cut -d'|' -f1 | sort -u); do
+  [ "$who" = all ] && continue
+  case " $LANGUAGES " in *" $who "*) ;; *)
+    echo "facts are written here for $who, a language the application does not declare" >&2
+    exit 1 ;;
+  esac
+done
 
 page_in() {
   case "$1" in
@@ -321,4 +375,5 @@ WHY
   exit 1
 fi
 
-echo "PASS: the legal screen and the published terms agree on $checked facts, in seven languages, and none says what ADR 0015 retired"
+count="$(printf '%s' "$LANGUAGES" | wc -w | tr -d ' ')"
+echo "PASS: the legal screen and the published terms agree on $checked facts, in $count languages, and none says what ADR 0015 retired"

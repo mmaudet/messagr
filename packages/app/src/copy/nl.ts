@@ -9,7 +9,7 @@ import type { CopyKey } from './fr'
  *
  * `u` throughout, as the French uses `vous`.
  *
- * The two legal strings want a lawyer’s eye before the store listing goes
+ * The three legal strings want a lawyer’s eye before the store listing goes
  * out; `en.ts` says the same and for the same reason.
  */
 export const nl: Readonly<Record<CopyKey, string>> = {
@@ -447,7 +447,7 @@ export const nl: Readonly<Record<CopyKey, string>> = {
   legal_forbidden_body:
     'Materiaal van seksueel kindermisbruik, bedreigingen tegen het leven of de veiligheid van een persoon, intimidatie, identiteitsmisbruik, haatdragende inhoud, seksuele inhoud die wordt opgedrongen aan wie er niet om vroeg en intieme beelden die zonder toestemming worden verspreid, ongevraagde reclame en werving, en elke andere inhoud die onwettig is naar Frans of Europees recht.',
   legal_forbidden_zero:
-    'Messagr tolereert geen enkele inhoud die deze voorwaarden verbieden en geen enkel grensoverschrijdend gedrag: de inhoud wordt verwijderd en de afzender uitgesloten.',
+    'De exploitant tolereert geen enkele inhoud die deze voorwaarden verbieden en geen enkel grensoverschrijdend gedrag: hij verwijdert de inhoud, schort het account van de afzender op en sluit het als de beslissing dat bevestigt.',
   legal_forbidden_entry:
     'Men komt uitsluitend binnen op naam en op uitnodiging. Een uitnodiging is persoonlijk, beperkt in gebruik, en wordt niet doorverkocht. De minimumleeftijd is vijftien jaar.',
   legal_moderation_title: 'Hoe de moderatie werkelijk werkt',
@@ -476,10 +476,9 @@ export const nl: Readonly<Record<CopyKey, string>> = {
     'Messagr is een hostingdienst en geen onlineplatform; overweging 14 van de DSA sluit interpersoonlijke communicatiediensten uit. De artikelen 20 en 21 zijn dus niet van toepassing, en deze tekst beweert niet ze te bieden.',
   legal_delete_title: 'Uw account verwijderen',
   legal_delete_body:
-    'Verwijderen gebeurt in de applicatie: Instellingen, dan „Mijn account verwijderen”. Het account wordt dan meteen gedeactiveerd en zijn gegevens worden binnen dertig dagen gewist; reeds verstuurde berichten blijven gebeurtenissen van de ruimtes waarin ze zijn geschreven, en het verwijderen van het account haalt ze daar niet weg. Zonder dit apparaat, of wanneer de applicatie daarom vraagt, vraagt u de verwijdering per e-mail aan bij conformite@messagr.eu.',
+    'Verwijderen gebeurt in de applicatie: Instellingen, dan „Mijn account verwijderen”. Het account wordt dan meteen gedeactiveerd en zijn gegevens worden binnen dertig dagen gewist; reeds verstuurde berichten blijven gebeurtenissen van de gesprekken waarin ze zijn geschreven, en het verwijderen van het account haalt ze daar niet weg. Zonder dit apparaat, of wanneer de applicatie daarom vraagt, vraagt u de verwijdering per e-mail aan bij conformite@messagr.eu.',
   legal_delete_link: 'Zonder dit apparaat: messagr.eu/aide',
-  legal_full_terms:
-    'Volledige gebruiksvoorwaarden, in het Engels: messagr.eu/conditions-generales/en',
+  'legal_full_terms %@': 'Volledige gebruiksvoorwaarden: %@',
   trust_action: 'Wat er van deze persoon bekend is',
   trust_title: 'Wat er van deze persoon bekend is',
   trust_calm:

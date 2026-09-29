@@ -11,7 +11,7 @@ import type { CopyKey } from './fr'
  * somebody it has never met, about what a server can and cannot read, is not
  * the place to be familiar.
  *
- * The two legal strings want a lawyer’s eye before the store listing goes
+ * The three legal strings want a lawyer’s eye before the store listing goes
  * out; `en.ts` says the same and for the same reason.
  */
 export const es: Readonly<Record<CopyKey, string>> = {
@@ -445,7 +445,7 @@ export const es: Readonly<Record<CopyKey, string>> = {
   legal_forbidden_body:
     'Los contenidos de abuso sexual infantil, las amenazas contra la vida o la seguridad de una persona, el acoso, la suplantación de identidad, los contenidos de odio, los contenidos sexuales impuestos a quien no los ha pedido y las imágenes íntimas difundidas sin consentimiento, la captación y la publicidad no solicitadas, y cualquier otro contenido ilegal según el derecho francés o europeo.',
   legal_forbidden_zero:
-    'Messagr no tolera ningún contenido prohibido por estas condiciones ni ningún comportamiento abusivo: el contenido se retira y su autor queda excluido.',
+    'Quien explota el servicio no tolera ningún contenido prohibido por estas condiciones ni ningún comportamiento abusivo: retira el contenido, suspende la cuenta de su autor y después la cierra si la decisión lo confirma.',
   legal_forbidden_entry:
     'Solo se entra por invitación nominativa. Una invitación es personal, de uso limitado, y no se revende. La edad mínima es de quince años.',
   legal_moderation_title: 'Cómo funciona realmente la moderación',
@@ -474,10 +474,9 @@ export const es: Readonly<Record<CopyKey, string>> = {
     'Messagr es un servicio de alojamiento y no una plataforma en línea; el considerando 14 del DSA excluye los servicios de comunicaciones interpersonales. Los artículos 20 y 21 no se aplican, por tanto, y este texto no pretende ofrecerlos.',
   legal_delete_title: 'Eliminar su cuenta',
   legal_delete_body:
-    'La eliminación se hace desde la aplicación: Ajustes y, luego, «Eliminar mi cuenta». La cuenta queda entonces desactivada de inmediato y sus datos se purgan en un plazo de treinta días; los mensajes ya enviados siguen siendo eventos de las salas donde se escribieron, y eliminar la cuenta no los retira de ellas. Sin este dispositivo, o cuando la aplicación se lo pida, la eliminación se solicita por correo electrónico a conformite@messagr.eu.',
+    'La eliminación se hace desde la aplicación: Ajustes y, luego, «Eliminar mi cuenta». La cuenta queda entonces desactivada de inmediato y sus datos se purgan en un plazo de treinta días; los mensajes ya enviados siguen siendo eventos de las conversaciones donde se escribieron, y eliminar la cuenta no los retira de ellas. Sin este dispositivo, o cuando la aplicación se lo pida, la eliminación se solicita por correo electrónico a conformite@messagr.eu.',
   legal_delete_link: 'Sin este dispositivo: messagr.eu/aide',
-  legal_full_terms:
-    'Condiciones de uso completas, en inglés: messagr.eu/conditions-generales/en',
+  'legal_full_terms %@': 'Condiciones de uso completas: %@',
   trust_action: 'Lo que se sabe de esta persona',
   trust_title: 'Lo que se sabe de esta persona',
   trust_calm:
