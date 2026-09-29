@@ -8,13 +8,13 @@
 #
 # Rapatrié d'old_messagr (deploy/admin-messagr.sh), avec ses gardes.
 #
-# # Continuwuity n'a pas d'API d'administration
+# # Continuwuity s'administre par des messages
 #
-# Le homeserver de production est Continuwuity, pas Synapse : une commande
-# d'administration est un MESSAGE, « !admin … », posté dans le salon
-# #admins:<serveur> par un compte administrateur, et le compte du serveur y
-# répond par un autre message. Ce script poste la commande et attend la
-# réponse, qu'il affiche sur la sortie standard.
+# Le homeserver de production est Continuwuity, pas Synapse : pas de
+# /_synapse/admin. Une commande d'administration est un MESSAGE, « !admin … »,
+# posté dans le salon #admins:<serveur> par un compte administrateur, et le
+# compte du serveur y répond par un autre message. Ce script poste la
+# commande et attend la réponse, qu'il affiche sur la sortie standard.
 #
 # # Les gestes
 #
