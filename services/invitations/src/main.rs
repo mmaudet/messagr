@@ -1,3 +1,4 @@
+mod alert;
 mod auth;
 mod ceilings;
 mod cleanup;
@@ -13,6 +14,7 @@ mod masking_quota;
 mod matrix;
 mod named_deactivation;
 mod operator;
+mod report;
 mod retire_key;
 mod sms;
 mod sms_history;
@@ -118,6 +120,16 @@ async fn main() -> anyhow::Result<()> {
         )),
         Err(missing) => Err(format!("{missing}: address-book discovery stays off")),
     };
+    // WHETHER THE OPERATOR IS TOLD BY SMS (#464), discovery on or off: the
+    // provider is named, never the number.
+    let alerts = match state.cfg.sms.to_the_operator() {
+        Ok((provider, _)) => Ok(format!(
+            "the operator's alerts go by SMS, through {provider:?}"
+        )),
+        Err(missing) => Err(format!(
+            "{missing}: the operator's alerts are only written in the log"
+        )),
+    };
     let app = router(state);
 
     let listener = tokio::net::TcpListener::bind(&addr).await?;
@@ -127,9 +139,11 @@ async fn main() -> anyhow::Result<()> {
     );
     // AFTER THE VERSION, which an update reads as the first line (step 6 of
     // `deploy/messagr-eu-invitations.md`).
-    match discovery {
-        Ok(on) => tracing::info!("{on}"),
-        Err(off) => tracing::warn!("{off}"),
+    for said in [discovery, alerts] {
+        match said {
+            Ok(on) => tracing::info!("{on}"),
+            Err(off) => tracing::warn!("{off}"),
+        }
     }
     axum::serve(listener, app).await?;
     Ok(())

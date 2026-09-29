@@ -48,6 +48,29 @@ pub struct Country {
     pub provider: Provider,
 }
 
+/// An ISO 3166-1 alpha-2 code, two capitals and nothing else: all the
+/// operator's SMS says of a country (#464).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct CountryCode([u8; 2]);
+
+impl CountryCode {
+    pub fn new(code: &str) -> Option<CountryCode> {
+        match code.as_bytes() {
+            &[a, b] if a.is_ascii_uppercase() && b.is_ascii_uppercase() => {
+                Some(CountryCode([a, b]))
+            }
+            _ => None,
+        }
+    }
+}
+
+impl std::fmt::Display for CountryCode {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let [a, b] = self.0.map(char::from);
+        write!(f, "{a}{b}")
+    }
+}
+
 /// The countries open at launch, all through OVHcloud.
 const LAUNCH: &[(&str, &str)] = &[
     // The European Union, less Italy, Denmark, Finland, Romania and Sweden.
@@ -164,6 +187,18 @@ pub fn open_country<'a>(countries: &'a [Country], number: &str) -> Option<&'a Co
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn a_country_code_is_two_capitals_and_nothing_else() {
+        // All the operator's SMS says of a country (#464).
+        assert_eq!(
+            CountryCode::new("FR").map(|c| c.to_string()),
+            Some("FR".into())
+        );
+        for other in ["", "F", "fr", "Fr", "FRA", "F1", "@alice:h", "ÉT"] {
+            assert_eq!(CountryCode::new(other), None, "{other:?}");
+        }
+    }
 
     #[test]
     fn a_number_is_international_or_it_is_not() {

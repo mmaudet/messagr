@@ -2,6 +2,9 @@
 //! duplicated (the timestamp identically in three handlers and inline in
 //! `cleanup.rs`, the localpart derivation five times).
 
+/// A day, in seconds: the window of the daily ceilings and limits.
+pub const DAY_SECONDS: i64 = 86_400;
+
 /// Current Unix timestamp, in seconds.
 pub fn now() -> i64 {
     std::time::UNIX_EPOCH.elapsed().unwrap().as_secs() as i64

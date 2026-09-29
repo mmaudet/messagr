@@ -65,9 +65,10 @@ conversation leaves the list without the device leaving the room, so the
 blocked account sees nothing change. A block does not lift, as decided on 27
 September; unblocking would be a ticket of its own.
 
-The operator is told who blocked whom, never what was said, in one SMS a day.
-The homeserver's account data now shows who ignores whom, as the service's
-database already showed who blocked whom.
+The service records who blocked whom, never what was said, and one SMS a day
+counts the blocks without naming any account. The homeserver's account data
+now shows who ignores whom, as the service's database already showed who
+blocked whom.
 
 ## Filtering
 

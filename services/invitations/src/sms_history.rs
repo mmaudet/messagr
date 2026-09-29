@@ -38,7 +38,7 @@ pub async fn remember(pool: &SqlitePool, message_id: u64, erase_after: i64) -> a
 /// Erases every SMS that is due, and answers how many left the history. Without
 /// a provider there is nothing to erase with: the rows wait.
 pub async fn erase_due(st: &Arc<AppState>, now: i64) -> anyhow::Result<u64> {
-    let Some(provider) = st.cfg.sms_provider.as_ref() else {
+    let Some(provider) = st.cfg.sms.provider.as_ref() else {
         return Ok(0);
     };
     let due: Vec<(i64, i64)> =
@@ -105,14 +105,10 @@ mod tests {
                 "token".into(),
             )),
             cfg: crate::config::Config {
-                sms_provider: Some(crate::sms::Ovhcloud {
-                    base_url,
-                    application_key: "ak".into(),
-                    application_secret: "as".into(),
-                    consumer_key: "ck".into(),
-                    service_name: "sms-test-1".into(),
-                    sender: "Messagr".into(),
-                }),
+                sms: crate::config::Sms {
+                    operator_number: None,
+                    ..crate::sms::test_support::sms_through(base_url)
+                },
                 ..crate::config::Config::for_tests()
             },
         });
