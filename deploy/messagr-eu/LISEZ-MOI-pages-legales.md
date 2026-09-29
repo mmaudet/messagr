@@ -44,11 +44,12 @@ serveur n'applique pas est un manquement, pas une intention.
 La version à publier de #467 en ajoute, que `retention.json` déclare et que
 `scripts/assert-retention.sh` vérifie une fois la version publiée :
 
-- contenu d'un signalement : effacement six mois après la décision, sauf s'il
-  a été transmis aux autorités ;
-- ce qui a été décidé sur un signalement : effacement douze mois après la
-  décision ;
-- blocage : tant que les deux comptes existent ;
+- contenu d'un signalement, le signalement scellé : effacement six mois après
+  la décision, sauf s'il a été transmis aux autorités ;
+- le reste d'un signalement, dont ce qui a été décidé et la clé
+  d'idempotence de son envoi : effacement douze mois après la décision ;
+- blocage : tant que les deux comptes existent pour le service, et tant que
+  le compte qui bloque existe pour la liste du serveur de messagerie ;
 - SMS qui préviennent l'exploitant : effacement demandé à OVHcloud un jour
   après l'envoi.
 

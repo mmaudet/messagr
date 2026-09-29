@@ -232,8 +232,11 @@
             combien de temps chacun est gardé&nbsp;;
           </li>
           <li>
-            «&nbsp;Ce que le service ne peut pas lire&nbsp;» dit ce qui nous
-            parvient lisible, pour l'exploitant seul&nbsp;: ce qu'une personne
+            «&nbsp;Qui traite vos données&nbsp;» dit qui est l'exploitant&nbsp;;
+          </li>
+          <li>
+            «&nbsp;Ce que le service ne peut pas lire&nbsp;» dit ce qui parvient
+            lisible à l'exploitant, et à lui seul&nbsp;: ce qu'une personne
             choisit de signaler&nbsp;;
           </li>
           <li>
@@ -268,6 +271,12 @@
         RV Myriagone Holding est le responsable de ce traitement au sens du
         règlement (UE) 2016/679. Point de contact&nbsp;:
         <a href="mailto:conformite@messagr.eu">conformite@messagr.eu</a>.
+      </p>
+      <p>
+        Dans cette politique, «&nbsp;nous&nbsp;» désigne RV Myriagone Holding,
+        et «&nbsp;l'exploitant&nbsp;» aussi&nbsp;: c'est le nom que
+        l'application et les conditions générales lui donnent quand il reçoit
+        un signalement.
       </p>
 
       <h2>Ce que Messagr ne vous demande pas</h2>
@@ -342,11 +351,11 @@
         signaler.</b> Quelqu'un qui reçoit un message peut le signaler à
         l'exploitant&nbsp;: son téléphone le lui transmet alors, avec la clé
         d'une photo ou d'un document signalé, scellé pour que l'exploitant seul
-        puisse l'ouvrir, sur sa machine, et non notre serveur. C'est le seul
-        chemin par lequel un contenu lisible nous parvient, et l'exploitant ne
+        puisse l'ouvrir, sur sa machine, et non le serveur. C'est le seul
+        chemin par lequel un contenu lisible parvient à l'exploitant, et il ne
         lit jamais d'une conversation que ce qu'un signalement porte. La
         section «&nbsp;Signaler et bloquer&nbsp;», plus bas, dit ce qui part,
-        pour qui, et combien de temps nous le gardons.
+        pour qui, et combien de temps un signalement est gardé.
       </p>
 
       <h2>Ce que le serveur voit malgré tout</h2>
@@ -385,8 +394,8 @@
       <!-- #467, ADR 0015 : chaque durée de cette section est déclarée dans
            `deploy/messagr-eu/retention.json`, avec sa phrase exacte, et
            `scripts/assert-retention.sh` vérifie que la politique en vigueur
-           la dit. Le numéro de signalement, le motif et la clé de
-           l'exploitant sont ceux du glossaire, section « Moderation ». -->
+           la dit. Le numéro de signalement et la clé de l'exploitant sont
+           ceux du glossaire, section « Moderation ». -->
       <p>
         Rien de cette section n'arrive sans un geste&nbsp;: signaler et bloquer
         se font dans une conversation, par la personne qui reçoit les messages,
@@ -406,14 +415,14 @@
           leur heure&nbsp;;
         </li>
         <li>
-          les identifiants qui les désignent sur notre serveur, eux et la
+          les identifiants qui les désignent sur le serveur, eux et la
           conversation où ils ont été écrits, pour que l'exploitant puisse les
           retirer&nbsp;;
         </li>
         <li>
           pour une photo ou un document, l'adresse de sa copie chiffrée, qui
-          est déjà sur notre serveur, la clé qui l'ouvre, son nom, son type et
-          sa taille&nbsp;: rien n'est envoyé de nouveau, et l'exploitant ne
+          est déjà sur le serveur, la clé qui l'ouvre, son nom, son type et sa
+          taille&nbsp;: rien n'est envoyé de nouveau, et l'exploitant ne
           déchiffre le fichier que pour le voir, sans en garder de copie&nbsp;;
         </li>
         <li>
@@ -432,24 +441,30 @@
         est scellé sur votre téléphone pour la clé de l'exploitant&nbsp;: sa
         moitié publique est dans l'application, et sa moitié privée n'existe
         que sur la machine de l'exploitant, avec une seule copie chiffrée hors
-        ligne, jamais sur notre serveur. Le service qui reçoit le signalement
+        ligne, jamais sur le serveur. Le service qui reçoit le signalement
         le garde sans pouvoir l'ouvrir. L'exploitant l'ouvre sur sa machine,
         sans rien y enregistrer de ce qu'il lit.
       </p>
       <p>
         <b>Ce que le service garde, et ce qu'il n'apprend jamais.</b> Il garde
-        le numéro de signalement, votre compte, le motif, le signalement scellé
-        et l'heure où il l'a reçu, puis la décision de l'exploitant et ses
-        dates. Il n'apprend ni le compte que vous signalez, ni la conversation,
-        ni ce qui a été écrit&nbsp;: tout cela reste dans le signalement
-        scellé. Signaler ne prévient que l'exploitant&nbsp;: le compte signalé
-        n'en est pas averti, et nous ne lui disons pas qui l'a signalé.
+        le numéro de signalement, votre compte, le motif, le signalement
+        scellé, l'heure où il l'a reçu, et une clé que votre téléphone tire au
+        hasard pour qu'un même signalement envoyé deux fois ne compte qu'une
+        fois&nbsp;; puis la décision de l'exploitant, sa motivation et ses
+        dates, sans nommer le compte visé ni recopier ce qui a été dit. Il
+        n'apprend ni le compte que vous signalez, ni la conversation, ni ce qui
+        a été écrit&nbsp;: tout cela reste dans le signalement scellé. Si vous
+        bloquez aussi ce compte, le service, qui apprend ce blocage, peut le
+        rapprocher de votre signalement. Signaler ne prévient que
+        l'exploitant&nbsp;: le compte signalé n'en est pas averti, et
+        l'exploitant ne lui dit pas qui l'a signalé.
       </p>
       <p>
-        <b>Combien de temps nous gardons un signalement.</b> Son contenu,
+        <b>Combien de temps un signalement est gardé.</b> Son contenu,
         c'est-à-dire le signalement scellé, est effacé six mois après la
-        décision de l'exploitant. Ce qui a été décidé, avec le numéro, votre
-        compte, le motif et les dates, est effacé douze mois après la décision.
+        décision de l'exploitant. Le reste, c'est-à-dire le numéro, votre
+        compte, le motif, la clé tirée par votre téléphone, la décision, sa
+        motivation et les dates, est effacé douze mois après la décision.
         Un signalement transmis aux autorités fait exception&nbsp;: il est
         gardé, contenu compris, tant qu'elles en ont besoin.
       </p>
@@ -457,14 +472,14 @@
         <b>Bloquer.</b> Bloquer un compte depuis une conversation fait que plus
         rien de ce qu'il envoie ne vous parvient, que ce qu'il a déjà écrit
         disparaît de vos écrans, et qu'il ne peut plus vous inviter. Il n'en
-        est pas averti, et un blocage ne se lève pas. Pour cela, nous le
-        gardons à deux endroits&nbsp;:
+        est pas averti, et un blocage ne se lève pas. Pour cela, il est gardé
+        à deux endroits&nbsp;:
       </p>
       <ul>
         <li>
           le serveur de messagerie garde, dans les données de votre compte, la
           liste des comptes que vous avez bloqués, pour ne plus vous livrer ce
-          qu'ils envoient, aussi longtemps que votre compte&nbsp;;
+          qu'ils envoient, tant que votre compte existe&nbsp;;
         </li>
         <li>
           le service d'invitations garde qui a bloqué qui, et à quelle date,
@@ -481,11 +496,12 @@
         et, une fois par jour, du nombre de blocages faits depuis le décompte
         précédent. Ces SMS ne portent ni contenu ni identifiant de
         compte&nbsp;: les numéros des signalements et leurs motifs, ou un
-        nombre de blocages. OVHcloud les envoie au numéro de l'exploitant, pour
-        notre compte&nbsp;: OVH SAS, 2 rue Kellermann, 59100 Roubaix, en
-        France, est notre sous-traitant pour cet envoi. Nous lui demandons
-        d'effacer chaque SMS de son historique un jour après son envoi, puis
-        chaque heure pendant un jour s'il ne l'y trouve pas encore.
+        nombre de blocages. OVHcloud les envoie à son numéro, pour le compte de
+        l'exploitant&nbsp;: OVH SAS, 2 rue Kellermann, 59100 Roubaix, en
+        France, est son sous-traitant pour cet envoi. Le service demande à
+        OVHcloud d'effacer chaque SMS de son historique un jour après son
+        envoi, puis chaque heure pendant un jour s'il ne l'y trouve pas
+        encore.
       </p>
 
       <h2>Ce qui reste sur votre appareil</h2>
@@ -698,11 +714,13 @@
         <b>Ce que laissent un signalement et un blocage a ses propres
         durées</b>, dites dans «&nbsp;Signaler et bloquer&nbsp;»&nbsp;: le
         contenu d'un signalement, six mois après la décision de
-        l'exploitant&nbsp;; ce qui a été décidé, douze mois après la
-        décision&nbsp;; un signalement transmis aux autorités, tant qu'elles en
-        ont besoin&nbsp;; un blocage, tant que vos deux comptes existent&nbsp;;
-        un SMS qui prévient l'exploitant, jusqu'à ce qu'OVHcloud l'efface de son
-        historique.
+        l'exploitant&nbsp;; le reste, dont ce qui a été décidé, douze mois
+        après la décision&nbsp;; un signalement transmis aux autorités, tant
+        qu'elles en ont besoin&nbsp;; qui a bloqué qui, au service
+        d'invitations, tant que vos deux comptes existent, et la liste des
+        comptes que vous avez bloqués, au serveur de messagerie, tant que votre
+        compte existe&nbsp;; un SMS qui prévient l'exploitant, jusqu'à ce
+        qu'OVHcloud l'efface de son historique.
       </p>
 
       <h2>Ce que l'effacement peut, et ce qu'il ne peut pas</h2>
