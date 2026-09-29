@@ -129,12 +129,14 @@ describe('Reporting messages to the operator (#468)', () => {
       // were chosen in.
       messages: [
         {
+          kind: 'text',
           eventId: '$first',
           sentAt: 1_790_000_010_000,
           sender: HIM,
           text: 'Tu vas le regretter.',
         },
         {
+          kind: 'text',
           eventId: '$second',
           sentAt: 1_790_000_020_000,
           sender: HIM,
@@ -214,32 +216,31 @@ describe('Reporting messages to the operator (#468)', () => {
     expect(reported).toEqual({ outcome: 'sent', number: 'K7QM-4ZT2' })
     expect(payloadOf(sealed[0]!.payload)?.messages).toEqual([
       {
+        kind: 'text',
         eventId: '$first',
         sentAt: 1_790_000_010_000,
         sender: HIM,
         text: 'Tu vas le regretter.',
       },
       {
+        kind: 'photograph',
         eventId: '$photograph',
         sentAt: 1_790_000_012_000,
         sender: HIM,
-        photograph: {
-          file: { ...material, url: 'mxc://example.org/photograph' },
-          mimetype: 'image/jpeg',
-          name: 'image.jpg',
-          size: 12_000_000,
-        },
+        file: { ...material, url: 'mxc://example.org/photograph' },
+        mimetype: 'image/jpeg',
+        name: 'image.jpg',
+        size: 12_000_000,
       },
       {
+        kind: 'document',
         eventId: '$document',
         sentAt: 1_790_000_014_000,
         sender: HIM,
-        document: {
-          file: { ...material, url: 'mxc://example.org/document' },
-          mimetype: 'application/pdf',
-          name: 'menaces.pdf',
-          size: 81_920,
-        },
+        file: { ...material, url: 'mxc://example.org/document' },
+        mimetype: 'application/pdf',
+        name: 'menaces.pdf',
+        size: 81_920,
       },
     ])
     expect(sealed[0]!.payload.length).toBeLessThan(4096)

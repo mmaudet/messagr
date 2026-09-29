@@ -269,7 +269,7 @@ async function openOnDemand(
     )
     return 2
   }
-  if ('text' in message) {
+  if (message.kind === 'text') {
     stderr(
       `Le message ${wanted} ne porte ni photo ni document : rien à ouvrir.`,
     )
@@ -284,10 +284,12 @@ async function openOnDemand(
     stderr(access.why)
     return 2
   }
-  const opened = await openReportedFile(
-    'photograph' in message ? message.photograph : message.document,
-    { download: access.download, show, temporary, stderr },
-  )
+  const opened = await openReportedFile(message, {
+    download: access.download,
+    show,
+    temporary,
+    stderr,
+  })
   if (!opened.shown) {
     stderr(opened.why)
     return 1
@@ -344,19 +346,15 @@ function readable(report) {
         `  expéditeur : ${displayable(message.sender, false)}, qui n’est pas l’auteur`,
       )
     }
-    if ('text' in message) {
+    if (message.kind === 'text') {
       for (const line of displayable(message.text, true).split('\n')) {
         lines.push(`  │ ${line}`)
       }
       return
     }
-    const [kind, file] =
-      'photograph' in message
-        ? ['photo', message.photograph]
-        : ['document', message.document]
     lines.push(
-      `  ${kind} : ${described(file)}`,
-      `  copie chiffrée : ${displayable(file.file.url, false)}`,
+      `  ${message.kind === 'photograph' ? 'photo' : 'document'} : ${statedFile(message)}`,
+      `  copie chiffrée : ${displayable(message.file.url, false)}`,
       `  pour l’ouvrir, à la demande : --ouvrir ${at + 1}`,
     )
   })
@@ -370,7 +368,7 @@ function readable(report) {
  * @param {import('../../packages/app/src/runtime/reportFormat.ts').ReportedFile} file
  * @returns {string}
  */
-function described(file) {
+function statedFile(file) {
   const name = displayable(file.name ?? 'sans nom', false)
   const type = displayable(file.mimetype ?? 'type non dit', false)
   const size = file.size === null ? 'taille non dite' : `${file.size} octets`

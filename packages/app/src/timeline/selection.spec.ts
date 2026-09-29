@@ -265,8 +265,20 @@ describe('what a report carries (#468)', () => {
     expect(reportable(new Set(['$h2', '$h1']), held, ME)).toEqual({
       author: HER,
       messages: [
-        { eventId: '$h1', sentAt: 1000, sender: HER, text: 'salut' },
-        { eventId: '$h2', sentAt: 2000, sender: HER, text: 'encore' },
+        {
+          kind: 'text',
+          eventId: '$h1',
+          sentAt: 1000,
+          sender: HER,
+          text: 'salut',
+        },
+        {
+          kind: 'text',
+          eventId: '$h2',
+          sentAt: 2000,
+          sender: HER,
+          text: 'encore',
+        },
       ],
     })
   })
@@ -323,7 +335,7 @@ describe('what a report carries (#468)', () => {
       body: 'image.jpg',
       msgtype: 'm.image',
       image: {
-        url: `mxc://x/photo${eventId}`,
+        url: `mxc://x/photo-${eventId.slice(1)}`,
         secret,
         mimeType: 'image/jpeg',
         width: 800,
@@ -354,7 +366,7 @@ describe('what a report carries (#468)', () => {
       body: 'contrat.pdf',
       msgtype: 'm.file',
       document: {
-        url: `mxc://x/file${eventId}`,
+        url: `mxc://x/file-${eventId.slice(1)}`,
         secret,
         name: 'contrat.pdf',
         mimeType: null,
@@ -380,30 +392,40 @@ describe('what a report carries (#468)', () => {
     expect(
       reportable(new Set(['$h2', '$d', '$p', '$h1']), held, ME)?.messages,
     ).toEqual([
-      { eventId: '$h1', sentAt: 1000, sender: HER, text: 'salut' },
       {
+        kind: 'text',
+        eventId: '$h1',
+        sentAt: 1000,
+        sender: HER,
+        text: 'salut',
+      },
+      {
+        kind: 'photograph',
         eventId: '$p',
         sentAt: 1500,
         sender: HER,
-        photograph: {
-          file: { ...MATERIAL, url: 'mxc://x/photo$p' },
-          mimetype: 'image/jpeg',
-          name: 'image.jpg',
-          size: 482_113,
-        },
+        file: { ...MATERIAL, url: 'mxc://x/photo-p' },
+        mimetype: 'image/jpeg',
+        name: 'image.jpg',
+        size: 482_113,
       },
       {
+        kind: 'document',
         eventId: '$d',
         sentAt: 1800,
         sender: HER,
-        document: {
-          file: { ...MATERIAL, url: 'mxc://x/file$d' },
-          mimetype: null,
-          name: 'contrat.pdf',
-          size: 10_240,
-        },
+        file: { ...MATERIAL, url: 'mxc://x/file-d' },
+        mimetype: null,
+        name: 'contrat.pdf',
+        size: 10_240,
       },
-      { eventId: '$h2', sentAt: 2000, sender: HER, text: 'encore' },
+      {
+        kind: 'text',
+        eventId: '$h2',
+        sentAt: 2000,
+        sender: HER,
+        text: 'encore',
+      },
     ])
   })
 

@@ -1,10 +1,9 @@
 import {
   encryptedFileOf,
-  type EncryptedFile,
   type ReportedFile,
   type ReportedMessage,
 } from '../runtime/reportFormat'
-import { fileOf } from './encryptedFile'
+import { fileOf, type EncryptedFile } from './encryptedFile'
 import type { TimelineEntry } from './mergeTimeline'
 
 /**
@@ -137,8 +136,9 @@ export interface Reportable {
  *
  * A selection holding anything else is not a report at all, rather than a
  * report quietly missing it: a video, a voice message, a place, a sticker, a
- * message this device could not open, one removed, or a file whose encrypted
- * copy it cannot describe, which the operator could not open either.
+ * message this device could not open, one removed, or a file the operator
+ * could not open, by the one rule the operator's tool reads too
+ * (`openingOf`).
  *
  * A selected event the conversation no longer carries makes it `null` too,
  * as for removing: nothing can say what would be sent.
@@ -154,21 +154,21 @@ export function reportable(
   if (found.length !== selected.size) return null
   const messages: ReportedMessage[] = []
   for (const entry of found) {
-    const carried =
+    const message =
       entry.claimedSender === author && entry.removed !== true
-        ? carriedOf(entry)
+        ? reportedMessageOf(entry)
         : null
-    if (carried === null) return null
-    messages.push(carried)
+    if (message === null) return null
+    messages.push(message)
   }
   return { author, messages }
 }
 
 /**
- * What a report carries of `entry`: its words, or the description of the
- * photograph or the document it is. `null` for anything else.
+ * The message a report carries for `entry`: its words, or the description
+ * of the photograph or the document it is. `null` for anything else.
  */
-function carriedOf(entry: TimelineEntry): ReportedMessage | null {
+function reportedMessageOf(entry: TimelineEntry): ReportedMessage | null {
   const sent = {
     eventId: entry.eventId,
     sentAt: entry.sentAt,
@@ -178,29 +178,36 @@ function carriedOf(entry: TimelineEntry): ReportedMessage | null {
   if (entry.msgtype === 'm.image' && image !== undefined) {
     // A photograph's `body` is the name its sender gave for clients that
     // cannot draw it (`imageEvent.ts`).
-    const photograph = described(image, entry.body, image.size)
-    return photograph === null ? null : { ...sent, photograph }
+    return fileMessageOf(sent, 'photograph', image, entry.body, image.size)
   }
   if (entry.msgtype === 'm.file' && document !== undefined) {
-    const file = described(document, document.name, document.size)
-    return file === null ? null : { ...sent, document: file }
+    return fileMessageOf(
+      sent,
+      'document',
+      document,
+      document.name,
+      document.size,
+    )
   }
   if (
     entry.msgtype !== undefined &&
     WORDS.has(entry.msgtype) &&
     entry.body !== null
   ) {
-    return { ...sent, text: entry.body }
+    return { ...sent, kind: 'text', text: entry.body }
   }
   return null
 }
 
 /**
- * The description of the encrypted file `read` was read from: its event's
- * `file` again (`fileOf`), its type, `name` and `size`. `null` when it lacks
- * what opening the file needs (`encryptedFileOf`).
+ * The message a report carries for a photograph or a document: the encrypted
+ * file its event carried, rebuilt from what the conversation kept of it
+ * (`fileOf`), its type, `name` and `size`. `null` when that file could not be
+ * opened (`encryptedFileOf`, whose rule the operator's tool reads too).
  */
-function described(
+function fileMessageOf(
+  sent: Pick<ReportedFile, 'eventId' | 'sentAt' | 'sender'>,
+  kind: ReportedFile['kind'],
   read: {
     readonly url: string
     readonly secret: string
@@ -216,7 +223,9 @@ function described(
     // A secret that is not an object: nothing could open this file.
     return null
   }
-  return file === null ? null : { file, mimetype: read.mimeType, name, size }
+  return file === null
+    ? null
+    : { ...sent, kind, file, mimetype: read.mimeType, name, size }
 }
 
 /**

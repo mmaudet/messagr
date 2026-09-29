@@ -592,6 +592,7 @@ describe("The operator's opening tool, as it is run", () => {
       roomId: '!room:example.org',
       messages: [
         {
+          kind: 'text',
           eventId: '$first',
           sentAt: 1_790_000_010_000,
           sender: '@carol:example.org',

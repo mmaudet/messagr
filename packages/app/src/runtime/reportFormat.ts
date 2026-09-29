@@ -1,3 +1,4 @@
+import type { EncryptedFile } from '../timeline/encryptedFile'
 import type { Sealed } from './hpke'
 
 /**
@@ -11,11 +12,13 @@ import type { Sealed } from './hpke'
  *
  * The operator's tools load this file under Node, which strips its types but
  * resolves no import without its extension, as the application writes them.
- * Its one import is a type, which the stripping erases. So the format is
+ * Its imports are types, which the stripping erases. So the format is
  * stated here and nowhere else: the tool cannot drift from what the
  * application seals, and the store-build guard reads a key the way the
  * application does. The sizes of the suite are restated below rather than
- * taken from `hpke.ts`, for the same reason.
+ * taken from `hpke.ts`, for the same reason, and what opening a reported
+ * file needs is said here once, for the application that reports it and the
+ * tool that opens it (`openingOf`).
  *
  * # THE FORMAT, WHICH THE BRIDGE KEEPS (#482)
  *
@@ -74,39 +77,40 @@ import type { Sealed } from './hpke'
  *           "event_id": "$first",
  *           "sent_at": 1790000000000,
  *           "sender": "@bob:example.org",
+ *           "kind": "text",
  *           "text": "…"
  *         },
  *         {
  *           "event_id": "$second",
  *           "sent_at": 1790000030000,
  *           "sender": "@bob:example.org",
- *           "photograph": {
- *             "file": {
- *               "v": "v2",
- *               "key": {
- *                 "kty": "oct",
- *                 "key_ops": ["encrypt", "decrypt"],
- *                 "alg": "A256CTR",
- *                 "k": "…",
- *                 "ext": true
- *               },
- *               "iv": "…",
- *               "hashes": { "sha256": "…" },
- *               "url": "mxc://example.org/AbCdEf"
+ *           "kind": "photograph",
+ *           "file": {
+ *             "v": "v2",
+ *             "key": {
+ *               "kty": "oct",
+ *               "key_ops": ["encrypt", "decrypt"],
+ *               "alg": "A256CTR",
+ *               "k": "…",
+ *               "ext": true
  *             },
- *             "mimetype": "image/jpeg",
- *             "name": "image.jpg",
- *             "size": 482113
- *           }
+ *             "iv": "…",
+ *             "hashes": { "sha256": "…" },
+ *             "url": "mxc://example.org/AbCdEf"
+ *           },
+ *           "mimetype": "image/jpeg",
+ *           "name": "image.jpg",
+ *           "size": 482113
  *         }
  *       ]
  *     }
  *
  * - `format`: this payload's number, 1. Another is refused, not guessed at.
- *   Photographs and documents (#471) came without changing it: a report of
- *   words is written exactly as #468 wrote it, so every report sealed before
- *   still reads, and a reader that knows only words shows a report carrying
- *   a file as it is rather than reading it wrong.
+ *   Photographs and documents (#471) came without changing it: every report
+ *   sealed before still reads. The reader of #468, which knows only words,
+ *   still reads a report of words, whose messages only gained a `kind` it
+ *   does not ask for, and shows a report carrying a file as it is rather
+ *   than reading it wrong.
  * - `reason`: the reason's code, the same as the one bound to the seal.
  * - `reported_at`: when the report was made, in milliseconds since the
  *   epoch, by the reporting device's clock.
@@ -119,19 +123,21 @@ import type { Sealed } from './hpke'
  * - `messages`: the messages the person selected, one at least, in the order
  *   the conversation reads them, and nothing else of the conversation. Each
  *   carries its `event_id`, which a takedown redacts, the homeserver's
- *   `sent_at` in milliseconds, its `sender` as the event names it, and
- *   exactly one of:
- *   - `text`, its words as the device showed them;
- *   - `photograph` or `document` (#471), the description of its encrypted
- *     file, never the file: `file` is Matrix's `EncryptedFile` as the event
- *     carried it, whose `url` is the address of the encrypted copy on the
- *     homeserver, `key` the JSON Web Key that opens it (AES-256-CTR, its
- *     `k`), `iv` the counter it starts from, and `hashes.sha256` the hash of
- *     the encrypted copy (`encryptedFileOf` says what must be there); then
- *     its `mimetype`, its `name` and its `size` in bytes, as the event
- *     states them, each `null` when it states none. A photograph's name is
- *     the one its sender gave for clients that cannot draw it (`image.jpg`
- *     from this application).
+ *   `sent_at` in milliseconds, its `sender` as the event names it, and its
+ *   `kind`, which says what else it carries and nothing else:
+ *   - `text`: `text`, its words as the device showed them. A message of
+ *     #468 has no `kind`: words were the only kind there was, and it is read
+ *     as `text`.
+ *   - `photograph` or `document` (#471): the description of its encrypted
+ *     file, never the file. `file` is Matrix's `EncryptedFile` as the event
+ *     carried it: `url`, the address of the encrypted copy on the
+ *     homeserver; `key`, the JSON Web Key that opens it (AES-256-CTR, its
+ *     `k`); `iv`, the counter it starts from; `hashes.sha256`, the hash of
+ *     the encrypted copy. `openingOf` says what each must be for the file to
+ *     open. Then its `mimetype`, its `name` and its `size` in bytes, as the
+ *     event states them, each `null` when it states none. A photograph's name
+ *     is the one its sender gave for clients that cannot draw it
+ *     (`image.jpg` from this application).
  *
  * Nothing is uploaded again: the operator downloads the encrypted copy
  * already on the homeserver, checks its hash, and opens it on its own
@@ -164,38 +170,6 @@ export interface ReportBinding {
   readonly reporter: string
 }
 
-/**
- * Matrix's `EncryptedFile`, as the event that carried a photograph or a
- * document gave it: where its encrypted copy is, and what opens and checks
- * it. `encryptedFileOf` says what must be there; the rest is carried as the
- * event gave it.
- */
-export interface EncryptedFile {
-  /** The address of the encrypted copy on the homeserver, `mxc://…`. */
-  readonly url: string
-  /** The JSON Web Key that opens it: AES-256-CTR, its `k` in base64url. */
-  readonly key: { readonly k: string; readonly [field: string]: unknown }
-  /** The counter the decryption starts from, in unpadded base64. */
-  readonly iv: string
-  /** Its `sha256` is the hash of the encrypted copy, in unpadded base64. */
-  readonly hashes: {
-    readonly sha256: string
-    readonly [field: string]: unknown
-  }
-  readonly [field: string]: unknown
-}
-
-/** A photograph or a document a report carries: never its bytes. */
-export interface ReportedFile {
-  readonly file: EncryptedFile
-  /** Its type, as the event states it, or `null`. */
-  readonly mimetype: string | null
-  /** Its name, as the event states it, or `null`. */
-  readonly name: string | null
-  /** Its size in bytes, as the event states it, or `null`. */
-  readonly size: number | null
-}
-
 /** Where a message a report carries comes from. */
 interface Sent {
   /** The event's identifier, which a takedown redacts. */
@@ -206,14 +180,48 @@ interface Sent {
   readonly sender: string
 }
 
+/** A message of words a report carries, as the device showed them. */
+export interface ReportedWords extends Sent {
+  readonly kind: 'text'
+  readonly text: string
+}
+
 /**
- * A message a report carries, as the reporting device read it: its words,
- * or the description of the photograph or the document it is.
+ * A photograph or a document a report carries: the description of its
+ * encrypted file, never its bytes.
  */
-export type ReportedMessage =
-  | (Sent & { readonly text: string })
-  | (Sent & { readonly photograph: ReportedFile })
-  | (Sent & { readonly document: ReportedFile })
+export interface ReportedFile extends Sent {
+  readonly kind: 'photograph' | 'document'
+  /** Its encrypted file, as the event carried it: `openingOf` opens it. */
+  readonly file: EncryptedFile
+  /** Its type, as the event states it, or `null`. */
+  readonly mimetype: string | null
+  /** Its name, as the event states it, or `null`. */
+  readonly name: string | null
+  /** Its size in bytes, as the event states it, or `null`. */
+  readonly size: number | null
+}
+
+/** A message a report carries, tagged by its `kind`. */
+export type ReportedMessage = ReportedWords | ReportedFile
+
+/**
+ * What opening a reported file needs, read from its description: the
+ * homeserver's media it is, and the key, the counter and the hash that open
+ * and check its encrypted copy.
+ */
+export interface Opening {
+  /** The server the media belongs to: `mxc://<server>/<mediaId>`. */
+  readonly server: string
+  /** The media's identifier on that server. */
+  readonly mediaId: string
+  /** The AES-256-CTR key, 32 bytes. */
+  readonly key: Uint8Array
+  /** The counter the decryption starts from, 16 bytes. */
+  readonly counter: Uint8Array
+  /** The SHA-256 hash of the encrypted copy, 32 bytes. */
+  readonly sha256: Uint8Array
+}
 
 /** What a report carries, sealed: see « THE PAYLOAD » above. */
 export interface ReportPayload {
@@ -292,31 +300,28 @@ export function payloadBytes(payload: ReportPayload): Uint8Array {
       reporting_account: payload.reportingAccount,
       reported_account: payload.reportedAccount,
       room_id: payload.roomId,
-      messages: payload.messages.map(message => ({
-        event_id: message.eventId,
-        sent_at: message.sentAt,
-        sender: message.sender,
-        ...carriedBy(message),
-      })),
+      messages: payload.messages.map(messageFields),
     }),
   )
 }
 
-/** What a message carries, as the payload writes it: see « THE PAYLOAD ». */
-function carriedBy(message: ReportedMessage): object {
-  if ('text' in message) return { text: message.text }
-  return 'photograph' in message
-    ? { photograph: fileFields(message.photograph) }
-    : { document: fileFields(message.document) }
-}
-
-function fileFields(file: ReportedFile): object {
-  return {
-    file: file.file,
-    mimetype: file.mimetype,
-    name: file.name,
-    size: file.size,
+/** A message as the payload writes it: see « THE PAYLOAD ». */
+function messageFields(message: ReportedMessage): object {
+  const sent = {
+    event_id: message.eventId,
+    sent_at: message.sentAt,
+    sender: message.sender,
+    kind: message.kind,
   }
+  return message.kind === 'text'
+    ? { ...sent, text: message.text }
+    : {
+        ...sent,
+        file: message.file,
+        mimetype: message.mimetype,
+        name: message.name,
+        size: message.size,
+      }
 }
 
 /** What JSON gives back, read field by field. */
@@ -326,7 +331,7 @@ type Fields = { readonly [field: string]: unknown } | null
  * The payload `bytes` hold, or `null` when they are not one the format
  * writes: not UTF-8, not JSON, another format's number, a reason outside the
  * eight, a field missing or of another type, no message, or a message that
- * carries not exactly one of words, a photograph or a document.
+ * is not exactly its `kind`.
  *
  * Read field by field: JSON's `null`, a number, a string or a list has none
  * of these fields, and fails the first test that asks for one.
@@ -365,12 +370,10 @@ export function payloadOf(bytes: Uint8Array): ReportPayload | null {
   }
 }
 
-/** What a message may carry, one of them exactly. */
-const CARRIED = ['text', 'photograph', 'document'] as const
-
 /**
- * A message of a payload, or `null` when a field is missing or mistyped, or
- * when it carries not exactly one of words, a photograph or a document.
+ * A message of a payload, by its `kind`, or `null` when a field is missing
+ * or mistyped, or when it carries what another kind carries. A message of
+ * #468, which has no `kind`, is words.
  */
 function messageOf(value: unknown): ReportedMessage | null {
   const fields = value as Fields
@@ -386,33 +389,26 @@ function messageOf(value: unknown): ReportedMessage | null {
     sentAt: fields.sent_at,
     sender: fields.sender,
   }
-  const carried = CARRIED.filter(one => fields[one] !== undefined)
-  if (carried.length !== 1) return null
-  if (carried[0] === 'text') {
-    return typeof fields.text === 'string'
-      ? { ...sent, text: fields.text }
+  const kind = fields.kind === undefined ? 'text' : fields.kind
+  if (kind === 'text') {
+    return typeof fields.text === 'string' && fields.file === undefined
+      ? { ...sent, kind, text: fields.text }
       : null
   }
-  const file = reportedFileOf(fields[carried[0]!])
-  if (file === null) return null
-  return carried[0] === 'photograph'
-    ? { ...sent, photograph: file }
-    : { ...sent, document: file }
-}
-
-/** A photograph or a document of a payload, or `null`. */
-function reportedFileOf(value: unknown): ReportedFile | null {
-  const fields = value as Fields
-  const file = encryptedFileOf(fields?.file)
+  if (kind !== 'photograph' && kind !== 'document') return null
+  const file = encryptedFileOf(fields.file)
   if (
     file === null ||
-    !stringOrNull(fields?.mimetype) ||
-    !stringOrNull(fields?.name) ||
-    !(typeof fields?.size === 'number' || fields?.size === null)
+    fields.text !== undefined ||
+    !stringOrNull(fields.mimetype) ||
+    !stringOrNull(fields.name) ||
+    !(typeof fields.size === 'number' || fields.size === null)
   ) {
     return null
   }
   return {
+    ...sent,
+    kind,
     file,
     mimetype: fields.mimetype,
     name: fields.name,
@@ -421,25 +417,79 @@ function reportedFileOf(value: unknown): ReportedFile | null {
 }
 
 /**
- * `value` as Matrix's `EncryptedFile`, or `null` when it lacks what opening
- * the file needs: an `mxc://` address, a key with its `k`, a counter, and the
- * encrypted copy's SHA-256 hash, each a string. Nothing else is required,
- * and whatever else the event gave is kept as it gave it.
+ * A homeserver's media: the name of a server, then the media's identifier,
+ * in the alphabet the specification gives it. Nothing that could leave a
+ * URL path segment, or add one.
  */
-export function encryptedFileOf(value: unknown): EncryptedFile | null {
+const MXC = /^mxc:\/\/([A-Za-z0-9.:[\]-]+)\/([A-Za-z0-9_-]+)$/
+
+/**
+ * What opening the encrypted file `value` describes needs, or `null` when
+ * it could not be opened: THE ONE DEFINITION, which the application reads
+ * before it reports a file (`reportable`, through `encryptedFileOf`) and the
+ * operator's tool before it downloads one (`ouvrir-un-fichier-signale.mjs`).
+ *
+ * An `mxc://` address of one media; a key of 32 bytes in unpadded base64url,
+ * as a JSON Web Key writes it; a counter of 16 bytes and a SHA-256 hash of
+ * 32 bytes, in base64 with or without its padding, as Matrix clients write
+ * them. Each is read the one way it can be written: a last character that
+ * carries bits beyond the last byte is not the same bytes written otherwise,
+ * it is refused.
+ */
+export function openingOf(value: unknown): Opening | null {
   const fields = value as Fields
-  const key = fields?.key as Fields
-  const hashes = fields?.hashes as Fields
-  if (
-    typeof fields?.url !== 'string' ||
-    !fields.url.startsWith('mxc://') ||
-    typeof key?.k !== 'string' ||
-    typeof fields.iv !== 'string' ||
-    typeof hashes?.sha256 !== 'string'
-  ) {
+  const media = typeof fields?.url === 'string' ? MXC.exec(fields.url) : null
+  const key = bytesOfBase64((fields?.key as Fields)?.k, 32, 'url')
+  const counter = bytesOfBase64(fields?.iv, 16, 'standard')
+  const sha256 = bytesOfBase64(
+    (fields?.hashes as Fields)?.sha256,
+    32,
+    'standard',
+  )
+  if (media === null || key === null || counter === null || sha256 === null) {
     return null
   }
-  return value as EncryptedFile
+  return { server: media[1]!, mediaId: media[2]!, key, counter, sha256 }
+}
+
+/**
+ * `value` as Matrix's `EncryptedFile`, kept as the event gave it, or `null`
+ * when it could not be opened (`openingOf`).
+ */
+export function encryptedFileOf(value: unknown): EncryptedFile | null {
+  return openingOf(value) === null ? null : (value as EncryptedFile)
+}
+
+/** The characters of each alphabet of base64, without its padding. */
+const ALPHABETS = {
+  standard: /^[A-Za-z0-9+/]*$/,
+  url: /^[A-Za-z0-9_-]*$/,
+} as const
+
+/**
+ * The `length` bytes `text` holds in base64 of `alphabet`, unpadded, or
+ * padded in the standard alphabet; `null` for anything else, bits left over
+ * after the last byte included.
+ */
+function bytesOfBase64(
+  text: unknown,
+  length: number,
+  alphabet: keyof typeof ALPHABETS,
+): Uint8Array | null {
+  if (typeof text !== 'string') return null
+  const characters = Math.ceil((length * 4) / 3)
+  const padding = '='.repeat((4 - (characters % 4)) % 4)
+  const bare =
+    alphabet === 'standard' && text === text.slice(0, characters) + padding
+      ? text.slice(0, characters)
+      : text
+  if (bare.length !== characters || !ALPHABETS[alphabet].test(bare)) {
+    return null
+  }
+  const standard =
+    alphabet === 'url' ? bare.replace(/-/g, '+').replace(/_/g, '/') : bare
+  const bytes = base64Bytes(standard + padding)
+  return bytes?.length === length ? bytes : null
 }
 
 function stringOrNull(value: unknown): value is string | null {

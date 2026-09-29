@@ -184,32 +184,31 @@ const PAYLOAD: ReportPayload = {
   roomId: '!room:example.org',
   messages: [
     {
+      kind: 'text',
       eventId: '$words',
       sentAt: 1_790_000_010_000,
       sender: HIM,
       text: 'Regarde.',
     },
     {
+      kind: 'photograph',
       eventId: '$photograph',
       sentAt: 1_790_000_020_000,
       sender: HIM,
-      photograph: {
-        file: { ...MATERIAL, url: 'mxc://example.org/photograph' },
-        mimetype: 'image/jpeg',
-        name: 'image.jpg',
-        size: 64,
-      },
+      file: { ...MATERIAL, url: 'mxc://example.org/photograph' },
+      mimetype: 'image/jpeg',
+      name: 'image.jpg',
+      size: 64,
     },
     {
+      kind: 'document',
       eventId: '$document',
       sentAt: 1_790_000_030_000,
       sender: HIM,
-      document: {
-        file: { ...MATERIAL, url: 'mxc://example.org/document' },
-        mimetype: 'application/pdf',
-        name: 'contrat.pdf',
-        size: 64,
-      },
+      file: { ...MATERIAL, url: 'mxc://example.org/document' },
+      mimetype: 'application/pdf',
+      name: 'contrat.pdf',
+      size: 64,
     },
   ],
 }
@@ -458,37 +457,40 @@ describe('A reported photograph or document, on the operator’s machine (#471)'
     }
   })
 
-  it('refuses a description it could not open, before asking the homeserver anything', async () => {
+  it('reads no report in a payload carrying a file that could not be opened, and asks nothing', async () => {
+    // What makes a file openable is one rule, the application's and the
+    // tool's (`openingOf`): the application reports no such file, and the
+    // tool reads no such report.
     const withKey = (k: string): ReportPayload => ({
       ...PAYLOAD,
       messages: [
         {
+          kind: 'photograph',
           eventId: '$photograph',
           sentAt: 1_790_000_020_000,
           sender: HIM,
-          photograph: {
-            file: {
-              ...MATERIAL,
-              key: { ...MATERIAL.key, k },
-              url: 'mxc://example.org/photograph',
-            },
-            mimetype: 'image/jpeg',
-            name: 'image.jpg',
-            size: 64,
+          file: {
+            ...MATERIAL,
+            key: { ...MATERIAL.key, k },
+            url: 'mxc://example.org/photograph',
           },
+          mimetype: 'image/jpeg',
+          name: 'image.jpg',
+          size: 64,
         },
       ],
     })
     const media = mediaHeld({ 'mxc://example.org/photograph': NIST.ciphertext })
     const shown = viewer()
 
-    const { status, temporary } = await run(
+    const { status, said, temporary } = await run(
       ['--cle', TEST_KEY_FILE, sealed(withKey('trop-courte')), '--ouvrir', '1'],
       media,
       shown,
     )
 
-    expect(status).toBe(1)
+    expect(status).toBe(2)
+    expect(said).toContain('pas un signalement au format 1')
     expect(media.downloaded).toEqual([])
     expect(shown.seen).toEqual([])
     expect(readdirSync(temporary)).toEqual([])

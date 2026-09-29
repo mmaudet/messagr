@@ -2,9 +2,11 @@ import { describe, expect, it } from 'vitest'
 
 import {
   base64Bytes,
+  encryptedFileOf,
   fromWire,
   keyBytesOf,
   MOST_PAYLOAD_BYTES,
+  openingOf,
   padded,
   payloadBytes,
   payloadOf,
@@ -166,12 +168,14 @@ describe('What a report carries, inside the seal (#468)', () => {
     roomId: '!room:example.org',
     messages: [
       {
+        kind: 'text',
         eventId: '$first',
         sentAt: 1_790_000_000_000,
         sender: '@bob:example.org',
         text: 'Tu vas le regretter.',
       },
       {
+        kind: 'text',
         eventId: '$second',
         sentAt: 1_790_000_030_000,
         sender: '@bob:example.org',
@@ -198,12 +202,14 @@ describe('What a report carries, inside the seal (#468)', () => {
             event_id: '$first',
             sent_at: 1790000000000,
             sender: '@bob:example.org',
+            kind: 'text',
             text: 'Tu vas le regretter.',
           },
           {
             event_id: '$second',
             sent_at: 1790000030000,
             sender: '@bob:example.org',
+            kind: 'text',
             text: 'Réponds.\nMaintenant.',
           },
         ],
@@ -231,6 +237,13 @@ describe('What a report carries, inside the seal (#468)', () => {
         json({ ...written, messages: [{ ...written.messages[0], text: 1 }] }),
       ],
       [
+        'a message of a kind the format does not know',
+        json({
+          ...written,
+          messages: [{ ...written.messages[0], kind: 'video' }],
+        }),
+      ],
+      [
         'a message without its event',
         json({
           ...written,
@@ -251,9 +264,10 @@ describe('What a report carries, inside the seal (#468)', () => {
     }
   })
 
-  it('still reads a report of words exactly as #468 wrote it', () => {
-    // Backward-readable (#471): photographs and documents came without a new
-    // format number, so every report sealed before reads as it did.
+  it('still reads a report of words exactly as #468 wrote it, without a kind', () => {
+    // Backward-readable (#471): a message of #468 has no `kind`, words being
+    // the only kind there was, and every report sealed before reads as it
+    // did.
     const written =
       '{"format":1,"reason":"threat","reported_at":1790000060000,' +
       '"reporting_account":"@alice:example.org",' +
@@ -269,6 +283,7 @@ describe('What a report carries, inside the seal (#468)', () => {
       roomId: '!room:example.org',
       messages: [
         {
+          kind: 'text',
           eventId: '$first',
           sentAt: 1_790_000_000_000,
           sender: '@bob:example.org',
@@ -289,31 +304,115 @@ describe('What a report carries, inside the seal (#468)', () => {
   })
 })
 
+/**
+ * NIST SP 800-38A, appendix F.5.5, CTR-AES256.Encrypt: its key and its
+ * initial counter, and the SHA-256 hash of its ciphertext, computed apart
+ * with `openssl dgst -sha256`. What an encrypted file of Matrix carries is
+ * these, written in base64.
+ */
+const NIST = {
+  key: '603deb1015ca71be2b73aef0857d77811f352c073b6108d72d9810a30914dff4',
+  counter: 'f0f1f2f3f4f5f6f7f8f9fafbfcfdfeff',
+  sha256: '663131a07e9ec56a0c7d066bbc44fd4eefa4bae97ceeb2701f53d2153e82ffa5',
+}
+
+/** That file described as Matrix describes it, as an event carries it. */
+const ENCRYPTED_FILE = {
+  v: 'v2',
+  key: {
+    kty: 'oct',
+    key_ops: ['encrypt', 'decrypt'],
+    alg: 'A256CTR',
+    k: 'YD3rEBXKcb4rc67whX13gR81LAc7YQjXLZgQowkU3_Q',
+    ext: true,
+  },
+  iv: '8PHy8/T19vf4+fr7/P3+/w',
+  hashes: { sha256: 'ZjExoH6exWoMfQZrvET9Tu+kuul87rJwH1PSFT6C/6U' },
+  url: 'mxc://example.org/AbCdEf_photo-1',
+}
+
+describe('What opening a reported file needs, for the application and the tool alike (#471)', () => {
+  it('reads the address, the key, the counter and the hash an encrypted file carries', () => {
+    const opening = openingOf(ENCRYPTED_FILE)
+
+    expect(opening?.server).toBe('example.org')
+    expect(opening?.mediaId).toBe('AbCdEf_photo-1')
+    expect(hex(opening!.key)).toBe(NIST.key)
+    expect(hex(opening!.counter)).toBe(NIST.counter)
+    expect(hex(opening!.sha256)).toBe(NIST.sha256)
+    // The counter and the hash as some clients pad them.
+    expect(
+      openingOf({
+        ...ENCRYPTED_FILE,
+        iv: '8PHy8/T19vf4+fr7/P3+/w==',
+        hashes: { sha256: 'ZjExoH6exWoMfQZrvET9Tu+kuul87rJwH1PSFT6C/6U=' },
+      }),
+    ).toEqual(opening)
+  })
+
+  it('opens nothing a byte short, written two ways, or addressed off a homeserver’s media', () => {
+    const withKey = (k: unknown) => ({
+      ...ENCRYPTED_FILE,
+      key: { ...ENCRYPTED_FILE.key, k },
+    })
+    const cases: [string, unknown][] = [
+      ['a key a byte short', withKey(ENCRYPTED_FILE.key.k.slice(0, 42))],
+      [
+        'a key in the other alphabet',
+        withKey(`${ENCRYPTED_FILE.key.k.slice(0, 42)}/`),
+      ],
+      // The last character carries bits beyond the key's last byte.
+      [
+        'a key with bits left over',
+        withKey(`${ENCRYPTED_FILE.key.k.slice(0, 42)}R`),
+      ],
+      ['no key', { ...ENCRYPTED_FILE, key: undefined }],
+      [
+        'a counter of fifteen bytes',
+        { ...ENCRYPTED_FILE, iv: 'AAECAwQFBgcICQoLDA0O' },
+      ],
+      [
+        'a counter in the other alphabet',
+        { ...ENCRYPTED_FILE, iv: '8PHy8_T19vf4-fr7_P3-_w' },
+      ],
+      ['no counter', { ...ENCRYPTED_FILE, iv: 7 }],
+      [
+        'a hash of 31 bytes',
+        {
+          ...ENCRYPTED_FILE,
+          hashes: { sha256: 'ZjExoH6exWoMfQZrvET9Tu+kuul87rJwH1PSFT6C/w' },
+        },
+      ],
+      ['no hash', { ...ENCRYPTED_FILE, hashes: {} }],
+      [
+        'an address on the web',
+        { ...ENCRYPTED_FILE, url: 'https://example.org/a.jpg' },
+      ],
+      [
+        'an address that walks out of its path',
+        { ...ENCRYPTED_FILE, url: 'mxc://example.org/../../x' },
+      ],
+      [
+        'an address of two segments',
+        { ...ENCRYPTED_FILE, url: 'mxc://example.org/a/b' },
+      ],
+      [
+        'an address without a media',
+        { ...ENCRYPTED_FILE, url: 'mxc://example.org/' },
+      ],
+      ['nothing', null],
+    ]
+    for (const [what, file] of cases) {
+      expect(openingOf(file), what).toBeNull()
+      expect(encryptedFileOf(file), what).toBeNull()
+    }
+    // Control: what opens is kept as the event gave it.
+    expect(encryptedFileOf(ENCRYPTED_FILE)).toBe(ENCRYPTED_FILE)
+  })
+})
+
 describe('A photograph or a document in a report (#471)', () => {
-  /** Matrix's `EncryptedFile`, as an event of this application carries it. */
-  const PHOTOGRAPH_FILE = {
-    v: 'v2',
-    key: {
-      kty: 'oct',
-      key_ops: ['encrypt', 'decrypt'],
-      alg: 'A256CTR',
-      k: 'qcHVMSgYg-71CauWBezXI5qkaRb0LuIy-Wx5kIaHMIA',
-      ext: true,
-    },
-    iv: 'X85+XgHN+HEAAAAAAAAAAA',
-    hashes: { sha256: 'eZjVdFJp2cSnZjB2S2BWrPCtbWRXjt0ZRkAyXvqSFw8' },
-    url: 'mxc://example.org/AbCdEfPhotograph',
-  }
-  const DOCUMENT_FILE = {
-    ...PHOTOGRAPH_FILE,
-    key: {
-      ...PHOTOGRAPH_FILE.key,
-      k: 'b3RoZXIta2V5LW9mLXRoaXJ0eS10d28tYnl0ZXMtLTA',
-    },
-    iv: 'AAECAwQFBgcAAAAAAAAAAA',
-    hashes: { sha256: 'KL3JMkqoqF6Es3QDvhdxPxZw9P7L9s46FLc5o3gfM9A' },
-    url: 'mxc://example.org/GhIjKlDocument',
-  }
+  const DOCUMENT_FILE = { ...ENCRYPTED_FILE, url: 'mxc://example.org/GhIjKl' }
   const PAYLOAD: ReportPayload = {
     reason: 'sexual_without_consent',
     reportedAt: 1_790_000_060_000,
@@ -322,32 +421,31 @@ describe('A photograph or a document in a report (#471)', () => {
     roomId: '!room:example.org',
     messages: [
       {
+        kind: 'text',
         eventId: '$words',
         sentAt: 1_790_000_000_000,
         sender: '@bob:example.org',
         text: 'Regarde.',
       },
       {
+        kind: 'photograph',
         eventId: '$photograph',
         sentAt: 1_790_000_010_000,
         sender: '@bob:example.org',
-        photograph: {
-          file: PHOTOGRAPH_FILE,
-          mimetype: 'image/jpeg',
-          name: 'image.jpg',
-          size: 12_000_000,
-        },
+        file: ENCRYPTED_FILE,
+        mimetype: 'image/jpeg',
+        name: 'image.jpg',
+        size: 12_000_000,
       },
       {
+        kind: 'document',
         eventId: '$document',
         sentAt: 1_790_000_020_000,
         sender: '@bob:example.org',
-        document: {
-          file: DOCUMENT_FILE,
-          mimetype: null,
-          name: 'contrat.pdf',
-          size: null,
-        },
+        file: DOCUMENT_FILE,
+        mimetype: null,
+        name: 'contrat.pdf',
+        size: null,
       },
     ],
   }
@@ -369,41 +467,40 @@ describe('A photograph or a document in a report (#471)', () => {
         event_id: '$words',
         sent_at: 1790000000000,
         sender: '@bob:example.org',
+        kind: 'text',
         text: 'Regarde.',
       },
       {
         event_id: '$photograph',
         sent_at: 1790000010000,
         sender: '@bob:example.org',
-        photograph: {
-          file: {
-            v: 'v2',
-            key: {
-              kty: 'oct',
-              key_ops: ['encrypt', 'decrypt'],
-              alg: 'A256CTR',
-              k: 'qcHVMSgYg-71CauWBezXI5qkaRb0LuIy-Wx5kIaHMIA',
-              ext: true,
-            },
-            iv: 'X85+XgHN+HEAAAAAAAAAAA',
-            hashes: { sha256: 'eZjVdFJp2cSnZjB2S2BWrPCtbWRXjt0ZRkAyXvqSFw8' },
-            url: 'mxc://example.org/AbCdEfPhotograph',
+        kind: 'photograph',
+        file: {
+          v: 'v2',
+          key: {
+            kty: 'oct',
+            key_ops: ['encrypt', 'decrypt'],
+            alg: 'A256CTR',
+            k: 'YD3rEBXKcb4rc67whX13gR81LAc7YQjXLZgQowkU3_Q',
+            ext: true,
           },
-          mimetype: 'image/jpeg',
-          name: 'image.jpg',
-          size: 12000000,
+          iv: '8PHy8/T19vf4+fr7/P3+/w',
+          hashes: { sha256: 'ZjExoH6exWoMfQZrvET9Tu+kuul87rJwH1PSFT6C/6U' },
+          url: 'mxc://example.org/AbCdEf_photo-1',
         },
+        mimetype: 'image/jpeg',
+        name: 'image.jpg',
+        size: 12000000,
       },
       {
         event_id: '$document',
         sent_at: 1790000020000,
         sender: '@bob:example.org',
-        document: {
-          file: DOCUMENT_FILE,
-          mimetype: null,
-          name: 'contrat.pdf',
-          size: null,
-        },
+        kind: 'document',
+        file: DOCUMENT_FILE,
+        mimetype: null,
+        name: 'contrat.pdf',
+        size: null,
       },
     ])
     expect(payloadBytes(PAYLOAD).length).toBeLessThan(4096)
@@ -413,63 +510,32 @@ describe('A photograph or a document in a report (#471)', () => {
     expect(payloadOf(payloadBytes(PAYLOAD))).toEqual(PAYLOAD)
   })
 
-  it('refuses a message carrying two things, or a file it could not open', () => {
+  it('refuses a message that is not exactly one kind, or a file it could not open', () => {
     const written = JSON.parse(
       new TextDecoder().decode(payloadBytes(PAYLOAD)),
     ) as Record<string, unknown> & { messages: Record<string, unknown>[] }
-    const photograph = written.messages[1] as {
-      photograph: { file: typeof PHOTOGRAPH_FILE }
-    }
-    const withFile = (file: unknown) =>
-      json({
-        ...written,
-        messages: [
-          { ...photograph, photograph: { ...photograph.photograph, file } },
-        ],
-      })
+    const photograph = written.messages[1]!
+    const changed = (fields: Record<string, unknown>) =>
+      json({ ...written, messages: [{ ...photograph, ...fields }] })
     const cases: [string, Uint8Array][] = [
+      ['words beside a photograph', changed({ text: 'Regarde.' })],
       [
-        'words and a photograph',
+        'words that carry a file',
         json({
           ...written,
-          messages: [{ ...photograph, text: 'Regarde.' }],
+          messages: [{ ...written.messages[0], file: ENCRYPTED_FILE }],
         }),
       ],
+      ['a photograph without its file', changed({ file: undefined })],
+      ['a photograph whose file is nothing', changed({ file: null })],
       [
-        'a photograph and a document',
-        json({
-          ...written,
-          messages: [{ ...photograph, document: photograph.photograph }],
-        }),
+        'a file it could not open',
+        changed({ file: { ...ENCRYPTED_FILE, hashes: {} } }),
       ],
-      [
-        'a photograph that is nothing',
-        json({ ...written, messages: [{ ...photograph, photograph: null }] }),
-      ],
-      ['no address', withFile({ ...PHOTOGRAPH_FILE, url: undefined })],
-      [
-        'an address off the homeserver',
-        withFile({ ...PHOTOGRAPH_FILE, url: 'https://example.org/a.jpg' }),
-      ],
-      ['no key', withFile({ ...PHOTOGRAPH_FILE, key: undefined })],
-      [
-        'a key without its bytes',
-        withFile({ ...PHOTOGRAPH_FILE, key: { alg: 'A256CTR' } }),
-      ],
-      ['no counter', withFile({ ...PHOTOGRAPH_FILE, iv: 7 })],
-      ['no hash', withFile({ ...PHOTOGRAPH_FILE, hashes: {} })],
-      [
-        'a size written as text',
-        json({
-          ...written,
-          messages: [
-            {
-              ...photograph,
-              photograph: { ...photograph.photograph, size: '12 Mo' },
-            },
-          ],
-        }),
-      ],
+      ['a size written as text', changed({ size: '12 Mo' })],
+      ['a type that is not text', changed({ mimetype: 7 })],
+      ['no name at all', changed({ name: undefined })],
+      ['no kind, and a file', changed({ kind: undefined })],
     ]
     for (const [what, bytes] of cases) {
       expect(payloadOf(bytes), what).toBeNull()

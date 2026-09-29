@@ -237,7 +237,7 @@ export function ReportSheet({
               <View style={styles.section}>
                 <Text style={styles.heading}>{t('report_what_heading')}</Text>
                 <Text style={styles.body}>{t('report_what')}</Text>
-                {(messages ?? []).some(message => !('text' in message)) && (
+                {(messages ?? []).some(message => message.kind !== 'text') && (
                   <Text style={styles.body} testID="report-what-files">
                     {t('report_what_files')}
                   </Text>
@@ -246,37 +246,45 @@ export function ReportSheet({
                   <Text style={styles.attributed} testID="report-author">
                     {t('report_author %@', author)}
                   </Text>
-                  {(messages ?? []).map(message => (
-                    <View
-                      key={message.eventId}
-                      style={styles.message}
-                      testID={`report-message-${message.eventId}`}>
-                      <Text style={styles.when}>
-                        {t(
-                          'report_when %1$@ %2$@',
-                          dayOf(message.sentAt),
-                          timeOf(message.sentAt),
+                  {(messages ?? []).map(message => {
+                    // The conversation always holds a photograph a report
+                    // carries, since `reportable` read the report from it.
+                    const image =
+                      message.kind === 'photograph'
+                        ? picture(message.eventId)
+                        : undefined
+                    return (
+                      <View
+                        key={message.eventId}
+                        style={styles.message}
+                        testID={`report-message-${message.eventId}`}>
+                        <Text style={styles.when}>
+                          {t(
+                            'report_when %1$@ %2$@',
+                            dayOf(message.sentAt),
+                            timeOf(message.sentAt),
+                          )}
+                        </Text>
+                        {message.kind === 'text' ? (
+                          <Text style={styles.text}>{message.text}</Text>
+                        ) : message.kind === 'document' ? (
+                          // A document read here always has a name:
+                          // `readFileEvent` refuses one without.
+                          <Document
+                            name={message.name ?? ''}
+                            size={message.size}
+                            testID={`report-document-${message.eventId}`}
+                          />
+                        ) : image === undefined ? null : (
+                          <Photograph
+                            image={image}
+                            fetch={fetch}
+                            testID={`report-photograph-${message.eventId}`}
+                          />
                         )}
-                      </Text>
-                      {'text' in message ? (
-                        <Text style={styles.text}>{message.text}</Text>
-                      ) : 'document' in message ? (
-                        // A document read here always has a name:
-                        // `readFileEvent` refuses one without.
-                        <Document
-                          name={message.document.name ?? ''}
-                          size={message.document.size}
-                          testID={`report-document-${message.eventId}`}
-                        />
-                      ) : (
-                        <ReportedPhotograph
-                          image={picture(message.eventId)}
-                          fetch={fetch}
-                          testID={`report-photograph-${message.eventId}`}
-                        />
-                      )}
-                    </View>
-                  ))}
+                      </View>
+                    )
+                  })}
                 </View>
               </View>
 
@@ -350,26 +358,6 @@ export function ReportSheet({
         </View>
       </View>
     </Modal>
-  )
-}
-
-/**
- * A photograph a report carries, drawn as the conversation draws it. The
- * conversation always holds it, since `reportable` read the report from it;
- * were it gone, nothing is drawn rather than a picture that is not the one
- * leaving.
- */
-function ReportedPhotograph({
-  image,
-  fetch,
-  testID,
-}: {
-  readonly image: ReadImage | undefined
-  readonly fetch: (file: ReadFile) => Promise<ShownImage>
-  readonly testID: string
-}) {
-  return image === undefined ? null : (
-    <Photograph image={image} fetch={fetch} testID={testID} />
   )
 }
 
