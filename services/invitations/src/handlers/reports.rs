@@ -56,7 +56,7 @@ use crate::{
     auth,
     error::AppError,
     extract::Body,
-    handlers::create::{validate_idempotency_key, IDEMPOTENCY_HEADER},
+    handlers::create::extract_idempotency_key,
     report::{Reason, ReportNumber, Reports, SealedReport},
     AppState,
 };
@@ -89,7 +89,7 @@ pub async fn report(
     Body(req): Body<ReportRequest>,
 ) -> Result<(StatusCode, Json<Reported>), AppError> {
     let reporter = auth::authenticate(&st.mx, &headers).await?;
-    let key = idempotency_key(&headers)?;
+    let key = extract_idempotency_key(&headers, PROTECTS_A_REPORT)?;
     let reason = Reason::from_code(&req.reason).ok_or_else(|| {
         AppError::InvalidRequest("reason: not one of the eight codes of the terms".into())
     })?;
@@ -131,22 +131,12 @@ pub async fn report(
     ))
 }
 
-/// The idempotency key of a report, required: without it, an answer lost
-/// then a new attempt would keep the report twice, and tell the operator
-/// twice. The same bounds as a key of `POST /invitations`.
-fn idempotency_key(headers: &HeaderMap) -> Result<String, AppError> {
-    let key = headers
-        .get(IDEMPOTENCY_HEADER)
-        .and_then(|value| value.to_str().ok())
-        .ok_or_else(|| {
-            AppError::InvalidRequest(format!(
-                "header {IDEMPOTENCY_HEADER} is required: it keeps a report sent again from \
-                 being kept twice"
-            ))
-        })?;
-    validate_idempotency_key(key)?;
-    Ok(key.to_string())
-}
+/// What the key of a report protects, said to a caller that sent none:
+/// without it, an answer lost then a new attempt would keep the report twice,
+/// and tell the operator twice. The key itself is read as a key of
+/// `POST /invitations` is, by the one reading of both
+/// (`extract_idempotency_key`).
+const PROTECTS_A_REPORT: &str = "it keeps a report sent again from being kept twice";
 
 /// A report as it is received, before it has a number.
 struct Received<'a> {
@@ -229,6 +219,7 @@ async fn sent_before(
 mod tests {
     use super::*;
     use crate::config::Config;
+    use crate::handlers::create::IDEMPOTENCY_HEADER;
     use crate::handlers::discovery::test_support::{bearer, state_from, whoami_hs, T0};
     use crate::report::test_support::sealed_of;
     use crate::sms::test_support::{fake_ovhcloud, sms_through, Inbox, OPERATOR_NUMBER};
@@ -432,11 +423,19 @@ mod tests {
 
     #[sqlx::test(migrations = "./migrations")]
     async fn a_report_without_an_idempotency_key_of_the_expected_form_is_refused(pool: SqlitePool) {
+        // The key is read as a key of `POST /invitations` is, by the one
+        // reading of both (#491): the same bounds, and a caller that sent
+        // none told what it protects here.
         let (st, inbox) = service(pool.clone()).await;
         let sealed = BASE64.encode(&sealed_of(1, 7));
         let too_long = "k".repeat(201);
+        match sent(&st, bearer("alice"), "harassment", &sealed).await {
+            Err(AppError::InvalidRequest(said)) => {
+                assert!(said.contains("kept twice"), "{said}");
+            }
+            other => panic!("a report without a key must be refused, got {other:?}"),
+        }
         for (what, headers) in [
-            ("no key", bearer("alice")),
             ("seven characters", keyed("alice", "7-chars")),
             ("201 characters", keyed("alice", &too_long)),
             ("a space", keyed("alice", "report key 1")),

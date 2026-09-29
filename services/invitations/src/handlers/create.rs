@@ -167,6 +167,12 @@ pub fn validate_idempotency_key(key: &str) -> Result<(), AppError> {
     Ok(())
 }
 
+/// What the key protects on `POST /invitations`, said to a caller that sent
+/// none.
+pub const PROTECTS_A_POOL: &str =
+    "it makes retries safe; without it, every retry would create a new pool of definitive \
+     accounts";
+
 /// Requires the idempotency key, and refuses it rather than doing without.
 ///
 /// **Mandatory, not optional.** An optional key does not fix the observed
@@ -176,14 +182,20 @@ pub fn validate_idempotency_key(key: &str) -> Result<(), AppError> {
 /// first call, before a single account exists; the price of silence is a
 /// pool of definitive Matrix accounts. Accounts cannot be un-created, 400s
 /// can.
-pub fn extract_idempotency_key(headers: &HeaderMap) -> Result<String, AppError> {
+///
+/// **THE ONE READING OF THE KEY (#491)**, for every route that takes one:
+/// this one, and `POST /reports` (`handlers::reports`), whose first version
+/// read the header with a copy of these lines. The header, its bounds and its
+/// form are read here and nowhere else. What differs from one route to the
+/// next is what the key protects there, `protects`, which a caller that sent
+/// none is told.
+pub fn extract_idempotency_key(headers: &HeaderMap, protects: &str) -> Result<String, AppError> {
     let raw = headers
         .get(IDEMPOTENCY_HEADER)
         .and_then(|v| v.to_str().ok())
         .ok_or_else(|| {
             AppError::InvalidRequest(format!(
-                "header {IDEMPOTENCY_HEADER} is required: it makes retries safe; without it, \
-                 every retry would create a new pool of definitive accounts"
+                "header {IDEMPOTENCY_HEADER} is required: {protects}"
             ))
         })?;
     validate_idempotency_key(raw)?;
@@ -314,7 +326,7 @@ pub async fn create(
     Body(req): Body<CreateRequest>,
 ) -> Result<Json<CreateResponse>, AppError> {
     validate(&req)?;
-    let key = extract_idempotency_key(&headers)?;
+    let key = extract_idempotency_key(&headers, PROTECTS_A_POOL)?;
 
     // `whoami`: the ONLY call to the homeserver that precedes the decision,
     // and it creates nothing — it is an identity read. It must come first,
@@ -707,7 +719,7 @@ mod tests {
     #[test]
     fn the_idempotency_header_is_required_and_its_case_is_irrelevant() {
         assert!(
-            extract_idempotency_key(&HeaderMap::new()).is_err(),
+            extract_idempotency_key(&HeaderMap::new(), PROTECTS_A_POOL).is_err(),
             "without the header, the request must be refused"
         );
 
@@ -717,7 +729,7 @@ mod tests {
             let mut h = HeaderMap::new();
             h.insert(name, "key-of-test-1".parse().unwrap());
             assert_eq!(
-                extract_idempotency_key(&h).unwrap(),
+                extract_idempotency_key(&h, PROTECTS_A_POOL).unwrap(),
                 "key-of-test-1",
                 "header not recognised under the case {name}"
             );
@@ -726,9 +738,29 @@ mod tests {
         let mut h = HeaderMap::new();
         h.insert(IDEMPOTENCY_HEADER, "short".parse().unwrap());
         assert!(
-            extract_idempotency_key(&h).is_err(),
+            extract_idempotency_key(&h, PROTECTS_A_POOL).is_err(),
             "a present but invalid key must be refused, not ignored"
         );
+    }
+
+    /// #491: ONE READING of the key, for every route that takes one. The
+    /// header, its bounds and its form are read here and nowhere else; what
+    /// differs from one route to the next is only what the key protects
+    /// there, which a caller that sent none is told.
+    #[test]
+    fn a_caller_without_a_key_is_told_what_it_protects_on_the_route_it_called() {
+        for protects in [
+            PROTECTS_A_POOL,
+            "it keeps a report sent again from being kept twice",
+        ] {
+            match extract_idempotency_key(&HeaderMap::new(), protects) {
+                Err(AppError::InvalidRequest(said)) => {
+                    assert!(said.contains(IDEMPOTENCY_HEADER), "{said}");
+                    assert!(said.contains(protects), "{said}");
+                }
+                other => panic!("a missing key must be refused, got {other:?}"),
+            }
+        }
     }
 
     // -----------------------------------------------------------------------
