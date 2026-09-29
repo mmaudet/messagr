@@ -14,6 +14,7 @@ mod idempotency;
 mod masking;
 mod masking_quota;
 mod matrix;
+mod moderation;
 mod named_deactivation;
 mod operator;
 mod report;
@@ -40,9 +41,39 @@ pub struct AppState {
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
-    tracing_subscriber::fmt::init();
+    // THE OPERATOR'S GESTURES ON REPORTS (#473): a command line that names
+    // one badly is refused here, before anything is read.
+    let gesture = moderation::the_gesture(&std::env::args().collect::<Vec<_>>())
+        .transpose()
+        .map_err(|refusal| anyhow::anyhow!("{refusal}"))?;
+    // They say what they say on stdout, and nothing else goes there: the
+    // export is piped into the opening tool on the operator's machine. Their
+    // log goes to stderr.
+    if gesture.is_some() {
+        tracing_subscriber::fmt()
+            .with_writer(std::io::stderr)
+            .init();
+    } else {
+        tracing_subscriber::fmt::init();
+    }
     let cfg = config::Config::from_env()?;
     let pool = db::connect(&cfg.database_url).await?;
+
+    // THEY ARE MODES, AND THEY COME FIRST: a report is acted on within
+    // twenty-four hours, so no guard of discovery's below may keep the
+    // operator from it. Like the named deactivation, they bind no port and
+    // start no sweeper, and run beside the live service.
+    if let Some(gesture) = gesture {
+        return match moderation::run(&pool, gesture, util::now(), ask_on_the_terminal).await {
+            Ok(said) => {
+                print!("{said}");
+                Ok(())
+            }
+            // A refusal leaves with a non-zero status, as the named
+            // deactivation's does.
+            Err(refusal) => Err(anyhow::anyhow!("{refusal}")),
+        };
+    }
 
     // RETIRING A MASKING KEY AT ONCE IS A MODE (#409), and it comes before the
     // guard below, which refuses to start while live masks were made with a

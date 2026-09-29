@@ -42,6 +42,12 @@
 //! else's deletion. It has to come BEFORE the deactivation, which makes the
 //! token worthless -- and the application treats its failure, an unknown
 //! route included, as nothing that should stop the deletion.
+//!
+//! The operator's termination (#473) is the one other way in, and it is not
+//! a route: typed on the host, once the homeserver has deactivated the
+//! account (`moderation`), it writes the same row through `record`, so that
+//! the purge within thirty days applies to a terminated account as to a
+//! deleted one.
 
 use std::sync::Arc;
 
@@ -68,25 +74,50 @@ pub async fn announce(
     headers: HeaderMap,
 ) -> Result<Json<DeletionResponse>, AppError> {
     let user_id = auth::authenticate(&st.mx, &headers).await?;
-    let at = st.cfg.clock.now();
-    let mut tx = st.pool.begin().await.map_err(anyhow::Error::from)?;
+    let recorded = record(&st.pool, &user_id, st.cfg.clock.now()).await?;
+    Ok(Json(DeletionResponse {
+        announced_at: recorded.announced_at,
+        expired_invitations: recorded.expired_invitations,
+    }))
+}
+
+/// What recording a deletion did.
+pub(crate) struct Recorded {
+    /// When the deletion was first recorded.
+    pub announced_at: i64,
+    /// How many of the account's invitations this recording expired.
+    pub expired_invitations: u64,
+}
+
+/// Records `user_id`'s deletion at `at`, and what goes with it, in one
+/// transaction: the four things the header says.
+///
+/// THE SAME ROW FOR A TERMINATION (#473). The account that announces its own
+/// deletion writes it through `announce`; the operator, on the host, writes
+/// it for an account the homeserver deactivated after a decision
+/// (`moderation`), so that the purge within thirty days applies to it as to
+/// any deletion. Nothing here names a report, nor tells the two apart.
+pub(crate) async fn record(
+    pool: &sqlx::SqlitePool,
+    user_id: &str,
+    at: i64,
+) -> anyhow::Result<Recorded> {
+    let mut tx = pool.begin().await?;
 
     sqlx::query(
         "INSERT INTO account_deletions (user_id, announced_at, purge_after) \
          VALUES (?, ?, ?) ON CONFLICT(user_id) DO NOTHING",
     )
-    .bind(&user_id)
+    .bind(user_id)
     .bind(at)
     .bind(at + PURGE_AFTER_SECONDS)
     .execute(&mut *tx)
-    .await
-    .map_err(anyhow::Error::from)?;
+    .await?;
     let announced_at: i64 =
         sqlx::query_scalar("SELECT announced_at FROM account_deletions WHERE user_id = ?")
-            .bind(&user_id)
+            .bind(user_id)
             .fetch_one(&mut *tx)
-            .await
-            .map_err(anyhow::Error::from)?;
+            .await?;
 
     // STILL OPEN MEANS STILL PENDING AND NOT USED UP. One whose every use has
     // been spent lets nobody in any more, so expiring it would change nothing
@@ -97,13 +128,12 @@ pub async fn announce(
          WHERE inviter_user_id = ? AND status = 'pending' AND used_count < max_uses",
     )
     .bind(at)
-    .bind(&user_id)
+    .bind(user_id)
     .execute(&mut *tx)
-    .await
-    .map_err(anyhow::Error::from)?
+    .await?
     .rows_affected();
 
-    crate::handlers::discovery::withdraw_on(&mut tx, &user_id, at).await?;
+    crate::handlers::discovery::withdraw_on(&mut tx, user_id, at).await?;
     // WAITING MEANS NEITHER JOINED NOR RUN OUT (#410). One joined is left as
     // it is: its conversation may already be under way. One that has run out
     // keeps its end, from which the thirty days of who invited whom (#416)
@@ -115,16 +145,15 @@ pub async fn announce(
          AND claimed_at IS NULL AND expires_at > ?1",
     )
     .bind(at)
-    .bind(&user_id)
+    .bind(user_id)
     .execute(&mut *tx)
-    .await
-    .map_err(anyhow::Error::from)?;
+    .await?;
 
-    tx.commit().await.map_err(anyhow::Error::from)?;
-    Ok(Json(DeletionResponse {
+    tx.commit().await?;
+    Ok(Recorded {
         announced_at,
         expired_invitations: expired,
-    }))
+    })
 }
 
 #[cfg(test)]
