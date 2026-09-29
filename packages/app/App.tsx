@@ -69,7 +69,7 @@ import {
   vouchForEntrant,
   type CryptoPumpReport,
   type FormMigration,
-  type ReactionTally,
+  type LooseReaction,
   type ReceiveReport,
   type RunningSyncLoop,
   type TrustReading,
@@ -296,7 +296,8 @@ import {
   forgetfulIgnoredList,
   type IgnoredList,
 } from './src/runtime/ignoredListStore'
-import { shownOf } from './src/runtime/notShown'
+import { reactionsShown, shownOf, type NotShown } from './src/runtime/notShown'
+import { tallyReactions } from './src/timeline/reactions'
 import { takeDownNotificationsOf } from './src/runtime/showNotification'
 import {
   forgetfulUntoldBlocks,
@@ -1280,12 +1281,11 @@ export function App({
   const readTrustRef = useRef<((scope: string, other: string) => void) | null>(
     null,
   )
-  // Reactions, grouped by the message they point at. ADR-0011: this
-  // application aggregates its own, because a server cannot aggregate what it
-  // cannot read.
-  const [reactions, setReactions] = useState<
-    ReadonlyMap<string, readonly ReactionTally[]>
-  >(new Map())
+  // Reactions, each with who sent it. ADR-0011: this application aggregates
+  // its own, because a server cannot aggregate what it cannot read -- and it
+  // does so at each draw, from those the screen draws, so a blocked account's
+  // leave with its messages (#494, `reactionsShown`).
+  const [reactions, setReactions] = useState<readonly LooseReaction[]>([])
   // Whether this device publishes read receipts, and which of this account's
   // own messages somebody else has read. Off unless somebody turned it on:
   // see receiptSetting.ts.
@@ -3655,7 +3655,6 @@ export function App({
                   const fresh = await loadConversation(
                     sessionClient,
                     scope,
-                    credentials.userId,
                     undefined,
                     eventsRef.current,
                   )
@@ -3675,7 +3674,6 @@ export function App({
                 const fresh = await loadConversation(
                   sessionClient,
                   scope,
-                  credentials.userId,
                   undefined,
                   eventsRef.current,
                 )
@@ -3762,7 +3760,6 @@ export function App({
                       await loadConversation(
                         sessionClient,
                         scope,
-                        credentials.userId,
                         undefined,
                         eventsRef.current,
                       )
@@ -3901,7 +3898,6 @@ export function App({
                 const fresh = await loadConversation(
                   sessionClient,
                   scope,
-                  credentials.userId,
                   undefined,
                   eventsRef.current,
                 )
@@ -3964,7 +3960,6 @@ export function App({
                   const fresh = await loadConversation(
                     sessionClient,
                     scope,
-                    credentials.userId,
                     undefined,
                     eventsRef.current,
                   )
@@ -3975,7 +3970,10 @@ export function App({
                   // The tallies for the message that was pressed. Adding a
                   // reaction has landed when one of them is this key and is
                   // mine; removing one has landed when none of them is.
-                  const here = fresh.reactions.get(target) ?? []
+                  const here =
+                    tallyReactions(fresh.reactions, credentials.userId).get(
+                      target,
+                    ) ?? []
                   const landed =
                     own === null
                       ? here.some(
@@ -4042,7 +4040,6 @@ export function App({
                 const fresh = await loadConversation(
                   sessionClient,
                   scope,
-                  credentials.userId,
                   undefined,
                   eventsRef.current,
                 )
@@ -4106,7 +4103,6 @@ export function App({
                 const fresh = await loadConversation(
                   sessionClient,
                   scope,
-                  credentials.userId,
                   undefined,
                   eventsRef.current,
                 )
@@ -5068,7 +5064,6 @@ export function App({
                   loadConversation(
                     sessionClient,
                     open,
-                    credentials.userId,
                     undefined,
                     eventsRef.current,
                   )
@@ -5776,6 +5771,10 @@ export function App({
     selected.size > 0
       ? reportable(selected, conversation ?? [], selfUserId)
       : null
+  // WHAT THIS DEVICE DOES NOT DRAW, NOW (#469, #494): one value, which the
+  // conversation's messages and their reactions are both drawn from, so a
+  // block takes both off in the same render.
+  const notShownNow: NotShown = { hidden, blocked: ignored ?? new Set() }
 
   return (
     <GestureHandlerRootView style={styles.root}>
@@ -6747,7 +6746,14 @@ export function App({
               sendMessage !== null && (
                 <View style={styles.block}>
                   <Conversation
-                    reactions={reactions}
+                    // TALLIED FROM THOSE DRAWN, by the filter of the messages
+                    // below and from the same value: a blocked account's
+                    // reactions leave with its messages (#494).
+                    reactions={reactionsShown(
+                      reactions,
+                      notShownNow,
+                      selfUserId,
+                    )}
                     read={readHere}
                     onReact={(target, key, own) =>
                       reactRef.current?.(target, key, own)
@@ -6762,10 +6768,7 @@ export function App({
                     // received before or not: that one is the account's
                     // decision, synced, and the same on every one of its
                     // devices. One filter for both (`notShown.ts`).
-                    entries={shownOf(conversation, {
-                      hidden,
-                      blocked: ignored ?? new Set(),
-                    })}
+                    entries={shownOf(conversation, notShownNow)}
                     selected={selected}
                     // `null` is the background tap: it clears rather than
                     // toggling, which is the only way out that does not

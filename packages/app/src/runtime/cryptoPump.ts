@@ -95,7 +95,7 @@ import {
 } from './encryptedSend'
 import { theOtherMember } from './vouch'
 import { reactTo, redactEvent, unreact, type ReactingDeps } from './react'
-import { tallyReactions, type ReactionTally } from '../timeline/reactions'
+import type { LooseReaction } from '../timeline/reactions'
 import { probeUnsettledEncrypt, type ProbeReport } from './panicProbe'
 import { claimHistory, type HistoryClaim } from './claimHistory'
 import { evictFrom, type EvictOutcome } from './evict'
@@ -474,14 +474,17 @@ export async function receiveOneEncryptedMessage(
  */
 export interface LoadedConversation {
   readonly entries: TimelineEntry[]
-  /** Reactions, already grouped by the message they point at. */
-  readonly reactions: ReadonlyMap<string, readonly ReactionTally[]>
+  /**
+   * The reactions read, each with who sent it, not yet tallied: what is
+   * drawn is tallied from those the screen draws (`reactionsShown`), so a
+   * blocked account's leave in the same render as its messages (#494).
+   */
+  readonly reactions: readonly LooseReaction[]
 }
 
 export async function loadConversation(
   sessionClient: ReturnType<typeof createClient>,
   roomId: string,
-  selfUserId: string,
   limit = 40,
   /**
    * Where the ciphertext of the last successful fetch is kept, and where it
@@ -526,8 +529,9 @@ export async function loadConversation(
     events,
   )
   // Both, from one pass. ADR-0011: reactions come out of the same door the
-  // messages do, and the aggregation the server would have done happens here.
-  return { entries, reactions: tallyReactions(reactions, selfUserId) }
+  // messages do, and the aggregation the server would have done happens on
+  // the screen, at each draw (`reactionsShown`).
+  return { entries, reactions }
 }
 
 /**
@@ -1330,7 +1334,7 @@ export async function registerThisDeviceForWaking(
   )
 }
 
-export type { ReactionTally } from '../timeline/reactions'
+export type { LooseReaction } from '../timeline/reactions'
 
 /**
  * Tells the homeserver this account has read up to `eventId`.
