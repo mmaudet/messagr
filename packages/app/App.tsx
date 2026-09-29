@@ -281,7 +281,9 @@ import type { Plate as Grouping } from './src/timeline/plates'
 import type { EvictOutcome } from './src/runtime/evict'
 import {
   blockAccount,
+  callsWithoutTheBlocked,
   keptWithoutTheBlocked,
+  mayCall,
   noticeOf,
   readIgnored,
   sameAccounts,
@@ -1412,6 +1414,10 @@ export function App({
    * One function rather than three copies of the same six lines: the header
    * has two buttons now and the calls list a third, and a `place` that
    * differed between them would differ in the failure handling first.
+   *
+   * AND THE ONE PLACE A BLOCKED ACCOUNT IS NEVER CALLED FROM (#494): the
+   * screens no longer offer it, and a gesture left over from before the
+   * block, or reached by a way they did not foresee, rings nothing either.
    */
   const placeCall = (
     scope: string | null,
@@ -1420,6 +1426,13 @@ export function App({
   ) => {
     const runtime = callRuntimeRef.current
     if (runtime === null || scope === null) return
+    if (!mayCall(peerUserId, ignoredRef.current ?? new Set())) {
+      // Never the account: the log names nobody.
+      logEvent('warn', 'MESSAGR_CALL_NOT_PLACED', {
+        reason: 'the account is blocked',
+      })
+      return
+    }
     runtime.place(scope, peerUserId, wants).catch((cause: unknown) =>
       logEvent('warn', 'MESSAGR_CALL_NOT_PLACED', {
         reason: getErrorMessage(cause),
@@ -6263,9 +6276,13 @@ export function App({
                 {/* A row opens the CONVERSATION; the button beside it rings
                     the person back. `CallsList.tsx` says why this screen
                     carries a call button where the conversation list does
-                    not, and why it is still not a directory. */}
+                    not, and why it is still not a directory.
+
+                    WITHOUT THE CALLS OF A BLOCKED ACCOUNT (#494), which
+                    leave this screen as its messages leave the others, and
+                    take their « Rappeler » with them. */}
                 <CallsList
-                  calls={calls}
+                  calls={callsWithoutTheBlocked(calls, notShownNow.blocked)}
                   now={Date.now()}
                   shownFor={who => displayNameFor(who, names.get(who))}
                   onOpen={scope => {
