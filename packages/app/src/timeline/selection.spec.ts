@@ -8,6 +8,7 @@ import {
   canRemoveForEveryone,
   copyText,
   onlyPhotograph,
+  reportedAuthor,
   toggle,
 } from './selection'
 
@@ -237,5 +238,69 @@ describe('what can be kept as a favourite', () => {
 
   it('refuses an empty selection', () => {
     expect(canFavourite(new Set(), [MINE])).toBe(false)
+  })
+})
+
+describe('what can be reported (#468)', () => {
+  const HIS = said('$b1', '@him:x', 'et toi')
+  const HERS_TOO = said('$h2', HER, 'encore')
+
+  it('names the one other participant who wrote every text selected', () => {
+    // #462: « Signaler » only on the messages of one other participant,
+    // several of them if they wrote several.
+    const held = [MINE, HERS, HIS, HERS_TOO]
+    expect(reportedAuthor(new Set(['$h1']), held, ME)).toBe(HER)
+    expect(reportedAuthor(new Set(['$h1', '$h2']), held, ME)).toBe(HER)
+  })
+
+  it('names nobody, so « Signaler » is absent, when two people wrote them', () => {
+    const held = [HERS, HIS]
+    expect(reportedAuthor(new Set(['$h1', '$b1']), held, ME)).toBeNull()
+  })
+
+  it('names nobody when one of them is this account’s own', () => {
+    const held = [MINE, HERS]
+    expect(reportedAuthor(new Set(['$m1']), held, ME)).toBeNull()
+    expect(reportedAuthor(new Set(['$m1', '$h1']), held, ME)).toBeNull()
+  })
+
+  it('names nobody for a photograph or a document, which are #471’s', () => {
+    const document: TimelineEntry = {
+      eventId: '$d1',
+      claimedSender: HER,
+      sentAt: 0,
+      body: 'contrat.pdf',
+      document: {} as TimelineEntry['document'],
+    }
+    const held = [HERS, shown('$p1', HER), document]
+    expect(reportedAuthor(new Set(['$p1']), held, ME)).toBeNull()
+    expect(reportedAuthor(new Set(['$h1', '$p1']), held, ME)).toBeNull()
+    expect(reportedAuthor(new Set(['$d1']), held, ME)).toBeNull()
+  })
+
+  it('names nobody for a message this device could not open, or one removed', () => {
+    // Nothing readable to send: a report carries the messages as read.
+    const unreadable: TimelineEntry = {
+      eventId: '$u',
+      claimedSender: HER,
+      sentAt: 1,
+      body: null,
+      reason: 'no key',
+    }
+    const gone: TimelineEntry = {
+      eventId: '$g',
+      claimedSender: HER,
+      sentAt: 1,
+      body: null,
+      removed: true,
+    }
+    const held = [HERS, unreadable, gone]
+    expect(reportedAuthor(new Set(['$h1', '$u']), held, ME)).toBeNull()
+    expect(reportedAuthor(new Set(['$g']), held, ME)).toBeNull()
+  })
+
+  it('names nobody for a selection the conversation no longer carries', () => {
+    expect(reportedAuthor(new Set(['$h1', '$gone']), [HERS], ME)).toBeNull()
+    expect(reportedAuthor(new Set(), [HERS], ME)).toBeNull()
   })
 })

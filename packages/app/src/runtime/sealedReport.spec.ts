@@ -15,7 +15,14 @@ import { bytesOf } from './base64'
 import { deriveKeyPair, generateKeyPair, seal, type KeyPair } from './hpke'
 import { OPERATOR_KEY } from './operatorKey'
 import { base64Of } from './receiveImage'
-import { REPORT_INFO, reportAad, toWire } from './reportFormat'
+import {
+  payloadBytes,
+  REPORT_INFO,
+  reportAad,
+  toWire,
+  type ReportPayload,
+} from './reportFormat'
+import { reportMessages } from './reportMessages'
 import { sealReport, sealReportWithEphemeral } from './sealedReport'
 
 /**
@@ -458,6 +465,135 @@ describe("The operator's opening tool, as it is run", () => {
 
     expect(status).toBe(0)
     expect(printed).toEqual(['rouge \\x1b[31m cloche \\x07 fin\ttab\nligne'])
+  })
+
+  it('shows a report the application made: who reports, the author, the conversation, then each message with its time and its event', async () => {
+    // From the selection to the operator's screen, through the application's
+    // own assembly and seal (#468), for the test key.
+    const sent: string[] = []
+    const reported = await reportMessages(
+      {
+        seal: (payload, binding) =>
+          sealReportWithEphemeral(
+            generateKeyPair(),
+            payload,
+            binding,
+            TEST_KEY.public_key,
+          ),
+        service: {
+          send: async body => {
+            sent.push(body)
+            return { status: 201, body: '{"number":"K7QM-4ZT2"}' }
+          },
+        },
+        now: () => 1_790_000_060_000,
+      },
+      {
+        reporter: '@alice:example.org',
+        roomId: '!room:example.org',
+        reason: 'harassment',
+        selected: new Set(['$first', '$second']),
+        timeline: [
+          {
+            eventId: '$first',
+            claimedSender: '@bob:example.org',
+            sentAt: 1_790_000_010_000,
+            body: 'Tu vas le regretter.',
+          },
+          {
+            eventId: '$between',
+            claimedSender: '@alice:example.org',
+            sentAt: 1_790_000_015_000,
+            body: 'Arrête.',
+          },
+          {
+            eventId: '$second',
+            claimedSender: '@bob:example.org',
+            sentAt: 1_790_000_020_000,
+            body: 'Réponds.\nMaintenant.',
+          },
+        ],
+      },
+    )
+    expect(reported).toEqual({ sent: true, number: 'K7QM-4ZT2' })
+    const { reason, sealed } = JSON.parse(sent[0]!) as {
+      readonly reason: string
+      readonly sealed: string
+    }
+
+    const { status, said, printed } = await run([
+      '--cle',
+      TEST_KEY_FILE,
+      written({ reason, reporter: '@alice:example.org', sealed }),
+    ])
+
+    expect(status).toBe(0)
+    expect(said).not.toContain('Attention')
+    expect(printed.join('\n').split('\n')).toEqual([
+      'compte qui signale : @alice:example.org',
+      'auteur             : @bob:example.org',
+      'conversation       : !room:example.org',
+      'motif              : harassment',
+      'signalé le         : 2026-09-21 14:14:20 UTC',
+      '',
+      'message 1 sur 2, écrit le 2026-09-21 14:13:30 UTC',
+      '  événement : $first',
+      '  │ Tu vas le regretter.',
+      '',
+      'message 2 sur 2, écrit le 2026-09-21 14:13:40 UTC',
+      '  événement : $second',
+      '  │ Réponds.',
+      '  │ Maintenant.',
+    ])
+  })
+
+  it('says when what it opens is not a report the format writes, and shows it as it is', async () => {
+    const { status, said, printed } = await run([
+      '--cle',
+      TEST_KEY_FILE,
+      TEST_REPORT_FILE,
+    ])
+
+    expect(status).toBe(0)
+    expect(said).toContain('pas un signalement au format 1')
+    expect(printed).toEqual(['Beauty is truth, truth beauty'])
+  })
+
+  it('says so when the report names another reason, reporter or author than it should', async () => {
+    // Not what the application writes: the seal binds the reason and the
+    // reporting account kept by the service, and those are what count.
+    const payload: ReportPayload = {
+      reason: 'threat',
+      reportedAt: 1_790_000_060_000,
+      reportingAccount: '@mallory:example.org',
+      reportedAccount: '@bob:example.org',
+      roomId: '!room:example.org',
+      messages: [
+        {
+          eventId: '$first',
+          sentAt: 1_790_000_010_000,
+          sender: '@carol:example.org',
+          text: 'rouge \u001b[31m cloche \u0007',
+        },
+      ],
+    }
+
+    const { status, said, printed } = await run([
+      '--cle',
+      TEST_KEY_FILE,
+      written({
+        ...BINDING,
+        sealed: sealedForTheTestKey(payloadBytes(payload)),
+      }),
+    ])
+
+    expect(status).toBe(0)
+    expect(said).toContain('Attention')
+    const shown = printed.join('\n').split('\n')
+    expect(shown).toContain(
+      '  expéditeur : @carol:example.org, qui n’est pas l’auteur',
+    )
+    expect(shown).toContain('  │ rouge \\x1b[31m cloche \\x07')
   })
 
   it('says what is missing from a document that is not a sealed report', async () => {

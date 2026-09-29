@@ -13,6 +13,16 @@
 //
 // Ce qu'un signalement contient n'est écrit nulle part (ADR 0006) : il
 // s'affiche, et c'est tout.
+//
+// # Ce qui s'affiche (#468)
+//
+// Un signalement que l'application a fait porte une charge au format que
+// `reportFormat.ts` décrit, et que `payloadOf` lit : l'outil montre le compte
+// qui signale, l'auteur, la conversation, le motif et l'instant, puis chaque
+// message avec son heure et son identifiant d'événement, celui qu'un retrait
+// vise. Chaque ligne d'un message commence par « │ », pour qu'aucun texte ne
+// se fasse passer pour une ligne de l'outil. Une charge d'une autre forme
+// s'affiche telle quelle, et l'outil le dit.
 
 import { readFileSync } from 'node:fs'
 import { TextDecoder } from 'node:util'
@@ -21,6 +31,7 @@ import { open } from '../../packages/app/src/runtime/hpke.ts'
 import {
   base64Bytes,
   fromWire,
+  payloadOf,
   REPORT_FORMAT,
   REPORT_INFO,
   reportAad,
@@ -168,24 +179,91 @@ export async function openTool(argv, { home, stdin, stderr, stdout }) {
       'ce sont celles que l’appareil a scellées. Ce qu’il porte suit.',
     ].join('\n'),
   )
-  stdout(displayable(opened.payload))
+  const report = payloadOf(opened.payload)
+  if (report === null) {
+    stderr(
+      'Ce qu’il porte n’est pas un signalement au format 1 : le voici tel quel.',
+    )
+    stdout(displayable(new TextDecoder().decode(opened.payload), true))
+    return 0
+  }
+  if (
+    report.reason !== opened.reason ||
+    report.reportingAccount !== opened.reporter
+  ) {
+    stderr(
+      'Attention : ce qu’il porte nomme un autre motif ou un autre compte qui\n' +
+        'signale que ceux que le pli lie. Ce sont ceux du pli qui font foi.',
+    )
+  }
+  stdout(readable(report).join('\n'))
   return 0
 }
 
 /**
- * Le texte d'une charge, où chaque caractère de contrôle, sauf la tabulation
- * et le saut de ligne, s'écrit `\xNN` : ce qu'un signalement contient ne pilote
- * pas le terminal de l'exploitant.
+ * Un signalement ouvert, ligne à ligne, dans l'ordre où l'exploitant le lit.
+ * Un message dont l'expéditeur n'est pas l'auteur le dit : l'application
+ * n'en écrit pas, et un retrait vise l'auteur.
  *
- * @param {Uint8Array} payload
+ * @param {import('../../packages/app/src/runtime/reportFormat.ts').ReportPayload} report
+ * @returns {string[]}
+ */
+function readable(report) {
+  const lines = [
+    `compte qui signale : ${displayable(report.reportingAccount, false)}`,
+    `auteur             : ${displayable(report.reportedAccount, false)}`,
+    `conversation       : ${displayable(report.roomId, false)}`,
+    `motif              : ${displayable(report.reason, false)}`,
+    `signalé le         : ${instant(report.reportedAt)}`,
+  ]
+  report.messages.forEach((message, at) => {
+    lines.push(
+      '',
+      `message ${at + 1} sur ${report.messages.length}, écrit le ${instant(message.sentAt)}`,
+      `  événement : ${displayable(message.eventId, false)}`,
+    )
+    if (message.sender !== report.reportedAccount) {
+      lines.push(
+        `  expéditeur : ${displayable(message.sender, false)}, qui n’est pas l’auteur`,
+      )
+    }
+    for (const line of displayable(message.text, true).split('\n')) {
+      lines.push(`  │ ${line}`)
+    }
+  })
+  return lines
+}
+
+/**
+ * Un instant en millisecondes depuis l'époque, en UTC à la seconde, ou le
+ * nombre tel quel s'il ne date rien.
+ *
+ * @param {number} milliseconds
  * @returns {string}
  */
-function displayable(payload) {
+function instant(milliseconds) {
+  const moment = new Date(milliseconds)
+  return Number.isNaN(moment.getTime())
+    ? String(milliseconds)
+    : `${moment.toISOString().slice(0, 19).replace('T', ' ')} UTC`
+}
+
+/**
+ * `text` où chaque caractère de contrôle s'écrit `\xNN`, sauf la tabulation,
+ * et le saut de ligne quand `lines` le garde : ce qu'un signalement contient
+ * ne pilote pas le terminal de l'exploitant, et un champ d'une ligne n'en
+ * fait pas deux.
+ *
+ * @param {string} text
+ * @param {boolean} lines
+ * @returns {string}
+ */
+function displayable(text, lines) {
   let shown = ''
-  for (const character of new TextDecoder().decode(payload)) {
+  for (const character of text) {
     const code = character.codePointAt(0) ?? 0
     const control =
-      (code < 0x20 && character !== '\t' && character !== '\n') ||
+      (code < 0x20 && character !== '\t' && (character !== '\n' || !lines)) ||
       (code >= 0x7f && code <= 0x9f)
     shown += control ? `\\x${code.toString(16).padStart(2, '0')}` : character
   }

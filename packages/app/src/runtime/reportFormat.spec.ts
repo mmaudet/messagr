@@ -1,6 +1,14 @@
 import { describe, expect, it } from 'vitest'
 
-import { base64Bytes, fromWire, keyBytesOf, reportAad } from './reportFormat'
+import {
+  base64Bytes,
+  fromWire,
+  keyBytesOf,
+  payloadBytes,
+  payloadOf,
+  reportAad,
+  type ReportPayload,
+} from './reportFormat'
 
 function hex(of: Uint8Array): string {
   return Array.from(of, b => b.toString(16).padStart(2, '0')).join('')
@@ -110,6 +118,95 @@ describe('Standard base64, as a sealed report and a key are written', () => {
     ).toBeNull()
     expect(keyBytesOf('Zm9vYmFy')).toBeNull()
     expect(keyBytesOf(`${key.slice(0, 40)}AAAAAA==`)).toBeNull()
+  })
+})
+
+describe('What a report carries, inside the seal (#468)', () => {
+  const PAYLOAD: ReportPayload = {
+    reason: 'harassment',
+    reportedAt: 1_790_000_060_000,
+    reportingAccount: '@alice:example.org',
+    reportedAccount: '@bob:example.org',
+    roomId: '!room:example.org',
+    messages: [
+      {
+        eventId: '$first',
+        sentAt: 1_790_000_000_000,
+        sender: '@bob:example.org',
+        text: 'Tu vas le regretter.',
+      },
+      {
+        eventId: '$second',
+        sentAt: 1_790_000_030_000,
+        sender: '@bob:example.org',
+        text: 'Réponds.\nMaintenant.',
+      },
+    ],
+  }
+
+  function json(value: unknown): Uint8Array {
+    return new TextEncoder().encode(JSON.stringify(value))
+  }
+
+  it('is JSON in UTF-8, laid out as the format says', () => {
+    expect(JSON.parse(new TextDecoder().decode(payloadBytes(PAYLOAD)))).toEqual(
+      {
+        format: 1,
+        reason: 'harassment',
+        reported_at: 1790000060000,
+        reporting_account: '@alice:example.org',
+        reported_account: '@bob:example.org',
+        room_id: '!room:example.org',
+        messages: [
+          {
+            event_id: '$first',
+            sent_at: 1790000000000,
+            sender: '@bob:example.org',
+            text: 'Tu vas le regretter.',
+          },
+          {
+            event_id: '$second',
+            sent_at: 1790000030000,
+            sender: '@bob:example.org',
+            text: 'Réponds.\nMaintenant.',
+          },
+        ],
+      },
+    )
+  })
+
+  it('reads back as it was written', () => {
+    expect(payloadOf(payloadBytes(PAYLOAD))).toEqual(PAYLOAD)
+  })
+
+  it('refuses what the format does not write', () => {
+    const written = JSON.parse(
+      new TextDecoder().decode(payloadBytes(PAYLOAD)),
+    ) as Record<string, unknown> & { messages: Record<string, unknown>[] }
+    const cases: [string, Uint8Array][] = [
+      ['not JSON', new TextEncoder().encode('Beauty is truth, truth beauty')],
+      ['not UTF-8', Uint8Array.of(0x7b, 0xff, 0x7d)],
+      ['a list', json([written])],
+      ['another format', json({ ...written, format: 2 })],
+      ['no format', json({ ...written, format: undefined })],
+      ['no message', json({ ...written, messages: [] })],
+      [
+        'a message without its text',
+        json({ ...written, messages: [{ ...written.messages[0], text: 1 }] }),
+      ],
+      [
+        'a message without its event',
+        json({
+          ...written,
+          messages: [{ ...written.messages[0], event_id: undefined }],
+        }),
+      ],
+      ['a time written as text', json({ ...written, reported_at: '1790' })],
+      ['no conversation', json({ ...written, room_id: undefined })],
+    ]
+    for (const [what, bytes] of cases) {
+      expect(payloadOf(bytes), what).toBeNull()
+    }
   })
 })
 

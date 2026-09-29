@@ -91,6 +91,45 @@ export function canRemoveForEveryone(
 }
 
 /**
+ * Whose messages the selection would report (#468): the one other
+ * participant who wrote every selected message, when each is a text this
+ * device could read. `null` otherwise, and « Signaler » is then absent.
+ *
+ * ONE AUTHOR, BECAUSE A REPORT NAMES ONE. What the operator decides, it
+ * decides about an account (#462): a selection mixing two people would ask
+ * it to take down a message somebody else wrote. And never this account's
+ * own messages, which nobody reports to have them removed.
+ *
+ * TEXT ONLY, FOR NOW. A photograph or a document goes as the key to its
+ * encrypted copy, which #471 adds; until then a selection holding one is not
+ * a report at all, rather than a report quietly missing a picture. A message
+ * this device could not open, or one removed, has nothing readable to send.
+ *
+ * A selected event the conversation no longer carries makes it `null` too,
+ * as for removing: nothing can say what would be sent.
+ */
+export function reportedAuthor(
+  selected: ReadonlySet<string>,
+  entries: readonly TimelineEntry[],
+  selfUserId: string,
+): string | null {
+  const found = chosen(selected, entries)
+  const author = found[0]?.claimedSender
+  if (author === undefined || author === selfUserId) return null
+  if (found.length !== selected.size) return null
+  return found.every(
+    entry =>
+      entry.claimedSender === author &&
+      entry.body !== null &&
+      entry.image === undefined &&
+      entry.document === undefined &&
+      entry.removed !== true,
+  )
+    ? author
+    : null
+}
+
+/**
  * Whether the selection can be forwarded.
  *
  * Everything readable can: a message this device could not open has nothing
