@@ -1,8 +1,8 @@
-import { bytesOf } from './base64'
 import { generateKeyPair, sealWithEphemeral, type KeyPair } from './hpke'
 import { OPERATOR_KEY } from './operatorKey'
 import { base64Of } from './receiveImage'
 import {
+  keyBytesOf,
   padded,
   REPORT_INFO,
   reportAad,
@@ -20,9 +20,16 @@ import {
  * sealed, and is what the service receives beside the reason code.
  *
  * The format is `reportFormat.ts`'s, which the operator's tool reads too. The
- * reason and the reporting account travel unsealed, since the service keeps
- * them, and the seal binds both: a report whose reason or account was changed
- * on the way does not open.
+ * reason and the reporting account's ID travel unsealed, since the service
+ * keeps them, and the seal binds both: a report whose reason or account ID
+ * was changed on the way does not open.
+ *
+ * # FOR THE KEY BUILT INTO THE APPLICATION, AND NO OTHER
+ *
+ * ADR 0015: the operator key's public half is built into the application, so
+ * that nothing can swap it. `sealReport` therefore takes no key, and seals
+ * for `OPERATOR_KEY`, the very value `scripts/assert-operator-key.mjs` reads
+ * before a store build.
  *
  * # IN TYPESCRIPT, UNTIL THE BRIDGE SEALS
  *
@@ -33,31 +40,29 @@ import {
  */
 
 /**
- * `payload` sealed for `operatorKey` (standard base64, the key built into the
- * application unless told otherwise), bound to `binding`, in standard base64,
- * under an ephemeral key drawn for this report alone.
+ * `payload` sealed for the operator key built into the application, bound to
+ * `binding`, under an ephemeral key drawn for this report alone, in standard
+ * base64.
  *
- * Throws a `RangeError` for a key that is not 32 bytes of base64, or a reason
- * or an account `reportAad` cannot bind; and what X25519 throws for a key of
- * low order, as `hpke.ts` says. Nothing is sealed then, so nothing is sent.
+ * Throws a `RangeError` for a reason or an account ID `reportAad` cannot
+ * bind. Nothing is sealed then, so nothing is sent.
  */
 export function sealReport(
   payload: Uint8Array,
   binding: ReportBinding,
-  operatorKey: string = OPERATOR_KEY,
 ): string {
-  return sealReportWithEphemeral(
-    generateKeyPair(),
-    payload,
-    binding,
-    operatorKey,
-  )
+  return sealReportWithEphemeral(generateKeyPair(), payload, binding)
 }
 
 /**
- * `sealReport`, under the ephemeral key given: FOR THE TEST VECTORS ONLY,
- * which fix it. The same ephemeral key used twice for the same operator key
- * gives two reports the same key and nonce, and gives both away.
+ * `sealReport`, under the ephemeral key given, and for another operator key
+ * when one is given: FOR THE TEST VECTORS AND THE TESTS ONLY, which fix the
+ * first and seal for the test key. The same ephemeral key used twice for the
+ * same operator key gives two reports the same key and nonce, and gives both
+ * away.
+ *
+ * Throws a `RangeError` for a key that is not 32 bytes of standard base64,
+ * and what X25519 throws for one of low order, as `hpke.ts` says.
  */
 export function sealReportWithEphemeral(
   ephemeral: KeyPair,
@@ -65,31 +70,19 @@ export function sealReportWithEphemeral(
   binding: ReportBinding,
   operatorKey: string = OPERATOR_KEY,
 ): string {
-  const recipient = publicKeyIn(operatorKey)
-  const aad = reportAad(binding)
+  const recipient = keyBytesOf(operatorKey)
+  if (recipient === null) {
+    throw new RangeError('operator key: not 32 bytes of standard base64')
+  }
   return base64Of(
     toWire(
       sealWithEphemeral(
         ephemeral,
         recipient,
         REPORT_INFO,
-        aad,
+        reportAad(binding),
         padded(payload),
       ),
     ),
   )
-}
-
-/** The 32 bytes `base64` holds, or a `RangeError`. */
-function publicKeyIn(base64: string): Uint8Array {
-  let key: Uint8Array
-  try {
-    key = bytesOf(base64)
-  } catch {
-    throw new RangeError('operator key: not base64')
-  }
-  if (key.length !== 32) {
-    throw new RangeError('operator key: not an X25519 public key')
-  }
-  return key
 }

@@ -109,12 +109,8 @@ jobs:
 
       - run: yarn install --frozen-lockfile
 
-      # NOT THE TEST KEY OF THE OPERATOR (#465). The application seals every
-      # report for the key it carries, and the test key's private half is in
-      # this public repository, so anyone opens what it seals. A store build
-      # refuses it, here before nine minutes of build; #470 puts the
-      # production key in. ci.yml and device.yml keep building with the test
-      # key, as all development does.
+      # The operator key a store build may carry (#465), before nine minutes
+      # of build. Why: the script says it, once.
       - name: Assert the application carries a key other than the test key
         run: node scripts/assert-operator-key.mjs
 

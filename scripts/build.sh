@@ -71,10 +71,9 @@ if [ "$WHICH" != "android" ]; then
   echo
   echo "#### iOS ####"
 
-  # AVANT DE MONTER LE NUMÉRO DE BUILD. `publish-ios.sh` refuse une build qui
-  # porte encore la clé de test de l'exploitant (#465) ; le vérifier ici
-  # épargne un numéro monté pour une build qui ne partira pas. Le Pixel, plus
-  # haut, la garde : ce n'est pas une build de magasin.
+  # La clé de l'exploitant (#465), vérifiée par `publish-ios.sh` aussi, mais
+  # ici avant de monter le numéro de build : un numéro monté pour une build
+  # qui ne partira pas ne sert à rien. Le pourquoi est dans ce script-là.
   node "$ROOT/scripts/assert-operator-key.mjs"
 
   # THE BUILD NUMBER, RAISED HERE RATHER THAN REMEMBERED BY A PERSON.

@@ -25,7 +25,8 @@
 // contrôle écrits `\xNN`. Rien de ce qui est ouvert n'est écrit sur le disque
 // (ADR 0006). Codes de sortie : 0 ouvert, 1 refusé, 2 rien à ouvrir.
 //
-// Tout se passe dans `lib/exploitant.mjs`, que les essais exercent.
+// Tout se passe dans `lib/ouvrir-un-signalement.mjs`, que les essais
+// exercent.
 //
 // Pour essayer, avec la clé de test et un pli scellé pour elle :
 //
@@ -39,13 +40,13 @@ import { homedir } from 'node:os'
 import { quietAboutTypelessModules } from './lib/typescript.mjs'
 
 quietAboutTypelessModules()
-const { openTool } = await import('./lib/exploitant.mjs')
+const { openTool } = await import('./lib/ouvrir-un-signalement.mjs')
 
 process.exitCode = await openTool(process.argv.slice(2), {
   home: homedir(),
   stdin: readStandardInput,
-  say: line => process.stderr.write(`${line}\n`),
-  print: text => process.stdout.write(`${text}\n`),
+  stderr: line => process.stderr.write(`${line}\n`),
+  stdout: text => process.stdout.write(`${text}\n`),
 })
 
 /**

@@ -1,34 +1,51 @@
+import { randomBytes } from 'node:crypto'
 import { mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 
+import * as independent from '../../../../scripts/fixtures/hpke-independant.mjs'
+import { readKeyFile } from '../../../../scripts/lib/cle-de-l-exploitant.mjs'
 import {
   openSealedReport,
   openTool,
-  readKeyFile,
-} from '../../../../scripts/lib/exploitant.mjs'
+} from '../../../../scripts/lib/ouvrir-un-signalement.mjs'
 import { bytesOf } from './base64'
-import { deriveKeyPair, generateKeyPair, seal } from './hpke'
+import { deriveKeyPair, generateKeyPair, seal, type KeyPair } from './hpke'
 import { OPERATOR_KEY } from './operatorKey'
 import { base64Of } from './receiveImage'
 import { REPORT_INFO, reportAad, toWire } from './reportFormat'
 import { sealReport, sealReportWithEphemeral } from './sealedReport'
 
 /**
- * The seal, verified on both sides (#465): what this module seals, the
- * operator's tool opens (`scripts/lib/exploitant.mjs`), and it refuses a
- * sealed report whose reason or reporting account was changed on the way.
+ * The seal, verified on both sides (#465), and never by the application
+ * alone.
  *
- * The tool's own behaviour is proved here too, beside what it opens: what it
- * reads, what it prints, and what it refuses.
+ * A second construction of RFC 9180 on node:crypto
+ * (`scripts/fixtures/hpke-independant.mjs`), which shares no code with
+ * `hpke.ts` nor with `reportFormat.ts`, first reproduces the vectors of
+ * appendix A.2.1. Then it seals the committed test report byte for byte,
+ * which the application must seal too, and opens what the application seals.
+ * The operator's tool (`scripts/lib/ouvrir-un-signalement.mjs`) opens what
+ * either seals, and refuses a report whose reason or account ID was changed.
  */
+
+/** The ephemeral key `sealReport` draws, when a test fixes it. */
+const drawn = vi.hoisted(() => ({ ephemeral: null as KeyPair | null }))
+
+vi.mock('./hpke', async importOriginal => {
+  const real = await importOriginal<typeof import('./hpke')>()
+  return {
+    ...real,
+    generateKeyPair: () => drawn.ephemeral ?? real.generateKeyPair(),
+  }
+})
 
 const FIXTURES = join(__dirname, '../../../../scripts/fixtures')
 /** The test key, in the format of the operator's key file. TEST ONLY. */
 const TEST_KEY_FILE = join(FIXTURES, 'cle-de-test-de-l-exploitant.json')
-/** A sealed report for the test key, computed outside this repository. */
+/** A sealed report for the test key, computed by the second construction. */
 const TEST_REPORT_FILE = join(FIXTURES, 'signalement-de-test.json')
 
 interface ReportDocument {
@@ -45,11 +62,24 @@ const TEST_REPORT = JSON.parse(
   readFileSync(TEST_REPORT_FILE, 'utf8'),
 ) as ReportDocument
 
-/** RFC 9180, appendix A.2.1: the ephemeral key's seed, and what it encapsulates. */
+/**
+ * RFC 9180, appendix A.2.1: DHKEM(X25519, HKDF-SHA256), HKDF-SHA256,
+ * ChaCha20Poly1305, base mode, and its first encryption. Copied from the
+ * RFC's text, as `hpke.spec.ts` copies it.
+ */
 const A_2_1 = {
+  info: '4f6465206f6e2061204772656369616e2055726e',
   ikmE: '909a9b35d3dc4713a5e72a4da274b55d3d3821a37e5d099e74a647db583a904b',
+  skEm: 'f4ec9b33b792c372c1d2c2063507b684ef925b8c75a42dbcbf57d63ccd381600',
+  ikmR: '1ac01f181fdf9f352797655161c58b75c656a6cc2716dcb66372da835542e1df',
+  pkRm: '4310ee97d88cc1f088a5576c77ab0cf5c3ac797f3d95139c6c84b5429c59662a',
+  skRm: '8057991eef8f1f1af18f4a9491d16a1ce333f695d4db8e38da75975c4478e0fb',
   enc: '1afa08d3dec047a643885163f1180476fa7ddb54c6a8029ea33f95796bf2ac4a',
   pt: '4265617574792069732074727574682c20747275746820626561757479',
+  aad: '436f756e742d30',
+  ct:
+    '1c5250d8034ec2b784ba2cfd69dbdb8af406cfe3ff938e131f0def8c8b60b4db' +
+    '21993c62ce81883d2dd1b51a28',
 }
 
 const BINDING = { reason: 'harassment', reporter: '@alice:example.org' }
@@ -60,12 +90,24 @@ function bytes(hexadecimal: string): Uint8Array {
   )
 }
 
-function hex(of: Uint8Array): string {
-  return Array.from(of, b => b.toString(16).padStart(2, '0')).join('')
+function hex(of: Uint8Array | null): string | null {
+  return of === null
+    ? null
+    : Array.from(of, b => b.toString(16).padStart(2, '0')).join('')
 }
 
 function text(of: string): Uint8Array {
   return new TextEncoder().encode(of)
+}
+
+/** `payload` sealed by the application, for the test key. */
+function sealedForTheTestKey(payload: Uint8Array): string {
+  return sealReportWithEphemeral(
+    generateKeyPair(),
+    payload,
+    BINDING,
+    TEST_KEY.public_key,
+  )
 }
 
 function testSecretKey(): Uint8Array {
@@ -85,8 +127,8 @@ async function run(
   const status = await openTool([...argv], {
     home,
     stdin: async () => input,
-    say: (line: string) => said.push(line),
-    print: (line: string) => printed.push(line),
+    stderr: (line: string) => said.push(line),
+    stdout: (line: string) => printed.push(line),
   })
   return { status, said: said.join('\n'), printed }
 }
@@ -99,10 +141,7 @@ function written(document: object): string {
 }
 
 describe('A report, sealed for the operator key', () => {
-  it('seals exactly the bytes computed outside this repository', () => {
-    // Same ephemeral key (A.2.1's), same test key, same reason, account and
-    // payload as the fixture, whose bytes an independent construction of
-    // RFC 9180 on node:crypto computed after reproducing A.2.1 itself.
+  it('seals exactly the bytes of the test report, under the ephemeral key of A.2.1', () => {
     const sealed = sealReportWithEphemeral(
       deriveKeyPair(bytes(A_2_1.ikmE)),
       bytes(A_2_1.pt),
@@ -119,7 +158,6 @@ describe('A report, sealed for the operator key', () => {
         deriveKeyPair(bytes(A_2_1.ikmE)),
         text('anything'),
         BINDING,
-        TEST_KEY.public_key,
       ),
     )
 
@@ -128,12 +166,8 @@ describe('A report, sealed for the operator key', () => {
   })
 
   it('draws a fresh ephemeral key for every report', () => {
-    const first = bytesOf(
-      sealReport(text('same'), BINDING, TEST_KEY.public_key),
-    )
-    const second = bytesOf(
-      sealReport(text('same'), BINDING, TEST_KEY.public_key),
-    )
+    const first = bytesOf(sealReport(text('same'), BINDING))
+    const second = bytesOf(sealReport(text('same'), BINDING))
 
     expect(hex(first.subarray(1, 33))).not.toBe(hex(second.subarray(1, 33)))
     expect(hex(first)).not.toBe(hex(second))
@@ -141,8 +175,7 @@ describe('A report, sealed for the operator key', () => {
 
   it('gives the service one size for every report up to 4,095 bytes', () => {
     const sizeOf = (length: number): number =>
-      bytesOf(sealReport(new Uint8Array(length), BINDING, TEST_KEY.public_key))
-        .length
+      bytesOf(sealReport(new Uint8Array(length), BINDING)).length
 
     // 1 + 32 + 4,096 + 16, written from the format: its number, the
     // encapsulated key, one block, and the tag.
@@ -151,54 +184,146 @@ describe('A report, sealed for the operator key', () => {
     expect(sizeOf(4096)).toBe(8241)
   })
 
-  it('seals for the key built into the application, unless told otherwise', () => {
-    const ephemeral = generateKeyPair()
+  it('seals for the key built into the application, whatever it is handed', () => {
     const other = base64Of(generateKeyPair().publicKey)
+    const ephemeral = generateKeyPair()
     const payload = text('the same payload')
+    drawn.ephemeral = ephemeral
+    try {
+      const sealed = sealReport(payload, BINDING)
+      // A key handed anyway, past the type that leaves it no room.
+      const handedAKey: unknown = Reflect.apply(sealReport, undefined, [
+        payload,
+        BINDING,
+        other,
+      ])
 
-    const byDefault = sealReportWithEphemeral(ephemeral, payload, BINDING)
-
-    expect(byDefault).toBe(
-      sealReportWithEphemeral(ephemeral, payload, BINDING, OPERATOR_KEY),
-    )
-    expect(byDefault).not.toBe(
-      sealReportWithEphemeral(ephemeral, payload, BINDING, other),
-    )
+      expect(sealed).toBe(
+        sealReportWithEphemeral(ephemeral, payload, BINDING, OPERATOR_KEY),
+      )
+      expect(handedAKey).toBe(sealed)
+      expect(sealed).not.toBe(
+        sealReportWithEphemeral(ephemeral, payload, BINDING, other),
+      )
+    } finally {
+      drawn.ephemeral = null
+    }
   })
 
-  it('refuses a key that is not an X25519 public key', () => {
-    const short = base64Of(new Uint8Array(31).fill(9))
-
-    expect(() => sealReport(text('x'), BINDING, short)).toThrow(RangeError)
-    expect(() => sealReport(text('x'), BINDING, 'not base64 at all')).toThrow(
-      RangeError,
-    )
+  it('refuses a key that is not an X25519 public key, however it is written', () => {
+    for (const key of [
+      base64Of(new Uint8Array(31).fill(9)),
+      'not base64 at all',
+      // The test key, with bits left over after its last byte.
+      'mD3vxUbnchoghIM22hYScz6J+lmbQuZTjX22y4FoSDZ=',
+    ]) {
+      expect(() =>
+        sealReportWithEphemeral(generateKeyPair(), text('x'), BINDING, key),
+      ).toThrow(RangeError)
+    }
   })
 
-  it('refuses a reason or an account the binding cannot carry', () => {
+  it('refuses a reason or an account ID the binding cannot carry', () => {
     expect(() =>
-      sealReport(
-        text('x'),
-        { ...BINDING, reason: 'two words' },
-        TEST_KEY.public_key,
-      ),
+      sealReport(text('x'), { ...BINDING, reason: 'two words' }),
     ).toThrow(RangeError)
   })
 })
 
-describe("What the application seals, the operator's tool opens", () => {
-  it('opens a report sealed here, with the reason and account the device bound', () => {
+describe('A second construction of RFC 9180, on node:crypto alone', () => {
+  it('reproduces appendix A.2.1, sealing and opening', () => {
+    const ephemeral = independent.deriveSecretKey(bytes(A_2_1.ikmE))
+    const recipient = independent.deriveSecretKey(bytes(A_2_1.ikmR))
+
+    expect(hex(ephemeral)).toBe(A_2_1.skEm)
+    expect(hex(recipient)).toBe(A_2_1.skRm)
+    expect(hex(independent.publicKeyOf(recipient))).toBe(A_2_1.pkRm)
+
+    const sealed = independent.seal(
+      ephemeral,
+      bytes(A_2_1.pkRm),
+      bytes(A_2_1.info),
+      bytes(A_2_1.aad),
+      bytes(A_2_1.pt),
+    )
+    expect(hex(sealed.enc)).toBe(A_2_1.enc)
+    expect(hex(sealed.ciphertext)).toBe(A_2_1.ct)
+    expect(
+      hex(
+        independent.open(
+          recipient,
+          bytes(A_2_1.enc),
+          bytes(A_2_1.info),
+          bytes(A_2_1.aad),
+          bytes(A_2_1.ct),
+        ),
+      ),
+    ).toBe(A_2_1.pt)
+  })
+
+  it('seals the test report byte for byte, from the format’s description alone', () => {
+    const sealed = independent.sealReport({
+      ephemeral: independent.deriveSecretKey(bytes(A_2_1.ikmE)),
+      recipient: bytesOf(TEST_KEY.public_key),
+      reason: TEST_REPORT.reason,
+      reporter: TEST_REPORT.reporter,
+      payload: bytes(A_2_1.pt),
+    })
+
+    expect(sealed).toBe(TEST_REPORT.sealed)
+  })
+
+  it('opens what the application seals, and refuses it with the reason or the account ID changed', () => {
+    const payload = text('Tu vas le regretter.')
+    const sealed = sealedForTheTestKey(payload)
+    const secret = testSecretKey()
+
+    expect(hex(independent.openReport({ secret, ...BINDING, sealed }))).toBe(
+      hex(payload),
+    )
+    expect(
+      independent.openReport({ secret, ...BINDING, reason: 'spam', sealed }),
+    ).toBeNull()
+    expect(
+      independent.openReport({
+        secret,
+        ...BINDING,
+        reporter: '@bob:example.org',
+        sealed,
+      }),
+    ).toBeNull()
+  })
+})
+
+describe("What is sealed for the operator key, the operator's tool opens", () => {
+  it('opens a report sealed by the application, with its reason and account ID', () => {
     // Any bytes: what a report holds is #468's to assemble.
     const payload = text('Tu vas le regretter.')
-    const sealed = sealReport(payload, BINDING, TEST_KEY.public_key)
 
-    const opened = openSealedReport(testSecretKey(), { ...BINDING, sealed })
+    const opened = openSealedReport(testSecretKey(), {
+      ...BINDING,
+      sealed: sealedForTheTestKey(payload),
+    })
 
     expect(opened).toEqual({ opened: true, payload, ...BINDING })
   })
 
+  it('opens a report sealed by the second construction', () => {
+    const payload = text('scellé ailleurs')
+    const sealed = independent.sealReport({
+      ephemeral: randomBytes(32),
+      recipient: bytesOf(TEST_KEY.public_key),
+      ...BINDING,
+      payload,
+    })
+
+    const opened = openSealedReport(testSecretKey(), { ...BINDING, sealed })
+
+    expect(opened.opened ? hex(opened.payload) : opened.why).toBe(hex(payload))
+  })
+
   it('refuses a report whose reason was changed after sealing', () => {
-    const sealed = sealReport(text('x'), BINDING, TEST_KEY.public_key)
+    const sealed = sealedForTheTestKey(text('x'))
 
     const opened = openSealedReport(testSecretKey(), {
       ...BINDING,
@@ -209,8 +334,8 @@ describe("What the application seals, the operator's tool opens", () => {
     expect(opened.opened).toBe(false)
   })
 
-  it('refuses a report whose reporting account was changed after sealing', () => {
-    const sealed = sealReport(text('x'), BINDING, TEST_KEY.public_key)
+  it('refuses a report whose account ID was changed after sealing', () => {
+    const sealed = sealedForTheTestKey(text('x'))
 
     const opened = openSealedReport(testSecretKey(), {
       ...BINDING,
@@ -222,11 +347,9 @@ describe("What the application seals, the operator's tool opens", () => {
   })
 
   it('opens nothing with another key', () => {
-    const sealed = sealReport(text('x'), BINDING, TEST_KEY.public_key)
-
     const opened = openSealedReport(generateKeyPair().secretKey, {
       ...BINDING,
-      sealed,
+      sealed: sealedForTheTestKey(text('x')),
     })
 
     expect(opened.opened).toBe(false)
@@ -252,7 +375,7 @@ describe("What the application seals, the operator's tool opens", () => {
   })
 
   it('refuses another format, a truncated report and loose base64', () => {
-    const wire = bytesOf(sealReport(text('x'), BINDING, TEST_KEY.public_key))
+    const wire = bytesOf(sealedForTheTestKey(text('x')))
     const otherFormat = wire.slice()
     otherFormat[0] = 0x02
     const cases = [
@@ -272,7 +395,7 @@ describe("What the application seals, the operator's tool opens", () => {
 })
 
 describe("The operator's opening tool, as it is run", () => {
-  it('opens the sealed report of the fixture, and prints its payload', async () => {
+  it('opens the test report, and prints its payload alone on stdout', async () => {
     const { status, said, printed } = await run([
       '--cle',
       TEST_KEY_FILE,
@@ -308,7 +431,7 @@ describe("The operator's opening tool, as it is run", () => {
     expect(status).toBe(0)
   })
 
-  it('refuses the fixture with its reason or its account changed, and prints nothing', async () => {
+  it('refuses the test report with its reason or its account ID changed, and prints nothing', async () => {
     for (const changed of [
       { ...TEST_REPORT, reason: 'spam' },
       { ...TEST_REPORT, reporter: '@bob:example.org' },
@@ -326,12 +449,11 @@ describe("The operator's opening tool, as it is run", () => {
 
   it('shows control characters rather than sending them to the terminal', async () => {
     const payload = text('rouge \u001b[31m cloche \u0007 fin\ttab\nligne')
-    const sealed = sealReport(payload, BINDING, TEST_KEY.public_key)
 
     const { status, printed } = await run([
       '--cle',
       TEST_KEY_FILE,
-      written({ ...BINDING, sealed }),
+      written({ ...BINDING, sealed: sealedForTheTestKey(payload) }),
     ])
 
     expect(status).toBe(0)
