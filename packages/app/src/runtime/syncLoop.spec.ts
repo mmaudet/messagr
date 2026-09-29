@@ -180,9 +180,36 @@ describe('startSyncLoop', () => {
         changedScopes: [],
         receipts: new Map(),
         timelineEvents: new Map(),
+        ignored: null,
         cursorPersisted: true,
       },
     ])
+  })
+
+  it('hands on the ignored list a poll carries, for every screen to derive from (#469)', async () => {
+    // Global account data, which the homeserver sends when it changed: from
+    // this device's own block, or from another device of the account.
+    const harness = drive({
+      responses: [
+        JSON.stringify({
+          next_batch: 's_2',
+          account_data: {
+            events: [
+              {
+                type: 'm.ignored_user_list',
+                content: { ignored_users: { '@bothers:x': {} } },
+              },
+            ],
+          },
+        }),
+        '{"next_batch":"s_3"}',
+        '{}',
+      ],
+    })
+    await harness.loop.stopped
+    expect(
+      harness.ticks.map(t => (t.ignored === null ? null : [...t.ignored])),
+    ).toEqual([['@bothers:x'], null])
   })
 
   it('says so when the cursor could not be persisted, and keeps going', async () => {

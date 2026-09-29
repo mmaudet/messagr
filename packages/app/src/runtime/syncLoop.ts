@@ -4,6 +4,7 @@
 // functions are bound by the caller.
 import type { SyncDelta } from 'react-native-matrix-crypto'
 
+import { ignoredInSync } from './block'
 import { errcodeOf } from './errors'
 import {
   drainOutgoingRequests,
@@ -80,6 +81,13 @@ export interface SyncTick {
    * request. `readTimelineEvents` says why at length.
    */
   readonly timelineEvents: ReadonlyMap<string, readonly unknown[]>
+  /**
+   * The account's ignored list, when this poll carried it, and `null` when
+   * it said nothing of it (#469). A poll resumed from a cursor carries
+   * account data only when it changed: this device's own block, or another
+   * device's. What leaves the screens derives from it (`block.ts`).
+   */
+  readonly ignored: ReadonlySet<string> | null
   /**
    * Whether the cursor this poll ended at reached the keystore. `false` is
    * survivable — the loop carries on from the token it holds in memory, and
@@ -223,6 +231,7 @@ export function startSyncLoop(deps: SyncLoopDeps): RunningSyncLoop {
             changedScopes: readChangedScopes(sync),
             receipts: readAllReceipts(sync),
             timelineEvents: readTimelineEvents(sync),
+            ignored: ignoredInSync(sync),
             cursorPersisted,
           })
         } catch (cause: unknown) {

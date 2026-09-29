@@ -86,7 +86,43 @@ describe('the remembered conversation list', () => {
       },
     ])
     const insert = ran.find(one => one.sql.startsWith('INSERT'))
-    expect(insert?.params).toEqual(['!b:x', '', '', '', 0, 0, -1, ''])
+    expect(insert?.params).toEqual(['!b:x', '', '', '', 0, 0, -1, '', ''])
+  })
+
+  it('keeps who wrote the opening, and nothing of the messages behind it (#469)', async () => {
+    // Who wrote it lets a relaunch drop the opening of an account blocked
+    // since. The window a row is drawn again from stays in memory: this page
+    // holds one line per conversation, and never more of what was said.
+    const { database, ran } = fake()
+    const cache = await openListCache(database)
+    await cache.keep([
+      {
+        ...SUMMARY,
+        previewBy: '@her:x',
+        window: [
+          {
+            sender: '@her:x',
+            sentAt: 1_700_000_000_000,
+            body: 'à tout à l’heure',
+            unread: true,
+          },
+          {
+            sender: '@him:x',
+            sentAt: 1_600_000_000_000,
+            body: 'an older secret',
+            unread: false,
+          },
+        ],
+      },
+    ])
+    const insert = ran.find(one => one.sql.startsWith('INSERT'))
+    expect(insert?.params?.[8]).toBe('@her:x')
+    expect(JSON.stringify(ran)).not.toContain('an older secret')
+
+    const again = await openListCache(
+      fake([{ ...ROW, preview_by: '@her:x' }]).database,
+    )
+    expect((await again.all())[0]?.previewBy).toBe('@her:x')
   })
 
   it('keeps who was here and left, and reads them back (#388)', async () => {

@@ -2,6 +2,7 @@ import React from 'react'
 import { Pressable, StyleSheet, Text, View } from 'react-native'
 
 import { t, type CopyKey } from '../copy'
+import type { BlockNotice } from '../runtime/block'
 import type { InvitationOutcome } from '../runtime/entry'
 import {
   color,
@@ -12,7 +13,10 @@ import {
   stroke,
   type,
 } from '../design/tokens'
-import type { ConversationSummary } from '../runtime/conversationList'
+import {
+  NOTHING_LEFT_TO_SHOW,
+  type ConversationSummary,
+} from '../runtime/conversationList'
 import type {
   JoinedInvitation,
   SentInvitation,
@@ -86,6 +90,12 @@ export interface ConversationListProps {
    * to be said.
    */
   readonly deliveredOutcome?: 'expired' | 'gone' | null
+  /**
+   * What became of the account just blocked from the panel of the person
+   * (#469), which brought the person back here: blocked, and whether the
+   * service's record still waits. `null` when nothing is to be said.
+   */
+  readonly blocked?: BlockNotice | null
   /**
    * What became of an invitation this launch was opened with, when the
    * device already had an account. `null` when there was none. See
@@ -161,6 +171,19 @@ export interface ConversationListProps {
   readonly onProveAgain?: (() => void) | null
 }
 
+/**
+ * What a block says above the list (#469), one test identifier per sentence,
+ * as #276 asks: a block whose service record waits must not pass for one
+ * the service has.
+ */
+const BLOCKED_SAYS: Readonly<
+  Record<BlockNotice, { readonly key: CopyKey; readonly testID: string }>
+> = {
+  blocked: { key: 'list_blocked', testID: 'list-blocked' },
+  waiting: { key: 'list_blocked_waiting', testID: 'list-blocked-waiting' },
+  'not-kept': { key: 'list_blocked_not_kept', testID: 'list-blocked-not-kept' },
+}
+
 /** What each end of being findable says above the list (#398, #409). */
 const ENDED_SAYS: Readonly<
   Record<Exclude<ListNotice['notice'], 'renew'>, CopyKey>
@@ -179,6 +202,7 @@ export function ConversationList({
   onOpenDelivered = () => undefined,
   joinedDelivered = [],
   deliveredOutcome = null,
+  blocked = null,
   invitation = null,
   reinstalled = null,
   notInYet = false,
@@ -248,7 +272,7 @@ export function ConversationList({
           there the person has something to do -- ask for an invitation --
           which is why it is said in those words rather than as an error. */}
       {reinstalled !== null && (
-        <Text style={styles.ignored} testID="list-reinstalled">
+        <Text style={styles.notice} testID="list-reinstalled">
           {reinstalled === 'reentered'
             ? t('list_reinstalled_back')
             : t('list_reinstalled_stranded')}
@@ -272,7 +296,7 @@ export function ConversationList({
           the generic refusal sent somebody holding a perfectly good link to
           ask for another. */}
       {invitation !== null && invitation !== undefined && (
-        <Text style={styles.ignored} testID="list-invitation-ignored">
+        <Text style={styles.notice} testID="list-invitation-ignored">
           {invitation.kind === 'used'
             ? t('list_invitation_used')
             : invitation.kind === 'already'
@@ -299,7 +323,7 @@ export function ConversationList({
           fichier -- pas envoyé, pas gardé non plus -- qui est ce que les
           autres phrases de cet écran ne disent pas. */}
       {shareRefused !== null && (
-        <Text style={styles.ignored} testID="list-share-refused">
+        <Text style={styles.notice} testID="list-share-refused">
           {shareRefused === 'not-yet'
             ? t('share_not_yet')
             : shareRefused === 'too-large'
@@ -311,10 +335,17 @@ export function ConversationList({
           the screen that asked has closed, and the row has gone with it, so
           this is what says why nothing followed. */}
       {deliveredOutcome !== null && (
-        <Text style={styles.ignored} testID="list-delivered-outcome">
+        <Text style={styles.notice} testID="list-delivered-outcome">
           {deliveredOutcome === 'expired'
             ? t('list_delivered_expired')
             : t('list_delivered_gone')}
+        </Text>
+      )}
+      {/* AN ACCOUNT JUST BLOCKED (#469): its conversation is gone from the
+          rows below, and this says so, and what still waits. */}
+      {blocked !== null && (
+        <Text style={styles.notice} testID={BLOCKED_SAYS[blocked].testID}>
+          {t(BLOCKED_SAYS[blocked].key)}
         </Text>
       )}
       {/* THE INVITATIONS DELIVERED INSIDE MESSAGR, ATOP THE LIST (#404), each
@@ -649,6 +680,10 @@ function previewOf(summary: ConversationSummary): string {
   if (summary.reason === 'the last message was removed') {
     return t('conversation_removed')
   }
+  // SOMETHING WAS SAID, AND NONE OF IT IS TO BE SHOWN (#469): hidden here,
+  // or written by a blocked account. Neither « nothing said » nor « could not
+  // be read » would be true, and an empty line is.
+  if (summary.reason === NOTHING_LEFT_TO_SHOW) return ''
   return summary.lastAt === 0 ? t('list_unreachable') : t('list_unreadable')
 }
 
@@ -678,9 +713,10 @@ function Empty() {
 }
 
 const styles = StyleSheet.create({
-  // A note, not an alarm: nothing went wrong, and the invitation is intact.
-  // `neutral.600` is the role for a line that explains rather than warns.
-  ignored: {
+  // A note above the list, not an alarm: what became of an invitation, a
+  // share or a block. `neutral.600` is the role for a line that explains
+  // rather than warns.
+  notice: {
     ...type.caption,
     color: color.neutral['600'],
     paddingHorizontal: layout.screenGutter,

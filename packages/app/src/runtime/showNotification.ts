@@ -349,6 +349,24 @@ export async function stopRinging(scope: string): Promise<void> {
 }
 
 /**
+ * Takes down what this application drew for a conversation with a blocked
+ * account (#469): the message notification, keyed by the conversation
+ * (`readNotification`), and a call ringing or missed there. Left up, a tap
+ * on one would open the conversation the block took away.
+ *
+ * WHAT NOTHING HERE CAN TAKE DOWN, ON AN IPHONE. When the wake could not
+ * run, iOS shows the push gateway's constant sentence (ADR-0009,
+ * `handlers::wake` in the service), drawn by the system under an identifier
+ * of Apple's: nothing names the conversation, so there is no handle to
+ * cancel it by, and a tap on it opens the list, never a conversation
+ * (`scopeOfPress`).
+ */
+export async function takeDownNotificationsOf(scope: string): Promise<void> {
+  await notifee.cancelNotification(scope)
+  await stopRinging(scope)
+}
+
+/**
  * What a press on a ringing notification asked for, and about which
  * conversation. `null` when the press was not one.
  */

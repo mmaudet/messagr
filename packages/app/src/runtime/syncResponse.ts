@@ -126,9 +126,10 @@ export function readTimelineEvents(
  * `null` for anything that is not a plain object, arrays included. Every read
  * above walks a path the homeserver could have sent differently, and a walk
  * that assumed its shape would turn a strange response into a crash inside
- * the loop rather than a poll that found nothing.
+ * the loop rather than a poll that found nothing. Shared with what else reads
+ * a homeserver's JSON (`block.ts`).
  */
-function asRecord(value: unknown): Record<string, unknown> | null {
+export function asRecord(value: unknown): Record<string, unknown> | null {
   return typeof value === 'object' && value !== null && !Array.isArray(value)
     ? (value as Record<string, unknown>)
     : null

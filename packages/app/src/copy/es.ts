@@ -458,6 +458,39 @@ export const es: Readonly<Record<CopyKey, string>> = {
     'Nada ha cambiado: esta cuenta no está bloqueada, y la invitación sigue esperando su respuesta. Puede volver a intentarlo.',
   invited_block_confirm: 'Bloquear',
   invited_block_cancel: 'Cancelar',
+  block_action: 'Bloquear',
+  block_hint:
+    'Ya no le llegará nada de esta cuenta, y esta conversación saldrá de su lista.',
+  block_explain_title: 'Lo que hace el bloqueo, y lo que no hace',
+  block_explain_lead:
+    'Esta cuenta no lo sabrá. Esto es todo lo que cambia este gesto, antes de decidir.',
+  block_fact_nothing: 'Ya no le llega nada de esta cuenta',
+  block_explain_nothing:
+    'Ni sus mensajes, ni sus llamadas, ni sus invitaciones le llegan ya, en ninguno de sus dispositivos. Ya no puede invitarle en Messagr.',
+  block_fact_gone: 'Lo que escribió sale de sus pantallas',
+  block_explain_gone:
+    'Sus mensajes desaparecen de todas sus conversaciones, incluidos los ya recibidos, y esta conversación sale de su lista. Usted no sale de ella: esta cuenta no ve ningún cambio.',
+  block_fact_untold: 'Esta cuenta no recibe ningún aviso',
+  block_explain_untold:
+    'Nada se lo dice. Sus mensajes salen sin llegarle nunca, y sus invitaciones esperan y luego caducan.',
+  block_fact_not_hidden: 'El bloqueo no le oculta',
+  block_fact_operator: 'Quien explota el servicio lo sabrá',
+  block_explain_operator:
+    'Quien explota el servicio sabrá que usted ha bloqueado esta cuenta, nunca lo que se dijo.',
+  block_fact_report: 'Denunciar se hace desde sus mensajes',
+  block_explain_report:
+    'Para mostrar a quien explota el servicio lo que esta cuenta le escribió, seleccione sus mensajes en la conversación y denúncielos antes de bloquear: después, salen de sus pantallas.',
+  block_confirm: 'Sí, bloquear esta cuenta',
+  block_cancel: 'Cancelar',
+  block_working: 'En curso…',
+  block_failed:
+    'No ha salido bien, y no ha cambiado nada: esta cuenta no está bloqueada. Puede intentarlo de nuevo.',
+  list_blocked:
+    'Esta cuenta está bloqueada: ya no le llegará nada de ella, y su conversación con ella ha salido de la lista.',
+  list_blocked_waiting:
+    'Esta cuenta está bloqueada, y su conversación con ella ha salido de la lista: sus mensajes y sus llamadas ya no le llegarán. Quien explota el servicio aún no lo sabe, y hasta entonces una invitación en Messagr de esta cuenta todavía puede llegarle. La aplicación volverá a intentarlo en cada inicio, hasta que lo sepa.',
+  list_blocked_not_kept:
+    'Esta cuenta está bloqueada, y su conversación con ella ha salido de la lista: sus mensajes y sus llamadas ya no le llegarán. Quien explota el servicio no lo sabe, y este dispositivo no ha podido anotarlo para volver a intentarlo: una invitación en Messagr de esta cuenta todavía puede llegarle.',
   invited_working: 'Un momento…',
   invited_failed:
     'Nada ha cambiado: esta invitación no se ha aceptado ni rechazado. Puede intentarlo de nuevo.',

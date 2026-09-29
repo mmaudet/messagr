@@ -2,8 +2,14 @@ import { describe, expect, it } from 'vitest'
 
 import {
   fetchConversationSummaries,
+  listWithoutTheBlocked,
+  NOTHING_LEFT_TO_SHOW,
+  scopesWithTheBlocked,
   type ConversationListDeps,
+  type ConversationSummary,
 } from './conversationList'
+import { mergeSummaries } from './mergeSummaries'
+import type { NotShown } from './notShown'
 import type { HttpRequester } from './pump'
 
 /**
@@ -487,6 +493,205 @@ describe('a participant who was here and is not any more (#388)', () => {
     await fetchConversationSummaries(homeserver, ME, NOTHING_READ)
     expect(homeserver.asked).toEqual([
       `/_matrix/client/v3/rooms/${encodeURIComponent('!b:x')}/members`,
+    ])
+  })
+})
+
+describe('the conversations with a blocked account (#469)', () => {
+  // Derived from the ignored list, which every device of the account syncs:
+  // the homeserver holds back what that account sends from then on, and this
+  // is what takes off the rows what was already received.
+  const BLOCKED = '@bothers:example.org'
+  const HER = '@her:example.org'
+  const ONLY_BLOCKED: NotShown = {
+    hidden: new Set(),
+    blocked: new Set([BLOCKED]),
+  }
+
+  /** A conversation of three, the blocked account's messages the newest. */
+  const threeOfUs = {
+    members: [ME, BLOCKED, HER],
+    events: [
+      { id: '$2', sender: HER, ts: 200, plain: 'hello' },
+      { id: '$3', sender: BLOCKED, ts: 300, plain: 'go away' },
+      { id: '$4', sender: BLOCKED, ts: 400, plain: 'again' },
+    ],
+  }
+
+  it('leaves out the conversation with the blocked account, and its messages from every other row', async () => {
+    const summaries = await fetchConversationSummaries(
+      fakeHomeserver({
+        '!with-them:x': {
+          members: [ME, BLOCKED],
+          events: [{ id: '$1', sender: BLOCKED, ts: 100, plain: 'go away' }],
+        },
+        '!three-of-us:x': threeOfUs,
+      }),
+      ME,
+      new Map([['!three-of-us:x', 100]]),
+      ONLY_BLOCKED,
+    )
+
+    expect(summaries).toHaveLength(1)
+    expect(summaries[0]).toMatchObject({
+      scope: '!three-of-us:x',
+      preview: 'hello',
+      previewBy: HER,
+      lastAt: 200,
+      unread: 1,
+    })
+  })
+
+  it('keeps the conversation out once the blocked account has left it', async () => {
+    const summaries = await fetchConversationSummaries(
+      fakeHomeserver({
+        '!with-them:x': {
+          members: [ME],
+          memberships: [{ user: BLOCKED, membership: 'leave', before: 'join' }],
+        },
+      }),
+      ME,
+      NOTHING_READ,
+      ONLY_BLOCKED,
+    )
+
+    expect(summaries).toEqual([])
+  })
+
+  it('redraws a row of three in the same draw as the block, with nothing asked again', async () => {
+    // Derived before the block: the blocked account's message is the
+    // opening, and two of the three unread messages are its own.
+    const rows = await fetchConversationSummaries(
+      fakeHomeserver({ '!three-of-us:x': threeOfUs }),
+      ME,
+      new Map([['!three-of-us:x', 100]]),
+    )
+    expect(rows[0]).toMatchObject({ preview: 'again', unread: 3, lastAt: 400 })
+
+    const [drawn] = listWithoutTheBlocked(rows, new Set([BLOCKED]))
+
+    expect(drawn).toMatchObject({
+      scope: '!three-of-us:x',
+      preview: 'hello',
+      previewBy: HER,
+      lastAt: 200,
+      unread: 1,
+    })
+  })
+
+  it('says nothing is left to show, and not that nothing was said, when only the blocked account spoke', async () => {
+    const [summary] = await fetchConversationSummaries(
+      fakeHomeserver({
+        '!three-of-us:x': {
+          members: [ME, BLOCKED, HER],
+          events: [{ id: '$3', sender: BLOCKED, ts: 300, plain: 'go away' }],
+        },
+      }),
+      ME,
+      NOTHING_READ,
+      ONLY_BLOCKED,
+    )
+
+    expect(summary).toMatchObject({
+      preview: null,
+      reason: NOTHING_LEFT_TO_SHOW,
+      unread: 0,
+    })
+  })
+
+  it('takes a row with nothing left to show over the one before it, which the blocked account wrote', async () => {
+    // A row with nothing left to show is not a derivation that failed: the
+    // one before it must not come back with the blocked account's words and
+    // count, on this launch or the next.
+    const before: ConversationSummary = {
+      scope: '!three-of-us:x',
+      other: null,
+      others: 2,
+      preview: 'go away',
+      previewBy: BLOCKED,
+      lastAt: 300,
+      unread: 1,
+    }
+    const derived = await fetchConversationSummaries(
+      fakeHomeserver({
+        '!three-of-us:x': {
+          members: [ME, BLOCKED, HER],
+          events: [{ id: '$3', sender: BLOCKED, ts: 300, plain: 'go away' }],
+        },
+      }),
+      ME,
+      NOTHING_READ,
+      ONLY_BLOCKED,
+    )
+
+    const [merged] = mergeSummaries([before], derived)
+
+    expect(merged).toMatchObject({ preview: null, unread: 0 })
+  })
+
+  it('drops the opening the blocked account wrote from a row kept from an earlier launch', () => {
+    // A row read from the notebook carries no messages to redraw from: its
+    // opening goes, and what it says of the others waits for the next
+    // derivation.
+    const kept: ConversationSummary = {
+      scope: '!three-of-us:x',
+      other: null,
+      others: 2,
+      preview: 'go away',
+      previewBy: BLOCKED,
+      lastAt: 300,
+      unread: 1,
+    }
+
+    const [drawn] = listWithoutTheBlocked([kept], new Set([BLOCKED]))
+
+    expect(drawn).toMatchObject({
+      preview: null,
+      reason: NOTHING_LEFT_TO_SHOW,
+    })
+    expect(drawn?.previewBy).toBeUndefined()
+  })
+
+  it('names the conversations with the blocked account, whoever is in them now', () => {
+    const rows: ConversationSummary[] = [
+      {
+        scope: '!a:x',
+        other: BLOCKED,
+        others: 1,
+        preview: null,
+        lastAt: 0,
+        unread: 0,
+      },
+      {
+        scope: '!b:x',
+        other: null,
+        others: 0,
+        departed: BLOCKED,
+        preview: null,
+        lastAt: 0,
+        unread: 0,
+      },
+      {
+        scope: '!c:x',
+        other: HER,
+        others: 1,
+        preview: null,
+        lastAt: 0,
+        unread: 0,
+      },
+      {
+        scope: '!d:x',
+        other: null,
+        others: 2,
+        preview: null,
+        lastAt: 0,
+        unread: 0,
+      },
+    ]
+
+    expect(scopesWithTheBlocked(rows, new Set([BLOCKED]))).toEqual([
+      '!a:x',
+      '!b:x',
     ])
   })
 })

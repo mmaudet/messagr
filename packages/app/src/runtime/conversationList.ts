@@ -3,8 +3,8 @@ import type { TimelineMachine } from '../timeline/buildTimeline'
 import { fetchRoomMessages, toTimelineEntries } from '../timeline/buildTimeline'
 import { fetchJoinedMembers, fetchJoinedRooms } from './encryptedSend'
 import { getErrorMessage } from './errors'
+import { EVERYTHING_SHOWN, shownOf, type NotShown } from './notShown'
 import type { HttpRequester } from './pump'
-import { countUnread } from './unread'
 import { howManyOthers, theOtherMember } from './vouch'
 
 /**
@@ -74,6 +74,12 @@ export interface ConversationSummary {
    * value cut to a guess would be a value no screen could uncut.
    */
   readonly preview: string | null
+  /**
+   * Who wrote that opening, when there is one (#469): what lets a row read
+   * from the notebook drop an opening a blocked account wrote, when it has no
+   * `window` to be drawn again from.
+   */
+  readonly previewBy?: string
   /** Why there is no preview, when there is none. */
   readonly reason?: string
   /**
@@ -93,6 +99,190 @@ export interface ConversationSummary {
    * would not be. See `unread.ts` for where the mark comes from.
    */
   readonly unread: number
+  /**
+   * The messages this row was derived from, without what this device does
+   * not draw (#469): what the row says is drawn again from them, at once and
+   * with nothing asked, when an account is blocked (`listWithoutTheBlocked`).
+   *
+   * IN MEMORY ONLY. The notebook keeps a row's opening and nothing behind it
+   * (`listCacheStore.ts`), and a row read from it has none.
+   */
+  readonly window?: readonly RowMessage[]
+}
+
+/**
+ * One message of a row's window, as the row needs it: who sent it, when,
+ * what it says, and whether it counts as unread.
+ */
+export interface RowMessage {
+  readonly sender: string
+  readonly sentAt: number
+  /** `null` when this device could not read it. */
+  readonly body: string | null
+  /** Why it could not be read, when it could not. */
+  readonly reason?: string
+  /** Removed for everyone: a line, and no opening. */
+  readonly removed?: boolean
+  /**
+   * Arrived after this device last looked at the conversation, from somebody
+   * else: what `unread.ts` counts.
+   */
+  readonly unread: boolean
+}
+
+/**
+ * What a row says when every message its window holds is one this device
+ * does not draw (#469): hidden here, or written by a blocked account.
+ *
+ * NOT A FAILURE, and not « nothing has been said » either: something was
+ * said, and none of it is to be shown. `mergeSummaries` keeps the row before
+ * a derivation that failed, and a row that took this for one kept the
+ * blocked account's opening and count for good.
+ */
+export const NOTHING_LEFT_TO_SHOW = 'nothing left to show'
+
+/**
+ * What a row says of its window: its opening and who wrote it, or why there
+ * is none; when the last message came; and how many are unread.
+ */
+export function saidIn(
+  window: readonly RowMessage[],
+): Pick<
+  ConversationSummary,
+  'preview' | 'previewBy' | 'reason' | 'lastAt' | 'unread'
+> {
+  // The newest first, so the search below stops at the first readable one.
+  const newest = [...window].sort((a, b) => b.sentAt - a.sentAt)
+  const readable = newest.find(one => one.body !== null)
+  return {
+    preview: readable?.body ?? null,
+    // Named separately from a missing preview, because "nothing has been
+    // said" and "this device cannot read what was said" look identical on a
+    // row and mean opposite things to the person reading it.
+    ...(readable === undefined
+      ? {
+          reason:
+            newest.length === 0
+              ? NOTHING_LEFT_TO_SHOW
+              : // A REMOVAL IS NOT A KEY THAT NEVER ARRIVED, and the row
+                // said it was. A tombstone carries `body: null` like an
+                // unreadable message and nothing else here told them
+                // apart, so a conversation whose last message had been
+                // deleted for everyone reported "this device cannot read
+                // the last message" -- a fault claimed where the truth is
+                // that somebody deleted something.
+                newest[0]?.removed === true
+                ? 'the last message was removed'
+                : (newest[0]?.reason ??
+                  'this device cannot read the last message'),
+        }
+      : { previewBy: readable.sender }),
+    lastAt: newest[0]?.sentAt ?? 0,
+    unread: window.filter(one => one.unread).length,
+  }
+}
+
+/**
+ * Most recently active first. Ties broken by the identifier so that two
+ * conversations with the same timestamp do not swap places between
+ * launches, which reads as movement nobody caused.
+ */
+export function byActivity(
+  a: ConversationSummary,
+  b: ConversationSummary,
+): number {
+  return b.lastAt - a.lastAt || a.scope.localeCompare(b.scope)
+}
+
+/**
+ * Whether a row is the conversation with a blocked account (#469): its other
+ * person, or the one who left it when this account is alone in it now. A
+ * conversation of more people is not: only that account's messages leave it.
+ */
+export function isWithTheBlocked(
+  row: ConversationSummary,
+  blocked: ReadonlySet<string>,
+): boolean {
+  const withWhom = row.other ?? row.departed
+  return withWhom !== null && withWhom !== undefined && blocked.has(withWhom)
+}
+
+/** The conversations with a blocked account, whoever is in them now. */
+export function scopesWithTheBlocked(
+  rows: readonly ConversationSummary[],
+  blocked: ReadonlySet<string>,
+): readonly string[] {
+  return rows
+    .filter(row => isWithTheBlocked(row, blocked))
+    .map(row => row.scope)
+}
+
+/**
+ * The list as it is drawn once `blocked` are blocked (#469), with nothing
+ * asked of anybody: the conversation with one of them leaves it, and every
+ * other row is drawn again from its window without their messages -- its
+ * opening, its time and its count, in the same draw as the block.
+ *
+ * A row with no window, read from the notebook, loses an opening a blocked
+ * account wrote; what it says of the others waits for the next derivation.
+ * The same list, handed back, when nobody is blocked.
+ */
+export function listWithoutTheBlocked(
+  rows: readonly ConversationSummary[],
+  blocked: ReadonlySet<string>,
+): readonly ConversationSummary[] {
+  if (blocked.size === 0) return rows
+  let changed = false
+  const drawn: ConversationSummary[] = []
+  for (const row of rows) {
+    if (isWithTheBlocked(row, blocked)) {
+      changed = true
+      continue
+    }
+    const redrawn = rowWithout(row, blocked)
+    if (redrawn !== row) changed = true
+    drawn.push(redrawn)
+  }
+  return changed ? drawn.sort(byActivity) : rows
+}
+
+function rowWithout(
+  row: ConversationSummary,
+  blocked: ReadonlySet<string>,
+): ConversationSummary {
+  const { window } = row
+  if (window === undefined) {
+    if (row.previewBy === undefined || !blocked.has(row.previewBy)) return row
+    return {
+      ...whoAndWhere(row),
+      preview: null,
+      reason: NOTHING_LEFT_TO_SHOW,
+      lastAt: row.lastAt,
+      unread: row.unread,
+    }
+  }
+  if (!window.some(one => blocked.has(one.sender))) return row
+  const left = window.filter(one => !blocked.has(one.sender))
+  return { ...whoAndWhere(row), ...saidIn(left), window: left }
+}
+
+/**
+ * A row without what it says of its messages: whom it is with, and what is
+ * known of who was there. What a redraw keeps, whatever a row comes to hold.
+ */
+function whoAndWhere({
+  preview: _preview,
+  previewBy: _previewBy,
+  reason: _reason,
+  lastAt: _lastAt,
+  unread: _unread,
+  window: _window,
+  ...rest
+}: ConversationSummary): Omit<
+  ConversationSummary,
+  'preview' | 'previewBy' | 'reason' | 'lastAt' | 'unread' | 'window'
+> {
+  return rest
 }
 
 export interface ConversationListDeps {
@@ -116,8 +306,12 @@ export async function fetchConversationSummaries(
   selfUserId: string,
   /** How far each conversation has been read here. Empty means none of them. */
   lastRead: ReadonlyMap<string, number>,
-  /** What this device was told not to draw. See `hiddenStore.ts`. */
-  hidden: ReadonlySet<string> = new Set(),
+  /**
+   * What this device does not draw: the messages hidden here, and the
+   * conversation with a blocked account and its messages everywhere else
+   * (#469). See `notShown.ts`.
+   */
+  notShown: NotShown = EVERYTHING_SHOWN,
 ): Promise<ConversationSummary[]> {
   const scopes = await fetchJoinedRooms(deps.http)
 
@@ -127,15 +321,12 @@ export async function fetchConversationSummaries(
   // its rows going wrong.
   const summaries = await Promise.all(
     scopes.map(scope =>
-      summarise(deps, scope, selfUserId, lastRead.get(scope) ?? 0, hidden),
+      summarise(deps, scope, selfUserId, lastRead.get(scope) ?? 0, notShown),
     ),
   )
 
-  // Most recently active first. Ties broken by the identifier so that two
-  // conversations with the same timestamp do not swap places between
-  // launches, which reads as movement nobody caused.
-  return summaries.sort(
-    (a, b) => b.lastAt - a.lastAt || a.scope.localeCompare(b.scope),
+  return [...listWithoutTheBlocked(summaries, notShown.blocked)].sort(
+    byActivity,
   )
 }
 
@@ -144,7 +335,7 @@ async function summarise(
   scope: string,
   selfUserId: string,
   lastReadAt: number,
-  hidden: ReadonlySet<string>,
+  notShown: NotShown,
 ): Promise<ConversationSummary> {
   let other: string | null = null
   let others: number | null = null
@@ -185,46 +376,37 @@ async function summarise(
       scope,
       await fetchRoomMessages(deps.http, scope, LOOK_BACK),
     )
-    // WITHOUT WHAT THIS DEVICE WAS TOLD NOT TO DRAW. Hiding a message and
-    // then reading it in the list is the promise broken in the one place
-    // somebody looks first, and the count would go on counting it too.
-    const entries =
-      hidden.size === 0
-        ? everything
-        : everything.filter(entry => !hidden.has(entry.eventId))
-    // The newest first, so the search below stops at the first readable one.
-    const newest = [...entries].sort((a, b) => b.sentAt - a.sentAt)
-    const readable = newest.find(entry => entry.body !== null)
+    // WITHOUT WHAT THIS DEVICE DOES NOT DRAW. Hiding a message and then
+    // reading it in the list is the promise broken in the one place somebody
+    // looks first, and the count would go on counting it too; a blocked
+    // account's messages leave every row for the same reason (#469).
+    const window: RowMessage[] = shownOf(everything, notShown).map(entry => ({
+      sender: entry.claimedSender,
+      sentAt: entry.sentAt,
+      body: entry.body,
+      ...(entry.reason === undefined ? {} : { reason: entry.reason }),
+      ...(entry.removed === true ? { removed: true } : {}),
+      // What `unread.ts` counts: after the mark, from somebody else.
+      unread: entry.sentAt > lastReadAt && entry.claimedSender !== selfUserId,
+    }))
 
     return {
       scope,
       other,
       others,
       ...whoWasHere,
-      preview: readable?.body ?? null,
-      // Named separately from a missing preview, because "nothing has been
-      // said" and "this device cannot read what was said" look identical on a
-      // row and mean opposite things to the person reading it.
-      ...(readable === undefined
+      // NOTHING SAID, which is not NOTHING LEFT TO SHOW: `saidIn` says the
+      // second when every message of the window is one this device does not
+      // draw.
+      ...(everything.length === 0
         ? {
-            reason:
-              newest.length === 0
-                ? 'nothing has been said yet'
-                : // A REMOVAL IS NOT A KEY THAT NEVER ARRIVED, and the row
-                  // said it was. A tombstone carries `body: null` like an
-                  // unreadable message and nothing else here told them
-                  // apart, so a conversation whose last message had been
-                  // deleted for everyone reported "this device cannot read
-                  // the last message" -- a fault claimed where the truth is
-                  // that somebody deleted something.
-                  newest[0]?.removed === true
-                  ? 'the last message was removed'
-                  : (newest[0]?.reason ??
-                    'this device cannot read the last message'),
+            preview: null,
+            reason: 'nothing has been said yet',
+            lastAt: 0,
+            unread: 0,
           }
-        : {}),
-      lastAt: newest[0]?.sentAt ?? 0,
-      unread: countUnread(entries, lastReadAt, selfUserId),
+        : saidIn(window)),
+      window,
     }
   } catch (cause: unknown) {
     return {

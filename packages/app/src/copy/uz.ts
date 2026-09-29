@@ -476,6 +476,39 @@ export const uz: Readonly<Record<CopyKey, string>> = {
     'Hech narsa oʻzgarmadi: bu hisob bloklanmagan va taklif hamon javobingizni kutmoqda. Qayta urinib koʻrishingiz mumkin.',
   invited_block_confirm: 'Bloklash',
   invited_block_cancel: 'Bekor qilish',
+  block_action: 'Bloklash',
+  block_hint:
+    'Bu hisobdan sizga boshqa hech narsa yetib kelmaydi va bu suhbat roʻyxatingizdan chiqadi.',
+  block_explain_title: 'Bloklash nima qiladi va nima qilmaydi',
+  block_explain_lead:
+    'Bu hisob buni bilmaydi. Qaror qilishdan oldin, bu harakat oʻzgartiradigan hamma narsa shu.',
+  block_fact_nothing: 'Bu hisobdan sizga hech narsa yetib kelmaydi',
+  block_explain_nothing:
+    'Uning xabarlari ham, qoʻngʻiroqlari ham, takliflari ham endi hech bir qurilmangizga yetib kelmaydi. U sizni Messagrda boshqa taklif qila olmaydi.',
+  block_fact_gone: 'U yozgan narsalar ekranlaringizdan ketadi',
+  block_explain_gone:
+    'Uning xabarlari barcha suhbatlaringizdan, allaqachon olinganlari ham, yoʻqoladi va bu suhbat roʻyxatingizdan chiqadi. Siz undan chiqmaysiz: bu hisob hech qanday oʻzgarishni koʻrmaydi.',
+  block_fact_untold: 'Bu hisobga xabar berilmaydi',
+  block_explain_untold:
+    'Unga hech narsa aytilmaydi. Uning xabarlari sizga hech qachon yetib kelmasdan joʻnatiladi, takliflari esa kutib turadi, keyin muddati tugaydi.',
+  block_fact_not_hidden: 'Bloklash sizni yashirmaydi',
+  block_fact_operator: 'Operator bundan xabar topadi',
+  block_explain_operator:
+    'Operator siz bu hisobni bloklaganingizni biladi, lekin nima deyilganini hech qachon bilmaydi.',
+  block_fact_report: 'Shikoyat uning xabarlari orqali qilinadi',
+  block_explain_report:
+    'Operatorga bu hisob sizga nima yozganini koʻrsatish uchun, bloklashdan oldin suhbatda uning xabarlarini tanlang va ular ustidan shikoyat qiling: keyin ular ekranlaringizdan ketadi.',
+  block_confirm: 'Ha, bu hisobni bloklash',
+  block_cancel: 'Bekor qilish',
+  block_working: 'Bajarilmoqda…',
+  block_failed:
+    'Bu oʻtmadi va hech narsa oʻzgarmadi: bu hisob bloklanmagan. Qayta urinib koʻrishingiz mumkin.',
+  list_blocked:
+    'Bu hisob bloklandi: undan sizga boshqa hech narsa yetib kelmaydi va u bilan suhbatingiz roʻyxatdan chiqdi.',
+  list_blocked_waiting:
+    'Bu hisob bloklandi va u bilan suhbatingiz roʻyxatdan chiqdi: uning xabarlari va qoʻngʻiroqlari endi sizga yetib kelmaydi. Operatorga hali xabar berilmagan va shu vaqtgacha bu hisobdan Messagrdagi taklif sizga hali yetib kelishi mumkin. Ilova bu amalga oshmaguncha har safar ishga tushganda qayta urinadi.',
+  list_blocked_not_kept:
+    'Bu hisob bloklandi va u bilan suhbatingiz roʻyxatdan chiqdi: uning xabarlari va qoʻngʻiroqlari endi sizga yetib kelmaydi. Operatorga xabar berilmadi va bu qurilma qayta urinish uchun buni yozib qoʻya olmadi: bu hisobdan Messagrdagi taklif sizga hali yetib kelishi mumkin.',
   invited_working: 'Bir daqiqa…',
   invited_failed:
     'Hech narsa oʻzgarmadi: bu taklifga na qoʻshildingiz, na uni rad etdingiz. Qayta urinib koʻrishingiz mumkin.',

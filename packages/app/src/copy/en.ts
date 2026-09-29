@@ -465,6 +465,39 @@ export const en: Readonly<Record<CopyKey, string>> = {
     'Nothing has changed: this account is not blocked, and the invitation is still waiting for your answer. You can try again.',
   invited_block_confirm: 'Block',
   invited_block_cancel: 'Cancel',
+  block_action: 'Block',
+  block_hint:
+    'Nothing from this account will reach you any more, and this conversation will leave your list.',
+  block_explain_title: 'What blocking does, and what it does not',
+  block_explain_lead:
+    'This account will not know. Here is everything this gesture changes, before you decide.',
+  block_fact_nothing: 'Nothing from this account reaches you',
+  block_explain_nothing:
+    'Neither its messages, nor its calls, nor its invitations reach you any more, on any of your devices. It can no longer invite you in Messagr.',
+  block_fact_gone: 'What it wrote leaves your screens',
+  block_explain_gone:
+    'Its messages disappear from all your conversations, those already received included, and this conversation leaves your list. You do not leave it: this account sees nothing change.',
+  block_fact_untold: 'This account is not told',
+  block_explain_untold:
+    'Nothing tells it. Its messages go out without ever reaching you, and its invitations wait, then expire.',
+  block_fact_not_hidden: 'Blocking does not hide you',
+  block_fact_operator: 'The operator learns of it',
+  block_explain_operator:
+    'The operator will learn that you blocked this account, never what was said.',
+  block_fact_report: 'Reporting goes through its messages',
+  block_explain_report:
+    'To show the operator what this account wrote to you, select its messages in the conversation and report them before blocking: afterwards, they leave your screens.',
+  block_confirm: 'Yes, block this account',
+  block_cancel: 'Cancel',
+  block_working: 'Working…',
+  block_failed:
+    'That did not go through, and nothing changed: this account is not blocked. You can try again.',
+  list_blocked:
+    'This account is blocked: nothing from it will reach you any more, and your conversation with it has left the list.',
+  list_blocked_waiting:
+    'This account is blocked, and your conversation with it has left the list: its messages and calls will no longer reach you. The operator has not been told yet, and until then an invitation in Messagr from this account can still reach you. The app will try again at every launch until it is.',
+  list_blocked_not_kept:
+    'This account is blocked, and your conversation with it has left the list: its messages and calls will no longer reach you. The operator has not been told, and this device could not note it to try again: an invitation in Messagr from this account can still reach you.',
   invited_working: 'One moment…',
   invited_failed:
     'Nothing has changed: this invitation was neither joined nor refused. You can try again.',
