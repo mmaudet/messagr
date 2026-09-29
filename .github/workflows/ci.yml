@@ -62,9 +62,11 @@ jobs:
         run: yarn tokens:check
 
       # A changelog generator that got it wrong would produce a public
-      # artefact nobody would think to doubt. It has no test file because
-      # `scripts/` has no test harness; it carries its own cases instead, and
-      # this is what makes them run.
+      # artefact nobody would think to doubt. It carries its own cases, and
+      # this is what makes them run. `scripts/` has no harness of its own:
+      # the only scripts with a test file are the operator's tools, whose
+      # specs sit in `packages/app` beside the modules they load (#465), and
+      # run with `yarn test` below.
       - name: Assert the release notes are built the way they are meant to be
         run: node scripts/release-notes.mjs --self-test
 
@@ -82,9 +84,10 @@ jobs:
       # Connect, après le téléversement -- c'est-à-dire à l'endroit exact où
       # on ne veut pas l'apprendre. Rien d'autre ne peut l'exercer : les
       # captures elles-mêmes demandent un simulateur, que ce runner n'a pas,
-      # et `scripts/` n'a pas de harnais de tests. Le fichier porte donc ses
-      # cas, comme `release-notes.mjs` et `testflight-reviewer.mjs` portent
-      # les leurs, et ceci est ce qui les lance.
+      # et `scripts/` n'a pas de harnais à lui : seuls les outils de
+      # l'exploitant ont des essais, dans `packages/app`. Le fichier porte
+      # donc ses cas, comme `release-notes.mjs` et `testflight-reviewer.mjs`
+      # portent les leurs, et ceci est ce qui les lance.
       - name: Assert the iOS screenshot sizes are the ones Apple accepts
         run: node scripts/assert-ios-captures.mjs --self-test
 

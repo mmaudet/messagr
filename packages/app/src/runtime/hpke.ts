@@ -8,7 +8,10 @@ import { sha256 } from '@noble/hashes/sha2.js'
  * DHKEM(X25519, HKDF-SHA256), HKDF-SHA256 and ChaCha20-Poly1305 (#405).
  *
  * What seals the name an inviter gives itself for the device of the person it
- * invites, and opens it there (`sealedName.ts`). The construction and the
+ * invites, and opens it there (`sealedName.ts`). And, until the bridge seals
+ * it (#482), what seals a report for the operator key (`sealedReport.ts`),
+ * which the operator opens on its own machine with this very file
+ * (`scripts/lib/ouvrir-un-signalement.mjs`). The construction and the
  * libraries were chosen on #405: the primitives come from `@noble/curves`,
  * `@noble/ciphers` and `@noble/hashes`, all three audited, and this file only
  * assembles them as §4, §5.1 and §7.1.3 of the RFC say, checked against the
@@ -17,8 +20,12 @@ import { sha256 } from '@noble/hashes/sha2.js'
  * SINGLE-SHOT: one message per encapsulation, so the nonce is the base nonce
  * itself, sequence number 0, as `SealBase` and `OpenBase` of §6.1.
  *
+ * NOTHING BUT ITS LIBRARIES: the operator's tools load this file under Node,
+ * which strips its types but resolves no import without its extension.
+ *
  * Outside the crypto bridge, which ADR 0001 otherwise keeps as the one place
- * for cryptography: its amendment of 27 September 2026 says why this may be.
+ * for cryptography: its amendments of 27 September 2026 (the declared name)
+ * and of 29 September 2026 (a report, until #482) say why this may be.
  */
 
 export interface KeyPair {

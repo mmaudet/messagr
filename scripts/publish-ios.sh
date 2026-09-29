@@ -50,6 +50,11 @@ WORK="${ASC_WORK_DIR:-$(mktemp -d)}"
 ONLY_UPLOAD=no
 if [ "${1:-}" = "--upload-only" ]; then ONLY_UPLOAD=yes; fi
 
+# La clé de l'exploitant qu'une build de magasin peut porter (#465) : le
+# pourquoi est dans ce script-là. Avant tout le reste, l'archive coûtant vingt
+# minutes.
+node "$ROOT/scripts/assert-operator-key.mjs"
+
 if [ -z "$KEY_ID" ] || [ -z "$ISSUER_ID" ]; then
   echo "ASC_KEY_ID and ASC_ISSUER_ID must be set." >&2
   echo "Put them in ~/.appstoreconnect/env (chmod 600), two lines:" >&2

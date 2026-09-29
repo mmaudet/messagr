@@ -359,6 +359,8 @@ stage "Build a signed bundle, before touching Play"
 say "Deliberately before the upload: a key that does not work should fail here,"
 say "not after you have filled in four declaration forms."
 pause "Build now? This takes a few minutes."
+# The operator key this bundle may carry (#465): the script says why.
+node "$REPO_ROOT/scripts/assert-operator-key.mjs"
 (
   cd "$REPO_ROOT/packages/app/android"
   MESSAGR_UPLOAD_KEYSTORE="$KEYSTORE_PATH" \

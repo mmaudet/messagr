@@ -71,6 +71,11 @@ if [ "$WHICH" != "android" ]; then
   echo
   echo "#### iOS ####"
 
+  # La clé de l'exploitant (#465), vérifiée par `publish-ios.sh` aussi, mais
+  # ici avant de monter le numéro de build : un numéro monté pour une build
+  # qui ne partira pas ne sert à rien. Le pourquoi est dans ce script-là.
+  node "$ROOT/scripts/assert-operator-key.mjs"
+
   # THE BUILD NUMBER, RAISED HERE RATHER THAN REMEMBERED BY A PERSON.
   #
   # App Store Connect refuses a build whose (version, build) pair it has seen

@@ -109,6 +109,11 @@ jobs:
 
       - run: yarn install --frozen-lockfile
 
+      # The operator key a store build may carry (#465), before nine minutes
+      # of build. Why: the script says it, once.
+      - name: Assert the application carries a key other than the test key
+        run: node scripts/assert-operator-key.mjs
+
       # Refused early and by name. Gradle would otherwise produce an unsigned
       # bundle and the upload would fail much later with a message about the
       # bundle rather than about the missing secret that caused it.
