@@ -50,6 +50,15 @@ WORK="${ASC_WORK_DIR:-$(mktemp -d)}"
 ONLY_UPLOAD=no
 if [ "${1:-}" = "--upload-only" ]; then ONLY_UPLOAD=yes; fi
 
+# LA CLÉ DE TEST DE L'EXPLOITANT NE PART PAS CHEZ APPLE (#465).
+#
+# L'application scelle chaque signalement pour la clé qu'elle porte, et la
+# moitié privée de la clé de test est dans ce dépôt public : ce qu'elle scelle,
+# n'importe qui l'ouvre. TestFlight comme l'App Store la refusent donc, et ici
+# avant tout le reste, puisque l'archive coûte vingt minutes. #470 y met la
+# clé de production ; les builds de la CI et du Pixel gardent la clé de test.
+node "$ROOT/scripts/assert-operator-key.mjs"
+
 if [ -z "$KEY_ID" ] || [ -z "$ISSUER_ID" ]; then
   echo "ASC_KEY_ID and ASC_ISSUER_ID must be set." >&2
   echo "Put them in ~/.appstoreconnect/env (chmod 600), two lines:" >&2

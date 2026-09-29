@@ -109,6 +109,15 @@ jobs:
 
       - run: yarn install --frozen-lockfile
 
+      # NOT THE TEST KEY OF THE OPERATOR (#465). The application seals every
+      # report for the key it carries, and the test key's private half is in
+      # this public repository, so anyone opens what it seals. A store build
+      # refuses it, here before nine minutes of build; #470 puts the
+      # production key in. ci.yml and device.yml keep building with the test
+      # key, as all development does.
+      - name: Assert the application carries a key other than the test key
+        run: node scripts/assert-operator-key.mjs
+
       # Refused early and by name. Gradle would otherwise produce an unsigned
       # bundle and the upload would fail much later with a message about the
       # bundle rather than about the missing secret that caused it.
