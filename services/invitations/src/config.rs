@@ -86,7 +86,7 @@ pub struct Sms {
     pub provider: Option<crate::sms::Ovhcloud>,
     /// The operator's own number, from `ALERT_SMS_TO` (`alert_sms_to`), or
     /// nobody but the log.
-    pub operator: Option<String>,
+    pub operator_number: Option<String>,
 }
 
 impl Sms {
@@ -95,7 +95,7 @@ impl Sms {
     pub fn from_vars(var: impl Fn(&str) -> Option<String>) -> Result<Sms, ConfigError> {
         Ok(Sms {
             provider: sms_provider(&var)?,
-            operator: alert_sms_to(var("ALERT_SMS_TO"))?,
+            operator_number: alert_sms_to(var("ALERT_SMS_TO"))?,
         })
     }
 
@@ -104,7 +104,9 @@ impl Sms {
     pub fn to_the_operator(&self) -> Result<(&crate::sms::Ovhcloud, &str), &'static str> {
         Ok((
             self.provider.as_ref().ok_or("no SMS provider")?,
-            self.operator.as_deref().ok_or("ALERT_SMS_TO absent")?,
+            self.operator_number
+                .as_deref()
+                .ok_or("ALERT_SMS_TO absent")?,
         ))
     }
 }
@@ -488,7 +490,8 @@ mod tests {
         ),
     ];
 
-    const OPERATOR: &[(&str, &str)] = &[("ALERT_SMS_TO", "+33600000000")];
+    const OPERATOR_NUMBER: &str = "+33600000000";
+    const OPERATOR: &[(&str, &str)] = &[("ALERT_SMS_TO", OPERATOR_NUMBER)];
 
     /// A deployment's variables: `REQUIRED`, and `more`.
     fn deployment(more: &[&[(&str, &str)]]) -> impl Fn(&str) -> Option<String> {
@@ -636,7 +639,7 @@ mod tests {
             masking_keys: Some(std::sync::Arc::new(keys)),
             sms: Sms {
                 provider: sms_provider(env(OVH)).unwrap(),
-                operator: None,
+                operator_number: None,
             },
             ..Config::for_tests()
         }
@@ -646,7 +649,7 @@ mod tests {
     fn with_the_operator(cfg: Config) -> Config {
         Config {
             sms: Sms {
-                operator: Some("+33600000000".into()),
+                operator_number: Some(OPERATOR_NUMBER.into()),
                 ..cfg.sms.clone()
             },
             ..cfg

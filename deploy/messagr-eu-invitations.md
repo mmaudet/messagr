@@ -217,13 +217,16 @@ its alerts go by SMS while discovery stays off (#462).
   stops the start.
 - **Once a day**: a country's ceiling or the budget reached, and the prepaid
   balance under `SMS_CREDITS_ALERT_BELOW` (below). The hourly sweep reads
-  the balance whenever the provider is given, discovery on or off: the
-  alerts spend the same credits as the proofs.
-- **At each call**, without a daily limit: what the reports and the blocks
-  of #462 are to tell the operator.
+  the balance whenever the alerts go by SMS, discovery on or off: they spend
+  the same credits as the proofs. Such an alert counts as told for the day
+  once its SMS is asked of OVHcloud, even if OVHcloud refuses it.
+- **At each call**, the service itself setting no limit: what the moderation
+  of #462 is to tell the operator with, at the cadence its tickets set, one
+  SMS per report (#468) until they are grouped every quarter of an hour
+  (#478), and one a day that counts the blocks (#469).
 - **No SMS names an account, or carries anything that was said.** An alert
-  that names an account is held back: no SMS leaves, and the log says only
-  that an alert was held back.
+  that carries an account's identifier (`@name:server`) is held back: no SMS
+  leaves, and the log says only that an alert was held back.
 - **Each alert is erased from OVHcloud's history** a day after it left, and
   **none leaves until OVHcloud has validated the sender**: until then the
   log says `the alert could not be sent` (below).
@@ -256,7 +259,7 @@ its SMS does not leave.
   `ALERT_SMS_TO` (international form): once a day for each ceiling reached,
   and once a day while the prepaid balance is under
   `SMS_CREDITS_ALERT_BELOW` credits (100 unless set), which the hourly sweep
-  reads whenever the provider is given, discovery on or off (above).
+  reads whenever the alerts go by SMS, discovery on or off (above).
   **Discovery stays off without `ALERT_SMS_TO`**, and a malformed one stops
   the start.
 - **The credits are prepaid, with automatic re-crediting off**, so that a

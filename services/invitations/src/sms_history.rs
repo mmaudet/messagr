@@ -106,15 +106,8 @@ mod tests {
             )),
             cfg: crate::config::Config {
                 sms: crate::config::Sms {
-                    provider: Some(crate::sms::Ovhcloud {
-                        base_url,
-                        application_key: "ak".into(),
-                        application_secret: "as".into(),
-                        consumer_key: "ck".into(),
-                        service_name: "sms-test-1".into(),
-                        sender: "Messagr".into(),
-                    }),
-                    operator: None,
+                    operator_number: None,
+                    ..crate::handlers::discovery::test_support::sms_through(base_url)
                 },
                 ..crate::config::Config::for_tests()
             },

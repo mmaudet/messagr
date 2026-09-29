@@ -7,7 +7,7 @@
 //! per ceiling (`alert`). So is a prepaid balance running low at OVHcloud,
 //! which the sweep checks: the budget counts SMS, OVHcloud bills credits, and
 //! a proof that cannot be paid for is one nobody receives. So is an alert
-//! (#464): the balance is checked whenever there is a provider, discovery on
+//! (#464): the balance is checked whenever the alerts go by SMS, discovery on
 //! or off.
 //!
 //! # COUNTED BEFORE THE SMS LEAVES
@@ -222,11 +222,11 @@ pub async fn release(pool: &SqlitePool, counted: Counted) -> anyhow::Result<()> 
 }
 
 /// Tells the operator when the prepaid balance at OVHcloud falls under
-/// `SMS_CREDITS_ALERT_BELOW`. Run by the sweep whenever there is a provider,
-/// discovery on or off (#464): the operator's alerts spend the same credits
-/// as the proofs.
+/// `SMS_CREDITS_ALERT_BELOW`. Run by the sweep whenever the operator's alerts
+/// go by SMS, discovery on or off (#464): they spend the same credits as the
+/// proofs. Without the operator's number, OVHcloud is asked nothing.
 pub async fn check_the_credits(st: &Arc<AppState>, now: i64) -> anyhow::Result<()> {
-    let Some(provider) = st.cfg.sms.provider.as_ref() else {
+    let Ok((provider, _)) = st.cfg.sms.to_the_operator() else {
         return Ok(());
     };
     let left = provider.credits_left(now).await?;

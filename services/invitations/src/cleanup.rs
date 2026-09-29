@@ -63,8 +63,9 @@ pub async fn purge_spent_proofs(pool: &SqlitePool, now: i64) -> Result<u64> {
 /// crédits prépayés qui baissent.
 ///
 /// Les SMS à effacer et les crédits ne sont pas qu'à la découverte : les
-/// alertes de l'exploitant partent aussi quand elle est éteinte (#464), et
-/// ces deux étapes tournent dès qu'un fournisseur est configuré.
+/// alertes de l'exploitant partent aussi quand elle est éteinte (#464). Les
+/// SMS s'effacent dès qu'un fournisseur est configuré, et les crédits sont
+/// relevés dès que les alertes partent par SMS.
 ///
 /// CHAQUE ÉTAPE TOURNE, QUOI QUE FASSENT LES AUTRES : un échec n'en saute
 /// aucune, et il est rendu une fois toutes passées.

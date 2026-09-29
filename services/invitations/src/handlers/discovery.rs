@@ -1324,7 +1324,7 @@ pub(crate) mod test_support {
                 service_name: "sms-test-1".into(),
                 sender: "Messagr".into(),
             }),
-            operator: Some(ALERT.to_string()),
+            operator_number: Some(ALERT.to_string()),
         }
     }
 
