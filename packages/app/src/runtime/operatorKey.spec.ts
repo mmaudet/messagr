@@ -20,6 +20,7 @@ import {
   excludeFromTimeMachine,
   keyTool,
 } from '../../../../scripts/lib/cle-de-l-exploitant.mjs'
+import { noFileOpened } from '../../../../scripts/fixtures/sans-fichier-ouvert.mjs'
 import { openTool } from '../../../../scripts/lib/ouvrir-un-signalement.mjs'
 import { bytesOf } from './base64'
 import { generateKeyPair } from './hpke'
@@ -317,6 +318,7 @@ describe('Drawing the operator key, on the operator’s machine', () => {
       stdin: async () => '',
       stderr: () => undefined,
       stdout: (text: string) => printed.push(text),
+      ...noFileOpened(),
     })
     expect(status).toBe(0)
     expect(printed).toEqual(['pour la clé tirée'])
@@ -418,6 +420,7 @@ describe('Restoring the operator key from its offline copy', () => {
       stdin: async () => '',
       stderr: (line: string) => said.push(line),
       stdout: () => undefined,
+      ...noFileOpened(),
     })
 
     expect(status).toBe(2)

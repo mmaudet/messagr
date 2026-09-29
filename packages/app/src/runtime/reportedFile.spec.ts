@@ -1,3 +1,4 @@
+import { EventEmitter } from 'node:events'
 import {
   existsSync,
   mkdirSync,
@@ -9,10 +10,10 @@ import {
 } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
+import { PassThrough } from 'node:stream'
 
 import { describe, expect, it } from 'vitest'
 
-import { mediaDownloader } from '../../../../scripts/lib/ouvrir-un-fichier-signale.mjs'
 import { openTool } from '../../../../scripts/lib/ouvrir-un-signalement.mjs'
 import type { TimelineEntry } from '../timeline/mergeTimeline'
 import { generateKeyPair } from './hpke'
@@ -25,14 +26,17 @@ import { sealReportWithEphemeral } from './sealedReport'
  * its own machine, on demand only (#471, ADR 0015).
  *
  * The report holds the description of its encrypted file, never the file.
- * Asked to open one (`--ouvrir <n>`), the tool downloads the encrypted copy
- * with the operator's account, refuses it unless its SHA-256 hash is the one
- * the report states, decrypts it in memory, shows it from a private copy,
- * and erases that copy whatever happens: nothing of it is left behind.
+ * Asked to open one (`--ouvrir <n>`), the tool first erases what an
+ * interrupted opening left, reads the operator's account, downloads the
+ * encrypted copy from that account's own server, refuses it unless its
+ * SHA-256 hash is the one the report states, decrypts it in memory, listens
+ * for an interruption, writes a private copy, hands it to Preview, waits for
+ * Enter, and erases the copy whatever happens.
  *
- * The homeserver is a local file double: the encrypted copy is a file here,
- * served for its `mxc://` address. The viewer is a double too, which reads
- * what it is handed while it is there.
+ * Everything the tool reaches of the machine is a double here: the
+ * homeserver is a local file behind `fetch`, Preview and the terminal are
+ * what the test says, and the interruptions are emitted by the test. The
+ * account is a file of a home made for the test: never the real one.
  */
 
 const FIXTURES = join(__dirname, '../../../../scripts/fixtures')
@@ -44,13 +48,10 @@ const TEST_KEY = JSON.parse(readFileSync(TEST_KEY_FILE, 'utf8')) as {
 
 /**
  * NIST SP 800-38A, appendix F.5.5, CTR-AES256.Encrypt: a file of four
- * blocks, its key, its initial counter, and its ciphertext. Matrix encrypts
- * a file in AES-256-CTR, so this is an encrypted file whose every byte was
- * computed outside this repository.
+ * blocks, and its ciphertext. Matrix encrypts a file in AES-256-CTR, so this
+ * is an encrypted file whose every byte was computed outside this repository.
  */
 const NIST = {
-  key: '603deb1015ca71be2b73aef0857d77811f352c073b6108d72d9810a30914dff4',
-  counter: 'f0f1f2f3f4f5f6f7f8f9fafbfcfdfeff',
   plaintext:
     '6bc1bee22e409f96e93d7e117393172aae2d8a571e03ac9c9eb76fac45af8e51' +
     '30c81c46a35ce411e5fbc1191a0a52eff69f2445df4f9b17ad2b417be66c3710',
@@ -60,9 +61,10 @@ const NIST = {
 }
 
 /**
- * That ciphertext described as Matrix describes an encrypted file: the key
- * in unpadded base64url, the counter in unpadded base64, and the SHA-256
- * hash of the ciphertext, computed apart with `openssl dgst -sha256`.
+ * That ciphertext described as Matrix describes an encrypted file: its key
+ * (603deb10…) in unpadded base64url, its counter (f0f1…) in unpadded base64,
+ * and the SHA-256 hash of the ciphertext, computed apart with
+ * `openssl dgst -sha256`.
  */
 const MATERIAL = {
   v: 'v2',
@@ -79,6 +81,14 @@ const MATERIAL = {
 
 const ME = '@alice:example.org'
 const HIM = '@bob:example.org'
+/** The operator's account of these tests, on its own server. TEST ONLY. */
+const ACCOUNT = {
+  serveur: 'https://messagr.example',
+  user_id: '@exploitation:messagr.example',
+  access_token: 'jeton-d-essai-471',
+}
+/** Where that server serves a media of `mxc://<server>/<id>`. */
+const DOWNLOADS = 'https://messagr.example/_matrix/client/v1/media/download'
 
 function bytes(hexadecimal: string): Uint8Array {
   return Uint8Array.from(hexadecimal.match(/../g) ?? [], pair =>
@@ -98,80 +108,120 @@ function arrayBufferOf(hexadecimal: string): ArrayBuffer {
   return buffer
 }
 
-/** A homeserver's media, as local files: each `mxc://` address, a file. */
-function mediaHeld(copies: Readonly<Record<string, string>>) {
-  const directory = mkdtempSync(join(tmpdir(), 'serveur-471-'))
+/** A home holding the operator's account, as its own file. */
+function homeWith(account: object | null = ACCOUNT): string {
+  const home = mkdtempSync(join(tmpdir(), 'exploitant-471-'))
+  if (account !== null) {
+    mkdirSync(join(home, '.messagr-exploitation'))
+    writeFileSync(
+      join(home, '.messagr-exploitation', 'messagr-eu.json'),
+      JSON.stringify(account),
+    )
+  }
+  return home
+}
+
+/**
+ * What the Mac is for the tool, doubled: a homeserver whose media are
+ * local files, Preview, the terminal, and the interruptions.
+ */
+function machine(
+  options: {
+    /** The encrypted copy of each media, by the download address. */
+    readonly served?: Readonly<Record<string, string>>
+    /** What Preview does once handed a file. */
+    readonly preview?: 'shows' | 'fails' | 'is-interrupted'
+    /** What the terminal does once asked for Enter. */
+    readonly terminal?: 'enter' | 'is-interrupted' | 'none'
+    readonly home?: string
+    readonly environment?: Readonly<Record<string, string>>
+    readonly temporary?: string
+  } = {},
+) {
+  const media = mkdtempSync(join(tmpdir(), 'serveur-471-'))
   const files = new Map<string, string>()
-  for (const [url, ciphertext] of Object.entries(copies)) {
-    const path = join(directory, String(files.size))
+  for (const [url, ciphertext] of Object.entries(options.served ?? {})) {
+    const path = join(media, String(files.size))
     writeFileSync(path, bytes(ciphertext))
     files.set(url, path)
   }
-  const downloaded: string[] = []
-  return {
-    downloaded,
-    download: async (url: string): Promise<Uint8Array> => {
-      downloaded.push(url)
+  const asked: { url: string; authorization: string | undefined }[] = []
+  const handed: {
+    command: string
+    args: readonly string[]
+    bytes: string
+    mode: number
+    directoryMode: number
+  }[] = []
+  const signals = new EventEmitter()
+  const said: string[] = []
+  const printed: string[] = []
+  const ports = {
+    home: options.home ?? homeWith(),
+    environment: options.environment ?? {},
+    stdin: async () => '',
+    stderr: (line: string) => said.push(line),
+    stdout: (line: string) => printed.push(line),
+    fetch: async (url: string, init: { headers: Record<string, string> }) => {
+      asked.push({ url, authorization: init.headers.Authorization })
       const path = files.get(url)
-      if (path === undefined) throw new Error('le serveur répond 404')
-      return new Uint8Array(readFileSync(path))
+      return path === undefined
+        ? {
+            ok: false,
+            status: 404,
+            arrayBuffer: async () => new ArrayBuffer(0),
+          }
+        : {
+            ok: true,
+            status: 200,
+            arrayBuffer: async () =>
+              arrayBufferOf(hex(new Uint8Array(readFileSync(path)))),
+          }
     },
-  }
-}
-
-/** What the viewer was handed, read while it was there. */
-interface Seen {
-  readonly path: string
-  readonly bytes: string
-  readonly mode: number
-  readonly directoryMode: number
-}
-
-/** A viewer that reads what it is shown, or one that fails. */
-function viewer(fails = false) {
-  const seen: Seen[] = []
-  return {
-    seen,
-    show: async (path: string): Promise<void> => {
-      seen.push({
-        path,
+    run: async (command: string, args: readonly string[]) => {
+      // What Preview would read, read while it is there.
+      const path = args[args.length - 1]!
+      handed.push({
+        command,
+        args,
         bytes: hex(new Uint8Array(readFileSync(path))),
         mode: statSync(path).mode % 0o1000,
         directoryMode: statSync(dirname(path)).mode % 0o1000,
       })
-      if (fails) throw new Error('Aperçu ne s’est pas ouvert')
+      if (options.preview === 'fails') throw new Error('Aperçu est absent')
+      if (options.preview === 'is-interrupted') {
+        signals.emit('SIGINT')
+        await new Promise(() => {})
+      }
     },
+    terminal: () => {
+      const tty = new PassThrough()
+      if (options.terminal === 'none') {
+        setTimeout(() => tty.emit('error', new Error('ENXIO: /dev/tty')), 0)
+      } else if (options.terminal === 'is-interrupted') {
+        setTimeout(() => signals.emit('SIGTERM'), 0)
+      } else {
+        setTimeout(() => tty.write('\n'), 0)
+      }
+      return tty
+    },
+    signals,
+    temporary:
+      options.temporary ?? mkdtempSync(join(tmpdir(), 'ouverture-471-')),
   }
+  return { ports, asked, handed, signals, said, printed }
 }
 
-/** What the tool says and prints, how it ends, and where it may write. */
+/** What the tool says and prints, and how it ends. */
 async function run(
   argv: readonly string[],
-  media: ReturnType<typeof mediaHeld>,
-  shown: ReturnType<typeof viewer>,
-  temporary = mkdtempSync(join(tmpdir(), 'ouverture-471-')),
-) {
-  const said: string[] = []
-  const printed: string[] = []
-  const accounts: (string | null)[] = []
-  const status = await openTool([...argv], {
-    home: mkdtempSync(join(tmpdir(), 'exploitant-471-')),
-    stdin: async () => '',
-    stderr: (line: string) => said.push(line),
-    stdout: (line: string) => printed.push(line),
-    media: async (named: string | null) => {
-      accounts.push(named)
-      return { ok: true, download: media.download }
-    },
-    show: shown.show,
-    temporary,
-  })
+  mac: ReturnType<typeof machine>,
+): Promise<{ status: number; said: string; printed: string[] }> {
+  const status = await openTool([...argv], mac.ports)
   return {
     status,
-    said: said.join('\n'),
-    printed: printed.join('\n').split('\n'),
-    accounts,
-    temporary,
+    said: mac.said.join('\n'),
+    printed: mac.printed.join('\n').split('\n'),
   }
 }
 
@@ -205,7 +255,7 @@ const PAYLOAD: ReportPayload = {
       eventId: '$document',
       sentAt: 1_790_000_030_000,
       sender: HIM,
-      file: { ...MATERIAL, url: 'mxc://example.org/document' },
+      file: { ...MATERIAL, url: 'mxc://elsewhere.example/contract' },
       mimetype: 'application/pdf',
       name: 'contrat.pdf',
       size: 64,
@@ -235,15 +285,23 @@ function sealed(payload: ReportPayload = PAYLOAD): string {
   return path
 }
 
+/** The photograph of `PAYLOAD`, served as the homeserver keeps it. */
+const PHOTOGRAPH = { [`${DOWNLOADS}/example.org/photograph`]: NIST.ciphertext }
+
+/** The number of listeners left on the interruptions. */
+function listening(signals: EventEmitter): number {
+  return ['SIGINT', 'SIGTERM', 'SIGHUP']
+    .map(signal => signals.listenerCount(signal))
+    .reduce((a, b) => a + b, 0)
+}
+
 describe('A reported photograph or document, on the operator’s machine (#471)', () => {
   it('shows each file’s description and how to open it, and opens nothing unasked', async () => {
-    const media = mediaHeld({})
-    const shown = viewer()
+    const mac = machine({ served: PHOTOGRAPH })
 
-    const { status, printed, accounts } = await run(
+    const { status, printed } = await run(
       ['--cle', TEST_KEY_FILE, sealed()],
-      media,
-      shown,
+      mac,
     )
 
     expect(status).toBe(0)
@@ -267,13 +325,11 @@ describe('A reported photograph or document, on the operator’s machine (#471)'
       'message 3 sur 3, écrit le 2026-09-21 14:13:50 UTC',
       '  événement : $document',
       '  document : contrat.pdf (application/pdf, 64 octets)',
-      '  copie chiffrée : mxc://example.org/document',
+      '  copie chiffrée : mxc://elsewhere.example/contract',
       '  pour l’ouvrir, à la demande : --ouvrir 3',
     ])
-    // Neither the account nor the homeserver was asked anything.
-    expect(accounts).toEqual([])
-    expect(media.downloaded).toEqual([])
-    expect(shown.seen).toEqual([])
+    expect(mac.asked).toEqual([])
+    expect(mac.handed).toEqual([])
   })
 
   it('opens a photograph on demand: downloaded with the operator’s account, its hash checked, shown from a private copy, then erased', async () => {
@@ -330,48 +386,58 @@ describe('A reported photograph or document, on the operator’s machine (#471)'
       report,
       JSON.stringify({ ...JSON.parse(sent[0]!), reporter: ME }),
     )
-    const media = mediaHeld({ 'mxc://example.org/photograph': NIST.ciphertext })
-    const shown = viewer()
+    const mac = machine({ served: PHOTOGRAPH })
 
-    const { status, said, accounts, temporary } = await run(
+    const { status, said, printed } = await run(
       ['--cle', TEST_KEY_FILE, report, '--ouvrir', '1'],
-      media,
-      shown,
+      mac,
     )
 
     expect(status).toBe(0)
-    expect(accounts).toEqual([null])
-    expect(media.downloaded).toEqual(['mxc://example.org/photograph'])
-    // What was shown is the file itself, decrypted, in a copy only this
+    // The account's own server, with the account's token.
+    expect(mac.asked).toEqual([
+      {
+        url: `${DOWNLOADS}/example.org/photograph`,
+        authorization: 'Bearer jeton-d-essai-471',
+      },
+    ])
+    // Preview was handed the file itself, decrypted, in a copy only this
     // user can read, in a directory only this user can enter.
-    expect(shown.seen).toHaveLength(1)
-    const [seen] = shown.seen
-    expect(seen!.bytes).toBe(NIST.plaintext)
-    expect(seen!.mode).toBe(0o600)
-    expect(seen!.directoryMode).toBe(0o700)
-    expect(seen!.path.startsWith(temporary)).toBe(true)
-    expect(seen!.path.endsWith('.jpg')).toBe(true)
-    // And nothing is left: not the copy, not its directory.
-    expect(existsSync(seen!.path)).toBe(false)
-    expect(readdirSync(temporary)).toEqual([])
+    expect(mac.handed).toHaveLength(1)
+    const [handed] = mac.handed
+    expect(handed!.command).toBe('open')
+    expect(handed!.args.slice(0, 2)).toEqual(['-a', 'Preview'])
+    expect(handed!.bytes).toBe(NIST.plaintext)
+    expect(handed!.mode).toBe(0o600)
+    expect(handed!.directoryMode).toBe(0o700)
+    const path = handed!.args[2]!
+    expect(path.startsWith(mac.ports.temporary)).toBe(true)
+    expect(path.endsWith('.jpeg')).toBe(true)
+    // And nothing is left: not the copy, not its directory, not a listener.
+    expect(existsSync(path)).toBe(false)
+    expect(readdirSync(mac.ports.temporary)).toEqual([])
+    expect(listening(mac.signals)).toBe(0)
     expect(said).toContain('empreinte')
+    expect(`${said}\n${printed.join('\n')}`).not.toContain('jeton-d-essai-471')
   })
 
-  it('opens a document on demand the same way', async () => {
-    const media = mediaHeld({ 'mxc://example.org/document': NIST.ciphertext })
-    const shown = viewer()
+  it('opens a document the same way, from the account’s server whatever server its address names', async () => {
+    const mac = machine({
+      served: { [`${DOWNLOADS}/elsewhere.example/contract`]: NIST.ciphertext },
+    })
 
-    const { status, temporary } = await run(
+    const { status } = await run(
       ['--cle', TEST_KEY_FILE, sealed(), '--ouvrir', '3'],
-      media,
-      shown,
+      mac,
     )
 
     expect(status).toBe(0)
-    expect(media.downloaded).toEqual(['mxc://example.org/document'])
-    expect(shown.seen.map(one => one.bytes)).toEqual([NIST.plaintext])
-    expect(shown.seen[0]!.path.endsWith('.pdf')).toBe(true)
-    expect(readdirSync(temporary)).toEqual([])
+    expect(mac.asked.map(one => one.url)).toEqual([
+      `${DOWNLOADS}/elsewhere.example/contract`,
+    ])
+    expect(mac.handed.map(one => one.bytes)).toEqual([NIST.plaintext])
+    expect(mac.handed[0]!.args[2]!.endsWith('.pdf')).toBe(true)
+    expect(readdirSync(mac.ports.temporary)).toEqual([])
   })
 
   it('refuses a file whose hash does not match, and neither decrypts, writes nor shows anything', async () => {
@@ -379,59 +445,70 @@ describe('A reported photograph or document, on the operator’s machine (#471)'
     // not the file that was reported.
     const other = bytes(NIST.ciphertext)
     other[17] = (other[17]! + 1) % 256
-    const media = mediaHeld({ 'mxc://example.org/photograph': hex(other) })
-    const shown = viewer()
+    const mac = machine({
+      served: { [`${DOWNLOADS}/example.org/photograph`]: hex(other) },
+    })
 
-    const { status, said, temporary } = await run(
+    const { status, said } = await run(
       ['--cle', TEST_KEY_FILE, sealed(), '--ouvrir', '2'],
-      media,
-      shown,
+      mac,
     )
 
     expect(status).toBe(1)
     expect(said).toContain('L’empreinte ne correspond pas')
-    expect(shown.seen).toEqual([])
-    expect(readdirSync(temporary)).toEqual([])
+    expect(mac.handed).toEqual([])
+    expect(readdirSync(mac.ports.temporary)).toEqual([])
   })
 
-  it('erases the copy even when the viewer fails', async () => {
-    const media = mediaHeld({ 'mxc://example.org/photograph': NIST.ciphertext })
-    const shown = viewer(true)
+  it('erases the copy when Preview fails, when the terminal cannot be read, and when the tool is interrupted', async () => {
+    for (const [what, options, expected] of [
+      ['Preview fails', { preview: 'fails' }, 1],
+      ['no terminal', { terminal: 'none' }, 1],
+      // Between writing the copy and viewing it: Ctrl-C while Preview opens.
+      ['interrupted while Preview opens', { preview: 'is-interrupted' }, 130],
+      [
+        'interrupted while waiting for Enter',
+        { terminal: 'is-interrupted' },
+        130,
+      ],
+    ] as const) {
+      const mac = machine({ served: PHOTOGRAPH, ...options })
 
-    const { status, temporary } = await run(
-      ['--cle', TEST_KEY_FILE, sealed(), '--ouvrir', '2'],
-      media,
-      shown,
-    )
+      const { status } = await run(
+        ['--cle', TEST_KEY_FILE, sealed(), '--ouvrir', '2'],
+        mac,
+      )
 
-    expect(status).toBe(1)
-    expect(shown.seen).toHaveLength(1)
-    expect(existsSync(shown.seen[0]!.path)).toBe(false)
-    expect(readdirSync(temporary)).toEqual([])
+      expect(status, what).toBe(expected)
+      expect(mac.handed, what).toHaveLength(1)
+      expect(existsSync(mac.handed[0]!.args[2]!), what).toBe(false)
+      expect(readdirSync(mac.ports.temporary), what).toEqual([])
+      expect(listening(mac.signals), what).toBe(0)
+    }
   })
 
-  it('erases a copy an interrupted opening left behind, and nothing else', async () => {
-    // A tool killed while a file was shown leaves its private copy: the next
-    // opening finds it and erases it.
+  it('erases what an interrupted opening left, first, before anything else, and nothing else', async () => {
+    // A tool killed while a file was shown leaves its private copy. The next
+    // opening erases it before it reads the account: here the account does
+    // not read, and the copy goes all the same.
     const temporary = mkdtempSync(join(tmpdir(), 'ouverture-471-'))
     mkdirSync(join(temporary, 'messagr-signalement-ancien'))
     writeFileSync(
-      join(temporary, 'messagr-signalement-ancien', 'signalement.jpg'),
+      join(temporary, 'messagr-signalement-ancien', 'signalement.jpeg'),
       'ce qui restait',
     )
     writeFileSync(join(temporary, 'autre-chose'), 'pas à nous')
-    const media = mediaHeld({ 'mxc://example.org/photograph': NIST.ciphertext })
+    const mac = machine({ served: PHOTOGRAPH, home: homeWith(null), temporary })
 
     const { status, said } = await run(
       ['--cle', TEST_KEY_FILE, sealed(), '--ouvrir', '2'],
-      media,
-      viewer(),
-      temporary,
+      mac,
     )
 
-    expect(status).toBe(0)
+    expect(status).toBe(2)
     expect(readdirSync(temporary)).toEqual(['autre-chose'])
     expect(said).toContain('messagr-signalement-ancien')
+    expect(mac.asked).toEqual([])
   })
 
   it('opens nothing for a message that carries no file, a number no message has, or no number', async () => {
@@ -440,28 +517,92 @@ describe('A reported photograph or document, on the operator’s machine (#471)'
       ['--ouvrir', '4'],
       ['--ouvrir', 'deux'],
       ['--ouvrir'],
+      ['--compte', '/a.json'],
     ]) {
-      const media = mediaHeld({})
-      const shown = viewer()
+      const mac = machine({ served: PHOTOGRAPH })
 
-      const { status, accounts } = await run(
+      const { status } = await run(
         ['--cle', TEST_KEY_FILE, sealed(), ...asked],
-        media,
-        shown,
+        mac,
       )
 
       expect(status, asked.join(' ')).toBe(2)
-      expect(accounts).toEqual([])
-      expect(media.downloaded).toEqual([])
-      expect(shown.seen).toEqual([])
+      expect(mac.asked).toEqual([])
+      expect(mac.handed).toEqual([])
     }
+  })
+
+  it('reads the account from the file --compte names, else the one the environment names, else the one in the home', async () => {
+    const elsewhere = homeWith({ ...ACCOUNT, access_token: 'jeton-nomme' })
+    const named = join(elsewhere, '.messagr-exploitation', 'messagr-eu.json')
+    const byEnvironment = homeWith({
+      ...ACCOUNT,
+      access_token: 'jeton-de-l-environnement',
+    })
+    const cases: [readonly string[], Record<string, string>, string][] = [
+      [['--compte', named], {}, 'Bearer jeton-nomme'],
+      [
+        [],
+        {
+          MESSAGR_EXPLOITATION_IDENTIFIANTS: join(
+            byEnvironment,
+            '.messagr-exploitation',
+            'messagr-eu.json',
+          ),
+        },
+        'Bearer jeton-de-l-environnement',
+      ],
+      [[], {}, 'Bearer jeton-d-essai-471'],
+    ]
+    for (const [flags, environment, authorization] of cases) {
+      const mac = machine({ served: PHOTOGRAPH, environment })
+
+      const { status } = await run(
+        ['--cle', TEST_KEY_FILE, sealed(), '--ouvrir', '2', ...flags],
+        mac,
+      )
+
+      expect(status, authorization).toBe(0)
+      expect(mac.asked.map(one => one.authorization)).toEqual([authorization])
+    }
+  })
+
+  it('stops when the account cannot be read, and says why without what it holds', async () => {
+    const mac = machine({
+      served: PHOTOGRAPH,
+      home: homeWith({ ...ACCOUNT, access_token: '' }),
+    })
+
+    const { status, said } = await run(
+      ['--cle', TEST_KEY_FILE, sealed(), '--ouvrir', '2'],
+      mac,
+    )
+
+    expect(status).toBe(2)
+    expect(said).toContain('`access_token` manque')
+    expect(mac.asked).toEqual([])
+  })
+
+  it('says what the homeserver answered, and never the token', async () => {
+    const mac = machine({ served: {} })
+
+    const { status, said, printed } = await run(
+      ['--cle', TEST_KEY_FILE, sealed(), '--ouvrir', '2'],
+      mac,
+    )
+
+    expect(status).toBe(1)
+    expect(said).toContain('404')
+    expect(`${said}\n${printed.join('\n')}`).not.toContain('jeton-d-essai-471')
+    expect(mac.handed).toEqual([])
   })
 
   it('reads no report in a payload carrying a file that could not be opened, and asks nothing', async () => {
     // What makes a file openable is one rule, the application's and the
     // tool's (`openingOf`): the application reports no such file, and the
     // tool reads no such report.
-    const withKey = (k: string): ReportPayload => ({
+    const mac = machine({ served: PHOTOGRAPH })
+    const unopenable: ReportPayload = {
       ...PAYLOAD,
       messages: [
         {
@@ -471,7 +612,7 @@ describe('A reported photograph or document, on the operator’s machine (#471)'
           sender: HIM,
           file: {
             ...MATERIAL,
-            key: { ...MATERIAL.key, k },
+            key: { ...MATERIAL.key, k: 'trop-courte' },
             url: 'mxc://example.org/photograph',
           },
           mimetype: 'image/jpeg',
@@ -479,127 +620,16 @@ describe('A reported photograph or document, on the operator’s machine (#471)'
           size: 64,
         },
       ],
-    })
-    const media = mediaHeld({ 'mxc://example.org/photograph': NIST.ciphertext })
-    const shown = viewer()
+    }
 
-    const { status, said, temporary } = await run(
-      ['--cle', TEST_KEY_FILE, sealed(withKey('trop-courte')), '--ouvrir', '1'],
-      media,
-      shown,
+    const { status, said } = await run(
+      ['--cle', TEST_KEY_FILE, sealed(unopenable), '--ouvrir', '1'],
+      mac,
     )
 
     expect(status).toBe(2)
     expect(said).toContain('pas un signalement au format 1')
-    expect(media.downloaded).toEqual([])
-    expect(shown.seen).toEqual([])
-    expect(readdirSync(temporary)).toEqual([])
-  })
-
-  it('names the account file it was given, and stops when the account cannot be read', async () => {
-    const said: string[] = []
-    const accounts: (string | null)[] = []
-    const status = await openTool(
-      [
-        '--cle',
-        TEST_KEY_FILE,
-        sealed(),
-        '--ouvrir',
-        '2',
-        '--compte',
-        '/a.json',
-      ],
-      {
-        home: mkdtempSync(join(tmpdir(), 'exploitant-471-')),
-        stdin: async () => '',
-        stderr: (line: string) => said.push(line),
-        stdout: () => {},
-        media: async (named: string | null) => {
-          accounts.push(named)
-          return { ok: false, why: '/a.json : `access_token` manque' }
-        },
-        show: async () => {
-          throw new Error('nothing to show')
-        },
-        temporary: mkdtempSync(join(tmpdir(), 'ouverture-471-')),
-      },
-    )
-
-    expect(status).toBe(2)
-    expect(accounts).toEqual(['/a.json'])
-    expect(said.join('\n')).toContain('`access_token` manque')
-  })
-})
-
-describe('Downloading a reported file with the operator’s account (#471)', () => {
-  it('asks the operator’s own homeserver, with the account’s token, whatever server the address names', async () => {
-    const asked: { url: string; authorization: string | undefined }[] = []
-    const download = mediaDownloader(
-      'https://messagr.example',
-      'the-account-token',
-      async (url: string, init: { headers: Record<string, string> }) => {
-        asked.push({ url, authorization: init.headers.Authorization })
-        return {
-          ok: true,
-          status: 200,
-          arrayBuffer: async () => arrayBufferOf(NIST.ciphertext),
-        }
-      },
-    )
-
-    const got = await download('mxc://elsewhere.example/AbC-d_9')
-
-    expect(hex(got)).toBe(NIST.ciphertext)
-    // The token goes to the account's own server, never to the host the
-    // address names: that one is only a path segment.
-    expect(asked).toEqual([
-      {
-        url: 'https://messagr.example/_matrix/client/v1/media/download/elsewhere.example/AbC-d_9',
-        authorization: 'Bearer the-account-token',
-      },
-    ])
-  })
-
-  it('says what the homeserver answered, and never the token', async () => {
-    const download = mediaDownloader(
-      'https://messagr.example',
-      'the-account-token',
-      async () => ({
-        ok: false,
-        status: 404,
-        arrayBuffer: async () => new ArrayBuffer(0),
-      }),
-    )
-
-    await expect(download('mxc://messagr.example/AbC')).rejects.toThrow(/404/)
-    await expect(download('mxc://messagr.example/AbC')).rejects.not.toThrow(
-      /the-account-token/,
-    )
-  })
-
-  it('refuses an address that is not a homeserver’s media, and asks nothing', async () => {
-    let asked = 0
-    const download = mediaDownloader(
-      'https://messagr.example',
-      'the-account-token',
-      async () => {
-        asked += 1
-        return {
-          ok: true,
-          status: 200,
-          arrayBuffer: async () => new ArrayBuffer(0),
-        }
-      },
-    )
-
-    for (const url of [
-      'https://elsewhere.example/a.jpg',
-      'mxc://messagr.example/../../_matrix/client/v3/account/whoami',
-      'mxc://messagr.example/a/b',
-      'mxc://messagr.example/',
-    ]) {
-      await expect(download(url), url).rejects.toThrow()
-    }
-    expect(asked).toBe(0)
+    expect(mac.asked).toEqual([])
+    expect(mac.handed).toEqual([])
   })
 })

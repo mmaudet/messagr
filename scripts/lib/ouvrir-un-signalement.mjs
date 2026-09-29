@@ -11,8 +11,10 @@
 // (`scripts/fixtures/hpke-independant.mjs`), c'est `sealedReport.spec.ts` qui
 // le vérifie.
 //
-// Ce qu'un signalement contient n'est écrit nulle part (ADR 0006) : il
-// s'affiche, et c'est tout.
+// Ce qu'un signalement contient s'affiche, et n'est écrit nulle part : ni
+// ses mots, ni rien de ce qu'il porte. La seule exception est une photo ou
+// un document qu'on demande à voir (ci-dessous), dont une copie déchiffrée
+// existe le temps d'être vue.
 //
 // # Ce qui s'affiche (#468)
 //
@@ -30,8 +32,22 @@
 // l'outil montre son nom, son type, sa taille et l'adresse de sa copie
 // chiffrée, et ne l'ouvre qu'à la demande, pour le message que `--ouvrir`
 // nomme. L'ouverture télécharge la copie avec le compte d'exploitation,
-// vérifie son empreinte, la montre, puis l'efface
-// (`ouvrir-un-fichier-signale.mjs`).
+// vérifie son empreinte, la déchiffre, en écrit une copie dans un répertoire
+// privé et temporaire, la montre dans Aperçu, puis l'efface ; ce qu'elle ne
+// peut pas garantir est dit dans `ouvrir-un-fichier-signale.mjs`.
+//
+// # Codes de sortie
+//
+// - 0 : le signalement s'est ouvert ; avec `--ouvrir`, le fichier a été
+//   montré, puis effacé.
+// - 1 : refusé. Le pli ne s'ouvre pas avec cette clé, ou le fichier demandé
+//   ne correspond pas à son empreinte, ne s'est pas téléchargé, n'a pas pu
+//   être montré ou vu jusqu'au bout, ou sa copie n'a pas pu être effacée, ce
+//   que l'outil dit alors en nommant le répertoire.
+// - 2 : rien à ouvrir. L'usage, un fichier illisible, un pli qui n'est pas
+//   du JSON, un message sans fichier, un compte d'exploitation illisible.
+// - 130 : interrompu pendant qu'un fichier était montré ; sa copie est
+//   effacée.
 
 import { readFileSync } from 'node:fs'
 import { TextDecoder } from 'node:util'
@@ -48,7 +64,7 @@ import {
 } from '../../packages/app/src/runtime/reportFormat.ts'
 
 import { keyPathIn, readKeyFile } from './cle-de-l-exploitant.mjs'
-import { openReportedFile } from './ouvrir-un-fichier-signale.mjs'
+import { openOnDemand } from './ouvrir-un-fichier-signale.mjs'
 
 const USAGE = [
   'usage : node scripts/ouvrir-un-signalement.mjs [--cle <fichier>] [<pli.json>]',
@@ -73,23 +89,14 @@ const DOES_NOT_OPEN = [
 ].join('\n')
 
 /**
- * Ce que l'outil d'ouverture demande au monde, que les essais remplacent.
+ * Ce que l'outil d'ouverture demande au monde, que les essais remplacent
+ * tout entier : l'entrée et les sorties, et ce qu'ouvrir une photo ou un
+ * document demande (`ouvrir-un-fichier-signale.mjs`).
  *
- * @typedef {object} OpenPorts
- * @property {string} home le répertoire personnel de l'exploitant
- * @property {() => Promise<string | null>} stdin l'entrée standard, ou `null` quand c'est un terminal
- * @property {(line: string) => void} stderr ce qui s'explique, sur la sortie d'erreur
- * @property {(text: string) => void} stdout la charge, seule, sur la sortie standard
- * @property {(named: string | null) => Promise<MediaAccess>} [media] le compte d'exploitation, lu seulement pour `--ouvrir`, depuis le fichier que `--compte` nomme s'il en nomme un
- * @property {(path: string) => Promise<void>} [show] montre le fichier écrit là, et rend la main une fois vu
- * @property {string} [temporary] le répertoire sous lequel un fichier ouvert est écrit le temps d'être vu
- */
-
-/**
- * Le compte d'exploitation, prêt à télécharger un média, ou pourquoi ses
- * identifiants ne se lisent pas. La raison ne dit jamais le jeton.
- *
- * @typedef {{ ok: true, download: (url: string) => Promise<Uint8Array> } | { ok: false, why: string }} MediaAccess
+ * @typedef {import('./ouvrir-un-fichier-signale.mjs').FilePorts & {
+ *   stdin: () => Promise<string | null>,
+ *   stdout: (text: string) => void,
+ * }} OpenPorts
  */
 
 /**
@@ -147,27 +154,18 @@ export function openSealedReport(secretKey, document) {
  */
 export async function openTool(argv, ports) {
   const { home, stdin, stderr, stdout } = ports
-  const args = [...argv]
-  const keyPath = taken(args, '--cle') ?? keyPathIn(home)
-  const asked = taken(args, '--ouvrir')
-  const account = taken(args, '--compte')
-  if (
-    keyPath === '' ||
-    asked === '' ||
-    account === '' ||
-    (account !== null && asked === null) ||
-    args.length > 1 ||
-    args.some(a => a.startsWith('-'))
-  ) {
+  const options = argumentsOf(argv)
+  if (options === null) {
     stderr(USAGE)
     return 2
   }
-  if (asked !== null && !/^[1-9][0-9]{0,5}$/.test(asked)) {
+  if (options.open !== null && !/^[1-9][0-9]{0,5}$/.test(options.open)) {
     stderr(
       `--ouvrir attend le numéro d’un message, tel que l’outil l’affiche.\n\n${USAGE}`,
     )
     return 2
   }
+  const keyPath = options.key ?? keyPathIn(home)
 
   const keyText = readText(keyPath)
   if (keyText === null) {
@@ -180,12 +178,13 @@ export async function openTool(argv, ports) {
     return 2
   }
 
-  const documentText = args.length === 1 ? readText(args[0]) : await stdin()
+  const documentText =
+    options.document === null ? await stdin() : readText(options.document)
   if (documentText === null) {
     stderr(
-      args.length === 1
-        ? `Le pli ne se lit pas : ${args[0]}`
-        : `Aucun pli : nommez son fichier, ou passez-le sur l’entrée standard.\n\n${USAGE}`,
+      options.document === null
+        ? `Aucun pli : nommez son fichier, ou passez-le sur l’entrée standard.\n\n${USAGE}`
+        : `Le pli ne se lit pas : ${options.document}`,
     )
     return 2
   }
@@ -224,7 +223,7 @@ export async function openTool(argv, ports) {
       'Ce qu’il porte n’est pas un signalement au format 1 : le voici tel quel.',
     )
     stdout(displayable(new TextDecoder().decode(opened.payload), true))
-    if (asked === null) return 0
+    if (options.open === null) return 0
     stderr(
       'Rien à ouvrir : ce qu’il porte n’a pas de message que l’outil lise.',
     )
@@ -240,81 +239,41 @@ export async function openTool(argv, ports) {
     )
   }
   stdout(readable(report).join('\n'))
-  return asked === null
+  return options.open === null
     ? 0
-    : await openOnDemand(report, Number(asked), account, ports)
+    : await openOnDemand(report, Number(options.open), options.account, ports)
 }
 
 /**
- * Ouvre la photo ou le document du message `wanted` (compté à partir de 1,
- * comme l'outil l'affiche), avec le compte d'exploitation. Rend le code de
- * sortie : 0 montré puis effacé, 1 refusé, 2 rien à ouvrir.
+ * Ce que `argv` demande : la clé, le message à ouvrir, le compte et le pli,
+ * chacun `null` quand il n'est pas nommé ; ou `null` quand `argv` ne se lit
+ * pas comme l'usage le dit (une option inconnue ou répétée, une option sans
+ * sa valeur, deux plis, un compte sans `--ouvrir`).
  *
- * @param {import('../../packages/app/src/runtime/reportFormat.ts').ReportPayload} report
- * @param {number} wanted
- * @param {string | null} account le fichier d'identifiants que `--compte` nomme
- * @param {OpenPorts} ports
- * @returns {Promise<number>}
+ * @param {readonly string[]} argv
+ * @returns {{ key: string | null, open: string | null, account: string | null, document: string | null } | null}
  */
-async function openOnDemand(
-  report,
-  wanted,
-  account,
-  { media, show, temporary, stderr },
-) {
-  const message = report.messages[wanted - 1]
-  if (message === undefined) {
-    stderr(
-      `Ce signalement n’a pas de message ${wanted} : il en a ${report.messages.length}.`,
-    )
-    return 2
+function argumentsOf(argv) {
+  /** @type {{ key: string | null, open: string | null, account: string | null, document: string | null }} */
+  const read = { key: null, open: null, account: null, document: null }
+  /** @type {Readonly<Record<string, 'key' | 'open' | 'account'>>} */
+  const OPTIONS = { '--cle': 'key', '--ouvrir': 'open', '--compte': 'account' }
+  for (let at = 0; at < argv.length; at += 1) {
+    const argument = argv[at]
+    const option = OPTIONS[argument]
+    if (option === undefined) {
+      if (argument.startsWith('-') || read.document !== null) return null
+      read.document = argument
+      continue
+    }
+    const value = argv[at + 1]
+    if (value === undefined || value.startsWith('-') || read[option] !== null) {
+      return null
+    }
+    read[option] = value
+    at += 1
   }
-  if (message.kind === 'text') {
-    stderr(
-      `Le message ${wanted} ne porte ni photo ni document : rien à ouvrir.`,
-    )
-    return 2
-  }
-  if (media === undefined || show === undefined || temporary === undefined) {
-    stderr('Cet outil n’a pas de quoi ouvrir un fichier ici.')
-    return 2
-  }
-  const access = await media(account)
-  if (!access.ok) {
-    stderr(access.why)
-    return 2
-  }
-  const opened = await openReportedFile(message, {
-    download: access.download,
-    show,
-    temporary,
-    stderr,
-  })
-  if (!opened.shown) {
-    stderr(opened.why)
-    return 1
-  }
-  return 0
-}
-
-/**
- * La valeur de l'option `flag`, retirée de `args` avec elle : `null` quand
- * l'option est absente, `''` quand elle n'a pas de valeur.
- *
- * @param {string[]} args
- * @param {string} flag
- * @returns {string | null}
- */
-function taken(args, flag) {
-  const at = args.indexOf(flag)
-  if (at === -1) return null
-  const value = args[at + 1]
-  if (value === undefined || value.startsWith('-')) {
-    args.splice(at, 1)
-    return ''
-  }
-  args.splice(at, 2)
-  return value
+  return read.account !== null && read.open === null ? null : read
 }
 
 /**

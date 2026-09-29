@@ -91,12 +91,21 @@ import {
 import { createInterface } from 'node:readline'
 import { fileURLToPath } from 'node:url'
 
+import {
+  CREDENTIALS_ENV,
+  credentialsPathIn,
+  nonEmptyString,
+  operatorDirectoryIn,
+  parsedObject,
+  readCredentials,
+  serverFrom,
+} from './lib/compte-d-exploitation.mjs'
+
 const HERE = dirname(fileURLToPath(import.meta.url))
 const REPOSITORY = resolve(HERE, '..')
 
-const CREDENTIALS_ENV = 'MESSAGR_EXPLOITATION_IDENTIFIANTS'
-const PRIVATE_DIRECTORY = join(homedir(), '.messagr-exploitation')
-const DEFAULT_CREDENTIALS = join(PRIVATE_DIRECTORY, 'messagr-eu.json')
+const PRIVATE_DIRECTORY = operatorDirectoryIn(homedir())
+const DEFAULT_CREDENTIALS = credentialsPathIn(homedir())
 const DEFAULT_PURPOSE = 'relecteur-apple'
 
 /** Ce que `--dry-run` décrit quand le fichier d'identifiants ne se lit pas. */
@@ -163,66 +172,12 @@ const REQUEST_TIMEOUT_MS = 30_000
 // Ce qui décide, sans rien toucher. `--self-test` exerce tout ce qui suit.
 // ---------------------------------------------------------------------------
 
-/** Un objet JSON, ou `null` pour tout le reste (texte, tableau, rien). */
-export function parsedObject(text) {
-  try {
-    const value = JSON.parse(text)
-    return value !== null && typeof value === 'object' && !Array.isArray(value)
-      ? value
-      : null
-  } catch {
-    return null
-  }
-}
-
-function nonEmptyString(value) {
-  return typeof value === 'string' && value !== '' ? value : null
-}
-
-/** `https://hôte`, sans barre finale ; `null` pour tout ce qui n'est pas https. */
-export function serverFrom(raw) {
-  if (typeof raw !== 'string') return null
-  const match = /^(https:\/\/[^/\s]+)\/*$/.exec(raw.trim())
-  return match === null ? null : match[1]
-}
-
 /**
  * Le lien, construit comme l'application le construit : `https`, et l'hôte
  * du homeserver de l'émetteur (`issueInvitation.ts`, `inviteSomebody`).
  */
 export function linkFor(server, token) {
   return `https://${server.slice('https://'.length)}/i/${token}`
-}
-
-/**
- * Les identifiants d'@exploitation, ou pourquoi ils ne se lisent pas.
- *
- * La raison nomme une clé, jamais une valeur : elle s'affiche.
- */
-export function readCredentials(text) {
-  const body = parsedObject(text)
-  if (body === null) {
-    return { ok: false, reason: "le fichier n'est pas un objet JSON" }
-  }
-  const server = serverFrom(body.serveur)
-  if (server === null) {
-    return { ok: false, reason: '`serveur` doit être une adresse https' }
-  }
-  if (typeof body.user_id !== 'string' || !/^@[^:]+:.+$/.test(body.user_id)) {
-    return {
-      ok: false,
-      reason: '`user_id` doit être un identifiant Matrix complet',
-    }
-  }
-  if (nonEmptyString(body.access_token) === null) {
-    return { ok: false, reason: '`access_token` manque' }
-  }
-  return {
-    ok: true,
-    server,
-    userId: body.user_id,
-    accessToken: body.access_token,
-  }
 }
 
 /** Ce que `--dry-run` peut dire du fichier sans en garder le jeton. */

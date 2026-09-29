@@ -15,15 +15,12 @@
 //
 // Le pli est un document JSON : `{ "reason": "<motif>", "reporter": "<compte
 // qui signale>", "sealed": "<pli en base64>" }`, les autres champs étant
-// ignorés. L'export d'un pli par le service, qui reste à écrire (#473), doit
-// avoir cette forme.
-// La clé se lit dans `~/.messagr-exploitation/cle-de-l-exploitant.json`,
+// ignorés. La clé se lit dans `~/.messagr-exploitation/cle-de-l-exploitant.json`,
 // qu'écrit `scripts/cle-de-l-exploitant.mjs`, sauf `--cle`.
 //
 // Le motif et le compte qui signale, vérifiés, s'affichent sur la sortie
 // d'erreur ; la charge, seule, sur la sortie standard, les caractères de
-// contrôle écrits `\xNN`. Rien de ce qui est ouvert n'est écrit sur le disque
-// (ADR 0006). Codes de sortie : 0 ouvert, 1 refusé, 2 rien à ouvrir.
+// contrôle écrits `\xNN`. Rien de ce qu'elle porte n'est écrit sur le disque.
 //
 // # Une photo ou un document, à la demande (#471)
 //
@@ -31,20 +28,40 @@
 //	node scripts/ouvrir-un-signalement.mjs pli.json --ouvrir 2 --compte <identifiants>
 //
 // Le signalement ne porte que la description du fichier chiffré. `--ouvrir`
+// efface d'abord ce qu'une ouverture interrompue aurait laissé, puis
 // télécharge la copie chiffrée du message nommé avec le compte
-// d'exploitation, dont les identifiants se lisent comme ceux de
-// `testflight-reviewer.mjs` : le fichier que nomme `--compte`, sinon
+// d'exploitation : le fichier que nomme `--compte`, sinon
 // `MESSAGR_EXPLOITATION_IDENTIFIANTS`, sinon
 // `~/.messagr-exploitation/messagr-eu.json`. Le jeton ne part que vers le
 // serveur de ce fichier, et ne s'affiche jamais. L'outil vérifie l'empreinte,
-// déchiffre en mémoire, écrit le fichier dans un répertoire privé et
-// temporaire, l'ouvre dans Aperçu, et l'efface dès que l'exploitant appuie
-// sur Entrée, ou l'interrompt : aucune copie ne reste. Aperçu montre les
-// photos et les PDF ; l'outil ne confie un fichier à aucune autre
-// application, qui pourrait en garder une copie à elle.
+// déchiffre en mémoire, et écrit UNE COPIE DÉCHIFFRÉE TEMPORAIRE : dans un
+// répertoire privé (700), un fichier que seul l'exploitant lit (600), sous le
+// répertoire temporaire du système. Il l'ouvre dans Aperçu, et l'efface dès
+// qu'on appuie sur Entrée, qu'on l'interrompt (Ctrl-C, fermeture du
+// terminal), ou qu'Aperçu ou le terminal échoue ; toute ouverture commence
+// par effacer une copie qu'une ouverture interrompue aurait laissée.
 //
-// Tout se passe dans `lib/ouvrir-un-signalement.mjs` et
-// `lib/ouvrir-un-fichier-signale.mjs`, que les essais exercent.
+// Ce que l'outil ne peut pas garantir : ce qu'Aperçu ou le système gardent
+// d'un fichier qu'on leur a confié (une vignette, les documents récents, la
+// reprise d'une fenêtre). Il ne le confie à aucune autre application
+// qu'Aperçu, qui montre les photos et les PDF.
+//
+// # Codes de sortie
+//
+// 0 ouvert (et, avec `--ouvrir`, montré puis effacé) ; 1 refusé (le pli ne
+// s'ouvre pas, ou le fichier ne correspond pas à son empreinte, ne s'est pas
+// téléchargé, n'a pas pu être montré, ou sa copie n'a pas pu être effacée,
+// ce que l'outil dit en la nommant) ; 2 rien à ouvrir (l'usage, un fichier
+// illisible, un message sans fichier, un compte illisible) ; 130 interrompu
+// pendant qu'un fichier était montré, sa copie effacée.
+//
+// # Tout se passe dans `lib/`, que les essais exercent
+//
+// `lib/ouvrir-un-signalement.mjs` ouvre et affiche, et
+// `lib/ouvrir-un-fichier-signale.mjs` ouvre un fichier à la demande : le
+// compte, le téléchargement, l'empreinte, la copie, Aperçu, l'attente et les
+// interruptions. Ce fichier-ci ne fait que leur passer la machine :
+// l'environnement, le réseau, `open`, le terminal, les signaux du processus.
 //
 // Pour essayer, avec la clé de test et un pli scellé pour elle :
 //
@@ -54,108 +71,27 @@
 
 import { Buffer } from 'node:buffer'
 import { execFile } from 'node:child_process'
-import { createReadStream, readFileSync } from 'node:fs'
+import { createReadStream } from 'node:fs'
 import { homedir, tmpdir } from 'node:os'
-import { join } from 'node:path'
-import { createInterface } from 'node:readline'
 import { promisify } from 'node:util'
 
 import { quietAboutTypelessModules } from './lib/typescript.mjs'
 
 quietAboutTypelessModules()
 const { openTool } = await import('./lib/ouvrir-un-signalement.mjs')
-const { mediaDownloader } = await import('./lib/ouvrir-un-fichier-signale.mjs')
-
-/** Si l'exploitant a interrompu l'outil pendant qu'un fichier était montré. */
-let interrupted = false
 
 process.exitCode = await openTool(process.argv.slice(2), {
   home: homedir(),
+  environment: process.env,
   stdin: readStandardInput,
   stderr: line => process.stderr.write(`${line}\n`),
   stdout: text => process.stdout.write(`${text}\n`),
-  media: theOperatorAccount,
-  show: inPreview,
+  fetch: globalThis.fetch,
+  run: promisify(execFile),
+  terminal: () => createReadStream('/dev/tty'),
+  signals: process,
   temporary: tmpdir(),
 })
-if (interrupted) process.exitCode = 130
-
-/**
- * Le compte d'exploitation, lu comme `testflight-reviewer.mjs` le lit, prêt
- * à télécharger un média sur son propre serveur. La raison d'un refus nomme
- * le fichier et la clé qui manque, jamais une valeur.
- *
- * @param {string | null} named le fichier que `--compte` nomme
- */
-async function theOperatorAccount(named) {
-  const path =
-    named ??
-    (process.env.MESSAGR_EXPLOITATION_IDENTIFIANTS ||
-      join(homedir(), '.messagr-exploitation', 'messagr-eu.json'))
-  let text
-  try {
-    text = readFileSync(path, 'utf8')
-  } catch {
-    return {
-      ok: false,
-      why: `Les identifiants du compte d’exploitation ne se lisent pas : ${path}`,
-    }
-  }
-  const { readCredentials } = await import('./testflight-reviewer.mjs')
-  const credentials = readCredentials(text)
-  if (!credentials.ok)
-    return { ok: false, why: `${path} : ${credentials.reason}` }
-  return {
-    ok: true,
-    download: mediaDownloader(credentials.server, credentials.accessToken),
-  }
-}
-
-/**
- * Ouvre le fichier dans Aperçu, et rend la main quand l'exploitant a appuyé
- * sur Entrée, ou interrompu l'outil : dans les deux cas, l'appelant efface
- * la copie aussitôt. Une interruption ne tue donc pas l'outil avant
- * l'effacement, elle le hâte.
- *
- * @param {string} path
- */
-async function inPreview(path) {
-  await promisify(execFile)('open', ['-a', 'Preview', path])
-  const how = await seen(
-    'Le fichier est ouvert dans Aperçu. Appuyez sur Entrée une fois vu :\n' +
-      'il sera effacé de cette machine.\n',
-  )
-  if (how === 'interrupted') interrupted = true
-  if (how === 'no-terminal') {
-    throw new Error('aucun terminal où attendre qu’il soit vu')
-  }
-}
-
-/**
- * Attend Entrée sur le terminal, même quand le pli est venu par l'entrée
- * standard, ou une interruption.
- *
- * @param {string} prompt
- * @returns {Promise<'seen' | 'interrupted' | 'no-terminal'>}
- */
-function seen(prompt) {
-  return new Promise(resolve => {
-    const terminal = createReadStream('/dev/tty')
-    const lines = createInterface({ input: terminal })
-    const signals = ['SIGINT', 'SIGTERM', 'SIGHUP']
-    const done = how => {
-      for (const signal of signals) process.off(signal, onSignal)
-      lines.close()
-      terminal.destroy()
-      resolve(how)
-    }
-    const onSignal = () => done('interrupted')
-    for (const signal of signals) process.on(signal, onSignal)
-    terminal.once('error', () => done('no-terminal'))
-    lines.once('line', () => done('seen'))
-    process.stderr.write(prompt)
-  })
-}
 
 /**
  * Tout ce que porte l'entrée standard, ou `null` quand c'est un terminal :
