@@ -45,10 +45,6 @@ pub enum Alert {
     /// The prepaid credits at OVHcloud run low (#399). Once a day.
     CreditsLow { left: f64 },
     /// Reports received (#462): their numbers and reasons. At each call.
-    #[cfg_attr(
-        not(test),
-        expect(dead_code, reason = "the reports route of #468 tells them")
-    )]
     ReportsReceived(Reports),
     /// Blocks since the previous count (#462), one at least. At each call.
     #[cfg_attr(
