@@ -1,5 +1,5 @@
 // LE CONTRÔLE DES PAGES LÉGALES ET CELUI DE L'ÉCRAN LÉGAL, MENÉS CONTRE LE
-// SITE CONSTRUIT (#466).
+// SITE CONSTRUIT (#466), ET CELUI DE LA RÉTENTION (#467).
 //
 // `scripts/assert-legal-pages.sh` et `scripts/assert-legal-screen.sh` ne
 // tournent qu'au moment de publier une build, et contre messagr.eu : c'est le
@@ -14,6 +14,13 @@
 // la barre oblique) pour le premier, lu comme fichiers pour le second. Chacun
 // doit passer sur le site tel qu'il sera publié, et refuser chaque défaut
 // qu'il existe pour voir.
+//
+// `scripts/assert-retention.sh` de même, qui ne tournait nulle part ailleurs
+// qu'à la main contre messagr.eu : servi ici, avec le `retention.json` de la
+// copie, et sans serveur à joindre, sa moitié qui lit la configuration de
+// l'hôte ne concernant que la production. Une durée nouvelle que seule une
+// version à publier dit (#467) n'y est pas vérifiée tant qu'elle attend, et
+// l'est sur la politique en vigueur dès qu'elle est publiée.
 //
 // DANS LES DEUX ÉTATS DU DÉPÔT : une version qui attend d'être publiée, et
 // aucune. Avant la publication, la copie est publiée d'abord, puisque c'est la
@@ -34,6 +41,7 @@ var siteDir = path.join(root, 'site');
 var retentionFile = path.join(root, 'retention.json');
 var pagesCheck = path.join(repository, 'scripts', 'assert-legal-pages.sh');
 var screenCheck = path.join(repository, 'scripts', 'assert-legal-screen.sh');
+var retentionCheck = path.join(repository, 'scripts', 'assert-retention.sh');
 var copyDir = path.join(repository, 'packages', 'app', 'src', 'copy');
 var status = 0;
 
@@ -199,6 +207,34 @@ function serve(dir) {
 
 function checkPages(server, source) {
   return run(pagesCheck, [], { MESSAGR_SITE: server.base, MESSAGR_SITE_SOURCE: source });
+}
+
+/**
+ * `assert-retention.sh` contre le site servi ici, avec le `retention.json`
+ * voisin de la copie, et aucun hôte à joindre : `MESSAGR_HOST` vide.
+ */
+function checkRetention(server, source, retention) {
+  return run(retentionCheck, [], {
+    MESSAGR_SITE: server.base,
+    MESSAGR_SITE_SOURCE: source,
+    MESSAGR_RETENTION: retention || path.join(source, '..', 'retention.json'),
+    MESSAGR_HOST: '',
+  });
+}
+
+/** Ce qu'une entrée de retention.json fait dire à sa page : sa durée, et « dit ». */
+function phrasesOf(entry) {
+  return (entry.duree === undefined ? [] : [entry.duree]).concat(entry.dit || []);
+}
+
+/** Les entrées de retention.json, sans les notes. */
+function entriesOf(file) {
+  var all = JSON.parse(read(file));
+  return Object.keys(all).filter(function (key) {
+    return all[key] && typeof all[key] === 'object';
+  }).map(function (key) {
+    return { key: key, entry: all[key] };
+  });
 }
 
 function checkScreen(french, english, catalogues) {
@@ -416,7 +452,94 @@ function translatedAddresses(site) {
   }
 })();
 
+// ── 4. La politique et retention.json disent les mêmes durées (#467) ─────
+//
+// Une durée nouvelle que seule une version à publier dit porte, dans
+// retention.json, l'adresse de cette version : elle n'est pas vérifiée tant
+// que la version attend, puisque rien ne la sert, et elle l'est sur la
+// politique en vigueur une fois publiée, puisque `publier` retire l'adresse.
+(function () {
+  // Tant qu'elle attend : chaque page légale tient une version à publier, et
+  // chacune reçoit une durée qu'elle seule dit, par-dessus celles du dépôt.
+  var source = aWaitingCopy();
+  var retention = path.join(source, '..', 'retention.json');
+  var waiting = PAGES.map(function (page) { return '/' + page + '/a-publier/'; });
+  fs.writeFileSync(retention, read(retention).replace(/\n}\s*$/, ',\n' + waiting.map(function (address, i) {
+    return '  "essai_' + i + '": {\n' +
+      '    "duree": "une durée que seule la version à publier dit",\n' +
+      '    "page": "' + address + '"\n' +
+      '  }';
+  }).join(',\n') + '\n}\n'));
+  var out = built(source);
+  var server = serve(out);
+  try {
+    var passed = checkRetention(server, source);
+    if (passed.code !== 0) {
+      fail('the retention check refuses a site where a version waits to be published: ' + passed.out + passed.err);
+    }
+    waiting.forEach(function (address) {
+      if (passed.out.indexOf('----  ' + address + ' is not published yet') === -1) {
+        fail('the retention check does not say it waits for ' + address + ' to be published: ' + passed.out);
+      }
+    });
+    // Publiée sans que retention.json suive, l'adresse ne répond plus :
+    // refusé, en la nommant, plutôt que passé sous silence.
+    fs.renameSync(path.join(source, PAGES[0], 'a-publier'), path.join(source, PAGES[0], 'a-publier-a-cote'));
+    var stale = checkRetention(server, source);
+    if (stale.code === 0 || stale.err.indexOf(server.base + waiting[0]) === -1) {
+      fail('the retention check passes a retention.json naming ' + waiting[0] + ', which nothing holds any more');
+    }
+  } finally {
+    server.stop();
+  }
+})();
+
+(function () {
+  // Publiée : ce que `publier` laisse dans retention.json se lit sur la
+  // politique en vigueur, chaque durée comme chaque phrase de « dit », et la
+  // politique qui en perd une est refusée, en la nommant.
+  var source = aPublishedCopy();
+  var retention = path.join(source, '..', 'retention.json');
+  var inForce = entriesOf(retention).filter(function (e) {
+    return e.entry.page === undefined && phrasesOf(e.entry).length > 0;
+  });
+  // Ce que le dépôt attend de publier est du nombre.
+  entriesOf(retentionFile).forEach(function (e) {
+    if (/^\/confidentialite\/a-publier\/$/.test(e.entry.page || '') &&
+        !inForce.some(function (f) { return f.key === e.key; })) {
+      fail('retention.json ' + e.key + ' is not checked on the policy in force once it is published');
+    }
+  });
+  var out = built(source);
+  var server = serve(out);
+  try {
+    var passed = checkRetention(server, source);
+    if (passed.code !== 0) {
+      fail('the retention check refuses the policy as it will be published: ' + passed.out + passed.err);
+    }
+    var policy = path.join(out, 'confidentialite', 'index.html');
+    var served = read(policy);
+    inForce.forEach(function (e) {
+      phrasesOf(e.entry).forEach(function (phrase) {
+        if (passed.out.indexOf('OK    /confidentialite/ says "' + phrase + '"') === -1) {
+          fail('the retention check does not check "' + phrase + '" (' + e.key + ') on the policy in force: ' + passed.out);
+        }
+        // Les espaces réduites comme le contrôle les réduit, pour que la
+        // phrase se retire même coupée en fin de ligne.
+        fs.writeFileSync(policy, served.replace(/\s+/g, ' ').split(phrase).join('(retiré par ce test)'));
+        var refused = checkRetention(server, source);
+        fs.writeFileSync(policy, served);
+        if (refused.code === 0 || refused.err.indexOf('never says "' + phrase + '"') === -1) {
+          fail('the retention check passes a policy that no longer says "' + phrase + '" (' + e.key + ')');
+        }
+      });
+    });
+  } finally {
+    server.stop();
+  }
+})();
+
 if (status === 0) {
-  console.log('controles-legaux: both legal checks pass on the site as it will be published, French and English, and refuse what they exist to see');
+  console.log('controles-legaux: the legal checks pass on the site as it will be published, French and English, the retention check holds each duration to the policy that states it, and all three refuse what they exist to see');
 }
 process.exit(status);
