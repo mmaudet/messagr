@@ -16,8 +16,8 @@ import {
   type ReportedMessage,
   type ReportReason,
 } from '../runtime/reportFormat'
-import type { Reported } from '../runtime/reportMessages'
 import { NotchedButton } from './NotchedButton'
+import type { ReportStage } from './reportStage'
 import { dayOf, timeOf } from './whenLabel'
 
 /**
@@ -55,31 +55,22 @@ import { dayOf, timeOf } from './whenLabel'
  * # WHAT BECOMES OF IT
  *
  * Sent, with the report number and how to learn the decision. Too long, and
- * fewer messages are to be chosen. Or unconfirmed: nothing came back, which
- * cannot tell a report never sent from one whose answer was lost, so the
- * sheet says so, and that sending again sends it once (`reportMessages.ts`).
- * The sheet closes at any time, the sending one included: the report goes
- * on without it, and sent again it is kept once. The reported messages stay
- * in the conversation whatever happens: reporting removes nothing.
+ * fewer messages are to be chosen. Refused, when the service answered that
+ * it will not take it, which it says before keeping anything: the sheet says
+ * so, and how to report without the application (#491). No longer
+ * reportable, when a message chosen was deleted or left the conversation
+ * while the sheet was open: the sheet says so as soon as it happens, and
+ * nothing leaves (#491). Or unconfirmed: nothing came back, which cannot
+ * tell a report never sent from one whose answer was lost, so the sheet says
+ * so, and that sending again sends it once (`reportMessages.ts`). Where
+ * sending again cannot help, « Envoyer » is absent. The sheet closes at any
+ * time, the sending one included: the report goes on without it, and sent
+ * again it is kept once. The reported messages stay in the conversation
+ * whatever happens: reporting removes nothing.
  *
  * Its shape is `RemoveSheet.tsx`'s, the ground, the scrim and the sheet: the
  * product has no bottom sheet of its own to borrow.
  */
-
-/** Where a report stands, as the sheet shows it. */
-export type ReportStage =
-  | { readonly stage: 'choosing' }
-  | { readonly stage: 'sending' }
-  | { readonly stage: 'sent'; readonly number: string }
-  | { readonly stage: 'too-long' }
-  | { readonly stage: 'unconfirmed' }
-
-/** The stage a report's outcome puts the sheet at. */
-export function stageAfter(reported: Reported): ReportStage {
-  return reported.outcome === 'sent'
-    ? { stage: 'sent', number: reported.number }
-    : { stage: reported.outcome }
-}
 
 /** Each reason of the terms, in the words of the catalogue. */
 const REASON_LABELS: Readonly<Record<ReportReason, CopyKey>> = {
@@ -110,9 +101,11 @@ export function ReportSheet({
   readonly reporter: string
   /**
    * What leaves: the selected messages, in the order the conversation reads
-   * them (`reportable`, the reading the report itself is made from).
+   * them (`reportable`, the reading the report itself is made from). `null`
+   * once they can no longer be reported, a message deleted meanwhile for
+   * one.
    */
-  readonly messages: readonly ReportedMessage[]
+  readonly messages: readonly ReportedMessage[] | null
   readonly stage: ReportStage
   readonly onSend: (reason: ReportReason) => void
   readonly onClose: () => void
@@ -121,6 +114,17 @@ export function ReportSheet({
   const [missing, setMissing] = useState(false)
   const insets = useSafeAreaInsets()
   const sending = stage.stage === 'sending'
+  // NO LONGER REPORTABLE (#491), whether the sending found it or the sheet
+  // sees it first. Not while a report is on its way: it was assembled from
+  // what was on screen when « Envoyer » was pressed, and its answer decides.
+  const unreportable =
+    stage.stage === 'unreportable' || (messages === null && !sending)
+  // « ANNULER » UNTIL SOMETHING HAS HAPPENED: once it has, closing cancels
+  // nothing, and the word must not say it does.
+  const closing =
+    stage.stage === 'choosing' && !unreportable
+      ? 'report_cancel'
+      : 'report_close'
 
   return (
     <Modal
@@ -134,14 +138,25 @@ export function ReportSheet({
           testID="report-scrim"
           style={styles.scrim}
           accessibilityRole="button"
-          accessibilityLabel={t(
-            stage.stage === 'choosing' ? 'report_cancel' : 'report_close',
-          )}
+          accessibilityLabel={t(closing)}
           onPress={onClose}
         />
         <View
           style={[styles.sheet, { paddingBottom: space.m + insets.bottom }]}>
-          {stage.stage === 'sent' ? (
+          {stage.stage !== 'sent' && unreportable ? (
+            // Nothing is left to choose a reason for, and nothing leaves.
+            <View style={styles.section} testID="report-unreportable">
+              <Text style={styles.title}>{t('report_title')}</Text>
+              <Text style={styles.waiting}>{t('report_unreportable')}</Text>
+              <NotchedButton
+                wide
+                tone="quiet"
+                label={t(closing)}
+                testID="report-cancel"
+                onPress={onClose}
+              />
+            </View>
+          ) : stage.stage === 'sent' ? (
             <View style={styles.section} testID="report-sent">
               <Text style={styles.title}>{t('report_sent_title')}</Text>
               {/* SELECTABLE, because it is copied into an email. */}
@@ -201,7 +216,7 @@ export function ReportSheet({
                   <Text style={styles.attributed} testID="report-author">
                     {t('report_author %@', author)}
                   </Text>
-                  {messages.map(message => (
+                  {(messages ?? []).map(message => (
                     <View
                       key={message.eventId}
                       style={styles.message}
@@ -241,11 +256,16 @@ export function ReportSheet({
                   {t('report_too_long')}
                 </Text>
               )}
+              {stage.stage === 'refused' && (
+                <Text style={styles.waiting} testID="report-refused">
+                  {t('report_refused')}
+                </Text>
+              )}
 
               <View style={styles.actions}>
-                {/* TOO LONG, SENDING AGAIN CANNOT HELP: absent, like every
-                    action here that cannot do what it says. */}
-                {stage.stage !== 'too-long' && (
+                {/* TOO LONG OR REFUSED, SENDING AGAIN CANNOT HELP: absent,
+                    like every action here that cannot do what it says. */}
+                {stage.stage !== 'too-long' && stage.stage !== 'refused' && (
                   <NotchedButton
                     wide
                     label={t(sending ? 'report_sending' : 'report_send')}
@@ -260,16 +280,11 @@ export function ReportSheet({
                     }}
                   />
                 )}
-                {/* « FERMER » ONCE IT HAS BEEN SENT: closing then cancels
-                    nothing, and the word must not say it does. */}
+                {/* « FERMER » ONCE SOMETHING HAS HAPPENED (`closing`). */}
                 <NotchedButton
                   wide
                   tone="quiet"
-                  label={t(
-                    stage.stage === 'choosing'
-                      ? 'report_cancel'
-                      : 'report_close',
-                  )}
+                  label={t(closing)}
                   testID="report-cancel"
                   onPress={onClose}
                 />

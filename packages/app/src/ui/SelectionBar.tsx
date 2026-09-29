@@ -72,7 +72,7 @@ export function SelectionBar({
   readonly canFavourite: boolean
   /**
    * Whether the selection is texts of one other participant, which is what
-   * a report carries (#468, `reportedAuthor`).
+   * a report carries (#468, `reportable`).
    */
   readonly canReport: boolean
   /**

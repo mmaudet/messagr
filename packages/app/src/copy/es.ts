@@ -200,6 +200,10 @@ export const es: Readonly<Record<CopyKey, string>> = {
     'La denuncia no está confirmada: quizá haya salido, quizá no. Volver a intentarlo solo la enviará una vez.',
   report_too_long:
     'Estos mensajes son demasiado largos para una sola denuncia: cierre y elija menos.',
+  report_refused:
+    'El servicio rechazó este envío y no guardó nada de él. Para denunciar de otro modo, escriba a conformite@messagr.eu.',
+  report_unreportable:
+    'Uno de los mensajes elegidos ya no se puede denunciar: se eliminó, o ya no está en esta conversación. Cierre y vuelva a elegir.',
   report_sent_title: 'Denuncia enviada',
   'report_sent_number %@': 'Número de denuncia: %@',
   report_sent_decision:

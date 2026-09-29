@@ -258,6 +258,18 @@ export const fr = {
     'Le signalement n’est pas confirmé : il est peut-être parti, peut-être pas. Réessayer ne l’enverra qu’une fois.',
   report_too_long:
     'Ces messages sont trop longs pour un seul signalement : fermez, puis choisissez-en moins.',
+  // UN REFUS, ET PAS « PAS CONFIRMÉ » (#491) : le service répond 400 ou 401
+  // avant de garder quoi que ce soit, et refuserait de même un nouvel envoi.
+  // « Cet envoi », et pas « ce signalement » : un envoi précédent du même
+  // signalement, resté sans réponse, a pu être gardé, et la phrase ne dit
+  // rien de lui. Sans l'application, on signale à la même adresse (l'écran
+  // légal le dit).
+  report_refused:
+    'Le service a refusé cet envoi et n’en a rien gardé. Pour signaler autrement, écrivez à conformite@messagr.eu.',
+  // UN MESSAGE CHOISI N'EST PLUS LÀ (#491) : supprimé pendant que la feuille
+  // était ouverte, ou sorti de la conversation. Rien n'est scellé ni envoyé.
+  report_unreportable:
+    'Un des messages choisis ne peut plus être signalé : il a été supprimé, ou il n’est plus dans cette conversation. Fermez, puis choisissez de nouveau.',
   report_sent_title: 'Signalement envoyé',
   'report_sent_number %@': 'Numéro de signalement : %@',
   report_sent_decision:

@@ -62,9 +62,15 @@ function device(
       | 'unreachable'
       | 'silent'
     readonly seal?: 'refuses'
-    /** What the homeserver's whoami answers for the token, or that it does not. */
-    readonly whoami?: string | 'unanswered'
-    /** Whether the deadline for the service's answer elapses. */
+    /**
+     * What the homeserver's whoami answers for the token, or that it fails,
+     * or that it never answers.
+     */
+    readonly whoami?: string | 'unanswered' | 'silent'
+    /**
+     * Whether a deadline elapses: on the next turn of the event loop, after
+     * any port that answers at once.
+     */
     readonly deadline?: 'elapses'
   } = {},
 ) {
@@ -78,6 +84,7 @@ function device(
   const reporting: Reporting = {
     whoami: async () => {
       if (options.whoami === 'unanswered') throw new Error('network')
+      if (options.whoami === 'silent') return new Promise<string>(() => {})
       return options.whoami ?? ME
     },
     seal: (payload, binding) => {
@@ -97,7 +104,9 @@ function device(
     now: () => NOW,
     after: async ms => {
       expect(ms).toBe(ANSWER_DEADLINE_MS)
-      if (options.deadline !== 'elapses') await new Promise(() => {})
+      await new Promise(elapsed => {
+        if (options.deadline === 'elapses') setTimeout(elapsed, 0)
+      })
     },
   }
   return { reporting, sealed, sent }
@@ -249,7 +258,9 @@ describe('Reporting messages to the operator (#468)', () => {
     expect(tooLong.sent).toEqual([])
   })
 
-  it('seals and sends nothing when the messages are not one other person’s words', async () => {
+  it('seals and sends nothing, and says so, when the selection is not one another person’s report can carry', async () => {
+    // Not « unconfirmed » (#491): nothing left, and sending again could not
+    // make it leave.
     for (const selected of [
       new Set(['$first', '$other']),
       new Set(['$mine']),
@@ -261,15 +272,50 @@ describe('Reporting messages to the operator (#468)', () => {
       const { reporting, sealed, sent } = device()
 
       expect(await reportMessages(reporting, { ...REQUEST, selected })).toEqual(
-        { outcome: 'unconfirmed' },
+        { outcome: 'unreportable' },
       )
       expect(sealed).toEqual([])
       expect(sent).toEqual([])
     }
   })
 
+  it('seals and sends nothing, and says so, when a message chosen was removed while the sheet was open', async () => {
+    // #491, the case the ticket names: the sheet opened on two messages, and
+    // one was removed for everyone before « Envoyer ».
+    const { reporting, sealed, sent } = device()
+    const removedMeanwhile = TIMELINE.map(entry =>
+      entry.eventId === '$second'
+        ? { ...entry, body: null, msgtype: undefined, removed: true }
+        : entry,
+    )
+
+    expect(
+      await reportMessages(reporting, {
+        ...REQUEST,
+        timeline: removedMeanwhile,
+      }),
+    ).toEqual({ outcome: 'unreportable' })
+    expect(sealed).toEqual([])
+    expect(sent).toEqual([])
+  })
+
   it('seals and sends nothing when the homeserver does not say whose account this is', async () => {
     const { reporting, sealed, sent } = device({ whoami: 'unanswered' })
+
+    expect(await reportMessages(reporting, REQUEST)).toEqual({
+      outcome: 'unconfirmed',
+    })
+    expect(sealed).toEqual([])
+    expect(sent).toEqual([])
+  })
+
+  it('gives the homeserver’s whoami the send’s deadline, and is unconfirmed when it does not answer within it', async () => {
+    // #491: asked just before sealing, it had none, and « Envoi… » could
+    // stay on the sheet for ever.
+    const { reporting, sealed, sent } = device({
+      whoami: 'silent',
+      deadline: 'elapses',
+    })
 
     expect(await reportMessages(reporting, REQUEST)).toEqual({
       outcome: 'unconfirmed',
@@ -287,10 +333,25 @@ describe('Reporting messages to the operator (#468)', () => {
     expect(sent).toEqual([])
   })
 
-  it('is unconfirmed when the service refuses it, cannot be reached, gives no number, or does not answer in time', async () => {
+  it('is refused when the service refuses it for good: a request it will not take, or a token it does not take', async () => {
+    // #491: « pas confirmé, réessayer ne l'enverra qu'une fois » cannot be
+    // true of a refusal. The service refuses before keeping anything
+    // (`handlers/reports.rs`), and the same request would be refused again.
+    for (const answer of [
+      { status: 400, body: '{"errcode":"M_INVALID_PARAM"}' },
+      { status: 401, body: '{"errcode":"M_UNAUTHORIZED"}' },
+    ]) {
+      const { reporting, sent } = device({ answer })
+
+      expect(await reportMessages(reporting, REQUEST)).toEqual({
+        outcome: 'refused',
+      })
+      expect(sent).toHaveLength(1)
+    }
+  })
+
+  it('is unconfirmed when the service cannot be reached, gives no number, fails, or does not answer in time', async () => {
     for (const options of [
-      { answer: { status: 400, body: '{"errcode":"M_INVALID_PARAM"}' } },
-      { answer: { status: 401, body: '{"errcode":"M_UNAUTHORIZED"}' } },
       { answer: { status: 404, body: '{"errcode":"M_UNRECOGNIZED"}' } },
       { answer: { status: 500, body: '{"errcode":"M_UNKNOWN"}' } },
       { answer: { status: 201, body: '{}' } },
