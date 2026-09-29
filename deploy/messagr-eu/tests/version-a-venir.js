@@ -36,7 +36,9 @@
 // reprend la marque, et une page qui n'en a pas en reçoit une, préparée comme
 // `LISEZ-MOI-pages-legales.md` le dit. Les pages sont trouvées par leur forme
 // (une version à venir, ou une version datée), comme `build-site.sh` et
-// `version-a-venir.mjs` les trouvent.
+// `version-a-venir.mjs` les trouvent. Depuis #466, le dépôt peut aussi tenir
+// une version qui attend d'être publiée, et une traduction une fois qu'elle
+// l'est : `aCopy` dit ce qu'il en fait, et version-a-publier.js le reste.
 'use strict';
 
 var fs = require('fs');
@@ -168,13 +170,39 @@ function unannounce(site, page) {
   });
 }
 
-/** Une copie du site et de retention.json, chaque page avec sa version à venir non annoncée. */
+/**
+ * Une copie du site et de retention.json, chaque page avec sa version à venir
+ * non annoncée.
+ *
+ * DEUX CHOSES EN SONT ÉCARTÉES, ET CE N'EST PAS UNE COMMODITÉ (#466). Une
+ * version qui attend dans `a-publier/` y est publiée d'abord : la version à
+ * venir est écrite par-dessus elle, et les trois gestes refusent de
+ * l'annoncer avant. Puis la traduction que cette publication pose est
+ * retirée : une version à venir n'en porte pas encore, et les trois gestes
+ * refusent une page traduite, qu'ils laisseraient traduire une version
+ * remplacée. version-a-publier.js tient ces deux refus sur le dépôt tel qu'il
+ * est ; ici, c'est le cycle de la version à venir qui est mené, en français,
+ * par-dessus la version publiée.
+ */
 function aCopy() {
   var copy = fs.mkdtempSync(path.join(os.tmpdir(), 'a-venir-source-'));
   var site = path.join(copy, 'site');
   fs.mkdirSync(site);
   child.execFileSync('cp', ['-R', siteDir + '/.', site]);
   child.execFileSync('cp', [retentionFile, path.join(copy, 'retention.json')]);
+  if (PAGES.some(function (page) { return exists(path.join(site, page, 'a-publier', 'index.html')); })) {
+    var published = run('node', [tool, 'publier', site]);
+    if (published.code !== 0) {
+      throw new Error('the copy could not publish the version waiting in a-publier/: ' + published.err);
+    }
+  }
+  PAGES.forEach(function (page) {
+    fs.readdirSync(path.join(site, page)).filter(function (name) {
+      return /^[a-z]{2}$/.test(name);
+    }).forEach(function (translation) {
+      fs.rmSync(path.join(site, page, translation), { recursive: true });
+    });
+  });
   PAGES.forEach(function (page) {
     if (exists(path.join(site, page, 'a-venir', 'index.html'))) {
       unannounce(site, page);

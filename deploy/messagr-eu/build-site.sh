@@ -84,7 +84,21 @@ find "$source_dir" -maxdepth 1 -type f -exec cp {} "$destination/" \;
 # ET RIEN DE CONSTRUIT NE PORTE LA MARQUE : vérifié sur la sortie, puisqu'une
 # page qui dirait « s'appliquera le MESSAGR-DATE-A-VENIR » serait publiée
 # fausse.
+#
+# UNE VERSION QUI S'APPLIQUE LE JOUR OÙ ELLE EST PUBLIÉE (#466) attend, elle,
+# dans `<page>/a-publier/`, avec sa traduction, la marque
+# MESSAGR-DATE-DE-PUBLICATION à la place de sa date : la version en vigueur
+# ne fixe aucun préavis, et c'est la publication qui fixe ce jour
+# (`version-a-venir.mjs publier`). Rien de ce dossier n'est jamais construit ;
+# `publier` en sort la version le jour venu. Un déploiement fait pour autre
+# chose ne publie donc pas les conditions d'avance, ni leur traduction.
 marque='MESSAGR-DATE-A-VENIR'
+marque_publication='MESSAGR-DATE-DE-PUBLICATION'
+for attente in "$destination"/*/a-publier; do
+  [ -d "$attente" ] || continue
+  rm -r "$attente"
+  echo "build-site: $(basename "$(dirname "$attente")")/a-publier/ waits to be published, and is not built"
+done
 for venir in "$destination"/*/a-venir/index.html; do
   [ -f "$venir" ] || continue
   if grep -qF -- "$marque" "$venir"; then
@@ -101,12 +115,14 @@ for page in "$destination"/*/index.html; do
   grep -qF -- "$marque" "$page" || continue
   perl -0777 -pi -e 's/[ \t]*<!-- a-venir -->.*?<!-- \/a-venir -->[ \t]*\n?//gs' "$page"
 done
-if grep -rlF -- "$marque" "$destination" >/dev/null; then
-  echo "build-site: FAIL: a built page still carries $marque:" >&2
-  grep -rlF -- "$marque" "$destination" >&2
-  echo "  A date that was never set would be published as it stands." >&2
-  exit 1
-fi
+for restante in "$marque" "$marque_publication"; do
+  if grep -rlF -- "$restante" "$destination" >/dev/null; then
+    echo "build-site: FAIL: a built page still carries $restante:" >&2
+    grep -rlF -- "$restante" "$destination" >&2
+    echo "  A date that was never set would be published as it stands." >&2
+    exit 1
+  fi
+done
 
 # THE BRAND MARKS ARE COPIED FROM `design/brand/`, NOT DUPLICATED INTO
 # `site/`. That directory is authoritative for the visual and read-only: a
