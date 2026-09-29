@@ -2,16 +2,17 @@
 //! its device for the operator key, reach the service with a reason, and
 //! leave it with a report number.
 //!
-//! - `POST /reports`: `{ "reason": <code>, "sealed": <base64> }`, answered
+//! - `POST /reports`, with the header `idempotency-key`:
+//!   `{ "reason": <code>, "sealed": <base64> }`, answered
 //!   `201 { "number": "K7QM-4ZT2" }`.
 //!
 //! # WHAT THE SERVICE KEEPS, AND WHAT IT NEVER LEARNS
 //!
 //! The number, the reporting account as the homeserver's `whoami` names the
-//! caller's token, the reason's code, the sealed report as it came, and the
-//! instant it came. The reported account, the conversation and the messages
-//! are inside the sealed report, which the operator alone opens, on its own
-//! machine: this service cannot.
+//! caller's token, the reason's code, the sealed report as it came, the
+//! instant it came, and the idempotency key it came with. The reported
+//! account, the conversation and the messages are inside the sealed report,
+//! which the operator alone opens, on its own machine: this service cannot.
 //!
 //! The reporting account is the caller, never a field of the body, and a body
 //! with any field beside the reason and the sealed report is refused: nothing
@@ -19,6 +20,15 @@
 //! unsealed because the service keeps them, and the seal binds both
 //! (`packages/app/src/runtime/reportFormat.ts`): a report kept under another
 //! reason or another account does not open.
+//!
+//! # THE SAME REPORT, SENT AGAIN, IS KEPT ONCE
+//!
+//! The device draws an idempotency key for a report and sends it again with
+//! every new attempt of the same report, as `POST /invitations` has one
+//! (`handlers::create`, which says why a header). An answer lost after the
+//! report was kept, then « Réessayer », finds the report the same account
+//! already sent under that key: the service answers its number, and keeps
+//! nothing more and tells the operator nothing more.
 //!
 //! # THE OPERATOR IS TOLD OF EACH REPORT
 //!
@@ -46,6 +56,7 @@ use crate::{
     auth,
     error::AppError,
     extract::Body,
+    handlers::create::{validate_idempotency_key, IDEMPOTENCY_HEADER},
     report::{Reason, ReportNumber, Reports, SealedReport},
     AppState,
 };
@@ -71,13 +82,14 @@ pub struct Reported {
 const DRAWS: usize = 8;
 
 /// `POST /reports`: keeps a sealed report and its reason, for the calling
-/// account, and answers its number.
+/// account, once per idempotency key, and answers its number.
 pub async fn report(
     State(st): State<Arc<AppState>>,
     headers: HeaderMap,
     Body(req): Body<ReportRequest>,
 ) -> Result<(StatusCode, Json<Reported>), AppError> {
     let reporter = auth::authenticate(&st.mx, &headers).await?;
+    let key = idempotency_key(&headers)?;
     let reason = Reason::from_code(&req.reason).ok_or_else(|| {
         AppError::InvalidRequest("reason: not one of the eight codes of the terms".into())
     })?;
@@ -91,20 +103,26 @@ pub async fn report(
     let at = st.cfg.clock.now();
     let received = Received {
         reporter: &reporter,
+        key: &key,
         reason,
         sealed: &sealed,
         at,
     };
-    let number = kept(&st.pool, &received, ReportNumber::draw).await?;
-
-    // IN THE BACKGROUND: OVHcloud may take fifteen seconds to answer, and the
-    // person is waiting for the number, not for the operator's telephone.
-    if let Some(reports) = Reports::new(vec![(number, reason)]) {
-        let told = st.clone();
-        tokio::spawn(async move {
-            alert::tell_the_operator(&told, &Alert::ReportsReceived(reports), at).await;
-        });
-    }
+    let number = match insert_under_a_free_number(&st.pool, &received, ReportNumber::draw).await? {
+        Kept::Now(number) => {
+            // IN THE BACKGROUND: OVHcloud may take fifteen seconds to answer,
+            // and the person is waiting for the number, not for the
+            // operator's telephone.
+            if let Some(reports) = Reports::new(vec![(number, reason)]) {
+                let told = st.clone();
+                tokio::spawn(async move {
+                    alert::tell_the_operator(&told, &Alert::ReportsReceived(reports), at).await;
+                });
+            }
+            number
+        }
+        Kept::Before(number) => number,
+    };
     Ok((
         StatusCode::CREATED,
         Json(Reported {
@@ -113,40 +131,98 @@ pub async fn report(
     ))
 }
 
+/// The idempotency key of a report, required: without it, an answer lost
+/// then a new attempt would keep the report twice, and tell the operator
+/// twice. The same bounds as a key of `POST /invitations`.
+fn idempotency_key(headers: &HeaderMap) -> Result<String, AppError> {
+    let key = headers
+        .get(IDEMPOTENCY_HEADER)
+        .and_then(|value| value.to_str().ok())
+        .ok_or_else(|| {
+            AppError::InvalidRequest(format!(
+                "header {IDEMPOTENCY_HEADER} is required: it keeps a report sent again from \
+                 being kept twice"
+            ))
+        })?;
+    validate_idempotency_key(key)?;
+    Ok(key.to_string())
+}
+
 /// A report as it is received, before it has a number.
 struct Received<'a> {
     reporter: &'a str,
+    key: &'a str,
     reason: Reason,
     sealed: &'a SealedReport,
     at: i64,
 }
 
-/// Keeps `received` under the first number `draw` gives that no report holds
-/// yet, and answers it. The number is written as it is shown, `K7QM-4ZT2`.
-async fn kept(
+/// Where a report received stands once it is kept.
+enum Kept {
+    /// Kept now, under this number: the operator is to be told.
+    Now(ReportNumber),
+    /// Kept by an earlier attempt of the same account under the same key.
+    Before(ReportNumber),
+}
+
+/// Inserts `received` under the first number `draw` gives that no report
+/// holds, DRAWING AGAIN ON A COLLISION; or, when the same account already sent
+/// a report under the same key, inserts nothing and answers that report's
+/// number. The number is written as it is shown, `K7QM-4ZT2`.
+///
+/// The key is looked up before each insert: two attempts that cross both find
+/// nothing, one inserts, and the other's insert, refused by the key's unique
+/// index, finds it on its next turn.
+async fn insert_under_a_free_number(
     pool: &SqlitePool,
     received: &Received<'_>,
     mut draw: impl FnMut() -> ReportNumber,
-) -> Result<ReportNumber, AppError> {
+) -> Result<Kept, AppError> {
     for _ in 0..DRAWS {
+        if let Some(number) = sent_before(pool, received).await? {
+            return Ok(Kept::Before(number));
+        }
         let number = draw();
         let written = sqlx::query(
-            "INSERT INTO reports (number, reporter_user_id, reason, sealed, received_at) \
-             VALUES (?, ?, ?, ?, ?) ON CONFLICT(number) DO NOTHING",
+            "INSERT INTO reports \
+             (number, reporter_user_id, reason, sealed, received_at, idempotency_key) \
+             VALUES (?, ?, ?, ?, ?, ?) ON CONFLICT DO NOTHING",
         )
         .bind(number.to_string())
         .bind(received.reporter)
         .bind(received.reason.code())
         .bind(received.sealed.bytes())
         .bind(received.at)
+        .bind(received.key)
         .execute(pool)
         .await
         .map_err(anyhow::Error::from)?;
         if written.rows_affected() == 1 {
-            return Ok(number);
+            return Ok(Kept::Now(number));
         }
     }
     Err(anyhow::anyhow!("no report number left free in {DRAWS} draws").into())
+}
+
+/// The number of the report `received`'s account already sent under its key,
+/// if it did.
+async fn sent_before(
+    pool: &SqlitePool,
+    received: &Received<'_>,
+) -> Result<Option<ReportNumber>, AppError> {
+    let kept: Option<String> = sqlx::query_scalar(
+        "SELECT number FROM reports WHERE reporter_user_id = ? AND idempotency_key = ?",
+    )
+    .bind(received.reporter)
+    .bind(received.key)
+    .fetch_optional(pool)
+    .await
+    .map_err(anyhow::Error::from)?;
+    kept.map(|number| {
+        ReportNumber::parse(&number)
+            .ok_or_else(|| anyhow::anyhow!("a report number kept does not read back").into())
+    })
+    .transpose()
 }
 
 #[cfg(test)]
@@ -154,22 +230,13 @@ mod tests {
     use super::*;
     use crate::config::Config;
     use crate::handlers::discovery::test_support::{bearer, state_from, whoami_hs, T0};
+    use crate::report::test_support::sealed_of;
     use crate::sms::test_support::{fake_ovhcloud, sms_through, Inbox, OPERATOR_NUMBER};
     use data_encoding::BASE64;
     use std::sync::Mutex;
 
     /// The strong suffix's alphabet, as #462 gives it: no 0, O, 1 or I.
     const ALPHABET: &str = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
-
-    /// A sealed report as `reportFormat.ts` lays one out: the format's
-    /// number, a 32-byte encapsulated key, then `blocks` blocks of 4,096
-    /// bytes and the 16-byte tag, every byte after the first `fill`. The
-    /// service cannot tell it from one that opens, and has no need to.
-    fn sealed_of(blocks: usize, fill: u8) -> Vec<u8> {
-        let mut bytes = vec![0x01];
-        bytes.resize(1 + 32 + blocks * 4096 + 16, fill);
-        bytes
-    }
 
     /// The service at `T0`, its homeserver reduced to `whoami`, telling the
     /// operator by SMS through a fake OVHcloud.
@@ -188,6 +255,13 @@ mod tests {
             },
         );
         (st, inbox)
+    }
+
+    /// `who`'s token, and `key` as the report's idempotency key.
+    fn keyed(who: &str, key: &str) -> HeaderMap {
+        let mut headers = bearer(who);
+        headers.insert(IDEMPOTENCY_HEADER, key.parse().unwrap());
+        headers
     }
 
     /// The status and the number of a report sent with `headers`.
@@ -209,13 +283,13 @@ mod tests {
         .map(|(status, Json(reported))| (status, reported.number))
     }
 
-    type Row = (String, String, String, Vec<u8>, i64);
+    type Row = (String, String, String, Vec<u8>, i64, String);
 
     /// Every report the service keeps, as its columns hold it.
     async fn kept_rows(pool: &SqlitePool) -> Vec<Row> {
         sqlx::query_as(
-            "SELECT number, reporter_user_id, reason, sealed, received_at FROM reports \
-             ORDER BY received_at, number",
+            "SELECT number, reporter_user_id, reason, sealed, received_at, idempotency_key \
+             FROM reports ORDER BY received_at, number",
         )
         .fetch_all(pool)
         .await
@@ -238,6 +312,12 @@ mod tests {
         inbox.sent.iter().map(|(_, text)| text.clone()).collect()
     }
 
+    /// Long enough for an alert spawned by mistake to have reached the fake
+    /// OVHcloud, which answers at once.
+    async fn a_moment() {
+        tokio::time::sleep(std::time::Duration::from_millis(100)).await;
+    }
+
     fn number(typed: &str) -> ReportNumber {
         ReportNumber::parse(typed).unwrap()
     }
@@ -249,9 +329,14 @@ mod tests {
         let (st, _) = service(pool.clone()).await;
         let sealed = sealed_of(1, 7);
 
-        let (status, number) = sent(&st, bearer("alice"), "harassment", &BASE64.encode(&sealed))
-            .await
-            .unwrap();
+        let (status, number) = sent(
+            &st,
+            keyed("alice", "report-key-1"),
+            "harassment",
+            &BASE64.encode(&sealed),
+        )
+        .await
+        .unwrap();
 
         assert_eq!(status, StatusCode::CREATED);
         // #462: eight characters of the strong suffix, grouped by four.
@@ -270,18 +355,21 @@ mod tests {
                 "@alice:h".to_string(),
                 "harassment".to_string(),
                 sealed,
-                T0
+                T0,
+                "report-key-1".to_string()
             )]
         );
     }
 
     #[sqlx::test(migrations = "./migrations")]
-    async fn a_report_keeps_its_number_its_account_its_reason_its_sealed_report_and_its_instant_and_nothing_else(
+    async fn a_report_keeps_its_number_account_reason_sealed_report_instant_and_key_and_nothing_else(
         pool: SqlitePool,
     ) {
         // #462: « rien d'autre que le motif, le compte qui signale et le pli
-        // n'est enregistré ». The reported account, the conversation and the
-        // messages are in the sealed report, and no column could hold them.
+        // n'est enregistré », beside what makes a report findable once: its
+        // number, its instant, the key of its sending. The reported account,
+        // the conversation and the messages are in the sealed report, and no
+        // column could hold them.
         let columns: Vec<String> =
             sqlx::query_scalar("SELECT name FROM pragma_table_info('reports')")
                 .fetch_all(&pool)
@@ -294,9 +382,74 @@ mod tests {
                 "reporter_user_id",
                 "reason",
                 "sealed",
-                "received_at"
+                "received_at",
+                "idempotency_key"
             ]
         );
+    }
+
+    #[sqlx::test(migrations = "./migrations")]
+    async fn the_same_report_sent_again_under_its_key_is_kept_once_and_told_once(pool: SqlitePool) {
+        // An answer lost after the report was kept, then « Réessayer »: the
+        // same number comes back, and nothing else is kept or told.
+        let (st, inbox) = service(pool.clone()).await;
+        let sealed = BASE64.encode(&sealed_of(1, 7));
+
+        let (_, first) = sent(&st, keyed("alice", "report-key-1"), "threat", &sealed)
+            .await
+            .unwrap();
+        let told_once = told(&inbox, 1).await;
+        let (status, again) = sent(&st, keyed("alice", "report-key-1"), "threat", &sealed)
+            .await
+            .unwrap();
+        a_moment().await;
+
+        assert_eq!((status, &again), (StatusCode::CREATED, &first));
+        assert_eq!(kept_rows(&pool).await.len(), 1);
+        assert_eq!(
+            told_once,
+            [format!("Messagr : 1 signalement reçu : {first} (menace).")]
+        );
+        assert_eq!(told(&inbox, 2).await, told_once, "told once");
+    }
+
+    #[sqlx::test(migrations = "./migrations")]
+    async fn a_key_is_the_reporting_account_s_own(pool: SqlitePool) {
+        // Another account's report under the same key is another report.
+        let (st, _) = service(pool.clone()).await;
+        let sealed = BASE64.encode(&sealed_of(1, 7));
+
+        let (_, alice) = sent(&st, keyed("alice", "report-key-1"), "hate", &sealed)
+            .await
+            .unwrap();
+        let (_, bob) = sent(&st, keyed("bob", "report-key-1"), "hate", &sealed)
+            .await
+            .unwrap();
+
+        assert_ne!(alice, bob);
+        assert_eq!(kept_rows(&pool).await.len(), 2);
+    }
+
+    #[sqlx::test(migrations = "./migrations")]
+    async fn a_report_without_an_idempotency_key_of_the_expected_form_is_refused(pool: SqlitePool) {
+        let (st, inbox) = service(pool.clone()).await;
+        let sealed = BASE64.encode(&sealed_of(1, 7));
+        let too_long = "k".repeat(201);
+        for (what, headers) in [
+            ("no key", bearer("alice")),
+            ("seven characters", keyed("alice", "7-chars")),
+            ("201 characters", keyed("alice", &too_long)),
+            ("a space", keyed("alice", "report key 1")),
+        ] {
+            let refused = sent(&st, headers, "harassment", &sealed).await;
+            assert!(
+                matches!(refused, Err(AppError::InvalidRequest(_))),
+                "{what}"
+            );
+        }
+        assert_eq!(kept_rows(&pool).await, []);
+        a_moment().await;
+        assert_eq!(told(&inbox, 0).await, Vec::<String>::new());
     }
 
     #[sqlx::test(migrations = "./migrations")]
@@ -313,11 +466,17 @@ mod tests {
             "solicitation",
             "other_illegal",
         ] {
-            let taken = sent(&st, bearer("alice"), reason, &sealed).await;
+            let taken = sent(
+                &st,
+                keyed("alice", &format!("key-{reason}")),
+                reason,
+                &sealed,
+            )
+            .await;
             assert!(matches!(taken, Ok((StatusCode::CREATED, _))), "{reason}");
         }
         for reason in ["", "spam", "Threat", "harassment ", "other"] {
-            let refused = sent(&st, bearer("alice"), reason, &sealed).await;
+            let refused = sent(&st, keyed("alice", "key-refused"), reason, &sealed).await;
             assert!(
                 matches!(refused, Err(AppError::InvalidRequest(_))),
                 "{reason:?}"
@@ -348,14 +507,14 @@ mod tests {
             ),
             ("seventeen blocks", BASE64.encode(&sealed_of(17, 7))),
         ] {
-            let refused = sent(&st, bearer("alice"), "harassment", &sealed).await;
+            let refused = sent(&st, keyed("alice", "report-key-1"), "harassment", &sealed).await;
             assert!(
                 matches!(refused, Err(AppError::InvalidRequest(_))),
                 "{what}"
             );
         }
         assert_eq!(kept_rows(&pool).await, []);
-        tokio::time::sleep(std::time::Duration::from_millis(100)).await;
+        a_moment().await;
         assert_eq!(told(&inbox, 0).await, Vec::<String>::new());
     }
 
@@ -363,8 +522,10 @@ mod tests {
     async fn a_call_without_a_valid_token_is_refused_and_nothing_is_kept_or_told(pool: SqlitePool) {
         let (st, inbox) = service(pool.clone()).await;
         let sealed = BASE64.encode(&sealed_of(1, 7));
+        let mut no_token = HeaderMap::new();
+        no_token.insert(IDEMPOTENCY_HEADER, "report-key-1".parse().unwrap());
         assert!(matches!(
-            sent(&st, HeaderMap::new(), "harassment", &sealed).await,
+            sent(&st, no_token, "harassment", &sealed).await,
             Err(AppError::Unauthenticated)
         ));
         // A token the homeserver does not vouch for: here, one nobody answers.
@@ -374,11 +535,17 @@ mod tests {
             Config::for_tests(),
         );
         assert!(matches!(
-            sent(&unreachable, bearer("alice"), "harassment", &sealed).await,
+            sent(
+                &unreachable,
+                keyed("alice", "report-key-1"),
+                "harassment",
+                &sealed
+            )
+            .await,
             Err(AppError::Unauthenticated)
         ));
         assert_eq!(kept_rows(&pool).await, []);
-        tokio::time::sleep(std::time::Duration::from_millis(100)).await;
+        a_moment().await;
         assert_eq!(told(&inbox, 0).await, Vec::<String>::new());
     }
 
@@ -391,11 +558,13 @@ mod tests {
         let (st, inbox) = service(pool.clone()).await;
         let sealed = BASE64.encode(&sealed_of(1, 7));
 
-        let (_, first) = sent(&st, bearer("alice"), "harassment", &sealed)
+        let (_, first) = sent(&st, keyed("alice", "report-key-1"), "harassment", &sealed)
             .await
             .unwrap();
         let after_the_first = told(&inbox, 1).await;
-        let (_, second) = sent(&st, bearer("bob"), "threat", &sealed).await.unwrap();
+        let (_, second) = sent(&st, keyed("bob", "report-key-2"), "threat", &sealed)
+            .await
+            .unwrap();
         let after_the_second = told(&inbox, 2).await;
 
         assert_eq!(
@@ -419,21 +588,27 @@ mod tests {
     #[sqlx::test(migrations = "./migrations")]
     async fn a_number_already_given_is_drawn_again(pool: SqlitePool) {
         let sealed = SealedReport::from_base64(&BASE64.encode(&sealed_of(1, 7))).unwrap();
-        let received = |reporter| Received {
+        let received = |reporter, key| Received {
             reporter,
+            key,
             reason: Reason::Harassment,
             sealed: &sealed,
             at: T0,
         };
-        let first = kept(&pool, &received("@alice:h"), || number("K7QM-4ZT2"))
-            .await
-            .unwrap();
+        let first = insert_under_a_free_number(&pool, &received("@alice:h", "key-1"), || {
+            number("K7QM-4ZT2")
+        })
+        .await
+        .unwrap();
         let mut draws = [number("K7QM-4ZT2"), number("ABCD-EFGH")].into_iter();
-        let second = kept(&pool, &received("@bob:h"), || draws.next().unwrap())
-            .await
-            .unwrap();
+        let second = insert_under_a_free_number(&pool, &received("@bob:h", "key-2"), || {
+            draws.next().unwrap()
+        })
+        .await
+        .unwrap();
 
-        assert_eq!((first, second), (number("K7QM-4ZT2"), number("ABCD-EFGH")));
+        assert!(matches!(first, Kept::Now(n) if n == number("K7QM-4ZT2")));
+        assert!(matches!(second, Kept::Now(n) if n == number("ABCD-EFGH")));
         let kept: Vec<(String, String)> = kept_rows(&pool)
             .await
             .into_iter()
@@ -449,8 +624,8 @@ mod tests {
     }
 
     /// Through the service's own router and over HTTP, since the application
-    /// reads the answer there: the status, the body, and the refusals made
-    /// before the handler.
+    /// reads the answer there: the status, the body, the same number for the
+    /// same key, and the refusals made before the handler.
     #[sqlx::test(migrations = "./migrations")]
     async fn on_the_wire_a_report_answers_201_with_its_number_and_a_body_naming_anything_else_is_refused(
         pool: SqlitePool,
@@ -462,18 +637,26 @@ mod tests {
         tokio::spawn(async move { axum::serve(listener, app).await.unwrap() });
         let http = reqwest::Client::new();
         let sealed = BASE64.encode(&sealed_of(1, 7));
+        let post = |body: serde_json::Value| {
+            http.post(format!("{base}/reports"))
+                .bearer_auth("alice")
+                .header(IDEMPOTENCY_HEADER, "report-key-1")
+                .json(&body)
+                .send()
+        };
 
-        let taken = http
-            .post(format!("{base}/reports"))
-            .bearer_auth("alice")
-            .json(&serde_json::json!({"reason": "hate", "sealed": sealed}))
-            .send()
+        let taken = post(serde_json::json!({"reason": "hate", "sealed": sealed}))
             .await
             .unwrap();
         assert_eq!(taken.status(), StatusCode::CREATED);
         let body: serde_json::Value = taken.json().await.unwrap();
         let rows = kept_rows(&pool).await;
         assert_eq!(body, serde_json::json!({"number": rows[0].0}));
+        let again = post(serde_json::json!({"reason": "hate", "sealed": sealed}))
+            .await
+            .unwrap();
+        assert_eq!(again.status(), StatusCode::CREATED);
+        assert_eq!(again.json::<serde_json::Value>().await.unwrap(), body);
 
         // The reporting account is the caller's: a body that names one, or
         // names the reported account or the conversation, is refused whole.
@@ -484,13 +667,7 @@ mod tests {
         ] {
             let mut body = serde_json::json!({"reason": "hate", "sealed": sealed});
             body[extra.0] = serde_json::json!(extra.1);
-            let refused = http
-                .post(format!("{base}/reports"))
-                .bearer_auth("alice")
-                .json(&body)
-                .send()
-                .await
-                .unwrap();
+            let refused = post(body).await.unwrap();
             assert_eq!(refused.status(), StatusCode::BAD_REQUEST, "{}", extra.0);
             let said: serde_json::Value = refused.json().await.unwrap();
             assert_eq!(said["errcode"], "M_INVALID_PARAM", "{}", extra.0);
@@ -498,6 +675,7 @@ mod tests {
 
         let anonymous = http
             .post(format!("{base}/reports"))
+            .header(IDEMPOTENCY_HEADER, "report-key-1")
             .json(&serde_json::json!({"reason": "hate", "sealed": sealed}))
             .send()
             .await

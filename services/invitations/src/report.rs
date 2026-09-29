@@ -44,11 +44,8 @@ impl ReportNumber {
         }))
     }
 
-    /// The number `typed` stands for, or `None` for anything else.
-    #[cfg_attr(
-        not(test),
-        expect(dead_code, reason = "the operator's modes of #473 read it typed back")
-    )]
+    /// The number `typed` stands for, or `None` for anything else. A number
+    /// kept is read back this way too (`handlers::reports`).
     pub fn parse(typed: &str) -> Option<ReportNumber> {
         let typed = typed.as_bytes();
         let (first, second) = match typed.len() {
@@ -200,8 +197,25 @@ impl Reports {
     }
 }
 
+/// What the tests of reports share.
+#[cfg(test)]
+pub(crate) mod test_support {
+    use super::*;
+
+    /// A sealed report laid out as the format says: its number, then the
+    /// encapsulated key, `blocks` blocks and the tag, every byte after the
+    /// first `fill`. The service cannot tell it from one that opens, and has
+    /// no need to.
+    pub(crate) fn sealed_of(blocks: usize, fill: u8) -> Vec<u8> {
+        let mut bytes = vec![SEALED_FORMAT];
+        bytes.resize(SEALED_OVERHEAD + blocks * SEALED_BLOCK, fill);
+        bytes
+    }
+}
+
 #[cfg(test)]
 mod tests {
+    use super::test_support::sealed_of;
     use super::*;
 
     #[test]
@@ -304,15 +318,6 @@ mod tests {
         }
         let distinct: std::collections::HashSet<&String> = drawn.iter().collect();
         assert_eq!(distinct.len(), drawn.len());
-    }
-
-    /// A sealed report as `reportFormat.ts` lays one out: the format's
-    /// number, a 32-byte encapsulated key, then `blocks` blocks of 4,096
-    /// bytes and the 16-byte tag, every byte after the first `fill`.
-    fn sealed_of(blocks: usize, fill: u8) -> Vec<u8> {
-        let mut bytes = vec![0x01];
-        bytes.resize(1 + 32 + blocks * 4096 + 16, fill);
-        bytes
     }
 
     #[test]
