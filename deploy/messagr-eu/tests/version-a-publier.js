@@ -15,8 +15,10 @@
 //   2. Publier mal : une date qui n'est pas celle du jour à Paris, une marque
 //      oubliée quelque part, la version remplacée perdue au lieu de rester
 //      lisible à son adresse datée, un renvoi qui ne mène nulle part, une
-//      traduction qui ne dit pas quel texte fait foi, ou l'annonce de la
-//      version à venir perdue en chemin.
+//      traduction qui ne dit pas quel texte fait foi, l'annonce de la
+//      version à venir perdue en chemin, ou `retention.json` qui chercherait
+//      encore une durée nouvelle à l'adresse d'une version publiée, où plus
+//      rien ne répond, au lieu de la politique en vigueur qui la dit (#467).
 //   3. Mêler deux changements : annoncer une version à venir pendant qu'une
 //      autre attend d'être publiée sur la même page, ou appliquer une version
 //      à venir qui laisserait une traduction traduire une version remplacée.
@@ -162,6 +164,26 @@ function aPlainCopy() {
   child.execFileSync('cp', ['-R', siteDir + '/.', site]);
   child.execFileSync('cp', [retentionFile, path.join(copy, 'retention.json')]);
   return site;
+}
+
+/**
+ * `retention.json` de la copie, avec une durée que chaque version qui attend
+ * dit, comme une durée nouvelle attend la version qui la dit (#467). Sa clé
+ * « page » est la dernière de son objet : la virgule de la clé qui la précède
+ * doit tomber avec elle. Rend le fichier tel qu'il est avant la publication.
+ */
+function withWaitingDurations(site) {
+  var file = path.join(site, '..', 'retention.json');
+  var added = PAGES.filter(function (page) {
+    return exists(path.join(site, page, 'a-publier', 'index.html'));
+  }).map(function (page) {
+    return '  "essai_' + page.replace(/-/g, '_') + '": {\n' +
+      '    "duree": "une durée que ce test fait dire",\n' +
+      '    "page": "/' + page + '/a-publier/"\n' +
+      '  }';
+  });
+  fs.writeFileSync(file, read(file).replace(/\n}\s*$/, ',\n' + added.join(',\n') + '\n}\n'));
+  return JSON.parse(read(file));
 }
 
 /** Une copie où chaque page légale tient une version qui attend d'être publiée. */
@@ -314,6 +336,7 @@ var LATER = '2031-03-30';
 (function () {
   [[LATER, 0, LATER], [LATER, 1, dayBefore(LATER)]].forEach(function (when) {
     var site = aCopy();
+    var retentionBefore = withWaitingDurations(site);
     var instant = parisMidnight(when[0], when[1]);
     var date = when[2];
     var before = {};
@@ -389,6 +412,30 @@ var LATER = '2031-03-30';
         fail(page + ' no longer announces its upcoming version once published');
       }
     });
+
+    // Ce que la version publiée dit se vérifie désormais sur la version en
+    // vigueur : `retention.json` perd chaque « page » qui nommait une version
+    // publiée, et rien d'autre, et reste lisible (#467).
+    var expected = JSON.parse(JSON.stringify(retentionBefore));
+    Object.keys(expected).forEach(function (key) {
+      var entry = expected[key];
+      if (entry && typeof entry === 'object' && /^\/[^/]+\/a-publier\/$/.test(entry.page || '')) {
+        delete entry.page;
+      }
+    });
+    var retentionAfter = read(path.join(site, '..', 'retention.json'));
+    var parsedAfter = null;
+    try {
+      parsedAfter = JSON.parse(retentionAfter);
+    } catch (e) {
+      fail('retention.json no longer parses once published: ' + e.message);
+    }
+    if (parsedAfter !== null && JSON.stringify(parsedAfter) !== JSON.stringify(expected)) {
+      fail('retention.json is not what it was without the pages naming a published version');
+    }
+    if (retentionAfter.indexOf('/a-publier/') !== -1) {
+      fail('retention.json still names an address under a-publier/ once published');
+    }
 
     var site2 = built(site);
     if (site2.result.code !== 0) {
@@ -488,6 +535,12 @@ var LATER = '2031-03-30';
         fs.mkdirSync(path.join(site, page, 'en'));
         fs.writeFileSync(path.join(site, page, 'en', 'index.html'), '<html lang="en"><p>An earlier translation.</p></html>');
       });
+    }],
+    // Les durées ne pourraient pas suivre, et une durée nouvelle resterait
+    // vérifiée à une adresse que la publication fait disparaître.
+    ['retention.json is missing beside the site', function (site) {
+      withWaitingDurations(site);
+      fs.rmSync(path.join(site, '..', 'retention.json'));
     }],
   ];
   var sample = aCopy();
@@ -675,6 +728,6 @@ var LATER = '2031-03-30';
 })();
 
 if (status === 0) {
-  console.log('version-a-publier: a version to publish is served from the day it is published, dated that day in Paris, with its translation, and the one it replaces stays readable');
+  console.log('version-a-publier: a version to publish is served from the day it is published, dated that day in Paris, with its translation, the one it replaces stays readable, and the durations it states are checked on it from then on');
 }
 process.exit(status);

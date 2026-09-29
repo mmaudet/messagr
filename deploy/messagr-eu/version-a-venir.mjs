@@ -70,7 +70,9 @@
 //     `appliquer` ;
 //   - la version qui attendait devient `<page>/index.html`, et sa traduction
 //     `<page>/en/index.html`, sa propre adresse ;
-//   - `<page>/a-publier/` disparaît.
+//   - `<page>/a-publier/` disparaît, et `retention.json` cesse d'y renvoyer :
+//     une durée nouvelle que la version publiée dit se vérifie désormais sur
+//     la version en vigueur (#467).
 // Le texte, c'est la page qui le porte, dans sa langue : le geste n'écrit que
 // des dates, et vérifie qu'il n'en manque aucune.
 //
@@ -718,8 +720,17 @@ function dater(texte, nom, date, langue) {
  * Publie chaque version qui attend dans `a-publier/`, datée du jour de Paris
  * à l'instant `maintenant`, et dit ce qui a été écrit. Rien n'est écrit si
  * une page ne dit pas exactement ce qu'il faut.
+ *
+ * `retention` vaut le `retention.json` voisin du site, comme pour
+ * `appliquer` : une durée nouvelle qu'une version à publier dit y porte
+ * `"page": "/<page>/a-publier/"` (#467), et la perd ici, pour se vérifier
+ * désormais sur la version en vigueur, qui la dit.
  */
-export function publier(site, maintenant = new Date()) {
+export function publier(
+  site,
+  maintenant = new Date(),
+  retention = join(site, '..', 'retention.json'),
+) {
   const date = aujourdhuiAParis(maintenant)
   const aPublier = versionsAPublier(site)
   if (aPublier.length === 0) {
@@ -727,6 +738,16 @@ export function publier(site, maintenant = new Date()) {
       'aucune version n’attend dans a-publier/, il n’y a rien à publier',
     )
   }
+  if (!existsSync(retention)) {
+    throw new Refus(
+      `${retention} n’existe pas : les durées ne peuvent pas suivre`,
+    )
+  }
+  const avantRetention = lire(retention)
+  const nouvelleRetention = retentionSans(
+    avantRetention,
+    aPublier.map(v => `/${v.nom}/a-publier/`),
+  )
   const ecritures = []
   for (const version of aPublier) {
     verifierLaFormeAPublier(version)
@@ -782,10 +803,13 @@ export function publier(site, maintenant = new Date()) {
     writeFileSync(page, texte)
   }
   for (const { dossier } of aPublier) rmSync(dossier, { recursive: true })
+  const retentionSuit = nouvelleRetention !== avantRetention
+  if (retentionSuit) writeFileSync(retention, nouvelleRetention)
   return {
     touchees: [
       ...ecritures.map(e => e.page),
       ...aPublier.map(v => `${v.dossier} (retiré)`),
+      ...(retentionSuit ? [retention] : []),
     ],
     attendent: [],
   }

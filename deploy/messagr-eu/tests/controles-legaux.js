@@ -31,6 +31,7 @@ var repository = path.join(root, '..', '..');
 var build = path.join(root, 'build-site.sh');
 var tool = path.join(root, 'version-a-venir.mjs');
 var siteDir = path.join(root, 'site');
+var retentionFile = path.join(root, 'retention.json');
 var pagesCheck = path.join(repository, 'scripts', 'assert-legal-pages.sh');
 var screenCheck = path.join(repository, 'scripts', 'assert-legal-screen.sh');
 var copyDir = path.join(repository, 'packages', 'app', 'src', 'copy');
@@ -91,11 +92,13 @@ function legalPages(site) {
 }
 var PAGES = legalPages(siteDir);
 
+/** Une copie du site, et de retention.json à côté comme dans le dépôt. */
 function aCopy() {
   var copy = fs.mkdtempSync(path.join(os.tmpdir(), 'controles-source-'));
   var site = path.join(copy, 'site');
   fs.mkdirSync(site);
   child.execFileSync('cp', ['-R', siteDir + '/.', site]);
+  child.execFileSync('cp', [retentionFile, path.join(copy, 'retention.json')]);
   return site;
 }
 
