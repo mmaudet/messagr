@@ -12,7 +12,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { t, type CopyKey } from '../copy'
 import { color, floors, radius, space, type } from '../design/tokens'
 import type { ReportedMessage } from '../runtime/reportFormat'
-import { REPORT_REASONS, type ReportReason } from '../runtime/reportMessages'
+import { REPORT_REASONS, type ReportReason } from '../runtime/reportFormat'
 import { NotchedButton } from './NotchedButton'
 import { dayOf, timeOf } from './whenLabel'
 

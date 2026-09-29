@@ -20,7 +20,9 @@ import {
   REPORT_INFO,
   reportAad,
   toWire,
+  type ReportBinding,
   type ReportPayload,
+  type ReportReason,
 } from './reportFormat'
 import { reportMessages } from './reportMessages'
 import { sealReport, sealReportWithEphemeral } from './sealedReport'
@@ -56,7 +58,7 @@ const TEST_KEY_FILE = join(FIXTURES, 'cle-de-test-de-l-exploitant.json')
 const TEST_REPORT_FILE = join(FIXTURES, 'signalement-de-test.json')
 
 interface ReportDocument {
-  readonly reason: string
+  readonly reason: ReportReason
   readonly reporter: string
   readonly sealed: string
 }
@@ -89,7 +91,10 @@ const A_2_1 = {
     '21993c62ce81883d2dd1b51a28',
 }
 
-const BINDING = { reason: 'harassment', reporter: '@alice:example.org' }
+const BINDING: ReportBinding = {
+  reason: 'harassment',
+  reporter: '@alice:example.org',
+}
 
 function bytes(hexadecimal: string): Uint8Array {
   return Uint8Array.from(hexadecimal.match(/../g) ?? [], pair =>
@@ -232,7 +237,18 @@ describe('A report, sealed for the operator key', () => {
 
   it('refuses a reason or an account ID the binding cannot carry', () => {
     expect(() =>
-      sealReport(text('x'), { ...BINDING, reason: 'two words' }),
+      sealReport(text('x'), {
+        ...BINDING,
+        reporter: '@alice smith:example.org',
+      }),
+    ).toThrow(RangeError)
+    // A reason outside the eight gets past no typed caller: this one stands
+    // for a caller the compiler does not see.
+    expect(() =>
+      sealReport(text('x'), {
+        ...BINDING,
+        reason: 'two words' as ReportReason,
+      }),
     ).toThrow(RangeError)
   })
 })

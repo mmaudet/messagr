@@ -5,6 +5,7 @@ import {
   payloadBytes,
   type ReportBinding,
   type ReportedMessage,
+  type ReportReason,
 } from './reportFormat'
 
 /**
@@ -41,23 +42,6 @@ import {
  * again then makes a second report, which the operator reads as such. The
  * reported messages stay on screen either way: reporting removes nothing.
  */
-
-/**
- * The eight reasons of the terms, in their order, by the codes the service
- * takes (`services/invitations/src/report.rs`).
- */
-export const REPORT_REASONS = [
-  'child_sexual_abuse',
-  'threat',
-  'harassment',
-  'impersonation',
-  'hate',
-  'sexual_without_consent',
-  'solicitation',
-  'other_illegal',
-] as const
-
-export type ReportReason = (typeof REPORT_REASONS)[number]
 
 /** The report route of the invitation service (`servicePoster.ts`). */
 export interface ReportService {

@@ -299,7 +299,10 @@ describe('Drawing the operator key, on the operator’s machine', () => {
     // #470's gesture, end to end: the line in the application, a store build
     // that accepts it, and a report sealed for it opened on the machine.
     expect(storeBuild(moduleWith(line)).status).toBe(0)
-    const binding = { reason: 'threat', reporter: '@alice:example.org' }
+    const binding = {
+      reason: 'threat',
+      reporter: '@alice:example.org',
+    } as const
     const sealed = sealReportWithEphemeral(
       generateKeyPair(),
       new TextEncoder().encode('pour la clé tirée'),

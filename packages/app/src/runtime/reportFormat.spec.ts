@@ -4,14 +4,26 @@ import {
   base64Bytes,
   fromWire,
   keyBytesOf,
+  MOST_PAYLOAD_BYTES,
+  padded,
   payloadBytes,
   payloadOf,
+  REPORT_REASONS,
   reportAad,
   type ReportPayload,
+  type ReportReason,
 } from './reportFormat'
 
 function hex(of: Uint8Array): string {
   return Array.from(of, b => b.toString(16).padStart(2, '0')).join('')
+}
+
+/**
+ * A reason as the operator's tool hands one over, read from a JSON document
+ * the compiler never sees: the format's own check is what stands then.
+ */
+function untyped(reason: string): ReportReason {
+  return reason as ReportReason
 }
 
 function text(of: Uint8Array): string {
@@ -35,8 +47,14 @@ describe('What binds a report to its reason and its reporting account', () => {
   it('tells a reason from an account ID, whatever their lengths', () => {
     // The same eleven characters, cut in two places: a plain concatenation
     // would give both the same bytes.
-    const cutEarly = reportAad({ reason: 'ab', reporter: '@c:d.example' })
-    const cutLate = reportAad({ reason: 'ab@', reporter: 'c:d.example' })
+    const cutEarly = reportAad({
+      reason: untyped('ab'),
+      reporter: '@c:d.example',
+    })
+    const cutLate = reportAad({
+      reason: untyped('ab@'),
+      reporter: 'c:d.example',
+    })
 
     expect(hex(cutEarly)).not.toBe(hex(cutLate))
   })
@@ -51,7 +69,9 @@ describe('What binds a report to its reason and its reporting account', () => {
       'line\nbreak',
       'x'.repeat(256),
     ]) {
-      expect(() => reportAad({ reason, reporter })).toThrow(RangeError)
+      expect(() => reportAad({ reason: untyped(reason), reporter })).toThrow(
+        RangeError,
+      )
     }
     expect(() => reportAad({ reason: 'harassment', reporter: '' })).toThrow(
       RangeError,
@@ -118,6 +138,22 @@ describe('Standard base64, as a sealed report and a key are written', () => {
     ).toBeNull()
     expect(keyBytesOf('Zm9vYmFy')).toBeNull()
     expect(keyBytesOf(`${key.slice(0, 40)}AAAAAA==`)).toBeNull()
+  })
+})
+
+describe('The reasons a report is sent for (#468)', () => {
+  it('are the eight of the terms, by the codes the service takes', () => {
+    // #462, one per prohibition of the terms, in their order.
+    expect(REPORT_REASONS).toEqual([
+      'child_sexual_abuse',
+      'threat',
+      'harassment',
+      'impersonation',
+      'hate',
+      'sexual_without_consent',
+      'solicitation',
+      'other_illegal',
+    ])
   })
 })
 
@@ -203,10 +239,26 @@ describe('What a report carries, inside the seal (#468)', () => {
       ],
       ['a time written as text', json({ ...written, reported_at: '1790' })],
       ['no conversation', json({ ...written, room_id: undefined })],
+      ['a reason outside the eight', json({ ...written, reason: 'spam' })],
+      ['nothing at all', json(null)],
+      [
+        'a message that is nothing',
+        json({ ...written, messages: [null, written.messages[1]] }),
+      ],
     ]
     for (const [what, bytes] of cases) {
       expect(payloadOf(bytes), what).toBeNull()
     }
+  })
+
+  it('fits the service’s sixteen blocks up to 65,535 bytes, and not one more', () => {
+    // The service takes one to sixteen blocks of 4,096 bytes (`report.rs`),
+    // and the padding needs one byte of its own.
+    expect(MOST_PAYLOAD_BYTES).toBe(16 * 4096 - 1)
+    expect(padded(new Uint8Array(MOST_PAYLOAD_BYTES))).toHaveLength(16 * 4096)
+    expect(padded(new Uint8Array(MOST_PAYLOAD_BYTES + 1))).toHaveLength(
+      17 * 4096,
+    )
   })
 })
 

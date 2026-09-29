@@ -3,7 +3,6 @@ import { describe, expect, it } from 'vitest'
 import type { TimelineEntry } from '../timeline/mergeTimeline'
 import { payloadOf, type ReportBinding } from './reportFormat'
 import {
-  REPORT_REASONS,
   reportMessages,
   type Reporting,
   type Selection,
@@ -75,20 +74,6 @@ function device(
 }
 
 describe('Reporting messages to the operator (#468)', () => {
-  it('offers the eight reasons of the terms, by the codes the service takes', () => {
-    // #462, one per prohibition of the terms, in their order.
-    expect(REPORT_REASONS).toEqual([
-      'child_sexual_abuse',
-      'threat',
-      'harassment',
-      'impersonation',
-      'hate',
-      'sexual_without_consent',
-      'solicitation',
-      'other_illegal',
-    ])
-  })
-
   it('seals the selected messages as read, from their one author, and nothing else of the conversation', async () => {
     const { reporting, sealed } = device()
 
