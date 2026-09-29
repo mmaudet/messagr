@@ -51,7 +51,10 @@ import { NotchedButton } from './NotchedButton'
  * that can be walked past is not a gate. The conditions themselves are one tap
  * away, at the address the published page and `assert-legal-screen.sh` already
  * agree on — the acceptance is of a text somebody can read, not of a sentence
- * about a text.
+ * about a text. The box says what those terms refuse (#466): no forbidden
+ * content, no abusive behaviour. Apple's guideline 1.2 asks for terms that
+ * say so, accepted before anything else, and this is where they are
+ * accepted.
  *
  * THE DARK GROUND IS THE MARK'S, NOT A THEME. `ink900` is the token for "fond
  * des frontières de sécurité", and the prototype puts this screen among the
@@ -68,8 +71,22 @@ const POINTS: readonly CopyKey[] = [
   'promise_point_invitation',
 ]
 
-/** Where the conditions are published. The one `assert-legal-screen.sh` reads. */
-const TERMS = 'https://messagr.eu/conditions-generales/'
+/**
+ * Where the conditions are published: the French text, which is
+ * authoritative, and its English translation at its own address. The two
+ * `assert-legal-screen.sh` reads.
+ *
+ * #466: somebody who chose another language than French ticks a box about
+ * terms they must be able to read. The conditions exist in these two
+ * languages only, so every other language opens the English page, which says
+ * which of the two texts is authoritative.
+ */
+const TERMS_FRENCH = 'https://messagr.eu/conditions-generales/'
+const TERMS_ENGLISH = 'https://messagr.eu/conditions-generales/en/'
+
+function termsFor(language: Language): string {
+  return language === 'fr' ? TERMS_FRENCH : TERMS_ENGLISH
+}
 
 export function FirstLaunch({
   onBegin,
@@ -172,7 +189,7 @@ export function FirstLaunch({
             onPress={() => {
               // Failure is ordinary: no browser, or somebody dismissed it.
               // There is nothing to report and nothing to retry.
-              Linking.openURL(TERMS).catch(() => {})
+              Linking.openURL(termsFor(language)).catch(() => {})
             }}
             accessibilityRole="link"
             style={styles.linkRow}>

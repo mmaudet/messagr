@@ -717,6 +717,15 @@ export const fr = {
   // Le rapprochement des deux n'est pas laissé à la bonne foi :
   // scripts/assert-legal-screen.sh va chercher la page en ligne et vérifie
   // que ce qu'elle engage se retrouve ici.
+  //
+  // #466 : LA TOLÉRANCE ZÉRO, APRÈS LE REFUS D'APPLE EN 1.2. L'écran disait
+  // qu'aucun filtre ne pouvait exister, que l'exploitant ne pouvait pas retirer
+  // un message précis, et que le signalement depuis l'application n'existait
+  // pas encore. Honnête pour un exploitant qui ne voit que du chiffré, lu chez
+  // Apple comme l'aveu que les garde-fous manquent. Il dit désormais ce que
+  // l'ADR 0015 a décidé, comme les conditions publiées en français et en
+  // anglais, et le contrôle vérifie les sept langues : chacune porte chaque
+  // fait, et aucune ne garde l'une des trois anciennes phrases.
   settings_action: 'Réglages',
   settings_title: 'Réglages',
   settings_legal: 'Informations légales',
@@ -732,29 +741,35 @@ export const fr = {
 
   legal_forbidden_title: 'Ce qui est interdit',
   legal_forbidden_body:
-    'Les contenus pédocriminels, les menaces contre la vie ou la sécurité d’une personne, le harcèlement, l’usurpation d’identité, et tout autre contenu illégal au regard du droit français ou européen.',
+    'Les contenus pédocriminels, les menaces contre la vie ou la sécurité d’une personne, le harcèlement, l’usurpation d’identité, les contenus haineux, les contenus sexuels imposés à qui ne les a pas demandés et les images intimes diffusées sans accord, le démarchage, et tout autre contenu illégal au regard du droit français ou européen.',
+  legal_forbidden_zero:
+    'Messagr ne tolère aucun contenu interdit par ces conditions ni aucun comportement abusif : le contenu est retiré et son auteur exclu.',
   legal_forbidden_entry:
     'On n’entre que sur invitation nominative. Une invitation est personnelle, à usage limité, et elle ne se revend pas. L’âge minimum est de quinze ans.',
 
   legal_moderation_title: 'Comment la modération fonctionne réellement',
   legal_moderation_human:
-    'La modération est celle des administrateurs du serveur. Ce sont des personnes. Toute décision est prise par une personne, jamais par un automatisme.',
-  legal_moderation_no_tools:
-    'Il n’existe aucun outil automatique de détection, aucun filtre, aucune analyse de contenu, et il ne peut pas en exister : le contenu est chiffré de bout en bout et l’exploitant détient des messages qu’il lui est cryptographiquement impossible de lire.',
-  legal_moderation_reported:
-    'Rien n’est examiné qui n’ait été signalé par une personne. Il n’y a ni surveillance générale, ni détection proactive, ni classement algorithmique.',
+    'La modération est faite par l’exploitant, c’est-à-dire par des personnes. Toute décision est prise par une personne, jamais par un automatisme.',
+  legal_moderation_filter:
+    'Ce qui filtre, c’est la forme même du service : on n’écrit qu’à qui a accepté l’invitation, et une invitation peut être refusée. Le serveur, lui, ne filtre pas le contenu : il est chiffré de bout en bout, et l’exploitant détient des messages qu’il lui est cryptographiquement impossible de lire.',
+  legal_moderation_block:
+    'Tout compte peut être bloqué depuis une conversation : plus rien de ce qu’il envoie ne vous parvient, ce qu’il a déjà écrit disparaît de vos écrans, et il ne peut plus vous inviter dans Messagr. Il n’en est pas averti, et un blocage ne se lève pas. L’exploitant apprend qui a bloqué qui, jamais ce qui a été dit.',
+  legal_moderation_reads:
+    'L’exploitant ne lit que ce qu’un signalement porte : les messages qu’une personne a reçus et choisit de lui transmettre, et rien d’autre de la conversation. Rien n’est examiné qui n’ait été signalé par une personne. Il n’y a ni surveillance générale, ni détection proactive, ni classement algorithmique.',
   legal_moderation_can:
-    'Ce que l’exploitant peut décider sans lire : suspendre un compte, lui retirer sa capacité d’émettre des invitations, l’exclure d’un groupe, révoquer une branche d’invitation.',
+    'Ce que l’exploitant peut décider sur ce qu’un signalement montre : retirer pour tout le monde les messages signalés, suspendre le compte de leur auteur, puis le fermer si la décision confirme la suspension. Un message retiré laisse à sa place une ligne qui le dit. Sans rien lire, il peut aussi retirer à un compte sa capacité d’émettre des invitations, l’exclure d’un groupe, ou révoquer une branche d’invitation.',
   legal_moderation_cannot:
-    'Ce qu’il ne peut pas faire : retirer un message précis, qualifier un contenu, établir qu’une règle a été enfreinte par la lecture.',
+    'Ce qu’il ne peut pas faire : lire une conversation, ni juger un message qu’aucun signalement ne lui a montré. Une mesure de compte se prend sur des faits établissables sans lire, ou sur ce que le signalement montre, jamais sur la seule affirmation d’un signalant.',
 
   legal_report_title: 'Signaler, et ce qui suit',
   legal_report_how:
-    'Le signalement se fait par courriel à conformite@messagr.eu. Le geste depuis l’application n’existe pas encore, et le dire vaut mieux que le promettre.',
+    'Le signalement se fait depuis l’application : dans une conversation, sélectionnez des messages d’une même personne, puis « Signaler », et choisissez un motif. Avant l’envoi, l’application dit exactement ce qui part, et seul l’exploitant peut ouvrir un signalement. Chaque signalement reçoit un numéro de signalement.',
   legal_report_delay:
-    'Un signalement produit une référence. Il reçoit un accusé de réception, puis une décision motivée au plus tard trente jours après sa réception, avec la voie pour la contester. Le signalement d’une menace pour la vie ou la sécurité aux autorités ne suit pas ce délai : il part sans attendre.',
+    'Sous vingt-quatre heures, l’exploitant ouvre le signalement et, si ce qu’il montre enfreint ces conditions, retire les messages signalés, puis suspend le compte de leur auteur. Une décision motivée suit au plus tard trente jours après la réception du signalement ; si elle confirme la suspension, le compte est fermé. Le signalement d’une menace pour la vie ou la sécurité aux autorités ne suit pas ces délais : il part sans attendre.',
+  legal_report_decision:
+    'La décision s’obtient en écrivant à conformite@messagr.eu avec le numéro de signalement. Sans l’application, on écrit à la même adresse : le courriel reçoit un accusé de réception, puis une décision motivée au plus tard trente jours après sa réception.',
   legal_report_review:
-    'Une décision peut être contestée auprès de conformite@messagr.eu, en citant la référence. Elle est réexaminée par une personne autre que celle qui l’a prise chaque fois que l’organisation le permet. Sur un service exploité par une ou deux personnes, cette condition ne peut pas toujours être tenue, et l’écrire vaut mieux que de promettre une séparation qui n’existerait pas.',
+    'Une décision peut être contestée auprès de conformite@messagr.eu, par la personne qui a signalé, en citant le numéro de signalement, comme par celle que la mesure vise. Elle est réexaminée par une personne autre que celle qui l’a prise chaque fois que l’organisation le permet. Sur un service exploité par une ou deux personnes, cette condition ne peut pas toujours être tenue, et l’écrire vaut mieux que de promettre une séparation qui n’existerait pas.',
   legal_report_scope:
     'Messagr est un service d’hébergement et non une plateforme en ligne, le considérant 14 du DSA écartant les services de messagerie interpersonnelle. Les articles 20 et 21 ne s’appliquent donc pas, et ce texte ne prétend pas les offrir.',
 
@@ -777,9 +792,10 @@ export const fr = {
   // dépend : aucune build qui affiche ce texte ne sort avant la page.
   legal_delete_title: 'Supprimer votre compte',
   legal_delete_body:
-    'La suppression se fait depuis l’application : Réglages, puis « Supprimer mon compte ». Le compte est alors désactivé aussitôt et ses données sont purgées sous trente jours ; les messages déjà envoyés restent des événements des salons où ils ont été écrits, et le serveur ne peut pas les en retirer puisqu’il ne peut pas les lire. Sans cet appareil, ou quand l’application le demande, la suppression se demande par courriel à conformite@messagr.eu.',
+    'La suppression se fait depuis l’application : Réglages, puis « Supprimer mon compte ». Le compte est alors désactivé aussitôt et ses données sont purgées sous trente jours ; les messages déjà envoyés restent des événements des salons où ils ont été écrits, et supprimer le compte ne les en retire pas. Sans cet appareil, ou quand l’application le demande, la suppression se demande par courriel à conformite@messagr.eu.',
   legal_delete_link: 'Sans cet appareil : messagr.eu/aide',
-  legal_full_terms: 'Conditions générales complètes : messagr.eu',
+  legal_full_terms:
+    'Conditions générales complètes : messagr.eu/conditions-generales',
 
   // LA CONFIANCE, EXPLIQUÉE PLUTÔT QUE SIGNALÉE.
   //
@@ -1015,7 +1031,8 @@ export const fr = {
 
   // Le premier lancement : la langue, puis l'acceptation.
   promise_language: 'Choisissez votre langue',
-  promise_terms: 'J’accepte les conditions générales d’utilisation de Messagr.',
+  promise_terms:
+    'J’accepte les conditions d’utilisation de Messagr, qui ne tolèrent aucun contenu interdit ni aucun comportement abusif.',
   promise_terms_link: 'Lire les conditions',
   promise_terms_required:
     'Cochez la case pour continuer. Rien ne démarre avant.',

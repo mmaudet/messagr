@@ -449,34 +449,40 @@ export const en: Readonly<Record<CopyKey, string>> = {
     'What this app shows is what stands. The terms published at messagr.eu restate what follows and add what a screen cannot carry: who operates the service, and under which law.',
   legal_forbidden_title: 'What is forbidden',
   legal_forbidden_body:
-    'Child sexual abuse material, threats against a person’s life or safety, harassment, impersonation, and any other content illegal under French or European law.',
+    'Child sexual abuse material, threats against a person’s life or safety, harassment, impersonation, hateful content, sexual content imposed on people who did not ask for it and intimate images shared without consent, solicitation, and any other content illegal under French or European law.',
+  legal_forbidden_zero:
+    'Messagr tolerates no content forbidden by these terms and no abusive behaviour: the content is taken down and its author excluded.',
   legal_forbidden_entry:
     'Entry is by named invitation only. An invitation is personal, limited in use, and not for resale. The minimum age is fifteen.',
   legal_moderation_title: 'How moderation actually works',
   legal_moderation_human:
-    'Moderation is done by the server’s administrators. They are people. Every decision is taken by a person, never by an automatism.',
-  legal_moderation_no_tools:
-    'There is no automatic detection tool, no filter, no content analysis, and there cannot be: content is end-to-end encrypted, and the operator holds messages it is cryptographically unable to read.',
-  legal_moderation_reported:
-    'Nothing is examined that a person has not reported. There is no general monitoring, no proactive detection, and no algorithmic ranking.',
+    'Moderation is done by the operator, that is, by people. Every decision is taken by a person, never by an automatism.',
+  legal_moderation_filter:
+    'What filters is the very shape of the service: you only write to someone who has accepted the invitation, and an invitation can be declined. The server, for its part, does not filter content: it is end-to-end encrypted, and the operator holds messages it is cryptographically unable to read.',
+  legal_moderation_block:
+    'Any account can be blocked from a conversation: nothing it sends reaches you any more, what it has already written leaves your screens, and it can no longer invite you in Messagr. It is not told, and a block cannot be lifted. The operator learns who blocked whom, never what was said.',
+  legal_moderation_reads:
+    'The operator reads only what a report carries: messages a person received and chooses to pass on to it, and nothing else of the conversation. Nothing is examined that a person has not reported. There is no general monitoring, no proactive detection and no algorithmic ranking.',
   legal_moderation_can:
-    'What the operator can decide without reading: suspend an account, take away its ability to issue invitations, remove it from a group, revoke a branch of invitations.',
+    'What the operator can decide on what a report shows: take the reported messages down for everyone, suspend their author’s account, then terminate it if the decision confirms the suspension. A message taken down leaves a line in its place saying so. Without reading anything, it can also take away an account’s ability to issue invitations, remove it from a group, or revoke a branch of invitations.',
   legal_moderation_cannot:
-    'What it cannot do: take down a particular message, characterise a piece of content, or establish by reading that a rule was broken.',
+    'What it cannot do: read a conversation, or judge a message no report has shown it. A measure against an account is taken on facts that can be established without reading, or on what the report shows, never on a reporter’s word alone.',
   legal_report_title: 'Reporting, and what follows',
   legal_report_how:
-    'Reports go by email to conformite@messagr.eu. Reporting from inside the app does not exist yet, and saying so is better than promising it.',
+    'Reporting is done from inside the application: in a conversation, select messages from the same person, then “Report”, and choose a reason. Before anything is sent, the application says exactly what leaves, and only the operator can open a report. Each report receives a report number.',
   legal_report_delay:
-    'A report produces a reference. It receives an acknowledgement, then a reasoned decision within thirty days of receipt at the latest, with the route to contest it. Reporting a threat to life or safety to the authorities does not wait for that deadline: it goes immediately.',
+    'Within twenty-four hours, the operator opens the report and, if what it shows breaks these terms, takes the reported messages down, then suspends their author’s account. A reasoned decision follows within thirty days of the report’s receipt at the latest; if it confirms the suspension, the account is terminated. Reporting a threat to life or safety to the authorities does not wait for these deadlines: it goes immediately.',
+  legal_report_decision:
+    'The decision is obtained by writing to conformite@messagr.eu with the report number. Without the application, you write to the same address: the e-mail receives an acknowledgement, then a reasoned decision within thirty days of its receipt at the latest.',
   legal_report_review:
-    'A decision can be contested at conformite@messagr.eu, quoting the reference. It is re-examined by someone other than whoever took it whenever the organisation allows. On a service run by one or two people that condition cannot always be met, and writing this down is better than promising a separation that would not exist.',
+    'A decision can be contested at conformite@messagr.eu, by the person who reported, quoting the report number, as well as by the person the measure concerns. It is re-examined by someone other than whoever took it whenever the organisation allows. On a service run by one or two people that condition cannot always be met, and writing this down is better than promising a separation that would not exist.',
   legal_report_scope:
     'Messagr is a hosting service and not an online platform, recital 14 of the DSA excluding interpersonal messaging services. Articles 20 and 21 therefore do not apply, and this text does not claim to offer them.',
   legal_delete_title: 'Delete your account',
   legal_delete_body:
-    'Deletion is done from inside the application: Settings, then “Delete my account”. The account is then deactivated at once and its data purged within thirty days; messages already sent remain events of the rooms they were written in, and the server cannot take them back, since it cannot read them. Without this device, or when the application asks you to, deletion is requested by e-mail at conformite@messagr.eu.',
+    'Deletion is done from inside the application: Settings, then “Delete my account”. The account is then deactivated at once and its data purged within thirty days; messages already sent remain events of the rooms they were written in, and deleting the account does not take them out. Without this device, or when the application asks you to, deletion is requested by e-mail at conformite@messagr.eu.',
   legal_delete_link: 'Without this device: messagr.eu/aide',
-  legal_full_terms: 'Full terms and conditions: messagr.eu',
+  legal_full_terms: 'Full terms of use: messagr.eu/conditions-generales/en',
   trust_action: 'What is known about this person',
   trust_title: 'What is known about this person',
   trust_calm:
@@ -629,7 +635,8 @@ export const en: Readonly<Record<CopyKey, string>> = {
   settings_keep_every_not_kept:
     'This choice could not be kept: it will return to its previous state at the next launch.',
   promise_language: 'Choose your language',
-  promise_terms: 'I accept Messagr’s terms and conditions of use.',
+  promise_terms:
+    'I accept Messagr’s terms of use, which tolerate no forbidden content and no abusive behaviour.',
   promise_terms_link: 'Read the terms',
   promise_terms_required:
     'Tick the box to continue. Nothing starts before that.',

@@ -443,34 +443,41 @@ export const es: Readonly<Record<CopyKey, string>> = {
     'Lo que muestra esta aplicación es lo que vale. Las condiciones publicadas en messagr.eu recogen lo que sigue y añaden lo que una pantalla no puede llevar: quién explota el servicio, y bajo qué derecho.',
   legal_forbidden_title: 'Lo que está prohibido',
   legal_forbidden_body:
-    'Los contenidos de abuso sexual infantil, las amenazas contra la vida o la seguridad de una persona, el acoso, la suplantación de identidad, y cualquier otro contenido ilegal según el derecho francés o europeo.',
+    'Los contenidos de abuso sexual infantil, las amenazas contra la vida o la seguridad de una persona, el acoso, la suplantación de identidad, los contenidos de odio, los contenidos sexuales impuestos a quien no los ha pedido y las imágenes íntimas difundidas sin consentimiento, la captación y la publicidad no solicitadas, y cualquier otro contenido ilegal según el derecho francés o europeo.',
+  legal_forbidden_zero:
+    'Messagr no tolera ningún contenido prohibido por estas condiciones ni ningún comportamiento abusivo: el contenido se retira y su autor queda excluido.',
   legal_forbidden_entry:
     'Solo se entra por invitación nominativa. Una invitación es personal, de uso limitado, y no se revende. La edad mínima es de quince años.',
   legal_moderation_title: 'Cómo funciona realmente la moderación',
   legal_moderation_human:
-    'La moderación es la de las personas que administran el servidor. Son personas. Toda decisión la toma una persona, nunca un automatismo.',
-  legal_moderation_no_tools:
-    'No existe ninguna herramienta automática de detección, ningún filtro, ningún análisis de contenido, y no puede existir: el contenido está cifrado de extremo a extremo y quien explota el servicio guarda mensajes que le es criptográficamente imposible leer.',
-  legal_moderation_reported:
-    'No se examina nada que no haya sido denunciado por una persona. No hay vigilancia general, ni detección proactiva, ni clasificación algorítmica.',
+    'La moderación la hace quien explota el servicio, es decir, personas. Toda decisión la toma una persona, nunca un automatismo.',
+  legal_moderation_filter:
+    'Lo que filtra es la forma misma del servicio: solo se escribe a quien ha aceptado la invitación, y una invitación puede rechazarse. El servidor, por su parte, no filtra el contenido: está cifrado de extremo a extremo, y quien explota el servicio guarda mensajes que le es criptográficamente imposible leer.',
+  legal_moderation_block:
+    'Cualquier cuenta puede bloquearse desde una conversación: nada de lo que envía le llega, lo que ya escribió desaparece de sus pantallas y no puede volver a invitarle en Messagr. No se le avisa, y el bloqueo no se levanta. Quien explota el servicio sabe quién bloqueó a quién, nunca lo que se dijo.',
+  legal_moderation_reads:
+    'Quien explota el servicio solo lee lo que lleva una denuncia: los mensajes que una persona ha recibido y decide transmitirle, y nada más de la conversación. No se examina nada que no haya sido denunciado por una persona. No hay vigilancia general, ni detección proactiva, ni clasificación algorítmica.',
   legal_moderation_can:
-    'Lo que quien explota el servicio puede decidir sin leer: suspender una cuenta, quitarle la capacidad de emitir invitaciones, excluirla de un grupo, revocar una rama de invitaciones.',
+    'Lo que quien explota el servicio puede decidir sobre lo que muestra una denuncia: retirar para todos los mensajes denunciados, suspender la cuenta de su autor y cerrarla si la decisión confirma la suspensión. Un mensaje retirado deja en su lugar una línea que lo dice. Sin leer nada, también puede quitar a una cuenta la capacidad de emitir invitaciones, excluirla de un grupo o revocar una rama de invitaciones.',
   legal_moderation_cannot:
-    'Lo que no puede hacer: retirar un mensaje concreto, calificar un contenido, o establecer leyendo que se ha infringido una norma.',
+    'Lo que no puede hacer: leer una conversación, ni juzgar un mensaje que ninguna denuncia le ha mostrado. Una medida contra una cuenta se toma sobre hechos que pueden establecerse sin leer, o sobre lo que muestra la denuncia, nunca sobre la sola afirmación de quien denuncia.',
   legal_report_title: 'Denunciar, y lo que viene después',
   legal_report_how:
-    'La denuncia se hace por correo a conformite@messagr.eu. El gesto desde la aplicación todavía no existe, y decirlo vale más que prometerlo.',
+    'La denuncia se hace desde la aplicación: en una conversación, seleccione mensajes de una misma persona, pulse «Denunciar» y elija un motivo. Antes del envío, la aplicación dice exactamente lo que sale, y solo quien explota el servicio puede abrir una denuncia. Cada denuncia recibe un número de denuncia.',
   legal_report_delay:
-    'Una denuncia produce una referencia. Recibe un acuse de recibo, y después una decisión motivada a más tardar treinta días después de su recepción, con la vía para recurrirla. La denuncia a las autoridades de una amenaza para la vida o la seguridad no sigue ese plazo: sale sin esperar.',
+    'En un plazo de veinticuatro horas, quien explota el servicio abre la denuncia y, si lo que muestra infringe estas condiciones, retira los mensajes denunciados y después suspende la cuenta de su autor. A más tardar treinta días después de la recepción de la denuncia llega una decisión motivada; si confirma la suspensión, la cuenta se cierra. La denuncia a las autoridades de una amenaza para la vida o la seguridad no sigue estos plazos: sale sin esperar.',
+  legal_report_decision:
+    'La decisión se obtiene escribiendo a conformite@messagr.eu con el número de denuncia. Sin la aplicación, se escribe a la misma dirección: el correo recibe un acuse de recibo, y después una decisión motivada a más tardar treinta días después de su recepción.',
   legal_report_review:
-    'Una decisión puede recurrirse ante conformite@messagr.eu, citando la referencia. La reexamina una persona distinta de quien la tomó siempre que la organización lo permita. En un servicio explotado por una o dos personas, esa condición no siempre puede cumplirse, y escribirlo vale más que prometer una separación que no existiría.',
+    'Una decisión puede recurrirse ante conformite@messagr.eu, tanto por la persona que denunció, citando el número de denuncia, como por la persona a quien afecta la medida. La reexamina una persona distinta de quien la tomó siempre que la organización lo permita. En un servicio explotado por una o dos personas, esa condición no siempre puede cumplirse, y escribirlo vale más que prometer una separación que no existiría.',
   legal_report_scope:
     'Messagr es un servicio de alojamiento y no una plataforma en línea; el considerando 14 del DSA excluye los servicios de comunicaciones interpersonales. Los artículos 20 y 21 no se aplican, por tanto, y este texto no pretende ofrecerlos.',
   legal_delete_title: 'Eliminar su cuenta',
   legal_delete_body:
-    'La eliminación se hace desde la aplicación: Ajustes y, luego, «Eliminar mi cuenta». La cuenta queda entonces desactivada de inmediato y sus datos se purgan en un plazo de treinta días; los mensajes ya enviados siguen siendo eventos de las salas donde se escribieron, y el servidor no puede retirarlos porque no puede leerlos. Sin este dispositivo, o cuando la aplicación se lo pida, la eliminación se solicita por correo electrónico a conformite@messagr.eu.',
+    'La eliminación se hace desde la aplicación: Ajustes y, luego, «Eliminar mi cuenta». La cuenta queda entonces desactivada de inmediato y sus datos se purgan en un plazo de treinta días; los mensajes ya enviados siguen siendo eventos de las salas donde se escribieron, y eliminar la cuenta no los retira de ellas. Sin este dispositivo, o cuando la aplicación se lo pida, la eliminación se solicita por correo electrónico a conformite@messagr.eu.',
   legal_delete_link: 'Sin este dispositivo: messagr.eu/aide',
-  legal_full_terms: 'Condiciones generales completas: messagr.eu',
+  legal_full_terms:
+    'Condiciones de uso completas, en inglés: messagr.eu/conditions-generales/en',
   trust_action: 'Lo que se sabe de esta persona',
   trust_title: 'Lo que se sabe de esta persona',
   trust_calm:
@@ -625,7 +632,8 @@ export const es: Readonly<Record<CopyKey, string>> = {
   settings_keep_every_not_kept:
     'Esta elección no se ha podido conservar: volverá a su estado anterior en el próximo arranque.',
   promise_language: 'Elija su idioma',
-  promise_terms: 'Acepto las condiciones generales de uso de Messagr.',
+  promise_terms:
+    'Acepto las condiciones de uso de Messagr, que no toleran ningún contenido prohibido ni ningún comportamiento abusivo.',
   promise_terms_link: 'Leer las condiciones',
   promise_terms_required:
     'Marque la casilla para continuar. Antes no arranca nada.',

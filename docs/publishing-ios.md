@@ -432,7 +432,7 @@ Lu dans le code, pas supposé ; les phrases sont celles de l'interface anglaise.
 
 **Un lien ouvert pendant que Messagr tourne arrive**, depuis #279 : `AppDelegate.swift` transmet `continueUserActivity` et `openURL` à `RCTLinkingManager`. Il n'y a plus à fermer Messagr avant d'ouvrir le lien.
 
-**Le premier écran**, un seul : « The messenger that asks you for nothing. », « Choose your language », la case « I accept Messagr’s terms and conditions of use. » et le bouton « Begin ». La réclamation ne part qu'après « Begin ».
+**Le premier écran**, un seul : « The messenger that asks you for nothing. », « Choose your language », la case « I accept Messagr’s terms of use, which tolerate no forbidden content and no abusive behaviour. », dont le lien « Read the terms » ouvre la traduction anglaise des conditions (#466), et le bouton « Begin ». La réclamation ne part qu'après « Begin ».
 
 **Pendant la réclamation**, aucun indicateur : la liste dit « No conversations yet. Invite someone to start one. ». Si elle échoue, pour quelque raison que ce soit, y compris un compte qu'`admettre` n'a pas invité à temps : « You are not in yet. Open the invitation link somebody sent you: it is the only door, and the application can do nothing before it. », et rien ne réessaie. Rouvrir le lien suffit : le compte tiré attend, invité, et la seconde tentative aboutit. Collé dans le champ de #370, le lien fait dire « Opening the invitation… » au bouton pendant la réclamation : une vingtaine de secondes, essayé le 26 septembre 2026.
 

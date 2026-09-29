@@ -455,34 +455,41 @@ export const de: Readonly<Record<CopyKey, string>> = {
     'Was diese App anzeigt, ist maßgeblich. Die auf messagr.eu veröffentlichten Bedingungen geben das Folgende wieder und ergänzen, was ein Bildschirm nicht tragen kann: wer den Dienst betreibt, und nach welchem Recht.',
   legal_forbidden_title: 'Was verboten ist',
   legal_forbidden_body:
-    'Darstellungen sexuellen Kindesmissbrauchs, Drohungen gegen Leben oder Sicherheit einer Person, Belästigung, Identitätsmissbrauch und jeder andere nach französischem oder europäischem Recht rechtswidrige Inhalt.',
+    'Darstellungen sexuellen Kindesmissbrauchs, Drohungen gegen Leben oder Sicherheit einer Person, Belästigung, Identitätsmissbrauch, hasserfüllte Inhalte, sexuelle Inhalte, die jemandem aufgedrängt werden, der sie nicht verlangt hat, und intime Bilder, die ohne Einwilligung verbreitet werden, unerbetene Werbung und jeder andere nach französischem oder europäischem Recht rechtswidrige Inhalt.',
+  legal_forbidden_zero:
+    'Messagr duldet keine durch diese Bedingungen verbotenen Inhalte und kein missbräuchliches Verhalten: Der Inhalt wird entfernt, und wer ihn verfasst hat, wird ausgeschlossen.',
   legal_forbidden_entry:
     'Der Zugang erfolgt ausschließlich über eine namentliche Einladung. Eine Einladung ist persönlich, in der Nutzung begrenzt und nicht weiterverkäuflich. Das Mindestalter beträgt fünfzehn Jahre.',
   legal_moderation_title: 'Wie die Moderation tatsächlich arbeitet',
   legal_moderation_human:
-    'Die Moderation liegt bei den Administratorinnen und Administratoren des Servers. Das sind Menschen. Jede Entscheidung wird von einem Menschen getroffen, nie von einem Automatismus.',
-  legal_moderation_no_tools:
-    'Es gibt kein automatisches Erkennungswerkzeug, keinen Filter, keine Inhaltsanalyse, und es kann sie nicht geben: die Inhalte sind Ende-zu-Ende verschlüsselt, und der Betreiber hält Nachrichten, die er kryptografisch nicht lesen kann.',
-  legal_moderation_reported:
-    'Geprüft wird nur, was ein Mensch gemeldet hat. Es gibt keine allgemeine Überwachung, keine proaktive Erkennung und keine algorithmische Einstufung.',
+    'Die Moderation liegt beim Betreiber, also bei Menschen. Jede Entscheidung wird von einem Menschen getroffen, nie von einem Automatismus.',
+  legal_moderation_filter:
+    'Was filtert, ist die Form des Dienstes selbst: Man schreibt nur jemandem, der die Einladung angenommen hat, und eine Einladung kann abgelehnt werden. Der Server selbst filtert keine Inhalte: Diese sind Ende-zu-Ende verschlüsselt, und der Betreiber hält Nachrichten, die er kryptografisch nicht lesen kann.',
+  legal_moderation_block:
+    'Jedes Konto kann aus einer Unterhaltung heraus blockiert werden: Nichts, was es sendet, erreicht Sie mehr; was es bereits geschrieben hat, verschwindet von Ihren Bildschirmen; und es kann Sie in Messagr nicht mehr einladen. Es erfährt davon nichts, und eine Blockierung wird nicht aufgehoben. Der Betreiber erfährt, wer wen blockiert hat, nie, was gesagt wurde.',
+  legal_moderation_reads:
+    'Der Betreiber liest nur, was eine Meldung enthält: die Nachrichten, die jemand erhalten hat und ihm weitergeben will, und nichts anderes aus der Unterhaltung. Geprüft wird nur, was ein Mensch gemeldet hat. Es gibt keine allgemeine Überwachung, keine proaktive Erkennung und keine algorithmische Einstufung.',
   legal_moderation_can:
-    'Was der Betreiber ohne Lesen entscheiden kann: ein Konto sperren, ihm die Möglichkeit zu Einladungen entziehen, es aus einer Gruppe ausschließen, einen Einladungszweig widerrufen.',
+    'Was der Betreiber auf Grundlage dessen entscheiden kann, was eine Meldung zeigt: die gemeldeten Nachrichten für alle entfernen, das Konto, von dem sie stammen, sperren und es schließen, wenn die Entscheidung die Sperre bestätigt. An der Stelle einer entfernten Nachricht steht eine Zeile, die das sagt. Ohne etwas zu lesen, kann er einem Konto außerdem die Möglichkeit zu Einladungen entziehen, es aus einer Gruppe ausschließen oder einen Einladungszweig widerrufen.',
   legal_moderation_cannot:
-    'Was er nicht kann: eine bestimmte Nachricht entfernen, einen Inhalt einordnen oder durch Lesen feststellen, dass eine Regel verletzt wurde.',
+    'Was er nicht kann: eine Unterhaltung lesen oder eine Nachricht beurteilen, die ihm keine Meldung gezeigt hat. Eine Maßnahme gegen ein Konto stützt sich auf Tatsachen, die sich ohne Lesen feststellen lassen, oder auf das, was die Meldung zeigt, nie auf die bloße Behauptung einer meldenden Person.',
   legal_report_title: 'Melden, und was danach folgt',
   legal_report_how:
-    'Meldungen erfolgen per E-Mail an conformite@messagr.eu. Das Melden aus der App heraus gibt es noch nicht, und das zu sagen ist besser, als es zu versprechen.',
+    'Gemeldet wird aus der App heraus: Markieren Sie in einer Unterhaltung Nachrichten derselben Person, tippen Sie auf „Melden“ und wählen Sie einen Grund. Vor dem Senden zeigt die App genau, was hinausgeht, und nur der Betreiber kann eine Meldung öffnen. Jede Meldung erhält eine Meldungsnummer.',
   legal_report_delay:
-    'Eine Meldung erzeugt eine Referenz. Sie erhält eine Empfangsbestätigung und danach spätestens dreißig Tage nach Eingang eine begründete Entscheidung samt dem Weg, ihr zu widersprechen. Die Meldung einer Gefahr für Leben oder Sicherheit an die Behörden hält sich nicht an diese Frist: sie geht sofort hinaus.',
+    'Innerhalb von vierundzwanzig Stunden öffnet der Betreiber die Meldung und entfernt, wenn das, was sie zeigt, gegen diese Bedingungen verstößt, die gemeldeten Nachrichten und sperrt danach das Konto, von dem sie stammen. Spätestens dreißig Tage nach Eingang der Meldung folgt eine begründete Entscheidung; bestätigt sie die Sperre, wird das Konto geschlossen. Die Meldung einer Gefahr für Leben oder Sicherheit an die Behörden hält sich nicht an diese Fristen: sie geht sofort hinaus.',
+  legal_report_decision:
+    'Die Entscheidung erfahren Sie, wenn Sie mit der Meldungsnummer an conformite@messagr.eu schreiben. Ohne die App schreibt man an dieselbe Adresse: Die E-Mail erhält eine Empfangsbestätigung und spätestens dreißig Tage nach Eingang eine begründete Entscheidung.',
   legal_report_review:
-    'Einer Entscheidung kann unter conformite@messagr.eu unter Angabe der Referenz widersprochen werden. Sie wird von einer anderen Person als der entscheidenden erneut geprüft, wann immer die Organisation das zulässt. Bei einem Dienst, den ein oder zwei Personen betreiben, lässt sich das nicht immer einhalten, und das aufzuschreiben ist besser, als eine Trennung zu versprechen, die es nicht gäbe.',
+    'Einer Entscheidung kann unter conformite@messagr.eu widersprochen werden, von der Person, die gemeldet hat, unter Angabe der Meldungsnummer, wie auch von der Person, gegen die sich die Maßnahme richtet. Sie wird von einer anderen Person als der entscheidenden erneut geprüft, wann immer die Organisation das zulässt. Bei einem Dienst, den ein oder zwei Personen betreiben, lässt sich das nicht immer einhalten, und das aufzuschreiben ist besser, als eine Trennung zu versprechen, die es nicht gäbe.',
   legal_report_scope:
     'Messagr ist ein Hostingdienst und keine Online-Plattform; Erwägungsgrund 14 des DSA nimmt interpersonelle Kommunikationsdienste aus. Die Artikel 20 und 21 gelten daher nicht, und dieser Text beansprucht nicht, sie zu bieten.',
   legal_delete_title: 'Ihr Konto löschen',
   legal_delete_body:
-    'Die Löschung erfolgt in der Anwendung: Einstellungen, dann „Mein Konto löschen“. Das Konto wird dann sofort deaktiviert und seine Daten werden innerhalb von dreißig Tagen gelöscht; bereits gesendete Nachrichten bleiben Ereignisse der Räume, in denen sie geschrieben wurden, und der Server kann sie nicht entfernen, da er sie nicht lesen kann. Ohne dieses Gerät, oder wenn die Anwendung Sie darum bittet, wird die Löschung per E-Mail an conformite@messagr.eu beantragt.',
+    'Die Löschung erfolgt in der Anwendung: Einstellungen, dann „Mein Konto löschen“. Das Konto wird dann sofort deaktiviert und seine Daten werden innerhalb von dreißig Tagen gelöscht; bereits gesendete Nachrichten bleiben Ereignisse der Räume, in denen sie geschrieben wurden, und das Löschen des Kontos entfernt sie nicht daraus. Ohne dieses Gerät, oder wenn die Anwendung Sie darum bittet, wird die Löschung per E-Mail an conformite@messagr.eu beantragt.',
   legal_delete_link: 'Ohne dieses Gerät: messagr.eu/aide',
-  legal_full_terms: 'Vollständige Bedingungen: messagr.eu',
+  legal_full_terms:
+    'Vollständige Nutzungsbedingungen, auf Englisch: messagr.eu/conditions-generales/en',
   trust_action: 'Was über diese Person bekannt ist',
   trust_title: 'Was über diese Person bekannt ist',
   trust_calm:
@@ -638,7 +645,8 @@ export const de: Readonly<Record<CopyKey, string>> = {
   settings_keep_every_not_kept:
     'Diese Wahl konnte nicht behalten werden: beim nächsten Start gilt wieder der vorherige Zustand.',
   promise_language: 'Wählen Sie Ihre Sprache',
-  promise_terms: 'Ich akzeptiere die Nutzungsbedingungen von Messagr.',
+  promise_terms:
+    'Ich akzeptiere die Nutzungsbedingungen von Messagr, die keine verbotenen Inhalte und kein missbräuchliches Verhalten dulden.',
   promise_terms_link: 'Bedingungen lesen',
   promise_terms_required:
     'Setzen Sie das Häkchen, um fortzufahren. Vorher startet nichts.',
