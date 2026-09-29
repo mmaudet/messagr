@@ -471,6 +471,40 @@ export const de: Readonly<Record<CopyKey, string>> = {
     'Nichts hat sich geändert: Dieses Konto ist nicht blockiert, und die Einladung wartet weiter auf Ihre Antwort. Sie können es erneut versuchen.',
   invited_block_confirm: 'Blockieren',
   invited_block_cancel: 'Abbrechen',
+  block_action: 'Blockieren',
+  block_hint:
+    'Von diesem Konto erreicht Sie nichts mehr, und diese Unterhaltung verschwindet aus Ihrer Liste.',
+  block_explain_title: 'Was das Blockieren bewirkt, und was nicht',
+  block_explain_lead:
+    'Dieses Konto erfährt davon nichts. Hier ist alles, was dieser Schritt ändert, bevor Sie entscheiden.',
+  block_fact_nothing: 'Von diesem Konto erreicht Sie nichts mehr',
+  block_explain_nothing:
+    'Weder seine Nachrichten noch seine Anrufe noch seine Einladungen erreichen Sie mehr, auf keinem Ihrer Geräte. Es kann Sie in Messagr nicht mehr einladen.',
+  block_fact_gone:
+    'Was es geschrieben hat, verschwindet von Ihren Bildschirmen',
+  block_explain_gone:
+    'Seine Nachrichten verschwinden aus allen Ihren Unterhaltungen, auch die bereits empfangenen, und diese Unterhaltung verschwindet aus Ihrer Liste. Sie verlassen sie nicht: Dieses Konto sieht keine Veränderung.',
+  block_fact_untold: 'Dieses Konto wird nicht benachrichtigt',
+  block_explain_untold:
+    'Nichts sagt es ihm. Seine Nachrichten gehen hinaus, ohne Sie je zu erreichen, und seine Einladungen warten und laufen dann ab.',
+  block_fact_not_hidden: 'Das Blockieren verbirgt Sie nicht',
+  block_fact_operator: 'Der Betreiber erfährt davon',
+  block_explain_operator:
+    'Der Betreiber erfährt, dass Sie dieses Konto blockiert haben, aber nie, was gesagt wurde.',
+  block_fact_report: 'Melden geht über seine Nachrichten',
+  block_explain_report:
+    'Um dem Betreiber zu zeigen, was Ihnen dieses Konto geschrieben hat, wählen Sie seine Nachrichten in der Unterhaltung aus und melden Sie sie, bevor Sie blockieren: Danach verschwinden sie von Ihren Bildschirmen.',
+  block_confirm: 'Ja, dieses Konto blockieren',
+  block_cancel: 'Abbrechen',
+  block_working: 'Läuft …',
+  block_failed:
+    'Das hat nicht geklappt, und nichts hat sich geändert: Dieses Konto ist nicht blockiert. Sie können es erneut versuchen.',
+  list_blocked:
+    'Dieses Konto ist blockiert: Von ihm erreicht Sie nichts mehr, und Ihre Unterhaltung mit ihm ist aus der Liste verschwunden.',
+  list_blocked_waiting:
+    'Dieses Konto ist blockiert, und Ihre Unterhaltung mit ihm ist aus der Liste verschwunden: Seine Nachrichten und Anrufe erreichen Sie nicht mehr. Der Betreiber ist noch nicht informiert, und bis dahin kann Sie eine Einladung in Messagr von diesem Konto noch erreichen. Die App versucht es bei jedem Start erneut, bis es gelingt.',
+  list_blocked_not_kept:
+    'Dieses Konto ist blockiert, und Ihre Unterhaltung mit ihm ist aus der Liste verschwunden: Seine Nachrichten und Anrufe erreichen Sie nicht mehr. Der Betreiber wurde nicht informiert, und dieses Gerät konnte es nicht festhalten, um es erneut zu versuchen: Eine Einladung in Messagr von diesem Konto kann Sie noch erreichen.',
   invited_working: 'Einen Moment…',
   invited_failed:
     'Nichts hat sich geändert: dieser Einladung wurde weder beigetreten noch wurde sie abgelehnt. Sie können es erneut versuchen.',

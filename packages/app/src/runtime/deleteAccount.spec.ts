@@ -134,7 +134,7 @@ describe('deleting the account this device holds', () => {
     // Deployed only after Apple's decision on 1.0: until then the route is
     // unknown, and a deletion it cannot hear about is still a deletion. A
     // service that takes the connection and never answers is given up after
-    // `ANNOUNCE_DEADLINE_MS`, rather than holding « Suppression… » on screen.
+    // `SERVICE_DEADLINE_MS`, rather than holding « Suppression… » on screen.
     for (const invitationService of [
       'absent',
       'unreachable',

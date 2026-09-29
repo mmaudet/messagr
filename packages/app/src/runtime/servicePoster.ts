@@ -209,3 +209,21 @@ export function reportService(account: HeldAccount): ReportService {
       call('/reports', body, 'POST', { 'idempotency-key': idempotencyKey }),
   }
 }
+
+/**
+ * The block route of the same service (#469), reached as the account this
+ * launch holds: `POST /blocks`, the same block as « Refuser et bloquer », and
+ * its status back. What counts as heard is `block.ts`'s to decide, where it
+ * is tested; a launch holding no account throws, like a service nobody
+ * reached.
+ */
+export function blockService(account: HeldAccount): {
+  readonly tell: (blocked: string) => Promise<number>
+} {
+  const call = asTheAccount(account)
+  return {
+    tell: async blocked =>
+      (await call('/blocks', JSON.stringify({ blocked_user_id: blocked })))
+        .status,
+  }
+}

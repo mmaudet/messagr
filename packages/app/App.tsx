@@ -279,6 +279,29 @@ import type { ShownImage } from './src/runtime/receiveImage'
 import type { ReadFile } from './src/timeline/imageEvent'
 import type { Plate as Grouping } from './src/timeline/plates'
 import type { EvictOutcome } from './src/runtime/evict'
+import {
+  blockAccount,
+  keptWithoutTheBlocked,
+  noticeOf,
+  readIgnored,
+  sameAccounts,
+  tellWhatIsWaiting,
+  type BlockNotice,
+} from './src/runtime/block'
+import {
+  listWithoutTheBlocked,
+  scopesWithTheBlocked,
+} from './src/runtime/conversationList'
+import {
+  forgetfulIgnoredList,
+  type IgnoredList,
+} from './src/runtime/ignoredListStore'
+import { shownOf } from './src/runtime/notShown'
+import { takeDownNotificationsOf } from './src/runtime/showNotification'
+import {
+  forgetfulUntoldBlocks,
+  type UntoldBlocks,
+} from './src/runtime/untoldBlocksStore'
 import type { HistoryClaim } from './src/runtime/claimHistory'
 import { Conversation } from './src/ui/Conversation'
 import { ConversationList } from './src/ui/ConversationList'
@@ -339,6 +362,7 @@ import {
 import { accountIdOf, stillKnown } from './src/runtime/sessionKnown'
 import { deletionMail } from './src/ui/deletionMail'
 import { Evict } from './src/ui/Evict'
+import { Block } from './src/ui/Block'
 import { Vouch } from './src/ui/Vouch'
 import { currentLanguage, setCatalogue, t } from './src/copy'
 import type { Language } from './src/copy/languages'
@@ -402,6 +426,7 @@ import {
 import { reenterWithPassword, retireDevice } from './src/runtime/reenter'
 import { photoLibrary } from './src/runtime/photoLibrary'
 import {
+  blockService,
   discoveryService,
   reportService,
   servicePoster,
@@ -537,7 +562,60 @@ export function App({
   // The conversations this account is in, and the names this device gives
   // their other participants. ADR-0010: the names are held here and nowhere
   // else -- not on the homeserver, not with the other participant.
-  const [summaries, setSummaries] = useState<readonly ConversationSummary[]>([])
+  const [derivedSummaries, setDerivedSummaries] = useState<
+    readonly ConversationSummary[]
+  >([])
+  // The same, for the callbacks made once, which a notification's tap and a
+  // block read long after (#469).
+  const derivedSummariesRef = useRef<readonly ConversationSummary[]>([])
+  useEffect(() => {
+    derivedSummariesRef.current = derivedSummaries
+  }, [derivedSummaries])
+  /**
+   * The accounts this account blocked: its ignored list, as its homeserver
+   * keeps it (#469). What leaves the screens derives from it (`block.ts`).
+   * Read from the notebook's copy before anything is drawn, then from the
+   * homeserver at launch, then as the sync loop brings it. `null` while
+   * nothing at all is known.
+   */
+  const [ignored, setIgnored] = useState<ReadonlySet<string> | null>(null)
+  const ignoredRef = useRef<ReadonlySet<string> | null>(null)
+  /** The notebook's copy of that list. `ignoredListStore.ts`. */
+  const ignoredListRef = useRef<IgnoredList>(forgetfulIgnoredList())
+  /** Whether the homeserver has said the list since this notebook was bound. */
+  const ignoredReadRef = useRef(false)
+  /**
+   * Holds the list the homeserver said, or the notebook's copy of it: what
+   * every screen draws from, the copy kept up to date, and the notifications
+   * this application drew for a conversation with an account now blocked
+   * taken down, whichever device made the block.
+   */
+  const holdIgnored = (
+    next: ReadonlySet<string>,
+    from: 'the homeserver' | 'the notebook',
+  ) => {
+    const before = ignoredRef.current ?? new Set<string>()
+    ignoredRef.current = next
+    setIgnored(next)
+    if (from === 'the homeserver') {
+      ignoredListRef.current.keep(next).catch(() => {})
+    }
+    const newly = new Set([...next].filter(account => !before.has(account)))
+    for (const scope of scopesWithTheBlocked(
+      derivedSummariesRef.current,
+      newly,
+    )) {
+      takeDownNotificationsOf(scope).catch(() => {})
+    }
+  }
+  // THE LIST EVERY SCREEN READS (#469): without the conversation with a
+  // blocked account, and every other row drawn again without its messages.
+  // Derived at each draw, so a block changes the list at once, before
+  // anything is asked again, and a list emptied elsewhere gives it back.
+  const summaries = useMemo(
+    () => listWithoutTheBlocked(derivedSummaries, ignored ?? new Set()),
+    [derivedSummaries, ignored],
+  )
   const [names, setNames] = useState<ReadonlyMap<string, string>>(new Map())
   // Inviting somebody, which is the same gesture as starting a conversation
   // with them. See issueInvitation.ts.
@@ -1353,6 +1431,11 @@ export function App({
   /** What this device has been told not to draw. `hiddenStore.ts` says why. */
   const hiddenRef = useRef<Hidden>(forgetfulHidden())
   /**
+   * The blocks the invitation service has not heard of yet, asked again at
+   * each launch (#469). `untoldBlocksStore.ts`. It hides nothing.
+   */
+  const untoldRef = useRef<UntoldBlocks>(forgetfulUntoldBlocks())
+  /**
    * What looking for contacts found, so that the next look masks only the
    * new numbers (#402). `discoveryResultsStore.ts` says what it keeps.
    */
@@ -1595,6 +1678,9 @@ export function App({
     now: () => Date.now(),
     after: ms => new Promise(resolve => setTimeout(resolve, ms)),
   }).current
+  // AND A BLOCK'S (#469): the same service as this account, for the gesture
+  // and for what each launch asks again.
+  const blocks = useRef(blockService(() => credentialsRef.current)).current
   /**
    * This device's envelope keys (#405): one published with each proof, and
    * what opens the names inviters seal for this account.
@@ -2197,6 +2283,107 @@ export function App({
   const [evicted, setEvicted] = useState<'idle' | 'working' | EvictOutcome>(
     'idle',
   )
+  /**
+   * Blocking the other person from their panel (#469): whom, and how far it
+   * got. A block that holds takes the person back to the list, and the list
+   * says what is done (`blockNotice`); only a failure stays on the panel.
+   */
+  const [blocking, setBlocking] = useState<{
+    readonly who: string
+    readonly state: 'working' | 'failed'
+  } | null>(null)
+  const [blockNotice, setBlockNotice] = useState<BlockNotice | null>(null)
+  /**
+   * Out of the conversation open, back to the list: what the header's back
+   * arrow does, and a block that holds (#469).
+   */
+  const leaveTheConversation = () => {
+    setOpenScope(null)
+    openScopeRef.current = null
+    setSelected(new Set())
+    setTrust(null)
+    // Otherwise the next conversation opens on the person screen of the one
+    // before it.
+    setPersonOpen(false)
+  }
+  /**
+   * Whether this account is findable now, as far as this device knows:
+   * what a screen about a block can truthfully say of who still sees it on
+   * Messagr (#406, #469). Unknown counts as findable: telling somebody they
+   * are still seen is the cautious error of the two.
+   */
+  const findableAsFarAsKnown = () =>
+    !discovery.read || isFindable(discovery, Date.now())
+  /**
+   * Blocks `who`, the other person of the conversation open, from their
+   * panel (#469). The gesture and its order are `block.ts`'s; this binds it
+   * to the session and to the screens.
+   *
+   * The ignored list written, the person is back on the list at once, where
+   * the conversation is gone, and the list says so; what the service answers
+   * comes after, and the list says that too. Not written, nothing changed,
+   * and the panel says so where the gesture was made.
+   */
+  const blockThePerson = (who: string) => {
+    const blockingAs = sessionClientRef.current
+    const held = credentialsRef.current
+    if (blockingAs === null || held === null) return
+    setBlocking({ who, state: 'working' })
+    setBlockNotice(null)
+    blockAccount(
+      {
+        http: makePumpHttp(blockingAs),
+        selfUserId: held.userId,
+        nowIgnored: next => {
+          // Every screen draws from it at once: the list, the rows of the
+          // other conversations, the conversations and Favoris.
+          holdIgnored(next, 'the homeserver')
+          // THE LIST THE NEXT LAUNCH DRAWS FIRST, kept at once as it is now
+          // drawn: it is drawn before the homeserver is asked again.
+          const drawn = derivedSummariesRef.current
+          ;(drawn.length > 0
+            ? Promise.resolve(drawn)
+            : listCacheRef.current.all()
+          )
+            .then(rows =>
+              listCacheRef.current.keep(listWithoutTheBlocked(rows, next)),
+            )
+            .catch(() => {})
+          leaveTheConversation()
+          setBlocking(null)
+          setBlockNotice('blocked')
+          // And the homeserver asked again, which now holds that account's
+          // messages back.
+          refreshListRef.current?.().catch(() => {})
+        },
+        untold: untoldRef.current,
+        tellTheService: blocks.tell,
+        after: ms => new Promise(resolve => setTimeout(resolve, ms)),
+      },
+      who,
+    ).then(
+      outcome => {
+        // Never the account: the log names nobody.
+        logEvent(
+          outcome.blocked && outcome.told ? 'info' : 'warn',
+          'MESSAGR_BLOCK',
+          outcome.blocked
+            ? {
+                blocked: true,
+                told: outcome.told,
+                ...(outcome.told ? {} : { kept: outcome.kept }),
+              }
+            : { blocked: false, reason: outcome.reason },
+        )
+        if (!outcome.blocked) {
+          setBlocking({ who, state: 'failed' })
+          return
+        }
+        setBlockNotice(noticeOf(outcome))
+      },
+      () => setBlocking({ who, state: 'failed' }),
+    )
+  }
   const [selfUserId, setSelfUserId] = useState('')
   // A MESSAGE SOMEBODY ELSE SENT, READ HERE FOR THE FIRST TIME.
   //
@@ -2764,6 +2951,17 @@ export function App({
         listCacheRef.current = book.list
         eventsRef.current = book.events
         hiddenRef.current = book.hidden
+        untoldRef.current = book.untoldBlocks
+        // THE BLOCKED ACCOUNTS AS THE HOMESERVER LAST SAID THEM (#469),
+        // before any row or message is drawn from this notebook: without
+        // them, a launch with no network gave back what a blocked account
+        // wrote. The homeserver is asked again at the first derivation. A
+        // notebook bound for another account starts from its own copy.
+        ignoredListRef.current = book.ignoredList
+        ignoredReadRef.current = false
+        const lastSaid = await book.ignoredList.read()
+        ignoredRef.current = lastSaid
+        setIgnored(lastSaid)
         readByRef.current = book.readBy
         discoveryResultsRef.current = book.discoveryResults
         recognizedRef.current = book.recognized
@@ -2784,7 +2982,7 @@ export function App({
         setNames(await book.names.all())
         const lastDrawn = await book.list.all()
         if (lastDrawn.length > 0) {
-          setSummaries(lastDrawn)
+          setDerivedSummaries(lastDrawn)
           logEvent('info', 'MESSAGR_LIST_REMEMBERED', {
             rows: lastDrawn.length,
           })
@@ -2960,7 +3158,7 @@ export function App({
         (entered.entered && entered.left !== undefined) ||
         entered.deletedForgotten === true
       if (leftAnAccount) {
-        setSummaries([])
+        setDerivedSummaries([])
         // AND A TOUCH MADE ON THOSE ROWS GOES WITH THEM. A conversation
         // touched on the list of the account this launch has just left
         // belongs to that account, and replaying it once the opener is bound
@@ -3526,6 +3724,16 @@ export function App({
                 )
                 if (!stillOpen()) return
                 const other = theOtherMember(members, credentials.userId)
+                // THE LAST LINE (#469): a conversation of two with a blocked
+                // account, reached by a way nothing above foresaw, is left
+                // for the list at once.
+                if (
+                  other !== null &&
+                  (ignoredRef.current?.has(other) ?? false)
+                ) {
+                  leaveTheConversation()
+                  return
+                }
                 setParty(other === null ? null : { scope, other })
 
                 await markRead(scope, fresh.entries)
@@ -4183,7 +4391,18 @@ export function App({
             whenNotificationPressed(
               scope => {
                 setTab('chat')
-                if (scope !== null) showConversation(scope)
+                // NEVER A CONVERSATION WITH A BLOCKED ACCOUNT (#469), from a
+                // notification drawn before the block, on this device or
+                // another: the tap lands on the list, where it is not.
+                if (
+                  scope !== null &&
+                  !scopesWithTheBlocked(
+                    derivedSummariesRef.current,
+                    ignoredRef.current ?? new Set(),
+                  ).includes(scope)
+                ) {
+                  showConversation(scope)
+                }
               },
               // SOMEBODY ALREADY SAID YES, ON A LOCKED SCREEN.
               //
@@ -4389,17 +4608,45 @@ export function App({
             // itself: see conversationList.ts for why it is not built out of
             // the sync loop's own response.
             const refreshList = async () => {
+              // THE BLOCKED ACCOUNTS FIRST (#469): the homeserver's list,
+              // read once per notebook bound, then kept up to date by the
+              // sync loop. Until it answers, the notebook's copy stands; with
+              // neither, nothing is known, the refresh fails, and the list on
+              // screen stays, as it does when the homeserver cannot be
+              // reached at all. A list derived without it would give back the
+              // conversation with a blocked account.
+              if (!ignoredReadRef.current) {
+                const before = ignoredRef.current
+                try {
+                  const said = await readIgnored(
+                    makePumpHttp(sessionClient),
+                    credentials.userId,
+                  )
+                  ignoredReadRef.current = true
+                  // Unless a block or a sync moved it while this was on its
+                  // way: theirs came later.
+                  if (ignoredRef.current === before) {
+                    holdIgnored(said, 'the homeserver')
+                  }
+                } catch (cause: unknown) {
+                  if (ignoredRef.current === null) throw cause
+                }
+              }
+              const blocked = ignoredRef.current ?? new Set<string>()
               const derived = await listConversations(
                 sessionClient,
                 credentials.userId,
                 // Read fresh rather than held: `markRead` has just written
                 // to it, and a held map would redraw the badge it cleared.
                 await lastReadRef.current.all(),
-                // Same argument, and the state is behind the ref by one
-                // render after a hiding: a row that previewed a message
-                // somebody had just hidden would break the promise in the
-                // one place they look first.
-                await hiddenRef.current.all(),
+                {
+                  // Same argument, and the state is behind the ref by one
+                  // render after a hiding: a row that previewed a message
+                  // somebody had just hidden would break the promise in the
+                  // one place they look first.
+                  hidden: await hiddenRef.current.all(),
+                  blocked,
+                },
               )
               // MERGED RATHER THAN REPLACED, and the notebook keeps the
               // merge rather than the derivation. `mergeSummaries.ts`
@@ -4415,7 +4662,7 @@ export function App({
               // this refresh started, and a refresh is exactly the thing
               // that changes it.
               let merged: readonly ConversationSummary[] = derived
-              setSummaries(shown => {
+              setDerivedSummaries(shown => {
                 merged = mergeSummaries(shown, derived)
                 return merged
               })
@@ -4424,7 +4671,16 @@ export function App({
               // notebook write is not something a person should wait behind.
               // The page swallows its own failures, so there is nothing here
               // that could reject.
-              listCacheRef.current.keep(merged).catch(() => {})
+              //
+              // WITHOUT THE ACCOUNTS BLOCKED NOW (#469), and not only those
+              // blocked when this derivation started: a block made while it
+              // ran must not put its conversation, or what that account
+              // wrote in the others, back into the list a launch draws first.
+              listCacheRef.current
+                .keep(
+                  listWithoutTheBlocked(merged, ignoredRef.current ?? blocked),
+                )
+                .catch(() => {})
             }
             // Published for whatever needs the list derived again from
             // outside this path. See `refreshListRef`.
@@ -4437,6 +4693,23 @@ export function App({
                 reason: getErrorMessage(cause),
               }),
             )
+            // THE BLOCKS THE SERVICE HAS NOT HEARD OF YET (#469), asked again
+            // at each launch until it has. Not awaited: nothing on screen
+            // waits on the service, and `tellWhatIsWaiting` never throws on
+            // an answer, only on a notebook that will not read.
+            tellWhatIsWaiting({
+              untold: untoldRef.current,
+              tellTheService: blocks.tell,
+            })
+              .then(round => {
+                if (round.told + round.waiting === 0) return
+                logEvent(
+                  round.waiting > 0 ? 'warn' : 'info',
+                  'MESSAGR_BLOCKS_TOLD_LATE',
+                  { ...round },
+                )
+              })
+              .catch(() => {})
             // THE LOOP THAT MAKES THIS A MESSENGER. ADR-0007.
             //
             // Started here, at the end of the launch path, for two reasons
@@ -4751,6 +5024,26 @@ export function App({
                         reason: getErrorMessage(cause),
                       }),
                     )
+
+                  // THE IGNORED LIST, WHEN THIS POLL CARRIED A NEW ONE (#469):
+                  // this device's own block coming back, or another device's.
+                  // The screens derive from it at the next draw, and the list
+                  // is derived again for what rows say of the others --
+                  // before the early return, since account data moves no
+                  // conversation.
+                  if (
+                    tick.ignored !== null &&
+                    !sameAccounts(tick.ignored, ignoredRef.current)
+                  ) {
+                    holdIgnored(tick.ignored, 'the homeserver')
+                    if (tick.changedScopes.length === 0) {
+                      refreshList().catch((cause: unknown) =>
+                        logEvent('warn', 'MESSAGR_LIST_FAILED', {
+                          reason: getErrorMessage(cause),
+                        }),
+                      )
+                    }
+                  }
 
                   if (tick.changedScopes.length === 0) return
 
@@ -5857,15 +6150,7 @@ export function App({
                     : displayNameFor(party.other, names.get(party.other))
                 }
                 named={party !== null && names.get(party.other) !== undefined}
-                onBack={() => {
-                  setOpenScope(null)
-                  openScopeRef.current = null
-                  setSelected(new Set())
-                  setTrust(null)
-                  // Otherwise the next conversation opens on the person screen of
-                  // the one before it.
-                  setPersonOpen(false)
-                }}
+                onBack={leaveTheConversation}
                 onOpenPerson={() => setPersonOpen(true)}
                 // Only with somebody to call. `theOtherMember` answers null in
                 // a conversation that is not two people, and a call button in
@@ -6285,7 +6570,12 @@ export function App({
             {openScope === null && tab === 'settings' && favouritesOpen && (
               <View style={styles.block}>
                 <Favourites
-                  kept={keptMessages ?? []}
+                  // Without what an account this one ignores wrote (#469):
+                  // it leaves every screen, this one included.
+                  kept={keptWithoutTheBlocked(
+                    keptMessages ?? [],
+                    ignored ?? new Set(),
+                  )}
                   shownFor={scope => {
                     const other = summaries.find(
                       one => one.scope === scope,
@@ -6332,6 +6622,7 @@ export function App({
                     }}
                     joinedDelivered={deliveredJoined}
                     deliveredOutcome={deliveredOutcome}
+                    blocked={blockNotice}
                     names={names}
                     invitation={linkOutcome}
                     reinstalled={reinstalled}
@@ -6340,7 +6631,11 @@ export function App({
                     pasting={pasting}
                     shareRefused={shareRefused}
                     opening={waitingOn}
-                    onOpen={openConversation}
+                    onOpen={scope => {
+                      // Said once, on the list the block came back to.
+                      setBlockNotice(null)
+                      openConversation(scope)
+                    }}
                     findableNotice={listNotice(discovery, Date.now())}
                     // THE GESTURE OF THE SENTENCE IS THE ONE OF SETTINGS, and
                     // the journey opens there. A proof still running is
@@ -6459,13 +6754,14 @@ export function App({
                     // room holds: hiding is this telephone's own decision,
                     // and mixing it into the derivation would make the
                     // timeline mean something different per device.
-                    entries={
-                      hidden.size === 0
-                        ? conversation
-                        : conversation.filter(
-                            entry => !hidden.has(entry.eventId),
-                          )
-                    }
+                    // AND WITHOUT WHAT A BLOCKED ACCOUNT WROTE (#469),
+                    // received before or not: that one is the account's
+                    // decision, synced, and the same on every one of its
+                    // devices. One filter for both (`notShown.ts`).
+                    entries={shownOf(conversation, {
+                      hidden,
+                      blocked: ignored ?? new Set(),
+                    })}
                     selected={selected}
                     // `null` is the background tap: it clears rather than
                     // toggling, which is the only way out that does not
@@ -6639,6 +6935,21 @@ export function App({
                         },
                       )
                     }}
+                  />
+                )}
+
+                {/* BLOCKING (#469), where vouching and eviction are: in a
+                conversation of two, where the other person is named rather
+                than chosen. A conversation of more has only the selection
+                (#472). */}
+                {party !== null && (
+                  <Block
+                    memberId={party.other}
+                    findable={findableAsFarAsKnown()}
+                    state={
+                      blocking?.who === party.other ? blocking.state : 'idle'
+                    }
+                    onBlock={() => blockThePerson(party.other)}
                   />
                 )}
               </View>
@@ -6911,9 +7222,7 @@ export function App({
               onRefuse={() => answerDelivered('refuse', deliveredOnScreen)}
               block={{
                 asking: blockingDelivered,
-                // Unknown counts as findable: telling somebody they are
-                // still seen is the cautious error of the two.
-                findable: !discovery.read || isFindable(discovery, Date.now()),
+                findable: findableAsFarAsKnown(),
                 onAsk: () => {
                   setDeliveredFailed(null)
                   setBlockingDelivered(true)

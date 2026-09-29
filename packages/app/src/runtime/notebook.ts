@@ -50,6 +50,16 @@ import {
   type RecognizedAccounts,
 } from './recognizedStore'
 import { openStorePassphrase } from './storePassphrase'
+import {
+  forgetfulUntoldBlocks,
+  openUntoldBlocks,
+  type UntoldBlocks,
+} from './untoldBlocksStore'
+import {
+  forgetfulIgnoredList,
+  openIgnoredList,
+  type IgnoredList,
+} from './ignoredListStore'
 
 /** What became of the notebook on this launch. Reported, not assumed. */
 export interface NotebookOpening {
@@ -96,6 +106,16 @@ export interface NotebookOpening {
    * they came from (#407). `recognizedStore.ts`.
    */
   readonly recognized: RecognizedAccounts
+  /**
+   * The accounts blocked here whose block the invitation service has not
+   * heard of yet, until it has (#469). `untoldBlocksStore.ts`.
+   */
+  readonly untoldBlocks: UntoldBlocks
+  /**
+   * The account's ignored list as its homeserver last said it (#469), which
+   * a launch hides with before any network. `ignoredListStore.ts`.
+   */
+  readonly ignoredList: IgnoredList
   readonly opened: boolean
   /** Why it did not open, when it did not. */
   readonly reason?: string
@@ -167,6 +187,8 @@ export async function openNotebook(storeDir: string): Promise<NotebookOpening> {
       discoveryResults: forgetfulDiscoveryResults(),
       sentInvitations: forgetfulSentInvitations(),
       recognized: forgetfulRecognizedAccounts(),
+      untoldBlocks: forgetfulUntoldBlocks(),
+      ignoredList: forgetfulIgnoredList(),
       opened: false,
       reason: 'no writable directory was supplied at launch',
     }
@@ -189,6 +211,8 @@ export async function openNotebook(storeDir: string): Promise<NotebookOpening> {
       discoveryResults: forgetfulDiscoveryResults(),
       sentInvitations: forgetfulSentInvitations(),
       recognized: forgetfulRecognizedAccounts(),
+      untoldBlocks: forgetfulUntoldBlocks(),
+      ignoredList: forgetfulIgnoredList(),
       opened: false,
       reason: passphrase.reason,
     }
@@ -221,6 +245,8 @@ export async function openNotebook(storeDir: string): Promise<NotebookOpening> {
       discoveryResults: await openDiscoveryResults(page),
       sentInvitations: await openSentInvitations(page),
       recognized: await openRecognizedAccounts(page),
+      untoldBlocks: await openUntoldBlocks(page),
+      ignoredList: await openIgnoredList(page),
       opened: true,
       minted: passphrase.minted,
     }
@@ -241,6 +267,8 @@ export async function openNotebook(storeDir: string): Promise<NotebookOpening> {
       discoveryResults: forgetfulDiscoveryResults(),
       sentInvitations: forgetfulSentInvitations(),
       recognized: forgetfulRecognizedAccounts(),
+      untoldBlocks: forgetfulUntoldBlocks(),
+      ignoredList: forgetfulIgnoredList(),
       opened: false,
       reason: getErrorMessage(cause),
       minted: passphrase.minted,

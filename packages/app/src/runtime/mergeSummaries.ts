@@ -1,4 +1,8 @@
-import type { ConversationSummary } from './conversationList'
+import {
+  byActivity,
+  NOTHING_LEFT_TO_SHOW,
+  type ConversationSummary,
+} from './conversationList'
 
 /**
  * Keeps what a row already said when the derivation could not say it again.
@@ -37,7 +41,12 @@ import type { ConversationSummary } from './conversationList'
  * - No timestamp without a reason is a conversation nothing has been said
  *   in. Also true, also not a failure.
  *
- * Only the pair means the derivation itself did not run.
+ * Only the pair means the derivation itself did not run -- but for one
+ * reason, `NOTHING_LEFT_TO_SHOW` (#469): every message of the row's window is
+ * one this device does not draw, hidden here or written by a blocked
+ * account. That is an answer too. Read as a failure, it kept the row before
+ * it, with the blocked account's opening and count, for good: the notebook
+ * kept the merge, and every launch after drew it again.
  *
  * # AND ONLY WHEN THE REMEMBERED ROW IS BETTER
  *
@@ -82,11 +91,13 @@ export function mergeSummaries(
   // and the derived list was ordered when every one of them was zero. The
   // same comparison `fetchConversationSummaries` uses, for the same reason:
   // two conversations that do not swap places between launches.
-  return [...merged].sort(
-    (a, b) => b.lastAt - a.lastAt || a.scope.localeCompare(b.scope),
-  )
+  return [...merged].sort(byActivity)
 }
 
 function failed(row: ConversationSummary): boolean {
-  return row.reason !== undefined && row.lastAt === 0
+  return (
+    row.reason !== undefined &&
+    row.reason !== NOTHING_LEFT_TO_SHOW &&
+    row.lastAt === 0
+  )
 }

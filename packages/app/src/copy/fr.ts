@@ -741,6 +741,50 @@ export const fr = {
     'Rien n’a changé : ce compte n’est pas bloqué, et l’invitation attend toujours votre réponse. Vous pouvez réessayer.',
   invited_block_confirm: 'Bloquer',
   invited_block_cancel: 'Annuler',
+  // BLOQUER UN COMPTE DEPUIS LE PANNEAU DE LA PERSONNE (#469). Le même
+  // blocage que « Refuser et bloquer », dont l'écran qui le précède reprend
+  // trois phrases telles quelles : ce qu'il ne cache pas, selon que la
+  // personne est trouvable ou non, et qu'il ne se lève pas. Le reste dit ce
+  // qu'il fait, que le compte n'est pas averti, ce que l'exploitant en
+  // apprend, et comment signaler, avant que les messages ne quittent les
+  // écrans. Puis la liste dit ce qui est fait et ce qui attend.
+  block_action: 'Bloquer',
+  block_hint:
+    'Plus rien de ce compte ne vous parviendra, et cette conversation quittera votre liste.',
+  block_explain_title: 'Ce que fait le blocage, ce qu’il ne fait pas',
+  block_explain_lead:
+    'Ce compte n’en saura rien. Voici tout ce que ce geste change, avant de décider.',
+  block_fact_nothing: 'Plus rien de ce compte ne vous parvient',
+  block_explain_nothing:
+    'Ni ses messages, ni ses appels, ni ses invitations ne vous parviennent plus, sur aucun de vos appareils. Il ne peut plus vous inviter dans Messagr.',
+  block_fact_gone: 'Ce qu’il a écrit quitte vos écrans',
+  block_explain_gone:
+    'Ses messages disparaissent de toutes vos conversations, ceux déjà reçus compris, et cette conversation quitte votre liste. Vous n’en sortez pas : ce compte ne voit rien changer.',
+  block_fact_untold: 'Ce compte n’est pas averti',
+  block_explain_untold:
+    'Rien ne le lui dit. Ses messages partent sans jamais vous parvenir, et ses invitations attendent, puis expirent.',
+  block_fact_not_hidden: 'Le blocage ne vous cache pas',
+  block_fact_operator: 'L’exploitant l’apprend',
+  block_explain_operator:
+    'L’exploitant apprendra que vous avez bloqué ce compte, jamais ce qui a été dit.',
+  block_fact_report: 'Signaler passe par ses messages',
+  block_explain_report:
+    'Pour montrer à l’exploitant ce que ce compte vous a écrit, sélectionnez ses messages dans la conversation et signalez-les avant de bloquer : ensuite, ils quittent vos écrans.',
+  block_confirm: 'Oui, bloquer ce compte',
+  block_cancel: 'Annuler',
+  block_working: 'En cours…',
+  block_failed:
+    'Cela n’a pas abouti, et rien n’a changé : ce compte n’est pas bloqué. Vous pouvez réessayer.',
+  list_blocked:
+    'Ce compte est bloqué : plus rien de lui ne vous parviendra, et votre conversation avec lui a quitté la liste.',
+  // CE QUI ATTEND, DIT POUR NE PAS SE CROIRE PROTÉGÉ À TORT (#462, récit
+  // 31) : tant que le service n'a pas enregistré le blocage, une invitation
+  // remise dans Messagr par ce compte peut encore arriver. Ses messages et
+  // ses appels, eux, ne passent plus : le homeserver les retient déjà.
+  list_blocked_waiting:
+    'Ce compte est bloqué, et votre conversation avec lui a quitté la liste : ses messages et ses appels ne vous parviendront plus. L’exploitant n’en est pas encore informé, et d’ici là, une invitation remise dans Messagr par ce compte peut encore vous parvenir. L’application réessaiera à chaque lancement, jusqu’à ce qu’il le soit.',
+  list_blocked_not_kept:
+    'Ce compte est bloqué, et votre conversation avec lui a quitté la liste : ses messages et ses appels ne vous parviendront plus. L’exploitant n’en a pas été informé, et cet appareil n’a pas pu le noter pour réessayer : une invitation remise dans Messagr par ce compte peut encore vous parvenir.',
   invited_working: 'Un instant…',
   invited_failed:
     'Rien n’a changé : cette invitation n’a été ni rejointe ni refusée. Vous pouvez réessayer.',

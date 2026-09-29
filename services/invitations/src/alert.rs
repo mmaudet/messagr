@@ -47,10 +47,6 @@ pub enum Alert {
     /// Reports received (#462): their numbers and reasons. At each call.
     ReportsReceived(Reports),
     /// Blocks since the previous count (#462), one at least. At each call.
-    #[cfg_attr(
-        not(test),
-        expect(dead_code, reason = "the daily count of #469 tells them")
-    )]
     Blocks(NonZeroU64),
 }
 

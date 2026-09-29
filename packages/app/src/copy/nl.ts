@@ -460,6 +460,39 @@ export const nl: Readonly<Record<CopyKey, string>> = {
     'Er is niets veranderd: dit account is niet geblokkeerd, en de uitnodiging wacht nog op uw antwoord. U kunt het opnieuw proberen.',
   invited_block_confirm: 'Blokkeren',
   invited_block_cancel: 'Annuleren',
+  block_action: 'Blokkeren',
+  block_hint:
+    'Van dit account bereikt u niets meer, en dit gesprek verdwijnt uit uw lijst.',
+  block_explain_title: 'Wat blokkeren doet, en wat niet',
+  block_explain_lead:
+    'Dit account komt het niet te weten. Dit is alles wat dit gebaar verandert, voordat u beslist.',
+  block_fact_nothing: 'Van dit account bereikt u niets meer',
+  block_explain_nothing:
+    'Zijn berichten, oproepen en uitnodigingen bereiken u niet meer, op geen enkel van uw apparaten. Het kan u in Messagr niet meer uitnodigen.',
+  block_fact_gone: 'Wat het schreef, verdwijnt van uw schermen',
+  block_explain_gone:
+    'Zijn berichten verdwijnen uit al uw gesprekken, ook de al ontvangen berichten, en dit gesprek verdwijnt uit uw lijst. U verlaat het niet: dit account ziet niets veranderen.',
+  block_fact_untold: 'Dit account wordt niet gewaarschuwd',
+  block_explain_untold:
+    'Niets zegt het dat. Zijn berichten gaan de deur uit zonder u ooit te bereiken, en zijn uitnodigingen wachten en verlopen dan.',
+  block_fact_not_hidden: 'Blokkeren verbergt u niet',
+  block_fact_operator: 'De exploitant komt het te weten',
+  block_explain_operator:
+    'De exploitant komt te weten dat u dit account hebt geblokkeerd, nooit wat er werd gezegd.',
+  block_fact_report: 'Melden gaat via zijn berichten',
+  block_explain_report:
+    'Om de exploitant te tonen wat dit account u schreef, selecteert u zijn berichten in het gesprek en meldt u ze voordat u blokkeert: daarna verdwijnen ze van uw schermen.',
+  block_confirm: 'Ja, dit account blokkeren',
+  block_cancel: 'Annuleren',
+  block_working: 'Bezig…',
+  block_failed:
+    'Dat is niet gelukt, en er is niets veranderd: dit account is niet geblokkeerd. U kunt het opnieuw proberen.',
+  list_blocked:
+    'Dit account is geblokkeerd: er bereikt u niets meer van, en uw gesprek ermee is uit de lijst verdwenen.',
+  list_blocked_waiting:
+    'Dit account is geblokkeerd, en uw gesprek ermee is uit de lijst verdwenen: zijn berichten en oproepen bereiken u niet meer. De exploitant is nog niet op de hoogte, en tot dan kan een uitnodiging in Messagr van dit account u nog bereiken. De app probeert het bij elke start opnieuw, tot het lukt.',
+  list_blocked_not_kept:
+    'Dit account is geblokkeerd, en uw gesprek ermee is uit de lijst verdwenen: zijn berichten en oproepen bereiken u niet meer. De exploitant is niet op de hoogte gebracht, en dit apparaat kon het niet noteren om het opnieuw te proberen: een uitnodiging in Messagr van dit account kan u nog bereiken.',
   invited_working: 'Een ogenblik…',
   invited_failed:
     'Er is niets veranderd: aan deze uitnodiging is niet deelgenomen en ze is niet geweigerd. U kunt het opnieuw proberen.',

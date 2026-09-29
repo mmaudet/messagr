@@ -1,4 +1,5 @@
 import type { PusherTakenAway, ThisDevicesPusher } from './pusher'
+import { withinTheDeadline } from './serviceDeadline'
 import type { RestoreCredentials } from './sessionCredentials'
 
 /**
@@ -105,14 +106,6 @@ export interface Ending extends ThisDevicesPusher {
  */
 const NOT_DEACTIVATED = 'the server did not deactivate this account'
 
-/**
- * How long the invitation service is given to answer. It is a courtesy before
- * the gesture that counts: a service that takes the connection and never
- * answers must not hold « Suppression… » on the screen. Given up, not
- * cancelled: an answer that comes later records the deletion all the same.
- */
-const ANNOUNCE_DEADLINE_MS = 10_000
-
 /** What happened before the deactivation. For the log, never a screen. */
 export interface Beforehand {
   /** Whether the invitation service heard about the deletion (#385). */
@@ -205,10 +198,13 @@ async function tellTheInvitationService(
   account: RestoreCredentials,
 ): Promise<Beforehand['invitationService']> {
   try {
-    const status = await Promise.race([
+    // A courtesy before the gesture that counts: past the deadline, the
+    // deletion goes on, and a late answer records it all the same.
+    const status = await withinTheDeadline(
       ending.announceDeletion(account),
-      ending.after(ANNOUNCE_DEADLINE_MS).then(() => 0),
-    ])
+      ms => ending.after(ms),
+      0,
+    )
     return status >= 200 && status < 300 ? 'told' : 'not told'
   } catch {
     return 'not told'

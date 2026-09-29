@@ -102,6 +102,16 @@ const ADD_OTHERS = `ALTER TABLE list_cache ADD COLUMN others INTEGER NOT NULL DE
  */
 const ADD_DEPARTED = `ALTER TABLE list_cache ADD COLUMN departed TEXT NOT NULL DEFAULT ''`
 
+/**
+ * Who wrote a row's opening (#469), added the way `departed` was: a launch
+ * that draws this page before it has derived anything drops an opening
+ * written by an account blocked since. The same kind of fact the page
+ * already holds -- whom a conversation is with -- and the only one: the
+ * messages a row is drawn again from (`ConversationSummary.window`) stay in
+ * memory, and this page keeps one line per conversation.
+ */
+const ADD_PREVIEW_BY = `ALTER TABLE list_cache ADD COLUMN preview_by TEXT NOT NULL DEFAULT ''`
+
 export function forgetfulListCache(): ListCache {
   return { all: async () => [], keep: async () => false }
 }
@@ -114,13 +124,14 @@ export async function openListCache(
   // it wants. See `ADD_OTHERS`.
   await database.execute(ADD_OTHERS).catch(() => undefined)
   await database.execute(ADD_DEPARTED).catch(() => undefined)
+  await database.execute(ADD_PREVIEW_BY).catch(() => undefined)
 
   return {
     all: async () => {
       try {
         const { rows } = await database.execute(
-          'SELECT scope, other, preview, reason, last_at, unread, others, departed ' +
-            'FROM list_cache ORDER BY last_at DESC',
+          'SELECT scope, other, preview, reason, last_at, unread, others, departed, ' +
+            'preview_by FROM list_cache ORDER BY last_at DESC',
         )
         const found: ConversationSummary[] = []
         for (const row of rows) {
@@ -136,6 +147,7 @@ export async function openListCache(
             unread,
             others,
             departed,
+            preview_by,
           } = row as Record<string, unknown>
           if (typeof scope !== 'string' || scope === '') continue
           if (typeof last_at !== 'number' || typeof unread !== 'number')
@@ -145,6 +157,9 @@ export async function openListCache(
             other: typeof other === 'string' && other !== '' ? other : null,
             preview:
               typeof preview === 'string' && preview !== '' ? preview : null,
+            ...(typeof preview_by === 'string' && preview_by !== ''
+              ? { previewBy: preview_by }
+              : {}),
             ...(typeof reason === 'string' && reason !== '' ? { reason } : {}),
             // A row from before the column existed reads `-1`, which is
             // this page saying it does not know -- not a conversation with
@@ -173,8 +188,8 @@ export async function openListCache(
         for (const summary of summaries) {
           await database.execute(
             'INSERT INTO list_cache ' +
-              '(scope, other, preview, reason, last_at, unread, others, departed) ' +
-              'VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+              '(scope, other, preview, reason, last_at, unread, others, departed, ' +
+              'preview_by) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
             // THE EMPTY STRING IS HOW THIS PAGE SPELLS `null`.
             // `EncryptedDatabase.execute` takes strings and numbers, which
             // is the right shape for four of the five pages; widening it so
@@ -193,6 +208,7 @@ export async function openListCache(
               // the empty string spells it above.
               summary.others ?? -1,
               summary.departed ?? '',
+              summary.previewBy ?? '',
             ],
           )
         }

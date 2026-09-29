@@ -154,6 +154,7 @@ import {
   fetchConversationSummaries,
   type ConversationSummary,
 } from './conversationList'
+import { EVERYTHING_SHOWN, type NotShown } from './notShown'
 import type { TimelineEntry } from '../timeline/mergeTimeline'
 import { makeToDeviceSource, subscribeToDeviceMessages } from './toDeviceBridge'
 
@@ -849,8 +850,11 @@ export async function listConversations(
   selfUserId: string,
   /** How far each conversation has been read on this device. */
   lastRead: ReadonlyMap<string, number>,
-  /** What this device was told not to draw. See `hiddenStore.ts`. */
-  hidden: ReadonlySet<string> = new Set(),
+  /**
+   * What this device does not draw: the messages hidden here, and what a
+   * blocked account wrote (#469). See `notShown.ts`.
+   */
+  notShown: NotShown = EVERYTHING_SHOWN,
 ): Promise<ConversationSummary[]> {
   return fetchConversationSummaries(
     {
@@ -863,7 +867,7 @@ export async function listConversations(
     },
     selfUserId,
     lastRead,
-    hidden,
+    notShown,
   )
 }
 
