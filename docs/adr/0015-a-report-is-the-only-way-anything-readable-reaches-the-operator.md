@@ -23,8 +23,10 @@ a report carries.
   into the application, so the service cannot swap it; its private half lives
   on the operator's own machine, with one offline copy. The service keeps a
   sealed report it cannot open, and a copy of its database shows nothing that
-  was reported. The seal is made in the bridge, as ADR-0001 requires of
-  anything that seals more than a declared name (amended the same day).
+  was reported. The seal belongs in the bridge, as ADR-0001 requires of
+  anything that seals more than a declared name; the first release seals in
+  TypeScript, in the same format, until a release of the bridge carries it
+  (ADR-0001, amended the same day).
 - It receives a report number. Whoever sent it learns the decision by writing
   to the operator with that number. An account sends ten reports a day at
   most.
