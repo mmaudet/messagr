@@ -291,6 +291,7 @@ import {
   type BlockNotice,
 } from './src/runtime/block'
 import {
+  isOpenWithTheBlocked,
   listWithoutTheBlocked,
   scopesWithTheBlocked,
 } from './src/runtime/conversationList'
@@ -594,9 +595,10 @@ export function App({
   const ignoredReadRef = useRef(false)
   /**
    * Holds the list the homeserver said, or the notebook's copy of it: what
-   * every screen draws from, the copy kept up to date, and the notifications
+   * every screen draws from, the copy kept up to date, the notifications
    * this application drew for a conversation with an account now blocked
-   * taken down, whichever device made the block.
+   * taken down, and the conversation open with one of them closed,
+   * whichever device made the block.
    */
   const holdIgnored = (
     next: ReadonlySet<string>,
@@ -614,6 +616,25 @@ export function App({
       newly,
     )) {
       takeDownNotificationsOf(scope).catch(() => {})
+    }
+    // THE CONVERSATION OPEN WITH AN ACCOUNT NOW BLOCKED CLOSES (#494), as the
+    // one blocked from does, and from here whichever device made the block:
+    // left open, what is written in it would still leave. One of more than
+    // two stays open, without that account's messages (#472).
+    const open = openScopeRef.current
+    const withWhom = partyRef.current
+    if (
+      open !== null &&
+      isOpenWithTheBlocked(
+        {
+          scope: open,
+          other: withWhom?.scope === open ? withWhom.other : null,
+        },
+        derivedSummariesRef.current,
+        next,
+      )
+    ) {
+      leaveTheConversation()
     }
   }
   // THE LIST EVERY SCREEN READS (#469): without the conversation with a
@@ -1659,6 +1680,12 @@ export function App({
     readonly scope: string
     readonly other: string
   } | null>(null)
+  // The same, for the callbacks made once: an ignored list a sync brings
+  // closes the conversation open with an account it names (#494).
+  const partyRef = useRef(party)
+  useEffect(() => {
+    partyRef.current = party
+  }, [party])
   const [vouch, setVouch] = useState<'idle' | 'working' | VouchOutcome>('idle')
   // Refs rather than state, and for one reason: the gesture's button lives
   // outside the effect that built the session, and re-rendering when a
