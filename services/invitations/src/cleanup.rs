@@ -75,16 +75,17 @@ async fn sweep_discovery(st: &Arc<AppState>, now: i64) -> Result<[u64; 5]> {
 /// La passe des SMS (#399, #464), découverte allumée ou non, puisque les
 /// alertes de l'exploitant partent aussi quand elle est éteinte : les SMS à
 /// effacer chez OVHcloud, les jours où l'exploitant a été prévenu, oubliés à
-/// trente jours, et les crédits prépayés, relevés quand les alertes partent
-/// par SMS.
+/// trente jours, les crédits prépayés, relevés quand les alertes partent
+/// par SMS, et le décompte quotidien des blocages (#469), une fois par jour.
 ///
 /// UN RELEVÉ DES CRÉDITS QUI ÉCHOUE N'ARRÊTE RIEN : il le dit dans le
 /// journal, une ligne par passe, et le ménage continue.
-async fn sweep_sms(st: &Arc<AppState>, now: i64) -> Result<[u64; 2]> {
+async fn sweep_sms(st: &Arc<AppState>, now: i64) -> Result<[u64; 3]> {
     let erased = crate::sms_history::erase_due(st, now).await;
     let days = crate::alert::forget_the_days(&st.pool, now).await;
     crate::ceilings::check_the_credits(st, now).await;
-    Ok([erased?, days?])
+    let blocks = crate::blocks_count::tell_the_day_s_count(st, now).await;
+    Ok([erased?, days?, blocks?])
 }
 
 /// Combien de temps le service garde ce qu'une découverte finie laisse.
@@ -589,7 +590,7 @@ pub(crate) async fn sweep_once(st: &Arc<AppState>, now: i64) -> bool {
             Ok(g),
             Ok(h),
             Ok(i),
-            Ok([s, t]),
+            Ok([s, t, u]),
             Ok([j, k, m, n, o]),
         ) => {
             tracing::info!(
@@ -598,7 +599,8 @@ pub(crate) async fn sweep_once(st: &Arc<AppState>, now: i64) -> bool {
                                 {f} requests purged, {g} graph rows purged, \
                                 {h} inviter counters purged, \
                                 {i} deletion announcements purged; SMS: \
-                                {s} erased at OVHcloud, {t} alert days forgotten; \
+                                {s} erased at OVHcloud, {t} alert days forgotten, \
+                                {u} blocks counted for the operator; \
                                 discovery: {j} spent proofs, {k} ended proofs, \
                                 {m} SMS counters forgotten, \
                                 {n} days of masking forgotten, \

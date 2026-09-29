@@ -227,6 +227,16 @@ its alerts go by SMS while discovery stays off (#462).
     previous count. The service sets no limit of its own: one SMS per
     report (#468) until they are grouped every quarter of an hour (#478),
     and one a day that counts the blocks (#469).
+- **The blocks are counted once a day by the hourly sweep**, at its first
+  pass between 07:00 and 19:00 UTC, so that the operator is not woken: the
+  blocks recorded since the blocks last told, in one SMS that names no
+  account, and none when there were none. What was told is kept in the
+  database (`blocks_count`) and moves only once the SMS has left: a refused
+  SMS, or a stop between the count and its SMS, leaves its blocks to the next
+  day's count, and a restart counts no block twice and misses none. Without
+  the provider or `ALERT_SMS_TO`, the count written in the log is told, and
+  the next day's does not repeat it. Blocks recorded before migration 021
+  carry no date and are never counted.
 - **The prepaid balance is read by the hourly sweep whenever the alerts go
   by SMS**, discovery on or off: they spend the same credits as the proofs.
   A balance that cannot be read is said in one line of the log per sweep,

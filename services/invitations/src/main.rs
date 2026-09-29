@@ -1,5 +1,6 @@
 mod alert;
 mod auth;
+mod blocks_count;
 mod ceilings;
 mod cleanup;
 mod config;
@@ -257,6 +258,10 @@ fn router(state: Arc<AppState>) -> Router {
             "/discovery/invitations/:id/block",
             post(handlers::delivered::block),
         )
+        // BLOCKING AN ACCOUNT FROM A CONVERSATION (#469): the relation of the
+        // route above, named by the account rather than by an invitation,
+        // discovery on or off. `handlers::blocks`.
+        .route("/blocks", post(handlers::blocks::block))
         // L'ANNONCE D'UNE SUPPRESSION DE COMPTE (#385), faite par le compte
         // lui-même juste avant qu'il soit désactivé. Sans corps : le jeton dit
         // qui. `handlers::deletion` dit ce qu'elle enregistre et ce qu'elle
@@ -352,6 +357,33 @@ mod tests {
 
         let r = reqwest::Client::new()
             .post(format!("{base}/account-deletions"))
+            .send()
+            .await
+            .unwrap();
+        assert_eq!(r.status(), StatusCode::UNAUTHORIZED);
+        let body: serde_json::Value = r.json().await.unwrap();
+        assert_eq!(body["errcode"], "M_UNAUTHORIZED");
+    }
+
+    /// Blocking an account is a route, and an authenticated one (#469),
+    /// through the real router for the reason the test above gives.
+    #[sqlx::test(migrations = "./migrations")]
+    async fn the_block_route_is_routed_and_asks_who_is_calling(pool: SqlitePool) {
+        let st = Arc::new(AppState {
+            pool,
+            mx: Arc::new(matrix::MatrixClient::new(
+                "http://127.0.0.1:1".into(),
+                "token".into(),
+            )),
+            cfg: config::Config::for_tests(),
+        });
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let base = format!("http://{}", listener.local_addr().unwrap());
+        tokio::spawn(async move { axum::serve(listener, router(st)).await.unwrap() });
+
+        let r = reqwest::Client::new()
+            .post(format!("{base}/blocks"))
+            .json(&serde_json::json!({"blocked_user_id": "@alice:h"}))
             .send()
             .await
             .unwrap();

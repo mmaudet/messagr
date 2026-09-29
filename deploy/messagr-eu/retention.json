@@ -27,7 +27,7 @@
     "$manque": "Les copies de la base de production gardées sur l'hôte portent encore ces lignes, et des arêtes de plus de trente jours, qu'aucun ménage ne touche : à purger ou supprimer avec l'accord du porteur (#416)."
   },
   "blocages_invitations": {
-    "$note": "Un blocage (#406) : la personne invitée refuse une invitation remise dans Messagr et bloque celui qui l'invite. Deux identifiants de compte, sans date. Les invitations suivantes de ce compte sont acceptées, jamais remises, puis expirent, et rien ne le lui dit.",
+    "$note": "Un blocage (#406) : la personne invitée refuse une invitation remise dans Messagr et bloque celui qui l'invite, ou bloque un compte depuis une conversation (#469). Deux identifiants de compte, et la date du blocage pour le décompte quotidien de l'exploitant (#469), que les blocages d'avant la migration 021 n'ont pas. Les invitations suivantes de ce compte sont acceptées, jamais remises, puis expirent, et rien ne le lui dit.",
     "jusqua": "tant que les deux comptes existent",
     "applique_par": [
       "la purge d'un compte supprimé efface ses blocages, de part et d'autre, et jamais l'annonce de sa suppression, qui n'est pas une preuve (#406)"

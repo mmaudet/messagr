@@ -43,6 +43,10 @@
 //! both accounts exist, and goes with the purge of a deleted one, either side,
 //! never with an announcement, which is not a proof (`deletion.rs`, #423).
 //!
+//! It is the one block of ADR 0015: the same relation is written from a
+//! conversation, naming the account (`blocks.rs`, #469), and both are dated
+//! for the operator's daily count.
+//!
 //! # EACH SIDE LEARNS THE OTHER WHEN THE RECIPIENT JOINS
 //!
 //! The service knows the recipient from the moment the invitation leaves:
@@ -472,15 +476,9 @@ pub async fn block(
     };
     let mut tx = st.pool.begin().await.map_err(anyhow::Error::from)?;
     declined_unless_joined(&mut tx, &id).await?;
-    sqlx::query(
-        "INSERT INTO delivered_blocks (blocker_user_id, blocked_user_id) VALUES (?, ?) \
-         ON CONFLICT DO NOTHING",
-    )
-    .bind(&recipient)
-    .bind(&inviter)
-    .execute(&mut *tx)
-    .await
-    .map_err(anyhow::Error::from)?;
+    // THE ONE BLOCK OF #469, dated like one made from a conversation, so that
+    // the daily count has it too.
+    crate::handlers::blocks::recorded(&mut *tx, &recipient, &inviter, st.cfg.clock.now()).await?;
     tx.commit().await.map_err(anyhow::Error::from)?;
     Ok(axum::http::StatusCode::NO_CONTENT)
 }
@@ -1632,6 +1630,77 @@ mod tests {
         blocked(&st, "bob", &second).await.unwrap();
 
         assert_eq!(waiting_for(&st, "bob").await, json!([]));
+    }
+
+    #[sqlx::test(migrations = "./migrations")]
+    async fn a_block_from_a_conversation_withholds_invitations_as_one_on_an_invitation(
+        pool: SqlitePool,
+    ) {
+        // #469: one block, whichever way it was made. Bob blocks Alice by her
+        // account, from a conversation, with one of hers joined and not
+        // entered, and one waiting.
+        let (st, time, bob) = two_findable(pool).await;
+        let joined_one = sent(&st, "alice", &bob).await.unwrap();
+        joined(&st, "bob", &joined_one).await.unwrap();
+        let waiting_one = sent(&st, "alice", &bob).await.unwrap();
+
+        crate::handlers::blocks::block(
+            State(st.clone()),
+            bearer("bob"),
+            Body(crate::handlers::blocks::BlockRequest {
+                blocked_user_id: "@alice:h".into(),
+            }),
+        )
+        .await
+        .unwrap();
+
+        // Both leave Bob's list, and Alice reads « pending » until the
+        // deadline, as for an invitation nobody saw.
+        assert_eq!(waiting_for(&st, "bob").await, json!([]));
+        assert_eq!(
+            status_of(&st, "alice", &waiting_one).await.unwrap()["status"],
+            "pending"
+        );
+        // Her later ones are taken, limits and all, and never delivered.
+        set_clock(&time, T0 + 21 * DAY);
+        let later = sent_with(&st, "alice", &bob, Some(&envelope(3)))
+            .await
+            .unwrap();
+        assert_eq!(waiting_for(&st, "bob").await, json!([]));
+        assert!(matches!(
+            joined(&st, "bob", &later).await,
+            Err(AppError::InvitationInvalid)
+        ));
+        assert_eq!(sealed_kept(&st, &later).await, None);
+        assert_eq!(
+            status_of(&st, "alice", &later).await.unwrap()["status"],
+            "pending"
+        );
+    }
+
+    #[sqlx::test(migrations = "./migrations")]
+    async fn a_block_on_an_invitation_is_dated_and_counted_as_any_other(pool: SqlitePool) {
+        // #469: the daily count counts every block, « Refuser et bloquer »
+        // included.
+        let (st, _, bob) = two_findable(pool).await;
+        let id = sent(&st, "alice", &bob).await.unwrap();
+
+        blocked(&st, "bob", &id).await.unwrap();
+
+        let dates: Vec<Option<i64>> = sqlx::query_scalar("SELECT blocked_at FROM delivered_blocks")
+            .fetch_all(&st.pool)
+            .await
+            .unwrap();
+        assert_eq!(dates, [Some(T0)]);
+        assert_eq!(
+            crate::blocks_count::tell_the_day_s_count(
+                &st,
+                T0 + crate::handlers::request::HOUR_SECONDS
+            )
+            .await
+            .unwrap(),
+            1
+        );
     }
 
     #[sqlx::test(migrations = "./migrations")]
