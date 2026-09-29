@@ -51,10 +51,24 @@
 # sets, the second a page still saying the policy « s'appliquera » on a day it
 # already does. nginx answers a missing file with a plain 404, so anything
 # else -- a page, an error, no answer -- is not the absence being checked.
+#
+# AND THE TRANSLATIONS, SINCE #466. The terms are published in French, which is
+# authoritative, and in English at `/conditions-generales/en/`, which the
+# application opens when it is not in French. A translation of the version in
+# force is a directory of two letters beside it, found by shape like the rest,
+# and it answers. A version that applies the day it is published waits in
+# `<page>/a-publier/` with its own translation until the porteur publishes it
+# (`version-a-venir.mjs publier`), and until then neither it nor that
+# translation is served: both answer 404.
+#
+# `MESSAGR_SITE_SOURCE` names the site the repository holds, and defaults to
+# this repository's. deploy/messagr-eu/tests/controles-legaux.js points it at
+# a copy, and `MESSAGR_SITE` at that copy served locally, so that this check
+# is seen passing and refusing somewhere else than in production.
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
-SITE_SOURCE="$ROOT/deploy/messagr-eu/site"
+SITE_SOURCE="${MESSAGR_SITE_SOURCE:-$ROOT/deploy/messagr-eu/site}"
 BASE="${MESSAGR_SITE:-https://messagr.eu}"
 PAGES=(/confidentialite /conditions-generales /aide)
 UNSERVED=()
@@ -74,6 +88,19 @@ for dir in "$SITE_SOURCE"/*/; do
     PAGES+=("/$legal/a-venir/")
   elif [ -f "$upcoming" ] || [ "$dated_any" -eq 1 ]; then
     UNSERVED+=("/$legal/a-venir/")
+  fi
+  for translated in "$dir"/[a-z][a-z]/index.html; do
+    [ -f "$translated" ] || continue
+    translated="${translated#"$SITE_SOURCE"}"
+    PAGES+=("${translated%index.html}")
+  done
+  if [ -f "$dir/a-publier/index.html" ]; then
+    UNSERVED+=("/$legal/a-publier/")
+    for waiting in "$dir"/a-publier/[a-z][a-z]/index.html; do
+      [ -f "$waiting" ] || continue
+      lang="$(basename "$(dirname "$waiting")")"
+      [ -f "$dir/$lang/index.html" ] || UNSERVED+=("/$legal/$lang/")
+    done
   fi
 done
 
@@ -97,7 +124,7 @@ for page in ${UNSERVED[@]+"${UNSERVED[@]}"}; do
   if [ "$code" = "404" ]; then
     printf '  OK    %s%s is not served (404)\n' "$BASE" "$page"
   else
-    printf '  FAIL  %s%s answered %s, and the repository has no announced version there\n' "$BASE" "$page" "$code" >&2
+    printf '  FAIL  %s%s answered %s, where the repository publishes nothing yet\n' "$BASE" "$page" "$code" >&2
     failed=1
   fi
 done
@@ -111,6 +138,8 @@ if [ "$failed" -ne 0 ]; then
   echo "  support URL: both are /aide." >&2
   echo "  An upcoming version is served from the deployment that follows its" >&2
   echo "  announcement, and retired by the one that follows its application;" >&2
+  echo "  a version waiting in a-publier/, and its translation, from the" >&2
+  echo "  deployment that follows its publication;" >&2
   echo "  see deploy/messagr-eu/LISEZ-MOI-pages-legales.md." >&2
   exit 1
 fi
