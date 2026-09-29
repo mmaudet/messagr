@@ -433,8 +433,8 @@ var LATER = '2031-03-30';
     if (parsedAfter !== null && JSON.stringify(parsedAfter) !== JSON.stringify(expected)) {
       fail('retention.json is not what it was without the pages naming a published version');
     }
-    if (retentionAfter.indexOf('/a-publier/') !== -1) {
-      fail('retention.json still names an address under a-publier/ once published');
+    if (/"page": "\/[^"]*\/a-publier\/"/.test(retentionAfter)) {
+      fail('retention.json still checks a duration at an address under a-publier/ once published');
     }
 
     var site2 = built(site);

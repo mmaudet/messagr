@@ -1,6 +1,6 @@
 {
   "$note": "Les durées de conservation, écrites une fois. La page publiée et la configuration du serveur doivent toutes deux s'y accorder, et scripts/assert-retention.sh le vérifie. La politique a déjà affirmé une durée que le code ne pratiquait pas ; c'est ce fichier qui empêche que cela recommence.",
-  "$page": "Une entrée qui porte « page » est dite par une autre page que la politique en vigueur : la version à venir (#412), qui dit une durée nouvelle du jour où elle est annoncée au jour où elle s'applique. scripts/assert-retention.sh vérifie la phrase à cette adresse, une fois la version annoncée, et ne la vérifie pas avant, puisque rien ne sert la page. Le geste qui applique la version (version-a-venir.mjs appliquer) retire « page », et la phrase se vérifie alors sur la politique en vigueur.",
+  "$page": "Une entrée qui porte « page » est dite par une autre page que la politique en vigueur : la version à venir (#412), qui dit une durée nouvelle du jour où elle est annoncée au jour où elle s'applique. scripts/assert-retention.sh vérifie la phrase à cette adresse, une fois la version annoncée, et ne la vérifie pas avant, puisque rien ne sert la page. Le geste qui applique la version (version-a-venir.mjs appliquer) retire « page », et la phrase se vérifie alors sur la politique en vigueur. Ou la version à publier (#467), « /confidentialite/a-publier/ », qui s'applique le jour où elle est publiée : rien ne la sert tant que le dépôt la tient, et la phrase n'est pas vérifiée d'ici là ; le geste qui la publie (version-a-venir.mjs publier) retire « page », et la phrase se vérifie alors sur la politique en vigueur.",
   "journaux_techniques": {
     "$note": "Le lien d'invitation porte son jeton dans le chemin, et le jeton est un secret porteur : tant que l'invitation n'est ni réclamée ni expirée, il fait entrer. Jusqu'au 15 septembre 2026 nginx écrivait ce chemin entier, gardé 366 jours (#313). La durée ne bouge pas — le décret l'impose aux données de connexion — mais le jeton n'en fait plus partie : le vhost journalise « /i/... » à la place du chemin, et le référent est réduit à « - ». Ce que la page en dit est sous « dit », et scripts/assert-retention.sh le vérifie comme une durée.",
     "duree": "douze mois",
@@ -34,7 +34,7 @@
     ],
     "$manque": "Cette purge est manuelle d'ici #423, et une suppression faite par courriel n'est jamais annoncée au service : l'exploitant doit penser à la table delivered_blocks.",
     "duree": "tant que vos deux comptes existent",
-    "page": "/confidentialite/a-venir/"
+    "page": "/confidentialite/a-publier/"
   },
   "decouverte_empreinte": {
     "$note": "L'empreinte masquée d'un numéro prouvé (#392, ADR 0014), jamais le numéro, et le compteur des numéros qu'il a fait masquer (#401). Gardés tant que le compte est trouvable, puis trente jours après la sortie : retrait, expiration, remplacement, clé retirée d'un coup, suppression du compte.",
@@ -105,6 +105,31 @@
     "jours": 30,
     "applique_par": [],
     "$manque": "Aucune purge automatique des données d'un compte supprimé n'existe. À l'échelle de la bêta l'opération est manuelle ; elle doit être outillée avant la production. Voir #423. Le service garde la ligne qui annonce une suppression faite depuis l'application (#385) et l'efface au bout de trente jours : cleanup::purge_account_deletions, colonne purge_after."
+  },
+  "signalements_contenu": {
+    "$note": "Le contenu d'un signalement (#462, ADR 0015) : ce qu'une personne a reçu et choisi de transmettre à l'exploitant, scellé sur son téléphone pour la clé de l'exploitant. Le service le garde sans pouvoir l'ouvrir, avec le numéro de signalement, le compte qui signale, le motif et l'instant de réception (#468), puis la décision et ses dates (#473) ; il n'apprend ni le compte visé, ni la conversation, ni ce qui a été écrit. Le pli s'efface six mois après la décision, sauf s'il a été transmis aux autorités : il est alors gardé tant qu'elles en ont besoin. Ce qui a été décidé est sous « signalements_decisions ».",
+    "duree": "six mois après la décision",
+    "page": "/confidentialite/a-publier/",
+    "applique_par": [],
+    "$manque": "Rien ne l'efface encore. #473 : le ménage horaire efface le pli au plus tard six mois après la décision, en mois du calendrier (181 jours ne dépassent jamais six mois), et jamais tant que le signalement est retenu pour les autorités ; puis sa fonction et sa durée se nomment sous « applique_par », et ce « $manque » part. Deux copies échapperaient à ce ménage, que #473 tient aussi : un pli exporté, qui ne doit rien laisser sur la machine de l'exploitant, et les copies de la base gardées sur l'hôte (#416)."
+  },
+  "signalements_decisions": {
+    "$note": "Ce qui a été décidé sur un signalement (#462, #473) : le numéro de signalement, le compte qui signale, le motif, les dates de réception et de décision, la décision et sa motivation. Jamais ce qui a été dit, qui est dans le pli, effacé plus tôt (« signalements_contenu »).",
+    "duree": "douze mois après la décision",
+    "page": "/confidentialite/a-publier/",
+    "applique_par": [],
+    "$manque": "Rien ne l'efface encore. #473 : le ménage horaire efface l'enregistrement au plus tard douze mois après la décision (365 jours ne dépassent jamais douze mois), et jamais tant que le signalement est retenu pour les autorités ; puis sa fonction et sa durée se nomment sous « applique_par », et ce « $manque » part."
+  },
+  "sms_de_lexploitant": {
+    "$note": "Les SMS qui préviennent l'exploitant (#464) : les signalements reçus, avec leurs numéros et leurs motifs, et le décompte quotidien des blocages. Chaque texte est écrit par le service à partir de chiffres typés, dans une liste fermée : aucun contenu ni aucun identifiant de compte n'y entre. OVHcloud les envoie au numéro de l'exploitant ; le service lui demande de les effacer de son historique un jour après l'envoi, puis chaque heure pendant un jour s'il ne les y trouve pas encore (sms_history.rs). Ce que la page en dit est sous « dit », et scripts/assert-retention.sh le vérifie comme une durée.",
+    "duree": "un jour après son envoi",
+    "jours": 1,
+    "dit": ["ni contenu ni identifiant de compte"],
+    "page": "/confidentialite/a-publier/",
+    "applique_par": [
+      "services/invitations/src/alert.rs : Alert, la liste fermée de ce qui est dit à l'exploitant, et VALID_MINUTES, le jour après lequel un SMS d'alerte est à effacer (sms_history::remember)",
+      "services/invitations : sms_history::erase_due, par la passe horaire de cleanup::sweep_once"
+    ]
   },
   "journal_de_lappareil": {
     "$note": "Quelques lignes dans le journal du système de l'appareil (logcat sous Android, journal unifié sous iOS), limitées aux appels, aux réveils par notification, à l'enregistrement des notifications, à l'offre de sauvegarde et aux sauvegardes qui n'ont pas pu être activées, sans contenu ni identifiant. L'application ne les envoie nulle part. Aucune durée n'est déclarée, et ce n'est pas un oubli : c'est le système de l'appareil qui garde ces lignes et les efface, pas l'application ni le serveur. Ce que la page en dit est sous « dit », et scripts/assert-retention.sh le vérifie comme une durée.",
