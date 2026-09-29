@@ -111,18 +111,7 @@ export async function reportMessages(
 ): Promise<Reported> {
   const author = reportedAuthor(what.selected, what.timeline, what.reporter)
   if (author === null) return NOT_SENT
-  const messages = what.timeline.flatMap((entry): ReportedMessage[] =>
-    what.selected.has(entry.eventId) && entry.body !== null
-      ? [
-          {
-            eventId: entry.eventId,
-            sentAt: entry.sentAt,
-            sender: entry.claimedSender,
-            text: entry.body,
-          },
-        ]
-      : [],
-  )
+  const messages = reportedMessages(what.selected, what.timeline)
 
   let sealed: string
   try {
@@ -153,4 +142,28 @@ export async function reportMessages(
   // (`handlers/reports.rs`), and anything else kept nothing.
   const number = answer.status === 201 ? parsed(answer.body)?.number : null
   return typeof number === 'string' ? { sent: true, number } : NOT_SENT
+}
+
+/**
+ * The selected messages of `timeline`, as a report carries them, in the order
+ * the conversation reads them. What the sheet shows as leaving is this, and
+ * so is what `reportMessages` seals: one reading for both, so that nothing
+ * leaves that was not shown.
+ */
+export function reportedMessages(
+  selected: ReadonlySet<string>,
+  timeline: readonly TimelineEntry[],
+): ReportedMessage[] {
+  return timeline.flatMap((entry): ReportedMessage[] =>
+    selected.has(entry.eventId) && entry.body !== null
+      ? [
+          {
+            eventId: entry.eventId,
+            sentAt: entry.sentAt,
+            sender: entry.claimedSender,
+            text: entry.body,
+          },
+        ]
+      : [],
+  )
 }

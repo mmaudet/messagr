@@ -3,6 +3,7 @@ import type { DeliveryService } from './deliveredInvitations'
 import type { DiscoveryService } from './discovery'
 import type { FindingService } from './findContacts'
 import type { InvitationService } from './issueInvitation'
+import type { ReportService } from './reportMessages'
 
 /**
  * The poster the invitation service's claim endpoint is reached with.
@@ -174,4 +175,37 @@ export async function announceDeletion(
     headers: { Authorization: `Bearer ${accessToken}` },
   })
   return response.status
+}
+
+/**
+ * The report route of the same service (#468), reached as the account this
+ * launch holds: the reason's code and the sealed report go, a report number
+ * comes back. The token says who reports; what the report carries is sealed
+ * for the operator key (`reportMessages.ts`).
+ *
+ * The account is read at each request, as `discoveryService` reads it, and a
+ * launch holding none fails like a service nobody reached.
+ */
+export function reportService(
+  account: () => {
+    readonly baseUrl: string
+    readonly accessToken: string
+  } | null,
+): ReportService {
+  return {
+    send: async body => {
+      const held = account()
+      if (held === null) throw new Error('this launch holds no account')
+      return answered(
+        await fetch(`${serviceAt(held.baseUrl)}/reports`, {
+          method: 'POST',
+          headers: {
+            Authorization: `Bearer ${held.accessToken}`,
+            'Content-Type': 'application/json',
+          },
+          body,
+        }),
+      )
+    },
+  }
 }

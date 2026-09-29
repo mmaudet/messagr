@@ -234,6 +234,7 @@ import {
   canRemoveForEveryone,
   copyText,
   onlyPhotograph,
+  reportedAuthor,
   toggle,
 } from './src/timeline/selection'
 import {
@@ -305,6 +306,7 @@ import { SelectionBar } from './src/ui/SelectionBar'
 import { PlusSheet } from './src/ui/PlusSheet'
 import { FindContacts } from './src/ui/FindContacts'
 import { RemoveSheet } from './src/ui/RemoveSheet'
+import { ReportSheet, type ReportStage } from './src/ui/ReportSheet'
 import { PickConversation } from './src/ui/PickConversation'
 import { ConversationHeader } from './src/ui/ConversationHeader'
 import { Legal } from './src/ui/Legal'
@@ -399,7 +401,17 @@ import {
 } from './src/runtime/sessionStore'
 import { reenterWithPassword, retireDevice } from './src/runtime/reenter'
 import { photoLibrary } from './src/runtime/photoLibrary'
-import { discoveryService, servicePoster } from './src/runtime/servicePoster'
+import {
+  discoveryService,
+  reportService,
+  servicePoster,
+} from './src/runtime/servicePoster'
+import {
+  reportedMessages,
+  reportMessages,
+  type Reporting,
+} from './src/runtime/reportMessages'
+import { sealReport } from './src/runtime/sealedReport'
 import {
   fetchSessionSyncStatus,
   makeSyncClient,
@@ -1290,6 +1302,18 @@ export function App({
    */
   const [forwarding, setForwarding] = useState<readonly string[] | null>(null)
   /**
+   * The report being prepared (#468), while its sheet is up: the
+   * conversation and the messages it carries, taken from the selection when
+   * « Signaler » was pressed as forwarding takes them, their one author, and
+   * where the sending stands. `null` otherwise.
+   */
+  const [reporting, setReporting] = useState<{
+    readonly scope: string
+    readonly eventIds: ReadonlySet<string>
+    readonly author: string
+    readonly stage: ReportStage
+  } | null>(null)
+  /**
    * Places a call, audio or video, from wherever the gesture came from.
    *
    * One function rather than three copies of the same six lines: the header
@@ -1535,6 +1559,14 @@ export function App({
   // `discoveryService`. Made once per mount, like the journey that uses it.
   const discoveryDeps = useRef({
     service: discoveryService(() => credentialsRef.current),
+    now: () => Date.now(),
+  }).current
+  // WHAT A REPORT NEEDS (#468): the same service as this account, the seal
+  // for the operator key built into the application, and a clock. No
+  // session: a report asks the homeserver nothing.
+  const reportDeps = useRef<Reporting>({
+    service: reportService(() => credentialsRef.current),
+    seal: sealReport,
     now: () => Date.now(),
   }).current
   /**
@@ -5060,6 +5092,14 @@ export function App({
         setRemoving(false)
         return true
       }
+      // THE REPORT SHEET (#468) closes as its own « Annuler » or « Fermer »
+      // does, and not while the report is on its way: its answer is the
+      // number, or that nothing left.
+      if (reporting !== null) {
+        if (reporting.stage.stage === 'sent') setSelected(new Set())
+        if (reporting.stage.stage !== 'sending') setReporting(null)
+        return true
+      }
       if (selected.size > 0) {
         setSelected(new Set())
         return true
@@ -5130,6 +5170,7 @@ export function App({
     trust,
     openPlate,
     removing,
+    reporting,
     selected,
     personOpen,
     openScope,
@@ -5547,6 +5588,51 @@ export function App({
           />
         )}
 
+        {/* SIGNALER (#468). What the sheet shows as leaving and what is
+            sealed are read from the same conversation, the one on screen,
+            by the same function (`reportedMessages`). The messages stay in
+            the conversation: a report removes nothing. */}
+        {reporting !== null && (
+          <ReportSheet
+            author={reporting.author}
+            reporter={selfUserId}
+            messages={reportedMessages(reporting.eventIds, conversation ?? [])}
+            stage={reporting.stage}
+            onSend={reason => {
+              const held = reporting
+              setReporting({ ...held, stage: { stage: 'sending' } })
+              reportMessages(reportDeps, {
+                reporter: selfUserId,
+                roomId: held.scope,
+                reason,
+                selected: held.eventIds,
+                timeline: conversation ?? [],
+              })
+                .catch(() => ({ sent: false }) as const)
+                .then(reported =>
+                  setReporting(now =>
+                    now === null
+                      ? null
+                      : {
+                          ...now,
+                          stage: reported.sent
+                            ? { stage: 'sent', number: reported.number }
+                            : { stage: 'failed' },
+                        },
+                  ),
+                )
+            }}
+            // SENT, THE MODE HAS DONE WHAT IT WAS OPENED FOR, and goes with
+            // the sheet. Cancelled or failed, the selection stays, to send
+            // again or to do something else with it, as the removal sheet
+            // leaves it.
+            onClose={() => {
+              if (reporting.stage.stage === 'sent') setSelected(new Set())
+              setReporting(null)
+            }}
+          />
+        )}
+
         {openPlate !== null && (
           <FullScreenPlate
             plate={openPlate.plate}
@@ -5601,6 +5687,10 @@ export function App({
                   undefined
                 }
                 canFavourite={canFavourite(selected, conversation ?? [])}
+                canReport={
+                  reportedAuthor(selected, conversation ?? [], selfUserId) !==
+                  null
+                }
                 // EVERY one, not any: the control does one thing to the whole
                 // selection, and a mixed one has to pick a direction. Keeping
                 // is the safe half -- a mark added to something already kept
@@ -5710,6 +5800,20 @@ export function App({
                     })
                 }}
                 onForward={() => setForwarding([...selected])}
+                onReport={() => {
+                  const author = reportedAuthor(
+                    selected,
+                    conversation ?? [],
+                    selfUserId,
+                  )
+                  if (openScope === null || author === null) return
+                  setReporting({
+                    scope: openScope,
+                    eventIds: selected,
+                    author,
+                    stage: { stage: 'choosing' },
+                  })
+                }}
                 onRemove={() => setRemoving(true)}
               />
             ) : undefined}

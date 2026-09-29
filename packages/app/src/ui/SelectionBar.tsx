@@ -50,12 +50,14 @@ export function SelectionBar({
   canForward: forwardable,
   canKeep: keepable,
   canFavourite: favouritable,
+  canReport: reportable,
   alreadyFavourite,
   onClear,
   onCopy,
   onFavourite,
   onForward,
   onKeep,
+  onReport,
   onRemove,
 }: {
   readonly count: number
@@ -69,6 +71,11 @@ export function SelectionBar({
   /** Whether the selection is something that could be found again. */
   readonly canFavourite: boolean
   /**
+   * Whether the selection is texts of one other participant, which is what
+   * a report carries (#468, `reportedAuthor`).
+   */
+  readonly canReport: boolean
+  /**
    * Whether every selected message is already kept.
    *
    * The same control does both, and it has to say which it will do: a button
@@ -81,6 +88,7 @@ export function SelectionBar({
   readonly onCopy: () => void
   readonly onForward: () => void
   readonly onKeep: () => void
+  readonly onReport: () => void
   readonly onRemove: () => void
 }) {
   return (
@@ -177,6 +185,22 @@ export function SelectionBar({
           accessibilityLabel={t('selection_keep')}
           style={({ pressed }) => [styles.action, pressed && styles.pressed]}>
           <TabIcon glyph="save" tint={color.surface.paper} />
+        </Pressable>
+      )}
+
+      {/* ONLY ON ONE OTHER PERSON'S WORDS (#468). A report names one account
+          and carries its messages as read, so a selection mixing two people,
+          holding one of this account's own, or a photograph (#471) has no
+          « Signaler » at all: absent, never greyed, as everything here. What
+          it opens says what leaves before anything does: `ReportSheet.tsx`. */}
+      {reportable && (
+        <Pressable
+          testID="selection-report"
+          onPress={onReport}
+          accessibilityRole="button"
+          accessibilityLabel={t('selection_report')}
+          style={({ pressed }) => [styles.action, pressed && styles.pressed]}>
+          <TabIcon glyph="flag" tint={color.surface.paper} />
         </Pressable>
       )}
 

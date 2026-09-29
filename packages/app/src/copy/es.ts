@@ -172,6 +172,37 @@ export const es: Readonly<Record<CopyKey, string>> = {
   remove_me_why:
     'El mensaje permanece en el dispositivo de su interlocutor. No volverá a mostrarse en este teléfono, pero reaparecerá en otro dispositivo o tras una reinstalación.',
   remove_cancel: 'Cancelar',
+  selection_report: 'Denunciar',
+  report_title: 'Denunciar ante quien explota el servicio',
+  report_reason_heading: 'Motivo',
+  report_reason_child_sexual_abuse: 'Abuso sexual infantil',
+  report_reason_threat: 'Amenaza contra la vida o la seguridad',
+  report_reason_harassment: 'Acoso',
+  report_reason_impersonation: 'Suplantación de identidad',
+  report_reason_hate: 'Contenido de odio',
+  report_reason_sexual_without_consent:
+    'Contenido sexual impuesto, o imagen íntima difundida sin consentimiento',
+  report_reason_solicitation: 'Publicidad no solicitada',
+  report_reason_other_illegal: 'Otro contenido ilegal',
+  report_reason_required: 'Elija primero un motivo.',
+  report_what_heading: 'Lo que sale de este teléfono',
+  report_what:
+    'Los mensajes elegidos, tal como usted los lee, con su autor y su hora. Nada más de la conversación.',
+  'report_author %@': 'Autor: %@',
+  'report_when %1$@ %2$@': '%1$@ a las %2$@',
+  'report_account %@': 'Enviada en nombre de su cuenta: %@',
+  report_operator_only:
+    'Solo quien explota el servicio podrá abrirla: el servidor que la recibe no puede leerla.',
+  report_send: 'Enviar',
+  report_sending: 'Enviando…',
+  report_cancel: 'Cancelar',
+  report_failed:
+    'La denuncia no ha salido: no se ha enviado nada. Puede intentarlo de nuevo.',
+  report_sent_title: 'Denuncia enviada',
+  'report_sent_number %@': 'Número de denuncia: %@',
+  report_sent_decision:
+    'Para conocer la decisión, escriba a conformite@messagr.eu citando este número.',
+  report_close: 'Cerrar',
   conversation_sending: 'Enviando…',
   conversation_send_failed: 'No enviado. Inténtelo de nuevo.',
   consequence_irreversible: 'Irreversible',

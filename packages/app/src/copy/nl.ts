@@ -168,6 +168,37 @@ export const nl: Readonly<Record<CopyKey, string>> = {
   remove_me_why:
     'Het bericht blijft bij uw gesprekspartner. Het wordt op deze telefoon niet meer getoond — maar het komt terug op een ander toestel of na een herinstallatie.',
   remove_cancel: 'Annuleren',
+  selection_report: 'Melden',
+  report_title: 'Melden aan de exploitant',
+  report_reason_heading: 'Reden',
+  report_reason_child_sexual_abuse: 'Seksueel misbruik van kinderen',
+  report_reason_threat: 'Bedreiging van leven of veiligheid',
+  report_reason_harassment: 'Intimidatie',
+  report_reason_impersonation: 'Identiteitsfraude',
+  report_reason_hate: 'Haatdragende inhoud',
+  report_reason_sexual_without_consent:
+    'Opgedrongen seksuele inhoud, of intieme beelden verspreid zonder toestemming',
+  report_reason_solicitation: 'Ongevraagde reclame',
+  report_reason_other_illegal: 'Andere illegale inhoud',
+  report_reason_required: 'Kies eerst een reden.',
+  report_what_heading: 'Wat deze telefoon verlaat',
+  report_what:
+    'De gekozen berichten, zoals u ze leest, met hun afzender en hun tijdstip. Verder niets uit het gesprek.',
+  'report_author %@': 'Afzender: %@',
+  'report_when %1$@ %2$@': '%1$@ om %2$@',
+  'report_account %@': 'Verstuurd namens uw account: %@',
+  report_operator_only:
+    'Alleen de exploitant kan haar openen: de dienst die haar ontvangt, kan haar niet lezen.',
+  report_send: 'Versturen',
+  report_sending: 'Versturen…',
+  report_cancel: 'Annuleren',
+  report_failed:
+    'De melding is niet vertrokken: er is niets verstuurd. U kunt het opnieuw proberen.',
+  report_sent_title: 'Melding verstuurd',
+  'report_sent_number %@': 'Meldingsnummer: %@',
+  report_sent_decision:
+    'Om de beslissing te vernemen, schrijft u naar conformite@messagr.eu met vermelding van dit nummer.',
+  report_close: 'Sluiten',
   conversation_sending: 'Versturen…',
   conversation_send_failed: 'Niet verstuurd. Probeer opnieuw.',
   consequence_irreversible: 'Onomkeerbaar',

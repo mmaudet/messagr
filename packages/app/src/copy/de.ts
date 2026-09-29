@@ -176,6 +176,37 @@ export const de: Readonly<Record<CopyKey, string>> = {
   remove_me_why:
     'Die Nachricht bleibt bei Ihrem Gegenüber. Auf diesem Telefon wird sie nicht mehr angezeigt — auf einem anderen Gerät oder nach einer Neuinstallation kommt sie zurück.',
   remove_cancel: 'Abbrechen',
+  selection_report: 'Melden',
+  report_title: 'An den Betreiber melden',
+  report_reason_heading: 'Grund',
+  report_reason_child_sexual_abuse: 'Sexueller Missbrauch von Kindern',
+  report_reason_threat: 'Bedrohung von Leben oder Sicherheit',
+  report_reason_harassment: 'Belästigung',
+  report_reason_impersonation: 'Identitätsmissbrauch',
+  report_reason_hate: 'Hassinhalte',
+  report_reason_sexual_without_consent:
+    'Aufgezwungene sexuelle Inhalte oder ohne Einwilligung verbreitete intime Bilder',
+  report_reason_solicitation: 'Unerwünschte Werbung',
+  report_reason_other_illegal: 'Andere rechtswidrige Inhalte',
+  report_reason_required: 'Wählen Sie zuerst einen Grund.',
+  report_what_heading: 'Was dieses Telefon verlässt',
+  report_what:
+    'Die ausgewählten Nachrichten, so wie Sie sie lesen, mit ihrem Verfasser und ihrer Uhrzeit. Nichts sonst aus der Unterhaltung.',
+  'report_author %@': 'Verfasser: %@',
+  'report_when %1$@ %2$@': '%1$@ um %2$@',
+  'report_account %@': 'Gesendet im Namen Ihres Kontos: %@',
+  report_operator_only:
+    'Nur der Betreiber kann sie öffnen: Der Dienst, der sie empfängt, kann sie nicht lesen.',
+  report_send: 'Senden',
+  report_sending: 'Wird gesendet …',
+  report_cancel: 'Abbrechen',
+  report_failed:
+    'Die Meldung ist nicht hinausgegangen: Es wurde nichts gesendet. Sie können es erneut versuchen.',
+  report_sent_title: 'Meldung gesendet',
+  'report_sent_number %@': 'Meldungsnummer: %@',
+  report_sent_decision:
+    'Um die Entscheidung zu erfahren, schreiben Sie unter Angabe dieser Nummer an conformite@messagr.eu.',
+  report_close: 'Schließen',
   conversation_sending: 'Wird gesendet …',
   conversation_send_failed: 'Nicht gesendet. Versuchen Sie es erneut.',
   consequence_irreversible: 'Unwiderruflich',
