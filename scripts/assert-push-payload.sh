@@ -47,6 +47,9 @@ PAGE="${MESSAGR_SITE:-https://messagr.eu}/confidentialite/"
 # day it applies, so held to the same claims from the day it is written.
 UPCOMING_SOURCE="$ROOT/deploy/messagr-eu/site/confidentialite/a-venir/index.html"
 UPCOMING="${MESSAGR_SITE:-https://messagr.eu}/confidentialite/a-venir/"
+# The version awaiting publication (#467), likewise: the policy the day it is
+# published. Nothing serves it before, so it has no live half.
+WAITING_SOURCE="$ROOT/deploy/messagr-eu/site/confidentialite/a-publier/index.html"
 
 failed=0
 say_ok() { printf '  OK    %s\n' "$1"; }
@@ -303,6 +306,10 @@ upcoming_announced=0
 if [ -f "$UPCOMING_SOURCE" ]; then
   holds_the_claims "the upcoming page in the repository" "$(cat "$UPCOMING_SOURCE")"
   grep -qF 'MESSAGR-DATE-A-VENIR' "$UPCOMING_SOURCE" || upcoming_announced=1
+fi
+
+if [ -f "$WAITING_SOURCE" ]; then
+  holds_the_claims "the page awaiting publication in the repository" "$(cat "$WAITING_SOURCE")"
 fi
 
 # THE LIVE HALF IS BINDING ONLY WHEN THE BUILD IS OUT.
