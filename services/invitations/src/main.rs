@@ -14,6 +14,7 @@ mod masking_quota;
 mod matrix;
 mod named_deactivation;
 mod operator;
+mod report;
 mod retire_key;
 mod sms;
 mod sms_history;

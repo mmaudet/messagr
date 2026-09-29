@@ -461,6 +461,7 @@ pub struct Discovery<'a> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::sms::test_support::OPERATOR_NUMBER;
 
     const ONE_SEED: &str = "AQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQE=";
 
@@ -490,7 +491,6 @@ mod tests {
         ),
     ];
 
-    const OPERATOR_NUMBER: &str = "+33600000000";
     const OPERATOR: &[(&str, &str)] = &[("ALERT_SMS_TO", OPERATOR_NUMBER)];
 
     /// A deployment's variables: `REQUIRED`, and `more`.
@@ -549,6 +549,26 @@ mod tests {
             };
             assert!(refused.to_string().contains(missing), "{refused}");
         }
+    }
+
+    #[test]
+    fn the_three_keys_and_the_sender_without_the_number_stop_the_start() {
+        // Production's likely mistake (#464): the three keys OVHcloud's
+        // createToken gives, and the sender, pasted without the SMS account,
+        // and without the operator's number either.
+        let pasted: &[(&str, &str)] = &[
+            ("OVH_APPLICATION_KEY", "ak"),
+            ("OVH_APPLICATION_SECRET", "as"),
+            ("OVH_CONSUMER_KEY", "ck"),
+            ("SMS_SENDER", "Messagr"),
+        ];
+        let Err(refused) = Config::from_vars(deployment(&[pasted])) else {
+            panic!("the start goes on without the SMS account");
+        };
+        assert_eq!(
+            refused.to_string(),
+            "the SMS provider is half configured: OVH_SMS_SERVICE is missing"
+        );
     }
 
     #[test]

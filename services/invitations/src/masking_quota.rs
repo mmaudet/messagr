@@ -39,6 +39,7 @@
 use sqlx::SqlitePool;
 
 use crate::masking::MaskingKeys;
+use crate::util::DAY_SECONDS;
 
 /// The most numbers one proven number has masked in the window.
 pub const PER_NUMBER: i64 = 5_000;
@@ -53,7 +54,6 @@ pub const EXTENSION: i64 = 5_000;
 pub const EXTENSION_SECONDS: i64 = 28 * DAY_SECONDS;
 
 const WINDOW_DAYS: i64 = 30;
-const DAY_SECONDS: i64 = 86_400;
 
 /// A proven number, as the count knows it: its mask under its key.
 pub struct Number<'a> {

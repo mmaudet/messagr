@@ -1,79 +1,154 @@
-//! Telling the operator (#399, #464).
+//! Telling the operator (#399, #462, #464).
 //!
-//! An alert is a sentence for the operator, in French. The service writes it
-//! in its log, with a warning that starts `told to the operator: `, and sends
-//! it by SMS to the operator's number through its provider when it has both
-//! (`config::Sms`), whether discovery is on or not. Without either, the log
-//! is all there is, and the service starts all the same: production had
-//! neither when #464 was written.
+//! What the operator is told is one of a closed list, `Alert`, and each alert
+//! is told by a sentence written here from typed figures only: a country's
+//! code, a ceiling, a balance, report numbers and reasons (`report`), a
+//! count. No sentence comes from anywhere else, so no SMS can carry an
+//! account or anything that was said: what was said never reaches this
+//! service readable, a report arrives sealed (ADR 0015).
 //!
-//! Two cadences:
+//! The service writes each alert in its log, with a warning that starts
+//! `told to the operator: `, and sends it by SMS to the operator's number
+//! through its provider when it has both (`config::Sms`), whether discovery
+//! is on or not. Without either, the log is all there is, and the service
+//! starts all the same: production had neither when #464 was written.
 //!
-//! - `tell_the_operator`: now, one SMS at each call, and an answer that says
-//!   whether it left (`Told`). A route calls it with its state, the hourly
-//!   sweep with its own. The cadence is the caller's: one SMS per report
-//!   (#468) until they are grouped every quarter of an hour (#478), one a day
-//!   that counts the blocks (#469);
-//! - `tell_the_operator_once_a_day`: by SMS once a day per subject, in the
-//!   log at each call. What the ceilings of #399 are told with.
-//!
-//! # NO ACCOUNT, AND NOTHING THAT WAS SAID
-//!
-//! An alert says what happened, never who did it nor what was written
-//! (#464). What was written never reaches this service readable: a report
-//! arrives sealed (ADR 0015). Accounts do, and a sentence that carries an
-//! account's identifier, `@name:server`, is held back: no SMS leaves, and the
-//! log says only that an alert was held back. Only a whole identifier is
-//! recognised: keeping out a piece of one, such as a name without its server,
-//! is the caller's part.
-//!
-//! ADR 0015 writes that the operator « is told who blocked whom, never what
-//! was said, in one SMS a day ». #464 and #469 say more narrowly that no SMS
-//! names an account: the SMS counts the blocks, and who blocked whom stays in
-//! the service's database.
+//! The cadence belongs to the alert. The ceilings of #399 and the prepaid
+//! balance go by SMS once a day each. Reports and blocks go at each call,
+//! since their callers keep their own: #468 tells each report, #478 will
+//! group them every quarter of an hour, and #469 counts the blocks once a
+//! day from the hourly sweep.
 //!
 //! Every SMS that leaves is erased from OVHcloud's history once it has had a
 //! day to arrive (`sms_history`).
 
+use std::num::NonZeroU64;
+
 use sqlx::SqlitePool;
 
-use crate::{sms_history, AppState};
+use crate::{countries::CountryCode, report::Reports, sms_history, util::DAY_SECONDS, AppState};
 
 /// How long an alert is worth delivering: it is still news the next day.
 const VALID_MINUTES: i64 = 24 * 60;
-const DAY_SECONDS: i64 = 86_400;
+/// How long the day a subject was told is kept: past a day it limits
+/// nothing, and the sweep forgets it at thirty, like the ceilings' counters.
+const DAYS_KEPT_SECONDS: i64 = 30 * DAY_SECONDS;
 
-/// What became of an alert told at once: what a caller reads to know whether
-/// the operator heard, and to tell again what did not leave.
+/// What the operator is told: the whole list.
+#[derive(Debug)]
+pub enum Alert {
+    /// A country's ceiling for the day on the SMS that prove numbers is
+    /// reached (#399). Once a day per country.
+    CountryCeiling { country: CountryCode, per_day: i64 },
+    /// The budget of SMS over thirty days is reached (#399). Once a day.
+    Budget { per_thirty_days: i64 },
+    /// The prepaid credits at OVHcloud run low (#399). Once a day.
+    CreditsLow { left: f64 },
+    /// Reports received (#462): their numbers and reasons. At each call.
+    #[cfg_attr(
+        not(test),
+        expect(dead_code, reason = "the reports route of #468 tells them")
+    )]
+    ReportsReceived(Reports),
+    /// Blocks since the previous count (#462), one at least. At each call.
+    #[cfg_attr(
+        not(test),
+        expect(dead_code, reason = "the daily count of #469 tells them")
+    )]
+    Blocks(NonZeroU64),
+}
+
+/// When an alert goes by SMS.
+enum Cadence {
+    AtEachCall,
+    /// The first time in a day, under a subject that stays the same from one
+    /// call to the next.
+    OnceADay(String),
+}
+
+impl Alert {
+    fn cadence(&self) -> Cadence {
+        match self {
+            Alert::CountryCeiling { country, .. } => {
+                Cadence::OnceADay(format!("country:{country}"))
+            }
+            Alert::Budget { .. } => Cadence::OnceADay("budget".into()),
+            Alert::CreditsLow { .. } => Cadence::OnceADay("credits".into()),
+            Alert::ReportsReceived(_) | Alert::Blocks(_) => Cadence::AtEachCall,
+        }
+    }
+
+    /// What the operator reads, in French.
+    fn text(&self) -> String {
+        match self {
+            Alert::CountryCeiling { country, per_day } => format!(
+                "Messagr : le plafond du jour est atteint pour les numéros {country} \
+                 ({per_day} SMS). Les nouvelles preuves attendent, les renouvellements passent."
+            ),
+            Alert::Budget { per_thirty_days } => format!(
+                "Messagr : le budget de SMS des trente derniers jours est atteint \
+                 ({per_thirty_days} SMS). Les nouvelles preuves attendent, les renouvellements \
+                 passent."
+            ),
+            // Whether discovery is on or not (#464): with it off, what stops
+            // is the operator's alerts.
+            Alert::CreditsLow { left } => format!(
+                "Messagr : il reste {left} crédits SMS chez OVHcloud. Sans recharge, plus \
+                 aucun SMS ne partira, ces alertes comprises."
+            ),
+            Alert::ReportsReceived(reports) => {
+                let received = match reports.count() {
+                    1 => "1 signalement reçu".to_string(),
+                    n => format!("{n} signalements reçus"),
+                };
+                let listed: Vec<String> = reports
+                    .urgent_first()
+                    .map(|(number, reason)| format!("{number} ({})", reason.in_an_sms()))
+                    .collect();
+                format!("Messagr : {received} : {}.", listed.join(", "))
+            }
+            Alert::Blocks(count) => match count.get() {
+                1 => "Messagr : 1 blocage depuis le dernier décompte.".to_string(),
+                n => format!("Messagr : {n} blocages depuis le dernier décompte."),
+            },
+        }
+    }
+}
+
+/// What became of an alert.
 #[derive(Debug, PartialEq, Eq)]
 pub enum Told {
     /// By SMS at the operator's number, and in the log.
     BySms,
-    /// In the log alone: this deployment has no SMS provider, or no
-    /// operator's number (`config::Sms`).
+    /// In the log alone: this deployment has no SMS provider or no
+    /// operator's number (`config::Sms`), OVHcloud refused the SMS or could
+    /// not be reached, or the subject was told by SMS already that day.
     OnlyInTheLog,
-    /// In the log alone: the provider refused the SMS or could not be
-    /// reached, which the log says too.
-    SmsFailed,
-    /// Nowhere: the sentence names an account. The log says that an alert
-    /// was held back, and not what it said.
-    HeldBack,
 }
 
-/// Tells the operator `alert` now: one SMS at each call, whatever was told
-/// before.
+/// Tells the operator `alert`: in the log at each call, and by SMS at the
+/// alert's cadence.
 ///
 /// It waits for OVHcloud's answer, fifteen seconds at most: a route that must
 /// not wait for it spawns this with its `Arc<AppState>`. `now` is the Unix
 /// time it is told at, which signs the request to OVHcloud.
-pub async fn tell_the_operator(st: &AppState, alert: &str, now: i64) -> Told {
-    if !write_in_the_log(alert) {
-        return Told::HeldBack;
+pub async fn tell_the_operator(st: &AppState, alert: &Alert, now: i64) -> Told {
+    let text = alert.text();
+    tracing::warn!("told to the operator: {text}");
+    if let Cadence::OnceADay(subject) = alert.cadence() {
+        match first_of_the_day(&st.pool, &subject, now).await {
+            Ok(true) => {}
+            Ok(false) => return Told::OnlyInTheLog,
+            Err(e) => {
+                tracing::warn!("the alert could not be recorded: {e}");
+                return Told::OnlyInTheLog;
+            }
+        }
     }
     let Ok((provider, number)) = st.cfg.sms.to_the_operator() else {
         return Told::OnlyInTheLog;
     };
-    match provider.send(number, alert, VALID_MINUTES, now).await {
+    match provider.send(number, &text, VALID_MINUTES, now).await {
         Ok(message_id) => {
             let erase_after = now + VALID_MINUTES * 60;
             if let Err(e) = sms_history::remember(&st.pool, message_id, erase_after).await {
@@ -83,53 +158,16 @@ pub async fn tell_the_operator(st: &AppState, alert: &str, now: i64) -> Told {
         }
         Err(e) => {
             tracing::warn!("the alert could not be sent: {e}");
-            Told::SmsFailed
+            Told::OnlyInTheLog
         }
     }
-}
-
-/// Tells the operator `alert` as `tell_the_operator` does, once a day per
-/// `subject`, and only writes it in the log at the other calls of the day.
-/// The subject is a name that stays the same from one call to the next, such
-/// as `budget` for the budget of #399.
-pub async fn tell_the_operator_once_a_day(st: &AppState, subject: &str, alert: &str, now: i64) {
-    match first_of_the_day(&st.pool, subject, now).await {
-        Ok(true) => {
-            tell_the_operator(st, alert, now).await;
-        }
-        Ok(false) => {
-            write_in_the_log(alert);
-        }
-        Err(e) => {
-            tracing::warn!("the alert could not be recorded: {e}");
-            write_in_the_log(alert);
-        }
-    }
-}
-
-/// Writes `alert` in the log, unless it names an account: whether it was
-/// written, and so may leave.
-fn write_in_the_log(alert: &str) -> bool {
-    if names_an_account(alert) {
-        tracing::warn!("an alert to the operator was held back: it named an account");
-        return false;
-    }
-    tracing::warn!("told to the operator: {alert}");
-    true
-}
-
-/// Whether `text` carries an account's identifier, `@name:server`: the form
-/// in which a route learns who calls it (`auth`).
-fn names_an_account(text: &str) -> bool {
-    text.split('@').skip(1).any(|after| {
-        let word = after.split(char::is_whitespace).next().unwrap_or_default();
-        word.split_once(':')
-            .is_some_and(|(name, server)| !name.is_empty() && !server.is_empty())
-    })
 }
 
 /// Whether nothing was told about `subject` in the last day, in which case
 /// this call is recorded as the day's, before its SMS leaves (#399).
+///
+/// The table's `ceiling` column holds any subject told once a day, the
+/// prepaid balance's too: it kept the name it had when only ceilings were.
 async fn first_of_the_day(pool: &SqlitePool, subject: &str, now: i64) -> anyhow::Result<bool> {
     let last: Option<i64> = sqlx::query_scalar("SELECT sent_at FROM sms_alerts WHERE ceiling = ?")
         .bind(subject)
@@ -149,15 +187,27 @@ async fn first_of_the_day(pool: &SqlitePool, subject: &str, now: i64) -> anyhow:
     Ok(true)
 }
 
+/// The days subjects were told, forgotten thirty days later
+/// (`DAYS_KEPT_SECONDS`).
+pub async fn forget_the_days(pool: &SqlitePool, now: i64) -> anyhow::Result<u64> {
+    let forgotten = sqlx::query("DELETE FROM sms_alerts WHERE sent_at <= ?")
+        .bind(now - DAYS_KEPT_SECONDS)
+        .execute(pool)
+        .await?;
+    Ok(forgotten.rows_affected())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::handlers::discovery::test_support::{
-        bearer, fake_ovhcloud, fake_ovhcloud_with, sent_to, sms_through, state_from, whoami_hs,
-        ALERT, DAY, T0,
+    use crate::config::{Config, Sms};
+    use crate::handlers::discovery::test_support::{state_from, whoami_hs, DAY, T0};
+    use crate::report::{Reason, ReportNumber, Reports};
+    use crate::sms::test_support::{
+        fake_ovhcloud, fake_ovhcloud_with, sent_to, sms_through, Inbox, OPERATOR_NUMBER,
     };
     use sqlx::SqlitePool;
-    use std::sync::Arc;
+    use std::sync::{Arc, Mutex};
 
     /// The service with its SMS provider, the fake OVHcloud at `ovh`, and the
     /// operator's number, and nothing of discovery: production's
@@ -168,20 +218,64 @@ mod tests {
         state_from(
             pool,
             hs.clone(),
-            crate::config::Config {
+            Config {
                 homeserver_url: hs,
                 sms: sms_through(ovh),
                 clock,
-                ..crate::config::Config::for_tests()
+                ..Config::for_tests()
             },
         )
     }
 
-    const ALERT_TEXT: &str = "Messagr : un essai.";
+    /// The same, through an OVHcloud nobody answers at, under an SMS account
+    /// no other test names, since the log is the whole binary's.
+    async fn told_through_nobody(
+        pool: SqlitePool,
+        service_name: &str,
+        operator_number: Option<&str>,
+    ) -> Arc<AppState> {
+        let mut sms = Sms {
+            operator_number: operator_number.map(Into::into),
+            ..sms_through("http://127.0.0.1:1".into())
+        };
+        if let Some(provider) = sms.provider.as_mut() {
+            provider.service_name = service_name.into();
+        }
+        state_from(
+            pool,
+            whoami_hs().await,
+            Config {
+                sms,
+                ..Config::for_tests()
+            },
+        )
+    }
+
+    fn reports(given: &[(&str, Reason)]) -> Alert {
+        let given = given
+            .iter()
+            .map(|(typed, reason)| (ReportNumber::parse(typed).unwrap(), *reason))
+            .collect();
+        Alert::ReportsReceived(Reports::new(given).unwrap())
+    }
+
+    fn blocks(count: u64) -> Alert {
+        Alert::Blocks(std::num::NonZeroU64::new(count).unwrap())
+    }
+
+    /// What reached the operator's number, in order, and nothing reached
+    /// another.
+    fn told(inbox: &Arc<Mutex<Inbox>>) -> Vec<String> {
+        let inbox = inbox.lock().unwrap();
+        for (to, _) in &inbox.sent {
+            assert_eq!(to, &[OPERATOR_NUMBER]);
+        }
+        inbox.sent.iter().map(|(_, text)| text.clone()).collect()
+    }
 
     /// The service's log, as the operator reads it.
     #[derive(Clone, Default)]
-    struct Log(Arc<std::sync::Mutex<Vec<u8>>>);
+    struct Log(Arc<Mutex<Vec<u8>>>);
 
     impl Log {
         /// Everything the tests of this binary log from the first call on.
@@ -228,26 +322,59 @@ mod tests {
     }
 
     #[sqlx::test(migrations = "./migrations")]
-    async fn an_alert_leaves_by_sms_at_each_call_with_discovery_off(pool: SqlitePool) {
+    async fn reports_are_told_at_each_call_with_their_numbers_and_reasons_urgent_first(
+        pool: SqlitePool,
+    ) {
+        // #462: « avec le nombre, les numéros et les motifs, les motifs
+        // urgents en tête ».
         let (ovh, inbox) = fake_ovhcloud(false).await;
         let st = told_by_sms(pool, ovh).await;
         assert!(st.cfg.discovery().is_err(), "discovery stays off");
 
-        assert_eq!(tell_the_operator(&st, ALERT_TEXT, T0).await, Told::BySms);
-        assert_eq!(tell_the_operator(&st, ALERT_TEXT, T0).await, Told::BySms);
-        let sent = inbox.lock().unwrap().sent.clone();
+        let one = reports(&[("K7QM-4ZT2", Reason::Harassment)]);
+        assert_eq!(tell_the_operator(&st, &one, T0).await, Told::BySms);
+        assert_eq!(tell_the_operator(&st, &one, T0).await, Told::BySms);
+        let two = reports(&[
+            ("ABCD-EFGH", Reason::Solicitation),
+            ("K7QM-4ZT2", Reason::Threat),
+        ]);
+        assert_eq!(tell_the_operator(&st, &two, T0).await, Told::BySms);
         assert_eq!(
-            sent,
-            vec![(vec![ALERT.to_string()], ALERT_TEXT.to_string()); 2],
-            "one SMS at each call, both at the same instant"
+            told(&inbox),
+            [
+                "Messagr : 1 signalement reçu : K7QM-4ZT2 (harcèlement).",
+                "Messagr : 1 signalement reçu : K7QM-4ZT2 (harcèlement).",
+                "Messagr : 2 signalements reçus : K7QM-4ZT2 (menace), ABCD-EFGH (démarchage).",
+            ]
         );
-        assert_eq!(sent_to(&inbox, ALERT), 2);
 
-        // Erased from OVHcloud's history once it has had a day to arrive,
+        // Erased from OVHcloud's history once they have had a day to arrive,
         // like the alerts of #399.
         let erased = |at| crate::sms_history::erase_due(&st, at);
         assert_eq!(erased(T0 + DAY - 1).await.unwrap(), 0);
-        assert_eq!(erased(T0 + DAY).await.unwrap(), 2);
+        assert_eq!(erased(T0 + DAY).await.unwrap(), 3);
+    }
+
+    #[sqlx::test(migrations = "./migrations")]
+    async fn blocks_are_counted_and_told_at_each_call(pool: SqlitePool) {
+        // #462: one SMS a day counts the blocks since the previous one. The
+        // day is kept by the count's caller (#469): each count it tells leaves.
+        let (ovh, inbox) = fake_ovhcloud(false).await;
+        let st = told_by_sms(pool, ovh).await;
+        for count in [1, 12, 12] {
+            assert_eq!(
+                tell_the_operator(&st, &blocks(count), T0).await,
+                Told::BySms
+            );
+        }
+        assert_eq!(
+            told(&inbox),
+            [
+                "Messagr : 1 blocage depuis le dernier décompte.",
+                "Messagr : 12 blocages depuis le dernier décompte.",
+                "Messagr : 12 blocages depuis le dernier décompte.",
+            ]
+        );
     }
 
     #[sqlx::test(migrations = "./migrations")]
@@ -258,86 +385,20 @@ mod tests {
         let st = told_by_sms(pool, ovh).await;
         let credits = |at| crate::ceilings::check_the_credits(&st, at);
 
-        credits(T0).await.unwrap();
-        assert_eq!(tell_the_operator(&st, ALERT_TEXT, T0).await, Told::BySms);
-        credits(T0 + 3_600).await.unwrap();
+        credits(T0).await;
+        tell_the_operator(&st, &blocks(1), T0).await;
+        credits(T0 + 3_600).await;
+        tell_the_operator(&st, &blocks(1), T0 + 3_600).await;
+        credits(T0 + DAY).await;
+
+        let the_balance = "Messagr : il reste 12 crédits SMS chez OVHcloud. Sans recharge, \
+                           plus aucun SMS ne partira, ces alertes comprises.";
+        let a_block = "Messagr : 1 blocage depuis le dernier décompte.";
         assert_eq!(
-            tell_the_operator(&st, ALERT_TEXT, T0 + 3_600).await,
-            Told::BySms
+            told(&inbox),
+            [the_balance, a_block, a_block, the_balance],
+            "the balance, a block, a block again, the balance the next day"
         );
-        credits(T0 + DAY).await.unwrap();
-
-        let at_once: Vec<bool> = inbox
-            .lock()
-            .unwrap()
-            .sent
-            .iter()
-            .map(|(_, text)| text == ALERT_TEXT)
-            .collect();
-        assert_eq!(
-            at_once,
-            [false, true, true, false],
-            "the credits, the alert, the alert again, the credits the next day"
-        );
-        assert_eq!(sent_to(&inbox, ALERT), 4);
-    }
-
-    #[sqlx::test(migrations = "./migrations")]
-    async fn without_the_operator_s_number_the_credits_are_not_read(pool: SqlitePool) {
-        // Nobody could be told by SMS: the hourly sweep asks OVHcloud
-        // nothing, and a provider it cannot reach fails none of its passes.
-        let hs = whoami_hs().await;
-        let st = state_from(
-            pool,
-            hs,
-            crate::config::Config {
-                sms: crate::config::Sms {
-                    operator_number: None,
-                    ..sms_through("http://127.0.0.1:1".into())
-                },
-                ..crate::config::Config::for_tests()
-            },
-        );
-        crate::ceilings::check_the_credits(&st, T0)
-            .await
-            .expect("the balance is not read");
-    }
-
-    #[sqlx::test(migrations = "./migrations")]
-    async fn an_alert_that_names_an_account_is_held_back(pool: SqlitePool) {
-        let (ovh, inbox) = fake_ovhcloud(false).await;
-        let st = told_by_sms(pool, ovh).await;
-        // The account as a route knows it: from its token. A name no other
-        // test gives, since the log is the whole binary's.
-        let log = Log::of_the_service();
-        let zelie = crate::auth::authenticate(&st.mx, &bearer("zelie-retenue"))
-            .await
-            .unwrap();
-        for naming in [
-            format!("Messagr : {zelie} a signalé des messages."),
-            format!("Messagr : un blocage ({zelie})."),
-        ] {
-            assert_eq!(
-                tell_the_operator(&st, &naming, T0).await,
-                Told::HeldBack,
-                "{naming}"
-            );
-        }
-        assert_eq!(sent_to(&inbox, ALERT), 0, "no SMS names an account");
-        let said = log.read();
-        assert!(said.contains("held back"), "the log says it: {said}");
-        assert!(
-            !said.contains("zelie-retenue"),
-            "the log repeats the account: {said}"
-        );
-
-        // The same sentence without the account leaves: nothing else held
-        // it back.
-        assert_eq!(
-            tell_the_operator(&st, "Messagr : un compte a signalé des messages.", T0).await,
-            Told::BySms
-        );
-        assert_eq!(sent_to(&inbox, ALERT), 1);
     }
 
     #[sqlx::test(migrations = "./migrations")]
@@ -346,16 +407,15 @@ mod tests {
         let (ovh, inbox) = fake_ovhcloud(false).await;
         let hs = whoami_hs().await;
         let log = Log::of_the_service();
-        // A sentence no other test tells, since the log is the whole
-        // binary's.
-        let alert = "Messagr : un essai qui ne va qu'au journal.";
+        // A count no other test tells, since the log is the whole binary's.
+        let alert = blocks(4641);
         for sms in [
-            crate::config::Sms::default(),
-            crate::config::Sms {
+            Sms::default(),
+            Sms {
                 operator_number: None,
                 ..sms_through(ovh.clone())
             },
-            crate::config::Sms {
+            Sms {
                 provider: None,
                 ..sms_through(ovh.clone())
             },
@@ -363,37 +423,88 @@ mod tests {
             let st = state_from(
                 pool.clone(),
                 hs.clone(),
-                crate::config::Config {
+                Config {
                     sms,
-                    ..crate::config::Config::for_tests()
+                    ..Config::for_tests()
                 },
             );
-            assert_eq!(tell_the_operator(&st, alert, T0).await, Told::OnlyInTheLog);
+            assert_eq!(tell_the_operator(&st, &alert, T0).await, Told::OnlyInTheLog);
         }
         assert!(inbox.lock().unwrap().sent.is_empty(), "no SMS left");
         let said = log.read();
         assert_eq!(
-            said.matches(&format!("told to the operator: {alert}"))
-                .count(),
+            said.matches(
+                "told to the operator: Messagr : 4641 blocages depuis le dernier décompte."
+            )
+            .count(),
             3,
             "the log is where the operator reads it: {said}"
         );
     }
 
     #[sqlx::test(migrations = "./migrations")]
-    async fn an_sms_the_provider_refuses_is_said_to_the_caller(pool: SqlitePool) {
-        // What a caller that groups its alerts reads, to tell them again.
+    async fn an_sms_the_provider_refuses_leaves_the_alert_in_the_log(pool: SqlitePool) {
         let (ovh, inbox) = fake_ovhcloud(true).await;
         let st = told_by_sms(pool, ovh).await;
         assert_eq!(
-            tell_the_operator(&st, ALERT_TEXT, T0).await,
-            Told::SmsFailed
+            tell_the_operator(&st, &blocks(1), T0).await,
+            Told::OnlyInTheLog
         );
-        assert_eq!(sent_to(&inbox, ALERT), 1, "asked, and refused");
+        assert_eq!(sent_to(&inbox, OPERATOR_NUMBER), 1, "asked, and refused");
         assert_eq!(
             crate::sms_history::erase_due(&st, T0 + DAY).await.unwrap(),
             0,
             "nothing to erase"
         );
+    }
+
+    #[sqlx::test(migrations = "./migrations")]
+    async fn without_the_operator_s_number_the_credits_are_not_read(pool: SqlitePool) {
+        // Nobody could be told by SMS: the hourly sweep asks OVHcloud
+        // nothing, so a provider nobody answers at says nothing either.
+        let log = Log::of_the_service();
+        let st = told_through_nobody(pool, "sms-sans-numero-1", None).await;
+        crate::ceilings::check_the_credits(&st, T0).await;
+        assert!(
+            !log.read().contains("sms-sans-numero-1"),
+            "OVHcloud was asked"
+        );
+    }
+
+    #[sqlx::test(migrations = "./migrations")]
+    async fn an_unreachable_provider_is_said_once_a_sweep_and_fails_nothing_else(pool: SqlitePool) {
+        let log = Log::of_the_service();
+        let st = told_through_nobody(pool, "sms-injoignable-1", Some(OPERATOR_NUMBER)).await;
+        assert!(
+            crate::cleanup::sweep_once(&st, T0).await,
+            "the rest of the sweep went through"
+        );
+        let said = log.read();
+        let about_it: Vec<&str> = said
+            .lines()
+            .filter(|line| line.contains("sms-injoignable-1"))
+            .collect();
+        assert_eq!(about_it.len(), 1, "{said}");
+        assert!(about_it[0].contains("could not be read"), "{}", about_it[0]);
+    }
+
+    #[sqlx::test(migrations = "./migrations")]
+    async fn the_days_alerts_were_told_are_forgotten_after_thirty_days(pool: SqlitePool) {
+        // #399: a day limits nothing past a day; the sweep forgets it at
+        // thirty, like the ceilings' counters.
+        for (subject, at) in [("budget", T0), ("credits", T0 + 1)] {
+            sqlx::query("INSERT INTO sms_alerts (ceiling, sent_at) VALUES (?, ?)")
+                .bind(subject)
+                .bind(at)
+                .execute(&pool)
+                .await
+                .unwrap();
+        }
+        assert_eq!(forget_the_days(&pool, T0 + 30 * DAY).await.unwrap(), 1);
+        let left: Vec<String> = sqlx::query_scalar("SELECT ceiling FROM sms_alerts")
+            .fetch_all(&pool)
+            .await
+            .unwrap();
+        assert_eq!(left, ["credits"]);
     }
 }

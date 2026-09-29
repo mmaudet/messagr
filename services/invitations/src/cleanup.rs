@@ -58,27 +58,33 @@ pub async fn purge_spent_proofs(pool: &SqlitePool, now: i64) -> Result<u64> {
 
 /// La passe de la découverte (#397, #398, #399, #401, #404), en une ligne du
 /// ménage : les preuves abandonnées, ce que les preuves finies laissent, les
-/// SMS à effacer chez OVHcloud, les compteurs des plafonds, ceux de la limite
-/// de masquage, les invitations remises finies depuis trente jours, et les
-/// crédits prépayés qui baissent.
-///
-/// Les SMS à effacer et les crédits ne sont pas qu'à la découverte : les
-/// alertes de l'exploitant partent aussi quand elle est éteinte (#464). Les
-/// SMS s'effacent dès qu'un fournisseur est configuré, et les crédits sont
-/// relevés dès que les alertes partent par SMS.
+/// compteurs des plafonds, ceux de la limite de masquage, et les invitations
+/// remises finies depuis trente jours.
 ///
 /// CHAQUE ÉTAPE TOURNE, QUOI QUE FASSENT LES AUTRES : un échec n'en saute
 /// aucune, et il est rendu une fois toutes passées.
-async fn sweep_discovery(st: &Arc<AppState>, now: i64) -> Result<[u64; 6]> {
+async fn sweep_discovery(st: &Arc<AppState>, now: i64) -> Result<[u64; 5]> {
     let spent = purge_spent_proofs(&st.pool, now).await;
     let ended = purge_ended_proofs(&st.pool, now).await;
-    let erased = crate::sms_history::erase_due(st, now).await;
     let counters = crate::ceilings::purge_counters(&st.pool, now).await;
     let masking = crate::masking_quota::purge(&st.pool, now).await;
     let delivered = purge_delivered_invitations(&st.pool, now, st.cfg.edge_retention_days).await;
-    let credits = crate::ceilings::check_the_credits(st, now).await;
-    credits?;
-    Ok([spent?, ended?, erased?, counters?, masking?, delivered?])
+    Ok([spent?, ended?, counters?, masking?, delivered?])
+}
+
+/// La passe des SMS (#399, #464), découverte allumée ou non, puisque les
+/// alertes de l'exploitant partent aussi quand elle est éteinte : les SMS à
+/// effacer chez OVHcloud, les jours où l'exploitant a été prévenu, oubliés à
+/// trente jours, et les crédits prépayés, relevés quand les alertes partent
+/// par SMS.
+///
+/// UN RELEVÉ DES CRÉDITS QUI ÉCHOUE N'ARRÊTE RIEN : il le dit dans le
+/// journal, une ligne par passe, et le ménage continue.
+async fn sweep_sms(st: &Arc<AppState>, now: i64) -> Result<[u64; 2]> {
+    let erased = crate::sms_history::erase_due(st, now).await;
+    let days = crate::alert::forget_the_days(&st.pool, now).await;
+    crate::ceilings::check_the_credits(st, now).await;
+    Ok([erased?, days?])
 }
 
 /// Combien de temps le service garde ce qu'une découverte finie laisse.
@@ -570,17 +576,31 @@ pub(crate) async fn sweep_once(st: &Arc<AppState>, now: i64) -> bool {
         purge_invitation_graph(&st.pool, now, st.cfg.edge_retention_days).await,
         purge_inviter_counters(&st.pool).await,
         purge_account_deletions(&st.pool, now).await,
+        sweep_sms(st, now).await,
         sweep_discovery(st, now).await,
     ) {
-        (Ok(a), Ok(b), Ok(c), Ok(d), Ok(e), Ok(f), Ok(g), Ok(h), Ok(i), Ok([j, k, l, m, n, o])) => {
+        (
+            Ok(a),
+            Ok(b),
+            Ok(c),
+            Ok(d),
+            Ok(e),
+            Ok(f),
+            Ok(g),
+            Ok(h),
+            Ok(i),
+            Ok([s, t]),
+            Ok([j, k, m, n, o]),
+        ) => {
             tracing::info!(
                 "cleanup: {a} edges, {b} invitations, {c} accounts, \
                                 {d} rows repaired, {e} claimed rows purged, \
                                 {f} requests purged, {g} graph rows purged, \
                                 {h} inviter counters purged, \
-                                {i} deletion announcements purged; discovery: \
-                                {j} spent proofs, {k} ended proofs, \
-                                {l} SMS erased at OVHcloud, {m} SMS counters forgotten, \
+                                {i} deletion announcements purged; SMS: \
+                                {s} erased at OVHcloud, {t} alert days forgotten; \
+                                discovery: {j} spent proofs, {k} ended proofs, \
+                                {m} SMS counters forgotten, \
                                 {n} days of masking forgotten, \
                                 {o} delivered invitations forgotten"
             );

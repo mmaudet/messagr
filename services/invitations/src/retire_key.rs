@@ -197,6 +197,7 @@ mod tests {
     use super::*;
     use crate::handlers::discovery::test_support::*;
     use crate::handlers::discovery::{directory, keys_of_live_masks_are_held, Ended};
+    use crate::sms::test_support::{fake_ovhcloud, Inbox};
     use axum::extract::State;
 
     fn named(key: &str) -> Vec<String> {

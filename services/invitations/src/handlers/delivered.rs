@@ -110,7 +110,7 @@ use sqlx::Row;
 
 use crate::{
     auth, error::AppError, extract::Body, handlers::discovery, handlers::status::InvitationStatus,
-    AppState,
+    util::DAY_SECONDS, AppState,
 };
 
 /// How long an invitation delivered inside the application stays good.
@@ -123,8 +123,6 @@ pub const PER_DAY: i64 = 10;
 /// How long after an invitation ran out unanswered the same account may be
 /// invited again (#406): fourteen days after its apparent end, the seventh.
 pub const AGAIN_AFTER_SECONDS: i64 = 14 * 86_400;
-
-const DAY_SECONDS: i64 = 86_400;
 
 /// Whether the recipient has not blocked the inviter (#406): what keeps an
 /// invitation from a blocked account out of its list, and out of its answers.
@@ -639,9 +637,9 @@ pub async fn status(
 mod tests {
     use super::*;
     use crate::handlers::discovery::test_support::{
-        bearer, fake_ovhcloud, prove, reference_of, set_clock, state_at, whoami_hs, DAY, NUMBER,
-        OTHER, T0,
+        bearer, prove, reference_of, set_clock, state_at, whoami_hs, DAY, NUMBER, OTHER, T0,
     };
+    use crate::sms::test_support::fake_ovhcloud;
     use serde_json::json;
     use sqlx::SqlitePool;
 

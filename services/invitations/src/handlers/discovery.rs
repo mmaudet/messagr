@@ -154,7 +154,7 @@ pub async fn start_proof(
         ceilings::Verdict::Counted(counted) => counted,
         ceilings::Verdict::TooMany { retry_at } => return Err(AppError::TooManyCodes { retry_at }),
         ceilings::Verdict::Later(reached) => {
-            reached.tell_the_operator(&st, now).await;
+            reached.tell_the_operator_once_a_day(&st, now).await;
             return Err(AppError::SmsLater);
         }
     };
@@ -1106,13 +1106,14 @@ async fn forget_the_proof(st: &AppState, user: &str) -> Result<(), AppError> {
 }
 
 /// What the tests of discovery, and of the invitations it delivers
-/// (`delivered.rs`), set up alike: a homeserver that says whose a token is,
-/// OVHcloud reduced to its calls, a service at a time the test moves, and a
-/// proof made the way a telephone makes one.
+/// (`delivered.rs`), set up alike: a homeserver that says whose a token is, a
+/// service at a time the test moves, and a proof made the way a telephone
+/// makes one, through the SMS double every test shares (`sms::test_support`).
 #[cfg(test)]
 pub(crate) mod test_support {
     use super::*;
-    use axum::routing::{get, post};
+    use crate::sms::test_support::{sms_through, Inbox};
+    use axum::routing::get;
     use sqlx::SqlitePool;
     use std::sync::Mutex;
 
@@ -1132,72 +1133,6 @@ pub(crate) mod test_support {
         let base = format!("http://{}", listener.local_addr().unwrap());
         tokio::spawn(async move { axum::serve(listener, app).await.unwrap() });
         base
-    }
-
-    /// OVHcloud reduced to the one call a proof makes. It keeps what it was
-    /// sent, so a test can read the code the way a phone would.
-    #[derive(Default)]
-    pub(crate) struct Inbox {
-        pub(crate) sent: Vec<(Vec<String>, String)>,
-        /// The ids OVHcloud was asked to erase from its history (#399).
-        pub(crate) erased: Vec<u64>,
-    }
-
-    pub(crate) async fn fake_ovhcloud(refuse: bool) -> (String, Arc<Mutex<Inbox>>) {
-        fake_ovhcloud_with(refuse, 0, 1_000.0).await
-    }
-
-    /// The same, answering each SMS after `delay_ms`, and saying
-    /// `credits_left` of the account.
-    pub(crate) async fn fake_ovhcloud_with(
-        refuse: bool,
-        delay_ms: u64,
-        credits_left: f64,
-    ) -> (String, Arc<Mutex<Inbox>>) {
-        let inbox = Arc::new(Mutex::new(Inbox::default()));
-        let kept = inbox.clone();
-        let erasing = inbox.clone();
-        let app = axum::Router::new()
-            .route(
-                "/sms/sms-test-1",
-                get(move || async move { Json(serde_json::json!({"creditsLeft": credits_left})) }),
-            )
-            .route(
-                "/sms/sms-test-1/jobs",
-                post(move |Json(body): Json<serde_json::Value>| {
-                    let kept = kept.clone();
-                    async move {
-                        tokio::time::sleep(std::time::Duration::from_millis(delay_ms)).await;
-                        let receivers: Vec<String> =
-                            serde_json::from_value(body["receivers"].clone()).unwrap();
-                        let message = body["message"].as_str().unwrap().to_string();
-                        let mut inbox = kept.lock().unwrap();
-                        inbox.sent.push((receivers, message));
-                        // One id per SMS, as OVHcloud answers: the one its
-                        // history knows the SMS by.
-                        let id = inbox.sent.len();
-                        if refuse {
-                            Json(serde_json::json!({"ids": [], "invalidReceivers": [NUMBER]}))
-                        } else {
-                            Json(serde_json::json!({"ids": [id], "invalidReceivers": []}))
-                        }
-                    }
-                }),
-            )
-            .route(
-                "/sms/sms-test-1/outgoing/:id",
-                axum::routing::delete(move |axum::extract::Path(id): axum::extract::Path<u64>| {
-                    let erasing = erasing.clone();
-                    async move {
-                        erasing.lock().unwrap().erased.push(id);
-                        Json(serde_json::Value::Null)
-                    }
-                }),
-            );
-        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
-        let base = format!("http://{}", listener.local_addr().unwrap());
-        tokio::spawn(async move { axum::serve(listener, app).await.unwrap() });
-        (base, inbox)
     }
 
     /// The masking keys of these key numbers, each from its own seed: the
@@ -1312,22 +1247,6 @@ pub(crate) mod test_support {
         }
     }
 
-    /// The service's SMS through a fake OVHcloud at `ovh`, to the operator's
-    /// number `ALERT` (#464).
-    pub(crate) fn sms_through(ovh: String) -> crate::config::Sms {
-        crate::config::Sms {
-            provider: Some(sms::Ovhcloud {
-                base_url: ovh,
-                application_key: "ak".into(),
-                application_secret: "as".into(),
-                consumer_key: "ck".into(),
-                service_name: "sms-test-1".into(),
-                sender: "Messagr".into(),
-            }),
-            operator_number: Some(ALERT.to_string()),
-        }
-    }
-
     pub(crate) async fn reading(st: &Arc<AppState>, who: &str) -> DiscoveryState {
         state(State(st.clone()), bearer(who))
             .await
@@ -1424,27 +1343,15 @@ pub(crate) mod test_support {
         reading(st, who).await.findable_until
     }
 
-    pub(crate) const ALERT: &str = "+33600000000";
-
     /// A second number of an open country, for a second findable account.
     pub(crate) const OTHER: &str = "+33687654321";
-
-    /// How many SMS reached `number`.
-    pub(crate) fn sent_to(inbox: &Arc<Mutex<Inbox>>, number: &str) -> usize {
-        inbox
-            .lock()
-            .unwrap()
-            .sent
-            .iter()
-            .filter(|(receivers, _)| receivers.iter().any(|r| r == number))
-            .count()
-    }
 }
 
 #[cfg(test)]
 mod tests {
     use super::test_support::*;
     use super::*;
+    use crate::sms::test_support::*;
     use crate::util;
     use sqlx::SqlitePool;
     use std::collections::HashMap;
@@ -1870,7 +1777,13 @@ mod tests {
         let [(to, told)] = inbox.sent.as_slice() else {
             panic!("one SMS, to the operator: {:?}", inbox.sent);
         };
-        assert_eq!(to, &[ALERT]);
+        assert_eq!(to, &[OPERATOR_NUMBER]);
+        // The sentence of #399, word for word.
+        assert_eq!(
+            told,
+            "Messagr : le plafond du jour est atteint pour les numéros FR (0 SMS). \
+             Les nouvelles preuves attendent, les renouvellements passent."
+        );
         for named in ["@carol:h", "carol", NUMBER] {
             assert!(!told.contains(named), "{named}: {told}");
         }
@@ -1901,12 +1814,12 @@ mod tests {
             start(&st, "carol", "+33612345670").await,
             Err(AppError::SmsLater)
         ));
-        assert_eq!(sent_to(&inbox, ALERT), 1, "the operator is told");
+        assert_eq!(sent_to(&inbox, OPERATOR_NUMBER), 1, "the operator is told");
         assert!(matches!(
             start(&st, "dave", "+33612345671").await,
             Err(AppError::SmsLater)
         ));
-        assert_eq!(sent_to(&inbox, ALERT), 1, "and told once");
+        assert_eq!(sent_to(&inbox, OPERATOR_NUMBER), 1, "and told once");
 
         start(&st, "alice", "+33612345678")
             .await
@@ -1943,7 +1856,7 @@ mod tests {
             start(&st, "carol", "+33612345670").await,
             Err(AppError::SmsLater)
         ));
-        assert_eq!(sent_to(&inbox, ALERT), 1, "the operator is told");
+        assert_eq!(sent_to(&inbox, OPERATOR_NUMBER), 1, "the operator is told");
         start(&st, "alice", "+33612345678")
             .await
             .expect("a renewal passes beyond the budget");
@@ -2046,7 +1959,7 @@ mod tests {
             start(&st, "alice", NUMBER).await,
             Err(AppError::SmsLater)
         ));
-        assert_eq!(sent_to(&inbox, ALERT), 1);
+        assert_eq!(sent_to(&inbox, OPERATOR_NUMBER), 1);
 
         let an_hour_later = T0 + 3_600;
         assert_eq!(
@@ -2071,20 +1984,20 @@ mod tests {
         let (clock, _) = crate::util::Clock::settable(T0);
         let st = state_at(pool, whoami_hs().await, Some(ovh), clock);
 
-        crate::ceilings::check_the_credits(&st, T0).await.unwrap();
+        crate::ceilings::check_the_credits(&st, T0).await;
         assert_eq!(
-            sent_to(&inbox, ALERT),
+            sent_to(&inbox, OPERATOR_NUMBER),
             1,
             "12 credits left, under the threshold"
         );
-        crate::ceilings::check_the_credits(&st, T0 + 3_600)
-            .await
-            .unwrap();
-        assert_eq!(sent_to(&inbox, ALERT), 1, "told once a day");
-        crate::ceilings::check_the_credits(&st, T0 + DAY)
-            .await
-            .unwrap();
-        assert_eq!(sent_to(&inbox, ALERT), 2, "and the next day again");
+        crate::ceilings::check_the_credits(&st, T0 + 3_600).await;
+        assert_eq!(sent_to(&inbox, OPERATOR_NUMBER), 1, "told once a day");
+        crate::ceilings::check_the_credits(&st, T0 + DAY).await;
+        assert_eq!(
+            sent_to(&inbox, OPERATOR_NUMBER),
+            2,
+            "and the next day again"
+        );
     }
 
     #[sqlx::test(migrations = "./migrations")]

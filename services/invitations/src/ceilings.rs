@@ -28,9 +28,14 @@ use std::sync::Arc;
 
 use sqlx::SqlitePool;
 
-use crate::{alert, config::SmsCeilings, AppState};
+use crate::{
+    alert::{self, Alert},
+    config::SmsCeilings,
+    countries::CountryCode,
+    util::DAY_SECONDS,
+    AppState,
+};
 
-const DAY_SECONDS: i64 = 86_400;
 /// The window of an account's monthly ceiling and of the budget.
 pub const THIRTY_DAYS_SECONDS: i64 = 30 * DAY_SECONDS;
 
@@ -66,48 +71,28 @@ pub struct Counted {
 /// What the operator is told about.
 #[derive(Debug, PartialEq)]
 pub enum Reached {
-    Country(String),
+    Country(CountryCode),
     Budget,
     /// The prepaid balance at OVHcloud, in credits.
     Credits(f64),
 }
 
 impl Reached {
-    /// The alert's name, to tell the operator once a day per subject.
-    fn subject(&self) -> String {
-        match self {
-            Reached::Country(code) => format!("country:{code}"),
-            Reached::Budget => "budget".to_string(),
-            Reached::Credits(_) => "credits".to_string(),
-        }
-    }
-
-    /// What the operator reads: which ceiling, at what figure, and what it does.
-    pub fn message(&self, ceilings: &SmsCeilings) -> String {
-        match self {
-            Reached::Country(code) => format!(
-                "Messagr : le plafond du jour est atteint pour les numéros {code} ({} SMS). \
-                 Les nouvelles preuves attendent, les renouvellements passent.",
-                ceilings.per_country_day
-            ),
-            Reached::Budget => format!(
-                "Messagr : le budget de SMS des trente derniers jours est atteint ({} SMS). \
-                 Les nouvelles preuves attendent, les renouvellements passent.",
-                ceilings.budget
-            ),
-            // Whether discovery is on or not (#464): with it off, what stops
-            // is the operator's alerts.
-            Reached::Credits(left) => format!(
-                "Messagr : il reste {left} crédits SMS chez OVHcloud. Sans recharge, plus \
-                 aucun SMS ne partira, ces alertes comprises."
-            ),
-        }
-    }
-
-    /// Tells the operator, by SMS once a day per ceiling (`alert`).
-    pub async fn tell_the_operator(&self, st: &AppState, now: i64) {
-        let message = self.message(&st.cfg.sms_ceilings);
-        alert::tell_the_operator_once_a_day(st, &self.subject(), &message, now).await;
+    /// Tells the operator: by SMS once a day per ceiling, and in the log at
+    /// each call (`alert`).
+    pub async fn tell_the_operator_once_a_day(&self, st: &AppState, now: i64) {
+        let ceilings = &st.cfg.sms_ceilings;
+        let told = match self {
+            Reached::Country(country) => Alert::CountryCeiling {
+                country: *country,
+                per_day: ceilings.per_country_day,
+            },
+            Reached::Budget => Alert::Budget {
+                per_thirty_days: ceilings.budget,
+            },
+            Reached::Credits(left) => Alert::CreditsLow { left: *left },
+        };
+        alert::tell_the_operator(st, &told, now).await;
     }
 }
 
@@ -174,7 +159,10 @@ async fn judge_and_count(
         .fetch_one(&mut *conn)
         .await?;
         if this_country >= ceilings.per_country_day {
-            return Ok(Verdict::Later(Reached::Country(asked.country.to_string())));
+            // Two capitals: the configuration refuses any other code.
+            let country = CountryCode::new(asked.country)
+                .ok_or_else(|| anyhow::anyhow!("a country code that is not two capitals"))?;
+            return Ok(Verdict::Later(Reached::Country(country)));
         }
         let thirty_days: i64 = sqlx::query_scalar(
             "SELECT COALESCE(SUM(sent), 0) FROM sms_by_country_day WHERE day > ?",
@@ -225,19 +213,31 @@ pub async fn release(pool: &SqlitePool, counted: Counted) -> anyhow::Result<()> 
 /// `SMS_CREDITS_ALERT_BELOW`. Run by the sweep whenever the operator's alerts
 /// go by SMS, discovery on or off (#464): they spend the same credits as the
 /// proofs. Without the operator's number, OVHcloud is asked nothing.
-pub async fn check_the_credits(st: &Arc<AppState>, now: i64) -> anyhow::Result<()> {
+///
+/// A balance that cannot be read is said in one line of the log, naming the
+/// SMS account, and fails nothing else: the sweep goes on, and reads it again
+/// an hour later.
+pub async fn check_the_credits(st: &Arc<AppState>, now: i64) {
     let Ok((provider, _)) = st.cfg.sms.to_the_operator() else {
-        return Ok(());
+        return;
     };
-    let left = provider.credits_left(now).await?;
-    if left < st.cfg.sms_ceilings.credits_alert_below as f64 {
-        Reached::Credits(left).tell_the_operator(st, now).await;
+    match provider.credits_left(now).await {
+        Ok(left) if left < st.cfg.sms_ceilings.credits_alert_below as f64 => {
+            Reached::Credits(left)
+                .tell_the_operator_once_a_day(st, now)
+                .await;
+        }
+        Ok(_) => {}
+        Err(e) => tracing::warn!(
+            "the prepaid credits of {} could not be read at OVHcloud: {e}",
+            provider.service_name
+        ),
     }
-    Ok(())
 }
 
-/// The counters and the alerts, forgotten thirty days later: past the longest
-/// window, they count nothing any more.
+/// The counters, forgotten thirty days later: past the longest window, they
+/// count nothing any more. The days the operator was told go with the alerts
+/// (`alert::forget_the_days`).
 pub async fn purge_counters(pool: &SqlitePool, now: i64) -> anyhow::Result<u64> {
     let by_account = sqlx::query("DELETE FROM sms_by_account WHERE sent_at <= ?")
         .bind(now - THIRTY_DAYS_SECONDS)
@@ -247,11 +247,7 @@ pub async fn purge_counters(pool: &SqlitePool, now: i64) -> anyhow::Result<u64> 
         .bind(now.div_euclid(DAY_SECONDS) - 30)
         .execute(pool)
         .await?;
-    let alerts = sqlx::query("DELETE FROM sms_alerts WHERE sent_at <= ?")
-        .bind(now - THIRTY_DAYS_SECONDS)
-        .execute(pool)
-        .await?;
-    Ok(by_account.rows_affected() + by_country.rows_affected() + alerts.rows_affected())
+    Ok(by_account.rows_affected() + by_country.rows_affected())
 }
 
 #[cfg(test)]
@@ -276,16 +272,10 @@ mod tests {
                 .execute(&pool)
                 .await
                 .unwrap();
-            sqlx::query("INSERT INTO sms_alerts (ceiling, sent_at) VALUES (?, ?)")
-                .bind(format!("country:{day}"))
-                .bind(at)
-                .execute(&pool)
-                .await
-                .unwrap();
         }
 
-        assert_eq!(purge_counters(&pool, now).await.unwrap(), 3);
-        for table in ["sms_by_account", "sms_by_country_day", "sms_alerts"] {
+        assert_eq!(purge_counters(&pool, now).await.unwrap(), 2);
+        for table in ["sms_by_account", "sms_by_country_day"] {
             let left: i64 = sqlx::query_scalar(&format!("SELECT COUNT(*) FROM {table}"))
                 .fetch_one(&pool)
                 .await

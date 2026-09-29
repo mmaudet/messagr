@@ -219,6 +219,114 @@ pub fn proof_message(language: &str, code: &str) -> String {
     format!("{first}\n\n@messagr.eu #{code}")
 }
 
+/// The SMS double every test of the service shares (#399, #464): OVHcloud
+/// reduced to its calls, and the configuration that sends through it to the
+/// operator's number.
+#[cfg(test)]
+pub(crate) mod test_support {
+    use axum::{
+        routing::{get, post},
+        Json,
+    };
+    use std::sync::{Arc, Mutex};
+
+    /// The operator's number in every test.
+    pub(crate) const OPERATOR_NUMBER: &str = "+33600000000";
+
+    /// OVHcloud reduced to the calls the service makes. It keeps what it was
+    /// sent, so a test can read an SMS the way a phone would.
+    #[derive(Default)]
+    pub(crate) struct Inbox {
+        pub(crate) sent: Vec<(Vec<String>, String)>,
+        /// The ids OVHcloud was asked to erase from its history (#399).
+        pub(crate) erased: Vec<u64>,
+    }
+
+    pub(crate) async fn fake_ovhcloud(refuse: bool) -> (String, Arc<Mutex<Inbox>>) {
+        fake_ovhcloud_with(refuse, 0, 1_000.0).await
+    }
+
+    /// The same, answering each SMS after `delay_ms`, and saying
+    /// `credits_left` of the account.
+    pub(crate) async fn fake_ovhcloud_with(
+        refuse: bool,
+        delay_ms: u64,
+        credits_left: f64,
+    ) -> (String, Arc<Mutex<Inbox>>) {
+        let inbox = Arc::new(Mutex::new(Inbox::default()));
+        let kept = inbox.clone();
+        let erasing = inbox.clone();
+        let app = axum::Router::new()
+            .route(
+                "/sms/sms-test-1",
+                get(move || async move { Json(serde_json::json!({"creditsLeft": credits_left})) }),
+            )
+            .route(
+                "/sms/sms-test-1/jobs",
+                post(move |Json(body): Json<serde_json::Value>| {
+                    let kept = kept.clone();
+                    async move {
+                        tokio::time::sleep(std::time::Duration::from_millis(delay_ms)).await;
+                        let receivers: Vec<String> =
+                            serde_json::from_value(body["receivers"].clone()).unwrap();
+                        let message = body["message"].as_str().unwrap().to_string();
+                        let mut inbox = kept.lock().unwrap();
+                        inbox.sent.push((receivers.clone(), message));
+                        // One id per SMS, as OVHcloud answers: the one its
+                        // history knows the SMS by.
+                        let id = inbox.sent.len();
+                        if refuse {
+                            Json(serde_json::json!({"ids": [], "invalidReceivers": receivers}))
+                        } else {
+                            Json(serde_json::json!({"ids": [id], "invalidReceivers": []}))
+                        }
+                    }
+                }),
+            )
+            .route(
+                "/sms/sms-test-1/outgoing/:id",
+                axum::routing::delete(move |axum::extract::Path(id): axum::extract::Path<u64>| {
+                    let erasing = erasing.clone();
+                    async move {
+                        erasing.lock().unwrap().erased.push(id);
+                        Json(serde_json::Value::Null)
+                    }
+                }),
+            );
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let base = format!("http://{}", listener.local_addr().unwrap());
+        tokio::spawn(async move { axum::serve(listener, app).await.unwrap() });
+        (base, inbox)
+    }
+
+    /// The service's SMS through a fake OVHcloud at `ovh`, to the operator's
+    /// number `OPERATOR_NUMBER` (#464).
+    pub(crate) fn sms_through(ovh: String) -> crate::config::Sms {
+        crate::config::Sms {
+            provider: Some(super::Ovhcloud {
+                base_url: ovh,
+                application_key: "ak".into(),
+                application_secret: "as".into(),
+                consumer_key: "ck".into(),
+                service_name: "sms-test-1".into(),
+                sender: "Messagr".into(),
+            }),
+            operator_number: Some(OPERATOR_NUMBER.to_string()),
+        }
+    }
+
+    /// How many SMS reached `number`.
+    pub(crate) fn sent_to(inbox: &Arc<Mutex<Inbox>>, number: &str) -> usize {
+        inbox
+            .lock()
+            .unwrap()
+            .sent
+            .iter()
+            .filter(|(receivers, _)| receivers.iter().any(|r| r == number))
+            .count()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

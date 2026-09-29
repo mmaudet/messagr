@@ -215,18 +215,22 @@ its alerts go by SMS while discovery stays off (#462).
   `ALERT_SMS_TO absent: the operator's alerts are only written in the log`.
   With both, it names the provider, never the number. A malformed number
   stops the start.
-- **Once a day**: a country's ceiling or the budget reached, and the prepaid
-  balance under `SMS_CREDITS_ALERT_BELOW` (below). The hourly sweep reads
-  the balance whenever the alerts go by SMS, discovery on or off: they spend
-  the same credits as the proofs. Such an alert counts as told for the day
-  once its SMS is asked of OVHcloud, even if OVHcloud refuses it.
-- **At each call**, the service itself setting no limit: what the moderation
-  of #462 is to tell the operator with, at the cadence its tickets set, one
-  SMS per report (#468) until they are grouped every quarter of an hour
-  (#478), and one a day that counts the blocks (#469).
-- **No SMS names an account, or carries anything that was said.** An alert
-  that carries an account's identifier (`@name:server`) is held back: no SMS
-  leaves, and the log says only that an alert was held back.
+- **What the operator can be told is a closed list**, each alert written by
+  the service from figures alone, so **no SMS names an account or carries
+  anything that was said**:
+  - **once a day**: a country's ceiling or the budget reached, and the
+    prepaid balance under `SMS_CREDITS_ALERT_BELOW` (below). Such an alert
+    counts as told for the day once its SMS is asked of OVHcloud, even if
+    OVHcloud refuses it;
+  - **at each call**: reports received, by their report numbers and
+    reasons, the urgent ones first, and the number of blocks since the
+    previous count. The service sets no limit of its own: one SMS per
+    report (#468) until they are grouped every quarter of an hour (#478),
+    and one a day that counts the blocks (#469).
+- **The prepaid balance is read by the hourly sweep whenever the alerts go
+  by SMS**, discovery on or off: they spend the same credits as the proofs.
+  A balance that cannot be read is said in one line of the log per sweep,
+  naming the SMS account, and fails nothing else.
 - **Each alert is erased from OVHcloud's history** a day after it left, and
   **none leaves until OVHcloud has validated the sender**: until then the
   log says `the alert could not be sent` (below).

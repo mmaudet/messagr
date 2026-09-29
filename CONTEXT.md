@@ -251,9 +251,10 @@ A recipient's lasting refusal of another account, whether made on an
 invitation delivered inside Messagr or from a conversation: nothing that
 account sends reaches them any more, what it already wrote leaves their
 screens, and it can deliver them no invitation. The blocked account is never
-told. The operator is told who blocked whom, never what was said. A block
-lasts as long as both accounts exist, and hides nobody from discovery, which
-only withdrawing one's number does.
+told. The operator is told who blocked whom, never what was said, through the
+service's records: its alerts name no account. A block lasts as long as both
+accounts exist, and hides nobody from discovery, which only withdrawing one's
+number does.
 _Avoid_: Ban, report, mute, ignore (the Matrix mechanism, not the gesture)
 
 **Report**:

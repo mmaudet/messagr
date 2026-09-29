@@ -107,7 +107,7 @@ mod tests {
             cfg: crate::config::Config {
                 sms: crate::config::Sms {
                     operator_number: None,
-                    ..crate::handlers::discovery::test_support::sms_through(base_url)
+                    ..crate::sms::test_support::sms_through(base_url)
                 },
                 ..crate::config::Config::for_tests()
             },
