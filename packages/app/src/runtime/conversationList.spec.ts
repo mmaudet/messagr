@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 
 import {
   fetchConversationSummaries,
+  isOpenWithTheBlocked,
   listWithoutTheBlocked,
   NOTHING_LEFT_TO_SHOW,
   scopesWithTheBlocked,
@@ -693,5 +694,96 @@ describe('the conversations with a blocked account (#469)', () => {
       '!a:x',
       '!b:x',
     ])
+  })
+})
+
+describe('the conversation open, once an account is blocked (#472, #494)', () => {
+  // Whichever device made the block: this one, from the panel or the
+  // selection, or another, whose ignored list the sync brings.
+  const BLOCKED = '@bothers:example.org'
+  const HER = '@her:example.org'
+  const blocked = new Set([BLOCKED])
+
+  function row(
+    scope: string,
+    other: string | null,
+    extra: Partial<ConversationSummary> = {},
+  ): ConversationSummary {
+    return {
+      scope,
+      other,
+      others: other === null ? 2 : 1,
+      preview: null,
+      lastAt: 0,
+      unread: 0,
+      ...extra,
+    }
+  }
+
+  const rows = [
+    row('!with-them:x', BLOCKED),
+    row('!three-of-us:x', null),
+    row('!alone-now:x', null, { others: 0, departed: BLOCKED }),
+    row('!with-her:x', HER),
+  ]
+
+  it('closes the conversation of two with the blocked account, which the list no longer draws', () => {
+    expect(
+      isOpenWithTheBlocked(
+        { scope: '!with-them:x', other: BLOCKED },
+        rows,
+        blocked,
+      ),
+    ).toBe(true)
+    // Its row says so before the conversation has found its other person...
+    expect(
+      isOpenWithTheBlocked(
+        { scope: '!with-them:x', other: null },
+        rows,
+        blocked,
+      ),
+    ).toBe(true)
+    // ...and the conversation says so before the list has a row for it.
+    expect(
+      isOpenWithTheBlocked({ scope: '!new:x', other: BLOCKED }, rows, blocked),
+    ).toBe(true)
+  })
+
+  it('closes the one this account is alone in, when the blocked account is who left it', () => {
+    expect(
+      isOpenWithTheBlocked(
+        { scope: '!alone-now:x', other: null },
+        rows,
+        blocked,
+      ),
+    ).toBe(true)
+  })
+
+  it('keeps a conversation of more than two open, without the blocked account’s messages', () => {
+    // The conversation stays in the list (`listWithoutTheBlocked`), so it
+    // stays on the screen too: only that account's messages leave it.
+    expect(
+      isOpenWithTheBlocked(
+        { scope: '!three-of-us:x', other: null },
+        rows,
+        blocked,
+      ),
+    ).toBe(false)
+    expect(
+      listWithoutTheBlocked(rows, blocked).map(one => one.scope),
+    ).toContain('!three-of-us:x')
+  })
+
+  it('keeps every other conversation open, and every one while nobody is blocked', () => {
+    expect(
+      isOpenWithTheBlocked({ scope: '!with-her:x', other: HER }, rows, blocked),
+    ).toBe(false)
+    expect(
+      isOpenWithTheBlocked(
+        { scope: '!with-them:x', other: BLOCKED },
+        rows,
+        new Set(),
+      ),
+    ).toBe(false)
   })
 })

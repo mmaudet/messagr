@@ -1,17 +1,22 @@
 import { describe, expect, it } from 'vitest'
 
 import type { TimelineEntry } from '../timeline/mergeTimeline'
+import { blockable } from '../timeline/selection'
 import {
   blockAccount,
+  callsWithoutTheBlocked,
   ignoredInSync,
   keptWithoutTheBlocked,
+  mayCall,
   noticeOf,
   readIgnored,
   sameAccounts,
   tellWhatIsWaiting,
   type Blocking,
 } from './block'
+import type { CallRecord } from './callLogStore'
 import {
+  isOpenWithTheBlocked,
   listWithoutTheBlocked,
   type ConversationSummary,
 } from './conversationList'
@@ -462,6 +467,39 @@ describe('the list and the conversations, derived from the homeserver’s ignore
     ).toEqual(['$mine'])
   })
 
+  it('closes the conversation open with the blocked account on that other device, and keeps one of more than two open (#494)', () => {
+    // Left open, what is written in it would still leave: it closes, as the
+    // conversation blocked from does, when the list its sync carries arrives.
+    const sync = {
+      account_data: {
+        events: [
+          {
+            type: 'm.ignored_user_list',
+            content: { ignored_users: { [BLOCKED]: {} } },
+          },
+        ],
+      },
+    }
+    const list = [row('!with-them:x', BLOCKED), row('!three-of-us:x', null)]
+
+    const blocked = ignoredInSync(sync) ?? new Set<string>()
+
+    expect(
+      isOpenWithTheBlocked(
+        { scope: '!with-them:x', other: BLOCKED },
+        list,
+        blocked,
+      ),
+    ).toBe(true)
+    expect(
+      isOpenWithTheBlocked(
+        { scope: '!three-of-us:x', other: null },
+        list,
+        blocked,
+      ),
+    ).toBe(false)
+  })
+
   it('keeps a conversation hidden once the blocked account has left it', () => {
     // Its row then names nobody on the other side, only who left.
     const list = [
@@ -504,5 +542,121 @@ describe('the list and the conversations, derived from the homeserver’s ignore
       false,
     )
     expect(sameAccounts(new Set([BLOCKED]), null)).toBe(false)
+  })
+})
+
+describe('blocking the author of a selection (#472)', () => {
+  // The same gesture as the panel of the person, from « Bloquer
+  // l’expéditeur »: the account is the one the selection names.
+  const received = [
+    said('$theirs-1', BLOCKED),
+    said('$friends', FRIEND),
+    said('$mine', ME),
+    said('$theirs-2', BLOCKED),
+  ]
+
+  it('blocks the one other participant every message chosen comes from', async () => {
+    const g = gesture()
+    const who = blockable(new Set(['$theirs-2', '$theirs-1']), received, ME)
+    expect(who).toBe(BLOCKED)
+
+    const outcome = await blockAccount(g.deps, who ?? '')
+
+    expect(outcome).toEqual({ blocked: true, told: true })
+    expect(g.server.state.writes).toEqual([
+      { ignored_users: { [BLOCKED]: {} } },
+    ])
+    expect(g.told).toEqual([BLOCKED])
+  })
+
+  it('keeps a conversation of more than two in the list and open, and takes only the blocked account’s messages off it', async () => {
+    // The conversation of three the App Store reviewer is in, where the
+    // panel of the person does not exist and the selection is the only way.
+    const g = gesture()
+    const list = [row('!three-of-us:x', null), row('!with-them:x', BLOCKED)]
+
+    await blockAccount(
+      g.deps,
+      blockable(new Set(['$theirs-1']), received, ME) ?? '',
+    )
+    const shown = g.shown[0] ?? new Set<string>()
+
+    expect(listWithoutTheBlocked(list, shown).map(one => one.scope)).toEqual([
+      '!three-of-us:x',
+    ])
+    expect(
+      isOpenWithTheBlocked(
+        { scope: '!three-of-us:x', other: null },
+        list,
+        shown,
+      ),
+    ).toBe(false)
+    expect(
+      shownOf(received, { hidden: new Set(), blocked: shown }).map(
+        one => one.eventId,
+      ),
+    ).toEqual(['$friends', '$mine'])
+  })
+
+  it('closes a conversation of two, as the panel of the person does', async () => {
+    const g = gesture()
+    const list = [row('!with-them:x', BLOCKED)]
+
+    await blockAccount(
+      g.deps,
+      blockable(new Set(['$theirs-1']), received, ME) ?? '',
+    )
+    const shown = g.shown[0] ?? new Set<string>()
+
+    expect(listWithoutTheBlocked(list, shown)).toEqual([])
+    expect(
+      isOpenWithTheBlocked(
+        { scope: '!with-them:x', other: BLOCKED },
+        list,
+        shown,
+      ),
+    ).toBe(true)
+  })
+})
+
+describe('the calls, once an account is blocked (#494)', () => {
+  function call(
+    peerUserId: string,
+    at: number,
+    extra: Partial<CallRecord> = {},
+  ): CallRecord {
+    return {
+      scope: `!call-${at}:x`,
+      peerUserId,
+      at,
+      direction: 'in',
+      outcome: 'missed',
+      ...extra,
+    }
+  }
+
+  it('leaves the blocked account’s calls out of the calls tab, every other in its order', () => {
+    // Which way they went and how they ended does not matter: the tab shows
+    // no call of that account, so it offers no « Rappeler » for it either.
+    const calls = [
+      call(BLOCKED, 4),
+      call(FRIEND, 3, { direction: 'out', outcome: 'answered', seconds: 42 }),
+      call(BLOCKED, 2, { direction: 'out', outcome: 'unplaced' }),
+      call(FRIEND, 1),
+    ]
+
+    expect(
+      callsWithoutTheBlocked(calls, new Set([BLOCKED])).map(one => one.at),
+    ).toEqual([3, 1])
+    // Nobody blocked: the same list, handed back.
+    expect(callsWithoutTheBlocked(calls, new Set())).toBe(calls)
+  })
+
+  it('never calls a blocked account, whatever the gesture', () => {
+    // « Rappeler », a conversation's header: whatever is on the screen, the
+    // call is not placed, and the blocked account's telephone never rings.
+    expect(mayCall(BLOCKED, new Set([BLOCKED]))).toBe(false)
+    expect(mayCall(FRIEND, new Set([BLOCKED]))).toBe(true)
+    expect(mayCall(BLOCKED, new Set())).toBe(true)
   })
 })

@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 
 import type { TimelineEntry } from './mergeTimeline'
 import {
+  blockable,
   canCopy,
   canFavourite,
   canForward,
@@ -499,5 +500,66 @@ describe('what a report carries (#468)', () => {
   it('carries nothing for a selection the conversation no longer holds, or none', () => {
     expect(reportable(new Set(['$h1', '$gone']), [HERS_FIRST], ME)).toBeNull()
     expect(reportable(new Set(), [HERS_FIRST], ME)).toBeNull()
+  })
+})
+
+describe('whom « Bloquer l’expéditeur » blocks (#472)', () => {
+  // #462: offered when every message chosen comes from one and the same
+  // other participant, absent otherwise and never greyed. A block is one
+  // relation with one account (ADR 0015), and the account is the one the
+  // homeserver attributes the messages to: the one its ignored list holds
+  // back.
+  const HIM = '@him:x'
+  const HERS_THEN = said('$h2', HER, 'encore')
+  const HIS = said('$b1', HIM, 'et toi')
+
+  it('names the one other participant who wrote every message chosen', () => {
+    const held = [MINE, HERS, HIS, HERS_THEN]
+
+    expect(blockable(new Set(['$h1']), held, ME)).toBe(HER)
+    expect(blockable(new Set(['$h2', '$h1']), held, ME)).toBe(HER)
+    expect(blockable(new Set(['$b1']), held, ME)).toBe(HIM)
+  })
+
+  it('names them whatever their messages hold, since a block carries none of it', () => {
+    // Unlike a report, which carries what it names: a photograph, a message
+    // this device could not open and one removed each still say who sent it.
+    const unreadable: TimelineEntry = {
+      eventId: '$u',
+      claimedSender: HER,
+      sentAt: 0,
+      body: null,
+      reason: 'no key',
+    }
+    const gone: TimelineEntry = {
+      eventId: '$g',
+      claimedSender: HER,
+      sentAt: 0,
+      body: null,
+      removed: true,
+    }
+    const held = [HERS, shown('$p', HER), unreadable, gone]
+
+    expect(blockable(new Set(['$p', '$u', '$g', '$h1']), held, ME)).toBe(HER)
+  })
+
+  it('names nobody, so it is absent, when two people wrote them', () => {
+    // The conversation of three the App Store reviewer is in: one message of
+    // each of the two others names neither.
+    expect(blockable(new Set(['$h1', '$b1']), [HERS, HIS], ME)).toBeNull()
+  })
+
+  it('names nobody when the selection holds this account’s own messages', () => {
+    expect(blockable(new Set(['$m1', '$m2']), [MINE, MINE_TOO], ME)).toBeNull()
+    expect(blockable(new Set(['$m1']), [MINE, HERS], ME)).toBeNull()
+    // Whichever comes first in the conversation.
+    expect(blockable(new Set(['$m1', '$h1']), [MINE, HERS], ME)).toBeNull()
+    expect(blockable(new Set(['$m1', '$h1']), [HERS, MINE], ME)).toBeNull()
+  })
+
+  it('names nobody for a selection the conversation no longer holds, or none', () => {
+    // Nothing can say whose it is, as for removing and reporting.
+    expect(blockable(new Set(['$h1', '$gone']), [HERS], ME)).toBeNull()
+    expect(blockable(new Set(), [HERS], ME)).toBeNull()
   })
 })

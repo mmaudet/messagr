@@ -207,6 +207,36 @@ export function isWithTheBlocked(
   return withWhom !== null && withWhom !== undefined && blocked.has(withWhom)
 }
 
+/**
+ * The conversation open, as the screen knows it: its scope, and its other
+ * person once it has found one, `null` for a conversation of more than two
+ * or before it knows.
+ */
+export interface OpenConversation {
+  readonly scope: string
+  readonly other: string | null
+}
+
+/**
+ * Whether the conversation open is one with a blocked account (#472, #494),
+ * which the list no longer draws. It closes then, whichever device made the
+ * block: open, what is written in it would still leave. A conversation of
+ * more than two stays open, and only that account's messages leave it.
+ *
+ * Its row says so (`isWithTheBlocked`), which knows who left a conversation
+ * this account is alone in now; before the list has a row for it, the other
+ * person the conversation itself found.
+ */
+export function isOpenWithTheBlocked(
+  open: OpenConversation,
+  rows: readonly ConversationSummary[],
+  blocked: ReadonlySet<string>,
+): boolean {
+  if (open.other !== null && blocked.has(open.other)) return true
+  const row = rows.find(one => one.scope === open.scope)
+  return row !== undefined && isWithTheBlocked(row, blocked)
+}
+
 /** The conversations with a blocked account, whoever is in them now. */
 export function scopesWithTheBlocked(
   rows: readonly ConversationSummary[],

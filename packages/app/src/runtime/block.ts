@@ -1,3 +1,4 @@
+import type { CallRecord } from './callLogStore'
 import { errcodeOf, getErrorMessage } from './errors'
 import type { HttpRequester } from './pump'
 import type { KeptMessage } from './readFavourites'
@@ -203,6 +204,29 @@ export function keptWithoutTheBlocked(
   return kept.filter(
     one => one.entry === null || !blocked.has(one.entry.claimedSender),
   )
+}
+
+/**
+ * The calls tab without the calls of a blocked account (#494), whichever way
+ * they went: what it wrote leaves every screen, and a row of the tab is also
+ * a « Rappeler » that would ring it. The same list, handed back, when nobody
+ * is blocked.
+ */
+export function callsWithoutTheBlocked(
+  calls: readonly CallRecord[],
+  blocked: ReadonlySet<string>,
+): readonly CallRecord[] {
+  if (blocked.size === 0) return calls
+  return calls.filter(call => !blocked.has(call.peerUserId))
+}
+
+/**
+ * Whether a call may be placed to `peer` (#494): never to a blocked account,
+ * whatever the gesture. The homeserver holds back what that account sends,
+ * never what this one sends it, so a call placed would ring its telephone.
+ */
+export function mayCall(peer: string, blocked: ReadonlySet<string>): boolean {
+  return !blocked.has(peer)
 }
 
 /** Whether two ignored lists name the same accounts. `null` is not knowing. */
