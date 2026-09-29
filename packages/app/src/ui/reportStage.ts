@@ -17,7 +17,9 @@ export type ReportStage =
   | { readonly stage: 'sent'; readonly number: string }
   | { readonly stage: 'too-long' }
   | { readonly stage: 'unreportable' }
+  | { readonly stage: 'not-sent' }
   | { readonly stage: 'refused' }
+  | { readonly stage: 'unavailable' }
   | { readonly stage: 'unconfirmed' }
 
 /**

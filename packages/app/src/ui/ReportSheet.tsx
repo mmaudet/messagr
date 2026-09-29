@@ -70,13 +70,15 @@ import { dayOf, timeOf } from './whenLabel'
  * Sent, with the report number and how to learn the decision. Too long, and
  * fewer messages are to be chosen. Refused, when the service answered that
  * it will not take it, which it says before keeping anything: the sheet says
- * so, and how to report without the application (#491). No longer
- * reportable, when a message chosen was deleted or left the conversation
- * while the sheet was open: the sheet says so as soon as it happens, and
- * nothing leaves (#491). Or unconfirmed: nothing came back, which cannot
- * tell a report never sent from one whose answer was lost, so the sheet says
- * so, and that sending again sends it once (`reportMessages.ts`). Where
- * sending again cannot help, « Envoyer » is absent. The sheet closes at any
+ * so, in the colour of a refusal, and how to report without the application
+ * (#491). No longer reportable, when a message chosen was deleted or left
+ * the conversation while the sheet was open: the sheet says so as soon as it
+ * happens, and nothing leaves (#491). Not sent, when nothing left the
+ * telephone, and unavailable, when the service kept nothing for now: both
+ * are to be sent again. Or unconfirmed: nothing came back, which cannot tell
+ * a report never sent from one whose answer was lost, so the sheet says so,
+ * and that sending again sends it once (`reportMessages.ts`). Where sending
+ * again cannot help, « Envoyer » is absent. The sheet closes at any
  * time, the sending one included: the report goes on without it, and sent
  * again it is kept once. The reported messages stay in the conversation
  * whatever happens: reporting removes nothing.
@@ -295,13 +297,23 @@ export function ReportSheet({
                   {t('report_unconfirmed')}
                 </Text>
               )}
+              {stage.stage === 'not-sent' && (
+                <Text style={styles.waiting} testID="report-not-sent">
+                  {t('report_not_sent')}
+                </Text>
+              )}
+              {stage.stage === 'unavailable' && (
+                <Text style={styles.waiting} testID="report-unavailable">
+                  {t('report_unavailable')}
+                </Text>
+              )}
               {stage.stage === 'too-long' && (
                 <Text style={styles.waiting} testID="report-too-long">
                   {t('report_too_long')}
                 </Text>
               )}
               {stage.stage === 'refused' && (
-                <Text style={styles.waiting} testID="report-refused">
+                <Text style={styles.refusal} testID="report-refused">
                   {t('report_refused')}
                 </Text>
               )}
@@ -420,5 +432,9 @@ const styles = StyleSheet.create({
   // the network: a reason to choose, a report to send again, fewer messages
   // to choose.
   waiting: { ...type.bodySm, color: color.wait['700'] },
+  // `deny.700`, the palette's text for a measure or a refusal, which is what
+  // a refusal of the service is: final, nothing to wait for (`Invite.tsx`
+  // says its own failure the same way).
+  refusal: { ...type.bodySm, color: color.deny['700'] },
   actions: { gap: space.s },
 })

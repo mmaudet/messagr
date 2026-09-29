@@ -208,6 +208,10 @@ export const de: Readonly<Record<CopyKey, string>> = {
     'Diese Nachrichten sind für eine einzige Meldung zu lang: Schließen Sie und wählen Sie weniger aus.',
   report_refused:
     'Der Dienst hat diesen Sendeversuch abgelehnt und nichts davon behalten. Um auf anderem Weg zu melden, schreiben Sie an conformite@messagr.eu.',
+  report_not_sent:
+    'Es wurde nichts gesendet. Versuchen Sie es gleich noch einmal.',
+  report_unavailable:
+    'Der Dienst konnte diese Meldung gerade nicht annehmen und hat nichts davon behalten. Versuchen Sie es gleich noch einmal.',
   report_unreportable:
     'Eine der ausgewählten Nachrichten kann nicht mehr gemeldet werden: Sie wurde gelöscht oder ist nicht mehr in dieser Unterhaltung. Schließen Sie und wählen Sie erneut aus.',
   report_sent_title: 'Meldung gesendet',

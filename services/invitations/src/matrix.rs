@@ -252,6 +252,13 @@ pub fn next_stage(body: &Value) -> Option<String> {
     })
 }
 
+/// The homeserver's own refusal of a token: `whoami` answered 401 or 403.
+/// The one failure of `whoami` that says the token will not do; every other
+/// one says only that the homeserver did not answer as one does.
+#[derive(Debug, thiserror::Error)]
+#[error("the homeserver refuses this token")]
+pub struct TokenRefused;
+
 impl MatrixClient {
     pub fn new(base: String, registration_token: String) -> Self {
         Self {
@@ -424,6 +431,12 @@ impl MatrixClient {
     /// upstream configuration, every caller would authenticate as the same
     /// empty principal, and with `may_revoke("", "")` being true, each one
     /// could revoke the others' invitations.
+    ///
+    /// The error is [`TokenRefused`] when, and only when, the homeserver
+    /// itself refuses the token (401 or 403). Anything else that keeps it
+    /// from naming an account (no answer, a 5xx, a 429, a 2xx without
+    /// `user_id`) is the homeserver not answering as one does, which says
+    /// nothing about the token (#491).
     pub async fn whoami(&self, token: &str) -> Result<String> {
         let r = self
             .http
@@ -431,8 +444,12 @@ impl MatrixClient {
             .bearer_auth(token)
             .send()
             .await?;
-        if !r.status().is_success() {
-            return Err(anyhow!("token refused"));
+        let status = r.status();
+        if status == reqwest::StatusCode::UNAUTHORIZED || status == reqwest::StatusCode::FORBIDDEN {
+            return Err(TokenRefused.into());
+        }
+        if !status.is_success() {
+            return Err(anyhow!("whoami answered {status}"));
         }
         Ok(r.json::<Value>().await?["user_id"]
             .as_str()

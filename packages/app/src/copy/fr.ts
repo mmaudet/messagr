@@ -272,6 +272,14 @@ export const fr = {
   // légal le dit).
   report_refused:
     'Le service a refusé cet envoi et n’en a rien gardé. Pour signaler autrement, écrivez à conformite@messagr.eu.',
+  // RIEN N'EST PARTI (#491) : le serveur du compte n'a pas dit à temps quel
+  // compte signale, ou ce qu'il a dit ne se scelle pas. Rien n'a été scellé
+  // ni envoyé, et renvoyer le fera partir.
+  report_not_sent: 'Rien n’est parti. Réessayez dans un moment.',
+  // LE SERVICE N'A RIEN GARDÉ (#491) : il répond 503 quand son propre
+  // homeserver ne lui dit pas qui est le compte, avant de rien garder.
+  report_unavailable:
+    'Le service n’a pas pu prendre ce signalement pour l’instant et n’en a rien gardé. Réessayez dans un moment.',
   // UN MESSAGE CHOISI N'EST PLUS LÀ (#491) : supprimé pendant que la feuille
   // était ouverte, ou sorti de la conversation. Rien n'est scellé ni envoyé.
   report_unreportable:

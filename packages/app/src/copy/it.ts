@@ -202,6 +202,9 @@ export const it: Readonly<Record<CopyKey, string>> = {
     'Questi messaggi sono troppo lunghi per una sola segnalazione: chiuda e ne scelga meno.',
   report_refused:
     'Il servizio ha rifiutato questo invio e non ne ha conservato nulla. Per segnalare in altro modo, scriva a conformite@messagr.eu.',
+  report_not_sent: 'Non è partito nulla. Riprovi tra un momento.',
+  report_unavailable:
+    'Il servizio non ha potuto accettare questa segnalazione per ora e non ne ha conservato nulla. Riprovi tra un momento.',
   report_unreportable:
     'Uno dei messaggi scelti non può più essere segnalato: è stato eliminato, o non è più in questa conversazione. Chiuda e scelga di nuovo.',
   report_sent_title: 'Segnalazione inviata',

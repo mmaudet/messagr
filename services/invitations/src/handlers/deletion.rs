@@ -130,6 +130,7 @@ pub async fn announce(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::handlers::discovery::test_support::refusing_hs;
     use sqlx::SqlitePool;
 
     /// Un homeserver réduit à `whoami`, qui croit le porteur sur parole :
@@ -281,10 +282,17 @@ mod tests {
             announce(State(st), HeaderMap::new()).await,
             Err(AppError::Unauthenticated)
         ));
+        let refusing = state_with(pool.clone(), refusing_hs().await);
+        assert!(matches!(
+            announce(State(refusing), bearer("alice")).await,
+            Err(AppError::Unauthenticated)
+        ));
+        // A homeserver that does not answer says nothing of the token: come
+        // back later (#491).
         let unreachable = state_with(pool.clone(), "http://127.0.0.1:1".into());
         assert!(matches!(
             announce(State(unreachable), bearer("alice")).await,
-            Err(AppError::Unauthenticated)
+            Err(AppError::HomeserverUnavailable)
         ));
 
         let rows: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM account_deletions")

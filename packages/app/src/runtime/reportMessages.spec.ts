@@ -391,17 +391,19 @@ describe('Reporting messages to the operator (#468)', () => {
     expect(sent).toEqual([])
   })
 
-  it('seals and sends nothing when the homeserver does not say whose account this is', async () => {
+  it('seals and sends nothing, and says nothing left, when the homeserver does not say whose account this is', async () => {
+    // #491, the review of #493: nothing was sealed, and nothing left this
+    // device. Not « perhaps sent ».
     const { reporting, sealed, sent } = device({ whoami: 'unanswered' })
 
     expect(await reportMessages(reporting, REQUEST)).toEqual({
-      outcome: 'unconfirmed',
+      outcome: 'not-sent',
     })
     expect(sealed).toEqual([])
     expect(sent).toEqual([])
   })
 
-  it('gives the homeserver’s whoami the send’s deadline, and is unconfirmed when it does not answer within it', async () => {
+  it('gives the homeserver’s whoami the send’s deadline, and says nothing left when it does not answer within it', async () => {
     // #491: asked just before sealing, it had none, and « Envoi… » could
     // stay on the sheet for ever.
     const { reporting, sealed, sent } = device({
@@ -410,19 +412,33 @@ describe('Reporting messages to the operator (#468)', () => {
     })
 
     expect(await reportMessages(reporting, REQUEST)).toEqual({
-      outcome: 'unconfirmed',
+      outcome: 'not-sent',
     })
     expect(sealed).toEqual([])
     expect(sent).toEqual([])
   })
 
-  it('sends nothing when the seal refuses its binding', async () => {
+  it('sends nothing, and says so, when the seal refuses its binding', async () => {
     const { reporting, sent } = device({ seal: 'refuses' })
 
     expect(await reportMessages(reporting, REQUEST)).toEqual({
-      outcome: 'unconfirmed',
+      outcome: 'not-sent',
     })
     expect(sent).toEqual([])
+  })
+
+  it('is to be sent again when the service answers 503: its homeserver did not answer, and it kept nothing', async () => {
+    // #491, the review of #493: the service answers 503 when it cannot ask
+    // its homeserver who the token is, before keeping anything
+    // (`auth.rs`). Not a refusal, which is final, nor « perhaps sent ».
+    const { reporting, sent } = device({
+      answer: { status: 503, body: '{"errcode":"MESSAGR_UPSTREAM"}' },
+    })
+
+    expect(await reportMessages(reporting, REQUEST)).toEqual({
+      outcome: 'unavailable',
+    })
+    expect(sent).toHaveLength(1)
   })
 
   it('is refused when the service refuses it for good: a request it will not take, or a token it does not take', async () => {

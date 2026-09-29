@@ -209,6 +209,9 @@ export const en: Readonly<Record<CopyKey, string>> = {
     'These messages are too long for a single report: close, then choose fewer.',
   report_refused:
     'The service refused this attempt and kept nothing of it. To report another way, write to conformite@messagr.eu.',
+  report_not_sent: 'Nothing was sent. Try again in a moment.',
+  report_unavailable:
+    'The service could not take this report just now and kept nothing of it. Try again in a moment.',
   report_unreportable:
     'One of the messages you chose can no longer be reported: it was deleted, or it is no longer in this conversation. Close, then choose again.',
   report_sent_title: 'Report sent',

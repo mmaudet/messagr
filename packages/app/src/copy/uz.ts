@@ -221,6 +221,10 @@ export const uz: Readonly<Record<CopyKey, string>> = {
     'Bu xabarlar bitta shikoyat uchun juda uzun: yoping va kamroq xabar tanlang.',
   report_refused:
     'Xizmat bu urinishni rad etdi va undan hech narsani saqlamadi. Boshqa yoʻl bilan shikoyat qilish uchun conformite@messagr.eu manziliga yozing.',
+  report_not_sent:
+    'Hech narsa yuborilmadi. Birozdan keyin qayta urinib koʻring.',
+  report_unavailable:
+    'Xizmat hozircha bu shikoyatni qabul qila olmadi va undan hech narsani saqlamadi. Birozdan keyin qayta urinib koʻring.',
   report_unreportable:
     'Tanlangan xabarlardan biri endi shikoyat qilinmaydi: u oʻchirilgan yoki endi bu suhbatda yoʻq. Yoping va qaytadan tanlang.',
   report_sent_title: 'Shikoyat yuborildi',

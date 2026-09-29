@@ -30,7 +30,9 @@ describe('Where a report stands on its sheet', () => {
     for (const outcome of [
       'too-long',
       'unreportable',
+      'not-sent',
       'refused',
+      'unavailable',
       'unconfirmed',
     ] as const) {
       expect(stageAfter({ outcome })).toEqual({ stage: outcome })
@@ -83,7 +85,9 @@ describe('Closing the sheet (#491)', () => {
       { stage: 'sending' },
       { stage: 'too-long' },
       { stage: 'unreportable' },
+      { stage: 'not-sent' },
       { stage: 'refused' },
+      { stage: 'unavailable' },
       { stage: 'unconfirmed' },
     ] as const) {
       expect(closingClearsTheSelection(opened(1, sheet)), sheet.stage).toBe(

@@ -198,7 +198,9 @@ mod tests {
     use super::test_support::{blocking, held, service, told};
     use super::*;
     use crate::config::Config;
-    use crate::handlers::discovery::test_support::{bearer, set_clock, state_from, DAY, T0};
+    use crate::handlers::discovery::test_support::{
+        bearer, refusing_hs, set_clock, state_from, DAY, T0,
+    };
     use sqlx::SqlitePool;
 
     #[sqlx::test(migrations = "./migrations")]
@@ -271,6 +273,13 @@ mod tests {
             Err(AppError::Unauthenticated)
         ));
         // A token the homeserver does not vouch for.
+        let refusing = state_from(pool.clone(), refusing_hs().await, Config::for_tests());
+        assert!(matches!(
+            block(State(refusing), bearer("bob"), request()).await,
+            Err(AppError::Unauthenticated)
+        ));
+        // A homeserver that does not answer says nothing of the token: come
+        // back later (#491).
         let unreachable = state_from(
             pool.clone(),
             "http://127.0.0.1:1".into(),
@@ -278,7 +287,7 @@ mod tests {
         );
         assert!(matches!(
             block(State(unreachable), bearer("bob"), request()).await,
-            Err(AppError::Unauthenticated)
+            Err(AppError::HomeserverUnavailable)
         ));
         assert!(held(&pool).await.is_empty());
     }

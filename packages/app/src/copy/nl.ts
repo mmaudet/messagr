@@ -200,6 +200,9 @@ export const nl: Readonly<Record<CopyKey, string>> = {
     'Deze berichten zijn te lang voor één melding: sluit en kies er minder.',
   report_refused:
     'De dienst heeft deze poging geweigerd en er niets van bewaard. Om op een andere manier te melden, schrijft u naar conformite@messagr.eu.',
+  report_not_sent: 'Er is niets verstuurd. Probeer het zo meteen opnieuw.',
+  report_unavailable:
+    'De dienst kon deze melding nu niet aannemen en heeft er niets van bewaard. Probeer het zo meteen opnieuw.',
   report_unreportable:
     'Een van de gekozen berichten kan niet meer worden gemeld: het is verwijderd, of het staat niet meer in dit gesprek. Sluit en kies opnieuw.',
   report_sent_title: 'Melding verstuurd',

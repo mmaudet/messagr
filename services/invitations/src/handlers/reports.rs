@@ -220,7 +220,9 @@ mod tests {
     use super::*;
     use crate::config::Config;
     use crate::handlers::create::IDEMPOTENCY_HEADER;
-    use crate::handlers::discovery::test_support::{bearer, state_from, whoami_hs, T0};
+    use crate::handlers::discovery::test_support::{
+        bearer, refusing_hs, state_from, whoami_hs, T0,
+    };
     use crate::report::test_support::sealed_of;
     use crate::sms::test_support::{fake_ovhcloud, sms_through, Inbox, OPERATOR_NUMBER};
     use data_encoding::BASE64;
@@ -527,7 +529,21 @@ mod tests {
             sent(&st, no_token, "harassment", &sealed).await,
             Err(AppError::Unauthenticated)
         ));
-        // A token the homeserver does not vouch for: here, one nobody answers.
+        // A token the homeserver does not vouch for.
+        let refusing = state_from(pool.clone(), refusing_hs().await, Config::for_tests());
+        assert!(matches!(
+            sent(
+                &refusing,
+                keyed("alice", "report-key-1"),
+                "harassment",
+                &sealed
+            )
+            .await,
+            Err(AppError::Unauthenticated)
+        ));
+        // A homeserver nobody reaches says nothing of the token (#491): the
+        // report is not refused, it is to be sent again, and nothing of it
+        // is kept meanwhile.
         let unreachable = state_from(
             pool.clone(),
             "http://127.0.0.1:1".into(),
@@ -541,7 +557,7 @@ mod tests {
                 &sealed
             )
             .await,
-            Err(AppError::Unauthenticated)
+            Err(AppError::HomeserverUnavailable)
         ));
         assert_eq!(kept_rows(&pool).await, []);
         a_moment().await;
@@ -682,6 +698,28 @@ mod tests {
         assert_eq!(anonymous.status(), StatusCode::UNAUTHORIZED);
         let said: serde_json::Value = anonymous.json().await.unwrap();
         assert_eq!(said["errcode"], "M_UNAUTHORIZED");
+
+        // A service whose homeserver nobody reaches answers 503, which the
+        // application reads as « nothing kept, send it again » (#491).
+        let away = crate::router(state_from(
+            pool.clone(),
+            "http://127.0.0.1:1".into(),
+            Config::for_tests(),
+        ));
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let away_base = format!("http://{}", listener.local_addr().unwrap());
+        tokio::spawn(async move { axum::serve(listener, away).await.unwrap() });
+        let later = http
+            .post(format!("{away_base}/reports"))
+            .bearer_auth("alice")
+            .header(IDEMPOTENCY_HEADER, "report-key-2")
+            .json(&serde_json::json!({"reason": "hate", "sealed": sealed}))
+            .send()
+            .await
+            .unwrap();
+        assert_eq!(later.status(), StatusCode::SERVICE_UNAVAILABLE);
+        let said: serde_json::Value = later.json().await.unwrap();
+        assert_eq!(said["errcode"], "MESSAGR_UPSTREAM");
 
         assert_eq!(kept_rows(&pool).await.len(), 1);
     }

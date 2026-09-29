@@ -450,10 +450,11 @@ function refusalDetail(status, body) {
  * - `closed` : `expired` ou `revoked`, les deux seuls que le service écrive.
  * - `unknown-invitation` : le 404 métier (`M_NOT_FOUND`). Pas le 404 d'une
  *   route inconnue (`M_UNRECOGNIZED`), ni une page d'erreur d'un proxy.
- * - `unauthenticated` : un 401. Le service le rend pour un jeton refusé, mais
- *   aussi quand le homeserver ne répond pas, parce qu'`authenticate` range
- *   toute panne de `whoami` sous ce code (`auth.rs`). La boucle demande donc
- *   au homeserver avant d'en conclure quoi que ce soit.
+ * - `unauthenticated` : un 401. Le service ne le rend que pour un jeton que
+ *   son homeserver refuse ; un homeserver qui ne lui répond pas donne un 503,
+ *   qui tombe dans `transient` (`auth.rs`, #491). La boucle demande tout de
+ *   même au homeserver avant d'en conclure quoi que ce soit : un 401 peut
+ *   aussi venir de ce qui se tient devant le service.
  * - `transient` : tout le reste, qui se réessaie.
  */
 export function readInvitationStatus(httpStatus, text) {
