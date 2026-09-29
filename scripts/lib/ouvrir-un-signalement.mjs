@@ -23,6 +23,15 @@
 // vise. Chaque ligne d'un message commence par « │ », pour qu'aucun texte ne
 // se fasse passer pour une ligne de l'outil. Une charge d'une autre forme
 // s'affiche telle quelle, et l'outil le dit.
+//
+// # Une photo ou un document (#471)
+//
+// Le signalement n'en porte que la description de son fichier chiffré :
+// l'outil montre son nom, son type, sa taille et l'adresse de sa copie
+// chiffrée, et ne l'ouvre qu'à la demande, pour le message que `--ouvrir`
+// nomme. L'ouverture télécharge la copie avec le compte d'exploitation,
+// vérifie son empreinte, la montre, puis l'efface
+// (`ouvrir-un-fichier-signale.mjs`).
 
 import { readFileSync } from 'node:fs'
 import { TextDecoder } from 'node:util'
@@ -39,14 +48,22 @@ import {
 } from '../../packages/app/src/runtime/reportFormat.ts'
 
 import { keyPathIn, readKeyFile } from './cle-de-l-exploitant.mjs'
+import { openReportedFile } from './ouvrir-un-fichier-signale.mjs'
 
 const USAGE = [
   'usage : node scripts/ouvrir-un-signalement.mjs [--cle <fichier>] [<pli.json>]',
+  '          [--ouvrir <n> [--compte <fichier>]]',
   '',
   'Le pli se lit dans le fichier nommé, sinon sur l’entrée standard :',
   '  { "reason": "<motif>", "reporter": "<compte qui signale>", "sealed": "<pli>" }',
   'La clé se lit dans ~/.messagr-exploitation/cle-de-l-exploitant.json,',
   'sauf --cle.',
+  '',
+  '--ouvrir <n> ouvre, à la demande, la photo ou le document du message n :',
+  'téléchargé avec le compte d’exploitation, son empreinte vérifiée, montré',
+  'puis effacé. Les identifiants du compte se lisent dans le fichier que',
+  'nomme --compte, sinon MESSAGR_EXPLOITATION_IDENTIFIANTS, sinon',
+  '~/.messagr-exploitation/messagr-eu.json.',
 ].join('\n')
 
 const DOES_NOT_OPEN = [
@@ -63,6 +80,16 @@ const DOES_NOT_OPEN = [
  * @property {() => Promise<string | null>} stdin l'entrée standard, ou `null` quand c'est un terminal
  * @property {(line: string) => void} stderr ce qui s'explique, sur la sortie d'erreur
  * @property {(text: string) => void} stdout la charge, seule, sur la sortie standard
+ * @property {(named: string | null) => Promise<MediaAccess>} [media] le compte d'exploitation, lu seulement pour `--ouvrir`, depuis le fichier que `--compte` nomme s'il en nomme un
+ * @property {(path: string) => Promise<void>} [show] montre le fichier écrit là, et rend la main une fois vu
+ * @property {string} [temporary] le répertoire sous lequel un fichier ouvert est écrit le temps d'être vu
+ */
+
+/**
+ * Le compte d'exploitation, prêt à télécharger un média, ou pourquoi ses
+ * identifiants ne se lisent pas. La raison ne dit jamais le jeton.
+ *
+ * @typedef {{ ok: true, download: (url: string) => Promise<Uint8Array> } | { ok: false, why: string }} MediaAccess
  */
 
 /**
@@ -109,24 +136,36 @@ export function openSealedReport(secretKey, document) {
 
 /**
  * L'outil d'ouverture : ouvre un pli avec la clé de l'exploitant, dit le
- * motif et le compte qui signale, vérifiés, puis affiche la charge. Rend le
+ * motif et le compte qui signale, vérifiés, puis affiche la charge ; avec
+ * `--ouvrir <n>`, ouvre ensuite la photo ou le document du message n. Rend le
  * code de sortie : 0 ouvert, 1 refusé, 2 rien à ouvrir (usage, fichier
- * illisible).
+ * illisible, message sans fichier, compte illisible).
  *
  * @param {string[]} argv
  * @param {OpenPorts} ports
  * @returns {Promise<number>}
  */
-export async function openTool(argv, { home, stdin, stderr, stdout }) {
+export async function openTool(argv, ports) {
+  const { home, stdin, stderr, stdout } = ports
   const args = [...argv]
-  let keyPath = keyPathIn(home)
-  const named = args.indexOf('--cle')
-  if (named !== -1) {
-    keyPath = args[named + 1] ?? ''
-    args.splice(named, 2)
-  }
-  if (keyPath === '' || args.length > 1 || args.some(a => a.startsWith('-'))) {
+  const keyPath = taken(args, '--cle') ?? keyPathIn(home)
+  const asked = taken(args, '--ouvrir')
+  const account = taken(args, '--compte')
+  if (
+    keyPath === '' ||
+    asked === '' ||
+    account === '' ||
+    (account !== null && asked === null) ||
+    args.length > 1 ||
+    args.some(a => a.startsWith('-'))
+  ) {
     stderr(USAGE)
+    return 2
+  }
+  if (asked !== null && !/^[1-9][0-9]{0,5}$/.test(asked)) {
+    stderr(
+      `--ouvrir attend le numéro d’un message, tel que l’outil l’affiche.\n\n${USAGE}`,
+    )
     return 2
   }
 
@@ -185,7 +224,11 @@ export async function openTool(argv, { home, stdin, stderr, stdout }) {
       'Ce qu’il porte n’est pas un signalement au format 1 : le voici tel quel.',
     )
     stdout(displayable(new TextDecoder().decode(opened.payload), true))
-    return 0
+    if (asked === null) return 0
+    stderr(
+      'Rien à ouvrir : ce qu’il porte n’a pas de message que l’outil lise.',
+    )
+    return 2
   }
   if (
     report.reason !== opened.reason ||
@@ -197,13 +240,87 @@ export async function openTool(argv, { home, stdin, stderr, stdout }) {
     )
   }
   stdout(readable(report).join('\n'))
+  return asked === null
+    ? 0
+    : await openOnDemand(report, Number(asked), account, ports)
+}
+
+/**
+ * Ouvre la photo ou le document du message `wanted` (compté à partir de 1,
+ * comme l'outil l'affiche), avec le compte d'exploitation. Rend le code de
+ * sortie : 0 montré puis effacé, 1 refusé, 2 rien à ouvrir.
+ *
+ * @param {import('../../packages/app/src/runtime/reportFormat.ts').ReportPayload} report
+ * @param {number} wanted
+ * @param {string | null} account le fichier d'identifiants que `--compte` nomme
+ * @param {OpenPorts} ports
+ * @returns {Promise<number>}
+ */
+async function openOnDemand(
+  report,
+  wanted,
+  account,
+  { media, show, temporary, stderr },
+) {
+  const message = report.messages[wanted - 1]
+  if (message === undefined) {
+    stderr(
+      `Ce signalement n’a pas de message ${wanted} : il en a ${report.messages.length}.`,
+    )
+    return 2
+  }
+  if ('text' in message) {
+    stderr(
+      `Le message ${wanted} ne porte ni photo ni document : rien à ouvrir.`,
+    )
+    return 2
+  }
+  if (media === undefined || show === undefined || temporary === undefined) {
+    stderr('Cet outil n’a pas de quoi ouvrir un fichier ici.')
+    return 2
+  }
+  const access = await media(account)
+  if (!access.ok) {
+    stderr(access.why)
+    return 2
+  }
+  const opened = await openReportedFile(
+    'photograph' in message ? message.photograph : message.document,
+    { download: access.download, show, temporary, stderr },
+  )
+  if (!opened.shown) {
+    stderr(opened.why)
+    return 1
+  }
   return 0
+}
+
+/**
+ * La valeur de l'option `flag`, retirée de `args` avec elle : `null` quand
+ * l'option est absente, `''` quand elle n'a pas de valeur.
+ *
+ * @param {string[]} args
+ * @param {string} flag
+ * @returns {string | null}
+ */
+function taken(args, flag) {
+  const at = args.indexOf(flag)
+  if (at === -1) return null
+  const value = args[at + 1]
+  if (value === undefined || value.startsWith('-')) {
+    args.splice(at, 1)
+    return ''
+  }
+  args.splice(at, 2)
+  return value
 }
 
 /**
  * Un signalement ouvert, ligne à ligne, dans l'ordre où l'exploitant le lit.
  * Un message dont l'expéditeur n'est pas l'auteur le dit : l'application
- * n'en écrit pas, et un retrait vise l'auteur.
+ * n'en écrit pas, et un retrait vise l'auteur. Une photo ou un document se
+ * montre par sa description, et par l'option qui l'ouvre : rien n'est
+ * téléchargé sans qu'on le demande.
  *
  * @param {import('../../packages/app/src/runtime/reportFormat.ts').ReportPayload} report
  * @returns {string[]}
@@ -227,11 +344,37 @@ function readable(report) {
         `  expéditeur : ${displayable(message.sender, false)}, qui n’est pas l’auteur`,
       )
     }
-    for (const line of displayable(message.text, true).split('\n')) {
-      lines.push(`  │ ${line}`)
+    if ('text' in message) {
+      for (const line of displayable(message.text, true).split('\n')) {
+        lines.push(`  │ ${line}`)
+      }
+      return
     }
+    const [kind, file] =
+      'photograph' in message
+        ? ['photo', message.photograph]
+        : ['document', message.document]
+    lines.push(
+      `  ${kind} : ${described(file)}`,
+      `  copie chiffrée : ${displayable(file.file.url, false)}`,
+      `  pour l’ouvrir, à la demande : --ouvrir ${at + 1}`,
+    )
   })
   return lines
+}
+
+/**
+ * Le nom, le type et la taille d'un fichier signalé, tels que l'événement
+ * les dit.
+ *
+ * @param {import('../../packages/app/src/runtime/reportFormat.ts').ReportedFile} file
+ * @returns {string}
+ */
+function described(file) {
+  const name = displayable(file.name ?? 'sans nom', false)
+  const type = displayable(file.mimetype ?? 'type non dit', false)
+  const size = file.size === null ? 'taille non dite' : `${file.size} octets`
+  return `${name} (${type}, ${size})`
 }
 
 /**
