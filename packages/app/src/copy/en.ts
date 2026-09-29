@@ -193,6 +193,8 @@ export const en: Readonly<Record<CopyKey, string>> = {
   report_what_heading: 'What leaves this phone',
   report_what:
     'The messages you chose, as you read them, with their author and their time, the identifier of the conversation and of each message, and the moment of the report. Nothing else from the conversation.',
+  report_what_files:
+    'For a photo or a document: the address of its encrypted copy, already on the server, the key that opens it, its type, its name and its size. The operator will be able to open it; the file itself is not sent a second time.',
   'report_author %@': 'Attributed by the server to %@',
   'report_when %1$@ %2$@': '%1$@ at %2$@',
   'report_account %@': 'Sent in the name of your account: %@',

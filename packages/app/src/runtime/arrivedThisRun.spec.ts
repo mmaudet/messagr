@@ -22,6 +22,7 @@ function file(url: string): ReadFile {
 function picture(url: string, thumbnail: string | null = null): ReadImage {
   return {
     ...file(url),
+    size: null,
     thumbnail: thumbnail === null ? null : file(thumbnail),
   }
 }

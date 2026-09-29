@@ -5928,6 +5928,14 @@ export function App({
               reportable(reporting.eventIds, conversation ?? [], selfUserId)
                 ?.messages ?? null
             }
+            // A PHOTOGRAPH AS THE CONVERSATION HOLDS IT (#471): the same
+            // object from one render to the next, so it is fetched once, and
+            // its thumbnail is the one the conversation already drew.
+            picture={eventId =>
+              (conversation ?? []).find(entry => entry.eventId === eventId)
+                ?.image
+            }
+            fetch={loadImage}
             stage={reporting.sheet}
             onSend={reason => {
               const { opening, scope, eventIds } = reporting

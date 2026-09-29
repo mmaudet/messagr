@@ -241,6 +241,12 @@ export const fr = {
   report_what_heading: 'Ce qui part de ce téléphone',
   report_what:
     'Les messages choisis, tels que vous les lisez, avec leur auteur et leur heure, l’identifiant de la conversation et celui de chaque message, et le moment du signalement. Rien d’autre de la conversation.',
+  // CE QUI PART D'UNE PHOTO OU D'UN DOCUMENT (#471), dit dès que le
+  // signalement en porte un : pas le fichier, mais de quoi ouvrir sa copie
+  // chiffrée, qui est déjà sur le serveur. L'exploitant pourra donc le voir,
+  // et c'est ce qui doit être lu avant « Envoyer ».
+  report_what_files:
+    'Pour une photo ou un document : l’adresse de sa copie chiffrée, déjà sur le serveur, la clé qui l’ouvre, son type, son nom et sa taille. L’exploitant pourra l’ouvrir ; le fichier lui-même n’est pas envoyé une seconde fois.',
   // ATTRIBUÉS, ET PAR LE SERVEUR : déchiffrer un message ne dit pas qui l'a
   // écrit (ADR 0001), et l'auteur nommé est celui que le serveur lui donne.
   'report_author %@': 'Attribués par le serveur à %@',

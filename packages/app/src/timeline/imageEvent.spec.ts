@@ -129,6 +129,7 @@ describe('readImageEvent', () => {
       mimeType: 'image/jpeg',
       width: 1024,
       height: 768,
+      size: 9,
       thumbnail: null,
     })
   })
@@ -169,6 +170,8 @@ describe('readImageEvent', () => {
     })
     expect(read?.width).toBeNull()
     expect(read?.mimeType).toBeNull()
+    // And a size it did not state is not one invented (#471).
+    expect(read?.size).toBeNull()
   })
 
   it('reads the thumbnail as a file with its own address and its own key', () => {

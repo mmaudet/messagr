@@ -251,6 +251,33 @@ describe('What a report carries, inside the seal (#468)', () => {
     }
   })
 
+  it('still reads a report of words exactly as #468 wrote it', () => {
+    // Backward-readable (#471): photographs and documents came without a new
+    // format number, so every report sealed before reads as it did.
+    const written =
+      '{"format":1,"reason":"threat","reported_at":1790000060000,' +
+      '"reporting_account":"@alice:example.org",' +
+      '"reported_account":"@bob:example.org","room_id":"!room:example.org",' +
+      '"messages":[{"event_id":"$first","sent_at":1790000000000,' +
+      '"sender":"@bob:example.org","text":"Tu vas le regretter."}]}'
+
+    expect(payloadOf(new TextEncoder().encode(written))).toEqual({
+      reason: 'threat',
+      reportedAt: 1_790_000_060_000,
+      reportingAccount: '@alice:example.org',
+      reportedAccount: '@bob:example.org',
+      roomId: '!room:example.org',
+      messages: [
+        {
+          eventId: '$first',
+          sentAt: 1_790_000_000_000,
+          sender: '@bob:example.org',
+          text: 'Tu vas le regretter.',
+        },
+      ],
+    })
+  })
+
   it('fits the service’s sixteen blocks up to 65,535 bytes, and not one more', () => {
     // The service takes one to sixteen blocks of 4,096 bytes (`report.rs`),
     // and the padding needs one byte of its own.
@@ -259,6 +286,194 @@ describe('What a report carries, inside the seal (#468)', () => {
     expect(padded(new Uint8Array(MOST_PAYLOAD_BYTES + 1))).toHaveLength(
       17 * 4096,
     )
+  })
+})
+
+describe('A photograph or a document in a report (#471)', () => {
+  /** Matrix's `EncryptedFile`, as an event of this application carries it. */
+  const PHOTOGRAPH_FILE = {
+    v: 'v2',
+    key: {
+      kty: 'oct',
+      key_ops: ['encrypt', 'decrypt'],
+      alg: 'A256CTR',
+      k: 'qcHVMSgYg-71CauWBezXI5qkaRb0LuIy-Wx5kIaHMIA',
+      ext: true,
+    },
+    iv: 'X85+XgHN+HEAAAAAAAAAAA',
+    hashes: { sha256: 'eZjVdFJp2cSnZjB2S2BWrPCtbWRXjt0ZRkAyXvqSFw8' },
+    url: 'mxc://example.org/AbCdEfPhotograph',
+  }
+  const DOCUMENT_FILE = {
+    ...PHOTOGRAPH_FILE,
+    key: {
+      ...PHOTOGRAPH_FILE.key,
+      k: 'b3RoZXIta2V5LW9mLXRoaXJ0eS10d28tYnl0ZXMtLTA',
+    },
+    iv: 'AAECAwQFBgcAAAAAAAAAAA',
+    hashes: { sha256: 'KL3JMkqoqF6Es3QDvhdxPxZw9P7L9s46FLc5o3gfM9A' },
+    url: 'mxc://example.org/GhIjKlDocument',
+  }
+  const PAYLOAD: ReportPayload = {
+    reason: 'sexual_without_consent',
+    reportedAt: 1_790_000_060_000,
+    reportingAccount: '@alice:example.org',
+    reportedAccount: '@bob:example.org',
+    roomId: '!room:example.org',
+    messages: [
+      {
+        eventId: '$words',
+        sentAt: 1_790_000_000_000,
+        sender: '@bob:example.org',
+        text: 'Regarde.',
+      },
+      {
+        eventId: '$photograph',
+        sentAt: 1_790_000_010_000,
+        sender: '@bob:example.org',
+        photograph: {
+          file: PHOTOGRAPH_FILE,
+          mimetype: 'image/jpeg',
+          name: 'image.jpg',
+          size: 12_000_000,
+        },
+      },
+      {
+        eventId: '$document',
+        sentAt: 1_790_000_020_000,
+        sender: '@bob:example.org',
+        document: {
+          file: DOCUMENT_FILE,
+          mimetype: null,
+          name: 'contrat.pdf',
+          size: null,
+        },
+      },
+    ],
+  }
+
+  function json(value: unknown): Uint8Array {
+    return new TextEncoder().encode(JSON.stringify(value))
+  }
+
+  it('writes each as the description of its encrypted file, laid out as the format says', () => {
+    // #471: the address of its encrypted copy on the server, its key, its
+    // counter, its hashes, then its type, its name and its size. Never its
+    // bytes: the payload names twelve megabytes and holds none of them.
+    const written = JSON.parse(
+      new TextDecoder().decode(payloadBytes(PAYLOAD)),
+    ) as { messages: unknown[] }
+
+    expect(written.messages).toEqual([
+      {
+        event_id: '$words',
+        sent_at: 1790000000000,
+        sender: '@bob:example.org',
+        text: 'Regarde.',
+      },
+      {
+        event_id: '$photograph',
+        sent_at: 1790000010000,
+        sender: '@bob:example.org',
+        photograph: {
+          file: {
+            v: 'v2',
+            key: {
+              kty: 'oct',
+              key_ops: ['encrypt', 'decrypt'],
+              alg: 'A256CTR',
+              k: 'qcHVMSgYg-71CauWBezXI5qkaRb0LuIy-Wx5kIaHMIA',
+              ext: true,
+            },
+            iv: 'X85+XgHN+HEAAAAAAAAAAA',
+            hashes: { sha256: 'eZjVdFJp2cSnZjB2S2BWrPCtbWRXjt0ZRkAyXvqSFw8' },
+            url: 'mxc://example.org/AbCdEfPhotograph',
+          },
+          mimetype: 'image/jpeg',
+          name: 'image.jpg',
+          size: 12000000,
+        },
+      },
+      {
+        event_id: '$document',
+        sent_at: 1790000020000,
+        sender: '@bob:example.org',
+        document: {
+          file: DOCUMENT_FILE,
+          mimetype: null,
+          name: 'contrat.pdf',
+          size: null,
+        },
+      },
+    ])
+    expect(payloadBytes(PAYLOAD).length).toBeLessThan(4096)
+  })
+
+  it('reads them back as they were written', () => {
+    expect(payloadOf(payloadBytes(PAYLOAD))).toEqual(PAYLOAD)
+  })
+
+  it('refuses a message carrying two things, or a file it could not open', () => {
+    const written = JSON.parse(
+      new TextDecoder().decode(payloadBytes(PAYLOAD)),
+    ) as Record<string, unknown> & { messages: Record<string, unknown>[] }
+    const photograph = written.messages[1] as {
+      photograph: { file: typeof PHOTOGRAPH_FILE }
+    }
+    const withFile = (file: unknown) =>
+      json({
+        ...written,
+        messages: [
+          { ...photograph, photograph: { ...photograph.photograph, file } },
+        ],
+      })
+    const cases: [string, Uint8Array][] = [
+      [
+        'words and a photograph',
+        json({
+          ...written,
+          messages: [{ ...photograph, text: 'Regarde.' }],
+        }),
+      ],
+      [
+        'a photograph and a document',
+        json({
+          ...written,
+          messages: [{ ...photograph, document: photograph.photograph }],
+        }),
+      ],
+      [
+        'a photograph that is nothing',
+        json({ ...written, messages: [{ ...photograph, photograph: null }] }),
+      ],
+      ['no address', withFile({ ...PHOTOGRAPH_FILE, url: undefined })],
+      [
+        'an address off the homeserver',
+        withFile({ ...PHOTOGRAPH_FILE, url: 'https://example.org/a.jpg' }),
+      ],
+      ['no key', withFile({ ...PHOTOGRAPH_FILE, key: undefined })],
+      [
+        'a key without its bytes',
+        withFile({ ...PHOTOGRAPH_FILE, key: { alg: 'A256CTR' } }),
+      ],
+      ['no counter', withFile({ ...PHOTOGRAPH_FILE, iv: 7 })],
+      ['no hash', withFile({ ...PHOTOGRAPH_FILE, hashes: {} })],
+      [
+        'a size written as text',
+        json({
+          ...written,
+          messages: [
+            {
+              ...photograph,
+              photograph: { ...photograph.photograph, size: '12 Mo' },
+            },
+          ],
+        }),
+      ],
+    ]
+    for (const [what, bytes] of cases) {
+      expect(payloadOf(bytes), what).toBeNull()
+    }
   })
 })
 

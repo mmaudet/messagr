@@ -11,12 +11,16 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context'
 
 import { t, type CopyKey } from '../copy'
 import { color, floors, layout, radius, space, type } from '../design/tokens'
+import type { ShownImage } from '../runtime/receiveImage'
 import {
   REPORT_REASONS,
   type ReportedMessage,
   type ReportReason,
 } from '../runtime/reportFormat'
+import type { ReadFile, ReadImage } from '../timeline/imageEvent'
+import { Document } from './Document'
 import { NotchedButton } from './NotchedButton'
+import { Photograph } from './Photograph'
 import type { ReportStage } from './reportStage'
 import { dayOf, timeOf } from './whenLabel'
 
@@ -34,6 +38,15 @@ import { dayOf, timeOf } from './whenLabel'
  * report, and nothing else of the conversation; and a sending that is wanted
  * every time, which is why no reason is chosen in advance and « Envoyer »
  * sends nothing until one is.
+ *
+ * # A PHOTOGRAPH OR A DOCUMENT, SHOWN AS READ, AND SAID AS IT LEAVES (#471)
+ *
+ * A photograph is drawn as the conversation draws it, from the copy the
+ * conversation already holds, and a document as its row: what the person
+ * chose, as they read it. What leaves of either is not the file but the
+ * description of its encrypted copy, already on the server, which lets the
+ * operator open it: the sheet says so in words (`report_what_files`),
+ * whenever the report carries one.
  *
  * # THE AUTHOR IS THE ACCOUNT THE SERVER ATTRIBUTES THE MESSAGES TO
  *
@@ -88,6 +101,8 @@ export function ReportSheet({
   author,
   reporter,
   messages,
+  picture,
+  fetch,
   stage,
   onSend,
   onClose,
@@ -106,6 +121,14 @@ export function ReportSheet({
    * one.
    */
   readonly messages: readonly ReportedMessage[] | null
+  /**
+   * The photograph a chosen message is, as the conversation holds it: the
+   * same object from one drawing to the next, so that `Photograph` fetches
+   * it once, and from the copy the conversation already fetched.
+   */
+  readonly picture: (eventId: string) => ReadImage | undefined
+  /** How the conversation fetches a photograph, stable across renders. */
+  readonly fetch: (file: ReadFile) => Promise<ShownImage>
   readonly stage: ReportStage
   readonly onSend: (reason: ReportReason) => void
   readonly onClose: () => void
@@ -212,6 +235,11 @@ export function ReportSheet({
               <View style={styles.section}>
                 <Text style={styles.heading}>{t('report_what_heading')}</Text>
                 <Text style={styles.body}>{t('report_what')}</Text>
+                {(messages ?? []).some(message => !('text' in message)) && (
+                  <Text style={styles.body} testID="report-what-files">
+                    {t('report_what_files')}
+                  </Text>
+                )}
                 <View style={styles.leaving} testID="report-messages">
                   <Text style={styles.attributed} testID="report-author">
                     {t('report_author %@', author)}
@@ -228,7 +256,23 @@ export function ReportSheet({
                           timeOf(message.sentAt),
                         )}
                       </Text>
-                      <Text style={styles.text}>{message.text}</Text>
+                      {'text' in message ? (
+                        <Text style={styles.text}>{message.text}</Text>
+                      ) : 'document' in message ? (
+                        // A document read here always has a name:
+                        // `readFileEvent` refuses one without.
+                        <Document
+                          name={message.document.name ?? ''}
+                          size={message.document.size}
+                          testID={`report-document-${message.eventId}`}
+                        />
+                      ) : (
+                        <ReportedPhotograph
+                          image={picture(message.eventId)}
+                          fetch={fetch}
+                          testID={`report-photograph-${message.eventId}`}
+                        />
+                      )}
                     </View>
                   ))}
                 </View>
@@ -294,6 +338,26 @@ export function ReportSheet({
         </View>
       </View>
     </Modal>
+  )
+}
+
+/**
+ * A photograph a report carries, drawn as the conversation draws it. The
+ * conversation always holds it, since `reportable` read the report from it;
+ * were it gone, nothing is drawn rather than a picture that is not the one
+ * leaving.
+ */
+function ReportedPhotograph({
+  image,
+  fetch,
+  testID,
+}: {
+  readonly image: ReadImage | undefined
+  readonly fetch: (file: ReadFile) => Promise<ShownImage>
+  readonly testID: string
+}) {
+  return image === undefined ? null : (
+    <Photograph image={image} fetch={fetch} testID={testID} />
   )
 }
 

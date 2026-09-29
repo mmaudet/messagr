@@ -25,7 +25,11 @@ import { parsed, type Answer } from './serviceAnswer'
  * device: the report number is all the person keeps, on screen.
  *
  * What it carries is `reportable`'s, the one definition the selection bar
- * and the sheet read too: nothing leaves that was not shown.
+ * and the sheet read too: nothing leaves that was not shown. A photograph or
+ * a document is in it as the description of its encrypted file, the key to
+ * a copy already on the server, never as its bytes (#471): nothing is
+ * downloaded, decrypted, written or uploaded to make a report, and what is
+ * handed to this module could not do any of it.
  *
  * # WHAT THE SERVICE LEARNS, AND WHAT IT DOES NOT
  *

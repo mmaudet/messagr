@@ -57,6 +57,7 @@ describe('whether this device has ever read a message somebody else sent', () =>
               mimeType: 'image/jpeg',
               width: 800,
               height: 600,
+              size: null,
               thumbnail: null,
             },
           }),

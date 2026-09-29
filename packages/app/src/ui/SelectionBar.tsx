@@ -71,8 +71,8 @@ export function SelectionBar({
   /** Whether the selection is something that could be found again. */
   readonly canFavourite: boolean
   /**
-   * Whether the selection is texts of one other participant, which is what
-   * a report carries (#468, `reportable`).
+   * Whether the selection is words, photographs or documents of one other
+   * participant, which is what a report carries (#468, #471, `reportable`).
    */
   readonly canReport: boolean
   /**
@@ -188,11 +188,13 @@ export function SelectionBar({
         </Pressable>
       )}
 
-      {/* ONLY ON ONE OTHER PERSON'S WORDS (#468). A report names one account
-          and carries its messages as read, so a selection mixing two people,
-          holding one of this account's own, or a photograph (#471) has no
-          « Signaler » at all: absent, never greyed, as everything here. What
-          it opens says what leaves before anything does: `ReportSheet.tsx`. */}
+      {/* ONLY ON ONE OTHER PERSON'S MESSAGES (#468, #471): words,
+          photographs and documents, mixed as chosen. A report names one
+          account and carries its messages as read, so a selection mixing two
+          people, holding one of this account's own, or a video or a voice
+          message has no « Signaler » at all: absent, never greyed, as
+          everything here. What it opens says what leaves before anything
+          does: `ReportSheet.tsx`. */}
       {reportable && (
         <Pressable
           testID="selection-report"

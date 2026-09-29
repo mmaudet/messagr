@@ -157,6 +157,98 @@ describe('Reporting messages to the operator (#468)', () => {
     }
   })
 
+  it('seals a photograph and a document of the same author beside their words, each as the description of its encrypted file, never its bytes (#471)', async () => {
+    // A twelve-megabyte photograph. What reporting is handed has no way to
+    // fetch it, decrypt it or upload it (`Reporting`), and what is sealed
+    // names its address, its key and its hash: one block, for any size.
+    const material = {
+      v: 'v2',
+      key: {
+        kty: 'oct',
+        key_ops: ['encrypt', 'decrypt'],
+        alg: 'A256CTR',
+        k: 'qcHVMSgYg-71CauWBezXI5qkaRb0LuIy-Wx5kIaHMIA',
+        ext: true,
+      },
+      iv: 'X85+XgHN+HEAAAAAAAAAAA',
+      hashes: { sha256: 'eZjVdFJp2cSnZjB2S2BWrPCtbWRXjt0ZRkAyXvqSFw8' },
+    }
+    const photograph: TimelineEntry = {
+      eventId: '$photograph',
+      claimedSender: HIM,
+      sentAt: 1_790_000_012_000,
+      body: 'image.jpg',
+      msgtype: 'm.image',
+      image: {
+        url: 'mxc://example.org/photograph',
+        secret: JSON.stringify(material),
+        mimeType: 'image/jpeg',
+        width: 4000,
+        height: 3000,
+        size: 12_000_000,
+        thumbnail: null,
+      },
+    }
+    const document: TimelineEntry = {
+      eventId: '$document',
+      claimedSender: HIM,
+      sentAt: 1_790_000_014_000,
+      body: 'menaces.pdf',
+      msgtype: 'm.file',
+      document: {
+        url: 'mxc://example.org/document',
+        secret: JSON.stringify(material),
+        name: 'menaces.pdf',
+        mimeType: 'application/pdf',
+        size: 81_920,
+      },
+    }
+    const { reporting, sealed, sent } = device()
+
+    const reported = await reportMessages(reporting, {
+      ...REQUEST,
+      selected: new Set(['$document', '$first', '$photograph']),
+      timeline: [...TIMELINE, photograph, document],
+    })
+
+    expect(reported).toEqual({ outcome: 'sent', number: 'K7QM-4ZT2' })
+    expect(payloadOf(sealed[0]!.payload)?.messages).toEqual([
+      {
+        eventId: '$first',
+        sentAt: 1_790_000_010_000,
+        sender: HIM,
+        text: 'Tu vas le regretter.',
+      },
+      {
+        eventId: '$photograph',
+        sentAt: 1_790_000_012_000,
+        sender: HIM,
+        photograph: {
+          file: { ...material, url: 'mxc://example.org/photograph' },
+          mimetype: 'image/jpeg',
+          name: 'image.jpg',
+          size: 12_000_000,
+        },
+      },
+      {
+        eventId: '$document',
+        sentAt: 1_790_000_014_000,
+        sender: HIM,
+        document: {
+          file: { ...material, url: 'mxc://example.org/document' },
+          mimetype: 'application/pdf',
+          name: 'menaces.pdf',
+          size: 81_920,
+        },
+      },
+    ])
+    expect(sealed[0]!.payload.length).toBeLessThan(4096)
+    // And the service learns no more of a file than of words.
+    expect(sent.map(({ body }) => JSON.parse(body) as unknown)).toEqual([
+      { reason: 'harassment', sealed: 'THE-SEALED-REPORT' },
+    ])
+  })
+
   it('names the reporting account exactly as the homeserver’s whoami answers, and binds the seal to it', async () => {
     // The service keeps the account its whoami names, and the seal must bind
     // that very string, or the report does not open: not the one this device

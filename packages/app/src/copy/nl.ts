@@ -184,6 +184,8 @@ export const nl: Readonly<Record<CopyKey, string>> = {
   report_what_heading: 'Wat deze telefoon verlaat',
   report_what:
     'De gekozen berichten, zoals u ze leest, met hun afzender en hun tijdstip, de identificatie van het gesprek en van elk bericht, en het moment van de melding. Verder niets uit het gesprek.',
+  report_what_files:
+    'Voor een foto of een document: het adres van de versleutelde kopie, die al op de server staat, de sleutel die haar opent, het type, de naam en de grootte. De exploitant kan het zo openen; het bestand zelf wordt geen tweede keer verstuurd.',
   'report_author %@': 'Door de server toegeschreven aan %@',
   'report_when %1$@ %2$@': '%1$@ om %2$@',
   'report_account %@': 'Verstuurd namens uw account: %@',
