@@ -48,21 +48,18 @@ function fail(message) {
   status = 1;
 }
 
+// La sortie d'erreur est gardée même quand le geste réussit : c'est là qu'il
+// dit quelle page attend, et pourquoi.
 function run(file, args) {
-  try {
-    var stdout = child.execFileSync(file, args, {
-      encoding: 'utf8',
-      env: { PATH: process.env.PATH, HOME: process.env.HOME },
-      stdio: ['ignore', 'pipe', 'pipe'],
-    });
-    return { code: 0, out: stdout, err: '' };
-  } catch (e) {
-    return {
-      code: e.status === undefined || e.status === null ? -1 : e.status,
-      out: String(e.stdout || ''),
-      err: String(e.stderr || '') + String(e.message || ''),
-    };
-  }
+  var result = child.spawnSync(file, args, {
+    encoding: 'utf8',
+    env: { PATH: process.env.PATH, HOME: process.env.HOME },
+  });
+  return {
+    code: result.status === null ? -1 : result.status,
+    out: String(result.stdout || ''),
+    err: String(result.stderr || '') + (result.error ? String(result.error.message) : ''),
+  };
 }
 
 function read(file) {
@@ -157,16 +154,19 @@ function prepare(site, page) {
   });
 }
 
-/**
- * Une copie du site, et de retention.json à côté comme dans le dépôt, chaque
- * page légale avec une version qui attend d'être publiée.
- */
-function aCopy() {
+/** Une copie du site, et de retention.json à côté comme dans le dépôt. */
+function aPlainCopy() {
   var copy = fs.mkdtempSync(path.join(os.tmpdir(), 'a-publier-source-'));
   var site = path.join(copy, 'site');
   fs.mkdirSync(site);
   child.execFileSync('cp', ['-R', siteDir + '/.', site]);
   child.execFileSync('cp', [retentionFile, path.join(copy, 'retention.json')]);
+  return site;
+}
+
+/** Une copie où chaque page légale tient une version qui attend d'être publiée. */
+function aCopy() {
+  var site = aPlainCopy();
   PAGES.forEach(function (page) {
     if (!exists(path.join(site, page, 'a-publier', 'index.html'))) {
       prepare(site, page);
@@ -208,12 +208,17 @@ function publishAt(site, instant) {
     'publier(' + JSON.stringify(site) + ', new Date(' + JSON.stringify(instant) + '));']);
 }
 
-/** `appliquer` à l'instant donné, comme version-a-venir.js le fait. */
+/**
+ * `appliquer` à l'instant donné, comme version-a-venir.js le fait, et ce qui
+ * retient les pages qui attendent, dit comme la ligne de commande le dit.
+ */
 function applyAt(site, instant) {
   return run('node', ['--input-type=module', '-e',
     'import { appliquer } from ' + JSON.stringify(tool) + ';\n' +
-    'appliquer(' + JSON.stringify(site) + ', ' + JSON.stringify(path.join(site, '..', 'retention.json')) +
-    ', new Date(' + JSON.stringify(instant) + '));']);
+    'const fait = appliquer(' + JSON.stringify(site) + ', ' +
+    JSON.stringify(path.join(site, '..', 'retention.json')) +
+    ', new Date(' + JSON.stringify(instant) + '));\n' +
+    'for (const retenue of fait.attendent) console.error(retenue);']);
 }
 
 /**
@@ -362,16 +367,16 @@ var LATER = '2031-03-30';
         fail(page + '/jusqu-au-' + date + '/ does not keep the replaced version');
         return;
       }
-      var archived = read(replaced);
+      var datedVersion = read(replaced);
       var body = function (html) {
         return textOf(html.replace(/<!-- (a-venir|jusqu-au) -->[\s\S]*?<!-- \/(a-venir|jusqu-au) -->/g, '')
           .replace(/<title>[^<]*<\/title>/, ''));
       };
-      if (body(archived) !== body(was.inForce)) {
+      if (body(datedVersion) !== body(was.inForce)) {
         fail(page + '/jusqu-au-' + date + '/ is not the version that was in force');
       }
-      if (archived.indexOf("s'est appliquée jusqu'au " + said(date, 'fr')) === -1 ||
-          archived.indexOf('href="/' + page + '/"') === -1) {
+      if (datedVersion.indexOf("s'est appliquée jusqu'au " + said(date, 'fr')) === -1 ||
+          datedVersion.indexOf('href="/' + page + '/"') === -1) {
         fail(page + '/jusqu-au-' + date + '/ does not say until when, and what replaced it');
       }
       // L'annonce de la version à venir passe dans la nouvelle version, une
@@ -434,9 +439,9 @@ var LATER = '2031-03-30';
     return;
   }
   PAGES.forEach(function (page) {
-    var archived = read(path.join(site, page, 'jusqu-au-' + LATER, 'index.html'));
-    var stamp = archived.indexOf('<p class="stamp">');
-    var card = archived.indexOf("s'est appliquée jusqu'au " + said(LATER, 'fr'));
+    var datedVersion = read(path.join(site, page, 'jusqu-au-' + LATER, 'index.html'));
+    var stamp = datedVersion.indexOf('<p class="stamp">');
+    var card = datedVersion.indexOf("s'est appliquée jusqu'au " + said(LATER, 'fr'));
     if (stamp === -1 || card === -1 || card < stamp) {
       fail(page + '/jusqu-au-' + LATER + '/, which announced nothing, does not say under its date until when it applied');
     }
@@ -522,7 +527,13 @@ var LATER = '2031-03-30';
   });
 })();
 
-// ── 4. Deux changements à la fois : les gestes de la version à venir refusent
+// ── 4. Deux changements sur une page : cette page attend, et elle seule ──
+//
+// Tant qu'une version attend d'être publiée, la version à venir de la même
+// page est écrite par-dessus elle ; une fois publiée avec sa traduction, la
+// version à venir n'a pas la sienne. Dans les deux cas cette page attend, le
+// geste dit ce qui lui manque, et les autres pages avancent : la politique de
+// confidentialité ne se voit pas retenue par les conditions générales.
 (function () {
   var upcoming = PAGES.filter(function (page) {
     return exists(path.join(siteDir, page, 'a-venir', 'index.html'));
@@ -530,53 +541,94 @@ var LATER = '2031-03-30';
   if (upcoming.length === 0) {
     return;
   }
-  // Tant qu'une version attend, la version à venir est écrite par-dessus
-  // elle, et l'annoncer comparerait ce qui change à la mauvaise version.
-  var waiting = aCopy();
-  var untouched = snapshot(waiting);
-  var announced = run('node', [tool, 'annoncer', new Date(Date.now() + 40 * 86400000).toISOString().slice(0, 10), waiting]);
-  if (!refused(announced) || !/publi/.test(announced.err)) {
-    fail('an upcoming version was announced while another waited to be published: ' + announced.out + announced.err);
-  }
-  if (snapshot(waiting) !== untouched) {
-    fail('a refused announcement wrote into the site');
+  var soon = new Date(Date.now() + 40 * 86400000).toISOString().slice(0, 10);
+
+  function both(site, page) {
+    return read(path.join(site, page, 'a-venir', 'index.html')) + read(path.join(site, page, 'index.html'));
   }
 
-  // Une fois publiée avec sa traduction, une version à venir ne peut ni être
-  // annoncée ni s'appliquer : sans traduction à elle, elle laisserait la
-  // traduction publiée traduire une version remplacée.
+  /**
+   * Annonce, puis vérifie que chaque page que `waits` retient est nommée avec
+   * ce qui lui manque (`lacks`), ses deux pages inchangées, et que chaque
+   * autre page est annoncée à côté d'elle.
+   */
+  function announceBeside(site, waits, lacks, label) {
+    var before = {};
+    upcoming.forEach(function (page) { before[page] = both(site, page); });
+    var free = upcoming.filter(function (page) { return !waits(page); });
+    var result = run('node', [tool, 'annoncer', soon, site]);
+    if (free.length === 0 ? !refused(result) : result.code !== 0) {
+      fail(label + ': the announcement ' + (free.length === 0 ? 'with every page waiting was not refused' : 'of the pages that wait for nothing failed') + ': ' + result.out + result.err);
+    }
+    upcoming.forEach(function (page) {
+      if (!waits(page)) {
+        if (both(site, page).indexOf(said(soon, 'fr')) === -1) {
+          fail(label + ': ' + page + ', which waits for nothing, was not announced beside the page that waits');
+        }
+        return;
+      }
+      if (both(site, page) !== before[page]) {
+        fail(label + ': ' + page + ', which waits, was written into');
+      }
+      if (result.err.indexOf('/' + page + '/a-venir/ attend') === -1 || !lacks.test(result.err)) {
+        fail(label + ': the announcement does not say what ' + page + ' waits for: ' + result.err);
+      }
+    });
+    return free;
+  }
+
+  // Une version qui attend d'être publiée sur une page, et sur elle seule :
+  // celle du dépôt s'il en tient une, une préparée sinon ; les autres pages
+  // n'en ont pas, pour qu'il y ait de quoi annoncer à côté.
+  var waiting = aPlainCopy();
+  var holder = upcoming.filter(function (page) {
+    return exists(path.join(waiting, page, 'a-publier', 'index.html'));
+  })[0] || upcoming[0];
+  upcoming.forEach(function (page) {
+    var dir = path.join(waiting, page, 'a-publier');
+    if (page === holder && !exists(dir)) {
+      prepare(waiting, page);
+    } else if (page !== holder && exists(dir)) {
+      fs.rmSync(dir, { recursive: true });
+    }
+  });
+  announceBeside(waiting, function (page) { return page === holder; }, /publi/, 'a version waiting to be published');
+
+  // Une fois publiée avec sa traduction : la page traduite attend sa
+  // traduction, les autres s'annoncent.
   var site = aCopy();
   publishAt(site, parisMidnight(LATER, 0));
-  var translated = upcoming.filter(function (page) {
-    return translationsOf(path.join(site, page)).length > 0;
-  });
-  if (translated.length === 0) {
-    return;
-  }
-  untouched = snapshot(site);
-  var refusal = run('node', [tool, 'annoncer', new Date(Date.now() + 40 * 86400000).toISOString().slice(0, 10), site]);
-  if (!refused(refusal) || !/traduction/.test(refusal.err)) {
-    fail('an upcoming version was announced beside a translation it does not carry: ' + refusal.out + refusal.err);
-  }
-  if (snapshot(site) !== untouched) {
-    fail('a refused announcement wrote into a published site');
-  }
-  // Et datée à la main, comme le ferait une annonce faite avant : refusée le
-  // jour venu, sans rien écrire.
-  var date = '2031-06-01';
-  upcoming.forEach(function (page) {
+  var translated = function (page) { return translationsOf(path.join(site, page)).length > 0; };
+  var free = announceBeside(site, translated, /traduction/, 'a published translation');
+
+  // Et le jour venu, la page traduite, datée à la main comme l'aurait fait une
+  // annonce plus ancienne, attend encore ; les autres s'appliquent.
+  upcoming.filter(translated).forEach(function (page) {
     [path.join(site, page, 'a-venir', 'index.html'), path.join(site, page, 'index.html')].forEach(function (file) {
-      fs.writeFileSync(file, read(file).split(A_VENIR).join(said(date, 'fr')));
+      fs.writeFileSync(file, read(file).split(A_VENIR).join(said(soon, 'fr')));
     });
   });
-  untouched = snapshot(site);
-  var applied = applyAt(site, parisMidnight(date, 0));
-  if (!refused(applied) || !/traduction/.test(applied.err)) {
-    fail('an upcoming version was applied beside a translation it does not carry: ' + applied.out + applied.err);
+  var held = {};
+  upcoming.filter(translated).forEach(function (page) { held[page] = both(site, page); });
+  var applied = applyAt(site, parisMidnight(soon, 0));
+  if (free.length === 0 ? !refused(applied) : applied.code !== 0) {
+    fail('applying beside a translated page ' + (free.length === 0 ? 'was not refused with every page waiting' : 'failed') + ': ' + applied.out + applied.err);
   }
-  if (snapshot(site) !== untouched) {
-    fail('a refused application wrote into a published site');
-  }
+  upcoming.forEach(function (page) {
+    var hasDatedVersion = exists(path.join(site, page, 'jusqu-au-' + soon, 'index.html'));
+    if (!translated(page)) {
+      if (!hasDatedVersion) {
+        fail(page + ', which waits for nothing, was not applied beside a translated page');
+      }
+      return;
+    }
+    if (hasDatedVersion || both(site, page) !== held[page]) {
+      fail(page + ', translated, was applied without a translation of its upcoming version');
+    }
+    if (applied.err.indexOf('/' + page + '/a-venir/ attend') === -1 || !/traduction/.test(applied.err)) {
+      fail('the application does not say what ' + page + ' waits for: ' + applied.err);
+    }
+  });
 })();
 
 // ── 5. La construction ne laisse aucune marque ───────────────────────────

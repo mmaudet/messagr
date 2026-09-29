@@ -100,8 +100,9 @@ d'être publiée ne répond pas, ni sa traduction.
 
 `scripts/assert-legal-screen.sh` va chercher les conditions, en français et
 en anglais, et vérifie que l'écran « Informations légales » dit les mêmes
-faits dans les sept langues de l'application, et qu'aucune ne garde les
-trois phrases retirées par #466. Le travail de publication d'une build le
+engagements dans chaque langue que l'application déclare (`languages.ts`,
+sept aujourd'hui), et qu'aucune ne garde les trois phrases retirées par
+#466. Le travail de publication d'une build le
 lance aussi : tant que les conditions publiées ne disent pas ce que l'écran
 dit, aucune build ne part. `deploy/messagr-eu/tests/controles-legaux.js` mène
 ces deux contrôles contre le site construit, à chaque changement.
@@ -265,9 +266,9 @@ Enfin les contrôles :
     ./scripts/assert-legal-pages.sh
     ./scripts/assert-legal-screen.sh
 
-Le premier attend les pages françaises et anglaise, et la version remplacée
+Le premier attend les pages française et anglaise, et la version remplacée
 à son adresse datée ; le second, que l'écran « Informations légales » dise
-dans les sept langues ce que disent les conditions publiées. Avant la
+dans chaque langue ce que disent les conditions publiées. Avant la
 publication, le second échoue : c'est l'ordre voulu, puisqu'une build qui
 signale ne part pas avant les conditions qui le disent.
 
@@ -278,14 +279,18 @@ Depuis #466, les conditions générales ont une traduction anglaise, à
 français. Une traduction traduit la version en vigueur, et aucune autre.
 
 **Une version à venir n'en porte pas encore.** L'annoncer, puis l'appliquer,
-laisserait la traduction publiée traduire une version remplacée : les trois
-gestes de la version à venir (`annoncer`, `reporter`, `appliquer`) refusent
-donc une page traduite, et le disent. C'est le cas de la version à venir des
-conditions générales, celle de la découverte (#392) : avant de l'annoncer,
-il faut sa traduction anglaise, et apprendre aux trois gestes à la dater, à
-la servir avec elle et à ranger l'ancienne à l'adresse datée. Ce n'est pas
-fait, et rien ne le fera en silence.
+laisserait la traduction publiée traduire une version remplacée : sur une
+page traduite, la version à venir attend donc, et les trois gestes
+(`annoncer`, `reporter`, `appliquer`) le disent, en nommant ce qui lui
+manque. Les autres pages avancent : la version à venir de la politique de
+confidentialité s'annonce et s'applique sans attendre celle des conditions.
+
+C'est le cas de la version à venir des conditions générales, celle de la
+découverte (#392) : avant de l'annoncer, il faut sa traduction anglaise, et
+apprendre aux trois gestes à la dater, à la servir avec elle et à ranger
+l'ancienne à l'adresse datée. Ce n'est pas fait, et rien ne le fera en
+silence. D'ici là, elle ne dit rien d'une traduction.
 
 **Tant qu'une version attend d'être publiée** sur une page, sa version à
-venir ne s'annonce pas non plus : elle est écrite par-dessus la version qui
-attend, et ce qu'elle dit changer se lit contre elle.
+venir attend aussi, de la même façon : elle est écrite par-dessus la version
+qui attend, et ce qu'elle dit changer se lit contre elle.

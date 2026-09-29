@@ -562,16 +562,16 @@ checkState(siteDir, retentionFile, 'the repository');
       if (!exists(dated)) {
         fail(page + '/jusqu-au-' + date + '/ does not keep the replaced version');
       } else {
-        var archived = read(dated);
+        var datedVersion = read(dated);
         var body = function (html) {
           return textOf(html.replace(/<!-- (a-venir|jusqu-au) -->[\s\S]*?<!-- \/(a-venir|jusqu-au) -->/, '')
             .replace(/<title>[^<]*<\/title>/, ''));
         };
-        if (body(archived) !== body(before[page])) {
+        if (body(datedVersion) !== body(before[page])) {
           fail(page + '/jusqu-au-' + date + '/ is not the version that was in force');
         }
-        if (archived.indexOf("s'est appliquée jusqu'au " + said(date)) === -1 ||
-            archived.indexOf('href="/' + page + '/"') === -1) {
+        if (datedVersion.indexOf("s'est appliquée jusqu'au " + said(date)) === -1 ||
+            datedVersion.indexOf('href="/' + page + '/"') === -1) {
           fail(page + '/jusqu-au-' + date + '/ does not say until when, and what replaced it');
         }
       }
