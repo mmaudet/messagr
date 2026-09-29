@@ -23,3 +23,15 @@ export async function stillKnown(
     return errcodeOf(error) === 'M_UNKNOWN_TOKEN' ? false : null
   }
 }
+
+/**
+ * The account ID exactly as the account's own server answers `whoami` for
+ * this session's token (#468): what the invitation service asks too, and
+ * keeps as the account a report comes from, so what the report's seal must
+ * bind. Throws when the server does not answer.
+ */
+export async function accountIdOf(
+  account: RestoreCredentials,
+): Promise<string> {
+  return (await createClient(account).whoami()).user_id
+}

@@ -221,6 +221,48 @@ export const fr = {
   remove_me_why:
     'Le message reste chez votre correspondant. Il ne s’affichera plus sur ce téléphone — mais il réapparaîtra sur un autre appareil ou après une réinstallation.',
   remove_cancel: 'Annuler',
+  // SIGNALER (#468, ADR 0015). Le compte qui envoie est nommé, ce qui part
+  // est dit, et l'envoi est voulu à chaque fois : ce que demande l'exemption
+  // « optional disclosure » d'Apple. Les huit motifs sont les interdits des
+  // conditions, dans leur ordre.
+  selection_report: 'Signaler',
+  report_title: 'Signaler à l’exploitant',
+  report_reason_heading: 'Motif',
+  report_reason_child_sexual_abuse: 'Pédocriminalité',
+  report_reason_threat: 'Menace contre la vie ou la sécurité',
+  report_reason_harassment: 'Harcèlement',
+  report_reason_impersonation: 'Usurpation d’identité',
+  report_reason_hate: 'Contenu haineux',
+  report_reason_sexual_without_consent:
+    'Contenu sexuel imposé, ou image intime diffusée sans accord',
+  report_reason_solicitation: 'Démarchage',
+  report_reason_other_illegal: 'Autre contenu illégal',
+  report_reason_required: 'Choisissez d’abord un motif.',
+  report_what_heading: 'Ce qui part de ce téléphone',
+  report_what:
+    'Les messages choisis, tels que vous les lisez, avec leur auteur et leur heure, l’identifiant de la conversation et celui de chaque message, et le moment du signalement. Rien d’autre de la conversation.',
+  // ATTRIBUÉS, ET PAR LE SERVEUR : déchiffrer un message ne dit pas qui l'a
+  // écrit (ADR 0001), et l'auteur nommé est celui que le serveur lui donne.
+  'report_author %@': 'Attribués par le serveur à %@',
+  'report_when %1$@ %2$@': '%1$@ à %2$@',
+  'report_account %@': 'Envoyé au nom de votre compte : %@',
+  report_operator_only:
+    'Seul l’exploitant pourra l’ouvrir : le service qui le reçoit ne peut pas le lire.',
+  report_send: 'Envoyer',
+  report_sending: 'Envoi…',
+  report_cancel: 'Annuler',
+  // VRAIE DANS TOUS LES CAS : une réponse perdue ne se distingue pas d'un
+  // envoi qui n'est jamais parti, et la clé d'idempotence fait qu'un nouvel
+  // envoi du même signalement ne le garde qu'une fois.
+  report_unconfirmed:
+    'Le signalement n’est pas confirmé : il est peut-être parti, peut-être pas. Réessayer ne l’enverra qu’une fois.',
+  report_too_long:
+    'Ces messages sont trop longs pour un seul signalement : fermez, puis choisissez-en moins.',
+  report_sent_title: 'Signalement envoyé',
+  'report_sent_number %@': 'Numéro de signalement : %@',
+  report_sent_decision:
+    'Pour connaître la décision, écrivez à conformite@messagr.eu en citant ce numéro.',
+  report_close: 'Fermer',
   conversation_sending: 'Envoi…',
   conversation_send_failed: 'Non envoyé. Réessayez.',
 

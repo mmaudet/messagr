@@ -262,6 +262,10 @@ fn router(state: Arc<AppState>) -> Router {
         // qui. `handlers::deletion` dit ce qu'elle enregistre et ce qu'elle
         // fait expirer.
         .route("/account-deletions", post(handlers::deletion::announce))
+        // A REPORT (#468, ADR 0015): a reason and a sealed report the service
+        // keeps and cannot open, answered with a report number. The token
+        // says who reports; `handlers::reports` says what is kept.
+        .route("/reports", post(handlers::reports::report))
         .route("/invitations", post(handlers::create::create))
         .route("/invitations/claim", post(handlers::claim::claim))
         .route(

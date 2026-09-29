@@ -52,14 +52,104 @@ import type { Sealed } from './hpke'
  * the operator's tool open them, and a second construction of the RFC on
  * node:crypto alone (`scripts/fixtures/hpke-independant.mjs`) seals and opens
  * them too (`sealedReport.spec.ts`). So must the bridge.
+ *
+ * The invitation service takes one to sixteen blocks (`report.rs`): a
+ * payload of `MOST_PAYLOAD_BYTES`, 65,535 bytes, at most. The application
+ * checks it before sealing, since a longer one could never be sent.
+ *
+ * # THE PAYLOAD, WHAT THE OPERATOR READS (#468)
+ *
+ * What the application seals is one JSON object, in UTF-8 (`payloadBytes`),
+ * assembled in memory and never written anywhere (ADR 0006):
+ *
+ *     {
+ *       "format": 1,
+ *       "reason": "harassment",
+ *       "reported_at": 1790000060000,
+ *       "reporting_account": "@alice:example.org",
+ *       "reported_account": "@bob:example.org",
+ *       "room_id": "!room:example.org",
+ *       "messages": [
+ *         {
+ *           "event_id": "$first",
+ *           "sent_at": 1790000000000,
+ *           "sender": "@bob:example.org",
+ *           "text": "…"
+ *         }
+ *       ]
+ *     }
+ *
+ * - `format`: this payload's number, 1. Another is refused, not guessed at.
+ * - `reason`: the reason's code, the same as the one bound to the seal.
+ * - `reported_at`: when the report was made, in milliseconds since the
+ *   epoch, by the reporting device's clock.
+ * - `reporting_account`: the account ID that reports, the same as the one
+ *   bound to the seal.
+ * - `reported_account`: the one account every message is from. A report
+ *   names one.
+ * - `room_id`: the Matrix room the messages were read in, which a takedown
+ *   needs.
+ * - `messages`: the messages the person selected, one at least, in the order
+ *   the conversation reads them, and nothing else of the conversation. Each
+ *   carries its `event_id`, which a takedown redacts, the homeserver's
+ *   `sent_at` in milliseconds, its `sender` as the event names it, and its
+ *   `text` as the device showed it.
+ *
+ * Only text messages for now: a photograph or a document will go as the
+ * description of its encrypted file (#471).
  */
+
+/**
+ * The eight reasons of the terms, in their order, by the codes the service
+ * takes (`services/invitations/src/report.rs`) and the seal binds.
+ */
+export const REPORT_REASONS = [
+  'child_sexual_abuse',
+  'threat',
+  'harassment',
+  'impersonation',
+  'hate',
+  'sexual_without_consent',
+  'solicitation',
+  'other_illegal',
+] as const
+
+export type ReportReason = (typeof REPORT_REASONS)[number]
 
 /** The two fields of a report the service keeps unsealed, bound to it. */
 export interface ReportBinding {
   /** The reason code, as the service records it. */
-  readonly reason: string
+  readonly reason: ReportReason
   /** The reporting account's ID, as the service authenticates it. */
   readonly reporter: string
+}
+
+/** A message a report carries, as the reporting device read it. */
+export interface ReportedMessage {
+  /** The event's identifier, which a takedown redacts. */
+  readonly eventId: string
+  /** The homeserver's timestamp, in milliseconds since the epoch. */
+  readonly sentAt: number
+  /** Who the event says sent it. */
+  readonly sender: string
+  /** Its text, as the device showed it. */
+  readonly text: string
+}
+
+/** What a report carries, sealed: see « THE PAYLOAD » above. */
+export interface ReportPayload {
+  /** The reason's code. */
+  readonly reason: ReportReason
+  /** When the report was made, in milliseconds since the epoch. */
+  readonly reportedAt: number
+  /** The account ID that reports. */
+  readonly reportingAccount: string
+  /** The account ID every message is from. */
+  readonly reportedAccount: string
+  /** The Matrix room the messages were read in. */
+  readonly roomId: string
+  /** One at least, in the order the conversation reads them. */
+  readonly messages: readonly ReportedMessage[]
 }
 
 /** Why `fromWire` refused: another format's number, or not a report's size. */
@@ -69,8 +159,17 @@ type WireRefusal = 'format' | 'size'
 export const REPORT_INFO = ascii('messagr report v1')
 /** The first byte of every sealed report: this format's number. */
 export const REPORT_FORMAT = 0x01
+/** The payload's own number, inside the seal. */
+const PAYLOAD_FORMAT = 1
 /** The payload is padded to a multiple of this. */
 const BLOCK_BYTES = 4096
+/** The most blocks the service takes (`report.rs`). */
+const MOST_BLOCKS = 16
+/**
+ * The longest payload the service takes: sixteen blocks, less the byte that
+ * ends the payload inside its padding. A longer one could never be sent.
+ */
+export const MOST_PAYLOAD_BYTES = MOST_BLOCKS * BLOCK_BYTES - 1
 /** Nenc, the size of an encapsulated key in this suite. */
 const ENC_BYTES = 32
 /** Nt, the size of ChaCha20-Poly1305's tag. */
@@ -102,6 +201,94 @@ export function reportAad(binding: ReportBinding): Uint8Array {
   aad.set(i2osp2(reporter.length), 2 + reason.length)
   aad.set(reporter, 2 + reason.length + 2)
   return aad
+}
+
+/** The bytes of `payload`, as the format lays them out, to be sealed. */
+export function payloadBytes(payload: ReportPayload): Uint8Array {
+  return new TextEncoder().encode(
+    JSON.stringify({
+      format: PAYLOAD_FORMAT,
+      reason: payload.reason,
+      reported_at: payload.reportedAt,
+      reporting_account: payload.reportingAccount,
+      reported_account: payload.reportedAccount,
+      room_id: payload.roomId,
+      messages: payload.messages.map(message => ({
+        event_id: message.eventId,
+        sent_at: message.sentAt,
+        sender: message.sender,
+        text: message.text,
+      })),
+    }),
+  )
+}
+
+/** What JSON gives back, read field by field. */
+type Fields = { readonly [field: string]: unknown } | null
+
+/**
+ * The payload `bytes` hold, or `null` when they are not one the format
+ * writes: not UTF-8, not JSON, another format's number, a reason outside the
+ * eight, a field missing or of another type, or no message.
+ *
+ * Read field by field: JSON's `null`, a number, a string or a list has none
+ * of these fields, and fails the first test that asks for one.
+ */
+export function payloadOf(bytes: Uint8Array): ReportPayload | null {
+  let value: Fields
+  try {
+    value = JSON.parse(
+      new TextDecoder('utf-8', { fatal: true }).decode(bytes),
+    ) as Fields
+  } catch {
+    return null
+  }
+  const messages = Array.isArray(value?.messages)
+    ? value.messages.map(messageOf)
+    : []
+  if (
+    value?.format !== PAYLOAD_FORMAT ||
+    !isReason(value.reason) ||
+    typeof value.reported_at !== 'number' ||
+    typeof value.reporting_account !== 'string' ||
+    typeof value.reported_account !== 'string' ||
+    typeof value.room_id !== 'string' ||
+    messages.length === 0 ||
+    messages.some(message => message === null)
+  ) {
+    return null
+  }
+  return {
+    reason: value.reason,
+    reportedAt: value.reported_at,
+    reportingAccount: value.reporting_account,
+    reportedAccount: value.reported_account,
+    roomId: value.room_id,
+    messages: messages as ReportedMessage[],
+  }
+}
+
+/** A message of a payload, or `null` when a field is missing or mistyped. */
+function messageOf(value: unknown): ReportedMessage | null {
+  const fields = value as Fields
+  if (
+    typeof fields?.event_id !== 'string' ||
+    typeof fields.sent_at !== 'number' ||
+    typeof fields.sender !== 'string' ||
+    typeof fields.text !== 'string'
+  ) {
+    return null
+  }
+  return {
+    eventId: fields.event_id,
+    sentAt: fields.sent_at,
+    sender: fields.sender,
+    text: fields.text,
+  }
+}
+
+function isReason(value: unknown): value is ReportReason {
+  return (REPORT_REASONS as readonly unknown[]).includes(value)
 }
 
 /** `payload`, then the marker byte, then zeros to a whole number of blocks. */

@@ -234,6 +234,7 @@ import {
   canRemoveForEveryone,
   copyText,
   onlyPhotograph,
+  reportable,
   toggle,
 } from './src/timeline/selection'
 import {
@@ -305,6 +306,7 @@ import { SelectionBar } from './src/ui/SelectionBar'
 import { PlusSheet } from './src/ui/PlusSheet'
 import { FindContacts } from './src/ui/FindContacts'
 import { RemoveSheet } from './src/ui/RemoveSheet'
+import { ReportSheet, stageAfter, type ReportStage } from './src/ui/ReportSheet'
 import { PickConversation } from './src/ui/PickConversation'
 import { ConversationHeader } from './src/ui/ConversationHeader'
 import { Legal } from './src/ui/Legal'
@@ -334,7 +336,7 @@ import {
   cameBackOnThisDevice,
   regainingOnThisDevice,
 } from './src/runtime/regainingThisDevice'
-import { stillKnown } from './src/runtime/sessionKnown'
+import { accountIdOf, stillKnown } from './src/runtime/sessionKnown'
 import { deletionMail } from './src/ui/deletionMail'
 import { Evict } from './src/ui/Evict'
 import { Vouch } from './src/ui/Vouch'
@@ -399,7 +401,18 @@ import {
 } from './src/runtime/sessionStore'
 import { reenterWithPassword, retireDevice } from './src/runtime/reenter'
 import { photoLibrary } from './src/runtime/photoLibrary'
-import { discoveryService, servicePoster } from './src/runtime/servicePoster'
+import {
+  discoveryService,
+  reportService,
+  servicePoster,
+} from './src/runtime/servicePoster'
+import {
+  drawnKey,
+  keysInMemory,
+  reportMessages,
+  type Reporting,
+} from './src/runtime/reportMessages'
+import { sealReport } from './src/runtime/sealedReport'
 import {
   fetchSessionSyncStatus,
   makeSyncClient,
@@ -1290,6 +1303,34 @@ export function App({
    */
   const [forwarding, setForwarding] = useState<readonly string[] | null>(null)
   /**
+   * The report being prepared (#468), while its sheet is up: the
+   * conversation and the messages it carries, taken from the selection when
+   * « Signaler » was pressed as forwarding takes them, their one author, and
+   * where the sheet stands. `null` otherwise.
+   *
+   * `opening` tells one sheet from the next: the sheet may close while its
+   * report is being sent, and the answer that comes back afterwards belongs
+   * to no sheet on screen.
+   */
+  const [reporting, setReporting] = useState<{
+    readonly opening: number
+    readonly scope: string
+    readonly eventIds: ReadonlySet<string>
+    readonly author: string
+    readonly sheet: ReportStage
+  } | null>(null)
+  const reportOpeningsRef = useRef(0)
+  /**
+   * Closes the report sheet: from its own buttons, its scrim, or back. Once
+   * the report is sent, the selection mode has done what it was opened for
+   * and goes with it; otherwise the selection stays, to send again or do
+   * something else with, as the removal sheet leaves it.
+   */
+  const closeReport = useCallback(() => {
+    if (reporting?.sheet.stage === 'sent') setSelected(new Set())
+    setReporting(null)
+  }, [reporting])
+  /**
    * Places a call, audio or video, from wherever the gesture came from.
    *
    * One function rather than three copies of the same six lines: the header
@@ -1536,6 +1577,23 @@ export function App({
   const discoveryDeps = useRef({
     service: discoveryService(() => credentialsRef.current),
     now: () => Date.now(),
+  }).current
+  // WHAT A REPORT NEEDS (#468): the same service as this account, the
+  // account ID its own server answers `whoami` with, the seal for the
+  // operator key built into the application, the keys of the reports sent
+  // while the application runs, a clock and a deadline. Made once per mount,
+  // so that a report sent again goes under its first key.
+  const reportDeps = useRef<Reporting>({
+    service: reportService(() => credentialsRef.current),
+    whoami: async () => {
+      const account = credentialsRef.current
+      if (account === null) throw new Error('this launch holds no account')
+      return accountIdOf(account)
+    },
+    seal: sealReport,
+    keyOf: keysInMemory(drawnKey),
+    now: () => Date.now(),
+    after: ms => new Promise(resolve => setTimeout(resolve, ms)),
   }).current
   /**
    * This device's envelope keys (#405): one published with each proof, and
@@ -5060,6 +5118,12 @@ export function App({
         setRemoving(false)
         return true
       }
+      // THE REPORT SHEET (#468) closes as its own « Annuler » or « Fermer »
+      // does, the sending one included (`closeReport`).
+      if (reporting !== null) {
+        closeReport()
+        return true
+      }
       if (selected.size > 0) {
         setSelected(new Set())
         return true
@@ -5130,6 +5194,8 @@ export function App({
     trust,
     openPlate,
     removing,
+    reporting,
+    closeReport,
     selected,
     personOpen,
     openScope,
@@ -5413,6 +5479,13 @@ export function App({
     )
   }
 
+  // WHAT A REPORT OF THE SELECTION WOULD CARRY (#468), read once: it offers
+  // « Signaler », and it is what « Signaler » opens the sheet with.
+  const reportableNow =
+    selected.size > 0
+      ? reportable(selected, conversation ?? [], selfUserId)
+      : null
+
   return (
     <GestureHandlerRootView style={styles.root}>
       <SafeAreaProvider>
@@ -5547,6 +5620,47 @@ export function App({
           />
         )}
 
+        {/* SIGNALER (#468). What the sheet shows as leaving and what is
+            sealed are read from the same conversation, the one on screen,
+            by the same definition (`reportable`). The messages stay in the
+            conversation: a report removes nothing. */}
+        {reporting !== null && (
+          <ReportSheet
+            author={displayNameFor(
+              reporting.author,
+              names.get(reporting.author),
+            )}
+            reporter={displayNameFor(selfUserId, undefined)}
+            messages={
+              reportable(reporting.eventIds, conversation ?? [], selfUserId)
+                ?.messages ?? []
+            }
+            stage={reporting.sheet}
+            onSend={reason => {
+              const { opening, scope, eventIds } = reporting
+              setReporting({ ...reporting, sheet: { stage: 'sending' } })
+              reportMessages(reportDeps, {
+                self: selfUserId,
+                roomId: scope,
+                reason,
+                selected: eventIds,
+                timeline: conversation ?? [],
+              })
+                .catch(() => ({ outcome: 'unconfirmed' }) as const)
+                .then(reported =>
+                  // TO THIS SHEET ONLY: closed meanwhile, and perhaps
+                  // another opened, the answer belongs to none on screen.
+                  setReporting(now =>
+                    now?.opening === opening
+                      ? { ...now, sheet: stageAfter(reported) }
+                      : now,
+                  ),
+                )
+            }}
+            onClose={closeReport}
+          />
+        )}
+
         {openPlate !== null && (
           <FullScreenPlate
             plate={openPlate.plate}
@@ -5601,6 +5715,7 @@ export function App({
                   undefined
                 }
                 canFavourite={canFavourite(selected, conversation ?? [])}
+                canReport={reportableNow !== null}
                 // EVERY one, not any: the control does one thing to the whole
                 // selection, and a mixed one has to pick a direction. Keeping
                 // is the safe half -- a mark added to something already kept
@@ -5710,6 +5825,17 @@ export function App({
                     })
                 }}
                 onForward={() => setForwarding([...selected])}
+                onReport={() => {
+                  if (openScope === null || reportableNow === null) return
+                  reportOpeningsRef.current += 1
+                  setReporting({
+                    opening: reportOpeningsRef.current,
+                    scope: openScope,
+                    eventIds: selected,
+                    author: reportableNow.author,
+                    sheet: { stage: 'choosing' },
+                  })
+                }}
                 onRemove={() => setRemoving(true)}
               />
             ) : undefined}

@@ -189,6 +189,39 @@ export const uz: Readonly<Record<CopyKey, string>> = {
   remove_me_why:
     'Xabar suhbatdoshda qoladi. U bu telefonda boshqa koʻrsatilmaydi — ammo boshqa qurilmada yoki qayta oʻrnatishdan keyin qaytadi.',
   remove_cancel: 'Bekor qilish',
+  selection_report: 'Shikoyat qilish',
+  report_title: 'Operatorga shikoyat qilish',
+  report_reason_heading: 'Sabab',
+  report_reason_child_sexual_abuse: 'Bolalarga nisbatan jinsiy zoʻravonlik',
+  report_reason_threat: 'Hayot yoki xavfsizlikka tahdid',
+  report_reason_harassment: 'Bezovta qilish',
+  report_reason_impersonation: 'Boshqa shaxs nomidan harakat qilish',
+  report_reason_hate: 'Nafrat qoʻzgʻatuvchi mazmun',
+  report_reason_sexual_without_consent:
+    'Majburan koʻrsatilgan jinsiy mazmun yoki roziliksiz tarqatilgan intim tasvir',
+  report_reason_solicitation: 'Soʻralmagan reklama',
+  report_reason_other_illegal: 'Boshqa noqonuniy mazmun',
+  report_reason_required: 'Avval sababni tanlang.',
+  report_what_heading: 'Bu telefondan nima ketadi',
+  report_what:
+    'Tanlangan xabarlar, siz ularni qanday oʻqisangiz shunday, muallifi va vaqti, suhbat va har bir xabarning identifikatori hamda shikoyat vaqti bilan. Suhbatdan boshqa hech narsa ketmaydi.',
+  'report_author %@': 'Server maʼlumotiga koʻra muallif: %@',
+  'report_when %1$@ %2$@': '%1$@, soat %2$@',
+  'report_account %@': 'Hisobingiz nomidan yuboriladi: %@',
+  report_operator_only:
+    'Uni faqat operator ocha oladi: uni qabul qiladigan xizmat uni oʻqiy olmaydi.',
+  report_send: 'Yuborish',
+  report_sending: 'Yuborilmoqda…',
+  report_cancel: 'Bekor qilish',
+  report_unconfirmed:
+    'Shikoyat tasdiqlanmadi: u ketgan boʻlishi ham, ketmagan boʻlishi ham mumkin. Qayta urinish uni faqat bir marta yuboradi.',
+  report_too_long:
+    'Bu xabarlar bitta shikoyat uchun juda uzun: yoping va kamroq xabar tanlang.',
+  report_sent_title: 'Shikoyat yuborildi',
+  'report_sent_number %@': 'Shikoyat raqami: %@',
+  report_sent_decision:
+    'Qarorni bilish uchun ushbu raqamni koʻrsatib, conformite@messagr.eu manziliga yozing.',
+  report_close: 'Yopish',
   conversation_sending: 'Yuborilmoqda…',
   conversation_send_failed: 'Yuborilmadi. Qayta urinib koʻring.',
   consequence_irreversible: 'Qaytarib boʻlmaydi',

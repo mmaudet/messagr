@@ -8,6 +8,7 @@ import {
   canRemoveForEveryone,
   copyText,
   onlyPhotograph,
+  reportable,
   toggle,
 } from './selection'
 
@@ -237,5 +238,120 @@ describe('what can be kept as a favourite', () => {
 
   it('refuses an empty selection', () => {
     expect(canFavourite(new Set(), [MINE])).toBe(false)
+  })
+})
+
+describe('what a report carries (#468)', () => {
+  /** A message of `kind` that this device read. */
+  function wrote(
+    eventId: string,
+    sender: string,
+    sentAt: number,
+    body: string,
+    msgtype = 'm.text',
+  ): TimelineEntry {
+    return { eventId, claimedSender: sender, sentAt, body, msgtype }
+  }
+
+  const HERS_FIRST = wrote('$h1', HER, 1000, 'salut')
+  const HERS_THEN = wrote('$h2', HER, 2000, 'encore')
+  const HIS = wrote('$b1', '@him:x', 1500, 'et toi')
+  const MY_WORDS = wrote('$m1', ME, 500, 'bonjour')
+
+  it('carries every text selected, from the one other participant who wrote them, in the conversation’s order', () => {
+    // #462: « Signaler » on the messages of one other participant, several
+    // of them if they wrote several, whatever order they were chosen in.
+    const held = [MY_WORDS, HERS_FIRST, HIS, HERS_THEN]
+    expect(reportable(new Set(['$h2', '$h1']), held, ME)).toEqual({
+      author: HER,
+      messages: [
+        { eventId: '$h1', sentAt: 1000, sender: HER, text: 'salut' },
+        { eventId: '$h2', sentAt: 2000, sender: HER, text: 'encore' },
+      ],
+    })
+  })
+
+  it('carries words of every kind a person writes: a text, a notice, an emote', () => {
+    const held = [
+      wrote('$n', HER, 1, 'avis', 'm.notice'),
+      wrote('$e', HER, 2, 'salue', 'm.emote'),
+    ]
+    expect(reportable(new Set(['$n', '$e']), held, ME)?.messages).toHaveLength(
+      2,
+    )
+  })
+
+  it('carries nothing, so « Signaler » is absent, when two people wrote them', () => {
+    const held = [HERS_FIRST, HIS]
+    expect(reportable(new Set(['$h1', '$b1']), held, ME)).toBeNull()
+  })
+
+  it('carries nothing when one of them is this account’s own', () => {
+    const held = [MY_WORDS, HERS_FIRST]
+    expect(reportable(new Set(['$m1']), held, ME)).toBeNull()
+    expect(reportable(new Set(['$m1', '$h1']), held, ME)).toBeNull()
+  })
+
+  it('carries nothing but words: a video, a voice message, a place, a sticker, a photograph or a document', () => {
+    // Photographs and documents are #471's; the others are not carried at
+    // all, and a selection holding one is not a report rather than a report
+    // quietly missing it.
+    const sticker: TimelineEntry = {
+      eventId: '$s',
+      claimedSender: HER,
+      sentAt: 5,
+      body: 'un chat',
+    }
+    const photograph: TimelineEntry = {
+      ...shown('$p', HER),
+      msgtype: 'm.image',
+    }
+    const document: TimelineEntry = {
+      eventId: '$d',
+      claimedSender: HER,
+      sentAt: 7,
+      body: 'contrat.pdf',
+      msgtype: 'm.file',
+      document: {} as TimelineEntry['document'],
+    }
+    const held = [
+      HERS_FIRST,
+      wrote('$v', HER, 2, 'film.mp4', 'm.video'),
+      wrote('$a', HER, 3, 'voix.ogg', 'm.audio'),
+      wrote('$l', HER, 4, 'Ici', 'm.location'),
+      sticker,
+      photograph,
+      document,
+    ]
+    for (const other of ['$v', '$a', '$l', '$s', '$p', '$d']) {
+      expect(reportable(new Set([other]), held, ME), other).toBeNull()
+      expect(reportable(new Set(['$h1', other]), held, ME), other).toBeNull()
+    }
+  })
+
+  it('carries nothing for a message this device could not open, or one removed', () => {
+    // Nothing readable to send: a report carries the messages as read.
+    const unreadable: TimelineEntry = {
+      eventId: '$u',
+      claimedSender: HER,
+      sentAt: 1,
+      body: null,
+      reason: 'no key',
+    }
+    const gone: TimelineEntry = {
+      eventId: '$g',
+      claimedSender: HER,
+      sentAt: 1,
+      body: null,
+      removed: true,
+    }
+    const held = [HERS_FIRST, unreadable, gone]
+    expect(reportable(new Set(['$h1', '$u']), held, ME)).toBeNull()
+    expect(reportable(new Set(['$g']), held, ME)).toBeNull()
+  })
+
+  it('carries nothing for a selection the conversation no longer holds, or none', () => {
+    expect(reportable(new Set(['$h1', '$gone']), [HERS_FIRST], ME)).toBeNull()
+    expect(reportable(new Set(), [HERS_FIRST], ME)).toBeNull()
   })
 })

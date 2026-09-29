@@ -172,6 +172,39 @@ export const es: Readonly<Record<CopyKey, string>> = {
   remove_me_why:
     'El mensaje permanece en el dispositivo de su interlocutor. No volverá a mostrarse en este teléfono, pero reaparecerá en otro dispositivo o tras una reinstalación.',
   remove_cancel: 'Cancelar',
+  selection_report: 'Denunciar',
+  report_title: 'Denunciar ante quien explota el servicio',
+  report_reason_heading: 'Motivo',
+  report_reason_child_sexual_abuse: 'Abuso sexual infantil',
+  report_reason_threat: 'Amenaza contra la vida o la seguridad',
+  report_reason_harassment: 'Acoso',
+  report_reason_impersonation: 'Suplantación de identidad',
+  report_reason_hate: 'Contenido de odio',
+  report_reason_sexual_without_consent:
+    'Contenido sexual impuesto, o imagen íntima difundida sin consentimiento',
+  report_reason_solicitation: 'Publicidad no solicitada',
+  report_reason_other_illegal: 'Otro contenido ilegal',
+  report_reason_required: 'Elija primero un motivo.',
+  report_what_heading: 'Lo que sale de este teléfono',
+  report_what:
+    'Los mensajes elegidos, tal como usted los lee, con su autor y su hora, el identificador de la conversación y el de cada mensaje, y el momento de la denuncia. Nada más de la conversación.',
+  'report_author %@': 'Atribuidos por el servidor a %@',
+  'report_when %1$@ %2$@': '%1$@ a las %2$@',
+  'report_account %@': 'Enviada en nombre de su cuenta: %@',
+  report_operator_only:
+    'Solo quien explota el servicio podrá abrirla: el servicio que la recibe no puede leerla.',
+  report_send: 'Enviar',
+  report_sending: 'Enviando…',
+  report_cancel: 'Cancelar',
+  report_unconfirmed:
+    'La denuncia no está confirmada: quizá haya salido, quizá no. Volver a intentarlo solo la enviará una vez.',
+  report_too_long:
+    'Estos mensajes son demasiado largos para una sola denuncia: cierre y elija menos.',
+  report_sent_title: 'Denuncia enviada',
+  'report_sent_number %@': 'Número de denuncia: %@',
+  report_sent_decision:
+    'Para conocer la decisión, escriba a conformite@messagr.eu citando este número.',
+  report_close: 'Cerrar',
   conversation_sending: 'Enviando…',
   conversation_send_failed: 'No enviado. Inténtelo de nuevo.',
   consequence_irreversible: 'Irreversible',

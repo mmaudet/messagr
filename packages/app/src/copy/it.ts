@@ -170,6 +170,39 @@ export const it: Readonly<Record<CopyKey, string>> = {
   remove_me_why:
     'Il messaggio resta presso il suo interlocutore. Non sarà più mostrato su questo telefono, ma riapparirà su un altro dispositivo o dopo una reinstallazione.',
   remove_cancel: 'Annullare',
+  selection_report: 'Segnalare',
+  report_title: 'Segnalare a chi gestisce il servizio',
+  report_reason_heading: 'Motivo',
+  report_reason_child_sexual_abuse: 'Abuso sessuale su minori',
+  report_reason_threat: 'Minaccia alla vita o alla sicurezza',
+  report_reason_harassment: 'Molestie',
+  report_reason_impersonation: 'Sostituzione di persona',
+  report_reason_hate: 'Contenuti d’odio',
+  report_reason_sexual_without_consent:
+    'Contenuti sessuali imposti, o immagini intime diffuse senza consenso',
+  report_reason_solicitation: 'Proposte commerciali non richieste',
+  report_reason_other_illegal: 'Altri contenuti illegali',
+  report_reason_required: 'Scelga prima un motivo.',
+  report_what_heading: 'Ciò che lascia questo telefono',
+  report_what:
+    'I messaggi scelti, così come lei li legge, con il loro autore e il loro orario, l’identificativo della conversazione e quello di ogni messaggio, e il momento della segnalazione. Nient’altro della conversazione.',
+  'report_author %@': 'Attribuiti dal server a %@',
+  'report_when %1$@ %2$@': '%1$@ alle %2$@',
+  'report_account %@': 'Inviata a nome del suo account: %@',
+  report_operator_only:
+    'Solo chi gestisce il servizio potrà aprirla: il servizio che la riceve non può leggerla.',
+  report_send: 'Inviare',
+  report_sending: 'Invio…',
+  report_cancel: 'Annullare',
+  report_unconfirmed:
+    'La segnalazione non è confermata: forse è partita, forse no. Riprovare la invierà una sola volta.',
+  report_too_long:
+    'Questi messaggi sono troppo lunghi per una sola segnalazione: chiuda e ne scelga meno.',
+  report_sent_title: 'Segnalazione inviata',
+  'report_sent_number %@': 'Numero di segnalazione: %@',
+  report_sent_decision:
+    'Per conoscere la decisione, scriva a conformite@messagr.eu citando questo numero.',
+  report_close: 'Chiudere',
   conversation_sending: 'Invio…',
   conversation_send_failed: 'Non inviato. Riprovi.',
   consequence_irreversible: 'Irreversibile',

@@ -177,6 +177,39 @@ export const en: Readonly<Record<CopyKey, string>> = {
   remove_me_why:
     'The message stays with the other person. It will not be shown on this telephone again — but it comes back on another device or after a reinstall.',
   remove_cancel: 'Cancel',
+  selection_report: 'Report',
+  report_title: 'Report to the operator',
+  report_reason_heading: 'Reason',
+  report_reason_child_sexual_abuse: 'Child sexual abuse',
+  report_reason_threat: 'Threat to life or safety',
+  report_reason_harassment: 'Harassment',
+  report_reason_impersonation: 'Impersonation',
+  report_reason_hate: 'Hateful content',
+  report_reason_sexual_without_consent:
+    'Sexual content imposed on someone, or an intimate image shared without consent',
+  report_reason_solicitation: 'Unsolicited canvassing',
+  report_reason_other_illegal: 'Other illegal content',
+  report_reason_required: 'Choose a reason first.',
+  report_what_heading: 'What leaves this phone',
+  report_what:
+    'The messages you chose, as you read them, with their author and their time, the identifier of the conversation and of each message, and the moment of the report. Nothing else from the conversation.',
+  'report_author %@': 'Attributed by the server to %@',
+  'report_when %1$@ %2$@': '%1$@ at %2$@',
+  'report_account %@': 'Sent in the name of your account: %@',
+  report_operator_only:
+    'Only the operator will be able to open it: the service that receives it cannot read it.',
+  report_send: 'Send',
+  report_sending: 'Sending…',
+  report_cancel: 'Cancel',
+  report_unconfirmed:
+    'The report is not confirmed: it may have left, or not. Trying again sends it only once.',
+  report_too_long:
+    'These messages are too long for a single report: close, then choose fewer.',
+  report_sent_title: 'Report sent',
+  'report_sent_number %@': 'Report number: %@',
+  report_sent_decision:
+    'To learn the decision, write to conformite@messagr.eu quoting this number.',
+  report_close: 'Close',
   conversation_sending: 'Sending…',
   conversation_send_failed: 'Not sent. Try again.',
   consequence_irreversible: 'Irreversible',

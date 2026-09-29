@@ -101,6 +101,14 @@ export type TabGlyph =
   // controls nobody can tell apart. Reported from the rehearsal of 13
   // September 2026 (#290).
   | 'flip'
+  // A FLAG ON ITS POLE, for « Signaler » in the selection bar (#468), and the
+  // same door as the bar's other five: the identity has no flag, because
+  // until a report could be sent there was nothing to draw one for. Drawn on
+  // the set's own rules -- 24 grid, 1.5 stroke, `currentColor`. Not the
+  // identity's `warn`, which its catalogue keeps for « Lien épuisé,
+  // attente »: a control and a state drawn alike would be two things nobody
+  // can tell apart.
+  | 'flag'
 
 const STROKE = {
   fill: 'none' as const,
@@ -226,6 +234,14 @@ export function TabIcon({
             stroke={tint}
             {...STROKE}
           />
+        </>
+      )}
+
+      {/* A pole, and a flag with a notch cut into its free edge. */}
+      {glyph === 'flag' && (
+        <>
+          <Path d="M6 20.5v-17" stroke={tint} {...STROKE} />
+          <Path d="M6 4.5h11.5l-2.8 4.2 2.8 4.2H6" stroke={tint} {...STROKE} />
         </>
       )}
 
