@@ -17,6 +17,29 @@ use sqlx::sqlite::SqlitePoolOptions;
 /// The binary under test, as cargo built it for these tests.
 const BINARY: &str = env!("CARGO_BIN_EXE_messagr-invitations");
 
+/// How long a gesture may take. Each ends within a second; a binary that runs
+/// on has not taken the flag for a gesture, and started the service instead:
+/// another build than this branch's, in a target directory shared with
+/// another checkout, say. It is killed and said, rather than waited for.
+const DEADLINE: std::time::Duration = std::time::Duration::from_secs(60);
+
+/// What `child` said once it ended, or a failure naming why it did not.
+fn finished(mut child: std::process::Child) -> Output {
+    let started = std::time::Instant::now();
+    while child.try_wait().unwrap().is_none() {
+        if started.elapsed() > DEADLINE {
+            let _ = child.kill();
+            let _ = child.wait();
+            panic!(
+                "{BINARY} ran on past {DEADLINE:?}: it took no gesture from its command line, \
+                 and started the service. Is it this branch's build?"
+            );
+        }
+        std::thread::sleep(std::time::Duration::from_millis(20));
+    }
+    child.wait_with_output().unwrap()
+}
+
 /// Runs the binary with `args` and `stdin` against the database in `dir`,
 /// with the four variables every start needs, and nothing that reaches out.
 fn gesture(dir: &Path, args: &[&str], stdin: &str) -> Output {
@@ -44,7 +67,7 @@ fn gesture(dir: &Path, args: &[&str], stdin: &str) -> Output {
         .unwrap()
         .write_all(stdin.as_bytes())
         .unwrap();
-    child.wait_with_output().unwrap()
+    finished(child)
 }
 
 fn stdout(output: &Output) -> String {
@@ -178,12 +201,16 @@ fn a_gesture_named_badly_is_refused_before_anything_is_read() {
         vec!["--decide-report", "K7QM-4ZT2", "maintained"],
         vec!["--hold-report", "K7QM-4ZT2", "--yes"],
     ] {
-        let refused = Command::new(BINARY)
-            .args(&args)
-            .env_clear()
-            .stdin(Stdio::null())
-            .output()
-            .unwrap();
+        let refused = finished(
+            Command::new(BINARY)
+                .args(&args)
+                .env_clear()
+                .stdin(Stdio::null())
+                .stdout(Stdio::piped())
+                .stderr(Stdio::piped())
+                .spawn()
+                .unwrap(),
+        );
         let said = String::from_utf8_lossy(&refused.stderr);
         assert!(!refused.status.success(), "{args:?}");
         assert!(
