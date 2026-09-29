@@ -6870,11 +6870,14 @@ export function App({
                   <Conversation
                     // TALLIED FROM THOSE DRAWN, by the filter of the messages
                     // below and from the same value: a blocked account's
-                    // reactions leave with its messages (#494).
+                    // reactions leave with its messages (#494). Which are
+                    // this account's own is read from the session, as the
+                    // reading of the conversation read it when it tallied:
+                    // `selfUserId` waits for a launch that found a room.
                     reactions={reactionsShown(
                       reactions,
                       notShownNow,
-                      selfUserId,
+                      credentialsRef.current?.userId ?? selfUserId,
                     )}
                     read={readHere}
                     onReact={(target, key, own) =>
