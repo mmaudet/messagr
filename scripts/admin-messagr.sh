@@ -48,7 +48,10 @@
 #   tapée en retour : l'événement, l'adresse ou le compte, la commande
 #   entière pour une commande libre. Toute autre réponse, ou la fin de
 #   l'entrée standard, ne poste rien.
-# - Le compte d'exploitation ne se suspend ni ne se ferme par ce script.
+# - Le compte d'exploitation ne se suspend ni ne se ferme par ce script : ni
+#   par un geste, ni par une commande libre, qui ne part pas quand elle le
+#   nomme, par son identifiant ou par son seul nom, que Continuwuity prend
+#   aussi. Une commande sur ce compte se poste à la main dans #admins.
 # - LE REPÈRE AVANT D'ÉCRIRE : sans lui, le script relirait d'anciennes
 #   réponses.
 # - LA RÉPONSE DU SERVEUR, PAS LA NÔTRE, et sans réponse sous 25 secondes le
@@ -242,6 +245,18 @@ def principal(arguments):
         )
     if nom in ("suspendre", "fermer") and attendu == moi:
         refuser(f"{moi} est le compte d'exploitation : ce script ne le {nom} pas.")
+    # Une commande libre qui nomme le compte d'exploitation ne part pas :
+    # `users deactivate <lui>` fermerait le compte même qui poste. Son seul
+    # nom compte aussi, Continuwuity le prenant pour le compte de ce serveur.
+    if nom is None:
+        seul = moi[1:].split(":", 1)[0].lower()
+        noms = {moi.lower(), seul, "@" + seul}
+        if any(mot.strip("\"'`,;()").lower() in noms for mot in commande.split()):
+            refuser(
+                f"cette commande nomme {moi}, le compte d'exploitation : elle ne part pas de "
+                "ce script. Postez-la à la main dans #admins si elle doit partir. Rien n'a été "
+                "posté."
+            )
 
     nom_du_serveur = serveur.split("://")[-1]
     salon = appel("/directory/room/" + urllib.parse.quote(f"#admins:{nom_du_serveur}"))[
@@ -427,6 +442,16 @@ def essai():
     cas("le compte d'exploitation ne se ferme pas", ["fermer", moi], moi + "\n", False, [])
     cas("le compte d'exploitation ne se suspend pas", ["suspendre", moi], moi + "\n",
         False, [])
+    for commande in [
+        "users deactivate " + moi,
+        "users lock exploitation",
+        "users deactivate --no-leave-rooms @Exploitation",
+        "users suspend '" + moi + "'",
+    ]:
+        cas(f"une commande libre qui nomme le compte d'exploitation ({commande!r})",
+            [commande], commande + "\n", False, [], dit="le compte d'exploitation")
+    cas("une commande libre sur un autre compte part", ["users lock " + bob],
+        "users lock " + bob + "\n", True, ["!admin users lock " + bob])
     etat["whoami"] = "@quelquun:example.org"
     cas("un jeton d'un autre compte", ["suspendre", bob], bob + "\n", False, [],
         dit="n'est pas celui de")
