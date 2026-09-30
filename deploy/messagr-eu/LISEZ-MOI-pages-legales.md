@@ -41,6 +41,23 @@ autres sont des décisions, et le serveur doit désormais les appliquer :
 Rien de tout cela n'est configuré aujourd'hui. Une politique publiée que le
 serveur n'applique pas est un manquement, pas une intention.
 
+La version à publier de #467 en ajoute, que `retention.json` déclare et que
+`scripts/assert-retention.sh` vérifie une fois la version publiée :
+
+- contenu d'un signalement, le signalement scellé, et la clé d'idempotence
+  de son envoi : effacement six mois après la décision, sauf s'il a été
+  transmis aux autorités ;
+- le reste d'un signalement, dont ce qui a été décidé (sans suite, suspension
+  levée, ou suspension confirmée et compte fermé) : effacement douze mois
+  après la décision ;
+- blocage : tant que les deux comptes existent pour le service, et tant que
+  le compte qui bloque existe pour la liste du serveur de messagerie ;
+- SMS qui préviennent l'exploitant : effacement demandé à OVHcloud un jour
+  après l'envoi.
+
+Les deux premières n'ont encore rien qui les applique : c'est le ménage de
+#473, et leur `$manque` dit ce qu'il doit faire.
+
 ## Publier
 
 Le site est encore déployé depuis l'ancien dépôt
@@ -216,11 +233,24 @@ La version qui les remplace (#466) dit la tolérance zéro, après le refus
 d'Apple en 1.2 le 29 septembre 2026. Ce jour-là, c'est la publication qui le
 fixe, avec le déploiement en production (#474) : il n'existe pas avant.
 
+C'est aussi le cas de la politique de confidentialité depuis #467. Celle du
+26 septembre 2026 ne fixe aucun délai : elle dit qu'« un changement est
+annoncé avant d'être appliqué ». La version qui la remplace dit ce que
+signaler et bloquer révèlent, et ce qu'elle décrit ne commence qu'avec la
+build qui signale et bloque (#475) : la publier avant cette build, c'est
+annoncer le changement avant de l'appliquer, ce que sa carte « depuis » dit
+en toutes lettres. **Elle se publie donc avant qu'une build qui signale soit
+disponible, jamais après**, et le même jour que les conditions, puisque
+`publier` publie tout ce qui attend (#474). Elle n'a pas de
+traduction, et c'est voulu : une page traduite retiendrait sa version à
+venir, celle de la découverte, tant que les gestes ne savent pas dater une
+traduction (« Une traduction », plus bas).
+
 La version attend donc dans `<page>/a-publier/index.html`, écrite telle
-qu'elle s'appliquera, et sa traduction à côté, dans
+qu'elle s'appliquera, et sa traduction à côté, s'il y en a une, dans
 `<page>/a-publier/en/index.html`. `build-site.sh` n'en construit rien : un
 déploiement fait pour autre chose publie le site d'aujourd'hui, exactement,
-sans les conditions d'avance ni leur traduction.
+sans les pages d'avance ni leur traduction.
 
 ### Préparer
 
@@ -237,9 +267,15 @@ sans les conditions d'avance ni leur traduction.
 3. Pour la traduction, la même chose dans sa langue, avec `<html lang="en">`,
    un renvoi au texte français, `href="/<page>/"`, qui dit qu'il fait foi, et
    le texte français qui renvoie à `/<page>/en/`.
+4. Pour une durée nouvelle que seule cette version dit, une entrée de
+   `retention.json` avec sa phrase exacte et
+   `"page": "/<page>/a-publier/"` : `assert-retention.sh` ne la vérifie pas
+   tant que le dépôt tient la version, puisque rien ne la sert, et
+   `publier` retire cette « page », pour que la phrase se vérifie ensuite
+   sur la version en vigueur.
 
 `publier` refuse une version dont la forme ne permettrait pas de la dater
-partout, et n'écrit rien alors.
+partout, ou sans `retention.json` à côté du site, et n'écrit rien alors.
 
 ### Publier
 
@@ -254,10 +290,11 @@ dans sa traduction (« 30 septembre 2026 », « 30 September 2026 »), puis :
 - la version qui attendait devient la version en vigueur, et renvoie à celle
   qu'elle remplace ;
 - sa traduction devient `<page>/en/index.html`, sa propre adresse ;
-- `<page>/a-publier/` disparaît du dépôt.
+- `<page>/a-publier/` disparaît du dépôt, et `retention.json` perd ses
+  « page » qui y renvoyaient.
 
 Puis commiter, et déployer **le jour même** (`deploy/messagr-eu/deploy.sh`,
-avec l'accord du porteur) : la date écrite dit depuis quand les conditions
+avec l'accord du porteur) : la date écrite dit depuis quand les pages
 s'appliquent, et elles ne s'appliquent que servies. Un déploiement qui
 glisserait au lendemain ferait dire à la page qu'elle s'applique depuis la
 veille : annuler alors le commit de publication, et publier de nouveau.
@@ -265,12 +302,19 @@ Enfin les contrôles :
 
     ./scripts/assert-legal-pages.sh
     ./scripts/assert-legal-screen.sh
+    ./scripts/assert-retention.sh
 
-Le premier attend les pages française et anglaise, et la version remplacée
-à son adresse datée ; le second, que l'écran « Informations légales » dise
-dans chaque langue ce que disent les conditions publiées. Avant la
-publication, le second échoue : c'est l'ordre voulu, puisqu'une build qui
-signale ne part pas avant les conditions qui le disent.
+Le premier attend les pages française et anglaise, et chaque version
+remplacée à son adresse datée ; le deuxième, que l'écran « Informations
+légales » dise dans chaque langue ce que disent les conditions publiées ; le
+troisième, que la politique publiée dise les durées nouvelles d'un
+signalement, d'un blocage et des SMS de l'exploitant. Avant la publication,
+le deuxième échoue : c'est l'ordre voulu, puisqu'une build qui signale ne
+part pas avant les conditions qui le disent.
+
+`deploy/messagr-eu/tests/controles-legaux.js` mène aussi le troisième contre
+le site construit, dans les deux états du dépôt, avec `MESSAGR_HOST` vide :
+sa moitié qui lit la configuration de l'hôte ne tourne qu'en production.
 
 ### Une traduction
 
@@ -283,7 +327,8 @@ laisserait la traduction publiée traduire une version remplacée : sur une
 page traduite, la version à venir attend donc, et les trois gestes
 (`annoncer`, `reporter`, `appliquer`) le disent, en nommant ce qui lui
 manque. Les autres pages avancent : la version à venir de la politique de
-confidentialité s'annonce et s'applique sans attendre celle des conditions.
+confidentialité s'annonce et s'applique sans attendre celle des conditions,
+dès que sa propre version à publier l'est (#467).
 
 C'est le cas de la version à venir des conditions générales, celle de la
 découverte (#392) : avant de l'annoncer, il faut sa traduction anglaise, et
@@ -293,4 +338,7 @@ silence. D'ici là, elle ne dit rien d'une traduction.
 
 **Tant qu'une version attend d'être publiée** sur une page, sa version à
 venir attend aussi, de la même façon : elle est écrite par-dessus la version
-qui attend, et ce qu'elle dit changer se lit contre elle.
+qui attend, et ce qu'elle dit changer se lit contre elle. C'est le cas de la
+politique de confidentialité depuis #467 : sa version à venir, celle de la
+découverte, redevient annonçable le jour où la version qui dit signaler et
+bloquer est publiée, et pas avant.

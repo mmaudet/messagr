@@ -51,8 +51,8 @@ jobs:
       # every script here is a second and catches that class outright.
       - name: Parse every shell script
         run: |
-          for script in scripts/*.sh .githooks/* deploy/messagr-eu/*.sh \
-                        deploy/messagr-eu/tests/*.sh; do
+          for script in scripts/*.sh scripts/lib/*.sh .githooks/* \
+                        deploy/messagr-eu/*.sh deploy/messagr-eu/tests/*.sh; do
             [ -f "$script" ] || continue
             bash -n "$script" || { echo "$script does not parse" >&2; exit 1; }
           done

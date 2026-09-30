@@ -22,25 +22,52 @@
 # duration from the day it is announced until the day it applies. Until it is
 # announced -- while the repository's copy still carries the mark that waits
 # for its date -- nothing serves it, and what it will say is not checked.
+#
+# Or the version awaiting publication (#467), which applies from the day it is
+# published: `/confidentialite/a-publier/`. While the repository holds it,
+# nothing serves it -- `build-site.sh` builds nothing under `a-publier/` --
+# and what it will say is not checked here. Publishing it
+# (`version-a-venir.mjs publier`) removes that `page` from retention.json, so
+# from that day on the duration is checked on the policy in force, which says
+# it. An entry still naming it once the repository no longer holds it is
+# fetched, answers 404, and fails: the address is not skipped for its name.
+#
+# `MESSAGR_SITE` names the site to read, `MESSAGR_SITE_SOURCE` the tree the
+# repository holds, `MESSAGR_RETENTION` the durations, and `MESSAGR_HOST` the
+# server whose configuration is read, empty for none.
+# deploy/messagr-eu/tests/controles-legaux.js points them at a copy served
+# locally, so that this check is seen passing and refusing somewhere else
+# than in production.
 set -uo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
-SOURCE="$ROOT/deploy/messagr-eu/retention.json"
-SITE_SOURCE="$ROOT/deploy/messagr-eu/site"
+SOURCE="${MESSAGR_RETENTION:-$ROOT/deploy/messagr-eu/retention.json}"
+SITE_SOURCE="${MESSAGR_SITE_SOURCE:-$ROOT/deploy/messagr-eu/site}"
 SITE="${MESSAGR_SITE:-https://messagr.eu}"
-HOST="${MESSAGR_HOST:-hermes}"
+# Empty names no server at all: the configuration half is left out, and said.
+HOST="${MESSAGR_HOST-hermes}"
+
+# Which version is served is the rule assert-legal-pages.sh applies too (#467).
+# shellcheck source=lib/versions-legales.sh
+. "$ROOT/scripts/lib/versions-legales.sh"
 
 failed=0
 
 # ── Each page says what the source declares ───────────────────────────────
 while IFS= read -r where; do
-  # The upcoming version only: the policy in force carries the same mark in
-  # the passage that will announce it, and is checked all the same.
-  if [[ "$where" == */a-venir/ ]] &&
-    grep -qF 'MESSAGR-DATE-A-VENIR' "$SITE_SOURCE${where}index.html" 2>/dev/null; then
-    printf '  ----  %s is not announced yet; what it will say is not checked\n' "$where"
-    continue
-  fi
+  # A version nothing serves yet. The policy in force is not one of them,
+  # although it carries the upcoming version's mark in the passage that will
+  # announce it: it is checked all the same.
+  case "$(etat_version "$SITE_SOURCE" "$where")" in
+    annonce-attendue)
+      printf '  ----  %s is not announced yet; what it will say is not checked\n' "$where"
+      continue
+      ;;
+    publication-attendue)
+      printf '  ----  %s is not published yet; what it will say is not checked\n' "$where"
+      continue
+      ;;
+  esac
   page="$(curl -sSL --fail --max-time 20 "$SITE$where" 2>/dev/null || true)"
   if [ -z "$page" ]; then
     echo "FAIL  the policy page could not be read at $SITE$where" >&2
@@ -78,7 +105,9 @@ EOF
 )
 
 # ── The server applies what the source declares ───────────────────────────
-if ssh -o ConnectTimeout=10 -o BatchMode=yes "$HOST" true 2>/dev/null; then
+if [ -z "$HOST" ]; then
+  printf '  ----  no server named (MESSAGR_HOST is empty); page checked, configuration not\n'
+elif ssh -o ConnectTimeout=10 -o BatchMode=yes "$HOST" true 2>/dev/null; then
   days="$(python3 -c "
 import json; print(json.load(open('$SOURCE'))['journaux_techniques']['jours'])")"
   actual="$(ssh -o BatchMode=yes "$HOST" "grep -oE '^[[:space:]]*rotate [0-9]+' /etc/logrotate.d/nginx | grep -oE '[0-9]+'" 2>/dev/null || echo 0)"

@@ -15,8 +15,10 @@
 //   2. Publier mal : une date qui n'est pas celle du jour à Paris, une marque
 //      oubliée quelque part, la version remplacée perdue au lieu de rester
 //      lisible à son adresse datée, un renvoi qui ne mène nulle part, une
-//      traduction qui ne dit pas quel texte fait foi, ou l'annonce de la
-//      version à venir perdue en chemin.
+//      traduction qui ne dit pas quel texte fait foi, l'annonce de la
+//      version à venir perdue en chemin, ou `retention.json` qui chercherait
+//      encore une durée nouvelle à l'adresse d'une version publiée, où plus
+//      rien ne répond, au lieu de la politique en vigueur qui la dit (#467).
 //   3. Mêler deux changements : annoncer une version à venir pendant qu'une
 //      autre attend d'être publiée sur la même page, ou appliquer une version
 //      à venir qui laisserait une traduction traduire une version remplacée.
@@ -33,6 +35,7 @@ var fs = require('fs');
 var os = require('os');
 var path = require('path');
 var child = require('child_process');
+var legales = require('./lib/versions-legales.js');
 
 var root = path.join(__dirname, '..');
 var build = path.join(root, 'build-site.sh');
@@ -164,6 +167,22 @@ function aPlainCopy() {
   return site;
 }
 
+/** Le retention.json voisin d'une copie du site, comme dans le dépôt. */
+function retentionOf(site) {
+  return path.join(site, '..', 'retention.json');
+}
+
+/**
+ * `retention.json` de la copie, avec une durée que chaque version qui attend
+ * dit, comme une durée nouvelle attend la version qui la dit (#467). Rend le
+ * fichier tel qu'il est avant la publication.
+ */
+function withWaitingDurations(site) {
+  return legales.withTrialDurations(retentionOf(site), PAGES.filter(function (page) {
+    return exists(path.join(site, page, 'a-publier', 'index.html'));
+  }).map(legales.aPublier));
+}
+
 /** Une copie où chaque page légale tient une version qui attend d'être publiée. */
 function aCopy() {
   var site = aPlainCopy();
@@ -205,7 +224,8 @@ function refused(result) {
 function publishAt(site, instant) {
   return run('node', ['--input-type=module', '-e',
     'import { publier } from ' + JSON.stringify(tool) + ';\n' +
-    'publier(' + JSON.stringify(site) + ', new Date(' + JSON.stringify(instant) + '));']);
+    'publier(' + JSON.stringify(site) + ', ' + JSON.stringify(retentionOf(site)) +
+    ', new Date(' + JSON.stringify(instant) + '));']);
 }
 
 /**
@@ -216,7 +236,7 @@ function applyAt(site, instant) {
   return run('node', ['--input-type=module', '-e',
     'import { appliquer } from ' + JSON.stringify(tool) + ';\n' +
     'const fait = appliquer(' + JSON.stringify(site) + ', ' +
-    JSON.stringify(path.join(site, '..', 'retention.json')) +
+    JSON.stringify(retentionOf(site)) +
     ', new Date(' + JSON.stringify(instant) + '));\n' +
     'for (const retenue of fait.attendent) console.error(retenue);']);
 }
@@ -314,6 +334,7 @@ var LATER = '2031-03-30';
 (function () {
   [[LATER, 0, LATER], [LATER, 1, dayBefore(LATER)]].forEach(function (when) {
     var site = aCopy();
+    var retentionBefore = withWaitingDurations(site);
     var instant = parisMidnight(when[0], when[1]);
     var date = when[2];
     var before = {};
@@ -389,6 +410,34 @@ var LATER = '2031-03-30';
         fail(page + ' no longer announces its upcoming version once published');
       }
     });
+
+    // Ce que la version publiée dit se vérifie désormais sur la version en
+    // vigueur : `retention.json` perd chaque « page » qui nommait une version
+    // publiée, et rien d'autre, et reste lisible (#467).
+    var published = PAGES.map(legales.aPublier);
+    var namesAPublishedVersion = function (entry) {
+      return entry !== null && typeof entry === 'object' && published.indexOf(entry.page) !== -1;
+    };
+    var expected = JSON.parse(JSON.stringify(retentionBefore));
+    Object.keys(expected).forEach(function (key) {
+      if (namesAPublishedVersion(expected[key])) {
+        delete expected[key].page;
+      }
+    });
+    var parsedAfter = null;
+    try {
+      parsedAfter = JSON.parse(read(retentionOf(site)));
+    } catch (e) {
+      fail('retention.json no longer parses once published: ' + e.message);
+    }
+    if (parsedAfter !== null && JSON.stringify(parsedAfter) !== JSON.stringify(expected)) {
+      fail('retention.json is not what it was without the pages naming a published version');
+    }
+    if (parsedAfter !== null && Object.keys(parsedAfter).some(function (key) {
+      return namesAPublishedVersion(parsedAfter[key]);
+    })) {
+      fail('retention.json still checks a duration at the address of a published version');
+    }
 
     var site2 = built(site);
     if (site2.result.code !== 0) {
@@ -488,6 +537,11 @@ var LATER = '2031-03-30';
         fs.mkdirSync(path.join(site, page, 'en'));
         fs.writeFileSync(path.join(site, page, 'en', 'index.html'), '<html lang="en"><p>An earlier translation.</p></html>');
       });
+    }],
+    // Les durées ne pourraient pas suivre, et une durée nouvelle resterait
+    // vérifiée à une adresse que la publication fait disparaître.
+    ['retention.json is missing beside the site', function (site) {
+      fs.rmSync(retentionOf(site));
     }],
   ];
   var sample = aCopy();
@@ -675,6 +729,6 @@ var LATER = '2031-03-30';
 })();
 
 if (status === 0) {
-  console.log('version-a-publier: a version to publish is served from the day it is published, dated that day in Paris, with its translation, and the one it replaces stays readable');
+  console.log('version-a-publier: a version to publish is served from the day it is published, dated that day in Paris, with its translation, the one it replaces stays readable, and the durations it states are checked on it from then on');
 }
 process.exit(status);

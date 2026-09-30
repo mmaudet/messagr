@@ -73,10 +73,14 @@ BASE="${MESSAGR_SITE:-https://messagr.eu}"
 PAGES=(/confidentialite /conditions-generales /aide)
 UNSERVED=()
 
+# Which version is served, and at which address, is the one rule these checks
+# share (#467).
+# shellcheck source=lib/versions-legales.sh
+. "$ROOT/scripts/lib/versions-legales.sh"
+
 for dir in "$SITE_SOURCE"/*/; do
   dir="${dir%/}"
   legal="$(basename "$dir")"
-  upcoming="$dir/a-venir/index.html"
   dated_any=0
   for dated in "$dir"/jusqu-au-*/index.html; do
     [ -f "$dated" ] || continue
@@ -84,21 +88,23 @@ for dir in "$SITE_SOURCE"/*/; do
     dated="${dated#"$SITE_SOURCE"}"
     PAGES+=("${dated%index.html}")
   done
-  if [ -f "$upcoming" ] && ! grep -qF 'MESSAGR-DATE-A-VENIR' "$upcoming"; then
-    PAGES+=("/$legal/a-venir/")
-  elif [ -f "$upcoming" ] || [ "$dated_any" -eq 1 ]; then
-    UNSERVED+=("/$legal/a-venir/")
-  fi
+  upcoming="$(adresse_version "$legal" a-venir)"
+  case "$(etat_version "$SITE_SOURCE" "$upcoming")" in
+    servie) PAGES+=("$upcoming") ;;
+    annonce-attendue) UNSERVED+=("$upcoming") ;;
+    absente) [ "$dated_any" -eq 0 ] || UNSERVED+=("$upcoming") ;;
+  esac
   for translated in "$dir"/[a-z][a-z]/index.html; do
     [ -f "$translated" ] || continue
     translated="${translated#"$SITE_SOURCE"}"
     PAGES+=("${translated%index.html}")
   done
-  if [ -f "$dir/a-publier/index.html" ]; then
-    UNSERVED+=("/$legal/a-publier/")
-    for waiting in "$dir"/a-publier/[a-z][a-z]/index.html; do
-      [ -f "$waiting" ] || continue
-      lang="$(basename "$(dirname "$waiting")")"
+  waiting="$(adresse_version "$legal" a-publier)"
+  if [ "$(etat_version "$SITE_SOURCE" "$waiting")" = publication-attendue ]; then
+    UNSERVED+=("$waiting")
+    for translation in "$SITE_SOURCE$waiting"[a-z][a-z]/index.html; do
+      [ -f "$translation" ] || continue
+      lang="$(basename "$(dirname "$translation")")"
       [ -f "$dir/$lang/index.html" ] || UNSERVED+=("/$legal/$lang/")
     done
   fi

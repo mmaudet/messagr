@@ -24,6 +24,8 @@ Messagr is an end-to-end encrypted messenger. Photos, files and message text are
 
 We therefore do not declare "Photos or Videos" or "Other User Content" under App Privacy. We follow Apple's own definition of collection as retaining data "in a readable form" (App privacy details on the App Store). We are aware of the guidance that an app which lets users upload a media type should disclose that type, and we read it against that definition: there is no readable form of this data on our side to disclose.
 
+The one exception is reporting: it sends the messages a user selects, sealed on the device for a key only we, the developer, hold, and our server cannot open it. We add no App Privacy type for it, as it meets every optional disclosure criterion: used only to act on the report, never to track or advertise; rare, optional, not the app's primary function; and the sheet names the sending account, shows what leaves the phone and sends nothing until "Send" is tapped.
+
 We do declare "Emails or Text Messages", linked to the user, no tracking, App Functionality. The server reads who sends to whom and when, which is what that type covers here, and Apple's guidance on messaging apps asks for it.
 
 Our full answers, question by question, each quoting the sentence of our privacy policy it rests on, are public at https://github.com/mmaudet/messagr/blob/master/docs/declarations-magasins.md

@@ -70,7 +70,9 @@
 //     `appliquer` ;
 //   - la version qui attendait devient `<page>/index.html`, et sa traduction
 //     `<page>/en/index.html`, sa propre adresse ;
-//   - `<page>/a-publier/` disparaît.
+//   - `<page>/a-publier/` disparaît, et `retention.json` cesse d'y renvoyer :
+//     une durée nouvelle que la version publiée dit se vérifie désormais sur
+//     la version en vigueur (#467).
 // Le texte, c'est la page qui le porte, dans sa langue : le geste n'écrit que
 // des dates, et vérifie qu'il n'en manque aucune.
 //
@@ -234,11 +236,23 @@ function versionsDans(site, sous) {
   return trouvees
 }
 
+/** Le sous-dossier d'une version à venir, et celui d'une version à publier. */
+export const A_VENIR = 'a-venir'
+export const A_PUBLIER = 'a-publier'
+
+/**
+ * L'adresse d'une version d'une page légale, `/confidentialite/a-publier/` :
+ * celle que `retention.json` nomme sous « page », et que les gestes retirent
+ * quand la version disparaît. Construite ici et nulle part ailleurs : les
+ * essais la demandent à ce module.
+ */
+export const adresseDe = (nom, sous) => `/${nom}/${sous}/`
+
 /** Les pages légales qui ont une version à venir. */
-const versionsAVenir = site => versionsDans(site, 'a-venir')
+const versionsAVenir = site => versionsDans(site, A_VENIR)
 
 /** Les pages légales qui ont une version qui attend d'être publiée. */
-const versionsAPublier = site => versionsDans(site, 'a-publier')
+const versionsAPublier = site => versionsDans(site, A_PUBLIER)
 
 /** Le titre de toute page légale, « … — Messagr », que la version datée reprend. */
 function exigerUnTitre(fichier, adresse) {
@@ -530,6 +544,33 @@ function retentionSans(texte, adresses) {
   return resultat
 }
 
+/** Le `retention.json` voisin du site, celui du dépôt : là où les gestes le cherchent. */
+const retentionVoisine = site => join(site, '..', 'retention.json')
+
+/**
+ * Ce que `retention.json` devient quand les versions aux `adresses`
+ * disparaissent, calculé avant que rien ne s'écrive, pour `appliquer` comme
+ * pour `publier`. Sans le fichier, le geste est refusé : les durées ne
+ * pourraient pas suivre. `null` quand rien n'y renvoie à ces adresses.
+ */
+function retentionSuivante(retention, adresses) {
+  if (!existsSync(retention)) {
+    throw new Refus(
+      `${retention} n’existe pas : les durées ne peuvent pas suivre`,
+    )
+  }
+  const avant = lire(retention)
+  const apres = retentionSans(avant, adresses)
+  return apres === avant ? null : apres
+}
+
+/** Écrit ce que `retentionSuivante` a rendu, et nomme le fichier s'il a changé. */
+function ecrireRetention(retention, texte) {
+  if (texte === null) return []
+  writeFileSync(retention, texte)
+  return [retention]
+}
+
 /**
  * Applique chaque version à venir annoncée pour aujourd'hui ou avant, et dit
  * ce qui a été écrit, et ce qui retient celles qui attendent. `retention`
@@ -537,7 +578,7 @@ function retentionSans(texte, adresses) {
  */
 export function appliquer(
   site,
-  retention = join(site, '..', 'retention.json'),
+  retention = retentionVoisine(site),
   maintenant = new Date(),
 ) {
   const aujourdhui = aujourdhuiAParis(maintenant)
@@ -569,15 +610,10 @@ export function appliquer(
       },
       { page: enVigueur, texte: enVigueurDepuis(lire(venir), nom, date) },
     )
-    retirees.push({ dossier: dirname(venir), adresse: `/${nom}/a-venir/` })
+    retirees.push({ dossier: dirname(venir), adresse: adresseDe(nom, A_VENIR) })
   }
-  if (!existsSync(retention)) {
-    throw new Refus(
-      `${retention} n’existe pas : les durées ne peuvent pas suivre`,
-    )
-  }
-  const nouvelleRetention = retentionSans(
-    lire(retention),
+  const nouvelleRetention = retentionSuivante(
+    retention,
     retirees.map(r => r.adresse),
   )
 
@@ -586,12 +622,11 @@ export function appliquer(
     writeFileSync(page, texte)
   }
   for (const { dossier } of retirees) rmSync(dossier, { recursive: true })
-  writeFileSync(retention, nouvelleRetention)
   return {
     touchees: [
       ...ecritures.map(e => e.page),
       ...retirees.map(r => `${r.dossier} (retiré)`),
-      retention,
+      ...ecrireRetention(retention, nouvelleRetention),
     ],
     attendent,
   }
@@ -718,8 +753,17 @@ function dater(texte, nom, date, langue) {
  * Publie chaque version qui attend dans `a-publier/`, datée du jour de Paris
  * à l'instant `maintenant`, et dit ce qui a été écrit. Rien n'est écrit si
  * une page ne dit pas exactement ce qu'il faut.
+ *
+ * `retention` vaut le `retention.json` voisin du site, comme pour
+ * `appliquer` : une durée nouvelle qu'une version à publier dit y porte
+ * `"page": "/<page>/a-publier/"` (#467), et la perd ici, pour se vérifier
+ * désormais sur la version en vigueur, qui la dit.
  */
-export function publier(site, maintenant = new Date()) {
+export function publier(
+  site,
+  retention = retentionVoisine(site),
+  maintenant = new Date(),
+) {
   const date = aujourdhuiAParis(maintenant)
   const aPublier = versionsAPublier(site)
   if (aPublier.length === 0) {
@@ -776,6 +820,10 @@ export function publier(site, maintenant = new Date()) {
       )
     }
   }
+  const nouvelleRetention = retentionSuivante(
+    retention,
+    aPublier.map(v => adresseDe(v.nom, A_PUBLIER)),
+  )
 
   for (const { dossier, page, texte } of ecritures) {
     if (dossier) mkdirSync(dossier, { recursive: true })
@@ -786,6 +834,7 @@ export function publier(site, maintenant = new Date()) {
     touchees: [
       ...ecritures.map(e => e.page),
       ...aPublier.map(v => `${v.dossier} (retiré)`),
+      ...ecrireRetention(retention, nouvelleRetention),
     ],
     attendent: [],
   }
@@ -815,7 +864,7 @@ const GESTES = {
   publier: ([site = SITE_PAR_DEFAUT]) => {
     const maintenant = new Date()
     return {
-      ...publier(site, maintenant),
+      ...publier(site, retentionVoisine(site), maintenant),
       suite: `la version publiée s’applique depuis aujourd’hui, le ${enFrancais(aujourdhuiAParis(maintenant))}. Reste à commiter et à déployer aujourd’hui même, la date écrite étant celle où la page est servie, ${SUITE}`,
     }
   },

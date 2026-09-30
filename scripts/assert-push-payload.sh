@@ -41,12 +41,21 @@ set -uo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 GATEWAY="$ROOT/services/invitations/src/handlers/wake.rs"
-PAGE_SOURCE="$ROOT/deploy/messagr-eu/site/confidentialite/index.html"
+SITE_SOURCE="$ROOT/deploy/messagr-eu/site"
+PAGE_SOURCE="$SITE_SOURCE/confidentialite/index.html"
 PAGE="${MESSAGR_SITE:-https://messagr.eu}/confidentialite/"
+# Which version is served, and at which address, is the rule the legal pages
+# check applies too (#467).
+# shellcheck source=lib/versions-legales.sh
+. "$ROOT/scripts/lib/versions-legales.sh"
 # The upcoming version (#412), when the repository holds one: the policy the
 # day it applies, so held to the same claims from the day it is written.
-UPCOMING_SOURCE="$ROOT/deploy/messagr-eu/site/confidentialite/a-venir/index.html"
-UPCOMING="${MESSAGR_SITE:-https://messagr.eu}/confidentialite/a-venir/"
+UPCOMING_ADDRESS="$(adresse_version confidentialite a-venir)"
+UPCOMING_SOURCE="$SITE_SOURCE${UPCOMING_ADDRESS}index.html"
+UPCOMING="${MESSAGR_SITE:-https://messagr.eu}$UPCOMING_ADDRESS"
+# The version awaiting publication (#467), likewise: the policy the day it is
+# published. Nothing serves it before, so it has no live half.
+WAITING_SOURCE="$SITE_SOURCE$(adresse_version confidentialite a-publier)index.html"
 
 failed=0
 say_ok() { printf '  OK    %s\n' "$1"; }
@@ -302,7 +311,11 @@ fi
 upcoming_announced=0
 if [ -f "$UPCOMING_SOURCE" ]; then
   holds_the_claims "the upcoming page in the repository" "$(cat "$UPCOMING_SOURCE")"
-  grep -qF 'MESSAGR-DATE-A-VENIR' "$UPCOMING_SOURCE" || upcoming_announced=1
+  [ "$(etat_version "$SITE_SOURCE" "$UPCOMING_ADDRESS")" = servie ] && upcoming_announced=1
+fi
+
+if [ -f "$WAITING_SOURCE" ]; then
+  holds_the_claims "the page awaiting publication in the repository" "$(cat "$WAITING_SOURCE")"
 fi
 
 # THE LIVE HALF IS BINDING ONLY WHEN THE BUILD IS OUT.
