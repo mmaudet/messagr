@@ -33,9 +33,11 @@
 //! way through. A REPORT NUMBER is taken back in any spelling a report number
 //! is typed in (`is_the_number`): any case, a hyphen, a space or nothing
 //! between its groups, since it is read off an SMS and read out (#375). AN
-//! ACCOUNT is taken back exactly, case included (`operator::typed_back`), as
-//! the named deactivation takes one: a localpart is case-sensitive, and an
-//! operator who typed another case did not read it off the plan.
+//! ACCOUNT is taken as the homeserver reads it, in lowercase
+//! (`command_line::as_the_homeserver_reads`), and back in any case
+//! (`is_the_account`): Continuwuity reads an identifier in lowercase whole,
+//! so its case designates no other account, and a deletion recorded in
+//! another case would name none.
 //!
 //! # A DECISION
 //!
@@ -57,20 +59,22 @@
 //! within thirty days applies to it, and that row names no report. Both carry
 //! the day, never the hour.
 //!
-//! That is all this does, and what remains is said plainly (ADR 0015, amended
-//! on 30 September 2026): a copy of the database can relate a confirmed
-//! report to an account deletion by their dates, when deletions are few; and
-//! a deletion dated at midnight UTC is a termination, where one announced from
-//! the application carries its second.
+//! That is all this does. What a copy of the database can still relate is
+//! said plainly, and it is not only the dates (ADR 0015, amended on 30
+//! September 2026; the policy says the same): a confirmed report and an
+//! account deletion, by their dates, when deletions are few; a deletion dated
+//! at midnight UTC is a termination, where one announced from the application
+//! carries its second; and a reporting account that also blocked the account
+//! it reported, through the block the service keeps, with its date (#469).
 
 mod command_line;
 mod erasure;
 mod motivation;
 
-pub use command_line::the_gesture;
+pub use command_line::{flags, the_gesture};
 pub use erasure::sweep;
 
-use command_line::{DECIDE, RECORD_TERMINATION};
+use command_line::{as_the_homeserver_reads, DECIDE, RECORD_TERMINATION};
 use data_encoding::BASE64;
 use erasure::{record_goes_on, sealed_goes_on, RECORD_KEPT_DAYS, SEALED_KEPT_DAYS};
 use motivation::{the_motivation, WHAT_A_MOTIVATION_IS};
@@ -79,7 +83,7 @@ use sqlx::{sqlite::SqliteRow, Row, SqlitePool};
 
 use crate::{
     handlers::deletion::PURGE_AFTER_SECONDS,
-    operator::{is_a_user_id, typed_back},
+    operator::is_a_user_id,
     report::{Reason, ReportNumber},
     util::{date, day_of, instant, DAY_SECONDS},
 };
@@ -164,6 +168,27 @@ where
 /// typed in (`ReportNumber::parse`). The end of stdin is a refusal.
 fn is_the_number(answer: Option<&str>, number: ReportNumber) -> bool {
     answer.and_then(|typed| ReportNumber::parse(typed.trim())) == Some(number)
+}
+
+/// Whether `answer` types `account` back, in any case: `account` is as the
+/// homeserver reads it, and the case typed designates no other account. The
+/// end of stdin is a refusal.
+fn is_the_account(answer: Option<&str>, account: &str) -> bool {
+    answer.is_some_and(|typed| as_the_homeserver_reads(typed.trim()) == account)
+}
+
+/// What was written, or the refusal saying that nothing was: the report was
+/// read for the plan, and a statement that touches no row means it is no
+/// longer what the plan said. The hourly sweep may have erased it while the
+/// operator read.
+fn one_row_or_nothing(written: u64, number: ReportNumber, what: &str) -> Result<(), String> {
+    match written {
+        1 => Ok(()),
+        _ => Err(format!(
+            "report {number} was not {what}: it is no longer what the plan said, erased or \
+             changed meanwhile. Nothing was written"
+        )),
+    }
 }
 
 /// A decision, as a report keeps it.
@@ -534,11 +559,7 @@ where
     .await
     .map_err(unwritten(number))?
     .rows_affected();
-    if written == 0 {
-        return Err(format!(
-            "report {number} is no longer kept: nothing was written"
-        ));
-    }
+    one_row_or_nothing(written, number, "decided")?;
     Ok(format!(
         "Report {number}: {}, decided on {}.\n",
         decision.code(),
@@ -583,12 +604,15 @@ where
         return Err(format!("report {number} was not held: nothing was written"));
     }
     let since = day_of(now);
-    sqlx::query("UPDATE reports SET held_since = ? WHERE number = ? AND held_since IS NULL")
-        .bind(since)
-        .bind(number.to_string())
-        .execute(pool)
-        .await
-        .map_err(unwritten(number))?;
+    let written =
+        sqlx::query("UPDATE reports SET held_since = ? WHERE number = ? AND held_since IS NULL")
+            .bind(since)
+            .bind(number.to_string())
+            .execute(pool)
+            .await
+            .map_err(unwritten(number))?
+            .rows_affected();
+    one_row_or_nothing(written, number, "held")?;
     Ok(format!(
         "Report {number} is held for the authorities since {}.\n",
         date(since)
@@ -627,20 +651,25 @@ where
             "report {number} was not released: nothing was written"
         ));
     }
-    sqlx::query("UPDATE reports SET held_since = NULL WHERE number = ?")
-        .bind(number.to_string())
-        .execute(pool)
-        .await
-        .map_err(unwritten(number))?;
+    let written = sqlx::query(
+        "UPDATE reports SET held_since = NULL WHERE number = ? AND held_since IS NOT NULL",
+    )
+    .bind(number.to_string())
+    .execute(pool)
+    .await
+    .map_err(unwritten(number))?
+    .rows_affected();
+    one_row_or_nothing(written, number, "released")?;
     Ok(format!("Report {number} is no longer held.\n"))
 }
 
 /// `--record-termination`: an account the homeserver deactivated after a
 /// confirmed decision, recorded among the account deletions
 /// (`handlers::deletion::record`, #385) so that the purge within thirty days
-/// applies to it, once the account is typed back, case included. Dated by the
-/// day, never the hour, like a decision; the row it writes has the columns of
-/// any other deletion, and names no report.
+/// applies to it, once the account is typed back. The account is recorded as
+/// the homeserver reads it, in lowercase. Dated by the day, never the hour,
+/// like a decision; the row it writes has the columns of any other deletion,
+/// and names no report.
 async fn record_termination<A>(
     pool: &SqlitePool,
     account: &str,
@@ -650,6 +679,8 @@ async fn record_termination<A>(
 where
     A: FnOnce(&str) -> Option<String>,
 {
+    let account = as_the_homeserver_reads(account);
+    let account = account.as_str();
     if !is_a_user_id(account) {
         return Err(format!(
             "{account:?} is not a Matrix account ID, such as @localpart:messagr.eu"
@@ -683,7 +714,7 @@ where
          Type the account to record it, or anything else to leave everything as it is:",
         date(on)
     );
-    if !typed_back(ask(&plan).as_deref(), account) {
+    if !is_the_account(ask(&plan).as_deref(), account) {
         return Err(format!("{account}: nothing was recorded"));
     }
     let recorded = crate::handlers::deletion::record(pool, account, on)
@@ -1346,6 +1377,99 @@ mod tests {
         assert_eq!(held_since_of(&pool, "K7QM-4ZT2").await, Some(DECIDED_ON));
     }
 
+    // ── What the plan read, gone before the confirmation ─────────────────
+
+    /// Runs `sql` on the database of `pool` from another connection, on
+    /// another thread, and waits for it: what the hourly sweep may do while
+    /// the operator reads a plan.
+    fn meanwhile(pool: &SqlitePool, sql: &'static str) {
+        let options = (*pool.connect_options()).clone();
+        std::thread::spawn(move || {
+            tokio::runtime::Builder::new_current_thread()
+                .enable_all()
+                .build()
+                .unwrap()
+                .block_on(async {
+                    let other = SqlitePool::connect_with(options).await.unwrap();
+                    sqlx::query(sql).execute(&other).await.unwrap();
+                    other.close().await;
+                })
+        })
+        .join()
+        .unwrap();
+    }
+
+    /// `gesture` confirmed, once `sql` has run between the plan and the
+    /// answer.
+    async fn confirmed_after(
+        pool: &SqlitePool,
+        gesture: Gesture,
+        sql: &'static str,
+    ) -> Result<String, String> {
+        run(pool, gesture, DECIDED, |_| {
+            meanwhile(pool, sql);
+            Some("K7QM-4ZT2".into())
+        })
+        .await
+    }
+
+    const THE_SWEEP_ERASES_IT: &str = "DELETE FROM reports WHERE number = 'K7QM-4ZT2'";
+
+    /// A record the sweep erased while the operator read the plan is not said
+    /// held, released or decided: the statement touches no row, and the
+    /// gesture refuses, with a non-zero status.
+    #[sqlx::test(migrations = "./migrations")]
+    async fn a_report_erased_between_the_plan_and_the_confirmation_is_said_so(pool: SqlitePool) {
+        a_report(&pool, "K7QM-4ZT2", "@alice:h", "threat", RECEIVED).await;
+        let held = confirmed_after(
+            &pool,
+            Gesture::Hold(number("K7QM-4ZT2")),
+            THE_SWEEP_ERASES_IT,
+        )
+        .await;
+        assert!(
+            held.as_ref().is_err_and(|why| why.contains("was not held")),
+            "{held:?}"
+        );
+
+        a_report(&pool, "K7QM-4ZT2", "@alice:h", "threat", RECEIVED).await;
+        let decided = confirmed_after(
+            &pool,
+            decide("K7QM-4ZT2", Decision::Lifted, MOTIVATION),
+            THE_SWEEP_ERASES_IT,
+        )
+        .await;
+        assert!(
+            decided
+                .as_ref()
+                .is_err_and(|why| why.contains("was not decided")),
+            "{decided:?}"
+        );
+
+        a_report(&pool, "K7QM-4ZT2", "@alice:h", "threat", RECEIVED).await;
+        answered(
+            &pool,
+            Gesture::Hold(number("K7QM-4ZT2")),
+            DECIDED,
+            Some("K7QM-4ZT2"),
+        )
+        .await
+        .1
+        .unwrap();
+        let released = confirmed_after(
+            &pool,
+            Gesture::Release(number("K7QM-4ZT2")),
+            THE_SWEEP_ERASES_IT,
+        )
+        .await;
+        assert!(
+            released
+                .as_ref()
+                .is_err_and(|why| why.contains("was not released")),
+            "{released:?}"
+        );
+    }
+
     // ── What is erased, and when ─────────────────────────────────────────
 
     /// What is left of `number`: its sealed report, its idempotency key, and
@@ -1519,13 +1643,40 @@ mod tests {
             None,
             Some(""),
             Some("yes"),
-            Some("@Bob:h"),
             Some("@carol:h"),
+            Some("@bob:h2"),
         ] {
             let (_, done) = answered(&pool, termination("@bob:h"), DECIDED, answer).await;
             assert!(done.is_err(), "{answer:?}");
         }
         assert_eq!(deletions(&pool).await, []);
+    }
+
+    /// The homeserver reads an identifier in lowercase whole: the account is
+    /// recorded as it reads it, whatever the case it was typed in, so that
+    /// the purge finds the account the deletion names.
+    #[sqlx::test(migrations = "./migrations")]
+    async fn an_account_is_recorded_as_the_homeserver_reads_it_and_typed_back_in_any_case(
+        pool: SqlitePool,
+    ) {
+        let (plan, done) = answered(
+            &pool,
+            termination("@bob:MESSAGR.EU"),
+            DECIDED,
+            Some("@BOB:messagr.eu"),
+        )
+        .await;
+
+        assert!(done.is_ok(), "{done:?}");
+        assert!(plan.contains("@bob:messagr.eu"), "{plan}");
+        assert_eq!(
+            deletions(&pool).await,
+            [(
+                "@bob:messagr.eu".to_string(),
+                DECIDED_ON,
+                DECIDED_ON + 30 * DAY
+            )]
+        );
     }
 
     #[sqlx::test(migrations = "./migrations")]

@@ -418,12 +418,14 @@ due.
   (`moderation::sweep`), and its log line counts them:
   `reports: … sealed reports erased, … records erased`.
 - **What a copy of the database still shows** (ADR 0015, amended on 30
-  September 2026): a confirmed report and an account deletion recorded the
-  same day can be related by their dates, when deletions are few; and a
-  deletion dated at midnight UTC is a termination, where one announced from
-  the application carries its second. Recording the application's deletions
-  by the day as well, or a termination on another day than its decision,
-  would lessen these traces; neither is done.
+  September 2026, and the policy says the same): a confirmed report and an
+  account deletion recorded the same day can be related by their dates, when
+  deletions are few; a deletion dated at midnight UTC is a termination, where
+  one announced from the application carries its second; and a reporting
+  account that also blocked the account it reported is related to it by that
+  block, which the service keeps with its date (#469). Recording the
+  application's deletions by the day as well, or a termination on another day
+  than its decision, would lessen the first two traces; neither is done.
 - **The dated copies of the database** that an update leaves (step 4 of
   "Updating it") hold the reports as they were, sealed reports included, and
   no sweep reaches them: delete them once the update is behind, as #416 says

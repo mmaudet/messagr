@@ -1,10 +1,10 @@
 //! The operator's gestures on reports, as typed on the host (#473): the
 //! binary itself, its command line, its stdin, its stdout and its exit
-//! status, against a database of its own. `src/moderation.rs` tests what each
+//! status, against a database of its own. `src/moderation/` tests what each
 //! gesture does; this holds what only the process shows: that the export's
 //! stdout carries the document and nothing else, that a confirmation is read
-//! from stdin, and that a command line naming a gesture badly is refused
-//! before anything is read.
+//! from stdin, that a command line naming a gesture badly is refused before
+//! anything is read, and that one naming what no mode takes starts nothing.
 //!
 //! No homeserver and no network: the gestures reach neither.
 
@@ -196,10 +196,16 @@ async fn a_termination_is_recorded_once_the_account_is_typed_back_on_stdin() {
 fn a_gesture_named_badly_is_refused_before_anything_is_read() {
     // No variable at all: a refusal that needed the configuration would say
     // DATABASE_URL is missing instead.
-    for args in [
-        vec!["--reports=K7QM-4ZT2"],
-        vec!["--decide-report", "K7QM-4ZT2", "lifted"],
-        vec!["--hold-report", "K7QM-4ZT2", "ABCD-EFGH"],
+    for (args, says) in [
+        (vec!["--reports=K7QM-4ZT2"], "nothing was started"),
+        (
+            vec!["--decide-report", "K7QM-4ZT2", "lifted"],
+            "The operator's gestures on reports",
+        ),
+        (
+            vec!["--hold-report", "K7QM-4ZT2", "ABCD-EFGH"],
+            "The operator's gestures on reports",
+        ),
     ] {
         let refused = finished(
             Command::new(BINARY)
@@ -213,10 +219,34 @@ fn a_gesture_named_badly_is_refused_before_anything_is_read() {
         );
         let said = String::from_utf8_lossy(&refused.stderr);
         assert!(!refused.status.success(), "{args:?}");
-        assert!(
-            said.contains("The operator's gestures on reports"),
-            "{args:?}: {said}"
-        );
+        assert!(said.contains(says), "{args:?}: {said}");
         assert!(!said.contains("DATABASE_URL"), "{args:?}: {said}");
     }
+}
+
+/// A MISTYPED FLAG STARTS NOTHING. With every variable a start needs, the
+/// service would start, sweeper and all, and its log would flow into the
+/// opening tool through the operator's pipe: an argument no mode takes is
+/// refused at once instead, and the process ends (`finished` kills and fails
+/// a process that runs on).
+#[tokio::test]
+async fn an_argument_no_mode_takes_starts_nothing_and_ends_at_once() {
+    let dir = tempfile::tempdir().unwrap();
+    for args in [
+        vec!["--export-reprot", "K7QM-4ZT2"],
+        vec!["--reports", "--verbose"],
+        vec!["--record-termination", "@bob:messagr.eu", "--yes"],
+        vec!["K7QM-4ZT2"],
+        vec!["serve"],
+    ] {
+        let refused = gesture(dir.path(), &args, "");
+        let said = String::from_utf8_lossy(&refused.stderr);
+        assert!(!refused.status.success(), "{args:?}");
+        assert!(said.contains("nothing was started"), "{args:?}: {said}");
+        assert_eq!(stdout(&refused), "", "{args:?}");
+    }
+    assert!(
+        !dir.path().join("invitations.db").exists(),
+        "and the database was never opened"
+    );
 }

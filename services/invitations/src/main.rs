@@ -41,9 +41,18 @@ pub struct AppState {
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
+    let argv: Vec<String> = std::env::args().collect();
+    // AN ARGUMENT NO MODE TAKES IS REFUSED HERE, before anything is read or
+    // started (#473): the service takes none, and starting it for a mistyped
+    // flag would run its sweeper and pour its log into whatever the operator
+    // piped the mode into.
+    let modes: Vec<&str> = moderation::flags()
+        .chain([retire_key::THE_FLAG, named_deactivation::THE_FLAG])
+        .collect();
+    operator::known_arguments(&argv, &modes).map_err(|refusal| anyhow::anyhow!("{refusal}"))?;
     // THE OPERATOR'S GESTURES ON REPORTS (#473): a command line that names
-    // one badly is refused here, before anything is read.
-    let gesture = moderation::the_gesture(&std::env::args().collect::<Vec<_>>())
+    // one badly is refused here too, before anything is read.
+    let gesture = moderation::the_gesture(&argv)
         .transpose()
         .map_err(|refusal| anyhow::anyhow!("{refusal}"))?;
     // They say what they say on stdout, and nothing else goes there: the
@@ -79,9 +88,7 @@ async fn main() -> anyhow::Result<()> {
     // guard below, which refuses to start while live masks were made with a
     // key MASKING_KEYS no longer holds: a lost key is what this retires. Like
     // the named deactivation, it binds no port and starts no sweeper.
-    if let Some(named) =
-        operator::named_after(&std::env::args().collect::<Vec<_>>(), retire_key::THE_FLAG)
-    {
+    if let Some(named) = operator::named_after(&argv, retire_key::THE_FLAG) {
         return match retire_key::run(
             &pool,
             &named,
@@ -119,9 +126,7 @@ async fn main() -> anyhow::Result<()> {
     // may be run beside the live service without a second sweeper or a fight
     // over the port. Both of those are true by reading the lines below: the
     // dispatch returns before either happens.
-    if let Some(named) =
-        named_deactivation::selects_the_named_deactivation(&std::env::args().collect::<Vec<_>>())
-    {
+    if let Some(named) = named_deactivation::selects_the_named_deactivation(&argv) {
         let seed_path = named_deactivation::the_seed_path();
         return match named_deactivation::run(&state, &named, &seed_path, ask_on_the_terminal).await
         {

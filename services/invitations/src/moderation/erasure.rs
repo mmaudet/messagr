@@ -85,11 +85,22 @@ mod tests {
             .join("\n")
     }
 
+    /// The name of an item as the code spells it, from the item itself: the
+    /// one token both come from, so that a rename changes the name, and a name
+    /// that no longer exists does not compile.
+    macro_rules! named {
+        ($item:ident) => {{
+            let _ = $item;
+            stringify!($item)
+        }};
+    }
+
     /// `deploy/messagr-eu/retention.json` holds each duration once, and the
     /// published policy is checked against it (`scripts/assert-retention.sh`).
-    /// Here the other half: the file names these erasures, with the days they
-    /// keep, and says the durations the policy says. A constant changed
-    /// without the file, or the file without the code, turns this red.
+    /// Here the other half: the file names these erasures and the constants
+    /// of the days they keep, as the code names them, with those days, and
+    /// says the durations the policy says. A function or a constant renamed or
+    /// changed without the file, or the file without the code, turns this red.
     #[test]
     fn retention_json_names_these_erasures_and_the_days_they_keep() {
         let retention: serde_json::Value =
@@ -97,22 +108,25 @@ mod tests {
                 .unwrap();
 
         let content = applied(&retention, "signalements_contenu");
-        assert!(content.contains("erase_sealed_reports"), "{content}");
-        assert!(
-            content.contains(&format!("SEALED_KEPT_DAYS = {SEALED_KEPT_DAYS} jours")),
-            "{content}"
-        );
+        assert!(content.contains(named!(erase_sealed_reports)), "{content}");
+        let sealed_days = format!("{} = {SEALED_KEPT_DAYS} jours", named!(SEALED_KEPT_DAYS));
+        assert!(content.contains(&sealed_days), "{sealed_days}: {content}");
         assert_eq!(
             retention["signalements_contenu"]["duree"],
             "six mois après la décision"
         );
 
         let decisions = applied(&retention, "signalements_decisions");
-        assert!(decisions.contains("erase_decided_reports"), "{decisions}");
         assert!(
-            decisions.contains(&format!("RECORD_KEPT_DAYS = {RECORD_KEPT_DAYS} jours")),
+            decisions.contains(named!(erase_decided_reports)),
             "{decisions}"
         );
+        let record_days = format!("{} = {RECORD_KEPT_DAYS} jours", named!(RECORD_KEPT_DAYS));
+        assert!(
+            decisions.contains(&record_days),
+            "{record_days}: {decisions}"
+        );
+        assert!(decisions.contains(named!(sweep)), "{decisions}");
         assert_eq!(
             retention["signalements_decisions"]["duree"],
             "douze mois après la décision"

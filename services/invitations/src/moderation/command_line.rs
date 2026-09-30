@@ -1,7 +1,7 @@
 //! Which gesture a command line names, and what it names (#473). Read with
 //! `operator::named_after`, as the other modes of the binary are: anything
-//! starting with a flag selects its gesture, and options are left out of what
-//! is named, so that `--yes` or `--force` confirm nothing.
+//! starting with a flag selects its gesture. Options no mode takes never get
+//! here: `operator::known_arguments` refuses them first, in `main`.
 
 use super::{Decision, Gesture};
 use crate::{
@@ -17,39 +17,50 @@ pub const HOLD: &str = "--hold-report";
 pub const RELEASE: &str = "--release-report";
 pub const RECORD_TERMINATION: &str = "--record-termination";
 
-/// The flags, one per gesture. An enumeration, so that reading one is a
-/// match the compiler holds whole: a flag added here and not read below does
-/// not build.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-enum Flag {
-    List,
-    Export,
-    Decide,
-    Hold,
-    Release,
-    RecordTermination,
+/// Declares the flags once: the enumeration, its every value in `Flag::ALL`,
+/// and each one's text. A flag is therefore in the list by construction, and
+/// reading one below is a match the compiler holds whole: a flag added here
+/// and not read there does not build.
+macro_rules! flags {
+    ($($flag:ident => $text:expr),+ $(,)?) => {
+        /// The flags, one per gesture.
+        #[derive(Clone, Copy, Debug, PartialEq, Eq)]
+        enum Flag {
+            $($flag),+
+        }
+
+        impl Flag {
+            const ALL: &'static [Flag] = &[$(Flag::$flag),+];
+
+            fn text(self) -> &'static str {
+                match self {
+                    $(Flag::$flag => $text),+
+                }
+            }
+        }
+    };
 }
 
-impl Flag {
-    const ALL: [Flag; 6] = [
-        Flag::List,
-        Flag::Export,
-        Flag::Decide,
-        Flag::Hold,
-        Flag::Release,
-        Flag::RecordTermination,
-    ];
+flags! {
+    List => LIST,
+    Export => EXPORT,
+    Decide => DECIDE,
+    Hold => HOLD,
+    Release => RELEASE,
+    RecordTermination => RECORD_TERMINATION,
+}
 
-    fn text(self) -> &'static str {
-        match self {
-            Flag::List => LIST,
-            Flag::Export => EXPORT,
-            Flag::Decide => DECIDE,
-            Flag::Hold => HOLD,
-            Flag::Release => RELEASE,
-            Flag::RecordTermination => RECORD_TERMINATION,
-        }
-    }
+/// The flags of the gestures on reports, which `main` counts among those the
+/// binary takes (`operator::known_arguments`).
+pub fn flags() -> impl Iterator<Item = &'static str> {
+    Flag::ALL.iter().map(|flag| flag.text())
+}
+
+/// An account as the homeserver reads it: in lowercase. Continuwuity reads
+/// an identifier in lowercase whole, so `@bob:MESSAGR.EU` is `@bob:messagr.eu`,
+/// and a deletion recorded under another spelling would name no account.
+pub fn as_the_homeserver_reads(account: &str) -> String {
+    account.to_lowercase()
 }
 
 /// The gestures, said with every refusal of a command line.
@@ -72,7 +83,8 @@ fn usage() -> String {
 /// leaves the command line to the other modes and to the service.
 pub fn the_gesture(argv: &[String]) -> Option<Result<Gesture, String>> {
     let selected: Vec<(Flag, Vec<String>)> = Flag::ALL
-        .into_iter()
+        .iter()
+        .copied()
         .filter_map(|flag| named_after(argv, flag.text()).map(|named| (flag, named)))
         .collect();
     if selected.is_empty() {
@@ -143,7 +155,9 @@ fn read(argv: &[String], selected: &[(Flag, Vec<String>)]) -> Result<Gesture, St
             )),
         },
         Flag::RecordTermination => match named[..] {
-            [account] if is_a_user_id(account) => Ok(Gesture::RecordTermination(account.into())),
+            [account] if is_a_user_id(&as_the_homeserver_reads(account)) => {
+                Ok(Gesture::RecordTermination(as_the_homeserver_reads(account)))
+            }
             [account] => Err(format!(
                 "{account:?} is not a Matrix account ID, such as @localpart:messagr.eu"
             )),
@@ -211,12 +225,34 @@ mod tests {
             gesture_of(&["--record-termination", "@bob:messagr.eu"]),
             Some(Ok(Gesture::RecordTermination("@bob:messagr.eu".into())))
         );
-        // Options confirm nothing, as for the other modes: they are left out
-        // of what is named, and the account is still typed back.
+    }
+
+    /// The homeserver reads an identifier in lowercase: the account is taken
+    /// as it reads it, so that a deletion is recorded under the account's own
+    /// name.
+    #[test]
+    fn an_account_is_taken_as_the_homeserver_reads_it() {
+        for typed in ["@Bob:messagr.eu", "@bob:MESSAGR.EU", "@BOB:Messagr.Eu"] {
+            assert_eq!(
+                gesture_of(&["--record-termination", typed]),
+                Some(Ok(Gesture::RecordTermination("@bob:messagr.eu".into()))),
+                "{typed}"
+            );
+        }
+    }
+
+    /// Every flag is listed, and each one names a gesture: the list `main`
+    /// counts among the binary's is the one read here.
+    #[test]
+    fn every_flag_is_listed_and_names_a_gesture() {
+        let listed: Vec<&str> = flags().collect();
         assert_eq!(
-            gesture_of(&["--record-termination", "@bob:messagr.eu", "--yes"]),
-            Some(Ok(Gesture::RecordTermination("@bob:messagr.eu".into())))
+            listed,
+            [LIST, EXPORT, DECIDE, HOLD, RELEASE, RECORD_TERMINATION]
         );
+        for flag in listed {
+            assert!(gesture_of(&[flag]).is_some(), "{flag}");
+        }
     }
 
     #[test]

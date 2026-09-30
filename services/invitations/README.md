@@ -25,7 +25,7 @@ preserved than rewritten from memory.
 ## Running it
 
 ```
-cargo test          # 471 tests, no network, about twenty seconds
+cargo test          # 478 tests, no network, about twenty seconds
 cargo clippy --all-targets -- -D warnings
 cargo fmt --check
 ```
