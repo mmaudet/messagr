@@ -115,3 +115,48 @@ describe('the one account App.tsx reads (#472, #494, #498)', () => {
     ])
   })
 })
+
+describe('the ways out of the conversation open (#494, #498)', () => {
+  it('closes it by one function, which puts down everything drawn over it', () => {
+    expect(bodyOf('leaveTheConversation')).toBe(
+      'setOpenScope(null)openScopeRef.current=nullsetOver(NOTHING_OVER)',
+    )
+    // Nowhere else is it closed by hand.
+    expect(count('setOpenScope(null)')).toBe(1)
+  })
+
+  it('says so on the list when a block is what closes it', () => {
+    expect(bodyOf('leaveAfterABlock')).toBe(
+      'leaveTheConversation()setBlockOnScreen(on=>saidOnLeaving(on,scope))',
+    )
+  })
+
+  it('takes a share that failed back to the list as `backToTheList` says, looking for contacts closed with the rest', () => {
+    // It closed the conversation by hand, and left the sheets over the list
+    // and looking for contacts drawn in its place.
+    const body = bodyOf('sayTheShareFailed') ?? ''
+
+    expect(callsOf('backToTheList')).toHaveLength(1)
+    expect(body).toContain('constnext=backToTheList(')
+    for (const applied of [
+      'setOpenScope(next.open)',
+      'openScopeRef.current=next.open',
+      'setOver(next.over)',
+      'setTab(next.tab)',
+      'setInvite(next.invite)',
+      'setPlusOpen(next.plusOpen)',
+      'setAdmission(next.admission)',
+      "if(next.finding.stage==='shut')findingRef.current.close()",
+    ]) {
+      expect(body).toContain(applied)
+    }
+  })
+
+  it('puts the layers down when another conversation opens, and when a tab is chosen, where none is open', () => {
+    expect(count('setOver(NOTHING_OVER)')).toBe(3)
+    expect(code).toMatch(
+      /openScopeRef\.current=scopesetConversation\(null\)setOver\(NOTHING_OVER\)/,
+    )
+    expect(code).toMatch(/onSelect=\{next=>\{setOver\(NOTHING_OVER\)/)
+  })
+})

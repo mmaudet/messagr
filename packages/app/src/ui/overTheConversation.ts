@@ -1,10 +1,11 @@
 import {
   openAfterTheBlock,
-  type AfterTheBlock,
+  openConversationOf,
   type ConversationSummary,
-  type OpenConversation,
   type WithSomebody,
 } from '../runtime/conversationList'
+import type { TrustReading } from '../runtime/cryptoPump'
+import type { FindingStage } from '../runtime/findContacts'
 import { allShown } from '../runtime/notShown'
 import type { TimelineEntry } from '../timeline/mergeTimeline'
 import type { Plate } from '../timeline/plates'
@@ -12,26 +13,21 @@ import {
   forwardingWithoutTheBlocked,
   selectionWithoutTheBlocked,
 } from '../timeline/selection'
+import type { InviteStage } from './Invite'
 import type { OpenReport } from './reportStage'
+import type { Tab } from './TabBar'
 
 /**
- * What is drawn over the conversation open, and the one way it is put down
- * (#494, #498): whether the conversation is left, another opened in its
- * place, a block closes it or keeps it open, or a share that failed takes
- * the person back to the list.
+ * What is drawn over the conversation open, and what closing it, opening
+ * another, a block and a share that failed make of it (#494, #498). Pure, as
+ * `reportStage.ts` asks of a rule a screen applies (#491): state in, state
+ * out, and `App.tsx` holds the state and applies what comes back.
  *
  * They were written inline in `App.tsx`, where nothing could test them, and
  * one of them closed the conversation by hand: a share that failed left the
  * sheets, the forward picker and the photograph full screen standing over
- * the list. They are here, pure, and `App.tsx` calls them with its setters,
- * as `reportStage.ts` asks of it (#491).
+ * the list.
  */
-
-/**
- * A piece of the screen's state, as React holds it: set to a value, or
- * changed from the one it holds.
- */
-export type Setter<T> = (next: T | ((held: T) => T)) => void
 
 /** A photograph open full screen: its plate, and at which of them. */
 export interface OpenPlate {
@@ -39,158 +35,161 @@ export interface OpenPlate {
   readonly at: number
 }
 
-/** Everything that can be drawn over the conversation open, each its setter. */
+/** Everything that can be drawn over the conversation open, as one value. */
 export interface OverTheConversation {
-  /** The selection mode: empty, it is gone. */
-  readonly setSelected: Setter<ReadonlySet<string>>
-  /** The trust screen about the other person. */
-  readonly setTrust: (next: null) => void
+  /**
+   * The messages the selection mode holds. Empty means there is no mode:
+   * `Conversation.tsx` derives the reaction row from it too, so the two
+   * cannot disagree.
+   */
+  readonly selected: ReadonlySet<string>
+  /** What is known of the other person, while their trust screen is up. */
+  readonly trust: TrustReading | null
   /** The panel of the person. */
-  readonly setPersonOpen: (next: false) => void
-  /** « Bloquer l'expéditeur »'s sheet (#472). */
-  readonly setBlockingSender: Setter<WithSomebody | null>
-  /** The report's sheet (#468). */
-  readonly setReporting: Setter<OpenReport | null>
+  readonly personOpen: boolean
+  /**
+   * « Bloquer l'expéditeur »'s sheet (#472): the conversation, and the
+   * account taken from the selection when the action was pressed.
+   */
+  readonly blockingSender: WithSomebody | null
+  /** The report's sheet (#468): `reportStage.ts`. */
+  readonly reporting: OpenReport | null
   /** The removal's sheet. */
-  readonly setRemoving: (next: false) => void
-  /** The messages waiting in the forward picker, while it is up. */
-  readonly setForwarding: Setter<readonly string[] | null>
-  /** A photograph full screen. */
-  readonly setOpenPlate: Setter<OpenPlate | null>
-}
-
-/** The screen a conversation is open on: it, and what is over it. */
-export interface TheConversationScreen extends OverTheConversation {
-  /** No conversation open any more. */
-  readonly closeTheConversation: () => void
+  readonly removing: boolean
+  /**
+   * The messages waiting in the forward picker, while it is up: taken from
+   * the selection when the gesture starts, since the picker clears it.
+   */
+  readonly forwarding: readonly string[] | null
+  /** A photograph full screen: the viewer is a modal over everything. */
+  readonly openPlate: OpenPlate | null
 }
 
 /**
- * The same, with what the list is drawn under: its tab, and the panels that
- * open over it.
+ * NOTHING OVER THE CONVERSATION: what every closing leaves -- the header's
+ * back arrow and the system's, a block, what becomes known afterwards, a
+ * share that failed -- and what every opening starts from (#494). Left up,
+ * each layer outlived its conversation: the removal sheet opened again in
+ * the next one, the others stood over the list.
  */
-export interface TheListScreen extends TheConversationScreen {
-  readonly setTab: (next: 'chat') => void
-  readonly setInvite: (next: { readonly stage: 'shut' }) => void
-  readonly setPlusOpen: (next: false) => void
-  readonly setAdmission: (next: null) => void
+export const NOTHING_OVER: OverTheConversation = {
+  selected: new Set(),
+  trust: null,
+  personOpen: false,
+  blockingSender: null,
+  reporting: null,
+  removing: false,
+  forwarding: null,
+  openPlate: null,
 }
 
 /**
- * Puts down everything drawn over the conversation open, with it or when
- * another opens in its place (#494). Left up, each outlived its
- * conversation: the removal sheet opened again in the next one, the others
- * stood over the list.
+ * What a block of `blocked` leaves over a conversation that stays open
+ * (#472, #494, #498): without that account's messages, and without what was
+ * bound to them -- its messages in the selection and in the forward picker,
+ * which closes when none of the messages waiting in it are left, its
+ * photograph full screen, and a sheet about it, reporting its messages or
+ * blocking it again. What shows somebody else stays as it is, and the same
+ * value comes back when nothing of that account was over the conversation.
  */
-export function putDownWhatIsOver(screen: OverTheConversation): void {
-  screen.setSelected(new Set())
-  screen.setTrust(null)
-  screen.setPersonOpen(false)
-  screen.setBlockingSender(null)
-  screen.setReporting(null)
-  screen.setRemoving(false)
-  screen.setForwarding(null)
-  screen.setOpenPlate(null)
-}
-
-/**
- * Out of the conversation open, back to the list: THE ONE WAY OUT, which
- * every closing takes -- the header's back arrow and the system's back, a
- * block that holds and one that arrives (#469, #494), what becomes known of
- * it afterwards (`lookAgain`), and a share that failed (`backToTheList`).
- */
-export function leaveTheConversation(screen: TheConversationScreen): void {
-  screen.closeTheConversation()
-  putDownWhatIsOver(screen)
-}
-
-/**
- * The list, where what became of a share is said (#498): the conversation
- * open left by the one way out, everything over it with it, then the
- * conversations' tab with no panel open over it. Measured on the emulator
- * on 12 September 2026: a share refused while a conversation was open
- * disappeared without a word, since the screen that says it was not the one
- * being looked at.
- */
-export function backToTheList(screen: TheListScreen): void {
-  leaveTheConversation(screen)
-  // The tab is enough to fold Favoris, which live under Réglages only.
-  screen.setTab('chat')
-  screen.setInvite({ stage: 'shut' })
-  screen.setPlusOpen(false)
-  screen.setAdmission(null)
-}
-
-/**
- * What blocking `blocked` takes from the conversation open, whichever device
- * made the block (#494, #498), by the one rule (`openAfterTheBlock`). What it
- * said, or `null` when no conversation is open.
- *
- * A conversation that leaves closes, the way every conversation does: left
- * open, what is written in it would still leave. One that stays stays open,
- * without that account's messages and without what was bound to them: its
- * messages in the selection and in the forward picker -- which closes when
- * none of the messages waiting in it are left --, its photograph full
- * screen, and a sheet about it, reporting its messages or blocking it again.
- * What shows somebody else stays as it is.
- *
- * One of which the screen does not know yet who is in it stays open for the
- * moment: `lookAgain` closes it once that is known.
- */
-export function takeWhatTheBlockTakes(
-  screen: TheConversationScreen,
-  open: OpenConversation | null,
-  rows: readonly ConversationSummary[],
-  blocked: ReadonlySet<string>,
+export function overAfterTheBlock(
+  over: OverTheConversation,
   conversation: readonly TimelineEntry[],
-): AfterTheBlock | null {
-  if (open === null) return null
-  const after = openAfterTheBlock(open, rows, blocked)
-  if (after === 'leaves') {
-    leaveTheConversation(screen)
-    return after
+  blocked: ReadonlySet<string>,
+): OverTheConversation {
+  const after: OverTheConversation = {
+    selected: selectionWithoutTheBlocked(over.selected, conversation, blocked),
+    trust: over.trust,
+    personOpen: over.personOpen,
+    blockingSender:
+      over.blockingSender !== null && blocked.has(over.blockingSender.other)
+        ? null
+        : over.blockingSender,
+    reporting:
+      over.reporting !== null && blocked.has(over.reporting.author)
+        ? null
+        : over.reporting,
+    removing: over.removing,
+    forwarding:
+      over.forwarding === null
+        ? null
+        : forwardingWithoutTheBlocked(over.forwarding, conversation, blocked),
+    openPlate:
+      over.openPlate === null ||
+      allShown(over.openPlate.plate.entries, { hidden: new Set(), blocked })
+        ? over.openPlate
+        : null,
   }
-  screen.setSelected(held =>
-    selectionWithoutTheBlocked(held, conversation, blocked),
+  const changed = (Object.keys(after) as (keyof OverTheConversation)[]).some(
+    layer => after[layer] !== over[layer],
   )
-  screen.setForwarding(held =>
-    held === null
-      ? null
-      : forwardingWithoutTheBlocked(held, conversation, blocked),
-  )
-  screen.setOpenPlate(shown =>
-    shown === null ||
-    allShown(shown.plate.entries, { hidden: new Set(), blocked })
-      ? shown
-      : null,
-  )
-  screen.setReporting(sheet =>
-    sheet !== null && blocked.has(sheet.author) ? null : sheet,
-  )
-  screen.setBlockingSender(sheet =>
-    sheet !== null && blocked.has(sheet.other) ? null : sheet,
-  )
-  return after
+  return changed ? after : over
 }
 
 /**
- * Looks again at the conversation open, once more is known of it (#498): its
- * other person found, its row read, or the blocked accounts changed. It
- * closes when the rule now says it leaves.
+ * Whether the conversation `open` leaves now that `blocked` are blocked
+ * (#494, #498), read on what is known of it: `found`, the other person the
+ * screen found -- for this conversation only --, and its row. The rule is
+ * the list's (`openAfterTheBlock`): the conversation with a blocked account
+ * leaves, as the one blocked from does.
  *
- * WHAT WAS NOT KNOWN IS ASKED AGAIN. A block that arrived while nothing said
- * who was in the conversation open left it open, and nothing looked again:
- * a conversation of two with the blocked account stayed open once its
- * members were known, and what was written in it still left.
+ * WHAT WAS NOT KNOWN IS ASKED AGAIN, whenever more is known: a block that
+ * arrived while nothing said who was in the conversation open left it open,
+ * and nothing looked again -- a conversation of two with the blocked account
+ * stayed open once its participants were known, and what was written in it
+ * still left. `false` while no conversation is open.
  */
-export function lookAgain(
-  screen: TheConversationScreen,
-  open: OpenConversation | null,
+export function leavesNow(
+  open: string | null,
+  found: WithSomebody | null,
   rows: readonly ConversationSummary[],
   blocked: ReadonlySet<string>,
-): void {
-  if (open === null) return
-  if (openAfterTheBlock(open, rows, blocked) === 'leaves') {
-    leaveTheConversation(screen)
+): boolean {
+  return (
+    open !== null &&
+    openAfterTheBlock(openConversationOf(open, found), rows, blocked) ===
+      'leaves'
+  )
+}
+
+/**
+ * Where the person is: the conversation open, what is drawn over it, the
+ * tab, and what can stand over the list or be drawn in its place.
+ */
+export interface TheScreen {
+  readonly open: string | null
+  readonly over: OverTheConversation
+  readonly tab: Tab
+  /** The invitation panel, drawn in the list's place (`Invite.tsx`). */
+  readonly invite: InviteStage
+  /** The sheet the green « + » opens (#394). */
+  readonly plusOpen: boolean
+  /** Who an invitation just let in, said with the panel. */
+  readonly admission: 'waiting' | 'admitted' | null
+  /** Looking for one's contacts (#400), drawn in the list's place. */
+  readonly finding: FindingStage
+}
+
+/**
+ * The list, where what became of a share is said (#498): no conversation
+ * open and nothing over it, the conversations' tab, and nothing over the
+ * list or drawn in its place -- the invitation panel, the « + » sheet, the
+ * admission, looking for one's contacts. The tab is enough to fold Favoris,
+ * which live under Réglages only.
+ *
+ * Measured on the emulator on 12 September 2026: a share refused while a
+ * conversation was open disappeared without a word, since the screen that
+ * says it was not the one being looked at.
+ */
+export function backToTheList(screen: TheScreen): TheScreen {
+  return {
+    ...screen,
+    open: null,
+    over: NOTHING_OVER,
+    tab: 'chat',
+    invite: { stage: 'shut' },
+    plusOpen: false,
+    admission: null,
+    finding: { stage: 'shut' },
   }
 }

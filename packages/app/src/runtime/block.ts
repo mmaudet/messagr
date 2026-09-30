@@ -129,6 +129,38 @@ export function noticeOf(outcome: BlockOutcome): BlockNotice | null {
   return outcome.kept ? 'waiting' : 'not-kept'
 }
 
+/**
+ * What the screens say once the conversation open, `scope`, has left the
+ * list after a block (#469, #498): what a block made here from it says,
+ * now of a conversation that left -- it was said to stay while who was in
+ * it was not known --; or, as for any closing after a block, that the
+ * account is blocked and the conversation with it left the list: a
+ * conversation of more than two that shrank to two with it, a block made on
+ * another device.
+ */
+export function saidOnLeaving(
+  on: BlockOnScreen | null,
+  scope: string,
+): BlockOnScreen {
+  return on !== null && on.stayingIn === scope
+    ? { ...on, stayingIn: null }
+    : { notice: 'blocked', stayingIn: null }
+}
+
+/**
+ * What the screens say once the service has answered a block made here
+ * (#469, #472, #498): its `notice`, where the person is now. A conversation
+ * that left meanwhile is not said to stay; one put away since is said again
+ * where the gesture left the person, `stayingIn`.
+ */
+export function saidOnceTold(
+  on: BlockOnScreen | null,
+  notice: BlockNotice,
+  stayingIn: string | null,
+): BlockOnScreen {
+  return { notice, stayingIn: on === null ? stayingIn : on.stayingIn }
+}
+
 /** Blocks `blocked`, in the order the module says. Never throws. */
 export async function blockAccount(
   deps: Blocking,
