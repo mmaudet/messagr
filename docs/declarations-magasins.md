@@ -16,7 +16,7 @@ Toutes lues le 15 septembre 2026, dans des copies faites ce jour-là.
 
 **Google**
 
-- Aide Play Console, « Fournir les informations pour la section Sécurité des données de Google Play » : <https://support.google.com/googleplay/android-developer/answer/10787469?hl=fr>. Les libellés et les règles citées en français viennent de cette page, sauf « Autres messages via une appli » : c'est le libellé de la console, lu dans son export le 30 septembre 2026, là où l'aide écrit « Autres messages dans l'application ». Sa version anglaise, « Provide information for Google Play's Data safety section », a servi à vérifier les règles : <https://support.google.com/googleplay/android-developer/answer/10787469?hl=en>.
+- Aide Play Console, « Fournir les informations pour la section Sécurité des données de Google Play » : <https://support.google.com/googleplay/android-developer/answer/10787469?hl=fr>. Les libellés et les règles citées en français viennent de cette page, sauf des libellés de la console, lus le 30 septembre 2026 dans son export et sur son écran : « Autres messages via une appli », là où l'aide écrit « Autres messages dans l'application », et les questions de la création de compte et de la suppression. Sa version anglaise, « Provide information for Google Play's Data safety section », a servi à vérifier les règles : <https://support.google.com/googleplay/android-developer/answer/10787469?hl=en>.
 - Aide Play Console, « Understanding Google Play's app account deletion requirements » : <https://support.google.com/googleplay/android-developer/answer/13327111?hl=en>.
 - Firebase, « Prepare for Google Play's data disclosure requirements » : <https://firebase.google.com/docs/android/play-data-disclosure>.
 - Firebase, « Get started with Firebase Cloud Messaging in Apple platform apps » : <https://firebase.google.com/docs/cloud-messaging/ios/get-started>.
@@ -81,19 +81,27 @@ Six phrases de l'aide Play décident de presque tout.
 
 ### Étape « Collecte des données et sécurité »
 
-| Question                                                                                                      | Réponse                      |
-| ------------------------------------------------------------------------------------------------------------- | ---------------------------- |
-| L'application collecte-t-elle ou partage-t-elle « l'un des types de données utilisateur obligatoires » ?      | **Oui**                      |
-| « Les données utilisateur que collecte votre application sont-elles toutes chiffrées lors de leur transit ? » | **Oui**, tranché le 16/09, 6 |
-| « Proposez-vous aux utilisateurs un moyen de demander la suppression de leurs données ? »                     | **Oui**, tranché, 7          |
+| Question                                                                                                                                                                                   | Réponse                                                                                                                                     |
+| ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------- |
+| L'application collecte-t-elle ou partage-t-elle « l'un des types de données utilisateur obligatoires » ?                                                                                   | **Oui**                                                                                                                                     |
+| « Les données utilisateur que collecte votre application sont-elles toutes chiffrées lors de leur transit ? »                                                                              | **Oui**, tranché le 16/09, 6                                                                                                                |
+| « Parmi les méthodes de création de compte suivantes, lesquelles votre appli prend-elle en charge ? »                                                                                      | **Autre**, tranché le 30/09, 7                                                                                                              |
+| « Décrivez la méthode de création de compte prise en charge par votre appli »                                                                                                              | « Le compte est créé sur l'appareil à l'ouverture d'un lien d'invitation, sans identifiant ni mot de passe à saisir. », tranché le 30/09, 7 |
+| « Ajoutez un lien permettant aux utilisateurs de demander la suppression de leur compte et des données associées »                                                                         | <https://messagr.eu/aide/#supprimer-votre-compte>, tranché le 30/09, 7                                                                      |
+| « Proposez-vous aux utilisateurs un moyen de demander la suppression d'une partie ou de la totalité de leurs données, sans qu'ils soient obligés de supprimer leur compte ? (Facultatif) » | **Oui**, tranché, 7                                                                                                                         |
+| « URL de suppression des données »                                                                                                                                                         | <https://messagr.eu/confidentialite/>, tranché, 7                                                                                           |
 
 **Des données sont collectées**, et la page le dit en ouvrant sa liste : « Faire circuler un message suppose de savoir où l'envoyer, et le serveur conserve donc : ».
 
-**Chiffrées en transit.** L'application parle au serveur et au service d'invitations en HTTPS, et le SDK de Firebase parle à Google en TLS. Play s'en contente : « TLS (Transport Layer Security) et HTTPS sont les protocoles de chiffrement les plus courants. » La page, elle, ne parle que du chiffrement du contenu. La réserve est le relais d'appel, servi aussi sans TLS : à trancher, 6.
+**Chiffrées en transit.** L'application parle au serveur et au service d'invitations en HTTPS, et le SDK de Firebase parle à Google en TLS. Play s'en contente : « TLS (Transport Layer Security) et HTTPS sont les protocoles de chiffrement les plus courants. » La page, elle, ne parle que du chiffrement du contenu. La réserve était le relais d'appel, servi aussi sans TLS jusqu'à #338, le 16 septembre 2026 : tranché, 6.
 
-**Suppression sur demande.** « Vous disposez des droits d'accès, de rectification, d'effacement, de limitation, d'opposition et de portabilité. Écrivez à conformite@messagr.eu. » Une adresse suffit à Play, pour qui ce mécanisme « peut être, sans s'y limiter, une fonctionnalité intégrée à l'application, un formulaire de contact ou un alias d'adresse e-mail dédié. »
+**Suppression sur demande.** « Vous disposez des droits d'accès, de rectification, d'effacement, de limitation, d'opposition et de portabilité. Écrivez à conformite@messagr.eu. » Une adresse suffit à Play, pour qui ce mécanisme « peut être, sans s'y limiter, une fonctionnalité intégrée à l'application, un formulaire de contact ou un alias d'adresse e-mail dédié. » L'URL de suppression des données renvoie donc à la page qui porte cette phrase, <https://messagr.eu/confidentialite/> : c'est elle qui dit comment demander l'effacement de ses données sans supprimer son compte, que le lien de suppression du compte couvre, lui.
 
 **La suppression de compte demande davantage.** L'aide sur la suppression de compte fait répondre tous les développeurs à des questions de suppression dans ce même formulaire. Une application qui permet de créer un compte doit en plus « provide users with an in-app path to delete their app accounts and associated data », et « provide a web link resource where users can request app account deletion and associated data deletion ». Messagr crée le compte dans l'application, à l'ouverture d'une invitation. Depuis #333, l'écran « Informations légales » mène à une section de la page d'aide, à une ancre qu'un lien peut viser, qui dit comment demander la suppression. À partir de la version qui porte le geste (#387), la dernière ligne des Réglages supprime le compte elle-même, et la page d'aide présente ce geste d'abord. Voir 7.
+
+**La création de compte.** La première saisie répondait « Mon appli ne permet pas aux utilisateurs de créer un compte », et c'était faux : le compte naît dans l'application, à l'ouverture d'une invitation. Aucune méthode proposée ne décrit un compte créé sans rien saisir : ni « Nom d'utilisateur et mot de passe », ni « OAuth », qui suppose un compte tiers. D'où « Autre », avec la phrase du tableau, et le lien de suppression du compte que Play demande alors, la section de la page d'aide que vise déjà « Privacy Choices » chez Apple. Un compte ne se crée que là, et le formulaire ne demande pas si des comptes se créent en dehors de l'application quand « Autre » est la seule méthode : sa question n'est pas posée, et l'export la laisse vide. La question de la suppression des données change alors de libellé, et devient celle du tableau ; l'export garde l'ancien, sous le même identifiant. Tranché par le porteur le 30 septembre 2026. Voir 7.
+
+**Une modification de cette étape en efface une autre.** Le 30 septembre 2026, changer la méthode de création de compte a effacé, sans rien en dire, la réponse « Oui » à la suppression des données, son URL restant en place. Elle se revérifie avant d'enregistrer, et le contrôle de l'export, plus bas, la voit.
 
 ### Étape « Types de données »
 
@@ -280,7 +288,7 @@ Apple ne demande ni si la donnée est partagée, ni si elle est facultative. Son
 #### « Contacts »
 
 - **Définition Apple.** « Such as a list of contacts in the user's phone, address book, or social graph »
-- **Ce que cela couvre.** Le graphe social que garde le serveur : qui échange avec qui, et qui a fait entrer qui. Pas le carnet d'adresses : « pas de carnet d'adresses, ni de contacts lus sur votre appareil. » À trancher, 3.
+- **Ce que cela couvre.** Le graphe social que garde le serveur : qui échange avec qui, et qui a fait entrer qui. Pas le carnet d'adresses : « pas de carnet d'adresses, ni de contacts lus sur votre appareil. » Tranché, 3.
 - **Page.** « donc qui échange avec qui » ; « Le lien entre celui qui invite et celui qui entre est effacé trente jours après que l'invitation a été dépensée. »
 - **Lié : oui.**
 
@@ -300,7 +308,7 @@ Apple ne demande ni si la donnée est partagée, ni si elle est facultative. Son
 
 ### Ce qui n'est pas déclaré sur l'App Store
 
-- **« Photos or Videos », « Other User Content ».** Le contenu n'est conservé que chiffré, sous des clés que le serveur n'a pas : il n'est jamais « in a readable form ». À trancher, 4. Ce qu'une personne signale parvient lisible à l'exploitant, et ne se déclare pas non plus, par l'« optional disclosure » : tranché, 8.
+- **« Photos or Videos », « Other User Content ».** Le contenu n'est conservé que chiffré, sous des clés que le serveur n'a pas : il n'est jamais « in a readable form ». Tranché, 4. Ce qu'une personne signale parvient lisible à l'exploitant, et ne se déclare pas non plus, par l'« optional disclosure » : tranché, 8.
 - **« Customer Support ».** Un signalement ressemble à une demande adressée à l'exploitant, et relève de la même exemption : tranché, 8.
 - **« Audio Data ».** Apple vise « The user's voice or sound recordings ». Messagr n'enregistre rien, et le son d'un appel passe chiffré, en temps réel.
 - **« Contact Info ».** « pas de numéro de téléphone » ; « pas d'adresse électronique » ; « pas de nom, réel ou déclaré ».
@@ -476,7 +484,7 @@ Mettre `turns:` en premier ne suffisait pas, et le croire était l'erreur à dé
 
 **Les réponses, dès maintenant.**
 
-- **Play, « Sécurité des données »** : « Proposez-vous aux utilisateurs un moyen de demander la suppression de leurs données ? » → **Oui**. Le lien de suppression de compte, s'il est demandé : <https://messagr.eu/aide/#supprimer-votre-compte>.
+- **Play, « Sécurité des données »** : la création de compte est « Autre », décrite, avec le lien de suppression du compte <https://messagr.eu/aide/#supprimer-votre-compte>. « Proposez-vous aux utilisateurs un moyen de demander la suppression d'une partie ou de la totalité de leurs données, sans qu'ils soient obligés de supprimer leur compte ? » → **Oui**, avec l'URL de suppression des données <https://messagr.eu/confidentialite/>. Tranché par le porteur le 30 septembre 2026 : la première saisie disait que l'application ne permet pas de créer de compte, et ne donnait donc pas ce lien. Les réponses exactes sont dans le tableau de l'étape « Collecte des données et sécurité ».
 - **App Store Connect, « App Privacy »** : « Privacy Choices » → la même adresse. Elle part avec la version suivante de l'application.
 - **Nulle part dans un magasin**, « trente jours », tant que la purge n'est pas automatisée (#423).
 - **La note au relecteur**, à partir de la build iOS 28, dit le chemin dans une section à part, « DELETING THE ACCOUNT » (`app-store-listing/review-notes.txt`), que `scripts/fiche-app-store.sh` retire pour une build qui ne le porte pas.
@@ -553,7 +561,7 @@ Pas « Vidéos » : l'application n'envoie pas de vidéo, et une vidéo envoyée
 
 **Saisi dans la Play Console le 30 septembre 2026, corrigé et vérifié le même jour.** Il a fallu quatre exports : une case voisine, « Fichiers audio » → « Enregistrements audio ou vidéo », avait été cochée, « Photos » décochée une fois, « Partagées » cochée une fois. Le dernier dit exactement ce point, et il est gardé, daté : `docs/declarations/play-securite-des-donnees-2026-09-30.csv`. À côté, `play-securite-des-donnees-avant-signaler.csv` est l'export d'avant : le dernier n'y ajoute que les seize réponses du point 9, dont trois « Non » à éphémère, et n'en retire ni n'en change aucune. Relu par `scripts/assert-play-data-safety.mjs`, le dernier ne s'écarte en rien du document, et celui d'avant n'en diffère que par ces seize réponses, qui lui manquent. Dans l'export, les trois types sont `PSL_OTHER_MESSAGES`, sous `PSL_DATA_TYPES_EMAIL_AND_TEXT`, `PSL_PHOTOS` et `PSL_FILES_AND_DOCS`, et la finalité est `PSL_FRAUD_PREVENTION_SECURITY`.
 
-`scripts/declarations-magasins.sh signaler` guide ces gestes pour une saisie refaite plus tard, dans l'ordre du formulaire, et fait relire l'export par ce contrôle (#500). Sans argument, il guide la première saisie (#321), qui ne change pas.
+`scripts/declarations-magasins.sh signaler` guide ces gestes pour une saisie refaite plus tard, dans l'ordre du formulaire, et fait relire l'export par ce contrôle (#500). Sans argument, il guide la première saisie (#321), qui ne gagne rien sur le signalement.
 
 ## Ce que la page ne dit pas encore
 

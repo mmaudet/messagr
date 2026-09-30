@@ -9,6 +9,12 @@
 // fois, « Partagées » cochée une fois. Chacune se lisait dans l'export CSV de
 // la console, à condition de le relire ligne à ligne contre le document.
 //
+// LA CONSOLE EFFACE AUSSI. Le même jour, corriger la méthode de création de
+// compte a vidé une autre réponse de la même étape, le « Oui » à la
+// suppression des données, sans rien en dire et en laissant son URL en place.
+// L'écran montrait ce qu'on venait de changer ; seul l'export montrait le
+// reste.
+//
 // Ce contrôle fait cette relecture. Il dit ce qui manque et ce qui est en trop,
 // et sort en erreur au moindre écart.
 //
@@ -35,10 +41,13 @@
 // L'export a une ligne par réponse possible, donnée ou non : 782 le
 // 30 septembre 2026, en cinq colonnes (identifiant de la question, identifiant
 // de la réponse, valeur, exigence, libellé). Sont comparées les réponses
-// données aux trois questions de la première étape, aux types de données, et
-// aux questions d'utilisation de chaque type, coché ou non. Le reste (méthodes
-// de création de compte, adresses de suppression, badges) n'est pas dans ces
-// tableaux, et n'est pas comparé.
+// données aux questions de la première étape que son tableau nomme (collecte,
+// transit, création de compte, liens de suppression), aux types de données,
+// et aux questions d'utilisation de chaque type, coché ou non. Le reste n'est
+// pas dans ces tableaux, et n'est pas comparé : l'engagement envers les
+// familles, l'examen de sécurité indépendant, le badge, et les comptes créés
+// en dehors de l'application, que le formulaire ne demande pas quand « Autre »
+// est la seule méthode de création de compte.
 //
 // # Usage
 //
@@ -97,26 +106,81 @@ const FINALITES = {
   'Gestion des comptes': 'PSL_ACCOUNT_MANAGEMENT',
 }
 
-// Les trois questions de la première étape, reconnues à quelques mots de leur
-// libellé dans le document, et ce que « Oui » et « Non » y rangent.
+// Ce qu'une cellule « Réponse » de la première étape range dans l'export :
+// `[identifiant de la réponse, valeur]`, ou `null` si elle ne se lit pas.
+// Un oui ou non en gras, un choix en gras, une phrase entre guillemets que la
+// console doit porter mot pour mot, ou une adresse entre chevrons.
+const ouiNon = reponse => {
+  const lu = /^\*\*(Oui|Non)\*\*/.exec(reponse)
+  return lu && ['', lu[1] === 'Oui' ? 'true' : 'false']
+}
+const choix = table => reponse => {
+  const lu = /^\*\*([^*]+)\*\*/.exec(reponse)
+  return lu && table[lu[1]] ? [table[lu[1]], 'true'] : null
+}
+const phrase = reponse => {
+  const lu = /^« (.+) »(?:,|$)/.exec(reponse)
+  return lu && ['', lu[1]]
+}
+const adresse = reponse => {
+  const lu = /^<(https:\/\/[^>]+)>/.exec(reponse)
+  return lu && ['', lu[1]]
+}
+
+// Les questions de la première étape, reconnues à quelques mots de leur
+// libellé dans le document, chacune par un seul fragment.
 const PREMIERE_ETAPE = [
   {
     mots: 'collecte-t-elle ou partage-t-elle',
     question: 'PSL_DATA_COLLECTION_COLLECTS_PERSONAL_DATA',
-    reponses: { Oui: ['', 'true'], Non: ['', 'false'] },
+    lire: ouiNon,
   },
   {
     mots: 'chiffrées',
     question: 'PSL_DATA_COLLECTION_ENCRYPTED_IN_TRANSIT',
-    reponses: { Oui: ['', 'true'], Non: ['', 'false'] },
+    lire: ouiNon,
   },
   {
-    mots: 'suppression',
+    mots: 'méthodes de création de compte',
+    question: 'PSL_SUPPORTED_ACCOUNT_CREATION_METHODS',
+    lire: choix({
+      "Nom d'utilisateur et mot de passe": 'PSL_ACM_USER_ID_PASSWORD',
+      "Nom d'utilisateur et autre authentification":
+        'PSL_ACM_USER_ID_OTHER_AUTH',
+      "Nom d'utilisateur, mot de passe et autres méthodes d'authentification":
+        'PSL_ACM_USER_ID_PASSWORD_OTHER_AUTH',
+      OAuth: 'PSL_ACM_OAUTH',
+      Autre: 'PSL_ACM_OTHER',
+      'Mon appli ne permet pas aux utilisateurs de créer un compte':
+        'PSL_ACM_NONE',
+    }),
+  },
+  {
+    mots: 'Décrivez la méthode de création de compte',
+    question: 'PSL_ACM_SPECIFY',
+    lire: phrase,
+  },
+  {
+    mots: 'suppression de leur compte',
+    question: 'PSL_ACCOUNT_DELETION_URL',
+    lire: adresse,
+  },
+  {
+    // Libellé du formulaire quand un compte se crée ; l'export garde l'ancien,
+    // « suppression de leurs données », sous le même identifiant.
+    mots: 'la totalité de leurs données',
     question: 'PSL_SUPPORT_DATA_DELETION_BY_USER',
-    reponses: {
-      Oui: ['DATA_DELETION_YES', 'true'],
-      Non: ['DATA_DELETION_NO', 'true'],
-    },
+    lire: choix({
+      Oui: 'DATA_DELETION_YES',
+      Non: 'DATA_DELETION_NO',
+      'Non, mais les données utilisateur sont automatiquement supprimées sous 90 jours':
+        'DATA_DELETION_NO_AUTO_DELETED',
+    }),
+  },
+  {
+    mots: 'URL de suppression des données',
+    question: 'PSL_DATA_DELETION_URL',
+    lire: adresse,
   },
 ]
 
@@ -199,12 +263,12 @@ export function lireDocument(texte) {
     )
   }
   for (const [libelle, reponse] of premiere[0].rangees) {
-    const etape = PREMIERE_ETAPE.find(({ mots }) => libelle.includes(mots))
-    if (!etape) throw illisible('première étape', libelle)
-    const oui = /^\*\*(Oui|Non)\*\*/.exec(reponse)
-    if (!oui) throw illisible('première étape', reponse)
-    const [id, valeur] = etape.reponses[oui[1]]
-    attendre(etape.question, id, valeur, `${libelle} → ${oui[1]}`)
+    const etapes = PREMIERE_ETAPE.filter(({ mots }) => libelle.includes(mots))
+    if (etapes.length !== 1) throw illisible('première étape', libelle)
+    const lu = etapes[0].lire(reponse)
+    if (!lu) throw illisible('première étape', reponse)
+    const [id, valeur] = lu
+    attendre(etapes[0].question, id, valeur, `${libelle} → ${id || valeur}`)
   }
   for (const { question } of PREMIERE_ETAPE) {
     if (![...attendues.values()].some(a => a.question === question)) {
@@ -409,8 +473,11 @@ export function comparer(attendues, lignes) {
 // voulu : le document dit ce que la console déclare.
 //
 // Puis il casse cet export d'une réponse à la fois, et exige chaque fois le
-// refus, sur la ligne cassée, dans le bon sens, et sur elle seule. Les trois
-// premiers cas sont les trois erreurs du 30 septembre 2026.
+// refus, sur la ligne cassée, dans le bon sens, et sur elle seule. Les quatre
+// premiers cas sont les erreurs du 30 septembre 2026 : les trois de la saisie
+// du point 9, puis la réponse que la correction de la création de compte a
+// effacée dans l'export (5), rejouée sur le dernier export plutôt que gardée
+// en fichier.
 
 const exportDeReference = () => {
   const dates = readdirSync(join(RACINE, EXPORTS))
@@ -429,16 +496,20 @@ function selfTest() {
   const reference = exportDeReference()
   const lignes = lireExport(readFileSync(join(RACINE, reference), 'utf8'))
 
-  // Une copie de l'export où des réponses changent. Une ligne introuvable fait
-  // échouer le cas : sinon il ne casserait rien et passerait pour juste.
+  // Une copie de l'export où des réponses changent. Une ligne introuvable, ou
+  // qui porte déjà la valeur, fait échouer le cas : sinon il ne casserait rien
+  // et passerait pour juste.
   const changer = (...changements) =>
     changements.reduce((copie, [question, reponse, valeur]) => {
-      if (!copie.some(l => l.question === question && l.reponse === reponse)) {
-        throw new Error(`l'export n'a pas de ligne ${question} ${reponse}`)
-      }
-      return copie.map(l =>
-        l.question === question && l.reponse === reponse ? { ...l, valeur } : l,
+      const ligne = copie.find(
+        l => l.question === question && l.reponse === reponse,
       )
+      if (!ligne || ligne.valeur === valeur) {
+        throw new Error(
+          `l'export n'a pas de ligne ${question} ${reponse} à changer en « ${valeur} »`,
+        )
+      }
+      return copie.map(l => (l === ligne ? { ...l, valeur } : l))
     }, lignes)
   const usage = (type, question) => `${UTILISATION}${type}:${question}`
 
@@ -477,6 +548,17 @@ function selfTest() {
       ]),
     }),
     { manque: [], enTrop: [['(Photos)', '/Partagées']] },
+  )
+  poser(
+    'le « Oui » à la suppression des données effacé par une modification de la même étape, comme dans l’export (5) du 30 septembre',
+    () => ({
+      lignes: changer([
+        'PSL_SUPPORT_DATA_DELETION_BY_USER',
+        'DATA_DELETION_YES',
+        '',
+      ]),
+    }),
+    { manque: [['suppression de leurs données', '/Oui']], enTrop: [] },
   )
   poser(
     '« Vidéos » cochée à côté de « Photos »',
@@ -584,10 +666,56 @@ function selfTest() {
     { manque: [], enTrop: [['(Vidéos)', 'éphémère', '→ Non']] },
   )
   poser(
-    'ce que les tableaux ne disent pas n’est pas comparé',
+    '« Mon appli ne permet pas aux utilisateurs de créer un compte » cochée',
+    () => ({
+      lignes: changer([
+        'PSL_SUPPORTED_ACCOUNT_CREATION_METHODS',
+        'PSL_ACM_NONE',
+        'true',
+      ]),
+    }),
+    {
+      manque: [],
+      enTrop: [
+        ['/Mon appli ne permet pas aux utilisateurs de créer un compte'],
+      ],
+    },
+  )
+  poser(
+    'la description de la création de compte changée',
+    () => ({
+      lignes: changer([
+        'PSL_ACM_SPECIFY',
+        '',
+        'Le compte est créé à l’ouverture d’une invitation.',
+      ]),
+    }),
+    {
+      manque: [['Décrivez la méthode', '→ Le compte est créé sur l']],
+      enTrop: [['Décrivez la méthode', '→ Le compte est créé à l’ouverture']],
+    },
+  )
+  poser(
+    'le lien de suppression du compte vide',
+    () => ({ lignes: changer(['PSL_ACCOUNT_DELETION_URL', '', '']) }),
+    {
+      manque: [['suppression de leur compte', '#supprimer-votre-compte']],
+      enTrop: [],
+    },
+  )
+  poser(
+    'l’URL de suppression des données changée',
     () => ({
       lignes: changer(['PSL_DATA_DELETION_URL', '', 'https://example.org/']),
     }),
+    {
+      manque: [['URL de suppression des données', '/confidentialite/']],
+      enTrop: [['URL de suppression des données', 'example.org']],
+    },
+  )
+  poser(
+    'ce que les tableaux ne disent pas n’est pas comparé',
+    () => ({ lignes: changer(['PSL_UPI_BADGE_OPT_IN', '', 'true']) }),
     { manque: [], enTrop: [] },
   )
   poser(
