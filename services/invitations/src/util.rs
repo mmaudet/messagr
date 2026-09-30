@@ -53,7 +53,8 @@ pub fn localpart(user_id: &str) -> String {
 }
 
 /// Midnight UTC of the day `at` falls on: the date a gesture of the operator
-/// leaves on a report or on an account deletion, never its hour (#473).
+/// leaves on a report, and the date of every account deletion, never its
+/// hour (#473).
 pub fn day_of(at: i64) -> i64 {
     at - at.rem_euclid(DAY_SECONDS)
 }

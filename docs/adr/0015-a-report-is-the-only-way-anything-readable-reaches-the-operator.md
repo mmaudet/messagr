@@ -113,7 +113,6 @@ person reporting saw; the tool shows it the same way, on demand (#496).
 
 **Amended on 30 September 2026 (a decision and a termination, #473).** A copy
 of the service's database can relate a confirmed report to an account
-deletion by their dates, when deletions are few: both are dated by the day,
-and a termination, recorded among the account deletions at midnight UTC,
-differs from a deletion announced from the application, which carries its
-second.
+deletion by their dates, when deletions are few. Every account deletion is
+dated by the day, a termination as a deletion its holder announced, so that
+the row does not say which it is.

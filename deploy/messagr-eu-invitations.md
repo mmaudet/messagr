@@ -387,8 +387,9 @@ down** (step 4):
    purge within thirty days applies to it; its invitations still open
    expire, and its number leaves discovery. **The purge of an account's data
    is still done by hand (#423)**, from that list, as for any deletion. The
-   row is dated by the day, like the decision, and names no report; the
-   decision names no account. What the two dates still show is said below.
+   row is dated by the day, as every account deletion is, one its holder
+   announces included, and names no report; the decision names no account.
+   What the dates still show is said below.
 
 A device that had kept the suspension then reads that the operator closed
 the account (#477).
@@ -420,12 +421,11 @@ due.
 - **What a copy of the database still shows** (ADR 0015, amended on 30
   September 2026, and the policy says the same): a confirmed report and an
   account deletion recorded the same day can be related by their dates, when
-  deletions are few; a deletion dated at midnight UTC is a termination, where
-  one announced from the application carries its second; and a reporting
-  account that also blocked the account it reported is related to it by that
-  block, which the service keeps with its date (#469). Recording the
-  application's deletions by the day as well, or a termination on another day
-  than its decision, would lessen the first two traces; neither is done.
+  deletions are few; and a reporting account that also blocked the account it
+  reported is related to it by that block, which the service keeps with its
+  date (#469). Every account deletion is dated by the day, a termination as a
+  deletion its holder announced (the owner's decision of 30 September 2026):
+  the row does not say which it is.
 - **The dated copies of the database** that an update leaves (step 4 of
   "Updating it") hold the reports as they were, sealed reports included, and
   no sweep reaches them: delete them once the update is behind, as #416 says

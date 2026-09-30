@@ -14,9 +14,10 @@
 -- qu'une fois.
 --
 -- LA DATE D'UNE DÉCISION EST UN JOUR, JAMAIS UNE HEURE : minuit UTC du jour
--- où l'exploitant la note, comme celle d'une retenue, et comme celle d'un
--- compte fermé, que l'exploitant enregistre à part parmi les suppressions de
--- compte (`account_deletions`, 011). Aucune colonne ne relie l'un à l'autre.
+-- où l'exploitant la note, comme celle d'une retenue, et comme celle de toute
+-- suppression de compte (`account_deletions`, 011), celle d'un compte fermé
+-- que l'exploitant enregistre à part comme celle que son titulaire annonce.
+-- Aucune colonne ne relie une décision à une suppression.
 -- Ce qui reste est dit dans l'ADR 0015 (amendée le 30 septembre 2026) : une
 -- copie de la base peut rapprocher par leurs dates une décision confirmée et
 -- une suppression de compte, quand les suppressions sont rares.

@@ -59,13 +59,14 @@
 //! within thirty days applies to it, and that row names no report. Both carry
 //! the day, never the hour.
 //!
-//! That is all this does. What a copy of the database can still relate is
-//! said plainly, and it is not only the dates (ADR 0015, amended on 30
-//! September 2026; the policy says the same): a confirmed report and an
-//! account deletion, by their dates, when deletions are few; a deletion dated
-//! at midnight UTC is a termination, where one announced from the application
-//! carries its second; and a reporting account that also blocked the account
-//! it reported, through the block the service keeps, with its date (#469).
+//! Every account deletion is dated by the day, a termination as a deletion
+//! its holder made (`handlers::deletion::record`, the owner's decision of 30
+//! September 2026): nothing in the row tells which it is. What a copy of the
+//! database can still relate is said plainly, and it is not only the dates
+//! (ADR 0015, amended on 30 September 2026; the policy says the same): a
+//! confirmed report and an account deletion, by their dates, when deletions
+//! are few; and a reporting account that also blocked the account it
+//! reported, through the block the service keeps, with its date (#469).
 
 mod command_line;
 mod erasure;
@@ -668,7 +669,7 @@ where
 /// (`handlers::deletion::record`, #385) so that the purge within thirty days
 /// applies to it, once the account is typed back. The account is recorded as
 /// the homeserver reads it, in lowercase. Dated by the day, never the hour,
-/// like a decision; the row it writes has the columns of any other deletion,
+/// as every deletion is: the row it writes is the row of any other deletion,
 /// and names no report.
 async fn record_termination<A>(
     pool: &SqlitePool,
@@ -707,8 +708,8 @@ where
          \x20 - it is listed there until {purge_by}; the purge of an account's data is still \
          done by hand (#423);\n\
          \x20 - its invitations still open expire, and its number leaves discovery;\n\
-         \x20 - it is dated {}, the day and never the hour, like a decision, and names no \
-         report: the decision is recorded on the report with {DECIDE}.\n\
+         \x20 - it is dated {}, the day and never the hour, as every deletion is, and names \
+         no report: the decision is recorded on the report with {DECIDE}.\n\
          Record it once the homeserver has deactivated the account \
          (scripts/admin-messagr.sh fermer), and not before.\n\
          Type the account to record it, or anything else to leave everything as it is:",
@@ -1762,8 +1763,8 @@ mod tests {
     /// decision names no account but the reporting one, the deletion has the
     /// columns of any other, and both carry the day, not the second. It does
     /// not show that nothing relates them: a copy of the database can relate
-    /// them by their dates when deletions are few, and a deletion dated at
-    /// midnight is a termination (ADR 0015, amended on 30 September 2026).
+    /// them by their dates when deletions are few (ADR 0015, amended on 30
+    /// September 2026).
     #[sqlx::test(migrations = "./migrations")]
     async fn no_row_holds_both_a_confirmed_report_and_the_account_it_terminated(pool: SqlitePool) {
         a_report(&pool, "K7QM-4ZT2", "@alice:h", "threat", RECEIVED).await;

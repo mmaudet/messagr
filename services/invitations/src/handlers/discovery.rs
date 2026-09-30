@@ -3394,16 +3394,26 @@ mod tests {
             .await
             .unwrap()
         };
+        // A deletion is dated by its day, never its hour (#473, the owner's
+        // decision of 30 September 2026): the thirty days count from it.
+        let the_day = crate::util::day_of(T0);
         crate::cleanup::purge_ended_proofs(
             &pool,
-            T0 + crate::cleanup::ENDED_PROOFS_KEPT_SECONDS - 1,
+            the_day + crate::cleanup::ENDED_PROOFS_KEPT_SECONDS - 1,
         )
         .await
         .unwrap();
-        assert_eq!(masks().await, 1, "the mask stays thirty days");
-        crate::cleanup::purge_ended_proofs(&pool, T0 + crate::cleanup::ENDED_PROOFS_KEPT_SECONDS)
-            .await
-            .unwrap();
+        assert_eq!(
+            masks().await,
+            1,
+            "the mask stays thirty days from the day of the deletion"
+        );
+        crate::cleanup::purge_ended_proofs(
+            &pool,
+            the_day + crate::cleanup::ENDED_PROOFS_KEPT_SECONDS,
+        )
+        .await
+        .unwrap();
         assert_eq!(masks().await, 0, "and not a day more");
     }
 
