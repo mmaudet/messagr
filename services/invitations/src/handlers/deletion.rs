@@ -3,10 +3,10 @@
 //!
 //! # WHAT THE SERVICE DOES WITH IT
 //!
-//! Four things, in one transaction. It records the account and the instant,
-//! once, whatever the number of calls: what the manual purge within thirty
-//! days needs, which the privacy policy promises and #423 will automate --
-//! not the whole list, since a deletion made by e-mail is never announced. And
+//! Four things, in one transaction. It records the account and the day, once,
+//! whatever the number of calls: what the manual purge within thirty days
+//! needs, which the privacy policy promises and #423 will automate -- not the
+//! whole list, since a deletion made by e-mail is never announced. And
 //! it expires, at once, the caller's invitations that could still let
 //! somebody in, a partly used one included (decided on 26 September 2026): an
 //! invitee holding one is refused at once, rather than left waiting for an
@@ -42,6 +42,22 @@
 //! else's deletion. It has to come BEFORE the deactivation, which makes the
 //! token worthless -- and the application treats its failure, an unknown
 //! route included, as nothing that should stop the deletion.
+//!
+//! The operator's termination (#473) is the one other way in, and it is not
+//! a route: typed on the host, once the homeserver has deactivated the
+//! account after a confirmed decision (`moderation`), it writes the same row
+//! through `record`, so that the purge within thirty days applies to a
+//! terminated account too.
+//!
+//! # BY THE DAY, WHOEVER RECORDS IT
+//!
+//! Every deletion is dated by its day, never its hour: the row, the
+//! invitations it ends and the withdrawal from discovery (the owner's
+//! decision of 30 September 2026, #473). What had already ended before the
+//! deletion keeps its end. The purge within thirty days needs no more, and
+//! the row does not say whether it is a termination or a deletion its holder
+//! made; the dates can still relate a deletion to a confirmed report, when
+//! deletions are few (ADR 0015, amended on 30 September 2026).
 
 use std::sync::Arc;
 
@@ -68,63 +84,95 @@ pub async fn announce(
     headers: HeaderMap,
 ) -> Result<Json<DeletionResponse>, AppError> {
     let user_id = auth::authenticate(&st.mx, &headers).await?;
-    let at = st.cfg.clock.now();
-    let mut tx = st.pool.begin().await.map_err(anyhow::Error::from)?;
+    let recorded = record(&st.pool, &user_id, st.cfg.clock.now()).await?;
+    Ok(Json(DeletionResponse {
+        announced_at: recorded.announced_at,
+        expired_invitations: recorded.expired_invitations,
+    }))
+}
+
+/// What recording a deletion did.
+pub(crate) struct Recorded {
+    /// When the deletion was first recorded.
+    pub announced_at: i64,
+    /// How many of the account's invitations this recording expired.
+    pub expired_invitations: u64,
+}
+
+/// Records `user_id`'s deletion at `now`, and what goes with it, in one
+/// transaction: the four things the header says. What it writes is dated by
+/// the day of `now`; `now` itself only tells what had already ended, which
+/// keeps its end.
+///
+/// THE SAME ROW FOR A TERMINATION (#473). The account that announces its own
+/// deletion writes it through `announce`; the operator, on the host, writes
+/// it for an account the homeserver deactivated after a confirmed decision
+/// (`moderation`), so that the purge within thirty days applies to it. The
+/// row names no report, and does not say which of the two it is.
+pub(crate) async fn record(
+    pool: &sqlx::SqlitePool,
+    user_id: &str,
+    now: i64,
+) -> anyhow::Result<Recorded> {
+    let day = crate::util::day_of(now);
+    let mut tx = pool.begin().await?;
 
     sqlx::query(
         "INSERT INTO account_deletions (user_id, announced_at, purge_after) \
          VALUES (?, ?, ?) ON CONFLICT(user_id) DO NOTHING",
     )
-    .bind(&user_id)
-    .bind(at)
-    .bind(at + PURGE_AFTER_SECONDS)
+    .bind(user_id)
+    .bind(day)
+    .bind(day + PURGE_AFTER_SECONDS)
     .execute(&mut *tx)
-    .await
-    .map_err(anyhow::Error::from)?;
+    .await?;
     let announced_at: i64 =
         sqlx::query_scalar("SELECT announced_at FROM account_deletions WHERE user_id = ?")
-            .bind(&user_id)
+            .bind(user_id)
             .fetch_one(&mut *tx)
-            .await
-            .map_err(anyhow::Error::from)?;
+            .await?;
 
     // STILL OPEN MEANS STILL PENDING AND NOT USED UP. One whose every use has
     // been spent lets nobody in any more, so expiring it would change nothing
-    // but the moment its sealed secrets are wiped. Its end is moved to now as
-    // well, so that what is timed from an invitation's end starts today.
+    // but the moment its sealed secrets are wiped. The end of one still
+    // running moves to the day of the deletion as well, so that what is timed
+    // from an invitation's end starts today; one that had already run out
+    // keeps its end.
     let expired = sqlx::query(
-        "UPDATE invitations SET status = 'expired', expires_at = MIN(expires_at, ?) \
-         WHERE inviter_user_id = ? AND status = 'pending' AND used_count < max_uses",
+        "UPDATE invitations SET status = 'expired', \
+         expires_at = CASE WHEN expires_at > ?1 THEN ?2 ELSE expires_at END \
+         WHERE inviter_user_id = ?3 AND status = 'pending' AND used_count < max_uses",
     )
-    .bind(at)
-    .bind(&user_id)
+    .bind(now)
+    .bind(day)
+    .bind(user_id)
     .execute(&mut *tx)
-    .await
-    .map_err(anyhow::Error::from)?
+    .await?
     .rows_affected();
 
-    crate::handlers::discovery::withdraw_on(&mut tx, &user_id, at).await?;
+    crate::handlers::discovery::withdraw_on(&mut tx, user_id, now, day).await?;
     // WAITING MEANS NEITHER JOINED NOR RUN OUT (#410). One joined is left as
-    // it is: its conversation may already be under way. One that has run out
-    // keeps its end, from which the thirty days of who invited whom (#416)
-    // and the fourteen days before inviting the same account again (#406)
-    // are counted: moved to today, they would start again.
+    // it is: its conversation may already be under way. One that has run out,
+    // even earlier on the day of the deletion, keeps its end, from which the
+    // thirty days of who invited whom (#416) and the fourteen days before
+    // inviting the same account again (#406) are counted: moved, they would
+    // be counted from another day.
     sqlx::query(
         "UPDATE delivered_invitations SET expires_at = ?1 \
          WHERE (recipient_user_id = ?2 OR inviter_user_id = ?2) \
-         AND claimed_at IS NULL AND expires_at > ?1",
+         AND claimed_at IS NULL AND expires_at > ?3",
     )
-    .bind(at)
-    .bind(&user_id)
+    .bind(day)
+    .bind(user_id)
+    .bind(now)
     .execute(&mut *tx)
-    .await
-    .map_err(anyhow::Error::from)?;
+    .await?;
 
-    tx.commit().await.map_err(anyhow::Error::from)?;
-    Ok(Json(DeletionResponse {
+    tx.commit().await?;
+    Ok(Recorded {
         announced_at,
         expired_invitations: expired,
-    }))
+    })
 }
 
 #[cfg(test)]
@@ -169,6 +217,157 @@ mod tests {
                 ..crate::config::Config::for_tests()
             },
         })
+    }
+
+    /// 2026-10-01 14:03:20 UTC, and the day it falls on.
+    const ANNOUNCED: i64 = 1_790_863_400;
+    const ITS_DAY: i64 = 1_790_812_800;
+
+    /// The owner's decision of 30 September 2026 (#473): a deletion is dated
+    /// by its day, as a termination the operator records is, so that the row
+    /// does not say which of the two it is. The row, the invitations it ends,
+    /// and the withdrawal from discovery alike. The dates can still relate a
+    /// deletion to a confirmed report when deletions are few (ADR 0015).
+    #[sqlx::test(migrations = "./migrations")]
+    async fn a_deletion_is_dated_by_its_day_as_a_termination_is(pool: SqlitePool) {
+        seed(&pool, "alice-open", "@alice:h", 1, 0).await;
+        sqlx::query(
+            "INSERT INTO findable_numbers \
+             (key_id, mask, user_id, reference, proven_at, expires_at, withdrawn_at) \
+             VALUES (1, X'01', '@alice:h', 'ref', 0, 4000000000, NULL)",
+        )
+        .execute(&pool)
+        .await
+        .unwrap();
+        let hs = whoami_hs().await;
+        let (clock, _) = crate::util::Clock::settable(ANNOUNCED);
+        let st = Arc::new(AppState {
+            pool: pool.clone(),
+            mx: Arc::new(crate::matrix::MatrixClient::new(hs.clone(), "token".into())),
+            cfg: crate::config::Config {
+                homeserver_url: hs,
+                clock,
+                ..crate::config::Config::for_tests()
+            },
+        });
+
+        let Json(said) = announce(State(st), bearer("alice")).await.unwrap();
+        // And a termination recorded the same day, for another account.
+        record(&pool, "@bob:h", ANNOUNCED + 3_600).await.unwrap();
+
+        assert_eq!(said.announced_at, ITS_DAY);
+        let rows: Vec<(String, i64, i64)> = sqlx::query_as(
+            "SELECT user_id, announced_at, purge_after FROM account_deletions ORDER BY user_id",
+        )
+        .fetch_all(&pool)
+        .await
+        .unwrap();
+        assert_eq!(
+            rows,
+            [
+                (
+                    "@alice:h".to_string(),
+                    ITS_DAY,
+                    ITS_DAY + PURGE_AFTER_SECONDS
+                ),
+                ("@bob:h".to_string(), ITS_DAY, ITS_DAY + PURGE_AFTER_SECONDS),
+            ],
+            "one form for both, by the day"
+        );
+        let expired: i64 =
+            sqlx::query_scalar("SELECT expires_at FROM invitations WHERE id = 'alice-open'")
+                .fetch_one(&pool)
+                .await
+                .unwrap();
+        assert_eq!(expired, ITS_DAY);
+        let withdrawn: Option<i64> = sqlx::query_scalar(
+            "SELECT withdrawn_at FROM findable_numbers WHERE user_id = '@alice:h'",
+        )
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+        assert_eq!(withdrawn, Some(ITS_DAY));
+    }
+
+    /// WHAT HAD ALREADY ENDED KEEPS ITS END. What a deletion ends ends on its
+    /// day; but an invitation, an invitation delivered inside Messagr or a
+    /// proof that had run out earlier on that same day is left as it was:
+    /// moved back to midnight, what is counted from its end (who invited whom,
+    /// #416; inviting the same account again, #406; a mask's thirty days)
+    /// would be counted from another moment.
+    #[sqlx::test(migrations = "./migrations")]
+    async fn what_had_already_ended_before_the_deletion_keeps_its_end(pool: SqlitePool) {
+        // 10:00 on the day of the deletion, before it; and three days on.
+        let ended = ITS_DAY + 10 * 3_600;
+        let running = ANNOUNCED + 3 * 86_400;
+        for (id, expires_at) in [("ended-link", ended), ("running-link", running)] {
+            sqlx::query(
+                "INSERT INTO invitations (id, inviter_user_id, token_sha256, created_at, \
+                 expires_at, max_uses, used_count, status) \
+                 VALUES (?, '@alice:h', ?, 0, ?, 1, 0, 'pending')",
+            )
+            .bind(id)
+            .bind(crate::crypto::token_hash(id))
+            .bind(expires_at)
+            .execute(&pool)
+            .await
+            .unwrap();
+        }
+        for (id, expires_at) in [("ended-delivered", ended), ("running-delivered", running)] {
+            sqlx::query(
+                "INSERT INTO delivered_invitations \
+                 (id, inviter_user_id, recipient_user_id, sent_at, expires_at) \
+                 VALUES (?, '@carol:h', '@alice:h', 0, ?)",
+            )
+            .bind(id)
+            .bind(expires_at)
+            .execute(&pool)
+            .await
+            .unwrap();
+        }
+        sqlx::query(
+            "INSERT INTO findable_numbers \
+             (key_id, mask, user_id, reference, proven_at, expires_at, withdrawn_at) \
+             VALUES (1, X'01', '@alice:h', 'ref', 0, ?, NULL)",
+        )
+        .bind(ended)
+        .execute(&pool)
+        .await
+        .unwrap();
+
+        record(&pool, "@alice:h", ANNOUNCED).await.unwrap();
+
+        let ends: Vec<(String, i64)> =
+            sqlx::query_as("SELECT id, expires_at FROM invitations ORDER BY id")
+                .fetch_all(&pool)
+                .await
+                .unwrap();
+        assert_eq!(
+            ends,
+            [
+                ("ended-link".to_string(), ended),
+                ("running-link".to_string(), ITS_DAY)
+            ]
+        );
+        let delivered: Vec<(String, i64)> =
+            sqlx::query_as("SELECT id, expires_at FROM delivered_invitations ORDER BY id")
+                .fetch_all(&pool)
+                .await
+                .unwrap();
+        assert_eq!(
+            delivered,
+            [
+                ("ended-delivered".to_string(), ended),
+                ("running-delivered".to_string(), ITS_DAY)
+            ]
+        );
+        let proof: (i64, Option<i64>) = sqlx::query_as(
+            "SELECT expires_at, withdrawn_at FROM findable_numbers WHERE user_id = '@alice:h'",
+        )
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+        assert_eq!(proof, (ended, Some(ITS_DAY)));
     }
 
     async fn seed(pool: &SqlitePool, id: &str, inviter: &str, max_uses: i64, used: i64) {

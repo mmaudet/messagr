@@ -48,7 +48,10 @@ use std::sync::Arc;
 use serde_json::Value;
 use sqlx::Row;
 
-use crate::{crypto, handlers::revoke::deactivate_with_either, util::localpart, AppState};
+use crate::{
+    crypto, handlers::revoke::deactivate_with_either, operator::is_a_user_id, util::localpart,
+    AppState,
+};
 
 /// The flag that selects this mode. Anything STARTING with it selects it too —
 /// see [`selects_the_named_deactivation`].
@@ -114,10 +117,15 @@ pub enum Outcome {
 /// `--deactivate-claimed=@x:h` is a near miss on the flag; landing it in this
 /// mode with zero identifiers gets it REFUSED by name (refusal 1), whereas
 /// treating it as "not the flag" would start a second service instead.
+///
+/// FROM THE COMMAND LINE, A NEAR MISS OR AN OPTION NEVER GETS HERE: `main`
+/// refuses any argument no mode takes first (`operator::known_arguments`,
+/// #473). This mode still refuses them on its own, for whatever calls it.
 pub fn selects_the_named_deactivation(argv: &[String]) -> Option<Vec<String>> {
     // Everything that is not an option is a NAMED identifier. Options are left
-    // out on purpose: `--all`, `--yes`, `--force` must arrive at refusal 1 as
-    // ZERO identifiers, and be refused for naming nobody.
+    // out on purpose: `--all`, `--yes`, `--force`, were they to get here,
+    // would arrive at refusal 1 as ZERO identifiers, and be refused for
+    // naming nobody.
     crate::operator::named_after(argv, THE_FLAG)
 }
 
@@ -154,24 +162,6 @@ pub fn the_one_identifier(named: &[String]) -> Result<String, String> {
         ));
     }
     Ok(one.clone())
-}
-
-/// `@localpart:server`, on the specification's grammar for the localpart.
-pub fn is_a_user_id(s: &str) -> bool {
-    let Some(rest) = s.strip_prefix('@') else {
-        return false;
-    };
-    let Some((local, server)) = rest.split_once(':') else {
-        return false;
-    };
-    !local.is_empty()
-        && !server.is_empty()
-        && local
-            .bytes()
-            .all(|b| b.is_ascii_lowercase() || b.is_ascii_digit() || b"._=/+-".contains(&b))
-        && server
-            .bytes()
-            .all(|b| b.is_ascii_alphanumeric() || b".-:[]".contains(&b))
 }
 
 /// `!opaque:server` (room versions 1–11) or `!opaque` (version 12 and later,

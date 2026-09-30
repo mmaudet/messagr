@@ -257,3 +257,13 @@ old reference to its new one without undoing what the retirement protects;
 so no signal could tell that account from another one that took the number,
 and no account ever inherits a contact. Devices that did not look during
 those days read the account's return as a first.
+
+**Amended on 30 September 2026 (a deletion dated by its day, #473).** An
+account's deletion is dated by its day, never its hour, and so is the
+withdrawal of its number from discovery (ADR 0015, amended the same day). A
+number that leaves discovery with its account is therefore kept masked from
+twenty-nine to thirty days after it leaves, and the thirty days above are at
+most thirty; the privacy policy says « au plus trente jours ». The bound on
+masking does not move: the count is kept by the day of each batch, for the
+quota window, whatever becomes of the masked number (`masking_quota`), so
+proving the number again, on the same account or on another, still finds it.

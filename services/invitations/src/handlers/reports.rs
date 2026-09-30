@@ -35,11 +35,11 @@
 //! By an SMS that names its number and its reason, nothing else (`alert`),
 //! told in the background: the answer does not wait for OVHcloud.
 //!
-//! # WHAT IS NOT HERE YET
+//! # WHAT IS NOT HERE
 //!
-//! The limit of ten a day and the grouping of the SMS (#478); the decision,
-//! the export of a sealed report, and the erasing that follows a decision
-//! (#473).
+//! The limit of ten a day and the grouping of the SMS (#478), not yet. The
+//! decision, the export of a sealed report, and the erasing that follows a
+//! decision are the operator's, on the host (`moderation`, #473).
 
 use std::sync::Arc;
 
@@ -361,7 +361,9 @@ mod tests {
         // n'est enregistré », beside what makes a report findable once: its
         // number, its instant, the key of its sending. The reported account,
         // the conversation and the messages are in the sealed report, and no
-        // column could hold them.
+        // column could hold them. Then what the operator decides (#473): the
+        // decision, its motivation, which names no account, its day, and the
+        // day it was held for the authorities (`moderation`).
         let columns: Vec<String> =
             sqlx::query_scalar("SELECT name FROM pragma_table_info('reports')")
                 .fetch_all(&pool)
@@ -375,7 +377,11 @@ mod tests {
                 "reason",
                 "sealed",
                 "received_at",
-                "idempotency_key"
+                "idempotency_key",
+                "decision",
+                "motivation",
+                "decided_on",
+                "held_since"
             ]
         );
     }

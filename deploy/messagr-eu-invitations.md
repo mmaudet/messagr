@@ -245,6 +245,196 @@ its alerts go by SMS while discovery stays off (#462).
   **none leaves until OVHcloud has validated the sender**: until then the
   log says `the alert could not be sent` (below).
 
+## Reports: acting within twenty-four hours
+
+What the operator does with a report (#473, ADR 0015): read it, and when it
+shows what the terms forbid, take the reported messages down and suspend
+their author within twenty-four hours; then decide within thirty days. The
+service keeps each report sealed for the operator key and cannot open it; the
+operator opens it on their own Mac, where the key's private half lives, never
+on the host.
+
+Three tools, and where each runs:
+
+- **the service's modes, on the host**, in `/opt/messagr-eu`, as
+  `docker compose run --rm invitations <flag>`. Like the other modes of this
+  guide, they bind no port and start no sweeper, and run beside the live
+  service. Those that write say what they will write and wait for the report
+  number, or the account, typed back: any other answer, or none, writes
+  nothing and exits in error;
+- **`scripts/admin-messagr.sh`, on the Mac.** The homeserver is Continuwuity,
+  not Synapse: no `/_synapse/admin`, and its administration goes through
+  commands posted in `#admins:messagr.eu`. The script posts them as the
+  operator account, whose token it reads from
+  `~/.messagr-exploitation/messagr-eu.json`, and prints the homeserver's
+  answer. Each gesture waits for its target typed back;
+- **`scripts/ouvrir-un-signalement.mjs`, on the Mac**, which opens a sealed
+  report with `~/.messagr-exploitation/cle-de-l-exploitant.json`.
+
+### 1. The SMS
+
+Each report sends an SMS to `ALERT_SMS_TO` with its report number and its
+reason, the urgent ones first (a child in danger, a threat to a life), and
+nothing else: no account, nothing that was said.
+`Messagr : 1 signalement reçu : K7QM-4ZT2 (menace).` Without the provider or
+the number, the same line is in the log, after `told to the operator:`.
+
+### 2. What awaits a decision, on the host
+
+    docker compose run --rm invitations --reports
+
+lists the reports awaiting a decision, the urgent ones first, each by number,
+instant of reception and reason, with how long it has waited; then the
+decided reports held for the authorities. **It never shows the reporting
+account.** `--reports K7QM-4ZT2` shows one report, with its reporting account,
+its decision and when what it keeps is erased: what the operator reads to
+answer whoever writes to `conformite@messagr.eu` with that number. A report
+with no decision stays listed, however old: nothing of it is erased until it
+has one.
+
+### 3. Open it, on the Mac
+
+    ssh hermes 'cd /opt/messagr-eu && docker compose run --rm -T invitations --export-report K7QM-4ZT2' \
+      | node scripts/ouvrir-un-signalement.mjs
+
+The export writes the sealed report as the opening tool reads it,
+`{ "reason", "reporter", "sealed" }`, and nothing else on its standard output;
+`-T` keeps a terminal from mixing anything in. **Piped straight into the
+tool, it is written on neither machine: never save it to a file**, and delete
+a copy saved by mistake. The tool refuses a report whose reason or reporting
+account is no longer what the device sealed. It shows the reporting account,
+the reported author, the conversation, and each message with its time and its
+event ID, which the takedown names; a photo or a document, the address of its
+encrypted copy on the homeserver (#471), and a photo that has a thumbnail,
+the address of the thumbnail's own copy, which is what the conversation
+shows (#496). To see one, run the same pipe with `--ouvrir <n>`, the number
+the tool gives the message, or with `--ouvrir-vignette <n>` for the thumbnail
+of its photo: it downloads the copy with the operator account, shows it, and
+erases what it wrote once Enter is pressed on the terminal
+(`scripts/ouvrir-un-signalement.mjs` says how).
+
+### 4. Within twenty-four hours, when it shows what the terms forbid
+
+From the Mac, in this order:
+
+1. **Take each reported message down**, one at a time:
+
+       scripts/admin-messagr.sh retirer '$<event ID>'
+
+   (`!admin users redact-event`). An event ID starts with `$`: between single
+   quotes, or the shell reads it as a variable, and the script refuses what is
+   left of it. The homeserver redacts as the author, **who must still be a
+   member of the conversation: every takedown comes before a termination.**
+   Read the answer: it says whether the event was redacted, and why not. The
+   message is gone for everyone, and the application shows « Retiré par
+   l'exploitant » in its place (#476), from the fixed reason Continuwuity
+   writes.
+
+2. **Erase the encrypted copy of a reported photo or document**, and that
+   of a photo's thumbnail when the tool shows one, each with the address the
+   opening tool shows:
+
+       scripts/admin-messagr.sh effacer-media mxc://messagr.eu/<media ID>
+
+   (`!admin media delete --mxc`).
+
+3. **Suspend the author:**
+
+       scripts/admin-messagr.sh suspendre @<author>:messagr.eu
+
+   (`!admin users lock`). The account can do nothing but log out, and keeps
+   its devices, its keys and its conversations; its holder reads that the
+   operator suspended it, and how to contest (#477). **Never through the HTTP
+   route that locks an account**: on the version in production, that route
+   applies the homeserver's `suspend` instead, under which the account still
+   reads its conversations.
+
+### 5. The decision, within thirty days, on the host
+
+    docker compose run --rm invitations --decide-report K7QM-4ZT2 <decision> "<motivation>"
+
+A decision finds the report unfounded, lifts the suspension, or confirms it
+by a termination:
+
+- `unfounded` (« sans suite »): nothing in the report is forbidden. Nothing
+  was taken down, or the operator restores what it can: a suspension is
+  lifted from the Mac, `scripts/admin-messagr.sh lever @<author>:messagr.eu`
+  (`!admin users unlock`), and a message taken down does not come back.
+- `lifted` (« levée »): the takedown stands, and the suspension is lifted, as
+  above.
+- `confirmed` (« confirmée »): the suspension is confirmed, and the account is
+  terminated (step 6).
+
+**The motivation is the reasoned decision, never a quotation**: what the
+report shows, and which rule of the terms it breaks or does not. It copies
+nothing that was said and names no account, no conversation and no message;
+the mode refuses a motivation holding a Matrix identifier. It is one line, in
+quotes, and it is kept a year, when what was said is long erased. A decision
+keeps its day, never its hour. **The erasures count from the first
+decision**: a second decision on the same report, after a contestation,
+replaces the first one's outcome and motivation, and moves neither erasure.
+
+### 6. A termination
+
+Once the decision is `confirmed`, and **every reported message is taken
+down** (step 4):
+
+1. **On the Mac**: `scripts/admin-messagr.sh fermer @<author>:messagr.eu`
+   (`!admin users deactivate`). The account leaves every conversation and never
+   comes back, and the homeserver never releases its name. It redacts
+   nothing: that is why the takedowns come first.
+2. **On the host**:
+
+       docker compose run --rm invitations --record-termination @<author>:messagr.eu
+
+   The account is recorded among the account deletions (#385), so that the
+   purge within thirty days applies to it; its invitations still open
+   expire, and its number leaves discovery. **The purge of an account's data
+   is still done by hand (#423)**, from that list, as for any deletion. The
+   row is dated by the day, as every account deletion is, one its holder
+   announces included, and names no report; the decision names no account.
+   What the dates still show is said below.
+
+A device that had kept the suspension then reads that the operator closed
+the account (#477).
+
+### 7. Held for the authorities
+
+    docker compose run --rm invitations --hold-report K7QM-4ZT2
+    docker compose run --rm invitations --release-report K7QM-4ZT2
+
+A report handed to the authorities is held: neither its sealed report nor
+its record is erased, whatever its decision, until it is released. Released,
+the erasures resume, and the next hourly sweep erases whatever is already
+due.
+
+### What the service keeps of a report, and when it goes
+
+- From the report (#468): its number, the reporting account, the reason, the
+  sealed report, the instant of reception, and the idempotency key of its
+  sending. Never the reported account, the conversation or what was said,
+  which only the sealed report holds.
+- From the operator (#473): the decision, its motivation and the day of the
+  first decision, and the day the report was held.
+- **The sealed report and its idempotency key go 181 days after the first
+  decision**, which never exceeds six calendar months, **and the record 365
+  days after**, which never exceeds twelve; neither while the report is held,
+  and neither while it has no decision. The hourly sweep does both
+  (`moderation::sweep`), and its log line counts them:
+  `reports: … sealed reports erased, … records erased`.
+- **What a copy of the database still shows** (ADR 0015, amended on 30
+  September 2026, and the policy says the same): a confirmed report and an
+  account deletion recorded the same day can be related by their dates, when
+  deletions are few; and a reporting account that also blocked the account it
+  reported is related to it by that block, which the service keeps with its
+  date (#469). Every account deletion is dated by the day, a termination as a
+  deletion its holder announced (the owner's decision of 30 September 2026):
+  the row does not say which it is.
+- **The dated copies of the database** that an update leaves (step 4 of
+  "Updating it") hold the reports as they were, sealed reports included, and
+  no sweep reaches them: delete them once the update is behind, as #416 says
+  of the invitation graph.
+
 ## The ceilings on the SMS that prove numbers
 
 Every proof costs an SMS, and the service bounds what they cost (#399):

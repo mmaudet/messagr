@@ -579,6 +579,9 @@ pub(crate) async fn sweep_once(st: &Arc<AppState>, now: i64) -> bool {
         purge_account_deletions(&st.pool, now).await,
         sweep_sms(st, now).await,
         sweep_discovery(st, now).await,
+        // Reports (#473): the sealed report 181 days after its first decision, the
+        // record 365 days after, neither while held for the authorities.
+        crate::moderation::sweep(&st.pool, now).await,
     ) {
         (
             Ok(a),
@@ -592,6 +595,7 @@ pub(crate) async fn sweep_once(st: &Arc<AppState>, now: i64) -> bool {
             Ok(i),
             Ok([s, t, u]),
             Ok([j, k, m, n, o]),
+            Ok([p, q]),
         ) => {
             tracing::info!(
                 "cleanup: {a} edges, {b} invitations, {c} accounts, \
@@ -604,7 +608,9 @@ pub(crate) async fn sweep_once(st: &Arc<AppState>, now: i64) -> bool {
                                 discovery: {j} spent proofs, {k} ended proofs, \
                                 {m} SMS counters forgotten, \
                                 {n} days of masking forgotten, \
-                                {o} delivered invitations forgotten"
+                                {o} delivered invitations forgotten; \
+                                reports: {p} sealed reports erased, \
+                                {q} records erased"
             );
             true
         }
