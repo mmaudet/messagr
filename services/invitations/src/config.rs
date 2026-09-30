@@ -14,6 +14,13 @@ pub enum ConfigError {
     IncompleteSmsProvider(&'static str),
     #[error("OVH_API_URL must be OVHcloud's European API outside the bench")]
     SmsProviderNotOvhcloud,
+    #[error(
+        "SMS_SHORT_NUMBER and SMS_SENDER are both given: the SMS go by OVHcloud's short \
+         number or under a named sender, not both"
+    )]
+    ShortNumberAndSender,
+    #[error("SMS_SHORT_NUMBER must be 1, or absent")]
+    InvalidShortNumber,
     #[error("DISCOVERY_COUNTRIES is unusable: {0}")]
     InvalidCountries(&'static str),
     #[error("ALERT_SMS_TO is not a number in international form (+ then 8 to 15 digits)")]
@@ -81,8 +88,8 @@ pub struct Config {
 /// No `Debug`: the number is nobody's business in a log line.
 #[derive(Clone, Default)]
 pub struct Sms {
-    /// OVHcloud, from its four credentials and `SMS_SENDER`
-    /// (`sms_provider`), or nobody.
+    /// OVHcloud, from its four credentials, and `SMS_SENDER` or
+    /// `SMS_SHORT_NUMBER` (`sms_provider`), or nobody.
     pub provider: Option<crate::sms::Ovhcloud>,
     /// The operator's own number, from `ALERT_SMS_TO` (`alert_sms_to`), or
     /// nobody but the log.
@@ -253,11 +260,13 @@ pub fn reference_key(raw: Option<String>) -> Result<Option<[u8; 32]>, ConfigErro
 /// and not a choice, whether discovery is meant to serve or not. The address
 /// is OVHcloud's European API; another one (the bench's fake provider) is taken
 /// only when `SMS_PROVIDER_FOR_TESTS=1` says so, and only on this host
-/// (`stays_on_the_host`).
+/// (`stays_on_the_host`). Who its SMS say they come from is read first, and
+/// may stop the start on its own (`sender`).
 pub fn sms_provider(
     var: impl Fn(&str) -> Option<String>,
 ) -> Result<Option<crate::sms::Ovhcloud>, ConfigError> {
     let given = |key| var(key).filter(|v| !v.trim().is_empty());
+    let sender = sender(given("SMS_SHORT_NUMBER"), given("SMS_SENDER"))?;
     const NEEDED: [&str; 4] = [
         "OVH_APPLICATION_KEY",
         "OVH_APPLICATION_SECRET",
@@ -283,8 +292,33 @@ pub fn sms_provider(
         application_secret: values.next().unwrap(),
         consumer_key: values.next().unwrap(),
         service_name: values.next().unwrap(),
-        sender: given("SMS_SENDER").unwrap_or_else(|| "Messagr".into()),
+        sender,
     }))
+}
+
+/// Who the service's SMS say they come from (#508): OVHcloud's short number
+/// with `SMS_SHORT_NUMBER=1`, and otherwise the sender `SMS_SENDER` names,
+/// `Messagr` unless it names one. Blank is absent, for both.
+///
+/// A SETTING OF ITS OWN, AND NO VALUE OF `SMS_SENDER`, so that going back to
+/// a named sender once OVHcloud has validated one is a change of the
+/// environment and a restart: `SMS_SHORT_NUMBER` goes, `SMS_SENDER` comes.
+/// Both at once stop the start, naming both: which one the operator meant is
+/// not a thing to guess. So does any value of `SMS_SHORT_NUMBER` but 1, as a
+/// malformed `ALERT_SMS_TO` does: a typo would leave the SMS under a sender
+/// OVHcloud refuses, and an alert that cannot leave is not a choice to hear
+/// nothing. Neither needs the credentials to be refused.
+fn sender(
+    short_number: Option<String>,
+    named: Option<String>,
+) -> Result<crate::sms::Sender, ConfigError> {
+    use crate::sms::Sender;
+    match (short_number, named) {
+        (None, named) => Ok(Sender::Named(named.unwrap_or_else(|| "Messagr".into()))),
+        (Some(_), Some(_)) => Err(ConfigError::ShortNumberAndSender),
+        (Some(flag), None) if flag.trim() == "1" => Ok(Sender::ShortNumber),
+        (Some(_), None) => Err(ConfigError::InvalidShortNumber),
+    }
 }
 
 /// Whether an address can only reach this host or a container beside it: the
@@ -438,7 +472,24 @@ impl Config {
     ///
     /// The provider and the operator's number are not discovery's own
     /// (#464): they tell the operator with discovery off as well (`Sms`).
+    ///
+    /// NEVER BY OVHCLOUD'S SHORT NUMBER (#508), whatever else is given, and
+    /// said before anything missing: a proof goes to a number of any open
+    /// country, and only French numbers are known to receive the short
+    /// number. It serves the operator's alerts alone, until a sender is
+    /// validated.
     pub fn discovery(&self) -> Result<Discovery<'_>, &'static str> {
+        if self
+            .sms
+            .provider
+            .as_ref()
+            .is_some_and(|provider| provider.sender == crate::sms::Sender::ShortNumber)
+        {
+            return Err(
+                "the SMS go by OVHcloud's short number (SMS_SHORT_NUMBER), which only French \
+                 numbers are known to receive",
+            );
+        }
         let keys = self.masking_keys.as_deref().ok_or("MASKING_KEYS absent")?;
         let (provider, _operator) = self.sms.to_the_operator()?;
         Ok(Discovery {
@@ -528,8 +579,114 @@ mod tests {
             .unwrap()
             .expect("the provider is loaded");
         assert_eq!(provider.base_url, crate::sms::OVHCLOUD_EUROPE);
-        assert_eq!(provider.sender, "Messagr");
+        assert_eq!(provider.sender, crate::sms::Sender::Named("Messagr".into()));
         assert_eq!(provider.service_name, "sms-ab12345-1");
+    }
+
+    const SHORT_NUMBER: &[(&str, &str)] = &[("SMS_SHORT_NUMBER", "1")];
+
+    /// Who the provider's SMS say they come from, given `more` beside its
+    /// four credentials.
+    fn sender_given(more: &[(&str, &str)]) -> crate::sms::Sender {
+        let mut given = OVH.to_vec();
+        given.extend_from_slice(more);
+        sms_provider(env(&given))
+            .unwrap()
+            .expect("the provider is loaded")
+            .sender
+    }
+
+    #[test]
+    fn the_short_number_is_a_setting_of_its_own() {
+        // #508: OVHcloud refused the sender « Messagr » on 30 September
+        // 2026, and its short number reached the operator's number that day.
+        use crate::sms::Sender::{Named, ShortNumber};
+        assert_eq!(sender_given(SHORT_NUMBER), ShortNumber);
+        assert_eq!(sender_given(&[("SMS_SHORT_NUMBER", " 1 ")]), ShortNumber);
+        // Without it, nothing changes: the sender SMS_SENDER names, and
+        // `Messagr` unless it names one. Blank is without it.
+        assert_eq!(sender_given(&[]), Named("Messagr".into()));
+        assert_eq!(
+            sender_given(&[("SMS_SENDER", "Autre")]),
+            Named("Autre".into())
+        );
+        assert_eq!(
+            sender_given(&[("SMS_SHORT_NUMBER", "  ")]),
+            Named("Messagr".into())
+        );
+    }
+
+    #[test]
+    fn the_short_number_and_a_sender_stop_the_start_naming_both() {
+        // Whatever else is given: the provider and the operator's number, or
+        // nothing at all. The SMS cannot go both ways, and which one the
+        // operator meant is not a thing to guess.
+        let both: &[(&str, &str)] = &[("SMS_SHORT_NUMBER", "1"), ("SMS_SENDER", "Messagr")];
+        for given in [deployment(&[OVH, OPERATOR, both]), deployment(&[both])] {
+            let Err(refused) = Config::from_vars(given) else {
+                panic!("the start goes on with both");
+            };
+            let said = refused.to_string();
+            assert!(
+                said.contains("SMS_SHORT_NUMBER") && said.contains("SMS_SENDER"),
+                "{said}"
+            );
+        }
+    }
+
+    #[test]
+    fn a_short_number_setting_other_than_1_stops_the_start() {
+        // A typo would leave the SMS under a sender OVHcloud refuses: an
+        // alert that cannot leave is not a choice to hear nothing, as for a
+        // malformed ALERT_SMS_TO.
+        for typo in ["true", "yes", "on", "0", "2", "1 1"] {
+            let Err(refused) =
+                Config::from_vars(deployment(&[OVH, OPERATOR, &[("SMS_SHORT_NUMBER", typo)]]))
+            else {
+                panic!("{typo:?} is taken");
+            };
+            assert_eq!(
+                refused.to_string(),
+                "SMS_SHORT_NUMBER must be 1, or absent",
+                "{typo:?}"
+            );
+        }
+    }
+
+    #[test]
+    fn with_the_short_number_discovery_never_turns_on() {
+        // #508: a proof goes to every open country, and only French numbers
+        // are known to receive the short number. With everything else
+        // discovery serves with, or without it, discovery stays off and names
+        // the short number first; the operator's alerts still go by SMS.
+        let keys = format!("1:{ONE_SEED}");
+        let discovery: &[(&str, &str)] =
+            &[("MASKING_KEYS", keys.as_str()), ("REFERENCE_KEY", ONE_SEED)];
+        for given in [
+            deployment(&[OVH, OPERATOR, discovery, SHORT_NUMBER]),
+            deployment(&[OVH, OPERATOR, SHORT_NUMBER]),
+        ] {
+            let Ok(cfg) = Config::from_vars(given) else {
+                panic!("the service starts");
+            };
+            assert_eq!(
+                cfg.discovery().err(),
+                Some(
+                    "the SMS go by OVHcloud's short number (SMS_SHORT_NUMBER), which only \
+                     French numbers are known to receive"
+                )
+            );
+            let Ok((provider, _)) = cfg.sms.to_the_operator() else {
+                panic!("the operator is told by SMS");
+            };
+            assert_eq!(provider.sender, crate::sms::Sender::ShortNumber);
+        }
+        // Inseparable control: the same deployment under a named sender
+        // serves discovery.
+        let Ok(named) = Config::from_vars(deployment(&[OVH, OPERATOR, discovery])) else {
+            panic!("the service starts");
+        };
+        assert!(named.discovery().is_ok());
     }
 
     #[test]

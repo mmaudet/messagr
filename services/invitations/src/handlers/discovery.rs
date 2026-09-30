@@ -1435,6 +1435,31 @@ mod tests {
         ));
     }
 
+    /// THE SHORT NUMBER CARRIES NO PROOF (#508): a proof goes to every open
+    /// country, and only French numbers are known to receive it. Keys,
+    /// provider, operator and reference key are all given, and the number
+    /// screen reads discovery off, and a proof is refused before any SMS,
+    /// a French number's as any other.
+    #[sqlx::test(migrations = "./migrations")]
+    async fn by_the_short_number_no_proof_leaves(pool: SqlitePool) {
+        let (ovh, inbox) = fake_ovhcloud(false).await;
+        let hs = whoami_hs().await;
+        let named = state_with(pool.clone(), hs.clone(), Some(ovh.clone()));
+        assert!(reading(&named, "alice").await.on, "served under a name");
+
+        let mut cfg = discovery_config(&hs, Some(ovh), util::Clock::system());
+        if let Some(provider) = cfg.sms.provider.as_mut() {
+            provider.sender = crate::sms::Sender::ShortNumber;
+        }
+        let st = state_from(pool, hs, cfg);
+        assert!(!reading(&st, "alice").await.on);
+        assert!(matches!(
+            start(&st, "alice", NUMBER).await,
+            Err(AppError::DiscoveryOff)
+        ));
+        assert!(inbox.lock().unwrap().sent.is_empty(), "an SMS left");
+    }
+
     #[sqlx::test(migrations = "./migrations")]
     async fn a_proof_needs_an_account(pool: SqlitePool) {
         let (ovh, _) = fake_ovhcloud(false).await;

@@ -11,8 +11,9 @@
 //!
 //! # NOTHING HERE PRINTS A SECRET
 //!
-//! `Ovhcloud` has its own `Debug`, which shows the endpoint and the service
-//! name and nothing else, and no error carries the number or the message.
+//! `Ovhcloud` has its own `Debug`, which shows the endpoint, the service
+//! name and who the SMS say they come from, and nothing else, and no error
+//! carries the number or the message.
 
 use sha1::{Digest, Sha1};
 use std::sync::OnceLock;
@@ -30,17 +31,42 @@ pub struct Ovhcloud {
     pub consumer_key: String,
     /// The SMS account, `sms-xx00000-1`.
     pub service_name: String,
-    /// The alphanumeric sender registered with OVHcloud.
-    pub sender: String,
+    /// Who the SMS say they come from.
+    pub sender: Sender,
+}
+
+/// Who the service's SMS say they come from (#508).
+///
+/// A named sender serves once OVHcloud has validated it for the SMS account,
+/// and until then OVHcloud refuses every SMS sent under it: « Messagr » was
+/// pending on 26 September 2026, and refused on 30 September (`Sms sender
+/// Messagr is refused`). OVHcloud's short number needs no validation, and a
+/// test SMS it carried reached the operator's number that same day. Only
+/// French numbers are known to receive it, so it carries the operator's
+/// alerts and never a proof (`Config::discovery`).
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum Sender {
+    /// An alphanumeric sender the SMS account has had validated, from
+    /// `SMS_SENDER`: `sender` in the body.
+    Named(String),
+    /// OVHcloud's short number, from `SMS_SHORT_NUMBER=1`:
+    /// `senderForResponse` in the body, and no `sender`.
+    ShortNumber,
 }
 
 impl std::fmt::Debug for Ovhcloud {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("Ovhcloud")
+        let mut shown = f.debug_struct("Ovhcloud");
+        shown
             .field("base_url", &self.base_url)
-            .field("service_name", &self.service_name)
-            .field("sender", &self.sender)
-            .finish()
+            .field("service_name", &self.service_name);
+        // AS THE BODY SAYS IT (#508): a named sender as the log always read
+        // it, the short number as OVHcloud is asked for it.
+        match &self.sender {
+            Sender::Named(name) => shown.field("sender", name),
+            Sender::ShortNumber => shown.field("sender_for_response", &true),
+        };
+        shown.finish()
     }
 }
 
@@ -78,17 +104,22 @@ impl Ovhcloud {
         now: i64,
     ) -> Result<u64, SmsError> {
         let url = format!("{}/sms/{}/jobs", self.base_url, self.service_name);
-        let body = serde_json::json!({
+        let mut body = serde_json::json!({
             "message": message,
             "receivers": [number],
-            "sender": self.sender,
             // A proof is not marketing: no « STOP » line, which would also
             // push the domain-bound last line off the end iOS reads.
             "noStopClause": true,
             "priority": "high",
             "validityPeriod": valid_minutes,
-        })
-        .to_string();
+        });
+        // WHO THE SMS SAYS IT COMES FROM (#508). OVHcloud sends by its short
+        // number when asked for `senderForResponse` and given no `sender`.
+        match &self.sender {
+            Sender::Named(name) => body["sender"] = name.as_str().into(),
+            Sender::ShortNumber => body["senderForResponse"] = true.into(),
+        }
+        let body = body.to_string();
         let answer = self
             .signed(reqwest::Method::POST, &url, body, now)
             .send()
@@ -309,7 +340,7 @@ pub(crate) mod test_support {
                 application_secret: "as".into(),
                 consumer_key: "ck".into(),
                 service_name: "sms-test-1".into(),
-                sender: "Messagr".into(),
+                sender: super::Sender::Named("Messagr".into()),
             }),
             operator_number: Some(OPERATOR_NUMBER.to_string()),
         }
@@ -411,7 +442,7 @@ mod tests {
             application_secret: "AS".into(),
             consumer_key: "CK".into(),
             service_name: "sms-ab12345-1".into(),
-            sender: "Messagr".into(),
+            sender: Sender::Named("Messagr".into()),
         }
     }
 
@@ -432,6 +463,7 @@ mod tests {
         let body: serde_json::Value = serde_json::from_str(raw).unwrap();
         assert_eq!(body["receivers"], serde_json::json!(["+33612345678"]));
         assert_eq!(body["sender"], "Messagr");
+        assert!(body.get("senderForResponse").is_none(), "{raw}");
         assert_eq!(body["noStopClause"], true);
         assert_eq!(body["validityPeriod"], 10);
         let headers = s.headers.as_ref().unwrap();
@@ -452,6 +484,66 @@ mod tests {
             )
             .as_str()
         );
+    }
+
+    /// #508: on 30 September 2026 OVHcloud refused the sender « Messagr »
+    /// (`Sms sender Messagr is refused`), and a test SMS sent the same day
+    /// with `senderForResponse` and no `sender` reached the operator's
+    /// number. By the short number, the body is a named sender's with that
+    /// one difference, and signed as any.
+    #[tokio::test]
+    async fn by_the_short_number_the_body_asks_for_it_and_names_no_sender() {
+        let (base, seen) = fake_ovhcloud(serde_json::json!({
+            "ids": [42], "invalidReceivers": [], "validReceivers": ["+33612345678"]
+        }))
+        .await;
+        let named = provider(base.clone());
+        let short = Ovhcloud {
+            sender: Sender::ShortNumber,
+            ..named.clone()
+        };
+        let body_of = |sent: &Ovhcloud| {
+            let sent = sent.clone();
+            let seen = seen.clone();
+            async move {
+                let id = sent
+                    .send("+33612345678", "Messagr : 1 blocage", 1_440, 1_458_034_342)
+                    .await
+                    .unwrap();
+                assert_eq!(id, 42);
+                let raw = seen.lock().unwrap().body.clone().unwrap();
+                let body: serde_json::Value = serde_json::from_str(&raw).unwrap();
+                (raw, body)
+            }
+        };
+
+        let (raw, mut by_the_short_number) = body_of(&short).await;
+        assert_eq!(by_the_short_number["senderForResponse"], true, "{raw}");
+        assert!(by_the_short_number.get("sender").is_none(), "{raw}");
+        let headers = seen.lock().unwrap().headers.clone().unwrap();
+        assert_eq!(
+            headers["x-ovh-signature"],
+            signature(
+                "AS",
+                "CK",
+                "POST",
+                &format!("{base}/sms/sms-ab12345-1/jobs"),
+                &raw,
+                "1458034342"
+            )
+            .as_str()
+        );
+
+        // NOTHING ELSE MOVES: the message, the receiver, no « STOP » line,
+        // the priority and the validity are a named sender's.
+        let (_, mut under_a_name) = body_of(&named).await;
+        assert_eq!(under_a_name["sender"], "Messagr");
+        under_a_name.as_object_mut().unwrap().remove("sender");
+        by_the_short_number
+            .as_object_mut()
+            .unwrap()
+            .remove("senderForResponse");
+        assert_eq!(by_the_short_number, under_a_name);
     }
 
     #[tokio::test]
@@ -548,11 +640,26 @@ mod tests {
 
     #[test]
     fn the_provider_never_prints_its_secrets() {
-        let printed = format!("{:?}", provider("https://eu.api.ovh.com/1.0".into()));
+        let named = provider("https://eu.api.ovh.com/1.0".into());
+        let short = Ovhcloud {
+            sender: Sender::ShortNumber,
+            ..named.clone()
+        };
+        for shown in [&named, &short] {
+            let printed = format!("{shown:?}");
+            assert!(
+                !printed.contains("AS") && !printed.contains("CK"),
+                "{printed}"
+            );
+            assert!(printed.contains("sms-ab12345-1"), "{printed}");
+        }
+        let named = format!("{named:?}");
+        assert!(named.contains("sender: \"Messagr\""), "{named}");
+        // #508: as the body says it, and never a sender it does not carry.
+        let short = format!("{short:?}");
         assert!(
-            !printed.contains("AS") && !printed.contains("CK"),
-            "{printed}"
+            short.contains("sender_for_response: true") && !short.contains("Messagr"),
+            "{short}"
         );
-        assert!(printed.contains("sms-ab12345-1"), "{printed}");
     }
 }
