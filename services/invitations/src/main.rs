@@ -156,25 +156,7 @@ async fn main() -> anyhow::Result<()> {
     handlers::discovery::serving_start(&state.pool, &state.cfg, util::now()).await?;
     tokio::spawn(cleanup::run_forever(state.clone()));
 
-    let discovery = match state.cfg.discovery() {
-        Ok(served) => Ok(format!(
-            "address-book discovery is on: {} masking keys, the current one is #{}; proofs by {:?}",
-            served.keys.len(),
-            served.keys.current().id(),
-            served.provider
-        )),
-        Err(missing) => Err(format!("{missing}: address-book discovery stays off")),
-    };
-    // WHETHER THE OPERATOR IS TOLD BY SMS (#464), discovery on or off: the
-    // provider is named, never the number.
-    let alerts = match state.cfg.sms.to_the_operator() {
-        Ok((provider, _)) => Ok(format!(
-            "the operator's alerts go by SMS, through {provider:?}"
-        )),
-        Err(missing) => Err(format!(
-            "{missing}: the operator's alerts are only written in the log"
-        )),
-    };
+    let said = what_the_start_says(&state.cfg);
     let app = router(state);
 
     let listener = tokio::net::TcpListener::bind(&addr).await?;
@@ -184,14 +166,47 @@ async fn main() -> anyhow::Result<()> {
     );
     // AFTER THE VERSION, which an update reads as the first line (step 6 of
     // `deploy/messagr-eu-invitations.md`).
-    for said in [discovery, alerts] {
-        match said {
+    for line in said {
+        match line {
             Ok(on) => tracing::info!("{on}"),
             Err(off) => tracing::warn!("{off}"),
         }
     }
     axum::serve(listener, app).await?;
     Ok(())
+}
+
+/// The two lines the start writes after the version: whether address-book
+/// discovery is on, and whether the operator's alerts go by SMS, each `Ok`
+/// for a line of information and `Err` for a warning.
+fn what_the_start_says(cfg: &config::Config) -> [Result<String, String>; 2] {
+    let discovery = match cfg.discovery() {
+        Ok(served) => Ok(format!(
+            "address-book discovery is on: {} masking keys, the current one is #{}; proofs by {:?}",
+            served.keys.len(),
+            served.keys.current().id(),
+            served.provider
+        )),
+        Err(missing) => Err(format!("{missing}: address-book discovery stays off")),
+    };
+    // WHETHER THE OPERATOR IS TOLD BY SMS (#464), discovery on or off: the
+    // provider is named, never the number. And whether by OVHcloud's short
+    // number (#508), in words, since a named sender's line is unchanged.
+    let alerts = match cfg.sms.to_the_operator() {
+        Ok((provider, _)) => Ok(match provider.sender {
+            sms::Sender::ShortNumber => format!(
+                "the operator's alerts go by SMS from OVHcloud's short number, through \
+                 {provider:?}"
+            ),
+            sms::Sender::Named(_) => {
+                format!("the operator's alerts go by SMS, through {provider:?}")
+            }
+        }),
+        Err(missing) => Err(format!(
+            "{missing}: the operator's alerts are only written in the log"
+        )),
+    };
+    [discovery, alerts]
 }
 
 /// Prints the plan and reads one line back. THE ONLY caller of stdin in this
@@ -445,6 +460,103 @@ mod tests {
                 "the guide documents {flag}, which the guard refuses"
             );
         }
+    }
+
+    /// THE START SAYS HOW THE SMS GO, AND NEVER WHAT IS SECRET (#464, #508).
+    /// A deployment with everything the SMS and discovery take, each value
+    /// one that no word of the start could hold by chance. By OVHcloud's
+    /// short number, discovery stays off and says why, and the line that
+    /// names the provider says the short number. Under a named sender, the
+    /// two lines are the ones production read before #508. No line prints
+    /// the operator's number, a key or a secret.
+    #[test]
+    fn the_start_says_the_short_number_and_never_the_number_a_key_or_a_secret() {
+        let start = |more: &[(&'static str, &'static str)]| {
+            let mut given = vec![
+                ("DATABASE_URL", "sqlite::memory:"),
+                ("HOMESERVER_URL", "http://127.0.0.1:1"),
+                ("REGISTRATION_TOKEN", "jeton-d-inscription-508"),
+                (
+                    "ENCRYPTION_KEY",
+                    "BQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQU=",
+                ),
+                ("OVH_APPLICATION_KEY", "cle-d-application-508"),
+                ("OVH_APPLICATION_SECRET", "secret-d-application-508"),
+                ("OVH_CONSUMER_KEY", "cle-du-consommateur-508"),
+                ("OVH_SMS_SERVICE", "sms-mm50800-1"),
+                ("ALERT_SMS_TO", "+33612345508"),
+                (
+                    "MASKING_KEYS",
+                    "1:AQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQE=",
+                ),
+                (
+                    "REFERENCE_KEY",
+                    "BwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwc=",
+                ),
+            ];
+            given.extend_from_slice(more);
+            let cfg = config::Config::from_vars(move |key| {
+                given
+                    .iter()
+                    .find(|(k, _)| *k == key)
+                    .map(|(_, v)| v.to_string())
+            })
+            .expect("the service starts");
+            what_the_start_says(&cfg)
+        };
+        let never_printed = |lines: &[Result<String, String>; 2]| {
+            for line in lines {
+                let line = line.as_ref().unwrap_or_else(|off| off);
+                for secret in [
+                    "612345508",
+                    "cle-d-application-508",
+                    "secret-d-application-508",
+                    "cle-du-consommateur-508",
+                    "jeton-d-inscription-508",
+                    "BQUFBQUF",
+                    "AQEBAQEB",
+                    "BwcHBwcH",
+                ] {
+                    assert!(!line.contains(secret), "{secret} printed: {line}");
+                }
+            }
+        };
+
+        let by_the_short_number = start(&[("SMS_SHORT_NUMBER", "1")]);
+        never_printed(&by_the_short_number);
+        assert_eq!(
+            by_the_short_number,
+            [
+                Err(
+                    "the SMS go by OVHcloud's short number (SMS_SHORT_NUMBER), which only \
+                     French numbers are known to receive: address-book discovery stays off"
+                        .to_string()
+                ),
+                Ok(
+                    "the operator's alerts go by SMS from OVHcloud's short number, through \
+                    Ovhcloud { base_url: \"https://eu.api.ovh.com/1.0\", service_name: \
+                    \"sms-mm50800-1\", sender_for_response: true }"
+                        .to_string()
+                ),
+            ]
+        );
+
+        let under_a_name = start(&[]);
+        never_printed(&under_a_name);
+        let provider = "Ovhcloud { base_url: \"https://eu.api.ovh.com/1.0\", service_name: \
+                        \"sms-mm50800-1\", sender: \"Messagr\" }";
+        assert_eq!(
+            under_a_name,
+            [
+                Ok(format!(
+                    "address-book discovery is on: 1 masking keys, the current one is #1; \
+                     proofs by {provider}"
+                )),
+                Ok(format!(
+                    "the operator's alerts go by SMS, through {provider}"
+                )),
+            ]
+        );
     }
 
     /// The deletion announcement is a route, and an authenticated one (#385).
