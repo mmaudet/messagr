@@ -364,3 +364,23 @@ export function blockable(
   if (found.length !== selected.size) return null
   return found.every(entry => entry.claimedSender === author) ? author : null
 }
+
+/**
+ * The selection without the messages of `blocked` (#494): blocked meanwhile,
+ * from another device, while they were selected in a conversation that
+ * stays. They leave the screen, and nothing is offered on what nobody can
+ * see any more. The same selection, handed back, when it held none.
+ */
+export function selectionWithoutTheBlocked(
+  selected: ReadonlySet<string>,
+  entries: readonly TimelineEntry[],
+  blocked: ReadonlySet<string>,
+): ReadonlySet<string> {
+  const theirs = chosen(selected, entries).filter(entry =>
+    blocked.has(entry.claimedSender),
+  )
+  if (theirs.length === 0) return selected
+  const left = new Set(selected)
+  for (const entry of theirs) left.delete(entry.eventId)
+  return left
+}

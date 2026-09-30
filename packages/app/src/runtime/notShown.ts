@@ -48,13 +48,22 @@ export function shownOf<
 }
 
 /**
+ * Whether every one of `entries` is still drawn: a photograph open full
+ * screen closes when one of its own is not (#472), as a blocked account's
+ * leave the viewer with the thread.
+ */
+export function allShown(
+  entries: readonly Pick<TimelineEntry, 'eventId' | 'claimedSender'>[],
+  notShown: NotShown,
+): boolean {
+  return shownOf(entries, notShown).length === entries.length
+}
+
+/**
  * The reactions drawn under the messages, tallied from those this device
- * draws (#494): a blocked account's leave by the filter its messages leave
- * by, from the same value, so in the same render.
- *
- * TALLIED HERE, AT EACH DRAW, and no longer once per reading of the
- * conversation: a tally counts, and forgets who reacted, so a block made
- * after it could only take that account's reactions off at the next reading.
+ * draws, by the filter the messages are drawn by and from the same value:
+ * a blocked account's leave in the same render as its messages (#494,
+ * ADR-0011 as amended on 30 September 2026).
  */
 export function reactionsShown(
   reactions: readonly LooseReaction[],

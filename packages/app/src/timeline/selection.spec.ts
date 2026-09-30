@@ -10,6 +10,7 @@ import {
   copyText,
   onlyPhotograph,
   reportable,
+  selectionWithoutTheBlocked,
   toggle,
 } from './selection'
 
@@ -561,5 +562,33 @@ describe('whom « Bloquer l’expéditeur » blocks (#472)', () => {
     // Nothing can say whose it is, as for removing and reporting.
     expect(blockable(new Set(['$h1', '$gone']), [HERS], ME)).toBeNull()
     expect(blockable(new Set(), [HERS], ME)).toBeNull()
+  })
+})
+
+describe('a selection when an account is blocked meanwhile (#494)', () => {
+  // From another device, while messages are selected in a conversation that
+  // stays: that account's messages leave the screen, and the selection with
+  // them, so that nothing is offered on what nobody can see any more.
+  const HIM = '@him:x'
+  const HIS = said('$b1', HIM, 'et toi')
+
+  it('drops the selected messages of the account now blocked, and keeps the rest', () => {
+    const held = [MINE, HERS, HIS]
+
+    expect([
+      ...selectionWithoutTheBlocked(
+        new Set(['$h1', '$b1', '$m1']),
+        held,
+        new Set([HER]),
+      ),
+    ]).toEqual(['$b1', '$m1'])
+  })
+
+  it('hands the same selection back when it holds nothing of theirs', () => {
+    const selected = new Set(['$b1', '$m1'])
+
+    expect(
+      selectionWithoutTheBlocked(selected, [MINE, HERS, HIS], new Set([HER])),
+    ).toBe(selected)
   })
 })
