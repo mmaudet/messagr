@@ -36,15 +36,16 @@ rather than on every commit.
 
 ## Configuration
 
-Twenty-two variables, four of them mandatory: `DATABASE_URL`, `HOMESERVER_URL`,
-`REGISTRATION_TOKEN`, `ENCRYPTION_KEY`, plus optional `EDGE_RETENTION_DAYS`,
-`BIND_ADDR`, `MAX_RESERVED_ACCOUNTS_PER_INVITER`, `PUSH_GATEWAY_URL`,
-`MASKING_KEYS`, `REFERENCE_KEY`, and the SMS provider's: `OVH_APPLICATION_KEY`,
-`OVH_APPLICATION_SECRET`, `OVH_CONSUMER_KEY`, `OVH_SMS_SERVICE`, `SMS_SENDER`,
-`OVH_API_URL` and `SMS_PROVIDER_FOR_TESTS`, the operator's number,
-`ALERT_SMS_TO`, the countries open to discovery, `DISCOVERY_COUNTRIES`, and
-the ceilings on its SMS, `SMS_CEILING_PER_COUNTRY_PER_DAY`,
-`SMS_BUDGET_PER_MONTH` and `SMS_CREDITS_ALERT_BELOW`.
+Twenty-three variables, four of them mandatory: `DATABASE_URL`,
+`HOMESERVER_URL`, `REGISTRATION_TOKEN`, `ENCRYPTION_KEY`, plus optional
+`EDGE_RETENTION_DAYS`, `BIND_ADDR`, `MAX_RESERVED_ACCOUNTS_PER_INVITER`,
+`PUSH_GATEWAY_URL`, `MASKING_KEYS`, `REFERENCE_KEY`, and the SMS provider's:
+`OVH_APPLICATION_KEY`, `OVH_APPLICATION_SECRET`, `OVH_CONSUMER_KEY`,
+`OVH_SMS_SERVICE`, `SMS_SENDER`, `SMS_SHORT_NUMBER`, `OVH_API_URL` and
+`SMS_PROVIDER_FOR_TESTS`, the operator's number, `ALERT_SMS_TO`, the countries
+open to discovery, `DISCOVERY_COUNTRIES`, and the ceilings on its SMS,
+`SMS_CEILING_PER_COUNTRY_PER_DAY`, `SMS_BUDGET_PER_MONTH` and
+`SMS_CREDITS_ALERT_BELOW`.
 
 `MASKING_KEYS` holds the keys that mask the phone numbers of address-book
 discovery (`masking`, RFC 9497, ADR 0014), each under its key number. Absent,
@@ -66,6 +67,12 @@ some of them stop the start. With `ALERT_SMS_TO`, the operator's alerts go
 by SMS whether discovery is on or not; without either, they are only written
 in the log, and the service starts all the same. Discovery needs both. The
 same guide says how to create them.
+
+The SMS carry the sender `SMS_SENDER` names, or, with `SMS_SHORT_NUMBER=1`,
+none: they go by OVHcloud's short number, which needs no validation, until
+OVHcloud validates a sender (#508). Both at once, or any other value of
+`SMS_SHORT_NUMBER`, the service refuses to start. By the short number,
+discovery stays off, since only French numbers are known to receive it.
 
 `PUSH_GATEWAY_URL` was missing from this list. It is where a stripped push
 notification is forwarded, and a deployment without it accepts every

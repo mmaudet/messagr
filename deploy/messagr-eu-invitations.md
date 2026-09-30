@@ -22,12 +22,13 @@ production stopped building the prototype (#289).
     `MAX_RESERVED_ACCOUNTS_PER_INVITER`, `PUSH_GATEWAY_URL`;
   - the SMS provider, all four or none: `OVH_APPLICATION_KEY`,
     `OVH_APPLICATION_SECRET`, `OVH_CONSUMER_KEY`, `OVH_SMS_SERVICE`, with
-    `SMS_SENDER` beside them;
+    `SMS_SENDER` or `SMS_SHORT_NUMBER` beside them, never both;
   - the operator's number, `ALERT_SMS_TO`. With the provider, the operator's
     alerts go by SMS, whether discovery is on or off; without either, they
     are only written in the log;
   - for discovery, `MASKING_KEYS` and `REFERENCE_KEY`, beside the provider
-    and `ALERT_SMS_TO`: without any one of them, it stays off;
+    and `ALERT_SMS_TO`: without any one of them, or by the short number, it
+    stays off;
   - optional: `DISCOVERY_COUNTRIES`, `SMS_CEILING_PER_COUNTRY_PER_DAY`,
     `SMS_BUDGET_PER_MONTH`, `SMS_CREDITS_ALERT_BELOW`.
 - **The networks.** `default`, and `sygnal` (the external network
@@ -50,7 +51,8 @@ two serve together while one replaces the other. A seed is 32 random bytes:
 - **Absent, discovery stays off.** The service starts, serves invitations as
   before, and says so right after the line that names its version:
   `MASKING_KEYS absent: address-book discovery stays off`. Every deployment
-  before discovery ships is in this case.
+  before discovery ships is in this case. By OVHcloud's short number, that
+  line names the short number instead (« The SMS provider »).
 - **Missing a key that masks are still made with, the service refuses to
   start.** Once a number is proven, its mask is useless without the key it
   was made with, so a key dropped or renumbered while this file is edited
@@ -185,6 +187,9 @@ OVHcloud sees it pass, as the consent screen says.
 - `OVH_SMS_SERVICE`: the SMS account, `sms-xx00000-1`.
 - `SMS_SENDER`: the sender the SMS carries, `Messagr` unless said otherwise.
   It must be a sender the SMS account has had validated.
+- `SMS_SHORT_NUMBER=1`: the SMS carry no sender and go by OVHcloud's short
+  number instead, which needs no validation (#508, below). Never beside
+  `SMS_SENDER`.
 
 What the service does with them:
 
@@ -194,13 +199,51 @@ What the service does with them:
 - **Some of them, the service refuses to start**, naming the first one
   missing, whether discovery is meant to serve or not: half an account is a
   mistake, not a choice.
+- **`SMS_SHORT_NUMBER` and `SMS_SENDER` together, the service refuses to
+  start**, naming both, whatever else is given: which one was meant is not a
+  thing to guess. So does any value of `SMS_SHORT_NUMBER` but `1`, `0` and
+  `true` included: a typo would leave the SMS under a sender OVHcloud refuses.
+  Blank is absent.
+- **By the short number, discovery stays off**, even with `MASKING_KEYS`,
+  `REFERENCE_KEY` and `ALERT_SMS_TO`: a proof goes to a number of any open
+  country, and only French numbers are known to receive the short number. The
+  line after the version says so, before anything else discovery lacks:
+  `the SMS go by OVHcloud's short number (SMS_SHORT_NUMBER), which only French numbers are known to receive: address-book discovery stays off`.
 - **Only OVHcloud's European API.** `OVH_API_URL` is refused unless it is
   `https://eu.api.ovh.com/1.0`. The bench alone may point it at its fake
   provider, with `SMS_PROVIDER_FOR_TESTS=1`, which never goes in this file,
   and even then only at an address that stays on its host: the loopback, or
   a container's name on a Docker network.
 - **The secret and the consumer key are never printed.** The log names the
-  endpoint, the SMS account and the sender, nothing else.
+  endpoint, the SMS account and the sender, or `sender_for_response: true`
+  by the short number, nothing else.
+
+### Until a sender is validated: the short number
+
+On 30 September 2026, OVHcloud refused the sender « Messagr », declared for
+the SMS account on 26 September: `POST /sms/<service>/jobs` answered 403,
+`Sms sender Messagr is refused`. OVHcloud refuses every SMS sent under a
+sender it has not validated, so no alert of the operator's could leave under
+it. The same day, a test SMS sent with `"senderForResponse": true` and no
+`sender` reached the operator's number.
+
+So until a sender is validated, production gives `SMS_SHORT_NUMBER=1` and no
+`SMS_SENDER`. The body OVHcloud receives then carries
+`"senderForResponse": true` and no `sender`, and nothing else in it changes.
+The line after discovery's says so, and never the number:
+
+    the operator's alerts go by SMS from OVHcloud's short number, through Ovhcloud { base_url: "https://eu.api.ovh.com/1.0", service_name: "sms-xx00000-1", sender_for_response: true }
+
+**Back to a named sender, once OVHcloud has validated one**: a change of the
+environment and a restart, no new version. In `/opt/messagr-eu`:
+
+1. **Edit `invitations.service.env`**: remove `SMS_SHORT_NUMBER`, and give
+   `SMS_SENDER` the sender OVHcloud validated, or leave it absent for
+   `Messagr`. Both at once, the service refuses to start and names them.
+2. **Restart** (`docker compose up -d --no-deps --no-build invitations`). The
+   line after discovery's names the sender again, `sender: "Messagr"`, and the
+   alerts leave under it. Discovery can then serve, once it is given what it
+   needs.
 
 ## The operator's alerts
 
@@ -208,13 +251,14 @@ The service tells the operator (#399, #464) in its log, with a warning that
 starts `told to the operator:`, and by SMS at `ALERT_SMS_TO`, in
 international form, when the provider is given too. Neither needs
 discovery: production is to be given both without `MASKING_KEYS`, so that
-its alerts go by SMS while discovery stays off (#462).
+its alerts go by SMS while discovery stays off (#462), and by OVHcloud's short
+number until a sender is validated (#508, « The SMS provider »).
 
 - **Without the provider or `ALERT_SMS_TO`, the log alone.** The service
   starts, and the line after discovery's says what is missing, such as
   `ALERT_SMS_TO absent: the operator's alerts are only written in the log`.
-  With both, it names the provider, never the number. A malformed number
-  stops the start.
+  With both, it names the provider, and says when the SMS go by the short
+  number, never the number. A malformed number stops the start.
 - **What the operator can be told is a closed list**, each alert written by
   the service from figures alone, so **no SMS names an account or carries
   anything that was said**:
@@ -241,9 +285,11 @@ its alerts go by SMS while discovery stays off (#462).
   by SMS**, discovery on or off: they spend the same credits as the proofs.
   A balance that cannot be read is said in one line of the log per sweep,
   naming the SMS account, and fails nothing else.
-- **Each alert is erased from OVHcloud's history** a day after it left, and
-  **none leaves until OVHcloud has validated the sender**: until then the
-  log says `the alert could not be sent` (below).
+- **Each alert is erased from OVHcloud's history** a day after it left, by
+  the short number as under a sender. **None leaves under a sender OVHcloud
+  has not validated**: the log says `the alert could not be sent`. Until one
+  is, `SMS_SHORT_NUMBER=1` sends them by the short number (« The SMS
+  provider »).
 
 ## Reports: acting within twenty-four hours
 
@@ -496,7 +542,8 @@ its SMS does not leave.
   The test left from OVHcloud's short number: the sender « Messagr » was
   still pending validation, and until it is validated OVHcloud refuses every
   SMS sent with it (« Sms sender Messagr is pending validation »), proofs
-  included.
+  included. It was refused on 30 September (« Until a sender is validated:
+  the short number », above).
 
 ## The countries open to discovery
 
@@ -578,7 +625,8 @@ this repository on its own.
 6. **Check production itself.** `https://messagr.eu/_messagr/health` answers
    200, `POST http://127.0.0.1:8095/_matrix/push/v1/notify` with `{}` answers
    422 and not 404, and the first log line names the version. The next two
-   say whether discovery is on, and whether the operator's alerts go by SMS.
+   say whether discovery is on, and whether the operator's alerts go by SMS,
+   under a sender or by OVHcloud's short number.
 
 ## Rolling back to the prototype
 
