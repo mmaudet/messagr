@@ -73,11 +73,7 @@ export function SelectionBar({
   readonly count: number
   /**
    * What the selection offers, action by action, as the conversation is
-   * shown and for this account (`conversationShown.ts`): copying, forwarding
-   * and keeping as a favourite what is readable, keeping a lone photograph
-   * in the gallery, reporting words, photographs or documents of one other
-   * participant (#468, #471), blocking that participant (#472), and the bin,
-   * always.
+   * shown and for this account (`offersOf`, `barActions.ts`).
    */
   readonly offers: Readonly<Record<BarAction, boolean>>
   /**

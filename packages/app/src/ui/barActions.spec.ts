@@ -1,7 +1,9 @@
 import { describe, expect, it } from 'vitest'
 
 import { floors, layout, space, type } from '../design/tokens'
-import { barOf, placeActions, type BarAction } from './barActions'
+import { shownOf, type NotShown } from '../runtime/notShown'
+import type { TimelineEntry } from '../timeline/mergeTimeline'
+import { barOf, offersOf, placeActions, type BarAction } from './barActions'
 
 /** The room `places` actions take, each at the touch-target floor. */
 function roomFor(places: number): number {
@@ -267,5 +269,69 @@ describe('what the bar draws, from the room it measured (#472, #498)', () => {
       drawn: ['copy', 'more', 'remove'],
       inMore: ['forward', 'favourite'],
     })
+  })
+})
+
+describe('what the selection offers (#192, #468, #472, #498)', () => {
+  const ME = '@me:example.org'
+  const HER = '@her:example.org'
+  const BLOCKED = '@bothers:example.org'
+
+  function said(eventId: string, sender: string): TimelineEntry {
+    return {
+      eventId,
+      claimedSender: sender,
+      sentAt: 1,
+      body: eventId,
+      msgtype: 'm.text',
+    }
+  }
+
+  /** A conversation of three, as the homeserver holds it. */
+  const CONVERSATION = [
+    said('$mine', ME),
+    said('$hers', HER),
+    said('$theirs', BLOCKED),
+  ]
+
+  /** The account the session holds, `ME`, on the conversation as shown. */
+  function offeredOn(
+    selected: readonly string[],
+    notShown: NotShown = { hidden: new Set(), blocked: new Set([BLOCKED]) },
+  ) {
+    return offersOf(new Set(selected), shownOf(CONVERSATION, notShown), ME)
+  }
+
+  it('offers « Signaler » and « Bloquer l’expéditeur » on somebody else’s message, beside the rest', () => {
+    expect(offeredOn(['$hers'])).toEqual({
+      copy: true,
+      forward: true,
+      favourite: true,
+      keep: false,
+      report: true,
+      block: true,
+      remove: true,
+    })
+  })
+
+  it('offers neither on this account’s own message, as the session holds the account', () => {
+    expect(offeredOn(['$mine'])).toMatchObject({ report: false, block: false })
+  })
+
+  it('offers nothing on what the conversation no longer shows, blocked or hidden, and still the bin', () => {
+    const nothing = {
+      copy: false,
+      forward: false,
+      favourite: false,
+      keep: false,
+      report: false,
+      block: false,
+      remove: true,
+    }
+
+    expect(offeredOn(['$theirs'])).toEqual(nothing)
+    expect(
+      offeredOn(['$hers'], { hidden: new Set(['$hers']), blocked: new Set() }),
+    ).toEqual(nothing)
   })
 })

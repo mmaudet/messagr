@@ -5,6 +5,7 @@ import { describe, expect, it, vi } from 'vitest'
 import { t } from '../copy'
 import {
   whatADeliveredInvitationSays,
+  whatIsKnown,
   type WhatIsKnown,
 } from '../runtime/invitationOnScreen'
 import { Invited } from './Invited'
@@ -533,5 +534,29 @@ describe('an invitation from somebody in the address book (#407)', () => {
       t('conversation_sender_claimed %@', 'Popol'),
       t('invited_lead'),
     ])
+  })
+})
+
+describe('an invitation from another server, after a launch that found no conversation (#498)', () => {
+  // The screen is handed this account as the session holds it (`selfNow`,
+  // `appWiring.spec.ts`). It was handed an account only a launch that found
+  // a conversation set: the empty string after one that found none, and an
+  // empty account can say of no server that it is another.
+  const invitation = { scope: '!a:other.example', from: '@her:other.example' }
+  const elsewhere = t('invited_instance_elsewhere %@', 'other.example')
+
+  it('warns that the inviter lives on another server, for the account the session holds', () => {
+    const drawn = screen({
+      known: whatIsKnown(invitation, '@me:messagr.eu', new Map()),
+    })
+
+    expect(said(drawn)).toContain(elsewhere)
+  })
+
+  it('could not warn of it with the empty account such a launch left', () => {
+    const drawn = screen({ known: whatIsKnown(invitation, '', new Map()) })
+
+    expect(said(drawn)).not.toContain(elsewhere)
+    expect(said(drawn)).toContain(t('invited_instance %@', 'other.example'))
   })
 })

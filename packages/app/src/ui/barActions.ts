@@ -1,4 +1,13 @@
 import { floors, space } from '../design/tokens'
+import type { TimelineEntry } from '../timeline/mergeTimeline'
+import {
+  blockable,
+  canCopy,
+  canFavourite,
+  canForward,
+  onlyPhotograph,
+  reportable,
+} from '../timeline/selection'
 
 /**
  * What the selection bar can offer (#192, #468, #472), in the order it draws
@@ -17,6 +26,35 @@ export const BAR_ORDER: readonly BarAction[] = [
   'block',
   'remove',
 ]
+
+/**
+ * What the selection offers, action by action (#192, #468, #471, #472,
+ * #498), read on the conversation `shown` -- as it is drawn, without what
+ * this device does not draw -- and for `self`, this account as the session
+ * holds it: copying, forwarding and keeping as a favourite what is readable,
+ * keeping a lone photograph in the gallery, reporting words, photographs or
+ * documents of one other participant, blocking that participant, and the
+ * bin, always. Absent, never greyed: a message hidden or blocked since
+ * offers nothing.
+ */
+export function offersOf(
+  selected: ReadonlySet<string>,
+  shown: readonly TimelineEntry[],
+  self: string,
+): Readonly<Record<BarAction, boolean>> {
+  const selecting = selected.size > 0
+  return {
+    copy: canCopy(selected, shown),
+    forward: canForward(selected, shown),
+    favourite: canFavourite(selected, shown),
+    // A gallery takes pictures: offered on a single photograph only.
+    keep: onlyPhotograph(selected, shown)?.image !== undefined,
+    report: selecting && reportable(selected, shown, self) !== null,
+    block: selecting && blockable(selected, shown, self) !== null,
+    // Always: hiding « pour moi » applies to anything selected.
+    remove: true,
+  }
+}
 
 /**
  * Which go into « Plus » first when the bar is short (#472, #498): « Bloquer

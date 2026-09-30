@@ -233,6 +233,8 @@ import {
 import { readFavourites, type KeptMessage } from './src/runtime/readFavourites'
 import { receivedFromSomebodyElse } from './src/runtime/receivedFromSomebodyElse'
 import {
+  blockable,
+  canRemoveForEveryone,
   copyText,
   forwarded,
   onlyPhotograph,
@@ -300,7 +302,7 @@ import {
   forgetfulIgnoredList,
   type IgnoredList,
 } from './src/runtime/ignoredListStore'
-import type { NotShown } from './src/runtime/notShown'
+import { reactionsShown, shownOf, type NotShown } from './src/runtime/notShown'
 import { tallyReactions } from './src/timeline/reactions'
 import { drawnNotifications } from './src/runtime/showNotification'
 import {
@@ -358,7 +360,7 @@ import {
   whatTheBlockWillDo,
   type WhatTheBlockWillDo,
 } from './src/ui/blockScreen'
-import { conversationShown } from './src/ui/conversationShown'
+import { offersOf } from './src/ui/barActions'
 import { PickConversation } from './src/ui/PickConversation'
 import { ConversationHeader } from './src/ui/ConversationHeader'
 import { Legal } from './src/ui/Legal'
@@ -1714,12 +1716,14 @@ export function App({
    * account the screens read: which side a bubble is drawn on, whether
    * « pour tout le monde » is offered, which messages carry the ticks, which
    * reaction is its own, and that « Signaler » and « Bloquer l'expéditeur »
-   * are offered on somebody else's messages only (`conversationShown.ts`).
+   * are offered on somebody else's messages only; which invitation comes
+   * from another server, and which message offers the backup.
    *
    * Held with the session, whatever the launch found. A second account used
    * to be set only by a launch that found a conversation: empty after one
    * that found none, and a conversation joined afterwards drew this
-   * account's own messages as somebody else's.
+   * account's own messages as somebody else's. `appWiring.spec.ts` holds
+   * that there is one.
    */
   const [selfNow, setSelfNow] = useState('')
   /** Holds the session, and with it this account (`selfNow`). */
@@ -5890,25 +5894,19 @@ export function App({
   // conversation's messages and their reactions are both drawn from, so a
   // block takes both off in the same render.
   const notShownNow: NotShown = { hidden, blocked: ignored ?? new Set() }
-  // THE CONVERSATION OPEN, AS SHOWN AND AS THIS ACCOUNT READS IT (#472,
-  // #494, #498), read once per draw (`conversationShown.ts`): the messages
-  // drawn, which the selection is made of, their reactions, what the bar
-  // offers, what « Signaler » would carry and whom « Bloquer l'expéditeur »
-  // would block, and whether « pour tout le monde » is offered -- on the
-  // conversation as shown, and for the one account, the session's.
-  const conversationNow = conversationShown(selfNow, {
-    conversation: conversation ?? [],
-    notShown: notShownNow,
-    reactions,
-    selected,
-  })
-  const shownNow = conversationNow.entries
+  // THE CONVERSATION AS SHOWN, which is what the selection is made of and
+  // what every action on it reads (#472, #498): none is offered on a message
+  // nobody can see, an account already blocked's included. Each reading of
+  // it below is for this account as the session holds it (`selfNow`).
+  const shownNow = shownOf(conversation ?? [], notShownNow)
   // What a report of the selection would carry (#468): it offers
   // « Signaler », and it is what « Signaler » opens the sheet with.
-  const reportableNow = conversationNow.reportable
+  const reportableNow =
+    selected.size > 0 ? reportable(selected, shownNow, selfNow) : null
   // Whom « Bloquer l'expéditeur » would block (#472): it offers the action,
   // and it is whom the action opens the screen for.
-  const blockableNow = conversationNow.blockable
+  const blockableNow =
+    selected.size > 0 ? blockable(selected, shownNow, selfNow) : null
   // WHAT BLOCKING THE ACCOUNT OF `target` WOULD DO, for the screen that says
   // it beforehand, from the panel or from the selection (#469, #472, #498):
   // what becomes of its conversation, whether the account still reads it,
@@ -6034,7 +6032,7 @@ export function App({
           <RemoveSheet
             count={selected.size}
             // This account's own, as the session holds it (#498).
-            forEveryone={conversationNow.forEveryone}
+            forEveryone={canRemoveForEveryone(selected, shownNow, selfNow)}
             onCancel={() => setRemoving(false)}
             onForMe={() => {
               const scope = openScope
@@ -6162,7 +6160,7 @@ export function App({
               <SelectionBar
                 count={selected.size}
                 // On the conversation as shown, for this account (#498).
-                offers={conversationNow.offers}
+                offers={offersOf(selected, shownNow, selfNow)}
                 // EVERY one, not any: the control does one thing to the whole
                 // selection, and a mixed one has to pick a direction. Keeping
                 // is the safe half -- a mark added to something already kept
@@ -6910,7 +6908,7 @@ export function App({
                     // TALLIED HERE, from the value the messages below are
                     // drawn from (ADR-0011, amended on 30 September 2026),
                     // this account's own read from the session (`selfNow`).
-                    reactions={conversationNow.reactions}
+                    reactions={reactionsShown(reactions, notShownNow, selfNow)}
                     read={readHere}
                     onReact={(target, key, own) =>
                       reactRef.current?.(target, key, own)
