@@ -1,19 +1,24 @@
+import { execFileSync } from 'node:child_process'
 import { EventEmitter } from 'node:events'
 import {
+  closeSync,
   existsSync,
   mkdirSync,
   mkdtempSync,
+  openSync,
   readdirSync,
   readFileSync,
   statSync,
   writeFileSync,
+  writeSync,
 } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
-import { PassThrough } from 'node:stream'
+import type { Readable } from 'node:stream'
 
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, onTestFinished } from 'vitest'
 
+import { terminalAt } from '../../../../scripts/lib/ouvrir-un-fichier-signale.mjs'
 import { openTool } from '../../../../scripts/lib/ouvrir-un-signalement.mjs'
 import type { TimelineEntry } from '../timeline/mergeTimeline'
 import { generateKeyPair } from './hpke'
@@ -38,9 +43,11 @@ import { sealReportWithEphemeral } from './sealedReport'
  * Enter, and erases the copy whatever happens.
  *
  * Everything the tool reaches of the machine is a double here: the
- * homeserver is a local file behind `fetch`, Preview and the terminal are
- * what the test says, and the interruptions are emitted by the test. The
- * account is a file of a home made for the test: never the real one.
+ * homeserver is a local file behind `fetch`, Preview is what the test says,
+ * the terminal is a named pipe the tool reads as it reads /dev/tty
+ * (`terminalAt`) and the test types into, and the interruptions are emitted
+ * by the test. The account is a file of a home made for the test: never the
+ * real one.
  */
 
 const FIXTURES = join(__dirname, '../../../../scripts/fixtures')
@@ -155,6 +162,53 @@ function homeWith(account: object | null = ACCOUNT): string {
 }
 
 /**
+ * The operator's terminal, doubled by a named pipe (#496). Like a terminal,
+ * a read there waits for the next line, and nothing ends it but a line, or
+ * the stream that reads being let go of. The tool reads it through
+ * `terminalAt`, as it reads /dev/tty; the test types into its other end,
+ * which it holds from the start, so that opening it never waits for a
+ * writer, and closes once the test is over.
+ */
+function keyboard() {
+  const path = join(mkdtempSync(join(tmpdir(), 'terminal-496-')), 'tty')
+  execFileSync('mkfifo', [path])
+  const typing = openSync(path, 'r+')
+  onTestFinished(() => closeSync(typing))
+  /** Each terminal the tool opened, and when it was let go of. */
+  const opened: { readonly closed: Promise<unknown> }[] = []
+  return {
+    open: (): Readable => {
+      const terminal = terminalAt(path)
+      // Not `events.once`, which would reject on the terminal's own error.
+      opened.push({
+        closed: new Promise(resolve => terminal.once('close', resolve)),
+      })
+      return terminal
+    },
+    type: (text: string) => writeSync(typing, text),
+    opened,
+  }
+}
+
+/**
+ * What became of each terminal the tool opened, a second after it
+ * returned: let go of, or still reading, waiting for a line.
+ */
+async function terminalsLeft(
+  opened: readonly { readonly closed: Promise<unknown> }[],
+): Promise<string[]> {
+  const aSecond = new Promise(resolve => setTimeout(resolve, 1000))
+  return Promise.all(
+    opened.map(({ closed }) =>
+      Promise.race([
+        closed.then(() => 'let go'),
+        aSecond.then(() => 'still reading'),
+      ]),
+    ),
+  )
+}
+
+/**
  * What the Mac is for the tool, doubled: a homeserver whose media are
  * local files, Preview, the terminal, and the interruptions.
  */
@@ -164,8 +218,12 @@ function machine(
     readonly served?: Readonly<Record<string, string>>
     /** What Preview does once handed a file. */
     readonly preview?: 'shows' | 'fails' | 'is-interrupted'
-    /** What the terminal does once asked for Enter. */
-    readonly terminal?: 'enter' | 'is-interrupted' | 'none'
+    /**
+     * What happens once the tool waits for Enter: Enter is pressed, Ctrl-C
+     * is, the tool is stopped, the terminal fails while it is read, or there
+     * is no terminal at all.
+     */
+    readonly terminal?: 'enter' | 'ctrl-c' | 'is-interrupted' | 'fails' | 'none'
     readonly home?: string
     readonly environment?: Readonly<Record<string, string>>
     readonly temporary?: string
@@ -189,6 +247,7 @@ function machine(
   const signals = new EventEmitter()
   const said: string[] = []
   const printed: string[] = []
+  const terminal = keyboard()
   const ports = {
     home: options.home ?? homeWith(),
     environment: options.environment ?? {},
@@ -227,22 +286,34 @@ function machine(
         await new Promise(() => {})
       }
     },
-    terminal: () => {
-      const tty = new PassThrough()
+    terminal: (): Readable => {
       if (options.terminal === 'none') {
-        setTimeout(() => tty.emit('error', new Error('ENXIO: /dev/tty')), 0)
-      } else if (options.terminal === 'is-interrupted') {
-        setTimeout(() => signals.emit('SIGTERM'), 0)
-      } else {
-        setTimeout(() => tty.write('\n'), 0)
+        // Nothing to open, as /dev/tty does not open without a terminal.
+        return terminalAt(join(media, 'aucun-terminal'))
       }
+      const tty = terminal.open()
+      setTimeout(() => {
+        if (options.terminal === 'ctrl-c') signals.emit('SIGINT')
+        else if (options.terminal === 'is-interrupted') signals.emit('SIGTERM')
+        else if (options.terminal === 'fails') {
+          tty.destroy(new Error('EIO: i/o error, read'))
+        } else terminal.type('\n')
+      }, 0)
       return tty
     },
     signals,
     temporary:
       options.temporary ?? mkdtempSync(join(tmpdir(), 'ouverture-471-')),
   }
-  return { ports, asked, handed, signals, said, printed }
+  return {
+    ports,
+    asked,
+    handed,
+    signals,
+    said,
+    printed,
+    terminals: terminal.opened,
+  }
 }
 
 /** What the tool says and prints, and how it ends. */
@@ -671,6 +742,7 @@ describe('A reported photograph or document, on the operator’s machine (#471)'
     for (const [what, options, expected] of [
       ['Preview fails', { preview: 'fails' }, 1],
       ['no terminal', { terminal: 'none' }, 1],
+      ['the terminal fails while it is read', { terminal: 'fails' }, 1],
       // Between writing the copy and viewing it: Ctrl-C while Preview opens.
       ['interrupted while Preview opens', { preview: 'is-interrupted' }, 130],
       [
@@ -844,5 +916,39 @@ describe('A reported photograph or document, on the operator’s machine (#471)'
     expect(said).toContain('pas un signalement au format 1')
     expect(mac.asked).toEqual([])
     expect(mac.handed).toEqual([])
+  })
+})
+
+describe('The tool returns once Enter or Ctrl-C is pressed (#496)', () => {
+  // It read /dev/tty through a stream whose read under way nothing cancels:
+  // once Enter or Ctrl-C was pressed, it erased the copy and said so, and
+  // then held the terminal until another line came. The terminal here is
+  // the named pipe of `keyboard`, where a read waits for a line as it does
+  // on a terminal.
+  it('returns once Enter is pressed, the copy erased, and waits for nothing more from the terminal', async () => {
+    const mac = machine({ served: PHOTOGRAPH })
+
+    const { status } = await run(
+      ['--cle', TEST_KEY_FILE, sealed(), '--ouvrir', '2'],
+      mac,
+    )
+
+    expect(status).toBe(0)
+    expect(readdirSync(mac.ports.temporary)).toEqual([])
+    expect(await terminalsLeft(mac.terminals)).toEqual(['let go'])
+  })
+
+  it('returns once Ctrl-C is pressed, the copy erased, and waits for nothing more from the terminal', async () => {
+    const mac = machine({ served: PHOTOGRAPH, terminal: 'ctrl-c' })
+
+    const { status } = await run(
+      ['--cle', TEST_KEY_FILE, sealed(), '--ouvrir', '2'],
+      mac,
+    )
+
+    expect(status).toBe(130)
+    expect(readdirSync(mac.ports.temporary)).toEqual([])
+    expect(listening(mac.signals)).toBe(0)
+    expect(await terminalsLeft(mac.terminals)).toEqual(['let go'])
   })
 })

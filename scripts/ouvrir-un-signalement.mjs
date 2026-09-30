@@ -79,7 +79,6 @@
 
 import { Buffer } from 'node:buffer'
 import { execFile } from 'node:child_process'
-import { createReadStream } from 'node:fs'
 import { homedir, tmpdir } from 'node:os'
 import { promisify } from 'node:util'
 
@@ -87,6 +86,7 @@ import { quietAboutTypelessModules } from './lib/typescript.mjs'
 
 quietAboutTypelessModules()
 const { openTool } = await import('./lib/ouvrir-un-signalement.mjs')
+const { terminalAt } = await import('./lib/ouvrir-un-fichier-signale.mjs')
 
 process.exitCode = await openTool(process.argv.slice(2), {
   home: homedir(),
@@ -96,7 +96,7 @@ process.exitCode = await openTool(process.argv.slice(2), {
   stdout: text => process.stdout.write(`${text}\n`),
   fetch: globalThis.fetch,
   run: promisify(execFile),
-  terminal: () => createReadStream('/dev/tty'),
+  terminal: () => terminalAt('/dev/tty'),
   signals: process,
   temporary: tmpdir(),
 })

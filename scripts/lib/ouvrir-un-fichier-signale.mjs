@@ -38,7 +38,8 @@
 //    et attend Entrée sur le terminal.
 // 6. Elle efface la copie dès qu'on appuie sur Entrée, qu'on interrompt
 //    l'outil, ou que la visionneuse ou le terminal échoue, puis vérifie que
-//    le répertoire a disparu.
+//    le répertoire a disparu. Elle lâche le terminal et rend la main
+//    aussitôt, sans attendre une autre ligne (`terminalAt`, #496).
 //
 // # Ce que l'outil ne peut pas garantir
 //
@@ -55,8 +56,10 @@ import { Buffer } from 'node:buffer'
 import { createDecipheriv, createHash } from 'node:crypto'
 import {
   chmodSync,
+  closeSync,
   existsSync,
   mkdtempSync,
+  openSync,
   readdirSync,
   readFileSync,
   rmSync,
@@ -64,6 +67,7 @@ import {
 } from 'node:fs'
 import { join } from 'node:path'
 import { createInterface } from 'node:readline'
+import { ReadStream } from 'node:tty'
 
 import { openingOf } from '../../packages/app/src/runtime/reportFormat.ts'
 
@@ -92,6 +96,30 @@ export const NOTHING_TO_OPEN = 2
 export const INTERRUPTED = 130
 
 /**
+ * Le terminal où attendre Entrée, `path` (`/dev/tty`), lu comme un terminal
+ * (#496).
+ *
+ * PAS `fs.createReadStream`, qui le lisait jusque-là : il lit dans un fil à
+ * part une lecture que rien n'annule, et le détruire attend qu'elle finisse,
+ * donc qu'une autre ligne arrive. Après Entrée ou Ctrl-C, l'outil effaçait
+ * la copie, le disait, et ne rendait pas la main. Un `tty.ReadStream` lit
+ * par la boucle d'événements, et le détruire lâche le terminal aussitôt.
+ * Sans terminal (ENXIO), l'ouverture lève, et la copie est effacée.
+ *
+ * @param {string} path
+ * @returns {import('node:tty').ReadStream}
+ */
+export function terminalAt(path) {
+  const descriptor = openSync(path, 'r')
+  try {
+    return new ReadStream(descriptor)
+  } catch (cause) {
+    closeSync(descriptor)
+    throw cause
+  }
+}
+
+/**
  * `fetch`, dans la part dont une ouverture a besoin.
  *
  * @typedef {(url: string, init: { method: string, headers: Record<string, string>, signal: AbortSignal }) => Promise<{ ok: boolean, status: number, arrayBuffer: () => Promise<ArrayBuffer> }>} Fetching
@@ -112,7 +140,7 @@ export const INTERRUPTED = 130
  * @property {Readonly<Record<string, string | undefined>>} environment l'environnement, qui peut nommer le fichier d'identifiants
  * @property {Fetching} fetch pour télécharger avec le compte d'exploitation
  * @property {(command: string, args: string[]) => Promise<unknown>} run pour confier le fichier à Aperçu
- * @property {() => import('node:stream').Readable} terminal le terminal où attendre Entrée, même quand le pli vient de l'entrée standard
+ * @property {() => import('node:stream').Readable} terminal le terminal où attendre Entrée, même quand le pli vient de l'entrée standard : un flux que détruire lâche aussitôt, comme celui de `terminalAt`
  * @property {Signals} signals où arrivent les interruptions
  * @property {string} temporary le répertoire sous lequel la copie privée est écrite
  * @property {(line: string) => void} stderr ce qui s'explique
@@ -327,7 +355,7 @@ function interruptionsOn(signals) {
 
 /**
  * Rend la main quand une ligne arrive sur le terminal, ou qu'une
- * interruption arrive ; lève si le terminal ne se lit pas.
+ * interruption arrive ; lève si le terminal ne s'ouvre pas ou ne se lit pas.
  *
  * @param {() => import('node:stream').Readable} terminal
  * @param {Promise<void>} interrupted
@@ -348,6 +376,9 @@ async function entered(terminal, interrupted) {
       interrupted,
     ])
   } finally {
+    // DÉTRUIT, ET PAS SEULEMENT LAISSÉ : une lecture reste en cours sur le
+    // terminal, et tant qu'elle y est, l'outil ne rend pas la main (#496).
+    // Détruire un terminal ouvert par `terminalAt` la fait cesser aussitôt.
     lines.close()
     input.destroy()
   }
