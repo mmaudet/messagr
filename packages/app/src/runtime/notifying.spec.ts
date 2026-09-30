@@ -3,8 +3,11 @@ import { describe, expect, it } from 'vitest'
 import {
   BLIND_ID,
   blindNotification,
+  missedNotification,
   readNotification,
+  ringingNotification,
   scopeOfPress,
+  showingTheBlocked,
 } from './notifying'
 
 describe('blindNotification', () => {
@@ -46,6 +49,45 @@ describe('readNotification', () => {
     const read = readNotification('!a:x', 'Maria', 'see you at eight')
     expect(read.title).toBe('Maria')
     expect(read.body).toBe('see you at eight')
+  })
+})
+
+describe('the notifications a block takes down (#472)', () => {
+  // A notification shows one account: whose message arrived last, or who is
+  // calling. It carries that account, unseen, so that a block takes down
+  // what shows the blocked account, and nothing that shows somebody else --
+  // a conversation of more than two whose latest message is another's keeps
+  // its notification.
+  const BLOCKED = '@bothers:messagr.eu'
+  const HER = '@maria:messagr.eu'
+
+  it('names the account each one shows', () => {
+    expect(readNotification('!a:x', 'Bothers', 'go away', BLOCKED).from).toBe(
+      BLOCKED,
+    )
+    expect(ringingNotification('!a:x', 'Bothers', false, BLOCKED).from).toBe(
+      BLOCKED,
+    )
+    expect(missedNotification('!a:x', 'Bothers', 0, BLOCKED).from).toBe(BLOCKED)
+    // The blind one shows nobody, and nothing takes it down for a block.
+    expect(blindNotification().from).toBeUndefined()
+  })
+
+  it('takes down those that show a blocked account, and only those', () => {
+    const displayed = [
+      { id: '!three-of-us:x', from: BLOCKED },
+      { id: '!three-of-us-too:x', from: HER },
+      { id: 'ringing:!with-them:x', from: BLOCKED },
+      // Drawn by an earlier version, or the blind one: nothing says whose.
+      { id: '!older:x' },
+      { id: BLIND_ID },
+    ]
+
+    expect(showingTheBlocked(displayed, new Set([BLOCKED]))).toEqual([
+      '!three-of-us:x',
+      'ringing:!with-them:x',
+    ])
+    expect(showingTheBlocked(displayed, new Set())).toEqual([])
   })
 })
 

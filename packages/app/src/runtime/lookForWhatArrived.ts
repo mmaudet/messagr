@@ -201,6 +201,7 @@ export async function lookForWhatArrived(
         // It says so rather than being dropped, which is what the
         // conversation itself does with the same event.
         preview: newest.body ?? '',
+        from: newest.claimedSender,
       })
     } catch {
       // Nothing to report to. The blind notification is what covers a wake

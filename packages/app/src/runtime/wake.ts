@@ -74,6 +74,11 @@ export interface Arrival {
   readonly shown: string
   /** The opening of what they said. */
   readonly preview: string
+  /**
+   * Their account, which the notification carries unseen: what a block
+   * takes it down by (#472).
+   */
+  readonly from: string
 }
 
 export type WakeOutcome =

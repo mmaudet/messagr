@@ -28,6 +28,13 @@ export interface Notification {
   readonly id: string
   readonly title: string
   readonly body: string
+  /**
+   * The account it shows: whose message arrived last, or who is calling.
+   * Carried unseen, and only on the device that drew it: what a block takes
+   * it down by, and nothing else (#472, `showingTheBlocked`). Absent on the
+   * blind one, which shows nobody.
+   */
+  readonly from?: string
 }
 
 /**
@@ -53,8 +60,32 @@ export function readNotification(
   scope: string,
   shown: string,
   preview: string,
+  /** Whose message it shows (`Notification.from`). */
+  from?: string,
 ): Notification {
-  return { id: scope, title: shown, body: preview }
+  return { id: scope, title: shown, body: preview, ...fromOf(from) }
+}
+
+/**
+ * The ones among `displayed` that show an account now blocked (#472): a
+ * message it wrote, the last to arrive in its conversation, or a call it
+ * placed. Only those: a conversation of more than two whose latest message
+ * is somebody else's keeps its notification, and one that says nothing of
+ * whose it shows -- drawn by an earlier version, or the blind one -- is not
+ * guessed at.
+ */
+export function showingTheBlocked(
+  displayed: readonly { readonly id: string; readonly from?: unknown }[],
+  blocked: ReadonlySet<string>,
+): readonly string[] {
+  return displayed
+    .filter(one => typeof one.from === 'string' && blocked.has(one.from))
+    .map(one => one.id)
+}
+
+/** `from`, when there is one to carry. */
+function fromOf(from: string | undefined): { readonly from?: string } {
+  return from === undefined ? {} : { from }
 }
 
 /**
@@ -83,11 +114,14 @@ export function ringingNotification(
    * carries the answer nowhere else.
    */
   video = false,
+  /** Who is calling (`Notification.from`). */
+  from?: string,
 ): Notification {
   return {
     id: `${RINGING}${scope}`,
     title: shown,
     body: video ? t('notify_ringing_video_body') : t('notify_ringing_body'),
+    ...fromOf(from),
   }
 }
 
@@ -109,6 +143,8 @@ export function missedNotification(
   scope: string,
   shown: string,
   at: number,
+  /** Who called (`Notification.from`). */
+  from?: string,
 ): Notification {
   const then = new Date(at)
   return {
@@ -119,6 +155,7 @@ export function missedNotification(
       then.getHours(),
       String(then.getMinutes()).padStart(2, '0'),
     ),
+    ...fromOf(from),
   }
 }
 

@@ -12,7 +12,12 @@ import notifee, {
 import { t } from '../copy'
 import { color } from '../design/tokens'
 import { logEvent } from './log'
-import { ringingOfPress, scopeOfPress, type Notification } from './notifying'
+import {
+  ringingOfPress,
+  scopeOfPress,
+  showingTheBlocked,
+  type Notification,
+} from './notifying'
 
 /**
  * Drawing a notification.
@@ -187,6 +192,7 @@ export async function drawNotification(
     id: notification.id,
     title: notification.title,
     body: notification.body,
+    ...carrying(notification),
     android: {
       channelId,
       pressAction: { id: 'default' },
@@ -293,6 +299,7 @@ export async function ringNotification(
     id: notification.id,
     title: notification.title,
     body: notification.body,
+    ...carrying(notification),
     android: {
       channelId,
       // What tells Android this is a telephone call rather than a message:
@@ -364,6 +371,44 @@ export async function stopRinging(scope: string): Promise<void> {
 export async function takeDownNotificationsOf(scope: string): Promise<void> {
   await notifee.cancelNotification(scope)
   await stopRinging(scope)
+}
+
+/**
+ * Takes down, in every conversation, what this application drew and still
+ * shows of an account now blocked (#472): a message of its own, the last to
+ * arrive in its conversation, or a call it placed -- as each notification
+ * says unseen (`Notification.from`, `showingTheBlocked`). In a conversation
+ * of more than two, which stays, a notification that shows somebody else is
+ * left up.
+ *
+ * THE SAME ON BOTH PLATFORMS, and what it finds differs: the wake that draws
+ * message notifications runs on Android only (`index.js`), so on an iPhone
+ * what it finds is the calls this application drew, and the push gateway's
+ * constant sentence, which names nobody, is not this application's to take
+ * down (`takeDownNotificationsOf`).
+ */
+export async function takeDownWhatShows(
+  blocked: ReadonlySet<string>,
+): Promise<void> {
+  if (blocked.size === 0) return
+  const displayed = await notifee.getDisplayedNotifications()
+  const ids = showingTheBlocked(
+    displayed.map(one => ({
+      id: one.id ?? one.notification.id ?? '',
+      from: one.notification.data?.from,
+    })),
+    blocked,
+  )
+  for (const id of ids) await notifee.cancelNotification(id)
+}
+
+/** The account a notification shows, carried unseen for `takeDownWhatShows`. */
+function carrying(notification: Notification): {
+  readonly data?: { readonly from: string }
+} {
+  return notification.from === undefined
+    ? {}
+    : { data: { from: notification.from } }
 }
 
 /**

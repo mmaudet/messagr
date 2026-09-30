@@ -35,6 +35,7 @@ const ARRIVAL: Arrival = {
   scope: '!a:messagr.eu',
   shown: 'Maria',
   preview: 'see you at eight',
+  from: '@maria:messagr.eu',
 }
 
 const CALLING: Calling = {
@@ -155,7 +156,12 @@ describe('wake', () => {
       lookForWhatArrived: async () => ({
         messages: [
           ARRIVAL,
-          { scope: '!b:messagr.eu', shown: 'Jo', preview: 'on my way' },
+          {
+            scope: '!b:messagr.eu',
+            shown: 'Jo',
+            preview: 'on my way',
+            from: '@jo:messagr.eu',
+          },
         ],
         ringing: [],
       }),
@@ -176,7 +182,12 @@ describe('wake', () => {
       lookForWhatArrived: async () => ({
         messages: [
           ARRIVAL,
-          { scope: '!b:messagr.eu', shown: 'Jo', preview: 'on my way' },
+          {
+            scope: '!b:messagr.eu',
+            shown: 'Jo',
+            preview: 'on my way',
+            from: '@jo:messagr.eu',
+          },
         ],
         ringing: [],
       }),

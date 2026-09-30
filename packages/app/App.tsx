@@ -311,7 +311,10 @@ import {
   type NotShown,
 } from './src/runtime/notShown'
 import { tallyReactions } from './src/timeline/reactions'
-import { takeDownNotificationsOf } from './src/runtime/showNotification'
+import {
+  takeDownNotificationsOf,
+  takeDownWhatShows,
+} from './src/runtime/showNotification'
 import {
   forgetfulUntoldBlocks,
   type UntoldBlocks,
@@ -625,9 +628,11 @@ export function App({
     closeWhatTheBlockTakes(next)
   }
   /**
-   * The notifications this application drew for a conversation with an
-   * account now blocked (#469): a tap on one would open what the block took
-   * away.
+   * The notifications this application drew that show an account now
+   * blocked: all of those of a conversation with it (#469), where a tap
+   * would open what the block took away, and, in any other, the one that
+   * shows a message it wrote or a call it placed (#472). A conversation of
+   * more than two keeps a notification that shows somebody else.
    */
   const takeDownTheirNotifications = (newly: ReadonlySet<string>) => {
     for (const scope of scopesWithTheBlocked(
@@ -636,6 +641,7 @@ export function App({
     )) {
       takeDownNotificationsOf(scope).catch(() => {})
     }
+    takeDownWhatShows(newly).catch(() => {})
   }
   /**
    * THE CONVERSATION OPEN WITH AN ACCOUNT NOW BLOCKED CLOSES (#494), as the
