@@ -188,6 +188,178 @@ finish() {
 TOTAL_STAGES=19
 DOC="docs/declarations-magasins.md"
 
+# ══ DEUX ENTRÉES ═══════════════════════════════════════════════════════════
+#
+#   scripts/declarations-magasins.sh            la première saisie (#321) :
+#                                               Play, puis App Store
+#   scripts/declarations-magasins.sh signaler   ce que la build qui signale
+#                                               ajoute chez Play (#500)
+#
+# UNE ENTRÉE À PART, ET NON UNE QUESTION SUR LE CHEMIN DE LA PREMIÈRE SAISIE.
+# Celle-ci ne change pas : qui la déroule de zéro avant la build qui signale
+# déclare chez Play quatre types, et eux seuls, sans une question de plus qui
+# lui ferait cocher les trois autres trop tôt. Et qui a déjà fait la première
+# saisie n'a pas à la refaire pour ajouter ce que le point 9 ajoute.
+#
+# CE QUE SIGNALER AJOUTE EST DÉJÀ SAISI : le porteur l'a fait le 30 septembre
+# 2026, et l'a corrigé le même jour, une case voisine ayant été cochée par
+# mégarde. `signaler` sert à le refaire plus tard, par exemple après une
+# première saisie reprise de zéro, et dit les cases voisines à laisser vides.
+
+# pas "…" — une case à NE PAS cocher, en rouge, sous celles à cocher.
+pas() { printf '  %s✗%s %s\n' "$RED" "$RESET" "$1"; }
+
+# facultatif_pour_signaler — les quatre réponses, les mêmes pour chacun des
+# trois types que le signalement ajoute (point 9).
+facultatif_pour_signaler() {
+  step "Collectées ou partagées ?      →  Collectées  (non partagées)"
+  step "Traitées de façon éphémère ?   →  Non"
+  step "Obligatoires ou facultatives ?"
+  say "     →  Les utilisateurs peuvent choisir si ces données sont collectées ou non"
+  step "Pourquoi sont-elles collectées ?"
+  say "     ☑ Prévention des fraudes, sécurité et conformité"
+  note "Une seule finalité. Facultatif : personne n'a à signaler pour se servir"
+  note "de Messagr. Tranché le 30 septembre 2026, jugement 9."
+}
+
+# ══ PLAY CONSOLE, CE QUE SIGNALER AJOUTE (#500) ════════════════════════════
+#
+# Dans l'ordre du formulaire : « ID utilisateur » vient avant les trois types
+# nouveaux, qui viennent avant « Contacts ».
+
+saisie_signaler() {
+  TOTAL_STAGES=9
+  banner "Ce que signaler ajoute chez Play (#500)"
+
+  stage "Play · signaler : une saisie à refaire"
+  say "Ce qu'un signalement transmet se déclare en plus dans « Sécurité des"
+  say "données » : le point 9 de $DOC,"
+  say "tranché le 30 septembre 2026."
+  say "Quand : au plus tard quand la build Android qui signale quitte la piste"
+  say "de test interne."
+  note "La section décrit « toutes les versions actuellement disponibles sur"
+  note "Google Play », et Play ne demande pas d'y tenir les canaux de test internes."
+  printf '\n'
+  warn "C'est déjà fait : saisi le 30 septembre 2026, et corrigé le même jour."
+  say "Cette entrée sert à le refaire plus tard, par exemple après une première"
+  say "saisie reprise de zéro. Elle n'ajoute que ce qui change."
+  note "App Store Connect ne change pas : chez Apple, le point 8 n'ajoute aucun type."
+  pause "On refait la saisie ?"
+
+  stage "Play · ouvrir « Sécurité des données »"
+  open_url "https://play.google.com/console"
+  step "Play Console → Messagr → « Contenu de l'application »."
+  note "Dans la barre latérale : Monitor and improve → Policy and programmes → App content."
+  step "Ligne « Sécurité des données » : ouvrir la déclaration."
+  step "« Suivant » jusqu'à « Types de données »."
+  note "« Collecte des données et sécurité » ne change pas : chiffrées en transit,"
+  note "Oui ; suppression sur demande, Oui."
+  pause "« Types de données » est ouvert ?"
+
+  stage "Play · « Types de données » : trois de plus"
+  say "Les quatre types de la première saisie restent cochés. Cocher EN PLUS"
+  say "ces trois-là, et aucun autre :"
+  step "Messages               →  Autres messages via une appli"
+  step "Photos et vidéos       →  Photos"
+  step "Fichiers et documents  →  Fichiers et documents"
+  printf '\n'
+  pas "Photos et vidéos       →  Vidéos"
+  pas "Fichiers audio         →  aucune de ses cases"
+  printf '\n'
+  warn "Une case voisine cochée par mégarde : c'est l'erreur de la saisie du"
+  warn "30 septembre 2026, corrigée le même jour. Relire de « Messages » à"
+  warn "« Fichiers et documents » avant de continuer."
+  note "Pas de vidéo : l'application n'en envoie pas, et une vidéo envoyée comme"
+  note "fichier est un document. Pas d'audio : il n'y a pas de message vocal."
+  pause "Les trois sont cochés en plus, et ni « Vidéos » ni « Fichiers audio » ?"
+
+  stage "Play · « ID utilisateur » : une finalité de plus"
+  step "« Suivant » : « Utilisation et traitement des données »."
+  say "Les types y viennent dans l'ordre du formulaire. Le premier ne gagne"
+  say "qu'une finalité :"
+  step "Collectées, Non, Obligatoire   →  inchangés"
+  step "Pourquoi sont-elles collectées ?"
+  say "     ☑ Fonctionnement de l'application                 déjà cochée"
+  say "     ☑ Gestion des comptes                             déjà cochée"
+  say "     ☑ Prévention des fraudes, sécurité et conformité  À COCHER"
+  note "Le service garde le compte qui signale jusqu'à douze mois après la"
+  note "décision, et un signalement porte le compte visé."
+  pause "« ID utilisateur » porte ses trois finalités ?"
+
+  stage "Play · « Autres messages via une appli »"
+  facultatif_pour_signaler
+  note "Play : « Tous les autres types de messages. Par exemple, messages"
+  note "instantanés ou contenus de chat. »"
+  pause "« Autres messages via une appli » est rempli ?"
+
+  stage "Play · « Photos »"
+  facultatif_pour_signaler
+  note "Play : « Photos d'un utilisateur. »"
+  pause "« Photos » est rempli ?"
+
+  stage "Play · « Fichiers et documents »"
+  facultatif_pour_signaler
+  note "Play : « Fichiers ou documents d'un utilisateur, ou informations sur ses"
+  note "fichiers ou documents (noms de fichier, par exemple). » Le signalement"
+  note "d'un document en porte le nom, le type, la taille et la clé."
+  pause "« Fichiers et documents » est rempli ?"
+
+  stage "Play · relire, enregistrer, envoyer"
+  say "Rien d'autre ne change :"
+  step "« Contacts », « Autres actions », « Appareil ou autres ID » : ne pas y toucher."
+  printf '\n'
+  step "Enregistrer."
+  step "« Aperçu de la fiche Play Store » : relire ce que verra une personne."
+  say "     sept types collectés, aucun partagé, aucune finalité publicitaire ;"
+  say "     chiffrées en transit, oui ; suppression sur demande, oui."
+  step "« Envoyer »."
+  pause "La déclaration est envoyée ?"
+
+  stage "Play · exporter le CSV"
+  step "En haut à droite de la page : « Exporter au format CSV »."
+  step "Le garder : il fait foi de ce qui a été déclaré ce jour-là."
+  note "Les trois types y sont PSL_OTHER_MESSAGES, PSL_PHOTOS et PSL_FILES_AND_DOCS,"
+  note "et la finalité, PSL_FRAUD_PREVENTION_SECURITY."
+  pause "Le CSV est exporté et rangé ?"
+
+  finish
+
+  # ── Le relevé de la saisie refaite ─────────────────────────────────────
+  RECORD="/tmp/declarations-signaler-$(date +%Y%m%d-%H%M).md"
+  # Les accents graves sont du Markdown, pour le ticket : rien à substituer.
+  # shellcheck disable=SC2016
+  {
+    printf '## Ce que signaler ajoute chez Play, saisi de nouveau le %s\n\n' "$(date +%d/%m/%Y)"
+    printf 'Saisie faite avec `scripts/declarations-magasins.sh signaler`, qui\n'
+    printf 'déroule le point 9 de `%s`. Première saisie : le\n' "$DOC"
+    printf '30 septembre 2026, corrigée le même jour.\n\n'
+    printf '**Play, « Sécurité des données »** : trois types de plus, « Autres\n'
+    printf 'messages via une appli », « Photos » et « Fichiers et documents »,\n'
+    printf 'collectés, non partagés, non éphémères, facultatifs, pour la seule\n'
+    printf 'finalité « Prévention des fraudes, sécurité et conformité ». « ID\n'
+    printf 'utilisateur » gagne cette finalité et reste obligatoire. Ni « Vidéos »,\n'
+    printf 'ni rien dans « Fichiers audio ».\n\n'
+    printf "**Rien d'autre n'a changé** : « Contacts », « Autres actions »,\n"
+    printf '« Appareil ou autres ID », chiffrement en transit « Oui », suppression\n'
+    printf '« Oui ». Déclaration envoyée, CSV exporté.\n\n'
+    printf '**App Store Connect, « App Privacy »** : rien, point 8.\n'
+  } > "$RECORD"
+
+  note "relevé écrit dans $RECORD"
+  note "à coller dans #500 : gh issue comment 500 --body-file $RECORD"
+  printf '\n'
+}
+
+case "${1:-}" in
+  "") ;;
+  signaler) saisie_signaler; exit 0 ;;
+  *)
+    printf 'usage : %s            la première saisie : Play, puis App Store (#321)\n' "$0" >&2
+    printf '        %s signaler   ce que signaler ajoute chez Play (#500)\n' "$0" >&2
+    exit 2
+    ;;
+esac
+
 banner "Déclarations de confidentialité aux magasins (#321)"
 
 # ══ PLAY CONSOLE ═══════════════════════════════════════════════════════════
@@ -395,6 +567,8 @@ finish
 
 # ── Le relevé de ce qui a été déclaré ──────────────────────────────────────
 RECORD="/tmp/declarations-$(date +%Y%m%d-%H%M).md"
+# Les accents graves sont du Markdown, pour le ticket : rien à substituer.
+# shellcheck disable=SC2016
 {
   printf '## Déclarations saisies dans les consoles, %s\n\n' "$(date +%d/%m/%Y)"
   printf 'Saisie faite avec `scripts/declarations-magasins.sh`, qui déroule\n'
@@ -411,4 +585,5 @@ RECORD="/tmp/declarations-$(date +%Y%m%d-%H%M).md"
 
 note "relevé écrit dans $RECORD"
 note "à coller dans #321 : gh issue comment 321 --body-file $RECORD"
+note "chez Play, ce que signaler ajoute se saisit à part : $0 signaler (#500)"
 printf '\n'
