@@ -633,20 +633,21 @@ async fn account_for_claim(st: &AppState, invitation_id: &str) -> Result<ClaimAc
 /// the registration is retried UNDER THE SAME NAME AND PASSWORD, so a second
 /// attempt cannot create a second account — at worst the homeserver refuses a
 /// name it already knows, and the next retry's login completes the row.
+///
+/// **NOTHING STANDS BETWEEN THE LOGIN AND THE ROW (#496).** The login opens
+/// a device on the account the invitee will receive, and `set_password`
+/// keeps every device (`logout_devices: false`). The account is named by
+/// the login's own answer, not by a `whoami` asked afterwards: that request
+/// could fail, or not answer in time, and the token went with its failure,
+/// leaving a device on the account that nobody holds, and the next retry
+/// logged in again. The token is in the row as soon as it exists.
 async fn resume_claim_trace(
     st: &AppState,
     localpart: &str,
     password: &str,
 ) -> Result<(String, String), AppError> {
-    let (user_id, access_token) = match st.mx.login(localpart, password).await {
-        Ok(tk) => {
-            let uid = st
-                .mx
-                .whoami(&tk)
-                .await
-                .map_err(|_| AppError::HomeserverUnavailable)?;
-            (uid, tk)
-        }
+    let (user_id, access_token) = match st.mx.login_session(localpart, password).await {
+        Ok(session) => (session.user_id, session.access_token),
         Err(_) => {
             let acct = st
                 .mx
@@ -1457,6 +1458,12 @@ mod tests {
         /// The central instrument of the "creation at claim time" model: a
         /// retried claim must NEVER make this counter go up a second time.
         registers: u32,
+        /// Number of calls to `/v3/login` — i.e. of devices opened by
+        /// password on a reserved account (#496).
+        ///
+        /// Each one is a device on the account the invitee will receive: one
+        /// whose token nobody records is a device left behind.
+        logins: u32,
     }
 
     struct Fake {
@@ -1498,6 +1505,9 @@ mod tests {
         /// `access_token` — the third path of the trace written in advance:
         /// a registration that returns an error although the account exists.
         register_amputated: std::sync::atomic::AtomicBool,
+        /// When set, `whoami` answers only after this long (#496): a
+        /// homeserver slow to answer, or one that never does.
+        whoami_after: Mutex<Option<std::time::Duration>>,
     }
 
     /// What the fake homeserver answers to `POST /rooms/…/invite`, and the
@@ -1541,6 +1551,10 @@ mod tests {
         let body: serde_json::Value = serde_json::from_slice(&raw).unwrap_or(json!({}));
 
         if path.ends_with("/account/whoami") {
+            let after = *f.whoami_after.lock().unwrap();
+            if let Some(after) = after {
+                tokio::time::sleep(after).await;
+            }
             // A token issued by `/v3/register` or `/v3/login` returns the
             // account it holds — that is what lets the resume of a `claiming`
             // trace find the full `user_id` again.
@@ -1581,6 +1595,7 @@ mod tests {
             return Json(json!({"user_id": format!("@{u}:h"), "access_token": tk})).into_response();
         }
         if path.ends_with("/v3/login") {
+            f.journal.lock().unwrap().logins += 1;
             let u = body["identifier"]["user"]
                 .as_str()
                 .unwrap_or("?")
@@ -1842,6 +1857,7 @@ mod tests {
             sql_at_sync,
             created_accounts: Mutex::new(Vec::new()),
             register_amputated: std::sync::atomic::AtomicBool::new(false),
+            whoami_after: Mutex::new(None),
         });
         let base = launch(fake.clone()).await;
         let st = Arc::new(AppState {
@@ -3629,5 +3645,148 @@ mod tests {
             "thirty-one days after, no table may say who brought this account in"
         );
         assert_eq!(count(&pool, "SELECT COUNT(*) FROM invitations").await, 0);
+    }
+
+    // -----------------------------------------------------------------------
+    // THE CLAIM PATH'S DEADLINE (#496).
+    //
+    // The authenticated routes give `whoami` five seconds; entry, the path
+    // App Store reviewers take, gives its own whoami the claim deadline,
+    // long enough for a homeserver that is slow but answers. A claim that
+    // fails is read by the application as « try again later »
+    // (`claimInvitation.ts`), and it does not try again by itself.
+    // -----------------------------------------------------------------------
+
+    /// `st` with its homeserver given `authenticated` for the whoami of the
+    /// authenticated routes and `claim` for the claim path's.
+    fn with_deadlines(
+        st: &Arc<AppState>,
+        authenticated: std::time::Duration,
+        claim: std::time::Duration,
+    ) -> Arc<AppState> {
+        Arc::new(AppState {
+            pool: st.pool.clone(),
+            mx: Arc::new(
+                crate::matrix::MatrixClient::new(st.cfg.homeserver_url.clone(), "token".into())
+                    .whoami_within(authenticated)
+                    .claim_whoami_within(claim),
+            ),
+            cfg: st.cfg.clone(),
+        })
+    }
+
+    /// A homeserver slower than the authenticated routes' deadline, which
+    /// answers well within the claim's, lets the claim through: the claim
+    /// path is not held to the five seconds.
+    #[sqlx::test(migrations = "./migrations")]
+    async fn a_claim_waits_for_a_slow_whoami_as_long_as_the_claim_deadline(pool: SqlitePool) {
+        seed_invitation(&pool, 1).await;
+        seed_account(&pool, "@target:h", "old", None).await;
+        let (st, fake) = setup(pool.clone(), "@target:h", View::Invite(ROOM), "old").await;
+        *fake.whoami_after.lock().unwrap() = Some(std::time::Duration::from_millis(300));
+        let st = with_deadlines(
+            &st,
+            std::time::Duration::from_millis(50),
+            std::time::Duration::from_secs(5),
+        );
+
+        let Json(entered) = perform_claim(&st, None, None)
+            .await
+            .expect("a whoami slower than the authenticated deadline, within the claim's");
+
+        assert_eq!(entered.user_id, "@target:h");
+        assert_eq!(entered.device_id, DEVICE);
+    }
+
+    /// A homeserver that never answers the claim path's whoami fails the
+    /// claim once the claim deadline has passed, and not before; and the
+    /// failure costs nothing: no rotation, the account still in the pool
+    /// with its secrets, no use spent.
+    #[sqlx::test(migrations = "./migrations")]
+    async fn a_whoami_that_never_answers_fails_a_claim_within_the_claim_deadline_and_moves_nothing(
+        pool: SqlitePool,
+    ) {
+        seed_invitation(&pool, 1).await;
+        seed_account(&pool, "@target:h", "old", None).await;
+        let (st, fake) = setup(pool.clone(), "@target:h", View::Invite(ROOM), "old").await;
+        *fake.whoami_after.lock().unwrap() = Some(std::time::Duration::from_secs(3600));
+        let deadline = std::time::Duration::from_millis(300);
+        let st = with_deadlines(&st, deadline, deadline);
+
+        let started = std::time::Instant::now();
+        let r = tokio::time::timeout(deadline * 10, perform_claim(&st, None, None))
+            .await
+            .expect("an answer within ten times the deadline");
+
+        assert!(matches!(r, Err(AppError::HomeserverUnavailable)));
+        assert!(started.elapsed() >= deadline);
+        assert_eq!(fake.journal.lock().unwrap().rotations, 0);
+        assert_eq!(usable_pool(&pool).await, 1);
+        assert_eq!(
+            count(&pool, "SELECT used_count FROM invitations WHERE id='inv1'").await,
+            0
+        );
+    }
+
+    /// A LOGIN'S TOKEN IS NEVER DROPPED FOR A WHOAMI. Resuming a `claiming`
+    /// trace opens a device by password on the reserved account, the one
+    /// the invitee will receive, and `set_password` keeps every device
+    /// (`logout_devices: false`). The account is named by the login's own
+    /// answer, and its token recorded at once: a whoami that never answers,
+    /// later in the same claim, fails that claim, and the retry adopts the
+    /// recorded token instead of logging in a second time. Resumed through
+    /// a whoami, the token was dropped with the failure, and each retry
+    /// left one more device nobody holds.
+    #[sqlx::test(migrations = "./migrations")]
+    async fn resuming_a_trace_records_the_token_of_its_login_whatever_whoami_does(
+        pool: SqlitePool,
+    ) {
+        seed_invitation(&pool, 2).await;
+        let (st, fake) = setup(pool.clone(), "@whoever:h", View::Invite(ROOM), "none").await;
+        fake.register_amputated
+            .store(true, std::sync::atomic::Ordering::SeqCst);
+        assert!(matches!(
+            perform_claim(&st, None, None).await,
+            Err(AppError::HomeserverUnavailable)
+        ));
+        fake.register_amputated
+            .store(false, std::sync::atomic::Ordering::SeqCst);
+        let created = fake.created_accounts.lock().unwrap()[0].clone();
+
+        // The homeserver stops answering whoami: the resume logs in, then the
+        // hand-over's whoami fails the claim.
+        *fake.whoami_after.lock().unwrap() = Some(std::time::Duration::from_secs(3600));
+        let deadline = std::time::Duration::from_millis(300);
+        let slow = with_deadlines(&st, deadline, deadline);
+        let r = tokio::time::timeout(deadline * 10, perform_claim(&slow, None, None))
+            .await
+            .expect("an answer within ten times the deadline");
+        assert!(matches!(r, Err(AppError::HomeserverUnavailable)));
+        let (user_id, status, token): (String, String, Vec<u8>) =
+            sqlx::query_as("SELECT user_id, status, access_token_enc FROM reserved_accounts")
+                .fetch_one(&pool)
+                .await
+                .unwrap();
+        assert_eq!(user_id, format!("@{}:h", created.0));
+        assert_eq!(status, "reserved", "the trace is completed");
+        assert_eq!(
+            crypto::open(&KEY, &token).unwrap(),
+            created.2,
+            "with the token of the login"
+        );
+        assert_eq!(fake.journal.lock().unwrap().logins, 1);
+
+        // It answers again: the retry adopts the recorded token.
+        *fake.whoami_after.lock().unwrap() = None;
+        let Json(entered) = perform_claim(&st, None, None)
+            .await
+            .expect("the retry must succeed");
+        assert_eq!(entered.user_id, format!("@{}:h", created.0));
+        assert_eq!(
+            fake.journal.lock().unwrap().logins,
+            1,
+            "no second login, so no second device"
+        );
+        assert_eq!(fake.journal.lock().unwrap().registers, 1);
     }
 }

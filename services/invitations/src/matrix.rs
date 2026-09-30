@@ -240,6 +240,19 @@ pub struct MatrixClient {
     /// How long `whoami` waits for the homeserver: `WHOAMI_DEADLINE`, and
     /// less in a test that does not wait five seconds to see it.
     whoami_deadline: Duration,
+    /// How long the claim path's `whoami_device` waits:
+    /// `CLAIM_WHOAMI_DEADLINE`, and less in a test.
+    claim_whoami_deadline: Duration,
+}
+
+/// The text `field` holds in the answer to a login, or an error naming the
+/// field: never an empty string standing for a field the homeserver did not
+/// send.
+fn login_field(answer: &Value, field: &str) -> Result<String> {
+    answer[field]
+        .as_str()
+        .map(str::to_string)
+        .ok_or_else(|| anyhow!("login response without {field}"))
 }
 
 pub fn next_stage(body: &Value) -> Option<String> {
@@ -279,6 +292,26 @@ pub struct TokenRefused;
 /// reads « later » rather than its own silence.
 pub const WHOAMI_DEADLINE: Duration = Duration::from_secs(5);
 
+/// How long the claim path gives its own `whoami`, `whoami_device` (#496).
+///
+/// Entry is the path App Store reviewers take, and the application reads a
+/// claim that fails as « try again later » (`claimInvitation.ts`), without
+/// trying again by itself: a homeserver that is slow but answers must not
+/// fail it, so the claim path is not held to the five seconds of the
+/// authenticated routes. Twenty seconds, under the thirty the application
+/// gives a claim request when it leaves an account for a link
+/// (`REQUEST_DEADLINE_MS`, `entry.ts`): the 503 still reaches it. Failing
+/// there costs nothing: the device is read back before anything moves
+/// (`handlers::claim`), with a token the service already holds.
+pub const CLAIM_WHOAMI_DEADLINE: Duration = Duration::from_secs(20);
+
+/// A session opened by password: the account the homeserver's answer names,
+/// and the access token of the device it opened.
+pub struct Session {
+    pub user_id: String,
+    pub access_token: String,
+}
+
 impl MatrixClient {
     pub fn new(base: String, registration_token: String) -> Self {
         Self {
@@ -286,6 +319,7 @@ impl MatrixClient {
             registration_token,
             http: reqwest::Client::new(),
             whoami_deadline: WHOAMI_DEADLINE,
+            claim_whoami_deadline: CLAIM_WHOAMI_DEADLINE,
         }
     }
 
@@ -295,6 +329,16 @@ impl MatrixClient {
     pub(crate) fn whoami_within(self, deadline: Duration) -> Self {
         Self {
             whoami_deadline: deadline,
+            ..self
+        }
+    }
+
+    /// The same client, its `whoami_device` given `deadline` rather than
+    /// `CLAIM_WHOAMI_DEADLINE`.
+    #[cfg(test)]
+    pub(crate) fn claim_whoami_within(self, deadline: Duration) -> Self {
+        Self {
+            claim_whoami_deadline: deadline,
             ..self
         }
     }
@@ -433,6 +477,37 @@ impl MatrixClient {
     /// it, and the password used is the one the service itself drew for a
     /// dormant account.
     pub async fn login(&self, localpart: &str, password: &str) -> Result<String> {
+        // Same discipline as `whoami` and `register_dormant`: a 2xx response
+        // without a token is an error, never an empty string — an empty token
+        // would make the deactivation fail further down, under a message that
+        // would not name its cause.
+        login_field(
+            &self.login_answer(localpart, password).await?,
+            "access_token",
+        )
+    }
+
+    /// [`login`](Self::login), with the account the homeserver's answer
+    /// names beside the token: `user_id`, which the specification requires
+    /// of every answer to `/login` (#496).
+    ///
+    /// For resuming a claim's trace (`handlers::claim`). The login opens a
+    /// device on the reserved account the invitee will receive, whose
+    /// `set_password` keeps every device; asking `whoami` for the account's
+    /// name afterwards was one more request, and its failure dropped the
+    /// token, leaving that device held by nobody. The answer that brings the
+    /// token names the account.
+    pub async fn login_session(&self, localpart: &str, password: &str) -> Result<Session> {
+        let answer = self.login_answer(localpart, password).await?;
+        Ok(Session {
+            user_id: login_field(&answer, "user_id")?,
+            access_token: login_field(&answer, "access_token")?,
+        })
+    }
+
+    /// The answer of `POST /login` for `localpart` and `password`, or an
+    /// error when it is not a success.
+    async fn login_answer(&self, localpart: &str, password: &str) -> Result<Value> {
         let r = self
             .http
             .post(self.cs("/v3/login"))
@@ -446,14 +521,7 @@ impl MatrixClient {
         if !r.status().is_success() {
             return Err(anyhow!("login refused: {}", r.status()));
         }
-        // Same discipline as `whoami` and `register_dormant`: a 2xx response
-        // without a token is an error, never an empty string — an empty token
-        // would make the deactivation fail further down, under a message that
-        // would not name its cause.
-        Ok(r.json::<Value>().await?["access_token"]
-            .as_str()
-            .ok_or_else(|| anyhow!("login response without access_token"))?
-            .to_string())
+        Ok(r.json::<Value>().await?)
     }
 
     /// Returns the caller's identity, or an error — **never an empty string**.
@@ -469,7 +537,10 @@ impl MatrixClient {
     /// 5xx, a 429, a 2xx without `user_id`) is the homeserver not answering
     /// as one does, which says nothing about the token (#491, #496).
     pub async fn whoami(&self, token: &str) -> Result<String> {
-        let r = self.whoami_request(token).send().await?;
+        let r = self
+            .whoami_request(token, self.whoami_deadline)
+            .send()
+            .await?;
         let status = r.status();
         if status == reqwest::StatusCode::UNAUTHORIZED || status == reqwest::StatusCode::FORBIDDEN {
             return Err(TokenRefused.into());
@@ -491,9 +562,13 @@ impl MatrixClient {
     /// the token just handed to it useless.
     ///
     /// Same discipline as `whoami`: a 2xx response without `device_id` is an
-    /// error, never an empty string, and so is no answer within its deadline.
+    /// error, never an empty string, and so is no answer within the claim
+    /// path's deadline, [`CLAIM_WHOAMI_DEADLINE`], its only caller.
     pub async fn whoami_device(&self, token: &str) -> Result<String> {
-        let r = self.whoami_request(token).send().await?;
+        let r = self
+            .whoami_request(token, self.claim_whoami_deadline)
+            .send()
+            .await?;
         if !r.status().is_success() {
             return Err(anyhow!("token refused"));
         }
@@ -503,13 +578,13 @@ impl MatrixClient {
             .to_string())
     }
 
-    /// `GET /account/whoami` for `token`, given `whoami_deadline` from the
-    /// moment it connects to the moment its body is read ([`WHOAMI_DEADLINE`]).
-    fn whoami_request(&self, token: &str) -> reqwest::RequestBuilder {
+    /// `GET /account/whoami` for `token`, given `deadline` from the moment it
+    /// connects to the moment its body is read.
+    fn whoami_request(&self, token: &str, deadline: Duration) -> reqwest::RequestBuilder {
         self.http
             .get(self.cs("/v3/account/whoami"))
             .bearer_auth(token)
-            .timeout(self.whoami_deadline)
+            .timeout(deadline)
     }
 
     pub async fn join_room(&self, token: &str, room: &str) -> Result<()> {
@@ -1037,6 +1112,36 @@ mod tests {
             String::new(),
         );
         assert_eq!(good.login("x", "pw").await.unwrap(), "fresh-token");
+    }
+
+    /// #496: resuming a claim's trace names the account from the login's own
+    /// answer, so that no request stands between the login and the row. The
+    /// same discipline: a refusal stays a refusal, and a 2xx answer missing
+    /// either field is an error, never an empty string.
+    #[tokio::test]
+    async fn login_session_names_the_account_from_the_login_answer() {
+        let refused = MatrixClient::new(
+            fake_server_with_status("403 Forbidden", r#"{"errcode":"M_FORBIDDEN"}"#).await,
+            String::new(),
+        );
+        assert!(refused.login_session("x", "pw").await.is_err(), "403");
+        for truncated in [r#"{"access_token":"t"}"#, r#"{"user_id":"@a:h"}"#] {
+            let mx = MatrixClient::new(fake_server(truncated).await, String::new());
+            assert!(
+                mx.login_session("x", "pw").await.is_err(),
+                "an answer that names no account, or brings no token: {truncated}"
+            );
+        }
+
+        let good = MatrixClient::new(
+            fake_server(r#"{"user_id":"@a:h","access_token":"fresh-token","device_id":"D"}"#).await,
+            String::new(),
+        );
+        let session = good.login_session("x", "pw").await.unwrap();
+        assert_eq!(
+            (session.user_id.as_str(), session.access_token.as_str()),
+            ("@a:h", "fresh-token")
+        );
     }
 
     /// The fixed defect: "no room" had TWO meanings merged into a single
