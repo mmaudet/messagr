@@ -234,9 +234,9 @@ import {
   canForward,
   canRemoveForEveryone,
   copyText,
+  forwarded,
   onlyPhotograph,
   reportable,
-  selectionWithoutTheBlocked,
   toggle,
 } from './src/timeline/selection'
 import {
@@ -279,7 +279,6 @@ import {
 } from './src/runtime/showNotification'
 import type { ShownImage } from './src/runtime/receiveImage'
 import type { ReadFile } from './src/timeline/imageEvent'
-import type { Plate as Grouping } from './src/timeline/plates'
 import type { EvictOutcome } from './src/runtime/evict'
 import {
   blockAccount,
@@ -304,12 +303,7 @@ import {
   forgetfulIgnoredList,
   type IgnoredList,
 } from './src/runtime/ignoredListStore'
-import {
-  allShown,
-  reactionsShown,
-  shownOf,
-  type NotShown,
-} from './src/runtime/notShown'
+import { reactionsShown, shownOf, type NotShown } from './src/runtime/notShown'
 import { tallyReactions } from './src/timeline/reactions'
 import {
   takeDownNotificationsOf,
@@ -352,6 +346,15 @@ import {
   closingClearsTheSelection,
   type OpenReport,
 } from './src/ui/reportStage'
+import {
+  backToTheList,
+  leaveTheConversation,
+  lookAgain,
+  putDownWhatIsOver,
+  takeWhatTheBlockTakes,
+  type OpenPlate,
+  type TheListScreen,
+} from './src/ui/overTheConversation'
 import { PickConversation } from './src/ui/PickConversation'
 import { ConversationHeader } from './src/ui/ConversationHeader'
 import { Legal } from './src/ui/Legal'
@@ -645,41 +648,19 @@ export function App({
   }
   /**
    * THE CONVERSATION OPEN WITH AN ACCOUNT NOW BLOCKED CLOSES (#494), as the
-   * one blocked from does, whichever device made the block: left open, what
-   * is written in it would still leave. The rule is `openAfterTheBlock`, the
-   * one the list, the block's screen and what is said afterwards read.
-   *
-   * One that stays stays open, without that account's messages (#472), and
-   * without what was bound to them: its messages in the selection, its
-   * photograph full screen, and a sheet about it -- reporting its messages,
-   * or blocking it again.
+   * one blocked from does, whichever device made the block; one that stays
+   * stays open without what was bound to that account (#472, #498). The rule
+   * is `takeWhatTheBlockTakes`, on the conversation open as the screen knows
+   * it now.
    */
   const closeWhatTheBlockTakes = (blocked: ReadonlySet<string>) => {
     const open = openScopeRef.current
-    if (open === null) return
-    const after = openAfterTheBlock(
-      openConversationOf(open, partyRef.current),
+    takeWhatTheBlockTakes(
+      theScreen,
+      open === null ? null : openConversationOf(open, partyRef.current),
       derivedSummariesRef.current,
       blocked,
-    )
-    if (after === 'leaves') {
-      leaveTheConversation()
-      return
-    }
-    setSelected(held =>
-      selectionWithoutTheBlocked(held, conversationRef.current, blocked),
-    )
-    setOpenPlate(shown =>
-      shown === null ||
-      allShown(shown.plate.entries, { hidden: new Set(), blocked })
-        ? shown
-        : null,
-    )
-    setReporting(sheet =>
-      sheet !== null && blocked.has(sheet.author) ? null : sheet,
-    )
-    setBlockingSender(sheet =>
-      sheet !== null && blocked.has(sheet.other) ? null : sheet,
+      conversationRef.current,
     )
   }
   // THE LIST EVERY SCREEN READS (#469): without the conversation with a
@@ -1334,10 +1315,7 @@ export function App({
   const [personOpen, setPersonOpen] = useState(false)
   // Which plate is open full screen, and at which photograph. `null` when
   // none is -- the viewer is a modal, so it is either there or it is not.
-  const [openPlate, setOpenPlate] = useState<{
-    readonly plate: Grouping
-    readonly at: number
-  } | null>(null)
+  const [openPlate, setOpenPlate] = useState<OpenPlate | null>(null)
   // How tall the bar and the action came out together. Not for positioning
   // them -- they are laid out, not offset -- but so the scroll view can end
   // above them rather than under them.
@@ -1646,9 +1624,12 @@ export function App({
   )
   /** Redacts messages for everyone. Bound with the session, like the rest. */
   const removeRef = useRef<((eventIds: readonly string[]) => void) | null>(null)
-  /** Sends the chosen events on to another conversation. See `forwardImage.ts`. */
+  /**
+   * Sends the chosen messages on to another conversation, as the
+   * conversation shows them (`forwarded`, #498). See `forwardImage.ts`.
+   */
   const forwardRef = useRef<
-    ((scope: string, eventIds: readonly string[]) => void) | null
+    ((scope: string, entries: readonly TimelineEntry[]) => void) | null
   >(null)
   // Registering or removing this device's pusher. Held in a ref because the
   // settings switch is rendered outside the launch effect that binds it.
@@ -2384,33 +2365,48 @@ export function App({
     null,
   )
   /**
-   * Out of the conversation open, back to the list: what the header's back
-   * arrow does, a block that holds (#469), and one that arrives (#494).
+   * THE SCREEN, AS THE RULES OF `overTheConversation.ts` MOVE IT: the
+   * conversation open, everything drawn over it, and what the list is drawn
+   * under. Every closing goes through them (#494, #498): the header's back
+   * arrow and the system's, a block that holds or arrives, what becomes known
+   * of the conversation afterwards, and a share that failed.
+   *
+   * Made once: its setters are React's, which do not change, and the ref is
+   * the same ref.
    */
-  const leaveTheConversation = () => {
-    setOpenScope(null)
-    openScopeRef.current = null
-    putDownWhatIsOverTheConversation()
-  }
-  /**
-   * Everything drawn over the conversation open, put down with it (#494),
-   * whether it is left or another opened in its place: the selection, the
-   * person and trust panels, and every sheet and viewer bound to it -- the
-   * block's, the report's, the removal's, the forward picker and the
-   * photograph full screen. Left up, each outlived its conversation: the
-   * removal sheet opened again in the next one, the others stood over the
-   * list.
-   */
-  const putDownWhatIsOverTheConversation = () => {
-    setSelected(new Set())
-    setTrust(null)
-    setPersonOpen(false)
-    setBlockingSender(null)
-    setReporting(null)
-    setRemoving(false)
-    setForwarding(null)
-    setOpenPlate(null)
-  }
+  const theScreen = useMemo<TheListScreen>(
+    () => ({
+      closeTheConversation: () => {
+        setOpenScope(null)
+        openScopeRef.current = null
+      },
+      setSelected,
+      setTrust,
+      setPersonOpen,
+      setBlockingSender,
+      setReporting,
+      setRemoving,
+      setForwarding,
+      setOpenPlate,
+      setTab,
+      setInvite,
+      setPlusOpen,
+      setAdmission,
+    }),
+    [],
+  )
+  // WHAT WAS NOT KNOWN IS LOOKED AT AGAIN (#498). A block that arrived
+  // while nothing said who was in the conversation open left it open; once
+  // its other person is found, or its row read, it closes if the rule says
+  // it leaves -- a conversation of two with the account blocked.
+  useEffect(() => {
+    lookAgain(
+      theScreen,
+      openScope === null ? null : openConversationOf(openScope, party),
+      derivedSummaries,
+      ignored ?? new Set(),
+    )
+  }, [theScreen, openScope, party, derivedSummaries, ignored])
   /**
    * Whether this account is findable now, as far as this device knows:
    * what a screen about a block can truthfully say of who still sees it on
@@ -2824,19 +2820,19 @@ export function App({
    * préserver, il y a une question à laquelle répondre. C'est la même chose
    * que le sélecteur fait quand le partage aboutit, sauf qu'ici il n'y a
    * rien à choisir.
+   *
+   * PAR LA MÊME SORTIE QUE TOUTES LES AUTRES (#498). La conversation se
+   * fermait ici à la main, et ce qui était ouvert par-dessus restait debout
+   * sur la liste : les feuilles, le choix où transférer, la photo en plein
+   * écran. `backToTheList` la ferme comme toutes les fermetures.
    */
-  const sayTheShareFailed = useCallback((why: ShareRefusal) => {
-    setOpenScope(null)
-    openScopeRef.current = null
-    setSelected(new Set())
-    setPersonOpen(false)
-    // `tab` suffit à replier les favoris, qui ne vivent que sous Réglages.
-    setTab('chat')
-    setInvite({ stage: 'shut' })
-    setPlusOpen(false)
-    setAdmission(null)
-    setShareRefused(why)
-  }, [])
+  const sayTheShareFailed = useCallback(
+    (why: ShareRefusal) => {
+      backToTheList(theScreen)
+      setShareRefused(why)
+    },
+    [theScreen],
+  )
 
   // CE QU'UN PARTAGE DEVIENT, décidé une fois qu'il est là.
   //
@@ -3732,7 +3728,7 @@ export function App({
               setConversation(null)
               // What was over the conversation open before this one belongs
               // to it, and does not come back over this one (#494).
-              putDownWhatIsOverTheConversation()
+              putDownWhatIsOver(theScreen)
               // THE BACKUP DECISION IS WRITTEN AGAIN FOR THIS OPENING, even
               // unchanged. The device suite reads it after its own tap
               // (`e2e/conversation.ts`), and two openings can share a launch:
@@ -3852,7 +3848,7 @@ export function App({
                   other !== null &&
                   (ignoredRef.current?.has(other) ?? false)
                 ) {
-                  leaveTheConversation()
+                  leaveTheConversation(theScreen)
                   return
                 }
                 setParty(other === null ? null : { scope, other })
@@ -3924,13 +3920,15 @@ export function App({
             // file: the destination reads what somebody meant to send in the
             // order they meant it, and one failure is one line rather than a
             // batch reporting a single outcome for five.
-            forwardRef.current = (target, eventIds) => {
+            //
+            // WHAT IS HANDED HERE IS WHAT THE CONVERSATION SHOWS (#498),
+            // read by `forwarded` when the conversation is picked: never a
+            // message hidden or blocked since the picker opened, which the
+            // conversation this held, unfiltered, still carried.
+            forwardRef.current = (target, entries) => {
               const going = async () => {
                 setSending('sending')
-                const held = conversationRef.current
-                for (const eventId of eventIds) {
-                  const entry = held.find(one => one.eventId === eventId)
-                  if (entry === undefined) continue
+                for (const entry of entries) {
                   if (entry.image !== undefined) {
                     const ready = await photographForForward(
                       credentials,
@@ -5533,10 +5531,9 @@ export function App({
         setPersonOpen(false)
         return true
       }
+      // By the one way out, as the header's back arrow (#498).
       if (openScope !== null) {
-        setOpenScope(null)
-        openScopeRef.current = null
-        setSelected(new Set())
+        leaveTheConversation(theScreen)
         return true
       }
       if (legalOpen) {
@@ -5600,6 +5597,7 @@ export function App({
     selected,
     personOpen,
     openScope,
+    theScreen,
     legalOpen,
     deletion,
     proof.stage,
@@ -6002,7 +6000,9 @@ export function App({
               setForwarding(null)
               setSelected(new Set())
               if (scope === null) return
-              forwardRef.current?.(scope, chosen)
+              // FROM THE CONVERSATION AS IT IS SHOWN (#498): a message hidden
+              // or blocked while the picker was up does not leave by it.
+              forwardRef.current?.(scope, forwarded(chosen, shownNow))
             }}
           />
         )}
@@ -6315,7 +6315,7 @@ export function App({
                     : displayNameFor(party.other, names.get(party.other))
                 }
                 named={party !== null && names.get(party.other) !== undefined}
-                onBack={leaveTheConversation}
+                onBack={() => leaveTheConversation(theScreen)}
                 onOpenPerson={() => setPersonOpen(true)}
                 // Only with somebody to call. `theOtherMember` answers null in
                 // a conversation that is not two people, and a call button in
@@ -7322,11 +7322,9 @@ export function App({
               <TabBar
                 current={tab}
                 onSelect={next => {
-                  setOpenPlate(null)
-                  setPersonOpen(false)
-                  setSelected(new Set())
-                  setOpenScope(null)
-                  openScopeRef.current = null
+                  // The one way out, which puts down every layer bound to a
+                  // conversation (#498).
+                  leaveTheConversation(theScreen)
                   setLegalOpen(false)
                   // NOT WHILE THE SERVER IS BEING ASKED (#382), as on the back
                   // gesture: a failure must come back to a screen that is

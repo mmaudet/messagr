@@ -68,6 +68,16 @@ export interface ConversationSummary {
    */
   readonly membershipsUnread?: true
   /**
+   * Who is in it, this account included, as `/joined_members` said at the
+   * last derivation (#498): what tells the screen of a block whether the
+   * account blocked still reads a conversation that stays -- a member who
+   * left does not. Absent when the membership could not be read.
+   *
+   * IN MEMORY ONLY, as `window` is: the notebook keeps a row's opening, and
+   * never who is in a conversation (`listCacheStore.ts`).
+   */
+  readonly members?: readonly string[]
+  /**
    * The opening of the last message this device could read, or `null`.
    *
    * Not truncated here. How many words fit is the screen's question, and a
@@ -375,15 +385,25 @@ export interface ConversationListDeps {
  */
 const LOOK_BACK = 12
 
+/**
+ * Every conversation this account is in, each row without what this device
+ * does not draw: the messages hidden here, and what a blocked account wrote.
+ *
+ * THE CONVERSATION WITH A BLOCKED ACCOUNT IS DERIVED TOO (#498), without its
+ * messages, and it is `listWithoutTheBlocked` that leaves it out of the list
+ * drawn, as it does in the same draw as a block. Left out here, what its row
+ * learns was lost with it: a conversation open whose members were not known
+ * when the block arrived stayed open once they were, since nothing held the
+ * row that knew them.
+ */
 export async function fetchConversationSummaries(
   deps: ConversationListDeps,
   selfUserId: string,
   /** How far each conversation has been read here. Empty means none of them. */
   lastRead: ReadonlyMap<string, number>,
   /**
-   * What this device does not draw: the messages hidden here, and the
-   * conversation with a blocked account and its messages everywhere else
-   * (#469). See `notShown.ts`.
+   * What this device does not draw: the messages hidden here, and those of a
+   * blocked account (#469). See `notShown.ts`.
    */
   notShown: NotShown = EVERYTHING_SHOWN,
 ): Promise<ConversationSummary[]> {
@@ -399,9 +419,7 @@ export async function fetchConversationSummaries(
     ),
   )
 
-  return [...listWithoutTheBlocked(summaries, notShown.blocked)].sort(
-    byActivity,
-  )
+  return summaries.sort(byActivity)
 }
 
 async function summarise(
@@ -413,8 +431,9 @@ async function summarise(
 ): Promise<ConversationSummary> {
   let other: string | null = null
   let others: number | null = null
+  let members: readonly string[] | undefined
   try {
-    const members = await fetchJoinedMembers(deps.http, scope)
+    members = await fetchJoinedMembers(deps.http, scope)
     other = theOtherMember(members, selfUserId)
     others = howManyOthers(members, selfUserId)
   } catch {
@@ -438,6 +457,7 @@ async function summarise(
   const whoWasHere = {
     ...(departed === undefined ? {} : { departed }),
     ...(membershipsUnread ? { membershipsUnread: true as const } : {}),
+    ...(members === undefined ? {} : { members }),
   }
 
   try {
