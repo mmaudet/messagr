@@ -3,7 +3,7 @@ import { Platform, Pressable, StyleSheet, Text, View } from 'react-native'
 
 import { t } from '../copy'
 import { color, floors, layout, radius, space, type } from '../design/tokens'
-import { BAR_ORDER, placeActions, type BarAction } from './barActions'
+import { barOf, type BarAction } from './barActions'
 import { BottomSheet } from './BottomSheet'
 import { TabIcon, type TabGlyph } from './TabIcon'
 
@@ -53,16 +53,11 @@ import { TabIcon, type TabGlyph } from './TabIcon'
  * and never less to make them fit. When they do not fit on one line, the
  * least frequent go into « Plus », « Signaler » and « Bloquer
  * l'expéditeur » first (#472), and « Plus » opens them, in words
- * (`barActions.ts` decides, from the room the bar measured).
+ * (`barOf`, `barActions.ts`, decides, from the room the bar measured).
  */
 export function SelectionBar({
   count,
-  canCopy: copyable,
-  canForward: forwardable,
-  canKeep: keepable,
-  canFavourite: favouritable,
-  canReport: reportable,
-  canBlock: blockable,
+  offers,
   alreadyFavourite,
   onClear,
   onCopy,
@@ -74,20 +69,15 @@ export function SelectionBar({
   onRemove,
 }: {
   readonly count: number
-  readonly canCopy: boolean
-  readonly canForward: boolean
   /**
-   * Whether the selection is one photograph, and so has somewhere to be
-   * kept. Words have no gallery to go to.
+   * What the selection offers, action by action, as the conversation is
+   * shown and for this account (`conversationShown.ts`): copying, forwarding
+   * and keeping as a favourite what is readable, keeping a lone photograph
+   * in the gallery, reporting words, photographs or documents of one other
+   * participant (#468, #471), blocking that participant (#472), and the bin,
+   * always.
    */
-  readonly canKeep: boolean
-  /** Whether the selection is something that could be found again. */
-  readonly canFavourite: boolean
-  /**
-   * Whether the selection is words, photographs or documents of one other
-   * participant, which is what a report carries (#468, #471, `reportable`).
-   */
-  readonly canReport: boolean
+  readonly offers: Readonly<Record<BarAction, boolean>>
   /**
    * Whether every selected message is already kept.
    *
@@ -96,12 +86,6 @@ export function SelectionBar({
    * nobody can predict.
    */
   readonly alreadyFavourite: boolean
-  /**
-   * Whether every message chosen comes from one and the same other
-   * participant, whom « Bloquer l’expéditeur » would block (#472,
-   * `blockable`).
-   */
-  readonly canBlock: boolean
   readonly onClear: () => void
   readonly onFavourite: () => void
   readonly onCopy: () => void
@@ -199,22 +183,7 @@ export function SelectionBar({
       onPress: onRemove,
     },
   }
-  const offers: Readonly<Record<BarAction, boolean>> = {
-    copy: copyable,
-    forward: forwardable,
-    favourite: favouritable,
-    keep: keepable,
-    report: reportable,
-    block: blockable,
-    remove: true,
-  }
-  const placed =
-    room === null
-      ? null
-      : placeActions(
-          BAR_ORDER.filter(action => offers[action]),
-          room,
-        )
+  const placed = barOf(offers, room)
   const more: Described = {
     testID: 'selection-more',
     label: t('selection_more'),
@@ -263,21 +232,16 @@ export function SelectionBar({
       </Text>
 
       {/* THE ROOM LEFT, MEASURED, and the actions drawn once it is known:
-          what fits is decided from it, never guessed. */}
+          what fits is decided from it, never guessed (`barOf`). */}
       <View
         style={styles.actions}
         onLayout={event => setRoom(event.nativeEvent.layout.width)}>
-        {placed !== null && (
-          <>
-            {placed.onBar
-              .filter(action => action !== 'remove')
-              .map(action => (
-                <Action key={action} {...described[action]} />
-              ))}
-            {placed.inMore.length > 0 && <Action {...more} />}
-            <Action {...described.remove} />
-          </>
-        )}
+        {placed?.drawn.map(action => (
+          <Action
+            key={action}
+            {...(action === 'more' ? more : described[action])}
+          />
+        ))}
       </View>
 
       {placed !== null && placed.inMore.length > 0 && (

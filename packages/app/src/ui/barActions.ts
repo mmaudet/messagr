@@ -65,3 +65,35 @@ export function placeActions(
     inMore: offered.filter(action => moving.has(action)),
   }
 }
+
+/**
+ * What the bar draws, from what the selection `offers` and the `room` it
+ * measured for its actions (#472, #498): NOTHING UNTIL IT HAS MEASURED,
+ * since what fits is decided from the room and never guessed; then the
+ * actions in the bar's order, « Plus » (`'more'`) before the bin when some
+ * went into it, the bin last; and what « Plus » lists. Measured again, it is
+ * drawn again: a telephone turned has another room.
+ *
+ * It was written inline in `SelectionBar.tsx`, where nothing could test it.
+ */
+export function barOf(
+  offers: Readonly<Record<BarAction, boolean>>,
+  room: number | null,
+): {
+  readonly drawn: readonly (BarAction | 'more')[]
+  readonly inMore: readonly BarAction[]
+} | null {
+  if (room === null) return null
+  const { onBar, inMore } = placeActions(
+    BAR_ORDER.filter(action => offers[action]),
+    room,
+  )
+  return {
+    drawn: [
+      ...onBar.filter(action => action !== 'remove'),
+      ...(inMore.length > 0 ? ['more' as const] : []),
+      'remove',
+    ],
+    inMore,
+  }
+}

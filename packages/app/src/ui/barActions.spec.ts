@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 
 import { floors, space } from '../design/tokens'
-import { placeActions, type BarAction } from './barActions'
+import { barOf, placeActions, type BarAction } from './barActions'
 
 /** The room `places` actions take, each at the touch-target floor. */
 function roomFor(places: number): number {
@@ -77,5 +77,64 @@ describe('the selection bar’s actions, and « Plus » (#472)', () => {
       'forward',
       'favourite',
     ])
+  })
+})
+
+describe('what the bar draws, from the room it measured (#472, #498)', () => {
+  /** What somebody else's words offer: everything but keeping. */
+  const offers: Readonly<Record<BarAction, boolean>> = {
+    copy: true,
+    forward: true,
+    favourite: true,
+    keep: false,
+    report: true,
+    block: true,
+    remove: true,
+  }
+
+  it('draws no action before it has measured its room: what fits is never guessed', () => {
+    expect(barOf(offers, null)).toBeNull()
+  })
+
+  it('draws, once measured, the actions the selection offers, in the bar’s order, the bin last', () => {
+    expect(barOf(offers, roomFor(6))).toEqual({
+      drawn: ['copy', 'forward', 'favourite', 'report', 'block', 'remove'],
+      inMore: [],
+    })
+  })
+
+  it('draws « Plus » before the bin when some went into it, and lists them there', () => {
+    expect(barOf(offers, roomFor(5))).toEqual({
+      drawn: ['copy', 'forward', 'favourite', 'more', 'remove'],
+      inMore: ['report', 'block'],
+    })
+  })
+
+  it('measures again: a room grown or shrunk draws again', () => {
+    // A telephone turned, or a window resized: the bar is laid out again.
+    expect(barOf(offers, roomFor(4))?.drawn).toEqual([
+      'copy',
+      'forward',
+      'more',
+      'remove',
+    ])
+    expect(barOf(offers, roomFor(8))?.drawn).toEqual([
+      'copy',
+      'forward',
+      'favourite',
+      'report',
+      'block',
+      'remove',
+    ])
+  })
+
+  it('draws nothing the selection does not offer, on the bar or in « Plus »', () => {
+    // Absent, never greyed: my own words have nobody to report or block.
+    const mine = { ...offers, report: false, block: false }
+
+    expect(barOf(mine, roomFor(3))).toEqual({
+      drawn: ['copy', 'more', 'remove'],
+      inMore: ['forward', 'favourite'],
+    })
   })
 })

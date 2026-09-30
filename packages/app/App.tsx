@@ -151,7 +151,12 @@ import {
   arrivedThisRun,
   photographsThatJustArrived,
 } from './src/runtime/arrivedThisRun'
-import { markUpTo, readAtMark, type Receipt } from './src/runtime/receipts'
+import {
+  markUpTo,
+  readAtMark,
+  readMarkNow,
+  type Receipt,
+} from './src/runtime/receipts'
 import { hasSeenPromise, rememberPromiseSeen } from './src/runtime/promiseSeen'
 import { clearSignUp, isSignUpUnfinished } from './src/runtime/signUpMarker'
 import {
@@ -228,11 +233,6 @@ import {
 import { readFavourites, type KeptMessage } from './src/runtime/readFavourites'
 import { receivedFromSomebodyElse } from './src/runtime/receivedFromSomebodyElse'
 import {
-  blockable,
-  canCopy,
-  canFavourite,
-  canForward,
-  canRemoveForEveryone,
   copyText,
   forwarded,
   onlyPhotograph,
@@ -300,7 +300,7 @@ import {
   forgetfulIgnoredList,
   type IgnoredList,
 } from './src/runtime/ignoredListStore'
-import { reactionsShown, shownOf, type NotShown } from './src/runtime/notShown'
+import type { NotShown } from './src/runtime/notShown'
 import { tallyReactions } from './src/timeline/reactions'
 import { drawnNotifications } from './src/runtime/showNotification'
 import {
@@ -358,6 +358,7 @@ import {
   whatTheBlockWillDo,
   type WhatTheBlockWillDo,
 } from './src/ui/blockScreen'
+import { conversationShown } from './src/ui/conversationShown'
 import { PickConversation } from './src/ui/PickConversation'
 import { ConversationHeader } from './src/ui/ConversationHeader'
 import { Legal } from './src/ui/Legal'
@@ -1708,6 +1709,24 @@ export function App({
   const sessionClientRef = useRef<ReturnType<typeof createClient> | null>(null)
   // THE WHOLE SESSION, since #382: deleting the account needs whose it is.
   const credentialsRef = useRef<RestoreCredentials | null>(null)
+  /**
+   * THIS ACCOUNT, AS THE SESSION HOLDS IT (#472, #494, #498), and the only
+   * account the screens read: which side a bubble is drawn on, whether
+   * « pour tout le monde » is offered, which messages carry the ticks, which
+   * reaction is its own, and that « Signaler » and « Bloquer l'expéditeur »
+   * are offered on somebody else's messages only (`conversationShown.ts`).
+   *
+   * Held with the session, whatever the launch found. A second account used
+   * to be set only by a launch that found a conversation: empty after one
+   * that found none, and a conversation joined afterwards drew this
+   * account's own messages as somebody else's.
+   */
+  const [selfNow, setSelfNow] = useState('')
+  /** Holds the session, and with it this account (`selfNow`). */
+  const holdTheSession = (account: RestoreCredentials) => {
+    credentialsRef.current = account
+    setSelfNow(account.userId)
+  }
   // THE SERVICE AS THIS ACCOUNT, read at each request: see
   // `discoveryService`. Made once per mount, like the journey that uses it.
   const discoveryDeps = useRef({
@@ -2487,7 +2506,6 @@ export function App({
       () => setBlocking({ who, state: 'failed' }),
     )
   }
-  const [selfUserId, setSelfUserId] = useState('')
   // A MESSAGE SOMEBODY ELSE SENT, READ HERE FOR THE FIRST TIME.
   //
   // The trigger ADR-0013 settles on, and `offerBackup.ts` says why it is
@@ -2509,8 +2527,10 @@ export function App({
   // was last written has to outlive the effect that wrote it.
   const backupOfferLog = useRef(logWhenChanged('MESSAGR_BACKUP_OFFER'))
   useEffect(() => {
-    if (conversation === null || selfUserId === '') return
-    const received = receivedFromSomebodyElse(conversation, selfUserId)
+    // Somebody else than this account, as the session holds it (`selfNow`),
+    // whatever the launch found (#498).
+    if (conversation === null || selfNow === '') return
+    const received = receivedFromSomebodyElse(conversation, selfNow)
     // SAID WHETHER OR NOT IT IS TRUE, and that is the point: a prompt that
     // never appears looks identical whether the trigger has not fired or the
     // trigger is broken. This is the line that tells them apart, and it is
@@ -2566,7 +2586,7 @@ export function App({
       // the promise: a rejection nobody anticipated costs an offer made
       // later, from a conversation that draws again, and never a launch.
     })
-  }, [conversation, selfUserId])
+  }, [conversation, selfNow])
   /**
    * The other half of the same lot: offering to bring a past back.
    *
@@ -2980,26 +3000,27 @@ export function App({
   //
   // So the timeline moving is itself a reason to look again. The mark only
   // rises (`receipts.ts` says why), so this can run as often as it likes.
+  //
+  // FOR THIS ACCOUNT AS THE SESSION HOLDS IT (#498): the ticks go on its own
+  // messages, whatever the launch found.
   useEffect(() => {
     const scope = openScope
-    if (scope === null || selfUserId === '') return
-    const entries = conversation ?? []
-    const seen = seenReceiptsRef.current.get(scope)
-    if (seen !== undefined && seen.length > 0) {
-      const found = markUpTo(entries, seen, selfUserId)
-      const held = readMarksRef.current.get(scope) ?? 0
-      if (found !== null && found > held) {
-        readMarksRef.current.set(scope, found)
-        // AND INTO THE NOTEBOOK, so the tick survives the next launch. Not
-        // awaited: the screen already has the mark, and a page that would
-        // not take it costs a tick after a relaunch rather than now.
-        readByRef.current.raise(scope, found).catch(() => {})
-      }
-    }
-    setReadHere(
-      readAtMark(entries, readMarksRef.current.get(scope) ?? 0, selfUserId),
+    if (scope === null || selfNow === '') return
+    const now = readMarkNow(
+      conversation ?? [],
+      seenReceiptsRef.current.get(scope) ?? [],
+      readMarksRef.current.get(scope) ?? 0,
+      selfNow,
     )
-  }, [conversation, openScope, selfUserId])
+    if (now.raised) {
+      readMarksRef.current.set(scope, now.mark)
+      // AND INTO THE NOTEBOOK, so the tick survives the next launch. Not
+      // awaited: the screen already has the mark, and a page that would not
+      // take it costs a tick after a relaunch rather than now.
+      readByRef.current.raise(scope, now.mark).catch(() => {})
+    }
+    setReadHere(now.read)
+  }, [conversation, openScope, selfNow])
 
   useEffect(() => {
     // Not started until the promise has been accepted. The effect re-runs when
@@ -3414,7 +3435,7 @@ export function App({
       const credentials =
         lostStore === 'stranded' || lostAccount !== null ? null : session
       if (lostAccount !== null) {
-        credentialsRef.current = lostAccount
+        holdTheSession(lostAccount)
         await offerWaysOut()
       }
       // THE STATE THAT EXISTED AND WAS NEVER SET.
@@ -3466,7 +3487,9 @@ export function App({
       } else {
         const sessionClient = createClient(credentials)
         sessionClientRef.current = sessionClient
-        credentialsRef.current = credentials
+        // And this account with it, whether or not a conversation is found
+        // below (#498).
+        holdTheSession(credentials)
         // Started before the sync below, not after: see startCryptoMachine's
         // own documentation for why the ordering is load-bearing.
         const start = await startCryptoMachine(
@@ -5248,7 +5271,10 @@ export function App({
               // fetched and decrypted on every launch instead of read from a
               // second copy. It costs a round trip and it is why a device
               // holds no cleartext history.
-              setSelfUserId(credentials.userId)
+              //
+              // THIS ACCOUNT IS NOT SET HERE (#498). It was, and a launch that
+              // found no conversation left it empty; it is held with the
+              // session now (`holdTheSession`).
 
               // Who this conversation's gesture is for, and the passive half
               // of it. Both run before the timeline is built, so history
@@ -5864,23 +5890,25 @@ export function App({
   // conversation's messages and their reactions are both drawn from, so a
   // block takes both off in the same render.
   const notShownNow: NotShown = { hidden, blocked: ignored ?? new Set() }
-  // THE CONVERSATION AS SHOWN, which is what the selection is made of and
-  // what « Signaler » and « Bloquer l'expéditeur » read: neither is offered
-  // on a message nobody can see, an account already blocked's included.
-  const shownNow = shownOf(conversation ?? [], notShownNow)
-  // THIS ACCOUNT, AS THE SESSION HOLDS IT (#472, #494). `selfUserId` waits
-  // for a launch that found a room, and a conversation joined after such a
-  // launch would have no messages of this account's own: both actions would
-  // be offered on them, and its reactions would not be its own.
-  const selfNow = credentialsRef.current?.userId ?? selfUserId
-  // WHAT A REPORT OF THE SELECTION WOULD CARRY (#468), read once: it offers
+  // THE CONVERSATION OPEN, AS SHOWN AND AS THIS ACCOUNT READS IT (#472,
+  // #494, #498), read once per draw (`conversationShown.ts`): the messages
+  // drawn, which the selection is made of, their reactions, what the bar
+  // offers, what « Signaler » would carry and whom « Bloquer l'expéditeur »
+  // would block, and whether « pour tout le monde » is offered -- on the
+  // conversation as shown, and for the one account, the session's.
+  const conversationNow = conversationShown(selfNow, {
+    conversation: conversation ?? [],
+    notShown: notShownNow,
+    reactions,
+    selected,
+  })
+  const shownNow = conversationNow.entries
+  // What a report of the selection would carry (#468): it offers
   // « Signaler », and it is what « Signaler » opens the sheet with.
-  const reportableNow =
-    selected.size > 0 ? reportable(selected, shownNow, selfNow) : null
-  // WHOM « BLOQUER L'EXPÉDITEUR » WOULD BLOCK (#472), read once too: it
-  // offers the action, and it is whom the action opens the screen for.
-  const blockableNow =
-    selected.size > 0 ? blockable(selected, shownNow, selfNow) : null
+  const reportableNow = conversationNow.reportable
+  // Whom « Bloquer l'expéditeur » would block (#472): it offers the action,
+  // and it is whom the action opens the screen for.
+  const blockableNow = conversationNow.blockable
   // WHAT BLOCKING THE ACCOUNT OF `target` WOULD DO, for the screen that says
   // it beforehand, from the panel or from the selection (#469, #472, #498):
   // what becomes of its conversation, whether the account still reads it,
@@ -6005,11 +6033,8 @@ export function App({
         {removing && openScope !== null && (
           <RemoveSheet
             count={selected.size}
-            forEveryone={canRemoveForEveryone(
-              selected,
-              conversation ?? [],
-              selfUserId,
-            )}
+            // This account's own, as the session holds it (#498).
+            forEveryone={conversationNow.forEveryone}
             onCancel={() => setRemoving(false)}
             onForMe={() => {
               const scope = openScope
@@ -6136,15 +6161,8 @@ export function App({
             {selected.size > 0 ? (
               <SelectionBar
                 count={selected.size}
-                canCopy={canCopy(selected, conversation ?? [])}
-                canForward={canForward(selected, conversation ?? [])}
-                canKeep={
-                  onlyPhotograph(selected, conversation ?? [])?.image !==
-                  undefined
-                }
-                canFavourite={canFavourite(selected, conversation ?? [])}
-                canReport={reportableNow !== null}
-                canBlock={blockableNow !== null}
+                // On the conversation as shown, for this account (#498).
+                offers={conversationNow.offers}
                 // EVERY one, not any: the control does one thing to the whole
                 // selection, and a mixed one has to pick a direction. Keeping
                 // is the safe half -- a mark added to something already kept
@@ -6186,9 +6204,9 @@ export function App({
                     .catch(() => {})
                 }}
                 onCopy={() => {
-                  const held = conversation ?? []
-                  const words = copyText(selected, held)
-                  const alone = onlyPhotograph(selected, held)
+                  // What the conversation shows, as what it offers (#498).
+                  const words = copyText(selected, shownNow)
+                  const alone = onlyPhotograph(selected, shownNow)
                   setSelected(new Set())
                   // WORDS WIN WHEN THERE ARE BOTH. A clipboard holds one
                   // thing and `setImage` would replace `setString`, so
@@ -6219,7 +6237,7 @@ export function App({
                     )
                 }}
                 onKeep={() => {
-                  const alone = onlyPhotograph(selected, conversation ?? [])
+                  const alone = onlyPhotograph(selected, shownNow)
                   setSelected(new Set())
                   if (alone?.image === undefined) return
                   // THE SAME BYTES THE SCREEN IS DRAWING. `openImageRef`
@@ -6892,7 +6910,7 @@ export function App({
                     // TALLIED HERE, from the value the messages below are
                     // drawn from (ADR-0011, amended on 30 September 2026),
                     // this account's own read from the session (`selfNow`).
-                    reactions={reactionsShown(reactions, notShownNow, selfNow)}
+                    reactions={conversationNow.reactions}
                     read={readHere}
                     onReact={(target, key, own) =>
                       reactRef.current?.(target, key, own)
@@ -6917,7 +6935,9 @@ export function App({
                         eventIds === null ? new Set() : toggle(held, eventIds),
                       )
                     }
-                    selfUserId={selfUserId}
+                    // Which side a bubble is drawn on: this account, as the
+                    // session holds it, whatever the launch found (#498).
+                    selfUserId={selfNow}
                     sending={sending}
                     kept={photoKept}
                     onLoadImage={loadImage}
@@ -7346,7 +7366,7 @@ export function App({
             style={[StyleSheet.absoluteFill, styles.root]}
             edges={['top', 'bottom', 'left', 'right']}>
             <Invited
-              known={whatIsKnown(deciding, selfUserId, names)}
+              known={whatIsKnown(deciding, selfNow, names)}
               behind={threshold.length - 1}
               working={answering}
               failed={answerFailed === deciding.scope}
