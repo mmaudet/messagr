@@ -188,6 +188,202 @@ finish() {
 TOTAL_STAGES=19
 DOC="docs/declarations-magasins.md"
 
+# ══ DEUX ENTRÉES ═══════════════════════════════════════════════════════════
+#
+#   scripts/declarations-magasins.sh            la première saisie (#321) :
+#                                               Play, puis App Store
+#   scripts/declarations-magasins.sh signaler   ce que la build qui signale
+#                                               ajoute chez Play (#500)
+#
+# UNE ENTRÉE À PART, ET NON UNE QUESTION SUR LE CHEMIN DE LA PREMIÈRE SAISIE.
+# Celle-ci ne gagne rien sur le signalement : qui la déroule de zéro avant la
+# build qui signale déclare chez Play quatre types, et eux seuls, sans une
+# question de plus qui lui ferait cocher les trois autres trop tôt. Et qui a
+# déjà fait la première saisie n'a pas à la refaire pour ajouter ce que le
+# point 9 ajoute. Elle suit le document ailleurs, depuis le 30 septembre 2026 :
+# la création de compte (point 7), le chiffrement en transit (point 6), et
+# « Other Diagnostic Data » décoché chez Apple (point 5).
+#
+# CE QUE SIGNALER AJOUTE EST DÉJÀ SAISI : le porteur l'a fait le 30 septembre
+# 2026, corrigé et vérifié le même jour, en quatre exports. Trois erreurs
+# avant la bonne : « Fichiers audio » → « Enregistrements audio ou vidéo »
+# cochée, « Photos » décochée, « Partagées » cochée. `signaler` sert à le
+# refaire plus tard, par exemple après une première saisie reprise de zéro :
+# il nomme ces trois cases, et fait relire l'export par
+# scripts/assert-play-data-safety.mjs, qui les voit toutes.
+
+# pas "…" — une case à NE PAS cocher, en rouge, sous celles à cocher.
+pas() { printf '  %s✗%s %s\n' "$RED" "$RESET" "$1"; }
+
+# facultatif_pour_signaler — les quatre réponses, les mêmes pour chacun des
+# trois types que le signalement ajoute (point 9).
+facultatif_pour_signaler() {
+  step "Collectées ou partagées ?      →  Collectées"
+  pas "Partagées                      →  ne pas cocher : rien n'est partagé"
+  step "Traitées de façon éphémère ?   →  Non"
+  step "Obligatoires ou facultatives ?"
+  say "     →  Les utilisateurs peuvent choisir si ces données sont collectées ou non"
+  step "Pourquoi sont-elles collectées ?"
+  say "     ☑ Prévention des fraudes, sécurité et conformité"
+  note "Une seule finalité. Facultatif : personne n'a à signaler pour se servir"
+  note "de Messagr. Tranché le 30 septembre 2026, jugement 9."
+}
+
+# ══ PLAY CONSOLE, CE QUE SIGNALER AJOUTE (#500) ════════════════════════════
+#
+# Dans l'ordre du formulaire : « ID utilisateur » vient avant les trois types
+# nouveaux, qui viennent avant « Contacts ».
+
+saisie_signaler() {
+  TOTAL_STAGES=9
+  banner "Ce que signaler ajoute chez Play (#500)"
+
+  stage "Play · signaler : une saisie à refaire"
+  say "Ce qu'un signalement transmet se déclare en plus dans « Sécurité des"
+  say "données » : le point 9 de $DOC,"
+  say "tranché le 30 septembre 2026."
+  say "Quand : au plus tard quand la build Android qui signale quitte la piste"
+  say "de test interne."
+  note "La section décrit « toutes les versions actuellement disponibles sur"
+  note "Google Play », et Play ne demande pas d'y tenir les canaux de test internes."
+  printf '\n'
+  warn "C'est déjà fait : saisi le 30 septembre 2026, corrigé et vérifié le même jour."
+  say "Cette entrée sert à le refaire plus tard, par exemple après une première"
+  say "saisie reprise de zéro. Elle n'ajoute que ce qui change."
+  note "App Store Connect ne change pas : chez Apple, le point 8 n'ajoute aucun type."
+  pause "On refait la saisie ?"
+
+  stage "Play · ouvrir « Sécurité des données »"
+  open_url "https://play.google.com/console"
+  step "Play Console → Messagr → « Contenu de l'application »."
+  note "Dans la barre latérale : Monitor and improve → Policy and programmes → App content."
+  step "Ligne « Sécurité des données » : ouvrir la déclaration."
+  step "« Suivant » jusqu'à « Types de données »."
+  note "« Collecte des données et sécurité » ne change pas : la première saisie y a"
+  note "répondu, création de compte « Autre » et suppression des données « Oui » comprises."
+  pause "« Types de données » est ouvert ?"
+
+  stage "Play · « Types de données » : trois de plus"
+  say "Les quatre types de la première saisie restent cochés. Cocher EN PLUS"
+  say "ces trois-là, et aucun autre :"
+  step "Messages               →  Autres messages via une appli"
+  step "Photos et vidéos       →  Photos"
+  step "Fichiers et documents  →  Fichiers et documents"
+  printf '\n'
+  pas "Photos et vidéos       →  Vidéos"
+  pas "Fichiers audio         →  aucune case, pas même « Enregistrements audio ou vidéo »"
+  printf '\n'
+  warn "Une case voisine cochée par mégarde, dans « Fichiers audio » : c'est la"
+  warn "première des trois erreurs de la saisie du 30 septembre 2026. Relire de"
+  warn "« Messages » à « Fichiers et documents » avant de continuer."
+  note "Pas de vidéo : l'application n'en envoie pas, et une vidéo envoyée comme"
+  note "fichier est un document. Pas d'audio : il n'y a pas de message vocal."
+  pause "Les trois sont cochés en plus, et ni « Vidéos » ni « Fichiers audio » ?"
+
+  stage "Play · « ID utilisateur » : une finalité de plus"
+  step "« Suivant » : « Utilisation et traitement des données »."
+  say "Les types y viennent dans l'ordre du formulaire. Le premier ne gagne"
+  say "qu'une finalité :"
+  step "Collectées, Non, Obligatoire   →  inchangés"
+  step "Pourquoi sont-elles collectées ?"
+  say "     ☑ Fonctionnement de l'application                 déjà cochée"
+  say "     ☑ Gestion des comptes                             déjà cochée"
+  say "     ☑ Prévention des fraudes, sécurité et conformité  À COCHER"
+  note "Le service garde le compte qui signale jusqu'à douze mois après la"
+  note "décision, et un signalement porte le compte visé."
+  pause "« ID utilisateur » porte ses trois finalités ?"
+
+  stage "Play · « Autres messages via une appli »"
+  facultatif_pour_signaler
+  note "Play : « Tous les autres types de messages. Par exemple, messages"
+  note "instantanés ou contenus de chat. »"
+  pause "« Autres messages via une appli » est rempli ?"
+
+  stage "Play · « Photos »"
+  facultatif_pour_signaler
+  note "Play : « Photos d'un utilisateur. »"
+  pause "« Photos » est rempli ?"
+
+  stage "Play · « Fichiers et documents »"
+  facultatif_pour_signaler
+  note "Play : « Fichiers ou documents d'un utilisateur, ou informations sur ses"
+  note "fichiers ou documents (noms de fichier, par exemple). » Le signalement"
+  note "d'un document en porte le nom, le type, la taille et la clé."
+  pause "« Fichiers et documents » est rempli ?"
+
+  stage "Play · relire, enregistrer, envoyer"
+  say "Rien d'autre ne change :"
+  step "« Contacts », « Autres actions », « ID de l'appareil ou autres ID » : ne pas y toucher."
+  printf '\n'
+  step "Enregistrer."
+  step "« Aperçu de la fiche Play Store » : relire ce que verra une personne."
+  say "     sept types collectés, aucun partagé, aucune finalité publicitaire ;"
+  say "     chiffrées en transit, oui ; suppression sur demande, oui."
+  step "« Envoyer »."
+  pause "La déclaration est envoyée ?"
+
+  stage "Play · exporter le CSV, et le relire contre le document"
+  step "En haut à droite de la page : « Exporter au format CSV »."
+  ask EXPORT_PLAY "Chemin du CSV exporté :"
+  EXPORT_PLAY="${EXPORT_PLAY/#\~/$HOME}"
+  printf '\n'
+  # Le contrôle lit ses réponses attendues dans les tableaux de $DOC : il dit
+  # ce qui manque et ce qui est en trop, case par case.
+  if node scripts/assert-play-data-safety.mjs "$EXPORT_PLAY"; then
+    RELU="relu contre le document par scripts/assert-play-data-safety.mjs, sans écart"
+    printf '\n'
+    step "Le garder, daté, dans une PR :"
+    say "  docs/declarations/play-securite-des-donnees-$(date +%Y-%m-%d).csv"
+    note "C'est lui que la chaîne d'intégration relit ensuite contre $DOC."
+  else
+    RELU="relu contre le document : des écarts, à corriger dans la console"
+    printf '\n'
+    warn "L'export ne dit pas ce que dit le document. Corriger dans la console ce"
+    warn "que la liste ci-dessus nomme, « Envoyer », exporter de nouveau, puis :"
+    printf '\n      node scripts/assert-play-data-safety.mjs <nouvel export>\n\n'
+    SKIPPED+=("corriger « Sécurité des données », puis relire le nouvel export")
+  fi
+  pause "On termine ?"
+
+  finish
+
+  # ── Le relevé de la saisie refaite ─────────────────────────────────────
+  RECORD="/tmp/declarations-signaler-$(date +%Y%m%d-%H%M).md"
+  # Les accents graves sont du Markdown, pour le ticket : rien à substituer.
+  # shellcheck disable=SC2016
+  {
+    printf '## Ce que signaler ajoute chez Play, saisi de nouveau le %s\n\n' "$(date +%d/%m/%Y)"
+    printf 'Saisie faite avec `scripts/declarations-magasins.sh signaler`, qui\n'
+    printf 'déroule le point 9 de `%s`. Première saisie : le\n' "$DOC"
+    printf '30 septembre 2026, corrigée et vérifiée le même jour.\n\n'
+    printf '**Play, « Sécurité des données »** : trois types de plus, « Autres\n'
+    printf 'messages via une appli », « Photos » et « Fichiers et documents »,\n'
+    printf 'collectés, non partagés, non éphémères, facultatifs, pour la seule\n'
+    printf 'finalité « Prévention des fraudes, sécurité et conformité ». « ID\n'
+    printf 'utilisateur » gagne cette finalité et reste obligatoire. Ni « Vidéos »,\n'
+    printf 'ni rien dans « Fichiers audio ».\n\n'
+    printf "**Rien d'autre n'a changé** : « Contacts », « Autres actions »,\n"
+    printf "« ID de l'appareil ou autres ID », chiffrement en transit « Oui »,\n"
+    printf 'suppression « Oui ». Déclaration envoyée.\n\n'
+    printf '**Export CSV** : %s.\n\n' "$RELU"
+    printf '**App Store Connect, « App Privacy »** : rien, point 8.\n'
+  } > "$RECORD"
+
+  note "relevé écrit dans $RECORD"
+  note "à coller dans #500 : gh issue comment 500 --body-file $RECORD"
+  printf '\n'
+}
+
+case "${1:-}" in
+  "") ;;
+  signaler) saisie_signaler; exit 0 ;;
+  *)
+    printf 'usage : %s            la première saisie : Play, puis App Store (#321)\n' "$0" >&2
+    printf '        %s signaler   ce que signaler ajoute chez Play (#500)\n' "$0" >&2
+    exit 2
+    ;;
+esac
+
 banner "Déclarations de confidentialité aux magasins (#321)"
 
 # ══ PLAY CONSOLE ═══════════════════════════════════════════════════════════
@@ -202,28 +398,32 @@ step "Ligne « Sécurité des données » → « Commencer »."
 note "Le formulaire s'enregistre en brouillon : vous pouvez vous arrêter à tout moment."
 pause "« Commencer » est cliqué ?"
 
-stage "Play · étape « Collecte des données et sécurité »"
-say "Trois questions. Les deux premières sont simples, la troisième demande un choix."
+stage "Play · « Collecte des données et sécurité » : collecte et transit"
+say "Deux temps dans cette étape. D'abord les deux premières questions :"
 step "« L'application collecte-t-elle ou partage-t-elle l'un des types de données"
 say "  utilisateur obligatoires ? »  →  OUI"
 note "La page de confidentialité l'écrit : « le serveur conserve donc : … »."
+step "« Toutes les données sont-elles chiffrées lors de leur transit ? »  →  OUI"
+note "Tranché le 16 septembre 2026, point 6 (#338)."
+pause "Les deux premières sont répondues ?"
+
+stage "Play · « Collecte des données et sécurité » : le compte et la suppression"
+say "Puis, dans l'ordre du formulaire :"
+step "Méthodes de création de compte  →  Autre, et elle seule"
+pas "« Mon appli ne permet pas aux utilisateurs de créer un compte »  →  faux"
+step "Décrire la méthode, en collant cette phrase telle quelle :"
+say "     Le compte est créé sur l'appareil à l'ouverture d'un lien d'invitation, sans identifiant ni mot de passe à saisir."
+step "Lien de suppression du compte  →  https://messagr.eu/aide/#supprimer-votre-compte"
+step "Suppression d'une partie ou de la totalité des données  →  Oui"
+step "URL de suppression des données  →  https://messagr.eu/confidentialite/"
+note "Avec « Autre » seule, le formulaire ne demande pas si des comptes se créent en"
+note "dehors de l'appli, et l'export laisse cette réponse vide : c'est normal."
+note "Tranché le 30 septembre 2026, point 7."
 printf '\n'
-warn "« Toutes les données sont-elles chiffrées lors de leur transit ? »"
-say "Le document dit OUI, mais il a été écrit avant la mesure du 16 septembre."
-say "Le relais d'appel annonce encore turn: en clair, et 32 sessions authentifiées"
-say "sur 45 y arrivent sans TLS, en portant l'identifiant du compte (#338)."
-say ""
-say "  • Répondre NON  : exact aujourd'hui. Une case négative visible sur la fiche,"
-say "                    à corriger une fois #338 déployé."
-say "  • Répondre OUI  : n'est vrai qu'après #338. À ne faire que si vous déployez"
-say "                    le correctif du relais avant de soumettre."
-ask TRANSIT "Qu'avez-vous répondu ? (oui / non)"
-printf '\n'
-step "« Proposez-vous un moyen de demander la suppression des données ? »  →  OUI"
-note "Le lien de suppression de compte, si le formulaire le demande :"
-note "https://messagr.eu/aide/#supprimer-votre-compte. La section existe depuis #333 ;"
-note "à partir de la version qui porte le geste, elle le présente d'abord (#386)."
-pause "Les trois questions sont répondues ?"
+warn "Changer la méthode de création de compte peut effacer d'autres réponses de"
+warn "cette étape. Le 30 septembre 2026, le « Oui » à la suppression des données a"
+warn "disparu ainsi, son URL restant en place : le revérifier avant d'enregistrer."
+pause "Les cinq réponses sont données, et le « Oui » revérifié ?"
 
 stage "Play · étape « Types de données »"
 say "Cocher ces quatre-là, et AUCUN autre :"
@@ -284,8 +484,6 @@ stage "Play · relire et enregistrer"
 step "Relire le récapitulatif : quatre types, aucun partagé, aucune finalité publicitaire."
 step "Exporter le CSV et le garder : il fait foi de ce qui a été déclaré ce jour-là."
 step "Enregistrer."
-warn "Ne soumettez pas encore si vous avez répondu NON au chiffrement en transit"
-warn "et comptez déployer #338 avant la mise en vente."
 pause "Play est enregistré ?"
 
 # ══ APP STORE CONNECT ══════════════════════════════════════════════════════
@@ -296,25 +494,27 @@ open_url "https://appstoreconnect.apple.com/apps/6809352505"
 step "Barre latérale → « App Privacy » → « Get Started »."
 step "« Do you or your third-party partners collect data from this app? »"
 say "     →  Yes, we collect data from this app"
-note "Firebase est un « third-party partner » au sens d'Apple, donc la réponse"
-note "serait oui même si le serveur ne gardait rien."
+note "Oui, parce que le serveur conserve des métadonnées. Firebase, lui, n'est plus"
+note "dans le paquet iOS depuis le 16 septembre 2026 (#334), point 5."
 step "« Next »."
 pause "« Yes, we collect data » est validé ?"
 
 stage "App Store Connect · cocher les types"
-say "Six types, et aucun autre :"
+say "Cinq types, et aucun autre :"
 step "Identifiers   →  User ID"
 step "Identifiers   →  Device ID"
 step "User Content  →  Emails or Text Messages"
 step "Contacts      →  Contacts"
 step "Usage Data    →  Other Usage Data"
-step "Diagnostics   →  Other Diagnostic Data"
+pas "Diagnostics   →  Other Diagnostic Data : à décocher s'il l'est"
+note "Il n'était coché que pour les pods Firebase, qui ne sont plus dans le paquet"
+note "iOS depuis le 16 septembre 2026 (#334). Tranché, point 5."
 printf '\n'
 note "PAS « Photos or Videos » ni « Other User Content » : un chiffré dont le serveur"
 note "n'a pas la clé n'est pas conservé « in a readable form ». Tranché le 16 septembre,"
 note "jugement 4. La note au relecteur, plus loin, désamorce la question d'avance."
 step "« Save »."
-pause "Les six types sont cochés ?"
+pause "Les cinq types sont cochés, et « Other Diagnostic Data » ne l'est pas ?"
 
 stage "App Store Connect · « User ID »"
 say "Trois réponses pour chaque type. Pour celui-ci :"
@@ -329,7 +529,7 @@ step "Data use            →  App Functionality"
 step "Linked to the user  →  Yes"
 step "Used for tracking   →  No"
 note "Couvre les clés d'appareil, le jeton APNs que le serveur garde, les adresses IP,"
-note "et l'identifiant d'installation Firebase."
+note "et, sur Android seulement, l'identifiant d'installation Firebase (point 5)."
 pause "« Device ID » est rempli ?"
 
 stage "App Store Connect · « Emails or Text Messages »"
@@ -351,14 +551,6 @@ step "Data use            →  App Functionality"
 step "Linked to the user  →  Yes"
 step "Used for tracking   →  No"
 pause "« Other Usage Data » est rempli ?"
-
-stage "App Store Connect · « Other Diagnostic Data »"
-step "Data use            →  App Functionality"
-warn "Linked to the user  →  NO"
-say "  C'est le SEUL des six qui n'est pas lié. Il vient des manifestes des pods"
-say "  Firebase, qui déclarent leur collecte comme non liée."
-step "Used for tracking   →  No"
-pause "« Other Diagnostic Data » est rempli ?"
 
 stage "App Store Connect · les deux liens"
 step "À côté de « Privacy Policy », cliquer « Edit »."
@@ -395,20 +587,26 @@ finish
 
 # ── Le relevé de ce qui a été déclaré ──────────────────────────────────────
 RECORD="/tmp/declarations-$(date +%Y%m%d-%H%M).md"
+# Les accents graves sont du Markdown, pour le ticket : rien à substituer.
+# shellcheck disable=SC2016
 {
   printf '## Déclarations saisies dans les consoles, %s\n\n' "$(date +%d/%m/%Y)"
   printf 'Saisie faite avec `scripts/declarations-magasins.sh`, qui déroule\n'
   printf '`%s`.\n\n' "$DOC"
-  printf '**Play, « Sécurité des données »** : quatre types déclarés (ID utilisateur,\n'
+  printf '**Play, « Collecte des données et sécurité »** : collecte, oui ;\n'
+  printf 'chiffrement en transit, oui (point 6) ; création de compte, « Autre »,\n'
+  printf 'décrite, avec le lien de suppression du compte ; suppression des\n'
+  printf "données, oui, avec l'URL de suppression des données (point 7).\n\n"
+  printf '**Play, « Types de données »** : quatre types déclarés (ID utilisateur,\n'
   printf 'Contacts, Autres actions, Appareil ou autres ID), aucun partagé, aucun\n'
   printf 'éphémère, tous obligatoires, aucune finalité publicitaire.\n\n'
-  printf '**Chiffrement en transit** : répondu « %s ».\n\n' "$TRANSIT"
-  printf '**App Store Connect, « App Privacy »** : six types déclarés, tous\n'
-  printf '« App Functionality », tous liés sauf « Other Diagnostic Data », aucun\n'
-  printf 'utilisé pour le suivi. « Privacy Choices URL » :\n'
+  printf '**App Store Connect, « App Privacy »** : cinq types déclarés, tous\n'
+  printf '« App Functionality », tous liés, aucun utilisé pour le suivi ; « Other\n'
+  printf 'Diagnostic Data » décoché (point 5). « Privacy Choices URL » :\n'
   printf 'https://messagr.eu/aide/#supprimer-votre-compte (#333, #386).\n'
 } > "$RECORD"
 
 note "relevé écrit dans $RECORD"
 note "à coller dans #321 : gh issue comment 321 --body-file $RECORD"
+note "chez Play, ce que signaler ajoute se saisit à part : $0 signaler (#500)"
 printf '\n'

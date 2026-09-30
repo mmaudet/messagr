@@ -100,6 +100,17 @@ jobs:
       - name: Assert the homeserver's administration script keeps its guards
         run: scripts/admin-messagr.sh --self-test
 
+      # LA CONSOLE PLAY NE RELIT RIEN : une case voisine s'y coche aussi bien
+      # que la bonne, et la fiche publique l'affiche. Le 30 septembre 2026, la
+      # saisie du point 9 en a fait trois avant d'être juste. Le contrôle lit
+      # ses réponses attendues dans les tableaux de
+      # `docs/declarations-magasins.md`, et nulle part ailleurs. Son self-test
+      # exige que le dernier export gardé dans `docs/declarations/` passe, puis
+      # rejoue ces trois erreurs, et d'autres, sur cet export : une réponse
+      # changée dans le document sans nouvel export gardé échoue ici.
+      - name: Assert the kept Play export says what the document says, and the check refuses the rest
+        run: node scripts/assert-play-data-safety.mjs --self-test
+
       - run: yarn lint
       - run: yarn format
       - run: yarn typecheck
