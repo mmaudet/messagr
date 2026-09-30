@@ -50,10 +50,12 @@ import { TabIcon, type TabGlyph } from './TabIcon'
  *
  * Each action is a target of `floors.touchTargetMin`, whatever its glyph
  * (`icon.$rule`: the glyph's size is never the button's), `space.s` apart,
- * and never less to make them fit. When they do not fit on one line, the
- * least frequent go into « Plus », « Signaler » and « Bloquer
- * l'expéditeur » first (#472), and « Plus » opens them, in words
- * (`barOf`, `barActions.ts`, decides, from the room the bar measured).
+ * and never less to make them fit. When they do not fit on one line, some go
+ * into « Plus », which opens them in words: « Bloquer l'expéditeur » first
+ * (#472), which the panel of the person offers too, then the least central
+ * to a selection; « Signaler » last, so that on somebody else's message it
+ * stays on the bar (#498). `barOf` (`barActions.ts`) decides, from the room
+ * the bar measured.
  */
 export function SelectionBar({
   count,

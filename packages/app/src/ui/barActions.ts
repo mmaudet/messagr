@@ -19,18 +19,26 @@ export const BAR_ORDER: readonly BarAction[] = [
 ]
 
 /**
- * Which go into « Plus » first when the bar is short: the least frequent,
- * « Bloquer l'expéditeur » and « Signaler » (#472), then the others from the
- * least used to the most. Never the bin: removing applies to anything
- * selected, so it is always on the bar.
+ * Which go into « Plus » first when the bar is short (#472, #498): « Bloquer
+ * l'expéditeur », which the panel of the person offers too; then the least
+ * central to a selection, « Garder » and « Favori »; then « Transférer » and
+ * « Copier »; « Signaler » last of all.
+ *
+ * « SIGNALER » STAYS ON THE BAR, on somebody else's message, where it is
+ * found without being looked for (decided on 30 September 2026): on a
+ * telephone of 393 points, as on one of 360, the bar holds it beside
+ * « Plus » and the bin, whatever the count shows.
+ *
+ * Never the bin: removing applies to anything selected, so it is always on
+ * the bar.
  */
 const INTO_MORE_FIRST: readonly BarAction[] = [
   'block',
-  'report',
   'keep',
   'favourite',
   'forward',
   'copy',
+  'report',
 ]
 
 /**
@@ -40,9 +48,10 @@ const INTO_MORE_FIRST: readonly BarAction[] = [
  * EVERY ONE AT THE TOUCH-TARGET FLOOR, `space.s` apart: a glyph of 20 in a
  * target of 44 (`icon.$rule`, `floors.touchTargetMin`), and never less to
  * make them fit. All on the bar when they fit. Otherwise « Plus » takes a
- * place of its own and holds the least frequent, until the rest fit beside
- * it; what it holds, it lists in the bar's order. It holds only what the
- * selection offers: absent, never greyed, there as on the bar.
+ * place of its own and holds them in the order `INTO_MORE_FIRST` says, until
+ * the rest fit beside it; what it holds, it lists in the bar's order. It
+ * holds only what the selection offers: absent, never greyed, there as on
+ * the bar.
  */
 export function placeActions(
   offered: readonly BarAction[],
@@ -70,9 +79,10 @@ export function placeActions(
  * What the bar draws, from what the selection `offers` and the `room` it
  * measured for its actions (#472, #498): NOTHING UNTIL IT HAS MEASURED,
  * since what fits is decided from the room and never guessed; then the
- * actions in the bar's order, « Plus » (`'more'`) before the bin when some
- * went into it, the bin last; and what « Plus » lists. Measured again, it is
- * drawn again: a telephone turned has another room.
+ * actions offered, in the bar's order, « Plus » (`'more'`) after them when
+ * some went into it, and the bin last when it is offered; and what « Plus »
+ * lists. Measured again, it is drawn again: a telephone turned has another
+ * room.
  *
  * It was written inline in `SelectionBar.tsx`, where nothing could test it.
  */
@@ -92,7 +102,7 @@ export function barOf(
     drawn: [
       ...onBar.filter(action => action !== 'remove'),
       ...(inMore.length > 0 ? ['more' as const] : []),
-      'remove',
+      ...onBar.filter(action => action === 'remove'),
     ],
     inMore,
   }

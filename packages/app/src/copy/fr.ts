@@ -825,8 +825,11 @@ export const fr = {
   // ensuite, sans prétendre qu'une conversation l'a quittée. Et si l'on
   // demandait de se bloquer soi-même, rien ne se fait, et l'écran dit
   // pourquoi. « Plus » ouvre, en mots, les actions de la barre qui n'y
-  // tiennent pas : chacune y garde la taille d'une cible, et les plus rares
-  // y vont d'abord.
+  // tiennent pas : chacune y garde la taille d'une cible. « Bloquer
+  // l'expéditeur », que le panneau de la personne offre aussi, y va d'abord,
+  // puis les moins centrales à une sélection ; « Signaler » y va en dernier,
+  // et reste sur la barre pour le message d'un autre (décision du 30
+  // septembre 2026).
   selection_block: 'Bloquer l’expéditeur',
   selection_more: 'Plus',
   selection_more_close: 'Fermer',
