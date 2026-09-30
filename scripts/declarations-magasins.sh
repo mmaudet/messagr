@@ -196,10 +196,13 @@ DOC="docs/declarations-magasins.md"
 #                                               ajoute chez Play (#500)
 #
 # UNE ENTRÉE À PART, ET NON UNE QUESTION SUR LE CHEMIN DE LA PREMIÈRE SAISIE.
-# Celle-ci ne change pas : qui la déroule de zéro avant la build qui signale
-# déclare chez Play quatre types, et eux seuls, sans une question de plus qui
-# lui ferait cocher les trois autres trop tôt. Et qui a déjà fait la première
-# saisie n'a pas à la refaire pour ajouter ce que le point 9 ajoute.
+# Celle-ci ne gagne rien sur le signalement : qui la déroule de zéro avant la
+# build qui signale déclare chez Play quatre types, et eux seuls, sans une
+# question de plus qui lui ferait cocher les trois autres trop tôt. Et qui a
+# déjà fait la première saisie n'a pas à la refaire pour ajouter ce que le
+# point 9 ajoute. Elle suit le document ailleurs, depuis le 30 septembre 2026 :
+# la création de compte (point 7), le chiffrement en transit (point 6), et
+# « Other Diagnostic Data » décoché chez Apple (point 5).
 #
 # CE QUE SIGNALER AJOUTE EST DÉJÀ SAISI : le porteur l'a fait le 30 septembre
 # 2026, corrigé et vérifié le même jour, en quatre exports. Trois erreurs
@@ -256,8 +259,8 @@ saisie_signaler() {
   note "Dans la barre latérale : Monitor and improve → Policy and programmes → App content."
   step "Ligne « Sécurité des données » : ouvrir la déclaration."
   step "« Suivant » jusqu'à « Types de données »."
-  note "« Collecte des données et sécurité » ne change pas : chiffrées en transit,"
-  note "Oui ; suppression sur demande, Oui."
+  note "« Collecte des données et sécurité » ne change pas : la première saisie y a"
+  note "répondu, création de compte « Autre » et suppression des données « Oui » comprises."
   pause "« Types de données » est ouvert ?"
 
   stage "Play · « Types de données » : trois de plus"
@@ -395,28 +398,32 @@ step "Ligne « Sécurité des données » → « Commencer »."
 note "Le formulaire s'enregistre en brouillon : vous pouvez vous arrêter à tout moment."
 pause "« Commencer » est cliqué ?"
 
-stage "Play · étape « Collecte des données et sécurité »"
-say "Trois questions. Les deux premières sont simples, la troisième demande un choix."
+stage "Play · « Collecte des données et sécurité » : collecte et transit"
+say "Deux temps dans cette étape. D'abord les deux premières questions :"
 step "« L'application collecte-t-elle ou partage-t-elle l'un des types de données"
 say "  utilisateur obligatoires ? »  →  OUI"
 note "La page de confidentialité l'écrit : « le serveur conserve donc : … »."
+step "« Toutes les données sont-elles chiffrées lors de leur transit ? »  →  OUI"
+note "Tranché le 16 septembre 2026, point 6 (#338)."
+pause "Les deux premières sont répondues ?"
+
+stage "Play · « Collecte des données et sécurité » : le compte et la suppression"
+say "Puis, dans l'ordre du formulaire :"
+step "Méthodes de création de compte  →  Autre, et elle seule"
+pas "« Mon appli ne permet pas aux utilisateurs de créer un compte »  →  faux"
+step "Décrire la méthode, en collant cette phrase telle quelle :"
+say "     Le compte est créé sur l'appareil à l'ouverture d'un lien d'invitation, sans identifiant ni mot de passe à saisir."
+step "Lien de suppression du compte  →  https://messagr.eu/aide/#supprimer-votre-compte"
+step "Suppression d'une partie ou de la totalité des données  →  Oui"
+step "URL de suppression des données  →  https://messagr.eu/confidentialite/"
+note "Avec « Autre » seule, le formulaire ne demande pas si des comptes se créent en"
+note "dehors de l'appli, et l'export laisse cette réponse vide : c'est normal."
+note "Tranché le 30 septembre 2026, point 7."
 printf '\n'
-warn "« Toutes les données sont-elles chiffrées lors de leur transit ? »"
-say "Le document dit OUI, mais il a été écrit avant la mesure du 16 septembre."
-say "Le relais d'appel annonce encore turn: en clair, et 32 sessions authentifiées"
-say "sur 45 y arrivent sans TLS, en portant l'identifiant du compte (#338)."
-say ""
-say "  • Répondre NON  : exact aujourd'hui. Une case négative visible sur la fiche,"
-say "                    à corriger une fois #338 déployé."
-say "  • Répondre OUI  : n'est vrai qu'après #338. À ne faire que si vous déployez"
-say "                    le correctif du relais avant de soumettre."
-ask TRANSIT "Qu'avez-vous répondu ? (oui / non)"
-printf '\n'
-step "« Proposez-vous un moyen de demander la suppression des données ? »  →  OUI"
-note "Le lien de suppression de compte, si le formulaire le demande :"
-note "https://messagr.eu/aide/#supprimer-votre-compte. La section existe depuis #333 ;"
-note "à partir de la version qui porte le geste, elle le présente d'abord (#386)."
-pause "Les trois questions sont répondues ?"
+warn "Changer la méthode de création de compte peut effacer d'autres réponses de"
+warn "cette étape. Le 30 septembre 2026, le « Oui » à la suppression des données a"
+warn "disparu ainsi, son URL restant en place : le revérifier avant d'enregistrer."
+pause "Les cinq réponses sont données, et le « Oui » revérifié ?"
 
 stage "Play · étape « Types de données »"
 say "Cocher ces quatre-là, et AUCUN autre :"
@@ -477,8 +484,6 @@ stage "Play · relire et enregistrer"
 step "Relire le récapitulatif : quatre types, aucun partagé, aucune finalité publicitaire."
 step "Exporter le CSV et le garder : il fait foi de ce qui a été déclaré ce jour-là."
 step "Enregistrer."
-warn "Ne soumettez pas encore si vous avez répondu NON au chiffrement en transit"
-warn "et comptez déployer #338 avant la mise en vente."
 pause "Play est enregistré ?"
 
 # ══ APP STORE CONNECT ══════════════════════════════════════════════════════
@@ -489,25 +494,27 @@ open_url "https://appstoreconnect.apple.com/apps/6809352505"
 step "Barre latérale → « App Privacy » → « Get Started »."
 step "« Do you or your third-party partners collect data from this app? »"
 say "     →  Yes, we collect data from this app"
-note "Firebase est un « third-party partner » au sens d'Apple, donc la réponse"
-note "serait oui même si le serveur ne gardait rien."
+note "Oui, parce que le serveur conserve des métadonnées. Firebase, lui, n'est plus"
+note "dans le paquet iOS depuis le 16 septembre 2026 (#334), point 5."
 step "« Next »."
 pause "« Yes, we collect data » est validé ?"
 
 stage "App Store Connect · cocher les types"
-say "Six types, et aucun autre :"
+say "Cinq types, et aucun autre :"
 step "Identifiers   →  User ID"
 step "Identifiers   →  Device ID"
 step "User Content  →  Emails or Text Messages"
 step "Contacts      →  Contacts"
 step "Usage Data    →  Other Usage Data"
-step "Diagnostics   →  Other Diagnostic Data"
+pas "Diagnostics   →  Other Diagnostic Data : à décocher s'il l'est"
+note "Il n'était coché que pour les pods Firebase, qui ne sont plus dans le paquet"
+note "iOS depuis le 16 septembre 2026 (#334). Tranché, point 5."
 printf '\n'
 note "PAS « Photos or Videos » ni « Other User Content » : un chiffré dont le serveur"
 note "n'a pas la clé n'est pas conservé « in a readable form ». Tranché le 16 septembre,"
 note "jugement 4. La note au relecteur, plus loin, désamorce la question d'avance."
 step "« Save »."
-pause "Les six types sont cochés ?"
+pause "Les cinq types sont cochés, et « Other Diagnostic Data » ne l'est pas ?"
 
 stage "App Store Connect · « User ID »"
 say "Trois réponses pour chaque type. Pour celui-ci :"
@@ -522,7 +529,7 @@ step "Data use            →  App Functionality"
 step "Linked to the user  →  Yes"
 step "Used for tracking   →  No"
 note "Couvre les clés d'appareil, le jeton APNs que le serveur garde, les adresses IP,"
-note "et l'identifiant d'installation Firebase."
+note "et, sur Android seulement, l'identifiant d'installation Firebase (point 5)."
 pause "« Device ID » est rempli ?"
 
 stage "App Store Connect · « Emails or Text Messages »"
@@ -544,14 +551,6 @@ step "Data use            →  App Functionality"
 step "Linked to the user  →  Yes"
 step "Used for tracking   →  No"
 pause "« Other Usage Data » est rempli ?"
-
-stage "App Store Connect · « Other Diagnostic Data »"
-step "Data use            →  App Functionality"
-warn "Linked to the user  →  NO"
-say "  C'est le SEUL des six qui n'est pas lié. Il vient des manifestes des pods"
-say "  Firebase, qui déclarent leur collecte comme non liée."
-step "Used for tracking   →  No"
-pause "« Other Diagnostic Data » est rempli ?"
 
 stage "App Store Connect · les deux liens"
 step "À côté de « Privacy Policy », cliquer « Edit »."
@@ -594,13 +593,16 @@ RECORD="/tmp/declarations-$(date +%Y%m%d-%H%M).md"
   printf '## Déclarations saisies dans les consoles, %s\n\n' "$(date +%d/%m/%Y)"
   printf 'Saisie faite avec `scripts/declarations-magasins.sh`, qui déroule\n'
   printf '`%s`.\n\n' "$DOC"
-  printf '**Play, « Sécurité des données »** : quatre types déclarés (ID utilisateur,\n'
+  printf '**Play, « Collecte des données et sécurité »** : collecte, oui ;\n'
+  printf 'chiffrement en transit, oui (point 6) ; création de compte, « Autre »,\n'
+  printf 'décrite, avec le lien de suppression du compte ; suppression des\n'
+  printf "données, oui, avec l'URL de suppression des données (point 7).\n\n"
+  printf '**Play, « Types de données »** : quatre types déclarés (ID utilisateur,\n'
   printf 'Contacts, Autres actions, Appareil ou autres ID), aucun partagé, aucun\n'
   printf 'éphémère, tous obligatoires, aucune finalité publicitaire.\n\n'
-  printf '**Chiffrement en transit** : répondu « %s ».\n\n' "$TRANSIT"
-  printf '**App Store Connect, « App Privacy »** : six types déclarés, tous\n'
-  printf '« App Functionality », tous liés sauf « Other Diagnostic Data », aucun\n'
-  printf 'utilisé pour le suivi. « Privacy Choices URL » :\n'
+  printf '**App Store Connect, « App Privacy »** : cinq types déclarés, tous\n'
+  printf '« App Functionality », tous liés, aucun utilisé pour le suivi ; « Other\n'
+  printf 'Diagnostic Data » décoché (point 5). « Privacy Choices URL » :\n'
   printf 'https://messagr.eu/aide/#supprimer-votre-compte (#333, #386).\n'
 } > "$RECORD"
 
