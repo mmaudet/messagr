@@ -294,7 +294,6 @@ import {
 import {
   listWithoutTheBlocked,
   openConversationOf,
-  scopesWithTheBlocked,
   type WithSomebody,
 } from './src/runtime/conversationList'
 import {
@@ -303,10 +302,11 @@ import {
 } from './src/runtime/ignoredListStore'
 import { reactionsShown, shownOf, type NotShown } from './src/runtime/notShown'
 import { tallyReactions } from './src/timeline/reactions'
+import { drawnNotifications } from './src/runtime/showNotification'
 import {
-  takeDownNotificationsOf,
-  takeDownWhatShows,
-} from './src/runtime/showNotification'
+  openedByTheTap,
+  takeDownWhatTheBlockTakes,
+} from './src/runtime/notifying'
 import {
   forgetfulUntoldBlocks,
   type UntoldBlocks,
@@ -629,24 +629,15 @@ export function App({
       ignoredListRef.current.keep(next).catch(() => {})
     }
     const newly = new Set([...next].filter(account => !before.has(account)))
-    takeDownTheirNotifications(newly)
-    closeWhatTheBlockTakes(next)
-  }
-  /**
-   * The notifications this application drew that show an account now
-   * blocked: all of those of a conversation with it (#469), where a tap
-   * would open what the block took away, and, in any other, the one that
-   * shows a message it wrote or a call it placed (#472). A conversation of
-   * more than two keeps a notification that shows somebody else.
-   */
-  const takeDownTheirNotifications = (newly: ReadonlySet<string>) => {
-    for (const scope of scopesWithTheBlocked(
+    // The notifications that show those newly blocked: all of those of a
+    // conversation with one of them (#469), and elsewhere those that show
+    // them (#472). Which, is `takeDownWhatTheBlockTakes`'s.
+    takeDownWhatTheBlockTakes(
+      drawnNotifications,
       derivedSummariesRef.current,
       newly,
-    )) {
-      takeDownNotificationsOf(scope).catch(() => {})
-    }
-    takeDownWhatShows(newly).catch(() => {})
+    ).catch(() => {})
+    closeWhatTheBlockTakes(next)
   }
   /**
    * THE CONVERSATION OPEN WITH AN ACCOUNT NOW BLOCKED CLOSES (#494), as the
@@ -4500,15 +4491,12 @@ export function App({
                 // NEVER A CONVERSATION WITH A BLOCKED ACCOUNT (#469), from a
                 // notification drawn before the block, on this device or
                 // another: the tap lands on the list, where it is not.
-                if (
-                  scope !== null &&
-                  !scopesWithTheBlocked(
-                    derivedSummariesRef.current,
-                    ignoredRef.current ?? new Set(),
-                  ).includes(scope)
-                ) {
-                  showConversation(scope)
-                }
+                const landsIn = openedByTheTap(
+                  scope,
+                  derivedSummariesRef.current,
+                  ignoredRef.current ?? new Set(),
+                )
+                if (landsIn !== null) showConversation(landsIn)
               },
               // SOMEBODY ALREADY SAID YES, ON A LOCKED SCREEN.
               //
