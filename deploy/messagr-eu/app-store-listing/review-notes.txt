@@ -12,7 +12,14 @@ Messagr can only be joined by invitation: there is no sign-up form, no user name
 
 HOW PEOPLE GET AN INVITATION
 
-From someone who already uses Messagr: any user can tap "Invite someone" and pass the link, or its QR code, however they like. A link created in the app is valid for one hour and for a single use; the one above was created for the review, with the same mechanism. Invitations are free and cannot be bought. Messagr is free, with no in-app purchases and no subscriptions.
+From someone who already uses Messagr: any user can tap "Invite someone" and pass the link, or its QR code, however they like. A link created in the app is valid for one hour and for a single use. Invitations are free and cannot be bought. Messagr is free, with no in-app purchases and no subscriptions.
+
+REPORTING AND BLOCKING (GUIDELINE 1.2)
+
+The attached video shows both on an iPhone.
+Report: long-press a message, tap "Report", choose a reason, tap "Send". A report number is shown and we are alerted by SMS.
+Block: tap the name at the top of a conversation, then "Block"; or long-press a message, then "More", "Block sender". Its messages leave the screen at once, and we are told of the block.
+We act on every report within 24 hours: we remove the messages and suspend the author's account, then close it if confirmed. The terms accepted in step 1 tolerate no objectionable content and no abusive users.
 
 DELETING THE ACCOUNT
 
