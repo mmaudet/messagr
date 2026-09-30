@@ -8,7 +8,7 @@ Ce qu'il faut répondre dans la Play Console (« Sécurité des données ») et 
 
 **Certaines réponses sont des jugements.** Elles portent un renvoi, par exemple « tranché, 2 » ou « à trancher, 6 », vers la section « Les jugements », où chaque point donne la règle lue et la réponse. Les tableaux et le manifeste portent cette réponse.
 
-**Les points 1 à 5 sont tranchés** par le porteur le 16 septembre 2026. Le 5 et le 7 sont devenus des tickets, #334 et #333, puis #380 pour le 7. Le 6 attend ce que le porteur décide de la lecture faite le 16 septembre. Le 8, signaler et bloquer chez Apple, est tranché par #462 le 29 septembre 2026. Le 9, chez Google, est écrit le même jour pour #467 et attend le porteur. Chacun dit ce qui change dans sa console.
+**Les points 1 à 5 sont tranchés** par le porteur le 16 septembre 2026. Le 5 et le 7 sont devenus des tickets, #334 et #333, puis #380 pour le 7. Le 6 attend ce que le porteur décide de la lecture faite le 16 septembre. Le 8, signaler et bloquer chez Apple, est tranché par #462 le 29 septembre 2026. Le 9, chez Google, écrit le même jour pour #467, est tranché par le porteur le 30 septembre 2026. Chacun dit ce qui change dans sa console.
 
 ## Sources
 
@@ -16,7 +16,7 @@ Toutes lues le 15 septembre 2026, dans des copies faites ce jour-là.
 
 **Google**
 
-- Aide Play Console, « Fournir les informations pour la section Sécurité des données de Google Play » : <https://support.google.com/googleplay/android-developer/answer/10787469?hl=fr>. Les libellés et les règles citées en français viennent de cette page. Sa version anglaise, « Provide information for Google Play's Data safety section », a servi à vérifier les règles : <https://support.google.com/googleplay/android-developer/answer/10787469?hl=en>.
+- Aide Play Console, « Fournir les informations pour la section Sécurité des données de Google Play » : <https://support.google.com/googleplay/android-developer/answer/10787469?hl=fr>. Les libellés et les règles citées en français viennent de cette page, sauf « Autres messages via une appli » : c'est le libellé de la console, lu dans son export le 30 septembre 2026, là où l'aide écrit « Autres messages dans l'application ». Sa version anglaise, « Provide information for Google Play's Data safety section », a servi à vérifier les règles : <https://support.google.com/googleplay/android-developer/answer/10787469?hl=en>.
 - Aide Play Console, « Understanding Google Play's app account deletion requirements » : <https://support.google.com/googleplay/android-developer/answer/13327111?hl=en>.
 - Firebase, « Prepare for Google Play's data disclosure requirements » : <https://firebase.google.com/docs/android/play-data-disclosure>.
 - Firebase, « Get started with Firebase Cloud Messaging in Apple platform apps » : <https://firebase.google.com/docs/cloud-messaging/ios/get-started>.
@@ -38,23 +38,23 @@ Les deux premières pages d'Apple n'ont pas de version française lisible : leur
 
 ## Ce que la page dit, donnée par donnée
 
-| Donnée                                                                                  | Où                                                                     | Combien de temps                                                                                     | Déclarée                                                          |
-| --------------------------------------------------------------------------------------- | ---------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------- |
-| Identifiant du compte, pseudonyme                                                       | serveur                                                                | vie du compte                                                                                        | oui                                                               |
-| Appartenance aux conversations                                                          | serveur                                                                | vie du compte                                                                                        | oui                                                               |
-| Date et heure des événements, taille                                                    | serveur                                                                | vie du compte                                                                                        | oui                                                               |
-| Appareils du compte et leurs clés publiques                                             | serveur                                                                | vie du compte                                                                                        | oui                                                               |
-| Demande d'accès au relais pour un appel                                                 | serveur, relais                                                        | la page ne le dit pas                                                                                | oui                                                               |
-| Adresses IP des requêtes                                                                | journaux techniques                                                    | douze mois                                                                                           | oui                                                               |
-| Jeton de notification                                                                   | serveur ; Google sur Android, Apple sur iPhone                         | tant que les notifications sont actives, et chez Google tant que l'application Android est installée | oui                                                               |
-| Lien entre celui qui invite et celui qui entre                                          | service d'invitations                                                  | trente jours après la dépense de l'invitation                                                        | oui                                                               |
-| Contenu : textes, photos, fichiers                                                      | serveur, chiffré de bout en bout                                       | vie de la conversation                                                                               | non, illisible                                                    |
-| Son et image des appels                                                                 | relais, chiffrés                                                       | temps réel                                                                                           | non                                                               |
-| Clés, session, journal de l'appareil                                                    | appareil                                                               | sans objet                                                                                           | non, ne quitte pas l'appareil                                     |
-| Contenu d'un signalement, scellé, et clé d'idempotence                                  | service d'invitations, scellé pour l'exploitant                        | six mois après la décision, plus s'il a été transmis aux autorités                                   | Play : oui, facultatif, à trancher, 9 ; Apple : non, tranché, 8   |
-| Reste d'un signalement : numéro, compte qui signale, motif, décision, motivation, dates | service d'invitations                                                  | douze mois après la décision                                                                         | oui, déjà : ID utilisateur ; tranché, 8 ; à trancher, 9           |
-| Blocage : qui a bloqué qui, et quand ; liste des comptes bloqués                        | service d'invitations ; serveur, dans les données du compte qui bloque | tant que les deux comptes existent ; la liste, tant que le compte qui bloque existe                  | oui, déjà : ID utilisateur, Contacts ; tranché, 8 ; à trancher, 9 |
-| SMS de l'exploitant : numéros de signalement, motifs, nombre de blocages                | OVHcloud, depuis le serveur                                            | effacement demandé un jour après l'envoi                                                             | non, ne part pas de l'appareil ; à trancher, 9                    |
+| Donnée                                                                                  | Où                                                                     | Combien de temps                                                                                     | Déclarée                                                     |
+| --------------------------------------------------------------------------------------- | ---------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------- | ------------------------------------------------------------ |
+| Identifiant du compte, pseudonyme                                                       | serveur                                                                | vie du compte                                                                                        | oui                                                          |
+| Appartenance aux conversations                                                          | serveur                                                                | vie du compte                                                                                        | oui                                                          |
+| Date et heure des événements, taille                                                    | serveur                                                                | vie du compte                                                                                        | oui                                                          |
+| Appareils du compte et leurs clés publiques                                             | serveur                                                                | vie du compte                                                                                        | oui                                                          |
+| Demande d'accès au relais pour un appel                                                 | serveur, relais                                                        | la page ne le dit pas                                                                                | oui                                                          |
+| Adresses IP des requêtes                                                                | journaux techniques                                                    | douze mois                                                                                           | oui                                                          |
+| Jeton de notification                                                                   | serveur ; Google sur Android, Apple sur iPhone                         | tant que les notifications sont actives, et chez Google tant que l'application Android est installée | oui                                                          |
+| Lien entre celui qui invite et celui qui entre                                          | service d'invitations                                                  | trente jours après la dépense de l'invitation                                                        | oui                                                          |
+| Contenu : textes, photos, fichiers                                                      | serveur, chiffré de bout en bout                                       | vie de la conversation                                                                               | non, illisible                                               |
+| Son et image des appels                                                                 | relais, chiffrés                                                       | temps réel                                                                                           | non                                                          |
+| Clés, session, journal de l'appareil                                                    | appareil                                                               | sans objet                                                                                           | non, ne quitte pas l'appareil                                |
+| Contenu d'un signalement, scellé, et clé d'idempotence                                  | service d'invitations, scellé pour l'exploitant                        | six mois après la décision, plus s'il a été transmis aux autorités                                   | Play : oui, facultatif, tranché, 9 ; Apple : non, tranché, 8 |
+| Reste d'un signalement : numéro, compte qui signale, motif, décision, motivation, dates | service d'invitations                                                  | douze mois après la décision                                                                         | oui, déjà : ID utilisateur ; tranché, 8 et 9                 |
+| Blocage : qui a bloqué qui, et quand ; liste des comptes bloqués                        | service d'invitations ; serveur, dans les données du compte qui bloque | tant que les deux comptes existent ; la liste, tant que le compte qui bloque existe                  | oui, déjà : ID utilisateur, Contacts ; tranché, 8 et 9       |
+| SMS de l'exploitant : numéros de signalement, motifs, nombre de blocages                | OVHcloud, depuis le serveur                                            | effacement demandé un jour après l'envoi                                                             | non, ne part pas de l'appareil ; tranché, 9                  |
 
 Les quatre dernières lignes valent à partir de la build qui signale, et de la publication de la version qui les dit.
 
@@ -104,9 +104,9 @@ Cocher ces quatre types, et aucun autre, tant qu'aucune build qui signale n'est 
 - « Activité dans les applications » → « Autres actions » ;
 - « Appareil ou autres ID » → « Appareil ou autres ID », tranché, 1 et 2.
 
-**Avec la build qui signale, trois de plus**, facultatifs, et « ID utilisateur » gagne une finalité : à trancher, 9.
+**Avec la build qui signale, trois de plus**, facultatifs, et « ID utilisateur » gagne une finalité : tranché, 9.
 
-- « Messages » → « Autres messages dans l'application » ;
+- « Messages » → « Autres messages via une appli » ;
 - « Photos et vidéos » → « Photos » ;
 - « Fichiers et documents » → « Fichiers et documents ».
 
@@ -128,14 +128,14 @@ La question « Pourquoi ces données utilisateur sont-elles partagées ? » ne c
 | Autres actions        | Collectées | Non | Obligatoire | Fonctionnement de l'application                                                  |
 | Appareil ou autres ID | Collectées | Non | Obligatoire | Fonctionnement de l'application ; Prévention des fraudes, sécurité et conformité |
 
-Avec la build qui signale, à trancher, 9 :
+Avec la build qui signale, tranché, 9 :
 
-| Type                               | 1          | 2   | 3                                                                      | 4                                                                                                      |
-| ---------------------------------- | ---------- | --- | ---------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------ |
-| ID utilisateur                     | Collectées | Non | Obligatoire                                                            | Fonctionnement de l'application ; Gestion des comptes ; Prévention des fraudes, sécurité et conformité |
-| Autres messages dans l'application | Collectées | Non | Les utilisateurs peuvent choisir si ces données sont collectées ou non | Prévention des fraudes, sécurité et conformité                                                         |
-| Photos                             | Collectées | Non | Les utilisateurs peuvent choisir si ces données sont collectées ou non | Prévention des fraudes, sécurité et conformité                                                         |
-| Fichiers et documents              | Collectées | Non | Les utilisateurs peuvent choisir si ces données sont collectées ou non | Prévention des fraudes, sécurité et conformité                                                         |
+| Type                          | 1          | 2   | 3                                                                      | 4                                                                                                      |
+| ----------------------------- | ---------- | --- | ---------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------ |
+| ID utilisateur                | Collectées | Non | Obligatoire                                                            | Fonctionnement de l'application ; Gestion des comptes ; Prévention des fraudes, sécurité et conformité |
+| Autres messages via une appli | Collectées | Non | Les utilisateurs peuvent choisir si ces données sont collectées ou non | Prévention des fraudes, sécurité et conformité                                                         |
+| Photos                        | Collectées | Non | Les utilisateurs peuvent choisir si ces données sont collectées ou non | Prévention des fraudes, sécurité et conformité                                                         |
+| Fichiers et documents         | Collectées | Non | Les utilisateurs peuvent choisir si ces données sont collectées ou non | Prévention des fraudes, sécurité et conformité                                                         |
 
 Le chiffrement en transit et la suppression se déclarent pour toute l'application, à l'étape précédente, et valent donc pour tous les types : chiffrés en transit, oui ; suppression sur demande, oui, à conformite@messagr.eu.
 
@@ -148,7 +148,7 @@ Le chiffrement en transit et la suppression se déclarent pour toute l'applicati
 - **Partagé : non.** Il reste chez l'hébergeur, fournisseur de services : « Le serveur est hébergé par Hetzner Online GmbH, à Helsinki, en Finlande, au sein de l'Union européenne. »
 - **Éphémère : non.** « Les métadonnées d'une conversation vivent aussi longtemps que le compte. »
 - **Obligatoire.** Il n'y a pas d'application sans compte.
-- **Finalités.** « Fonctionnement de l'application », puisque ces métadonnées « ne servent à aucun autre usage que l'acheminement ». « Gestion des comptes », que Play définit comme « Données utilisées par le développeur pour configurer ou gérer le compte d'un utilisateur. » Avec la build qui signale, « Prévention des fraudes, sécurité et conformité » aussi : le service garde le compte qui signale jusqu'à douze mois après la décision, et un signalement porte le compte visé. À trancher, 9.
+- **Finalités.** « Fonctionnement de l'application », puisque ces métadonnées « ne servent à aucun autre usage que l'acheminement ». « Gestion des comptes », que Play définit comme « Données utilisées par le développeur pour configurer ou gérer le compte d'un utilisateur. » Avec la build qui signale, « Prévention des fraudes, sécurité et conformité » aussi : le service garde le compte qui signale jusqu'à douze mois après la décision, et un signalement porte le compte visé. Tranché, 9.
 - **Suppression.** « À la suppression d'un compte, il est désactivé immédiatement et ses données sont purgées sous trente jours. » Avec la limite que la page reconnaît : « supprimer un compte le désactive et empêche toute réutilisation de son identifiant, mais les événements qu'il a produits restent des événements du salon. »
 
 #### « Contacts »
@@ -189,18 +189,18 @@ Le chiffrement en transit et la suppression se déclarent pour toute l'applicati
 
 ### Ce qui n'est pas déclaré sur Play
 
-| Type Play                                                                              | Pourquoi                                                                                         | Règle                                                   |
-| -------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------ | ------------------------------------------------------- |
-| « Messages » → « Autres messages dans l'application »                                  | chiffrés de bout en bout, sauf ce qu'une personne signale                                        | chiffrement de bout en bout, tranché, 4 ; à trancher, 9 |
-| « Photos et vidéos » → « Photos »                                                      | chiffrées de bout en bout, sauf ce qu'une personne signale ; l'application n'envoie pas de vidéo | chiffrement de bout en bout, tranché, 4 ; à trancher, 9 |
-| « Fichiers et documents »                                                              | chiffrés de bout en bout, sauf ce qu'une personne signale                                        | chiffrement de bout en bout, tranché, 4 ; à trancher, 9 |
-| « Fichiers audio »                                                                     | pas de message vocal ; le son des appels passe chiffré, en temps réel                            | chiffrement de bout en bout ; traitement éphémère       |
-| « Position »                                                                           | aucune position n'est déduite des adresses IP                                                    | la note de Play sur la position déduite                 |
-| « Informations personnelles » : nom, adresse e-mail, téléphone, adresse                | jamais demandés                                                                                  | rien n'est transmis                                     |
-| « Infos et performance des applis »                                                    | aucun outil de mesure ; le journal reste sur l'appareil                                          | traitement sur l'appareil, tranché, 5                   |
-| Interactions, recherches, applications installées, navigation, agenda, finances, santé | rien de tel                                                                                      | rien n'est transmis                                     |
+| Type Play                                                                              | Pourquoi                                                                                         | Règle                                             |
+| -------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------ | ------------------------------------------------- |
+| « Messages » → « Autres messages via une appli »                                       | chiffrés de bout en bout, sauf ce qu'une personne signale                                        | chiffrement de bout en bout, tranché, 4 et 9      |
+| « Photos et vidéos » → « Photos »                                                      | chiffrées de bout en bout, sauf ce qu'une personne signale ; l'application n'envoie pas de vidéo | chiffrement de bout en bout, tranché, 4 et 9      |
+| « Fichiers et documents »                                                              | chiffrés de bout en bout, sauf ce qu'une personne signale                                        | chiffrement de bout en bout, tranché, 4 et 9      |
+| « Fichiers audio »                                                                     | pas de message vocal ; le son des appels passe chiffré, en temps réel                            | chiffrement de bout en bout ; traitement éphémère |
+| « Position »                                                                           | aucune position n'est déduite des adresses IP                                                    | la note de Play sur la position déduite           |
+| « Informations personnelles » : nom, adresse e-mail, téléphone, adresse                | jamais demandés                                                                                  | rien n'est transmis                               |
+| « Infos et performance des applis »                                                    | aucun outil de mesure ; le journal reste sur l'appareil                                          | traitement sur l'appareil, tranché, 5             |
+| Interactions, recherches, applications installées, navigation, agenda, finances, santé | rien de tel                                                                                      | rien n'est transmis                               |
 
-- **Le contenu.** « Le contenu de vos conversations est chiffré de bout en bout : il est chiffré sur l'appareil qui l'écrit et déchiffré sur celui qui le lit. Les clés ne quittent jamais les appareils. » Le code le confirme pour les photos et les fichiers : ce qui est téléversé est le chiffré, déclaré `application/octet-stream`, sans nom de fichier (`cryptoPump.ts`, `mediaRepository.ts`). Seul ce qu'une personne signale fait exception, déclaré à part avec la build qui signale : à trancher, 9.
+- **Le contenu.** « Le contenu de vos conversations est chiffré de bout en bout : il est chiffré sur l'appareil qui l'écrit et déchiffré sur celui qui le lit. Les clés ne quittent jamais les appareils. » Le code le confirme pour les photos et les fichiers : ce qui est téléversé est le chiffré, déclaré `application/octet-stream`, sans nom de fichier (`cryptoPump.ts`, `mediaRepository.ts`). Seul ce qu'une personne signale fait exception, déclaré à part avec la build qui signale : tranché, 9.
 - **Les appels.** « ce relais voit l'adresse IP des téléphones qui s'en servent, jamais le contenu de l'appel ».
 - **La position.** Play : « Vous devez indiquer ici la position approximative déduite, par exemple à partir de l'adresse IP ou du nom du point d'accès. » Rien n'en est déduit : « Nous ne les enrichissons pas, nous ne les croisons avec rien ».
 - **L'identité.** « pas de numéro de téléphone » ; « pas d'adresse électronique » ; « pas de nom, réel ou déclaré ».
@@ -351,7 +351,7 @@ Neuf questions où la règle laisse un choix. Chacune donne les faits, la règle
 
 **Tranché par #462 le 29 septembre 2026 :** le 8, signaler et bloquer chez Apple.
 
-**À trancher :** le 9, signaler et bloquer chez Google, écrit pour #467 le même jour.
+**Tranché par le porteur le 30 septembre 2026 :** le 9, signaler et bloquer chez Google, écrit pour #467 le 29 septembre.
 
 ### 1. Le jeton de notification compte-t-il comme collecté ?
 
@@ -528,9 +528,9 @@ Apple donne l'exemple le plus proche : « Examples of data that may not need to 
 - **La finalité.** « Prévention des fraudes, sécurité et conformité », « Données utilisées pour prévenir les fraudes, assurer la sécurité ou respecter les lois ». Un signalement sert à faire respecter les conditions et la loi, à rien d'autre.
 - **Pas de partage.** Transmis aux autorités, un signalement ne se déclare pas comme partagé : « Motifs juridiques : transfert de données utilisateur à des fins juridiques particulières, par exemple en réponse à une obligation légale ou à des demandes gouvernementales. » Les SMS de l'exploitant partent du serveur vers OVHcloud, qui agit pour le compte de l'exploitant : « Fournisseurs de services : transfert de données utilisateur à un "fournisseur de services" qui les traite pour le compte du développeur. »
 
-**La réponse retenue, à trancher par le porteur : trois types de plus pour le signalement**, chacun « Collectées » et non partagées, « Non » à éphémère, « Les utilisateurs peuvent choisir si ces données sont collectées ou non », et une seule finalité, « Prévention des fraudes, sécurité et conformité » :
+**Tranché par le porteur le 30 septembre 2026 : trois types de plus pour le signalement**, chacun « Collectées » et non partagées, « Non » à éphémère, « Les utilisateurs peuvent choisir si ces données sont collectées ou non », et une seule finalité, « Prévention des fraudes, sécurité et conformité » :
 
-- « Messages » → « Autres messages dans l'application » : « Tous les autres types de messages. Par exemple, messages instantanés ou contenus de chat. » ;
+- « Messages » → « Autres messages via une appli », que l'aide appelle « Autres messages dans l'application » : « Tous les autres types de messages. Par exemple, messages instantanés ou contenus de chat. » ;
 - « Photos et vidéos » → « Photos » : « Photos d'un utilisateur. » ;
 - « Fichiers et documents » → « Fichiers et documents » : « Fichiers ou documents d'un utilisateur, ou informations sur ses fichiers ou documents (noms de fichier, par exemple). » Le signalement d'un document en porte le nom, le type, la taille et la clé.
 
@@ -538,15 +538,20 @@ Pas « Vidéos » : l'application n'envoie pas de vidéo, et une vidéo envoyée
 
 **Pour le blocage : aucun type nouveau.** Il laisse deux identifiants de compte et une date, que couvrent « ID utilisateur » et « Contacts », dont Play nomme les « informations des graphes sociaux comme les noms d'utilisateur ». « Contacts » porte déjà « Prévention des fraudes, sécurité et conformité », et « ID utilisateur » la gagne avec le signalement.
 
-**Ce qui reste à juger.** « Facultatif » se lit du côté de la personne qui signale. L'auteur des messages signalés, lui, ne choisit rien : une lecture plus stricte déclarerait ces trois types « Obligatoire ». Mais Play réserve « Obligatoire » à ce que « la fonctionnalité principale de votre application nécessite », et aucune personne n'a à signaler pour se servir de Messagr. La réponse retenue est « facultatif ».
+**L'autre réponse, écartée.** « Facultatif » se lit du côté de la personne qui signale. L'auteur des messages signalés, lui, ne choisit rien : une lecture plus stricte déclarerait ces trois types « Obligatoire ». Mais Play réserve « Obligatoire » à ce que « la fonctionnalité principale de votre application nécessite », et aucune personne n'a à signaler pour se servir de Messagr. Le porteur a retenu « facultatif » le 30 septembre 2026.
 
 **Ce que le porteur change dans la Play Console, « Sécurité des données »**, au plus tard quand la build Android qui signale sort de la piste de test interne : la section décrit « l'ensemble des pratiques de votre application concernant la collecte et le partage des données pour toutes les versions actuellement disponibles sur Google Play », et « Les développeurs ne sont pas tenus d'inclure les applications actives sur les canaux de test internes dans la section Sécurité des données ».
 
-1. « Types de données » : cocher en plus « Messages » → « Autres messages dans l'application », « Photos et vidéos » → « Photos », et « Fichiers et documents » → « Fichiers et documents ».
+1. « Types de données » : cocher en plus « Messages » → « Autres messages via une appli », « Photos et vidéos » → « Photos », et « Fichiers et documents » → « Fichiers et documents ». Ni « Vidéos », ni rien dans « Fichiers audio ».
 2. Pour chacun des trois : « Collectées » ; éphémère, « Non » ; « Les utilisateurs peuvent choisir si ces données sont collectées ou non » ; « Prévention des fraudes, sécurité et conformité », et aucune autre finalité.
 3. « ID utilisateur » : ajouter la finalité « Prévention des fraudes, sécurité et conformité ».
 4. Rien d'autre ne change : « Contacts », « Autres actions », « Appareil ou autres ID », le chiffrement en transit et la suppression gardent leurs réponses.
-5. Exporter le CSV et le garder, comme à la première saisie. `scripts/declarations-magasins.sh` guide cette première saisie (#321) et ne connaît pas ce point : ces gestes se font à la main.
+5. Enregistrer, relire l'« Aperçu de la fiche Play Store », puis « Envoyer ».
+6. Exporter le CSV et le garder, comme à la première saisie.
+
+**Saisi dans la Play Console le 30 septembre 2026, et corrigé le même jour** : une case voisine avait été cochée par mégarde. Dans l'export CSV de la console, les trois types sont `PSL_OTHER_MESSAGES`, sous `PSL_DATA_TYPES_EMAIL_AND_TEXT`, `PSL_PHOTOS` et `PSL_FILES_AND_DOCS`, et la finalité est `PSL_FRAUD_PREVENTION_SECURITY`.
+
+`scripts/declarations-magasins.sh signaler` guide ces gestes pour une saisie refaite plus tard, dans l'ordre du formulaire (#500). Sans argument, il guide la première saisie (#321), qui ne change pas.
 
 ## Ce que la page ne dit pas encore
 
