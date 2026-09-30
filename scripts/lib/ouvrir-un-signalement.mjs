@@ -74,7 +74,7 @@ import { openOnDemand } from './ouvrir-un-fichier-signale.mjs'
 
 const USAGE = [
   'usage : node scripts/ouvrir-un-signalement.mjs [--cle <fichier>] [<pli.json>]',
-  '          [--ouvrir <n> | --ouvrir-vignette <n> [--compte <fichier>]]',
+  '          [(--ouvrir <n> | --ouvrir-vignette <n>) [--compte <fichier>]]',
   '',
   'Le pli se lit dans le fichier nommé, sinon sur l’entrée standard :',
   '  { "reason": "<motif>", "reporter": "<compte qui signale>", "sealed": "<pli>" }',

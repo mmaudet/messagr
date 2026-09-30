@@ -627,10 +627,12 @@ export function explainRefusal(httpStatus, text) {
       'le service ne voit pas la conversation avec ce jeton.',
     MESSAGR_CREATION_IN_FLIGHT:
       'une création est encore en cours sous cette clé : relancez dans un instant.',
-    // Depuis #493, le service ne rend 401 que pour un jeton que son
-    // homeserver refuse, et 503 quand ce homeserver ne lui répond pas, dans
-    // le délai qu'il lui donne compris (#496) : le self-test le relit dans
-    // le service.
+    // Depuis #493, le service rend 401 à un appel sans jeton, à une
+    // réclamation faite au nom d'un autre compte, et à un jeton que son
+    // homeserver refuse ; il rend 503 quand ce homeserver ne lui répond pas,
+    // dans le délai qu'il lui donne compris (#496). Cet outil envoie
+    // toujours le jeton du compte et ne réclame rien : un 401 n'y peut venir
+    // que du troisième. Le self-test le relit dans le service.
     M_UNAUTHORIZED:
       "le service n'a pas authentifié le compte : son homeserver refuse ce jeton.",
     MESSAGR_UPSTREAM:
@@ -1433,9 +1435,11 @@ async function selfTest() {
   )
 
   // CE QUE VEUT DIRE UN REFUS DU SERVICE, relu dans le service (#493, #496) :
-  // 401 M_UNAUTHORIZED pour un jeton que son homeserver refuse, et pour lui
-  // seul ; 503 MESSAGR_UPSTREAM pour toute autre panne de sa demande
-  // d'identité, un homeserver qui ne répond pas dans le délai compris.
+  // de sa demande d'identité, seul un jeton que son homeserver refuse donne
+  // 401 M_UNAUTHORIZED, et toute autre panne 503 MESSAGR_UPSTREAM, un
+  // homeserver qui ne répond pas dans le délai compris. Le service rend
+  // aussi 401 à un appel sans jeton et à une réclamation au nom d'un autre
+  // compte, deux cas que cet outil ne produit pas.
   const errors = readFileSync(
     join(REPOSITORY, 'services/invitations/src/error.rs'),
     'utf8',
