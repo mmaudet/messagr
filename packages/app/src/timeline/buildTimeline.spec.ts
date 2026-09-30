@@ -295,11 +295,55 @@ describe('toTimelineEntries', () => {
         },
       ],
     )
+    // #461: and it keeps the mark. The conversation draws, under its
+    // bubble, that this message is not encrypted; its words stay readable.
     expect(entry).toMatchObject({
       eventId: '$p',
       body: 'en clair',
       msgtype: 'm.text',
+      unencrypted: true,
     })
+  })
+
+  it('marks no message that arrived encrypted, whatever became of it', async () => {
+    // #461: a message encrypted and then decrypted never carries the mark.
+    // Nor does one this device could not open, nor one removed for
+    // everyone. Only `$p` carries it: it arrived as it was written.
+    const entries = await entriesOf(
+      machine({ $a: 'lisible' }),
+      decodeUtf8,
+      '!room:messagr.eu',
+      [
+        encrypted('$a', 1000),
+        {
+          type: 'm.room.message',
+          event_id: '$p',
+          sender: '@her:messagr.eu',
+          origin_server_ts: 1500,
+          content: { msgtype: 'm.text', body: 'en clair' },
+        },
+        encrypted('$b', 2000),
+        {
+          ...encrypted('$gone', 3000),
+          content: {},
+          unsigned: {
+            redacted_because: {
+              type: 'm.room.redaction',
+              content: { 'eu.messagr.kind': 'message' },
+            },
+          },
+        },
+      ],
+    )
+
+    expect(
+      entries.map(entry => [entry.eventId, entry.unencrypted === true]),
+    ).toEqual([
+      ['$a', false],
+      ['$p', true],
+      ['$b', false],
+      ['$gone', false],
+    ])
   })
 
   it('says what kind of message each is, and no kind for anything else', async () => {

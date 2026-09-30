@@ -67,6 +67,20 @@ export interface TimelineEntry {
    * identical on the wire.
    */
   readonly removed?: boolean
+  /**
+   * Whether this message was not encrypted: it arrived as an
+   * `m.room.message`, where the conversation's messages arrive as
+   * `m.room.encrypted` (#461).
+   *
+   * Set only there. A message this device decrypted never carries it, nor
+   * one it could not open, nor one removed for everyone: each of those
+   * arrived encrypted.
+   *
+   * The conversation draws it under the bubble, and the words stay
+   * readable. The list's row does not repeat it: a row shows the opening
+   * of the last message, and the mention is read where the message is.
+   */
+  readonly unencrypted?: boolean
 }
 
 /**

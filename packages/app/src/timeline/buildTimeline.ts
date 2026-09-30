@@ -136,6 +136,11 @@ export async function toTimelineEntries(
       // Never encrypted, and said so. Refusing to show it would hide
       // something that was in the room; decrypting it would fail for a
       // reason that has nothing to do with what happened.
+      //
+      // SAID BY THE ENTRY, WHICH THIS COMMENT CLAIMED BEFORE IT WAS TRUE.
+      // The entry carried the words and nothing else, so the conversation
+      // drew it exactly like the messages around it. `unencrypted` is the
+      // mark, and the bubble says it (#461).
       const body = event.content?.body
       if (typeof body === 'string') {
         entries.push({
@@ -144,6 +149,7 @@ export async function toTimelineEntries(
           sentAt,
           body,
           ...kindOf(event.content?.msgtype),
+          unencrypted: true,
         })
       }
       continue
