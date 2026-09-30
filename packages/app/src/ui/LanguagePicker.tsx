@@ -10,7 +10,15 @@ import {
 
 import { t } from '../copy'
 import { LANGUAGES, type Language } from '../copy/languages'
-import { color, floors, radius, space, stroke, type } from '../design/tokens'
+import {
+  color,
+  floors,
+  layout,
+  radius,
+  space,
+  stroke,
+  type,
+} from '../design/tokens'
 
 /**
  * Choosing the language: a closed control that says what is chosen, and opens
@@ -223,7 +231,7 @@ const styles = StyleSheet.create({
     // The ink and an opacity, exactly as `Plate.tsx`: the darkest ground the
     // palette has, dimmed, rather than a translucent value invented here.
     backgroundColor: color.brand.ink900,
-    opacity: 0.62,
+    opacity: layout.scrimOpacity,
   },
   sheet: {
     backgroundColor: color.surface.paper,
