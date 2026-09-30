@@ -45,13 +45,15 @@
 #   le fichier nomme (whoami) : c'est à ce compte que le script reconnaît son
 #   propre message, pour attendre la réponse du serveur et non la sienne.
 # - LA CONFIRMATION. Rien ne part avant que le geste soit dit et sa cible
-#   tapée en retour : l'événement, l'adresse ou le compte, la commande
-#   entière pour une commande libre. Toute autre réponse, ou la fin de
-#   l'entrée standard, ne poste rien.
-# - Le compte d'exploitation ne se suspend ni ne se ferme par ce script : ni
-#   par un geste, ni par une commande libre, qui ne part pas quand elle le
-#   nomme, par son identifiant ou par son seul nom, que Continuwuity prend
-#   aussi. Une commande sur ce compte se poste à la main dans #admins.
+#   tapée en retour : l'événement ou l'adresse tels quels, le compte en toute
+#   casse, la commande entière pour une commande libre. Toute autre réponse,
+#   ou la fin de l'entrée standard, ne poste rien.
+# - Le compte d'exploitation ne se suspend, ne se lève ni ne se ferme par ce
+#   script : ni par un geste, ni par une commande libre, qui ne part pas quand
+#   elle le nomme, par son identifiant ou par son seul nom, que Continuwuity
+#   prend aussi. En toute casse : Continuwuity lit un identifiant en
+#   minuscules, et `@exploitation:MESSAGR.EU` est le compte d'exploitation.
+#   Une commande sur ce compte se poste à la main dans #admins.
 # - LE REPÈRE AVANT D'ÉCRIRE : sans lui, le script relirait d'anciennes
 #   réponses.
 # - LA RÉPONSE DU SERVEUR, PAS LA NÔTRE, et sans réponse sous 25 secondes le
@@ -89,7 +91,11 @@ ATTENTE = float(os.environ.get("ADMIN_MESSAGR_ATTENTE", "25"))
 
 EVENEMENT = re.compile(r"^\$[A-Za-z0-9+/=_.:\-]{8,}$")
 MEDIA = re.compile(r"^mxc://[A-Za-z0-9.\-:\[\]]+/[A-Za-z0-9_\-]+$")
-COMPTE = re.compile(r"^@[a-z0-9._=/+\-]+:[A-Za-z0-9.\-:\[\]]+$")
+# Un compte s'écrit en toute casse, et se lit en minuscules : Continuwuity lit
+# un identifiant en minuscules tout entier, `@bob:MESSAGR.EU` est
+# `@bob:messagr.eu`. Le script le met donc en minuscules avant tout, pour le
+# poster, le faire taper en retour et le comparer au compte d'exploitation.
+COMPTE = re.compile(r"^@[A-Za-z0-9._=/+\-]+:[A-Za-z0-9.\-:\[\]]+$")
 
 USAGE = """usage :
   scripts/admin-messagr.sh retirer '$<événement>'
@@ -161,7 +167,9 @@ GESTES = {
 
 
 def le_geste(arguments):
-    """La commande à poster, ce qu'il faut taper en retour, et le plan."""
+    """La commande à poster, ce qu'il faut taper en retour, le plan, le geste,
+    et si le retour se compare en toute casse : un compte, oui ; un événement,
+    une adresse ou une commande, non."""
     if not arguments or arguments[0] in ("-h", "--help"):
         refuser(USAGE, 2)
     nom = arguments[0]
@@ -174,11 +182,15 @@ def le_geste(arguments):
             refuser(
                 f"{cible!r} n'est pas {attendu}. Rien n'a été posté.\n\n{USAGE}", 2
             )
+        un_compte = forme is COMPTE
+        if un_compte:
+            cible = cible.lower()
         return (
             f"{commande} {cible}",
             cible,
             plan.format(cible=cible) + f"\nTapez {quoi} pour le faire, autre chose pour ne rien faire :",
             nom,
+            un_compte,
         )
     if len(arguments) != 1 or nom.startswith("-"):
         refuser(
@@ -191,6 +203,7 @@ def le_geste(arguments):
         nom,
         "Tapez la commande entière pour la poster, autre chose pour ne rien faire :",
         None,
+        False,
     )
 
 
@@ -213,7 +226,7 @@ def les_identifiants():
 
 
 def principal(arguments):
-    commande, attendu, plan, nom = le_geste(arguments)
+    commande, attendu, plan, nom, en_toute_casse = le_geste(arguments)
     serveur, moi, jeton = les_identifiants()
     base = serveur + "/_matrix/client/v3"
     entetes = {"Authorization": "Bearer " + jeton, "Content-Type": "application/json"}
@@ -235,16 +248,19 @@ def principal(arguments):
             refuser(f"le homeserver ne répond pas ({e.reason}) : rien n'a été posté.")
 
     # LE COMPTE D'EXPLOITATION : le jeton est-il celui du compte que le
-    # fichier nomme ? Sinon le script prendrait son propre message pour la
-    # réponse du serveur.
-    qui = appel("/account/whoami").get("user_id")
-    if qui != moi:
+    # fichier nomme, en toute casse ? Le compte se prend ensuite tel que le
+    # homeserver l'écrit : c'est à ce nom qu'il signe les messages du script,
+    # qui sinon prendrait le sien pour la réponse du serveur.
+    qui = appel("/account/whoami").get("user_id") or ""
+    if qui.lower() != moi.lower():
         refuser(
             f"le jeton de {CREDENTIALS} n'est pas celui de {moi} : le homeserver le donne à "
             f"{qui}. Rien n'a été posté."
         )
-    if nom in ("suspendre", "fermer") and attendu == moi:
-        refuser(f"{moi} est le compte d'exploitation : ce script ne le {nom} pas.")
+    moi = qui
+    verbes = {"suspendre": "suspend", "lever": "lève", "fermer": "ferme"}
+    if nom in verbes and attendu == moi.lower():
+        refuser(f"{moi} est le compte d'exploitation : ce script ne le {verbes[nom]} pas.")
     # Une commande libre qui nomme le compte d'exploitation ne part pas :
     # `users deactivate <lui>` fermerait le compte même qui poste. Son seul
     # nom compte aussi, Continuwuity le prenant pour le compte de ce serveur.
@@ -266,8 +282,8 @@ def principal(arguments):
 
     # LA CONFIRMATION : le geste dit, la cible tapée en retour.
     dire(plan.replace("Tapez", f"Poste dans #admins:{nom_du_serveur}, au nom de {moi} :\n  !admin {commande}\nTapez", 1))
-    reponse = sys.stdin.readline()
-    if reponse.strip() != attendu:
+    tape = sys.stdin.readline().strip()
+    if (tape.lower() if en_toute_casse else tape) != attendu:
         refuser("Rien n'a été posté.")
 
     # Le repère AVANT d'écrire : sans lui, on relirait d'anciennes réponses.
@@ -364,12 +380,12 @@ def essai():
     dossier.mkdir()
     fichier = dossier / "messagr-eu.json"
 
-    def identifiants(droits=0o600):
+    def identifiants(droits=0o600, compte=moi):
         fichier.write_text(
             json.dumps(
                 {
                     "serveur": f"http://127.0.0.1:{serveur.server_port}",
-                    "user_id": moi,
+                    "user_id": compte,
                     "access_token": jeton,
                 }
             )
@@ -425,7 +441,7 @@ def essai():
         ["!admin media delete --mxc " + media])
     cas("une commande libre, tapée en retour", ["server version"], "server version\n",
         True, ["!admin server version"])
-    for reponse in ["oui\n", "", "@Bob:example.org\n", "@bob:example.org, oui\n"]:
+    for reponse in ["oui\n", "", "@bob:example.com\n", "@bob:example.org, oui\n"]:
         cas(f"rien sans la cible tapée en retour ({reponse.strip()!r})", ["suspendre", bob],
             reponse, False, [])
     cas("une commande libre non tapée en retour", ["server version"], "oui\n", False, [])
@@ -452,6 +468,30 @@ def essai():
             [commande], commande + "\n", False, [], dit="le compte d'exploitation")
     cas("une commande libre sur un autre compte part", ["users lock " + bob],
         "users lock " + bob + "\n", True, ["!admin users lock " + bob])
+    # EN TOUTE CASSE : Continuwuity lit un identifiant en minuscules tout
+    # entier, et `@exploitation:EXAMPLE.ORG` est le compte d'exploitation.
+    for geste, verbe, cible in [
+        ("fermer", "ferme", "@exploitation:EXAMPLE.ORG"),
+        ("suspendre", "suspend", "@exploitation:Example.Org"),
+        ("lever", "lève", "@EXPLOITATION:example.org"),
+        ("fermer", "ferme", "@Exploitation:Example.org"),
+    ]:
+        cas(f"le compte d'exploitation en casse mêlée ne se {verbe} pas ({cible})",
+            [geste, cible], cible + "\n", False, [], dit="le compte d'exploitation")
+    cas("une commande libre qui nomme le compte d'exploitation en casse mêlée",
+        ["users deactivate @EXPLOITATION:EXAMPLE.ORG"],
+        "users deactivate @EXPLOITATION:EXAMPLE.ORG\n", False, [],
+        dit="le compte d'exploitation")
+    cas("un compte en casse mêlée se poste comme le homeserver le lit",
+        ["suspendre", "@Bob:EXAMPLE.ORG"], "@bob:example.org\n", True,
+        ["!admin users lock @bob:example.org"])
+    cas("et se tape en retour en toute casse", ["lever", "@bob:example.org"],
+        "@BOB:Example.Org\n", True, ["!admin users unlock @bob:example.org"])
+    identifiants(compte="@Exploitation:Example.ORG")
+    cas("des identifiants en casse mêlée : le compte est celui du jeton, et la réponse "
+        "attendue celle du serveur", ["suspendre", bob], bob + "\n", True,
+        ["!admin users lock " + bob], dit="fait : !admin users lock " + bob)
+    identifiants()
     etat["whoami"] = "@quelquun:example.org"
     cas("un jeton d'un autre compte", ["suspendre", bob], bob + "\n", False, [],
         dit="n'est pas celui de")
