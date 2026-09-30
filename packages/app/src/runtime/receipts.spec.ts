@@ -1,7 +1,13 @@
 import { describe, expect, it } from 'vitest'
 
 import type { TimelineEntry } from '../timeline/mergeTimeline'
-import { markUpTo, readAtMark, readReceiptsFor, readUpTo } from './receipts'
+import {
+  markUpTo,
+  readAtMark,
+  readMarkNow,
+  readReceiptsFor,
+  readUpTo,
+} from './receipts'
 
 const ME = '@me:x'
 const HER = '@her:x'
@@ -167,5 +173,44 @@ describe('the mark, held apart from what it marks', () => {
     const found = markUpTo(later, [{ reader: HER, upTo: '$m4' }], ME)
     expect(found).toBe(400)
     expect(readAtMark(later, found ?? 0, ME).has('$m4')).toBe(true)
+  })
+})
+
+describe('the ticks of the conversation open (#208, #498)', () => {
+  // Read again whenever the timeline moves, for the account the session
+  // holds: the one whose own messages carry the ticks.
+
+  it('raises the mark held when a receipt seen resolves further, and ticks this account’s messages up to it', () => {
+    expect(
+      readMarkNow(TIMELINE, [{ reader: HER, upTo: '$m2' }], 100, ME),
+    ).toEqual({ mark: 200, raised: true, read: new Set(['$m1', '$m2']) })
+  })
+
+  it('keeps the mark held when what was seen resolves lower, or to nothing yet', () => {
+    // It only ever goes up (`receipts.ts`), and a receipt naming an event
+    // not fetched yet leaves it where it was.
+    expect(
+      readMarkNow(TIMELINE, [{ reader: HER, upTo: '$m1' }], 300, ME),
+    ).toEqual({
+      mark: 300,
+      raised: false,
+      read: new Set(['$m1', '$m2', '$m3']),
+    })
+    expect(
+      readMarkNow(TIMELINE, [{ reader: HER, upTo: '$later' }], 100, ME),
+    ).toEqual({ mark: 100, raised: false, read: new Set(['$m1']) })
+    expect(readMarkNow(TIMELINE, [], 0, ME)).toEqual({
+      mark: 0,
+      raised: false,
+      read: new Set(),
+    })
+  })
+
+  it('ticks only this account’s own messages, and raises nothing on its own receipt', () => {
+    const now = readMarkNow(TIMELINE, [{ reader: ME, upTo: '$m3' }], 150, ME)
+
+    expect(now.raised).toBe(false)
+    expect(now.read.has('$h1')).toBe(false)
+    expect([...now.read]).toEqual(['$m1'])
   })
 })

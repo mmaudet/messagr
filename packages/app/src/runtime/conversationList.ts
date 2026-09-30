@@ -68,6 +68,16 @@ export interface ConversationSummary {
    */
   readonly membershipsUnread?: true
   /**
+   * Its participants, this account included, as `/joined_members` said at
+   * the last derivation (#498): what tells the screen of a block whether the
+   * account blocked still reads a conversation that stays -- one that left
+   * it does not. Absent when the membership could not be read.
+   *
+   * IN MEMORY ONLY, as `window` is: the notebook keeps a row's opening, and
+   * never who takes part in a conversation (`listCacheStore.ts`).
+   */
+  readonly participants?: readonly string[]
+  /**
    * The opening of the last message this device could read, or `null`.
    *
    * Not truncated here. How many words fit is the screen's question, and a
@@ -320,6 +330,47 @@ export function listWithoutTheBlocked(
   return changed ? drawn.sort(byActivity) : rows
 }
 
+/**
+ * The rows as they are held once `blocked` are blocked (#498): the
+ * conversation with one of them kept for who is in it -- what closes it
+ * once open (`leavesNow`), what a tap on one of its notifications is checked
+ * against -- and for nothing that was said in it: no opening, no messages,
+ * no count, this account's own words included, the way `whoAndWhere` keeps
+ * a row. Every other row as it is, and the same rows back when none was to
+ * be held so. What the list draws is `listWithoutTheBlocked`'s.
+ */
+export function rowsHeld(
+  rows: readonly ConversationSummary[],
+  blocked: ReadonlySet<string>,
+): readonly ConversationSummary[] {
+  if (blocked.size === 0) return rows
+  let changed = false
+  const held = rows.map(row => {
+    if (rowAfterTheBlock(row, blocked) !== 'leaves' || isBare(row)) return row
+    changed = true
+    return {
+      ...whoAndWhere(row),
+      preview: null,
+      reason: NOTHING_LEFT_TO_SHOW,
+      lastAt: 0,
+      unread: 0,
+    }
+  })
+  return changed ? held : rows
+}
+
+/** Whether `row` says nothing of what was said: what `rowsHeld` keeps. */
+function isBare(row: ConversationSummary): boolean {
+  return (
+    row.preview === null &&
+    row.previewBy === undefined &&
+    row.reason === NOTHING_LEFT_TO_SHOW &&
+    row.lastAt === 0 &&
+    row.unread === 0 &&
+    row.window === undefined
+  )
+}
+
 function rowWithout(
   row: ConversationSummary,
   blocked: ReadonlySet<string>,
@@ -375,15 +426,26 @@ export interface ConversationListDeps {
  */
 const LOOK_BACK = 12
 
+/**
+ * Every conversation this account is in, each row without what this device
+ * does not draw: the messages hidden here, and what a blocked account wrote.
+ *
+ * THE CONVERSATION WITH A BLOCKED ACCOUNT IS DERIVED TOO (#498), held for
+ * who is in it and for nothing that was said in it (`rowsHeld`), and it is
+ * `listWithoutTheBlocked` that leaves it out of the list drawn, as it does in
+ * the same draw as a block. Left out here, what its row learns was lost with
+ * it: a conversation open whose participants were not known when the block
+ * arrived stayed open once they were, since nothing held the row that knew
+ * them.
+ */
 export async function fetchConversationSummaries(
   deps: ConversationListDeps,
   selfUserId: string,
   /** How far each conversation has been read here. Empty means none of them. */
   lastRead: ReadonlyMap<string, number>,
   /**
-   * What this device does not draw: the messages hidden here, and the
-   * conversation with a blocked account and its messages everywhere else
-   * (#469). See `notShown.ts`.
+   * What this device does not draw: the messages hidden here, and those of a
+   * blocked account (#469). See `notShown.ts`.
    */
   notShown: NotShown = EVERYTHING_SHOWN,
 ): Promise<ConversationSummary[]> {
@@ -399,9 +461,7 @@ export async function fetchConversationSummaries(
     ),
   )
 
-  return [...listWithoutTheBlocked(summaries, notShown.blocked)].sort(
-    byActivity,
-  )
+  return [...rowsHeld(summaries, notShown.blocked)].sort(byActivity)
 }
 
 async function summarise(
@@ -413,10 +473,11 @@ async function summarise(
 ): Promise<ConversationSummary> {
   let other: string | null = null
   let others: number | null = null
+  let participants: readonly string[] | undefined
   try {
-    const members = await fetchJoinedMembers(deps.http, scope)
-    other = theOtherMember(members, selfUserId)
-    others = howManyOthers(members, selfUserId)
+    participants = await fetchJoinedMembers(deps.http, scope)
+    other = theOtherMember(participants, selfUserId)
+    others = howManyOthers(participants, selfUserId)
   } catch {
     // Left null. A conversation whose membership could not be read is still a
     // conversation, and the row shows what it can.
@@ -438,6 +499,7 @@ async function summarise(
   const whoWasHere = {
     ...(departed === undefined ? {} : { departed }),
     ...(membershipsUnread ? { membershipsUnread: true as const } : {}),
+    ...(participants === undefined ? {} : { participants }),
   }
 
   try {

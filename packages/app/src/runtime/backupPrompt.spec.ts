@@ -1,11 +1,13 @@
 import { describe, expect, it } from 'vitest'
 
+import type { TimelineEntry } from '../timeline/mergeTimeline'
 import {
   rememberBackupAsked,
   rememberReceived,
   shouldOfferBackup,
   type BackupPromptStores,
 } from './backupPrompt'
+import { receivedFromSomebodyElse } from './receivedFromSomebodyElse'
 import type { SecretStore } from './sessionStore'
 
 function store(initial: string | null = null): SecretStore {
@@ -181,5 +183,38 @@ describe('recording what happened', () => {
   it('reports a flag it could not keep, rather than pretending', async () => {
     expect(await rememberBackupAsked(refusing())).toBe(false)
     expect(await rememberReceived(refusing())).toBe(false)
+  })
+})
+
+describe('the offer, after a launch that found no conversation (#498)', () => {
+  // What a conversation drawn does in `App.tsx`: a message somebody else
+  // sent, somebody else than this account as the session holds it
+  // (`selfNow`, `appWiring.spec.ts`), is noted, then the offer is decided.
+  // The account used to be set only by a launch that found a conversation,
+  // and the screen noted nothing while it was empty: a conversation joined
+  // after a launch that found none never offered the backup.
+  const SESSION = '@me:example.org'
+  const THEM = '@them:example.org'
+
+  function said(eventId: string, sender: string): TimelineEntry {
+    return { eventId, claimedSender: sender, sentAt: 1, body: eventId }
+  }
+
+  async function drawn(conversation: readonly TimelineEntry[]) {
+    const held = stores()
+    if (receivedFromSomebodyElse(conversation, SESSION)) {
+      await rememberReceived(held.received)
+    }
+    return (await shouldOfferBackup(held)).decision
+  }
+
+  it('offers it once a conversation joined afterwards draws a message somebody else sent', async () => {
+    expect(await drawn([said('$1', SESSION), said('$2', THEM)])).toEqual({
+      offer: true,
+    })
+  })
+
+  it('does not offer it on a conversation of this account’s own messages only', async () => {
+    expect(await drawn([said('$1', SESSION)])).toEqual({ offer: false })
   })
 })

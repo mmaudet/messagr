@@ -8,11 +8,14 @@ import {
   canForward,
   canRemoveForEveryone,
   copyText,
+  forwarded,
+  forwardingWithoutTheBlocked,
   onlyPhotograph,
   reportable,
   selectionWithoutTheBlocked,
   toggle,
 } from './selection'
+import { shownOf } from '../runtime/notShown'
 
 const ME = '@me:x'
 const HER = '@her:x'
@@ -664,5 +667,55 @@ describe('a selection when an account is blocked meanwhile (#494)', () => {
     expect(
       selectionWithoutTheBlocked(selected, [MINE, HERS, HIS], new Set([HER])),
     ).toBe(selected)
+  })
+})
+
+describe('what a forward sends, and an account blocked meanwhile (#498)', () => {
+  // The picker is up: the messages chosen wait in it for a conversation to
+  // go to, and a block made meanwhile, here or on another device, can take
+  // their author off the screens before one is picked.
+  const HIM = '@him:x'
+  const HIS = said('$b1', HIM, 'et toi')
+  const held = [MINE, HERS, HIS, MINE_TOO]
+
+  it('keeps no message of the account now blocked in the picker, and the rest in the order chosen', () => {
+    expect(
+      forwardingWithoutTheBlocked(
+        ['$m2', '$h1', '$b1', '$m1'],
+        held,
+        new Set([HER]),
+      ),
+    ).toEqual(['$m2', '$b1', '$m1'])
+  })
+
+  it('leaves nothing in the picker when all of them were that account’s', () => {
+    expect(
+      forwardingWithoutTheBlocked(['$h1'], held, new Set([HER])),
+    ).toBeNull()
+  })
+
+  it('hands the same messages back when none of them was theirs', () => {
+    const waiting = ['$b1', '$m1']
+
+    expect(forwardingWithoutTheBlocked(waiting, held, new Set([HER]))).toBe(
+      waiting,
+    )
+  })
+
+  it('sends the messages chosen from the conversation as it is shown, in the order chosen', () => {
+    // A message of an account blocked since, or one hidden here since, is
+    // not shown any more, and nothing sends it on.
+    const asShown = shownOf(held, {
+      hidden: new Set(['$m2']),
+      blocked: new Set([HER]),
+    })
+
+    expect(
+      forwarded(['$m2', '$h1', '$b1', '$m1'], asShown).map(one => one.eventId),
+    ).toEqual(['$b1', '$m1'])
+  })
+
+  it('sends nothing the conversation no longer shows at all', () => {
+    expect(forwarded(['$gone'], held)).toEqual([])
   })
 })

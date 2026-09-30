@@ -13,10 +13,13 @@ import { t } from '../copy'
 import { color } from '../design/tokens'
 import { logEvent } from './log'
 import {
+  dataOf,
+  pressOf,
   ringingOfPress,
-  scopeOfPress,
-  showingTheBlocked,
+  type Displayed,
+  type Drawn,
   type Notification,
+  type Press,
 } from './notifying'
 
 /**
@@ -75,7 +78,12 @@ export const DECLINE = 'decline'
  * two would work everywhere except the case people actually complain about.
  */
 export function whenNotificationPressed(
-  open: (scope: string | null) => void,
+  /**
+   * What a tap on a notification says (`pressOf`): its conversation, and the
+   * account it showed, which a tap at a cold start is checked against
+   * (`openedByTheTap`, #498).
+   */
+  open: (press: Press) => void,
   /**
    * What a press on a ringing telephone asked for.
    *
@@ -90,20 +98,23 @@ export function whenNotificationPressed(
 ): () => void {
   // A PRESS THAT ANSWERED A CALL IS NOT A PRESS THAT OPENED A CONVERSATION,
   // and both arrive here through the same three doors.
-  const route = (id: string | undefined, action: string | undefined): void => {
-    const call = answeredCallOfPress(id, action)
+  const route = (
+    notification: Displayed['notification'] | undefined,
+    action: string | undefined,
+  ): void => {
+    const call = answeredCallOfPress(notification?.id, action)
     if (call !== null) {
       answered?.(call)
       return
     }
-    open(scopeOfPress(id))
+    open(pressOf(notification))
   }
 
   notifee
     .getInitialNotification()
     .then(initial => {
       if (initial !== null) {
-        route(initial.notification.id, initial.pressAction?.id)
+        route(initial.notification, initial.pressAction?.id)
       }
     })
     .catch(() => {
@@ -112,7 +123,7 @@ export function whenNotificationPressed(
 
   return notifee.onForegroundEvent(({ type, detail }) => {
     if (type === EventType.PRESS || type === EventType.ACTION_PRESS) {
-      route(detail.notification?.id, detail.pressAction?.id)
+      route(detail.notification, detail.pressAction?.id)
     }
   })
 }
@@ -192,7 +203,7 @@ export async function drawNotification(
     id: notification.id,
     title: notification.title,
     body: notification.body,
-    ...carrying(notification),
+    ...dataOf(notification),
     android: {
       channelId,
       pressAction: { id: 'default' },
@@ -299,7 +310,7 @@ export async function ringNotification(
     id: notification.id,
     title: notification.title,
     body: notification.body,
-    ...carrying(notification),
+    ...dataOf(notification),
     android: {
       channelId,
       // What tells Android this is a telephone call rather than a message:
@@ -356,59 +367,24 @@ export async function stopRinging(scope: string): Promise<void> {
 }
 
 /**
- * Takes down what this application drew for a conversation with a blocked
- * account (#469): the message notification, keyed by the conversation
- * (`readNotification`), and a call ringing or missed there. Left up, a tap
- * on one would open the conversation the block took away.
+ * The notifications this application drew, as notifee holds them: what a
+ * block takes down by (`takeDownNotificationsOfTheBlocked`, `notifying.ts`,
+ * which decides which, and is tested without a device).
  *
- * WHAT NOTHING HERE CAN TAKE DOWN, ON AN IPHONE. When the wake could not
- * run, iOS shows the push gateway's constant sentence (ADR-0009,
+ * ON AN IPHONE, THIS APPLICATION'S JAVASCRIPT DRAWS NO NOTIFICATION (#498).
+ * Messages and calls alike are drawn by the wake, whose JavaScript runs on
+ * Android only (`registerTheWake`, `index.js`), so notifee lists none of
+ * them there, and a block has nothing of theirs to take down. What an
+ * iPhone shows is the push gateway's constant sentence (ADR-0009,
  * `handlers::wake` in the service), drawn by the system under an identifier
- * of Apple's: nothing names the conversation, so there is no handle to
- * cancel it by, and a tap on it opens the list, never a conversation
- * (`scopeOfPress`).
+ * of Apple's: it names nobody and no conversation, nothing here can take it
+ * down, and a tap on it opens the list, never a conversation
+ * (`scopeOfPress`). `notifying.spec.ts` holds the first half of this true:
+ * nothing in this JavaScript draws but the wake, past its Android guard.
  */
-export async function takeDownNotificationsOf(scope: string): Promise<void> {
-  await notifee.cancelNotification(scope)
-  await stopRinging(scope)
-}
-
-/**
- * Takes down, in every conversation, what this application drew and still
- * shows of an account now blocked (#472): a message of its own, the last to
- * arrive in its conversation, or a call it placed -- as each notification
- * says unseen (`Notification.from`, `showingTheBlocked`). In a conversation
- * of more than two, which stays, a notification that shows somebody else is
- * left up.
- *
- * THE SAME ON BOTH PLATFORMS, and what it finds differs: the wake that draws
- * message notifications runs on Android only (`index.js`), so on an iPhone
- * what it finds is the calls this application drew, and the push gateway's
- * constant sentence, which names nobody, is not this application's to take
- * down (`takeDownNotificationsOf`).
- */
-export async function takeDownWhatShows(
-  blocked: ReadonlySet<string>,
-): Promise<void> {
-  if (blocked.size === 0) return
-  const displayed = await notifee.getDisplayedNotifications()
-  const ids = showingTheBlocked(
-    displayed.map(one => ({
-      id: one.id ?? one.notification.id ?? '',
-      from: one.notification.data?.from,
-    })),
-    blocked,
-  )
-  for (const id of ids) await notifee.cancelNotification(id)
-}
-
-/** The account a notification shows, carried unseen for `takeDownWhatShows`. */
-function carrying(notification: Notification): {
-  readonly data?: { readonly from: string }
-} {
-  return notification.from === undefined
-    ? {}
-    : { data: { from: notification.from } }
+export const drawnNotifications: Drawn = {
+  displayed: () => notifee.getDisplayedNotifications(),
+  cancel: id => notifee.cancelNotification(id),
 }
 
 /**

@@ -396,3 +396,41 @@ export function selectionWithoutTheBlocked(
   for (const entry of theirs) left.delete(entry.eventId)
   return left
 }
+
+/**
+ * The messages waiting in the forward picker without those of `blocked`
+ * (#498), blocked meanwhile: the picker keeps none of them, as the selection
+ * does not. `null` when none is left, and the picker then has nothing to
+ * send. The same messages, handed back, when it held none of theirs.
+ */
+export function forwardingWithoutTheBlocked(
+  waiting: readonly string[],
+  entries: readonly TimelineEntry[],
+  blocked: ReadonlySet<string>,
+): readonly string[] | null {
+  const theirs = new Set(
+    entries
+      .filter(entry => blocked.has(entry.claimedSender))
+      .map(entry => entry.eventId),
+  )
+  if (!waiting.some(eventId => theirs.has(eventId))) return waiting
+  const left = waiting.filter(eventId => !theirs.has(eventId))
+  return left.length === 0 ? null : left
+}
+
+/**
+ * What a forward sends (#194, #498): the messages chosen, in the order they
+ * were chosen, AS THE CONVERSATION SHOWS THEM NOW. One it no longer shows --
+ * hidden here since, or of an account blocked since -- is not sent: what was
+ * taken off the screens does not leave by another door.
+ */
+export function forwarded(
+  eventIds: readonly string[],
+  shown: readonly TimelineEntry[],
+): readonly TimelineEntry[] {
+  const byId = new Map(shown.map(entry => [entry.eventId, entry]))
+  return eventIds.flatMap(eventId => {
+    const entry = byId.get(eventId)
+    return entry === undefined ? [] : [entry]
+  })
+}

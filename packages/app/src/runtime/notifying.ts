@@ -1,4 +1,8 @@
 import { t } from '../copy'
+import {
+  scopesWithTheBlocked,
+  type ConversationSummary,
+} from './conversationList'
 
 /**
  * What a notification says when nothing may be said.
@@ -67,20 +71,144 @@ export function readNotification(
 }
 
 /**
- * The ones among `displayed` that show an account now blocked (#472): a
- * message it wrote, the last to arrive in its conversation, or a call it
- * placed. Only those: a conversation of more than two whose latest message
- * is somebody else's keeps its notification, and one that says nothing of
- * whose it shows -- drawn by an earlier version, or the blind one -- is not
- * guessed at.
+ * What a notification carries unseen besides what it says: the account it
+ * shows, in its data, and only on the device that drew it (#472). The
+ * platform hands it back with the notification, which is what a block takes
+ * it down by (`showingTheBlocked`). Nothing for the blind one.
+ */
+export function dataOf(notification: Notification): {
+  readonly data?: { readonly from: string }
+} {
+  return notification.from === undefined
+    ? {}
+    : { data: { from: notification.from } }
+}
+
+/**
+ * A notification the platform still shows, as notifee lists it: its
+ * identifier, beside or inside the notification, and the data it was drawn
+ * with.
+ */
+export interface Displayed {
+  readonly id?: string
+  readonly notification: {
+    readonly id?: string
+    readonly data?: Readonly<Record<string, unknown>>
+  }
+}
+
+/**
+ * The ones among `displayed` that show an account now blocked (#472), by
+ * their identifier: a message it wrote, the last to arrive in its
+ * conversation, or a call it placed, as their data says (`dataOf`). Only
+ * those: a conversation of more than two whose latest message is somebody
+ * else's keeps its notification, and one that says nothing of whose it
+ * shows -- drawn by an earlier version, or the blind one -- is not guessed
+ * at.
  */
 export function showingTheBlocked(
-  displayed: readonly { readonly id: string; readonly from?: unknown }[],
+  displayed: readonly Displayed[],
   blocked: ReadonlySet<string>,
 ): readonly string[] {
-  return displayed
-    .filter(one => typeof one.from === 'string' && blocked.has(one.from))
-    .map(one => one.id)
+  return displayed.flatMap(one => {
+    const from = one.notification.data?.from
+    const id = one.id ?? one.notification.id
+    return typeof from === 'string' && blocked.has(from) && id !== undefined
+      ? [id]
+      : []
+  })
+}
+
+/**
+ * The notifications this application drew, as the platform holds them:
+ * listed, and taken down by identifier. `showNotification.ts` hands notifee's.
+ */
+export interface Drawn {
+  readonly displayed: () => Promise<readonly Displayed[]>
+  readonly cancel: (id: string) => Promise<void>
+}
+
+/**
+ * Takes down the notifications of the accounts `newly` blocked (#469, #472,
+ * #498): every notification of a conversation with one of them, whoever it
+ * shows -- a tap on one would open what the block took away --, and, in
+ * every other conversation, those that show one of them. Never throws: a
+ * notification that will not come down is not worth a block that says it
+ * failed.
+ *
+ * THOSE OF THE CONVERSATION BY THEIR KEY, and so even when the platform will
+ * not list what it shows: a conversation's message notification is keyed by
+ * it (`readNotification`), and its call's by the same with a prefix
+ * (`ringingNotification`).
+ */
+export async function takeDownNotificationsOfTheBlocked(
+  drawn: Drawn,
+  rows: readonly ConversationSummary[],
+  newly: ReadonlySet<string>,
+): Promise<void> {
+  if (newly.size === 0) return
+  const down = new Set<string>()
+  const takeDown = async (id: string) => {
+    if (down.has(id)) return
+    down.add(id)
+    await drawn.cancel(id).catch(() => undefined)
+  }
+  for (const scope of scopesWithTheBlocked(rows, newly)) {
+    await takeDown(scope)
+    await takeDown(`${RINGING}${scope}`)
+  }
+  const displayed = await drawn.displayed().catch(() => [])
+  for (const id of showingTheBlocked(displayed, newly)) await takeDown(id)
+}
+
+/**
+ * What a tap on a notification says: the conversation it was about, and the
+ * account it showed, carried unseen (`dataOf`). `null` for either when the
+ * notification does not say.
+ */
+export interface Press {
+  readonly scope: string | null
+  readonly from: string | null
+}
+
+/**
+ * What a tap on `notification` says (#90, #498): its conversation, when it
+ * is one this application keys a notification by (`scopeOfPress`), and the
+ * account it showed.
+ */
+export function pressOf(
+  notification: Displayed['notification'] | undefined,
+): Press {
+  const from = notification?.data?.from
+  return {
+    scope: scopeOfPress(notification?.id),
+    from: typeof from === 'string' ? from : null,
+  }
+}
+
+/**
+ * The conversation a tap on a notification opens (#469, #498): the one it
+ * was about, never one with a blocked account. Drawn before the block, on
+ * this device or another, it lands on the list, where that conversation is
+ * not. `null` for the list.
+ *
+ * TWO THINGS SAY IT, AND THE SECOND ONE AT A COLD START. The rows, when they
+ * were derived: the conversation with a blocked account is among them. But a
+ * tap that started the application finds the rows the notebook kept, which
+ * never hold that conversation; what the notification showed, carried
+ * unseen, says it then, against the blocked accounts the notebook kept too:
+ * a notification that showed a blocked account opens nothing, not even for
+ * the instant the conversation would take to find who is in it.
+ */
+export function openedByTheTap(
+  press: Press,
+  rows: readonly ConversationSummary[],
+  blocked: ReadonlySet<string>,
+): string | null {
+  const { scope, from } = press
+  if (scope === null) return null
+  if (from !== null && blocked.has(from)) return null
+  return scopesWithTheBlocked(rows, blocked).includes(scope) ? null : scope
 }
 
 /** `from`, when there is one to carry. */

@@ -102,6 +102,30 @@ export function markUpTo(
   return highest
 }
 
+/**
+ * The mark the conversation open is read at, and its ticks (#208, #498): the
+ * mark `held`, raised when a receipt `seen` now resolves further against
+ * `entries`, and this account's own messages at or below it. `raised` says
+ * the mark went up, for the caller to keep. Read again whenever the timeline
+ * moves, which is what makes a receipt that arrived before its event resolve
+ * when the event lands.
+ */
+export function readMarkNow(
+  entries: readonly TimelineEntry[],
+  seen: readonly Receipt[],
+  held: number,
+  selfUserId: string,
+): {
+  readonly mark: number
+  readonly raised: boolean
+  readonly read: ReadonlySet<string>
+} {
+  const found = markUpTo(entries, seen, selfUserId)
+  const raised = found !== null && found > held
+  const mark = raised ? found : held
+  return { mark, raised, read: readAtMark(entries, mark, selfUserId) }
+}
+
 /** Which of this account's own messages sit at or below a mark. */
 export function readAtMark(
   entries: readonly TimelineEntry[],

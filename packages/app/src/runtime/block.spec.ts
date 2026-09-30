@@ -10,6 +10,8 @@ import {
   mayCall,
   noticeOf,
   readIgnored,
+  saidOnceTold,
+  saidOnLeaving,
   sameAccounts,
   tellWhatIsWaiting,
   type Blocking,
@@ -405,6 +407,57 @@ describe('blocking an account from the panel of the person', () => {
       blocked: true,
       told: false,
       kept: false,
+    })
+  })
+})
+
+describe('what the list says of a conversation that leaves after a block (#469, #498)', () => {
+  it('says the conversation left the list, of one a block made here said would stay', () => {
+    // Blocked from a conversation whose participants were not known: it
+    // stayed open, and the line said « what it wrote left your
+    // conversations »; once they were known, it left, and the list says so.
+    expect(
+      saidOnLeaving(
+        { notice: 'waiting', stayingIn: '!with-them:x' },
+        '!with-them:x',
+      ),
+    ).toEqual({ notice: 'waiting', stayingIn: null })
+  })
+
+  it('says so as for any closing after a block when nothing was said: the account is blocked, and the conversation with it left the list', () => {
+    // A conversation of three that shrank to two with the blocked account,
+    // or a block made on another device.
+    expect(saidOnLeaving(null, '!three-of-us:x')).toEqual({
+      notice: 'blocked',
+      stayingIn: null,
+    })
+    expect(
+      saidOnLeaving(
+        { notice: 'waiting', stayingIn: '!elsewhere:x' },
+        '!three-of-us:x',
+      ),
+    ).toEqual({ notice: 'blocked', stayingIn: null })
+  })
+
+  it('says what the service answered where the person is now, never that a conversation stays that has left meanwhile', () => {
+    expect(
+      saidOnceTold(
+        { notice: 'blocked', stayingIn: '!three-of-us:x' },
+        'waiting',
+        '!three-of-us:x',
+      ),
+    ).toEqual({ notice: 'waiting', stayingIn: '!three-of-us:x' })
+    expect(
+      saidOnceTold(
+        { notice: 'blocked', stayingIn: null },
+        'waiting',
+        '!with-them:x',
+      ),
+    ).toEqual({ notice: 'waiting', stayingIn: null })
+    // Said once and put away since: said again where the gesture left it.
+    expect(saidOnceTold(null, 'not-kept', '!three-of-us:x')).toEqual({
+      notice: 'not-kept',
+      stayingIn: '!three-of-us:x',
     })
   })
 })

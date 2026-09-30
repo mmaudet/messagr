@@ -1,11 +1,11 @@
 import { useState } from 'react'
 import { ScrollView, StyleSheet, Text, View } from 'react-native'
 
-import { t, type CopyKey } from '../copy'
+import { t } from '../copy'
 import { color, space, type as typeScale } from '../design/tokens'
-import type { AfterTheBlock } from '../runtime/conversationList'
+import { factsOfTheBlock, type WhatTheBlockWillDo } from './blockScreen'
 import { BottomSheet } from './BottomSheet'
-import { Consequences, type Consequence } from './Consequences'
+import { Consequences } from './Consequences'
 import { NotchedButton } from './NotchedButton'
 
 /**
@@ -30,13 +30,16 @@ import { NotchedButton } from './NotchedButton'
  * is that first asking, and opens the same screen in a sheet over the
  * conversation, as « Signaler » opens its own. What tells them apart is the
  * conversation's, not the entry's, and it is read from the one rule that
- * decides it (`AfterTheBlock`, `conversationList.ts`):
+ * decides it (`whatTheBlockWillDo`, `blockScreen.ts`):
  *
  * - it leaves the list, as a conversation of two with that account does;
- * - it stays, as one of more than two does, and that account still reads
- *   what is written in it: said plainly, so that nothing is found out
- *   afterwards (#462, story 22);
+ * - it stays, as one of more than two does, and while that account is still
+ *   in it, it reads what is written there: said plainly, so that nothing is
+ *   found out afterwards (#462, story 22), and never of an account that left
+ *   (#498);
  * - or who is in it is not known yet, and nothing is claimed either way.
+ *
+ * Which facts are stated, and in which words, is `factsOfTheBlock`'s.
  *
  * # WHAT IS SAID AFTERWARDS, AND WHERE
  *
@@ -50,12 +53,11 @@ export interface BlockProps {
   /** Who is being blocked. Shown so the gesture names its target. */
   readonly memberId: string
   /**
-   * Whether this account is findable now: what the screen can truthfully say
-   * of who still sees it on Messagr, as « Refuser et bloquer » says it.
+   * What the block will do to the conversation it is made from, whether that
+   * account still reads it, and whether this account is findable, as
+   * « Refuser et bloquer » says it (`whatTheBlockWillDo`).
    */
-  readonly findable: boolean
-  /** What the block will do to the conversation it is made from. */
-  readonly after: AfterTheBlock
+  readonly foreseen: WhatTheBlockWillDo
   readonly state: 'idle' | 'working' | 'failed' | 'itself'
   readonly onBlock: () => void
 }
@@ -108,21 +110,13 @@ export function BlockSheet({
   )
 }
 
-/** What the conversation's fate makes of « Ce qu'il a écrit quitte vos écrans ». */
-const GONE: Readonly<Record<AfterTheBlock, CopyKey>> = {
-  leaves: 'block_explain_gone',
-  stays: 'block_explain_gone_stays',
-  'not known': 'block_explain_gone_not_known',
-}
-
 /**
  * What the block does and does not do, then « Oui, bloquer ce compte » and
  * « Annuler », of the same rank: the one screen both entries open.
  */
 function WhatTheBlockDoes({
   memberId,
-  findable,
-  after,
+  foreseen,
   state,
   onBlock,
   onCancel,
@@ -135,66 +129,17 @@ function WhatTheBlockDoes({
     )
   }
 
-  const facts: Consequence[] = [
-    {
-      // THE MEASURE, in the red `deny` is for.
-      tone: 'measure',
-      said: t('block_fact_nothing'),
-      body: t('block_explain_nothing'),
-      testID: 'block-fact-nothing',
-    },
-    {
-      tone: 'plain',
-      said: t('block_fact_gone'),
-      body: t(GONE[after]),
-      testID: 'block-fact-gone',
-    },
-    // WHAT STAYS, WHERE THE CONVERSATION DOES: that account is still in it
-    // and reads what is written there. Something to weigh, in the ochre.
-    ...(after === 'stays'
-      ? [
-          {
-            tone: 'weigh' as const,
-            said: t('block_fact_still_reads'),
-            body: t('block_explain_still_reads'),
-            testID: 'block-fact-still-reads',
-          },
-        ]
-      : []),
-    {
-      tone: 'plain',
-      said: t('block_fact_untold'),
-      body: t('block_explain_untold'),
-      testID: 'block-fact-untold',
-    },
-    {
-      // WHAT A PERSON MIGHT ASSUME AND MUST NOT: the block hides nobody from
-      // discovery. Something to weigh, in the ochre.
-      tone: 'weigh',
-      said: t('block_fact_not_hidden'),
-      body: t(findable ? 'invited_block_not' : 'invited_block_not_hidden'),
-      testID: 'block-fact-not-hidden',
-    },
-    {
-      tone: 'weigh',
-      said: t('block_fact_operator'),
-      body: t('block_explain_operator'),
-      testID: 'block-fact-operator',
-    },
-    {
-      tone: 'plain',
-      said: t('block_fact_report'),
-      body: t('block_explain_report'),
-      testID: 'block-fact-report',
-    },
-  ]
-
   return (
     <Consequences
       testID="block-explain"
       title={t('block_explain_title')}
       lead={t('block_explain_lead')}
-      facts={facts}
+      facts={factsOfTheBlock(foreseen).map(fact => ({
+        tone: fact.tone,
+        said: t(fact.said),
+        body: t(fact.body),
+        testID: fact.testID,
+      }))}
       finally={t('invited_block_lasts')}
       target={memberId}>
       {/* ABSENT WHEN IT COULD ONLY FAIL: this account itself is never

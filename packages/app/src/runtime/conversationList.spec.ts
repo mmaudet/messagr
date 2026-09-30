@@ -6,6 +6,7 @@ import {
   NOTHING_LEFT_TO_SHOW,
   openAfterTheBlock,
   openConversationOf,
+  rowsHeld,
   scopesWithTheBlocked,
   type ConversationListDeps,
   type ConversationSummary,
@@ -160,6 +161,25 @@ describe('fetchConversationSummaries', () => {
       NOTHING_READ,
     )
     expect(summaries[0]?.other).toBeNull()
+  })
+
+  it('says who is in each conversation, as its membership reads now, and nothing when it cannot be read (#498)', async () => {
+    // What tells the screen of a block whether the account it blocks still
+    // reads a conversation of more than two: a participant who left does not.
+    const summaries = await fetchConversationSummaries(
+      fakeHomeserver({
+        '!a:x': { members: [ME, '@her:example.org', '@him:example.org'] },
+        '!b:x': { members: 'unreadable' },
+      }),
+      ME,
+      NOTHING_READ,
+    )
+    const bySpace = new Map(summaries.map(one => [one.scope, one]))
+
+    expect(new Set(bySpace.get('!a:x')?.participants)).toEqual(
+      new Set([ME, '@her:example.org', '@him:example.org']),
+    )
+    expect(bySpace.get('!b:x')?.participants).toBeUndefined()
   })
 
   it('carries the opening of the last readable message', async () => {
@@ -520,7 +540,7 @@ describe('the conversations with a blocked account (#469)', () => {
     ],
   }
 
-  it('leaves out the conversation with the blocked account, and its messages from every other row', async () => {
+  it('draws the list without the conversation with the blocked account, and without its messages in every other row', async () => {
     const summaries = await fetchConversationSummaries(
       fakeHomeserver({
         '!with-them:x': {
@@ -534,14 +554,56 @@ describe('the conversations with a blocked account (#469)', () => {
       ONLY_BLOCKED,
     )
 
-    expect(summaries).toHaveLength(1)
-    expect(summaries[0]).toMatchObject({
+    const drawn = listWithoutTheBlocked(summaries, ONLY_BLOCKED.blocked)
+    expect(drawn).toHaveLength(1)
+    expect(drawn[0]).toMatchObject({
       scope: '!three-of-us:x',
       preview: 'hello',
       previewBy: HER,
       lastAt: 200,
       unread: 1,
     })
+  })
+
+  it('keeps in what it derives the conversation with the blocked account, for who is in it and for nothing that was said there (#498)', async () => {
+    // What is learnt of it is not lost: a conversation open whose participants
+    // were not known when the block arrived closes once its row knows them
+    // (`leavesNow`), and a tap on a notification drawn before the block does
+    // not open it. Which conversations are drawn is `listWithoutTheBlocked`'s.
+    // Nothing decrypted stays with it, this account's own words included.
+    const summaries = await fetchConversationSummaries(
+      fakeHomeserver({
+        '!with-them:x': {
+          members: [ME, BLOCKED],
+          events: [
+            { id: '$1', sender: BLOCKED, ts: 100, plain: 'go away' },
+            { id: '$2', sender: ME, ts: 200, plain: 'leave me alone' },
+          ],
+        },
+      }),
+      ME,
+      NOTHING_READ,
+      ONLY_BLOCKED,
+    )
+
+    expect(summaries).toHaveLength(1)
+    expect(summaries[0]).toEqual({
+      scope: '!with-them:x',
+      other: BLOCKED,
+      others: 1,
+      participants: [ME, BLOCKED],
+      preview: null,
+      reason: NOTHING_LEFT_TO_SHOW,
+      lastAt: 0,
+      unread: 0,
+    })
+    expect(
+      openAfterTheBlock(
+        { scope: '!with-them:x', other: null },
+        summaries,
+        ONLY_BLOCKED.blocked,
+      ),
+    ).toBe('leaves')
   })
 
   it('keeps the conversation out once the blocked account has left it', async () => {
@@ -557,7 +619,46 @@ describe('the conversations with a blocked account (#469)', () => {
       ONLY_BLOCKED,
     )
 
-    expect(summaries).toEqual([])
+    expect(summaries[0]).toMatchObject({ others: 0, departed: BLOCKED })
+    expect(listWithoutTheBlocked(summaries, ONLY_BLOCKED.blocked)).toEqual([])
+  })
+
+  it('learns, at a later derivation, that a conversation whose participants could not be read is the one with the blocked account (#498)', async () => {
+    const unread = await fetchConversationSummaries(
+      fakeHomeserver({
+        '!with-them:x': {
+          members: 'unreadable',
+          events: [{ id: '$1', sender: BLOCKED, ts: 100, plain: 'go away' }],
+        },
+      }),
+      ME,
+      NOTHING_READ,
+      ONLY_BLOCKED,
+    )
+    const open = { scope: '!with-them:x', other: null }
+    expect(openAfterTheBlock(open, unread, ONLY_BLOCKED.blocked)).toBe(
+      'not known',
+    )
+
+    const read = await fetchConversationSummaries(
+      fakeHomeserver({
+        '!with-them:x': {
+          members: [ME, BLOCKED],
+          events: [{ id: '$1', sender: BLOCKED, ts: 100, plain: 'go away' }],
+        },
+      }),
+      ME,
+      NOTHING_READ,
+      ONLY_BLOCKED,
+    )
+
+    expect(
+      openAfterTheBlock(
+        open,
+        mergeSummaries(unread, read),
+        ONLY_BLOCKED.blocked,
+      ),
+    ).toBe('leaves')
   })
 
   it('redraws a row of three in the same draw as the block, with nothing asked again', async () => {
@@ -695,6 +796,53 @@ describe('the conversations with a blocked account (#469)', () => {
       '!a:x',
       '!b:x',
     ])
+  })
+
+  it('holds, once an account is blocked, its conversation for who is in it and for nothing it said, and every other row as it was (#498)', () => {
+    // Derived before the block: its opening, what it counts, and the
+    // messages it was drawn from, this account's own among them.
+    const withThem: ConversationSummary = {
+      scope: '!with-them:x',
+      other: BLOCKED,
+      others: 1,
+      participants: [ME, BLOCKED],
+      preview: 'leave me alone',
+      previewBy: ME,
+      lastAt: 200,
+      unread: 1,
+      window: [
+        { sender: BLOCKED, sentAt: 100, body: 'go away', unread: true },
+        { sender: ME, sentAt: 200, body: 'leave me alone', unread: false },
+      ],
+    }
+    const withHer: ConversationSummary = {
+      scope: '!with-her:x',
+      other: HER,
+      others: 1,
+      preview: 'hello',
+      lastAt: 300,
+      unread: 0,
+    }
+
+    const held = rowsHeld([withThem, withHer], new Set([BLOCKED]))
+
+    expect(held).toEqual([
+      {
+        scope: '!with-them:x',
+        other: BLOCKED,
+        others: 1,
+        participants: [ME, BLOCKED],
+        preview: null,
+        reason: NOTHING_LEFT_TO_SHOW,
+        lastAt: 0,
+        unread: 0,
+      },
+      withHer,
+    ])
+    expect(held[1]).toBe(withHer)
+    // Held once, held the same: the same rows come back.
+    expect(rowsHeld(held, new Set([BLOCKED]))).toBe(held)
+    expect(rowsHeld([withThem], new Set())).toEqual([withThem])
   })
 })
 
