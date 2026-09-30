@@ -384,6 +384,8 @@ function isBare(row: ConversationSummary): boolean {
   return (
     row.preview === null &&
     row.previewBy === undefined &&
+    // The mention in place of an opening is something said too (#461).
+    row.previewUnencrypted === undefined &&
     row.reason === NOTHING_LEFT_TO_SHOW &&
     row.lastAt === 0 &&
     row.unread === 0 &&

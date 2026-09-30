@@ -1105,4 +1105,36 @@ describe('a last message that is not encrypted (#461)', () => {
       ['!three-of-us:x', 'hello', undefined],
     ])
   })
+
+  it('holds the conversation with a blocked account without the mention (#498)', () => {
+    // Held for who is in it and for nothing said in it: the mention is
+    // something said, even on a row that says nothing else.
+    const withThem: ConversationSummary = {
+      scope: '!with-them:x',
+      other: BLOCKED,
+      others: 1,
+      preview: null,
+      previewUnencrypted: true,
+      previewBy: BLOCKED,
+      lastAt: 200,
+      unread: 1,
+    }
+    const onlyTheMention: ConversationSummary = {
+      scope: '!only:x',
+      other: BLOCKED,
+      others: 1,
+      preview: null,
+      previewUnencrypted: true,
+      reason: NOTHING_LEFT_TO_SHOW,
+      lastAt: 0,
+      unread: 0,
+    }
+
+    const held = rowsHeld([withThem, onlyTheMention], new Set([BLOCKED]))
+
+    expect(held.map(row => [row.scope, row.previewUnencrypted])).toEqual([
+      ['!with-them:x', undefined],
+      ['!only:x', undefined],
+    ])
+  })
 })
