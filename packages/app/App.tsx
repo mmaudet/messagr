@@ -309,7 +309,7 @@ import { tallyReactions } from './src/timeline/reactions'
 import { drawnNotifications } from './src/runtime/showNotification'
 import {
   openedByTheTap,
-  takeDownWhatTheBlockTakes,
+  takeDownNotificationsOfTheBlocked,
 } from './src/runtime/notifying'
 import {
   forgetfulUntoldBlocks,
@@ -652,8 +652,8 @@ export function App({
     const newly = new Set([...next].filter(account => !before.has(account)))
     // The notifications that show those newly blocked: all of those of a
     // conversation with one of them (#469), and elsewhere those that show
-    // them (#472). Which, is `takeDownWhatTheBlockTakes`'s.
-    takeDownWhatTheBlockTakes(
+    // them (#472). Which, is `takeDownNotificationsOfTheBlocked`'s.
+    takeDownNotificationsOfTheBlocked(
       drawnNotifications,
       derivedSummariesRef.current,
       newly,
@@ -4546,13 +4546,16 @@ export function App({
             // woke this device said which conversation. It lands on the list,
             // which then shows what is waiting.
             whenNotificationPressed(
-              scope => {
+              press => {
                 setTab('chat')
                 // NEVER A CONVERSATION WITH A BLOCKED ACCOUNT (#469), from a
                 // notification drawn before the block, on this device or
-                // another: the tap lands on the list, where it is not.
+                // another: the tap lands on the list, where it is not. At a
+                // cold start too, where the rows are the notebook's and say
+                // nothing of it, and the account the notification showed
+                // does, against the blocked accounts the notebook kept (#498).
                 const landsIn = openedByTheTap(
-                  scope,
+                  press,
                   derivedSummariesRef.current,
                   ignoredRef.current ?? new Set(),
                 )

@@ -116,6 +116,18 @@ describe('the one account App.tsx reads (#472, #494, #498)', () => {
   })
 })
 
+describe('a tap on a notification (#469, #498)', () => {
+  it('is read whole, what the notification showed included, against the blocked accounts held since the notebook opened', () => {
+    // At a cold start the rows are the notebook's, which never hold the
+    // conversation with a blocked account: what the notification showed says
+    // it, against the blocked accounts the notebook kept.
+    expect(callsOf('openedByTheTap')).toEqual([
+      ['press', 'derivedSummariesRef.current', 'ignoredRef.current??newSet()'],
+    ])
+    expect(code).toContain('whenNotificationPressed(press=>{')
+  })
+})
+
 describe('the ways out of the conversation open (#494, #498)', () => {
   it('closes it by one function, which puts down everything drawn over it', () => {
     expect(bodyOf('leaveTheConversation')).toBe(

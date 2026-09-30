@@ -129,18 +129,19 @@ export interface Drawn {
 }
 
 /**
- * Takes down what a block takes (#469, #472, #498): every notification of a
- * conversation with an account newly blocked, whoever it shows -- a tap on
- * one would open what the block took away --, and, in every other
- * conversation, those that show that account. Never throws: a notification
- * that will not come down is not worth a block that says it failed.
+ * Takes down the notifications of the accounts `newly` blocked (#469, #472,
+ * #498): every notification of a conversation with one of them, whoever it
+ * shows -- a tap on one would open what the block took away --, and, in
+ * every other conversation, those that show one of them. Never throws: a
+ * notification that will not come down is not worth a block that says it
+ * failed.
  *
  * THOSE OF THE CONVERSATION BY THEIR KEY, and so even when the platform will
  * not list what it shows: a conversation's message notification is keyed by
  * it (`readNotification`), and its call's by the same with a prefix
  * (`ringingNotification`).
  */
-export async function takeDownWhatTheBlockTakes(
+export async function takeDownNotificationsOfTheBlocked(
   drawn: Drawn,
   rows: readonly ConversationSummary[],
   newly: ReadonlySet<string>,
@@ -161,17 +162,52 @@ export async function takeDownWhatTheBlockTakes(
 }
 
 /**
+ * What a tap on a notification says: the conversation it was about, and the
+ * account it showed, carried unseen (`dataOf`). `null` for either when the
+ * notification does not say.
+ */
+export interface Press {
+  readonly scope: string | null
+  readonly from: string | null
+}
+
+/**
+ * What a tap on `notification` says (#90, #498): its conversation, when it
+ * is one this application keys a notification by (`scopeOfPress`), and the
+ * account it showed.
+ */
+export function pressOf(
+  notification: Displayed['notification'] | undefined,
+): Press {
+  const from = notification?.data?.from
+  return {
+    scope: scopeOfPress(notification?.id),
+    from: typeof from === 'string' ? from : null,
+  }
+}
+
+/**
  * The conversation a tap on a notification opens (#469, #498): the one it
- * was about (`scopeOfPress`), never one with a blocked account. Drawn before
- * the block, on this device or another, it lands on the list, where that
- * conversation is not. `null` for the list.
+ * was about, never one with a blocked account. Drawn before the block, on
+ * this device or another, it lands on the list, where that conversation is
+ * not. `null` for the list.
+ *
+ * TWO THINGS SAY IT, AND THE SECOND ONE AT A COLD START. The rows, when they
+ * were derived: the conversation with a blocked account is among them. But a
+ * tap that started the application finds the rows the notebook kept, which
+ * never hold that conversation; what the notification showed, carried
+ * unseen, says it then, against the blocked accounts the notebook kept too:
+ * a notification that showed a blocked account opens nothing, not even for
+ * the instant the conversation would take to find who is in it.
  */
 export function openedByTheTap(
-  scope: string | null,
+  press: Press,
   rows: readonly ConversationSummary[],
   blocked: ReadonlySet<string>,
 ): string | null {
+  const { scope, from } = press
   if (scope === null) return null
+  if (from !== null && blocked.has(from)) return null
   return scopesWithTheBlocked(rows, blocked).includes(scope) ? null : scope
 }
 

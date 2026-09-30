@@ -151,7 +151,7 @@ function registerTheWake() {
       lookForWhatArrived: lookForWhatArrivedHere,
       draw: drawNotification,
       // Each carries, unseen, the account it shows: what a block takes it
-      // down by (#472, `takeDownWhatTheBlockTakes`).
+      // down by (#472, `takeDownNotificationsOfTheBlocked`).
       describe: arrival =>
         readNotification(
           arrival.scope,

@@ -9,11 +9,12 @@ import {
   dataOf,
   missedNotification,
   openedByTheTap,
+  pressOf,
   readNotification,
   ringingNotification,
   scopeOfPress,
   showingTheBlocked,
-  takeDownWhatTheBlockTakes,
+  takeDownNotificationsOfTheBlocked,
   type Displayed,
   type Drawn,
   type Notification,
@@ -196,7 +197,7 @@ describe('what a block takes down, and where a tap lands afterwards (#469, #472,
       ].map(listedAsDrawn),
     )
 
-    await takeDownWhatTheBlockTakes(drawn, ROWS, new Set([BLOCKED]))
+    await takeDownNotificationsOfTheBlocked(drawn, ROWS, new Set([BLOCKED]))
 
     expect(new Set(cancelled)).toEqual(
       new Set(['!with-them:x', 'ringing:!with-them:x', '!three-of-us:x']),
@@ -208,7 +209,7 @@ describe('what a block takes down, and where a tap lands afterwards (#469, #472,
     // down by their key; only those elsewhere needed the listing.
     const { drawn, cancelled } = platform('will not list')
 
-    await takeDownWhatTheBlockTakes(drawn, ROWS, new Set([BLOCKED]))
+    await takeDownNotificationsOfTheBlocked(drawn, ROWS, new Set([BLOCKED]))
 
     expect(cancelled).toEqual(['!with-them:x', 'ringing:!with-them:x'])
   })
@@ -220,7 +221,7 @@ describe('what a block takes down, and where a tap lands afterwards (#469, #472,
       ),
     )
 
-    await takeDownWhatTheBlockTakes(drawn, ROWS, new Set())
+    await takeDownNotificationsOfTheBlocked(drawn, ROWS, new Set())
 
     expect(cancelled).toEqual([])
   })
@@ -229,26 +230,87 @@ describe('what a block takes down, and where a tap lands afterwards (#469, #472,
     // Drawn before the block, on this device or another: the tap lands on
     // the list, where that conversation is not.
     const blocked = new Set([BLOCKED])
+    const tap = (scope: string | null) => ({ scope, from: null })
 
-    expect(openedByTheTap('!with-them:x', ROWS, blocked)).toBeNull()
-    expect(openedByTheTap('!three-of-us:x', ROWS, blocked)).toBe(
+    expect(openedByTheTap(tap('!with-them:x'), ROWS, blocked)).toBeNull()
+    expect(openedByTheTap(tap('!three-of-us:x'), ROWS, blocked)).toBe(
       '!three-of-us:x',
     )
-    expect(openedByTheTap('!with-her:x', ROWS, blocked)).toBe('!with-her:x')
+    expect(openedByTheTap(tap('!with-her:x'), ROWS, blocked)).toBe(
+      '!with-her:x',
+    )
     // The blind one, and one the platform drew, open the list.
-    expect(openedByTheTap(null, ROWS, blocked)).toBeNull()
+    expect(openedByTheTap(tap(null), ROWS, blocked)).toBeNull()
     // Nobody blocked: whatever the tap names.
-    expect(openedByTheTap('!with-them:x', ROWS, new Set())).toBe('!with-them:x')
+    expect(openedByTheTap(tap('!with-them:x'), ROWS, new Set())).toBe(
+      '!with-them:x',
+    )
+  })
+
+  it('opens nothing from a tap at a cold start on what showed the blocked account, though the rows kept say nothing of it', () => {
+    // A cold start draws the list the notebook kept, which never holds the
+    // conversation with a blocked account: its row cannot tell. What the
+    // notification carries unseen can, against the blocked accounts the
+    // notebook kept, before anything is opened even for an instant.
+    const keptRows = [row('!with-her:x', HER), row('!three-of-us:x', null)]
+    const blocked = new Set([BLOCKED])
+    const press = pressOf(
+      listedAsDrawn(
+        readNotification('!with-them:x', 'Bothers', 'go away', BLOCKED),
+      ).notification,
+    )
+
+    expect(press).toEqual({ scope: '!with-them:x', from: BLOCKED })
+    expect(openedByTheTap(press, keptRows, blocked)).toBeNull()
+    // A message of somebody else still opens its conversation.
+    expect(
+      openedByTheTap(
+        pressOf(
+          listedAsDrawn(
+            readNotification('!three-of-us:x', 'Nous trois', 'hi', HER),
+          ).notification,
+        ),
+        keptRows,
+        blocked,
+      ),
+    ).toBe('!three-of-us:x')
+  })
+
+  it('reads what a tap says off the notification, and nothing it does not carry', () => {
+    expect(pressOf(undefined)).toEqual({ scope: null, from: null })
+    expect(pressOf({ id: BLIND_ID })).toEqual({ scope: null, from: null })
+    expect(pressOf({ id: '!a:x', data: { from: {} } })).toEqual({
+      scope: '!a:x',
+      from: null,
+    })
   })
 })
 
 describe('what draws a notification (#498)', () => {
   // THE CLAIM THE COMMENTS OF `showNotification.ts` MAKE, HELD HERE: on an
-  // iPhone this application draws no notification at all, calls included.
-  // What an iPhone shows is the push gateway's sentence, drawn by the
-  // system. A second place that drew one, or the wake registered on both
+  // iPhone this application's JavaScript draws no notification, calls
+  // included. What an iPhone shows is the push gateway's sentence, drawn by
+  // the system. A second place that drew one, or the wake registered on both
   // platforms, would make them false, and this says so.
   const app = join(__dirname, '..', '..')
+
+  /** `source` without its comments, which may name anything. */
+  function withoutComments(source: string): string {
+    return source.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/.*$/gm, '')
+  }
+
+  /** The body of `function name() { ... }` in `source`, between its braces. */
+  function functionBody(source: string, name: string): string {
+    const opening = `function ${name}() {`
+    const start = source.indexOf(opening) + opening.length
+    let depth = 1
+    let at = start
+    for (; at < source.length && depth > 0; at += 1) {
+      if (source[at] === '{') depth += 1
+      if (source[at] === '}') depth -= 1
+    }
+    return source.slice(start, at - 1)
+  }
 
   function sources(dir: string): string[] {
     return readdirSync(dir, { withFileTypes: true }).flatMap(entry => {
@@ -269,22 +331,30 @@ describe('what draws a notification (#498)', () => {
       .filter(path => !path.endsWith(join('runtime', 'showNotification.ts')))
       .filter(path =>
         /\b(drawNotification|ringNotification|displayNotification)\b/.test(
-          readFileSync(path, 'utf8'),
+          withoutComments(readFileSync(path, 'utf8')),
         ),
       )
       .map(path => path.slice(app.length + 1))
     expect(drawing).toEqual(['index.js'])
+  })
 
-    const index = readFileSync(join(app, 'index.js'), 'utf8')
-    const androidOnly = index.indexOf("if (Platform.OS !== 'android') return")
-    expect(androidOnly).toBeGreaterThan(-1)
-    // Named before the guard only where they are required; handed to the
-    // wake after it.
-    const handedOver = [
-      ...index.matchAll(/draw: drawNotification|ringNotification\(/g),
-    ].map(found => found.index)
-    expect(handedOver.length).toBeGreaterThan(0)
-    expect(handedOver.every(at => at > androidOnly)).toBe(true)
+  it('draws from inside the branch `registerTheWake` keeps for Android, and from nowhere else in `index.js`', () => {
+    const index = withoutComments(readFileSync(join(app, 'index.js'), 'utf8'))
+    const wake = functionBody(index, 'registerTheWake')
+    const drawingCall = /draw: drawNotification|ringNotification\(/g
+
+    // The guard is a statement of the function itself, not of a block
+    // nested in it: past it, the function runs on Android only.
+    const guard = wake.indexOf("if (Platform.OS !== 'android') return")
+    expect(guard).toBeGreaterThan(-1)
+    const before = wake.slice(0, guard)
+    expect(before.split('{').length).toBe(before.split('}').length)
+
+    // Every call that draws is past it, inside that function.
+    const inside = [...wake.matchAll(drawingCall)].map(found => found.index)
+    expect(inside.length).toBeGreaterThan(0)
+    expect(inside.every(at => at > guard)).toBe(true)
+    expect([...index.replace(wake, '').matchAll(drawingCall)]).toEqual([])
   })
 })
 
