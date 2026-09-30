@@ -474,18 +474,16 @@ export async function receiveOneEncryptedMessage(
  */
 export interface LoadedConversation {
   readonly entries: TimelineEntry[]
-  /**
-   * The reactions read, each with who sent it, not yet tallied: what is
-   * drawn is tallied from those the screen draws (`reactionsShown`), so a
-   * blocked account's leave in the same render as its messages (#494).
-   */
+  /** The reactions read, each with who sent it: tallied where drawn. */
   readonly reactions: readonly LooseReaction[]
 }
+
+/** How many events a conversation is read with: its last forty. */
+const CONVERSATION_WINDOW = 40
 
 export async function loadConversation(
   sessionClient: ReturnType<typeof createClient>,
   roomId: string,
-  limit = 40,
   /**
    * Where the ciphertext of the last successful fetch is kept, and where it
    * is read from when there is no network. Optional so every existing caller
@@ -515,7 +513,7 @@ export async function loadConversation(
   // exercised.
   const events = await eventsToBuildFrom(
     roomId,
-    () => fetchRoomMessages(http, roomId, limit),
+    () => fetchRoomMessages(http, roomId, CONVERSATION_WINDOW),
     remembered,
   )
 
@@ -528,10 +526,9 @@ export async function loadConversation(
     roomId,
     events,
   )
-  // Both, from one pass. ADR-0011: reactions come out of the same door the
-  // messages do, and the aggregation the server would have done happens
-  // where they are read: at each draw (`reactionsShown`), and where a
-  // reaction just sent is waited for.
+  // Both, from one pass. ADR-0011, as amended on 30 September 2026:
+  // reactions come out of the same door the messages do, and are tallied
+  // where they are drawn.
   return { entries, reactions }
 }
 

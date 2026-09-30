@@ -1350,9 +1350,8 @@ export function App({
     null,
   )
   // Reactions, each with who sent it. ADR-0011: this application aggregates
-  // its own, because a server cannot aggregate what it cannot read -- and it
-  // does so at each draw, from those the screen draws, so a blocked account's
-  // leave with its messages (#494, `reactionsShown`).
+  // its own, because a server cannot aggregate what it cannot read, and
+  // where they are drawn (amended on 30 September 2026).
   const [reactions, setReactions] = useState<readonly LooseReaction[]>([])
   // Whether this device publishes read receipts, and which of this account's
   // own messages somebody else has read. Off unless somebody turned it on:
@@ -3783,7 +3782,6 @@ export function App({
                   const fresh = await loadConversation(
                     sessionClient,
                     scope,
-                    undefined,
                     eventsRef.current,
                   )
                   if (!stillOpen()) return
@@ -3802,7 +3800,6 @@ export function App({
                 const fresh = await loadConversation(
                   sessionClient,
                   scope,
-                  undefined,
                   eventsRef.current,
                 )
                 if (!stillOpen()) return
@@ -3888,7 +3885,6 @@ export function App({
                       await loadConversation(
                         sessionClient,
                         scope,
-                        undefined,
                         eventsRef.current,
                       )
                     ).entries,
@@ -4026,7 +4022,6 @@ export function App({
                 const fresh = await loadConversation(
                   sessionClient,
                   scope,
-                  undefined,
                   eventsRef.current,
                 )
                 if (openScopeRef.current !== scope) return
@@ -4088,7 +4083,6 @@ export function App({
                   const fresh = await loadConversation(
                     sessionClient,
                     scope,
-                    undefined,
                     eventsRef.current,
                   )
                   setConversation(held =>
@@ -4168,7 +4162,6 @@ export function App({
                 const fresh = await loadConversation(
                   sessionClient,
                   scope,
-                  undefined,
                   eventsRef.current,
                 )
                 if (!stillOpen()) return
@@ -4231,7 +4224,6 @@ export function App({
                 const fresh = await loadConversation(
                   sessionClient,
                   scope,
-                  undefined,
                   eventsRef.current,
                 )
                 if (!stillOpen()) return
@@ -5189,12 +5181,7 @@ export function App({
                   if (open === null || !tick.changedScopes.includes(open)) {
                     return
                   }
-                  loadConversation(
-                    sessionClient,
-                    open,
-                    undefined,
-                    eventsRef.current,
-                  )
+                  loadConversation(sessionClient, open, eventsRef.current)
                     .then(async fresh => {
                       // #208, ET C'EST LE SEUL ENDROIT OÙ UNE ARRIVÉE EST
                       // NOTÉE.
@@ -6925,12 +6912,9 @@ export function App({
               sendMessage !== null && (
                 <View style={styles.block}>
                   <Conversation
-                    // TALLIED FROM THOSE DRAWN, by the filter of the messages
-                    // below and from the same value: a blocked account's
-                    // reactions leave with its messages (#494). Which are
-                    // this account's own is read from the session (`selfNow`),
-                    // as the reading of the conversation read it when it
-                    // tallied.
+                    // TALLIED HERE, from the value the messages below are
+                    // drawn from (ADR-0011, amended on 30 September 2026),
+                    // this account's own read from the session (`selfNow`).
                     reactions={reactionsShown(reactions, notShownNow, selfNow)}
                     read={readHere}
                     onReact={(target, key, own) =>
