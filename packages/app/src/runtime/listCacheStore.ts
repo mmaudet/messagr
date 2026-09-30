@@ -112,6 +112,14 @@ const ADD_DEPARTED = `ALTER TABLE list_cache ADD COLUMN departed TEXT NOT NULL D
  */
 const ADD_PREVIEW_BY = `ALTER TABLE list_cache ADD COLUMN preview_by TEXT NOT NULL DEFAULT ''`
 
+/**
+ * Whether a row's last message arrived unencrypted (#461), added the way
+ * `preview_by` was. `1` says the row draws the mention in place of an
+ * opening, which such a row does not have; `0`, the default a row from
+ * before the column reads, says nothing.
+ */
+const ADD_PREVIEW_UNENCRYPTED = `ALTER TABLE list_cache ADD COLUMN preview_unencrypted INTEGER NOT NULL DEFAULT 0`
+
 export function forgetfulListCache(): ListCache {
   return { all: async () => [], keep: async () => false }
 }
@@ -125,13 +133,14 @@ export async function openListCache(
   await database.execute(ADD_OTHERS).catch(() => undefined)
   await database.execute(ADD_DEPARTED).catch(() => undefined)
   await database.execute(ADD_PREVIEW_BY).catch(() => undefined)
+  await database.execute(ADD_PREVIEW_UNENCRYPTED).catch(() => undefined)
 
   return {
     all: async () => {
       try {
         const { rows } = await database.execute(
           'SELECT scope, other, preview, reason, last_at, unread, others, departed, ' +
-            'preview_by FROM list_cache ORDER BY last_at DESC',
+            'preview_by, preview_unencrypted FROM list_cache ORDER BY last_at DESC',
         )
         const found: ConversationSummary[] = []
         for (const row of rows) {
@@ -148,6 +157,7 @@ export async function openListCache(
             others,
             departed,
             preview_by,
+            preview_unencrypted,
           } = row as Record<string, unknown>
           if (typeof scope !== 'string' || scope === '') continue
           if (typeof last_at !== 'number' || typeof unread !== 'number')
@@ -159,6 +169,9 @@ export async function openListCache(
               typeof preview === 'string' && preview !== '' ? preview : null,
             ...(typeof preview_by === 'string' && preview_by !== ''
               ? { previewBy: preview_by }
+              : {}),
+            ...(preview_unencrypted === 1
+              ? { previewUnencrypted: true as const }
               : {}),
             ...(typeof reason === 'string' && reason !== '' ? { reason } : {}),
             // A row from before the column existed reads `-1`, which is
@@ -189,7 +202,7 @@ export async function openListCache(
           await database.execute(
             'INSERT INTO list_cache ' +
               '(scope, other, preview, reason, last_at, unread, others, departed, ' +
-              'preview_by) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
+              'preview_by, preview_unencrypted) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
             // THE EMPTY STRING IS HOW THIS PAGE SPELLS `null`.
             // `EncryptedDatabase.execute` takes strings and numbers, which
             // is the right shape for four of the five pages; widening it so
@@ -209,6 +222,7 @@ export async function openListCache(
               summary.others ?? -1,
               summary.departed ?? '',
               summary.previewBy ?? '',
+              summary.previewUnencrypted === true ? 1 : 0,
             ],
           )
         }
