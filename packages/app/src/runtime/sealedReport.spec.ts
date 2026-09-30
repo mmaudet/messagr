@@ -6,12 +6,9 @@ import { join } from 'node:path'
 import { describe, expect, it, vi } from 'vitest'
 
 import * as independent from '../../../../scripts/fixtures/hpke-independant.mjs'
-import { noFileOpened } from '../../../../scripts/fixtures/sans-fichier-ouvert.mjs'
+import { runTheOpeningTool as run } from '../../../../scripts/fixtures/lancer-l-outil-d-ouverture.mjs'
 import { readKeyFile } from '../../../../scripts/lib/cle-de-l-exploitant.mjs'
-import {
-  openSealedReport,
-  openTool,
-} from '../../../../scripts/lib/ouvrir-un-signalement.mjs'
+import { openSealedReport } from '../../../../scripts/lib/ouvrir-un-signalement.mjs'
 import { bytesOf } from './base64'
 import { deriveKeyPair, generateKeyPair, seal, type KeyPair } from './hpke'
 import { OPERATOR_KEY } from './operatorKey'
@@ -127,24 +124,6 @@ function testSecretKey(): Uint8Array {
   const key = readKeyFile(readFileSync(TEST_KEY_FILE, 'utf8'))
   if (!key.ok) throw new Error(key.why)
   return key.secretKey
-}
-
-/** What the tool says and prints, and how it ends. */
-async function run(
-  argv: readonly string[],
-  input = '',
-  home = mkdtempSync(join(tmpdir(), 'exploitant-')),
-): Promise<{ status: number; said: string; printed: string[] }> {
-  const said: string[] = []
-  const printed: string[] = []
-  const status = await openTool([...argv], {
-    home,
-    stdin: async () => input,
-    stderr: (line: string) => said.push(line),
-    stdout: (line: string) => printed.push(line),
-    ...noFileOpened(),
-  })
-  return { status, said: said.join('\n'), printed }
 }
 
 /** `document`, written to a file of its own. */
