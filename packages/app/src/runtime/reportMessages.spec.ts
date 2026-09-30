@@ -250,6 +250,62 @@ describe('Reporting messages to the operator (#468)', () => {
     ])
   })
 
+  it('reports a photograph the display shows, whatever form another client wrote its key, counter and hash in (#496)', async () => {
+    // Another client may pad the key of its JSON Web Key, pad the counter in
+    // part, or leave bits beyond the hash's last byte in its last character.
+    // The display opens the photograph all the same (`openingOf`), so it is
+    // reported, its description carried as the event gave it.
+    const material = {
+      v: 'v2',
+      key: {
+        kty: 'oct',
+        key_ops: ['encrypt', 'decrypt'],
+        alg: 'A256CTR',
+        k: 'qcHVMSgYg-71CauWBezXI5qkaRb0LuIy-Wx5kIaHMIA=',
+        ext: true,
+      },
+      iv: 'X85+XgHN+HEAAAAAAAAAAA=',
+      hashes: { sha256: 'eZjVdFJp2cSnZjB2S2BWrPCtbWRXjt0ZRkAyXvqSFw9' },
+    }
+    const photograph: TimelineEntry = {
+      eventId: '$photograph',
+      claimedSender: HIM,
+      sentAt: 1_790_000_012_000,
+      body: 'image.jpg',
+      msgtype: 'm.image',
+      image: {
+        url: 'mxc://example.org/photograph',
+        secret: JSON.stringify(material),
+        mimeType: 'image/jpeg',
+        width: 4000,
+        height: 3000,
+        size: 482_113,
+        thumbnail: null,
+      },
+    }
+    const { reporting, sealed } = device()
+
+    const reported = await reportMessages(reporting, {
+      ...REQUEST,
+      selected: new Set(['$photograph']),
+      timeline: [...TIMELINE, photograph],
+    })
+
+    expect(reported).toEqual({ outcome: 'sent', number: 'K7QM-4ZT2' })
+    expect(payloadOf(sealed[0]!.payload)?.messages).toEqual([
+      {
+        kind: 'photograph',
+        eventId: '$photograph',
+        sentAt: 1_790_000_012_000,
+        sender: HIM,
+        file: { ...material, url: 'mxc://example.org/photograph' },
+        mimetype: 'image/jpeg',
+        name: 'image.jpg',
+        size: 482_113,
+      },
+    ])
+  })
+
   it('names the reporting account exactly as the homeserver’s whoami answers, and binds the seal to it', async () => {
     // The service keeps the account its whoami names, and the seal must bind
     // that very string, or the report does not open: not the one this device

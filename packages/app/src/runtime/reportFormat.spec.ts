@@ -340,17 +340,56 @@ describe('What opening a reported file needs, for the application and the tool a
     expect(hex(opening!.key)).toBe(NIST.key)
     expect(hex(opening!.counter)).toBe(NIST.counter)
     expect(hex(opening!.sha256)).toBe(NIST.sha256)
-    // The counter and the hash as some clients pad them.
-    expect(
-      openingOf({
-        ...ENCRYPTED_FILE,
-        iv: '8PHy8/T19vf4+fr7/P3+/w==',
-        hashes: { sha256: 'ZjExoH6exWoMfQZrvET9Tu+kuul87rJwH1PSFT6C/6U=' },
-      }),
-    ).toEqual(opening)
   })
 
-  it('opens nothing a byte short, written two ways, or addressed off a homeserver’s media', () => {
+  it('opens every form of them the application’s display opens (#496)', () => {
+    // The display decrypts through the bridge (`decryptAttachment`), which
+    // reads a description as matrix-sdk-crypto does, with ruma's base64:
+    // the key in the URL-safe alphabet, the counter and the hash in the
+    // standard one, each with its padding, part of it or none, the bits of
+    // its last character beyond its last byte ignored. Each form below was
+    // decoded apart with that configuration (base64 0.22.1, the bridge's),
+    // to the bytes of the vector. A photograph the display shows is one a
+    // report carries.
+    const opening = openingOf(ENCRYPTED_FILE)
+    const written = (fields: { k?: string; iv?: string; sha256?: string }) => ({
+      ...ENCRYPTED_FILE,
+      key: { ...ENCRYPTED_FILE.key, k: fields.k ?? ENCRYPTED_FILE.key.k },
+      iv: fields.iv ?? ENCRYPTED_FILE.iv,
+      hashes: { sha256: fields.sha256 ?? ENCRYPTED_FILE.hashes.sha256 },
+    })
+    const forms: [string, object][] = [
+      [
+        'a key padded',
+        written({ k: 'YD3rEBXKcb4rc67whX13gR81LAc7YQjXLZgQowkU3_Q=' }),
+      ],
+      ['a counter padded', written({ iv: '8PHy8/T19vf4+fr7/P3+/w==' })],
+      ['a counter padded in part', written({ iv: '8PHy8/T19vf4+fr7/P3+/w=' })],
+      [
+        'a hash padded',
+        written({ sha256: 'ZjExoH6exWoMfQZrvET9Tu+kuul87rJwH1PSFT6C/6U=' }),
+      ],
+      [
+        'a key whose last character carries bits beyond its last byte',
+        written({ k: 'YD3rEBXKcb4rc67whX13gR81LAc7YQjXLZgQowkU3_T' }),
+      ],
+      [
+        'a counter whose last character carries bits beyond its last byte',
+        written({ iv: '8PHy8/T19vf4+fr7/P3+//' }),
+      ],
+      [
+        'a hash whose last character carries bits beyond its last byte',
+        written({ sha256: 'ZjExoH6exWoMfQZrvET9Tu+kuul87rJwH1PSFT6C/6V=' }),
+      ],
+    ]
+    for (const [what, file] of forms) {
+      expect(openingOf(file), what).toEqual(opening)
+      // And what is carried is the description as the event gave it.
+      expect(encryptedFileOf(file), what).toBe(file)
+    }
+  })
+
+  it('opens nothing the display refuses: a byte short, the other alphabet, more padding than the bytes need, or addressed off a homeserver’s media', () => {
     const withKey = (k: unknown) => ({
       ...ENCRYPTED_FILE,
       key: { ...ENCRYPTED_FILE.key, k },
@@ -361,10 +400,16 @@ describe('What opening a reported file needs, for the application and the tool a
         'a key in the other alphabet',
         withKey(`${ENCRYPTED_FILE.key.k.slice(0, 42)}/`),
       ],
-      // The last character carries bits beyond the key's last byte.
+      ['a key padded twice', withKey(`${ENCRYPTED_FILE.key.k}==`)],
       [
-        'a key with bits left over',
-        withKey(`${ENCRYPTED_FILE.key.k.slice(0, 42)}R`),
+        'a key padded before its end',
+        withKey(
+          `${ENCRYPTED_FILE.key.k.slice(0, 40)}=${ENCRYPTED_FILE.key.k.slice(40)}`,
+        ),
+      ],
+      [
+        'a key ending in a space',
+        withKey(`${ENCRYPTED_FILE.key.k.slice(0, 42)} `),
       ],
       ['no key', { ...ENCRYPTED_FILE, key: undefined }],
       [
@@ -375,12 +420,30 @@ describe('What opening a reported file needs, for the application and the tool a
         'a counter in the other alphabet',
         { ...ENCRYPTED_FILE, iv: '8PHy8_T19vf4-fr7_P3-_w' },
       ],
+      [
+        'a counter padded thrice',
+        { ...ENCRYPTED_FILE, iv: '8PHy8/T19vf4+fr7/P3+/w===' },
+      ],
       ['no counter', { ...ENCRYPTED_FILE, iv: 7 }],
       [
         'a hash of 31 bytes',
         {
           ...ENCRYPTED_FILE,
           hashes: { sha256: 'ZjExoH6exWoMfQZrvET9Tu+kuul87rJwH1PSFT6C/w' },
+        },
+      ],
+      [
+        'a hash padded twice',
+        {
+          ...ENCRYPTED_FILE,
+          hashes: { sha256: 'ZjExoH6exWoMfQZrvET9Tu+kuul87rJwH1PSFT6C/6U==' },
+        },
+      ],
+      [
+        'a hash ending in a new line',
+        {
+          ...ENCRYPTED_FILE,
+          hashes: { sha256: 'ZjExoH6exWoMfQZrvET9Tu+kuul87rJwH1PSFT6C/6U\n' },
         },
       ],
       ['no hash', { ...ENCRYPTED_FILE, hashes: {} }],

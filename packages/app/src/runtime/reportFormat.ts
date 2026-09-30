@@ -429,12 +429,22 @@ const MXC = /^mxc:\/\/([A-Za-z0-9.:[\]-]+)\/([A-Za-z0-9_-]+)$/
  * before it reports a file (`reportable`, through `encryptedFileOf`) and the
  * operator's tool before it downloads one (`ouvrir-un-fichier-signale.mjs`).
  *
- * An `mxc://` address of one media; a key of 32 bytes in unpadded base64url,
- * as a JSON Web Key writes it; a counter of 16 bytes and a SHA-256 hash of
- * 32 bytes, in base64 with or without its padding, as Matrix clients write
- * them. Each is read the one way it can be written: a last character that
- * carries bits beyond the last byte is not the same bytes written otherwise,
- * it is refused.
+ * An `mxc://` address of one media; a key of 32 bytes in the URL-safe
+ * alphabet of base64, as a JSON Web Key writes it; a counter of 16 bytes
+ * and a SHA-256 hash of 32 bytes in its standard alphabet.
+ *
+ * # EVERY FORM THE DISPLAY OPENS, AND NONE IT REFUSES (#496)
+ *
+ * A photograph the application shows is one it can report. The display
+ * decrypts through the bridge (`decryptAttachment`), which reads a
+ * description as matrix-sdk-crypto does, with ruma's base64: the URL-safe
+ * alphabet for the key, the standard one for the counter and the hash, and
+ * for each, its padding, part of it or none, and the bits of its last
+ * character beyond its last byte ignored. So these are read the same way
+ * here (`bytesOfBase64`), for the application and the tool alike: the other
+ * alphabet, a byte more or less, more padding than the bytes need or a
+ * space stay refused, as the display refuses them. And the tool still
+ * checks the hash of what it downloads before it decrypts anything.
  */
 export function openingOf(value: unknown): Opening | null {
   const fields = value as Fields
@@ -466,10 +476,15 @@ const ALPHABETS = {
   url: /^[A-Za-z0-9_-]*$/,
 } as const
 
+/** The standard alphabet, each character at its value. */
+const STANDARD_SYMBOLS =
+  'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/'
+
 /**
- * The `length` bytes `text` holds in base64 of `alphabet`, unpadded, or
- * padded in the standard alphabet; `null` for anything else, bits left over
- * after the last byte included.
+ * The `length` bytes `text` holds in base64 of `alphabet`, as ruma reads
+ * an encrypted file's for the display (`openingOf`): the characters the
+ * bytes need, then their padding, whole, in part or none, the bits of the
+ * last character beyond the last byte ignored. `null` for anything else.
  */
 function bytesOfBase64(
   text: unknown,
@@ -478,17 +493,26 @@ function bytesOfBase64(
 ): Uint8Array | null {
   if (typeof text !== 'string') return null
   const characters = Math.ceil((length * 4) / 3)
-  const padding = '='.repeat((4 - (characters % 4)) % 4)
-  const bare =
-    alphabet === 'standard' && text === text.slice(0, characters) + padding
-      ? text.slice(0, characters)
-      : text
-  if (bare.length !== characters || !ALPHABETS[alphabet].test(bare)) {
+  const padding = (4 - (characters % 4)) % 4
+  const written = text.slice(0, characters)
+  const after = text.slice(characters)
+  if (
+    written.length !== characters ||
+    !ALPHABETS[alphabet].test(written) ||
+    !/^=*$/.test(after) ||
+    after.length > padding
+  ) {
     return null
   }
   const standard =
-    alphabet === 'url' ? bare.replace(/-/g, '+').replace(/_/g, '/') : bare
-  const bytes = base64Bytes(standard + padding)
+    alphabet === 'url' ? written.replace(/-/g, '+').replace(/_/g, '/') : written
+  // The last character without the bits beyond the last byte, its lowest
+  // ones: the one spelling of those bytes, which `base64Bytes` reads.
+  const beyond = characters * 6 - length * 8
+  const last = STANDARD_SYMBOLS.indexOf(standard.slice(-1))
+  const kept = last - (last % 2 ** beyond)
+  const canonical = standard.slice(0, -1) + STANDARD_SYMBOLS[kept]
+  const bytes = base64Bytes(canonical + '='.repeat(padding))
   return bytes?.length === length ? bytes : null
 }
 
