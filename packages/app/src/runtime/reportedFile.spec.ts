@@ -595,10 +595,10 @@ describe('A reported photograph or document, on the operator’s machine (#471)'
   })
 
   it('opens a photograph’s thumbnail on demand, what the conversation drew of it: its own copy, its own key, its hash checked, then erased (#496)', async () => {
-    // From the selection to the operator's screen: the conversation drew
-    // this photograph from its thumbnail, whose key another client wrote
-    // padded (`openingOf`), and the application reports both. The tool
-    // opens the thumbnail, not the photograph.
+    // From the selection to the operator's screen: a photograph and its
+    // thumbnail, whose key another client wrote padded (`openingOf`),
+    // reported by the application. The tool opens the thumbnail, not the
+    // photograph.
     const photograph: TimelineEntry = {
       eventId: '$photograph',
       claimedSender: HIM,

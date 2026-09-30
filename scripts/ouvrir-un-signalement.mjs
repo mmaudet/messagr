@@ -49,10 +49,8 @@
 //
 //	node scripts/ouvrir-un-signalement.mjs pli.json --ouvrir-vignette 2
 //
-// Une photo porte aussi la description de sa vignette quand elle en a une
-// (#496) : la conversation dessine une photo depuis sa vignette, et c'est ce
-// que la personne qui signale a vu. `--ouvrir-vignette` l'ouvre comme
-// `--ouvrir` ouvre la photo, avec le même compte et le même effacement.
+// La vignette d'une photo qui en a une (`reportFormat.ts`, « THE PAYLOAD »)
+// s'ouvre comme la photo, avec le même compte et le même effacement.
 //
 // # Codes de sortie
 //

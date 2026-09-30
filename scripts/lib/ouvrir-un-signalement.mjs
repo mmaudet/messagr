@@ -37,8 +37,7 @@
 // peut pas garantir est dit dans `ouvrir-un-fichier-signale.mjs`.
 //
 // Une photo porte aussi la description de sa vignette quand elle en a une
-// (#496) : la conversation dessine une photo depuis sa vignette, et c'est
-// elle que la personne qui signale a vue. L'outil montre son type et
+// (`reportFormat.ts`, « THE PAYLOAD ») : l'outil montre son type et
 // l'adresse de sa copie chiffrée, et `--ouvrir-vignette` l'ouvre de même, à
 // la demande.
 //
@@ -168,10 +167,10 @@ export async function openTool(argv, ports) {
     stderr(USAGE)
     return 2
   }
-  const wanted = options.open ?? options.thumbnail
-  if (wanted !== null && !/^[1-9][0-9]{0,5}$/.test(wanted)) {
+  const { opening } = options
+  if (opening !== null && !/^[1-9][0-9]{0,5}$/.test(opening.message)) {
     stderr(
-      `${options.open === null ? '--ouvrir-vignette' : '--ouvrir'} attend le numéro d’un message, tel que l’outil l’affiche.\n\n${USAGE}`,
+      `${OPTION_OF[opening.copy]} attend le numéro d’un message, tel que l’outil l’affiche.\n\n${USAGE}`,
     )
     return 2
   }
@@ -233,7 +232,7 @@ export async function openTool(argv, ports) {
       'Ce qu’il porte n’est pas un signalement au format 1 : le voici tel quel.',
     )
     stdout(displayable(new TextDecoder().decode(opened.payload), true))
-    if (wanted === null) return 0
+    if (opening === null) return 0
     stderr(
       'Rien à ouvrir : ce qu’il porte n’a pas de message que l’outil lise.',
     )
@@ -249,61 +248,64 @@ export async function openTool(argv, ports) {
     )
   }
   stdout(readable(report).join('\n'))
-  return wanted === null
+  return opening === null
     ? 0
     : await openOnDemand(
         report,
-        { at: Number(wanted), thumbnail: options.thumbnail !== null },
+        { copy: opening.copy, message: Number(opening.message) },
         options.account,
         ports,
       )
 }
 
 /**
- * Ce que `argv` demande : la clé, le message dont ouvrir le fichier ou la
- * vignette, le compte et le pli, chacun `null` quand il n'est pas nommé ; ou
+ * L'option qui ouvre chaque copie d'un fichier signalé : le fichier du
+ * message, ou la vignette de sa photo.
+ *
+ * @type {Readonly<Record<import('./ouvrir-un-fichier-signale.mjs').Copy, string>>}
+ */
+const OPTION_OF = { file: '--ouvrir', thumbnail: '--ouvrir-vignette' }
+
+/**
+ * Ce que `argv` demande : la clé, l'ouverture (quelle copie, de quel
+ * message), le compte et le pli, chacun `null` quand il n'est pas nommé ; ou
  * `null` quand `argv` ne se lit pas comme l'usage le dit (une option inconnue
- * ou répétée, une option sans sa valeur, deux plis, deux ouvertures à la
- * fois, un compte sans ouverture).
+ * ou répétée, une option sans sa valeur, deux plis, deux ouvertures, un
+ * compte sans ouverture).
  *
  * @param {readonly string[]} argv
- * @returns {{ key: string | null, open: string | null, thumbnail: string | null, account: string | null, document: string | null } | null}
+ * @returns {{ key: string | null, account: string | null, opening: { copy: import('./ouvrir-un-fichier-signale.mjs').Copy, message: string } | null, document: string | null } | null}
  */
 function argumentsOf(argv) {
-  /** @type {{ key: string | null, open: string | null, thumbnail: string | null, account: string | null, document: string | null }} */
-  const read = {
-    key: null,
-    open: null,
-    thumbnail: null,
-    account: null,
-    document: null,
-  }
-  /** @type {Readonly<Record<string, 'key' | 'open' | 'thumbnail' | 'account'>>} */
-  const OPTIONS = {
-    '--cle': 'key',
-    '--ouvrir': 'open',
-    '--ouvrir-vignette': 'thumbnail',
-    '--compte': 'account',
-  }
+  /** @type {{ key: string | null, account: string | null, opening: { copy: import('./ouvrir-un-fichier-signale.mjs').Copy, message: string } | null, document: string | null }} */
+  const read = { key: null, account: null, opening: null, document: null }
+  /** @type {Readonly<Record<string, 'key' | 'account'>>} */
+  const VALUES = { '--cle': 'key', '--compte': 'account' }
+  /** @type {Readonly<Record<string, import('./ouvrir-un-fichier-signale.mjs').Copy>>} */
+  const COPY_OF = Object.fromEntries(
+    Object.entries(OPTION_OF).map(([copy, option]) => [option, copy]),
+  )
   for (let at = 0; at < argv.length; at += 1) {
     const argument = argv[at]
-    const option = OPTIONS[argument]
-    if (option === undefined) {
+    const option = VALUES[argument]
+    const copy = COPY_OF[argument]
+    if (option === undefined && copy === undefined) {
       if (argument.startsWith('-') || read.document !== null) return null
       read.document = argument
       continue
     }
     const value = argv[at + 1]
-    if (value === undefined || value.startsWith('-') || read[option] !== null) {
-      return null
-    }
-    read[option] = value
+    if (value === undefined || value.startsWith('-')) return null
     at += 1
+    if (copy !== undefined) {
+      if (read.opening !== null) return null
+      read.opening = { copy, message: value }
+    } else {
+      if (read[option] !== null) return null
+      read[option] = value
+    }
   }
-  if (read.open !== null && read.thumbnail !== null) return null
-  return read.account !== null && read.open === null && read.thumbnail === null
-    ? null
-    : read
+  return read.account !== null && read.opening === null ? null : read
 }
 
 /**

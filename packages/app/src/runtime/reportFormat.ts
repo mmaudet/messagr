@@ -203,46 +203,33 @@ export interface ReportedWords extends Sent {
 }
 
 /**
- * What a photograph or a document a report carries has of its file: the
- * description of its encrypted file, never its bytes.
+ * A file a report carries, a photograph's, a document's or a thumbnail's:
+ * the description of its encrypted file, never its bytes, and its type.
  */
-interface Described extends Sent {
+export interface CarriedFile {
   /** Its encrypted file, as the event carried it: `openingOf` opens it. */
   readonly file: EncryptedFile
   /** Its type, as the event states it, or `null`. */
   readonly mimetype: string | null
+}
+
+/** A photograph or a document as a message sent it: its file, named. */
+export interface SentFile extends Sent, CarriedFile {
   /** Its name, as the event states it, or `null`. */
   readonly name: string | null
   /** Its size in bytes, as the event states it, or `null`. */
   readonly size: number | null
 }
 
-/**
- * A photograph's thumbnail a report carries (#496): the description of its
- * own encrypted file, never its bytes.
- */
-export interface ReportedThumbnail {
-  /**
-   * Its encrypted file, as `info.thumbnail_file` carried it, with a key of
-   * its own: `openingOf` opens it.
-   */
-  readonly file: EncryptedFile
-  /** Its type, as `info.thumbnail_info` states it, or `null`. */
-  readonly mimetype: string | null
-}
-
 /** A photograph a report carries. */
-export interface ReportedPhotograph extends Described {
+export interface ReportedPhotograph extends SentFile {
   readonly kind: 'photograph'
-  /**
-   * Its thumbnail, what the conversation drew of it, or `null` when the
-   * event has none, or one the operator could not open.
-   */
-  readonly thumbnail: ReportedThumbnail | null
+  /** Its thumbnail, or `null`: see « THE PAYLOAD ». */
+  readonly thumbnail: CarriedFile | null
 }
 
 /** A document a report carries. */
-export interface ReportedDocument extends Described {
+export interface ReportedDocument extends SentFile {
   readonly kind: 'document'
 }
 
@@ -361,22 +348,23 @@ function messageFields(message: ReportedMessage): object {
     kind: message.kind,
   }
   if (message.kind === 'text') return { ...sent, text: message.text }
-  const described = {
+  const sentFile = {
     ...sent,
-    file: message.file,
-    mimetype: message.mimetype,
+    ...carriedFields(message),
     name: message.name,
     size: message.size,
   }
-  if (message.kind === 'document') return described
+  if (message.kind === 'document') return sentFile
   const { thumbnail } = message
   return {
-    ...described,
-    thumbnail:
-      thumbnail === null
-        ? null
-        : { file: thumbnail.file, mimetype: thumbnail.mimetype },
+    ...sentFile,
+    thumbnail: thumbnail === null ? null : carriedFields(thumbnail),
   }
+}
+
+/** A carried file as the payload writes it: its `file`, its `mimetype`. */
+function carriedFields(carried: CarriedFile): object {
+  return { file: carried.file, mimetype: carried.mimetype }
 }
 
 /** What JSON gives back, read field by field. */
@@ -453,40 +441,33 @@ function messageOf(value: unknown): ReportedMessage | null {
       : null
   }
   if (kind !== 'photograph' && kind !== 'document') return null
-  const file = encryptedFileOf(fields.file)
+  const carried = carriedOf(fields)
   if (
-    file === null ||
+    carried === null ||
     fields.text !== undefined ||
-    !stringOrNull(fields.mimetype) ||
     !stringOrNull(fields.name) ||
     !(typeof fields.size === 'number' || fields.size === null)
   ) {
     return null
   }
-  const described = {
-    ...sent,
-    file,
-    mimetype: fields.mimetype,
-    name: fields.name,
-    size: fields.size,
-  }
+  const sentFile = { ...sent, ...carried, name: fields.name, size: fields.size }
   if (kind === 'document') {
-    return fields.thumbnail === undefined ? { ...described, kind } : null
+    return fields.thumbnail === undefined ? { ...sentFile, kind } : null
   }
   // A photograph of #471 has no `thumbnail`: it carries none.
   if (fields.thumbnail === undefined || fields.thumbnail === null) {
-    return { ...described, kind, thumbnail: null }
+    return { ...sentFile, kind, thumbnail: null }
   }
-  const thumbnail = thumbnailOf(fields.thumbnail)
-  return thumbnail === null ? null : { ...described, kind, thumbnail }
+  const thumbnail = carriedOf(fields.thumbnail)
+  return thumbnail === null ? null : { ...sentFile, kind, thumbnail }
 }
 
 /**
- * A photograph's thumbnail as a payload carries it, or `null` when it is
- * not one the format writes: its file, which must open (`openingOf`), and
- * its type, text or `null`.
+ * The carried file `value` holds, a message's or its thumbnail's, or `null`
+ * when it is not one the format writes: a `file` that opens (`openingOf`),
+ * and a `mimetype`, text or `null`.
  */
-function thumbnailOf(value: unknown): ReportedThumbnail | null {
+function carriedOf(value: unknown): CarriedFile | null {
   const fields = value as Fields
   const file = encryptedFileOf(fields?.file)
   const mimetype = fields?.mimetype

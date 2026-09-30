@@ -741,9 +741,8 @@ describe('A photograph’s thumbnail in a report (#496)', () => {
   }
 
   it('writes a photograph’s thumbnail beside its file, as the description of its own encrypted file, and reads it back', () => {
-    // What the conversation showed the person who reports is the thumbnail
-    // (`smallestCopyOf`), so the operator can open it too: its address, its
-    // own key, its counter, its hashes, and its type. Never its bytes.
+    // As « THE PAYLOAD » lays it out: its address, its own key, its counter,
+    // its hashes, and its type. Never its bytes.
     expect(written().messages).toEqual([
       {
         event_id: '$photograph',

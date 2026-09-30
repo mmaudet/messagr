@@ -38,9 +38,9 @@ import { dayOf, timeOf } from './whenLabel'
  * conversation already holds, and a document as its row: what the person
  * chose, as they read it. What leaves of either is not the file but the
  * description of its encrypted copy, already on the server, which lets the
- * operator open it, and for a photograph the description of its thumbnail
- * too, the copy the conversation draws (#496): the sheet says so in words
- * (`report_what_files`), whenever the report carries one.
+ * operator open it, and a photograph's thumbnail's too (`reportFormat.ts`,
+ * « THE PAYLOAD »): the sheet says so in words (`report_what_files`),
+ * whenever the report carries one.
  *
  * # THE AUTHOR IS THE ACCOUNT THE SERVER ATTRIBUTES THE MESSAGES TO
  *

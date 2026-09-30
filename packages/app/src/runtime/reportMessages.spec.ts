@@ -309,10 +309,8 @@ describe('Reporting messages to the operator (#468)', () => {
   })
 
   it('seals a photograph’s thumbnail beside it, the copy the conversation drew, with its own key, never its bytes (#496)', async () => {
-    // The conversation draws a photograph from its thumbnail when it has
-    // one: the operator is to see what the person who reports saw, so the
-    // description of the thumbnail's encrypted file goes too, as the event
-    // carried it, with its type. The service learns nothing more of it.
+    // A photograph goes with its thumbnail (`reportFormat.ts`, « THE
+    // PAYLOAD »), as the event carried it. The service learns nothing more.
     const material = {
       v: 'v2',
       key: {

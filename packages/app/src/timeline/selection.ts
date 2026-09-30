@@ -1,10 +1,10 @@
 import {
   encryptedFileOf,
+  type CarriedFile,
   type ReportedMessage,
-  type ReportedThumbnail,
+  type SentFile,
 } from '../runtime/reportFormat'
 import { fileOf, type EncryptedFile } from './encryptedFile'
-import type { ReadFile } from './imageEvent'
 import type { TimelineEntry } from './mergeTimeline'
 
 /**
@@ -128,12 +128,10 @@ export interface Reportable {
  *
  * WORDS, PHOTOGRAPHS AND DOCUMENTS, mixed as the person chose them. Words
  * go as the device shows them. A photograph or a document goes as the
- * description of its encrypted file, the one its event carried
- * (`reportFormat.ts`): the address of the encrypted copy already on the
- * server, and what opens and checks it. A photograph goes with its
- * thumbnail's too, when it has one the operator can open, since the
- * conversation draws it from there (#496): the operator sees what the
- * person saw. Never their bytes, which this reading does not even have:
+ * description of its encrypted file, the one its event carried, a
+ * photograph with its thumbnail's (`reportFormat.ts`, « THE PAYLOAD »): the
+ * address of the encrypted copy already on the server, and what opens and
+ * checks it. Never their bytes, which this reading does not even have:
  * nothing is downloaded, decrypted or uploaded to make a report (ADR 0006,
  * ADR 0015).
  *
@@ -179,33 +177,20 @@ function reportedMessageOf(entry: TimelineEntry): ReportedMessage | null {
   }
   const { image, document } = entry
   if (entry.msgtype === 'm.image' && image !== undefined) {
-    const file = openableFileOf(image)
-    return file === null
+    // A photograph's `body` is the name its sender gave for clients that
+    // cannot draw it (`imageEvent.ts`).
+    const photograph = sentFileOf(sent, image, entry.body, image.size)
+    // And its thumbnail, when the operator can open it: see « THE PAYLOAD »
+    // (`reportFormat.ts`).
+    const thumbnail =
+      image.thumbnail === null ? null : eventFileOf(image.thumbnail)
+    return photograph === null
       ? null
-      : {
-          ...sent,
-          kind: 'photograph',
-          file,
-          mimetype: image.mimeType,
-          // A photograph's `body` is the name its sender gave for clients
-          // that cannot draw it (`imageEvent.ts`).
-          name: entry.body,
-          size: image.size,
-          thumbnail: reportedThumbnailOf(image.thumbnail),
-        }
+      : { ...photograph, kind: 'photograph', thumbnail }
   }
   if (entry.msgtype === 'm.file' && document !== undefined) {
-    const file = openableFileOf(document)
-    return file === null
-      ? null
-      : {
-          ...sent,
-          kind: 'document',
-          file,
-          mimetype: document.mimeType,
-          name: document.name,
-          size: document.size,
-        }
+    const sentFile = sentFileOf(sent, document, document.name, document.size)
+    return sentFile === null ? null : { ...sentFile, kind: 'document' }
   }
   if (
     entry.msgtype !== undefined &&
@@ -217,36 +202,42 @@ function reportedMessageOf(entry: TimelineEntry): ReportedMessage | null {
   return null
 }
 
-/**
- * The encrypted file `read` describes, rebuilt as its event carried it from
- * what the conversation kept of it (`fileOf`), or `null` when it could not
- * be opened (`encryptedFileOf`, whose rule the operator's tool reads too).
- */
-function openableFileOf(read: {
+/** What the conversation kept of a file an event carried. */
+interface KeptFile {
   readonly url: string
   readonly secret: string
-}): EncryptedFile | null {
+  readonly mimeType: string | null
+}
+
+/**
+ * A photograph or a document as its message sent it: the file its event
+ * carried (`eventFileOf`), with the name and the size the event states;
+ * `null` when that file could not be opened.
+ */
+function sentFileOf(
+  sent: Pick<SentFile, 'eventId' | 'sentAt' | 'sender'>,
+  kept: KeptFile,
+  name: string | null,
+  size: number | null,
+): SentFile | null {
+  const file = eventFileOf(kept)
+  return file === null ? null : { ...sent, ...file, name, size }
+}
+
+/**
+ * The file an event carried, rebuilt from what the conversation kept of it
+ * (`fileOf`), with its type; `null` when it could not be opened
+ * (`encryptedFileOf`, whose rule the operator's tool reads too).
+ */
+function eventFileOf(read: KeptFile): CarriedFile | null {
+  let file: EncryptedFile | null
   try {
-    return encryptedFileOf(fileOf(read))
+    file = encryptedFileOf(fileOf(read))
   } catch {
     // A secret that is not an object: nothing could open this file.
     return null
   }
-}
-
-/**
- * What a report carries of a photograph's thumbnail (#496): the encrypted
- * file of the copy the conversation draws, and its type. `null` when the
- * photograph has none, or one the operator could not open, which leaves
- * the photograph to go alone: a thumbnail that fails is not a photograph
- * that fails (`imageEvent.ts`).
- */
-function reportedThumbnailOf(
-  thumbnail: ReadFile | null,
-): ReportedThumbnail | null {
-  if (thumbnail === null) return null
-  const file = openableFileOf(thumbnail)
-  return file === null ? null : { file, mimetype: thumbnail.mimeType }
+  return file === null ? null : { file, mimetype: read.mimeType }
 }
 
 /**

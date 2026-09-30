@@ -460,10 +460,8 @@ describe('what a report carries (#468)', () => {
   })
 
   it('carries a photograph’s thumbnail, what the conversation drew of it, with its own key, and nothing for a photograph without one (#496)', () => {
-    // The conversation draws a photograph from its thumbnail when it has
-    // one (`smallestCopyOf`): the operator is to see what the person who
-    // reports saw, so the thumbnail's encrypted file goes too, as the event
-    // carried it in `info.thumbnail_file`.
+    // A photograph goes with its thumbnail (`reportFormat.ts`, « THE
+    // PAYLOAD »), as the event carried it in `info.thumbnail_file`.
     const held = [
       photographed('$p', HER, 1),
       photographed('$n', HER, 2, JSON.stringify(MATERIAL), null),
