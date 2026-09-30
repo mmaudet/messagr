@@ -17,7 +17,11 @@ import { describe, expect, it } from 'vitest'
 import { openTool } from '../../../../scripts/lib/ouvrir-un-signalement.mjs'
 import type { TimelineEntry } from '../timeline/mergeTimeline'
 import { generateKeyPair } from './hpke'
-import { payloadBytes, type ReportPayload } from './reportFormat'
+import {
+  payloadBytes,
+  type ReportBinding,
+  type ReportPayload,
+} from './reportFormat'
 import { reportMessages } from './reportMessages'
 import { sealReportWithEphemeral } from './sealedReport'
 
@@ -77,6 +81,35 @@ const MATERIAL = {
   },
   iv: '8PHy8/T19vf4+fr7/P3+/w',
   hashes: { sha256: 'ZjExoH6exWoMfQZrvET9Tu+kuul87rJwH1PSFT6C/6U' },
+}
+
+/**
+ * A photograph's thumbnail, sealed apart under a key of its own, as its
+ * sender seals one (`imageEvent.ts`): the ASCII of « the thumbnail the
+ * conversation drew », in AES-256-CTR under the key 000102…1f from the
+ * counter a0a1a2a3a4a5a6a7 then eight zeros. Its ciphertext was computed
+ * outside this repository, with `openssl enc -aes-256-ctr` and again with
+ * RustCrypto's `ctr`, and its hash with `openssl dgst -sha256`.
+ */
+const THUMBNAIL = {
+  plaintext:
+    '746865207468756d626e61696c2074686520636f6e766572736174696f6e2064726577',
+  ciphertext:
+    'aa141e65e99c3312ecb647c7ab9979284ceb1dd528979da3f1d305ead7c7e2788c3c99',
+}
+
+/** That thumbnail described as Matrix describes an encrypted file. */
+const THUMBNAIL_MATERIAL = {
+  v: 'v2',
+  key: {
+    kty: 'oct',
+    key_ops: ['encrypt', 'decrypt'],
+    alg: 'A256CTR',
+    k: 'AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8',
+    ext: true,
+  },
+  iv: 'oKGio6SlpqcAAAAAAAAAAA',
+  hashes: { sha256: 'piM3s213LABROxYZnnkExsCsjY9idjZfqVCxYxA3TRE' },
 }
 
 const ME = '@alice:example.org'
@@ -249,6 +282,10 @@ const PAYLOAD: ReportPayload = {
       mimetype: 'image/jpeg',
       name: 'image.jpg',
       size: 64,
+      thumbnail: {
+        file: { ...THUMBNAIL_MATERIAL, url: 'mxc://example.org/thumbnail' },
+        mimetype: 'image/jpeg',
+      },
     },
     {
       kind: 'document',
@@ -265,10 +302,14 @@ const PAYLOAD: ReportPayload = {
 
 /** `payload`, sealed for the test key and written as the service exports it. */
 function sealed(payload: ReportPayload = PAYLOAD): string {
-  const binding = {
+  return sealedBytes(payloadBytes(payload), {
     reason: payload.reason,
     reporter: payload.reportingAccount,
-  }
+  })
+}
+
+/** The payload `held`, sealed for the test key, as the service exports it. */
+function sealedBytes(held: Uint8Array, binding: ReportBinding): string {
   const path = join(mkdtempSync(join(tmpdir(), 'pli-471-')), 'pli.json')
   writeFileSync(
     path,
@@ -276,7 +317,7 @@ function sealed(payload: ReportPayload = PAYLOAD): string {
       ...binding,
       sealed: sealReportWithEphemeral(
         generateKeyPair(),
-        payloadBytes(payload),
+        held,
         binding,
         TEST_KEY.public_key,
       ),
@@ -285,8 +326,56 @@ function sealed(payload: ReportPayload = PAYLOAD): string {
   return path
 }
 
+/**
+ * `entry` reported by the application as it reports (`reportMessages`), for
+ * the test key, and written as the service exports it: from the selection
+ * to what the operator opens.
+ */
+async function reportedByTheApplication(entry: TimelineEntry): Promise<string> {
+  const sent: string[] = []
+  await reportMessages(
+    {
+      whoami: async () => ME,
+      seal: (payload, binding) =>
+        sealReportWithEphemeral(
+          generateKeyPair(),
+          payload,
+          binding,
+          TEST_KEY.public_key,
+        ),
+      keyOf: () => 'report-key-1',
+      service: {
+        send: async body => {
+          sent.push(body)
+          return { status: 201, body: '{"number":"K7QM-4ZT2"}' }
+        },
+      },
+      now: () => 1_790_000_060_000,
+      after: () => new Promise(() => {}),
+    },
+    {
+      self: ME,
+      roomId: '!room:example.org',
+      reason: 'sexual_without_consent',
+      selected: new Set([entry.eventId]),
+      timeline: [entry],
+    },
+  )
+  const report = join(mkdtempSync(join(tmpdir(), 'pli-471-')), 'pli.json')
+  writeFileSync(
+    report,
+    JSON.stringify({ ...JSON.parse(sent[0]!), reporter: ME }),
+  )
+  return report
+}
+
 /** The photograph of `PAYLOAD`, served as the homeserver keeps it. */
 const PHOTOGRAPH = { [`${DOWNLOADS}/example.org/photograph`]: NIST.ciphertext }
+
+/** Its thumbnail, served as the homeserver keeps it. */
+const ITS_THUMBNAIL = {
+  [`${DOWNLOADS}/example.org/thumbnail`]: THUMBNAIL.ciphertext,
+}
 
 /** The number of listeners left on the interruptions. */
 function listening(signals: EventEmitter): number {
@@ -321,6 +410,9 @@ describe('A reported photograph or document, on the operator’s machine (#471)'
       '  photo : image.jpg (image/jpeg, 64 octets)',
       '  copie chiffrée : mxc://example.org/photograph',
       '  pour l’ouvrir, à la demande : --ouvrir 2',
+      '  vignette, ce que la conversation montre : image/jpeg',
+      '  copie chiffrée de la vignette : mxc://example.org/thumbnail',
+      '  pour l’ouvrir, à la demande : --ouvrir-vignette 2',
       '',
       'message 3 sur 3, écrit le 2026-09-21 14:13:50 UTC',
       '  événement : $document',
@@ -352,40 +444,7 @@ describe('A reported photograph or document, on the operator’s machine (#471)'
         thumbnail: null,
       },
     }
-    const sent: string[] = []
-    await reportMessages(
-      {
-        whoami: async () => ME,
-        seal: (payload, binding) =>
-          sealReportWithEphemeral(
-            generateKeyPair(),
-            payload,
-            binding,
-            TEST_KEY.public_key,
-          ),
-        keyOf: () => 'report-key-1',
-        service: {
-          send: async body => {
-            sent.push(body)
-            return { status: 201, body: '{"number":"K7QM-4ZT2"}' }
-          },
-        },
-        now: () => 1_790_000_060_000,
-        after: () => new Promise(() => {}),
-      },
-      {
-        self: ME,
-        roomId: '!room:example.org',
-        reason: 'sexual_without_consent',
-        selected: new Set(['$photograph']),
-        timeline: [photograph],
-      },
-    )
-    const report = join(mkdtempSync(join(tmpdir(), 'pli-471-')), 'pli.json')
-    writeFileSync(
-      report,
-      JSON.stringify({ ...JSON.parse(sent[0]!), reporter: ME }),
-    )
+    const report = await reportedByTheApplication(photograph)
     const mac = machine({ served: PHOTOGRAPH })
 
     const { status, said, printed } = await run(
@@ -438,6 +497,154 @@ describe('A reported photograph or document, on the operator’s machine (#471)'
     expect(mac.handed.map(one => one.bytes)).toEqual([NIST.plaintext])
     expect(mac.handed[0]!.args[2]!.endsWith('.pdf')).toBe(true)
     expect(readdirSync(mac.ports.temporary)).toEqual([])
+  })
+
+  it('opens a photograph’s thumbnail on demand, what the conversation drew of it: its own copy, its own key, its hash checked, then erased (#496)', async () => {
+    // From the selection to the operator's screen: the conversation drew
+    // this photograph from its thumbnail, whose key another client wrote
+    // padded (`openingOf`), and the application reports both. The tool
+    // opens the thumbnail, not the photograph.
+    const photograph: TimelineEntry = {
+      eventId: '$photograph',
+      claimedSender: HIM,
+      sentAt: 1_790_000_020_000,
+      body: 'image.jpg',
+      msgtype: 'm.image',
+      image: {
+        url: 'mxc://example.org/photograph',
+        secret: JSON.stringify(MATERIAL),
+        mimeType: 'image/jpeg',
+        width: 4,
+        height: 4,
+        size: 64,
+        thumbnail: {
+          url: 'mxc://example.org/thumbnail',
+          secret: JSON.stringify({
+            ...THUMBNAIL_MATERIAL,
+            key: {
+              ...THUMBNAIL_MATERIAL.key,
+              k: `${THUMBNAIL_MATERIAL.key.k}=`,
+            },
+          }),
+          mimeType: 'image/png',
+          width: 2,
+          height: 2,
+        },
+      },
+    }
+    const report = await reportedByTheApplication(photograph)
+    const mac = machine({ served: { ...PHOTOGRAPH, ...ITS_THUMBNAIL } })
+
+    const { status, said, printed } = await run(
+      ['--cle', TEST_KEY_FILE, report, '--ouvrir-vignette', '1'],
+      mac,
+    )
+
+    expect(status).toBe(0)
+    expect(printed).toContain(
+      '  pour l’ouvrir, à la demande : --ouvrir-vignette 1',
+    )
+    expect(mac.asked).toEqual([
+      {
+        url: `${DOWNLOADS}/example.org/thumbnail`,
+        authorization: 'Bearer jeton-d-essai-471',
+      },
+    ])
+    expect(mac.handed).toHaveLength(1)
+    const [handed] = mac.handed
+    expect(handed!.bytes).toBe(THUMBNAIL.plaintext)
+    expect(handed!.mode).toBe(0o600)
+    expect(handed!.directoryMode).toBe(0o700)
+    // Named for what it is, by the thumbnail's own type.
+    expect(handed!.args[2]!.endsWith('vignette.png')).toBe(true)
+    expect(existsSync(handed!.args[2]!)).toBe(false)
+    expect(readdirSync(mac.ports.temporary)).toEqual([])
+    expect(listening(mac.signals)).toBe(0)
+    expect(said).toContain('la vignette que l’appareil a signalée')
+  })
+
+  it('opens no thumbnail for words, a document or a photograph without one, and asks nothing (#496)', async () => {
+    const withoutOne: ReportPayload = {
+      ...PAYLOAD,
+      messages: PAYLOAD.messages.map(message =>
+        message.kind === 'photograph'
+          ? { ...message, thumbnail: null }
+          : message,
+      ),
+    }
+    for (const [what, payload, number, why] of [
+      ['words', PAYLOAD, '1', 'ne porte ni photo ni document'],
+      [
+        'a document',
+        PAYLOAD,
+        '3',
+        'ne porte pas de vignette : rien à ouvrir.\n--ouvrir 3 ouvre le document',
+      ],
+      [
+        'a photograph without a thumbnail',
+        withoutOne,
+        '2',
+        'ne porte pas de vignette : rien à ouvrir.\n--ouvrir 2 ouvre la photo',
+      ],
+    ] as const) {
+      const mac = machine({ served: { ...PHOTOGRAPH, ...ITS_THUMBNAIL } })
+
+      const { status, said } = await run(
+        ['--cle', TEST_KEY_FILE, sealed(payload), '--ouvrir-vignette', number],
+        mac,
+      )
+
+      expect(status, what).toBe(2)
+      expect(said, what).toContain(why)
+      expect(mac.asked, what).toEqual([])
+      expect(mac.handed, what).toEqual([])
+    }
+  })
+
+  it('reads a report of #471 as it was sealed, its photograph without a thumbnail, and opens that photograph (#496)', async () => {
+    // A report sealed before #496: its photograph carries no `thumbnail`.
+    const binding: ReportBinding = {
+      reason: 'sexual_without_consent',
+      reporter: ME,
+    }
+    const of471 = new TextEncoder().encode(
+      JSON.stringify({
+        format: 1,
+        reason: 'sexual_without_consent',
+        reported_at: 1790000060000,
+        reporting_account: ME,
+        reported_account: HIM,
+        room_id: '!room:example.org',
+        messages: [
+          {
+            event_id: '$photograph',
+            sent_at: 1790000020000,
+            sender: HIM,
+            kind: 'photograph',
+            file: { ...MATERIAL, url: 'mxc://example.org/photograph' },
+            mimetype: 'image/jpeg',
+            name: 'image.jpg',
+            size: 64,
+          },
+        ],
+      }),
+    )
+    const mac = machine({ served: PHOTOGRAPH })
+
+    const { status, printed } = await run(
+      ['--cle', TEST_KEY_FILE, sealedBytes(of471, binding), '--ouvrir', '1'],
+      mac,
+    )
+
+    expect(status).toBe(0)
+    expect(printed.slice(-5)).toEqual([
+      'message 1 sur 1, écrit le 2026-09-21 14:13:40 UTC',
+      '  événement : $photograph',
+      '  photo : image.jpg (image/jpeg, 64 octets)',
+      '  copie chiffrée : mxc://example.org/photograph',
+      '  pour l’ouvrir, à la demande : --ouvrir 1',
+    ])
+    expect(mac.handed.map(one => one.bytes)).toEqual([NIST.plaintext])
   })
 
   it('refuses a file whose hash does not match, and neither decrypts, writes nor shows anything', async () => {
@@ -518,6 +725,11 @@ describe('A reported photograph or document, on the operator’s machine (#471)'
       ['--ouvrir', 'deux'],
       ['--ouvrir'],
       ['--compte', '/a.json'],
+      ['--ouvrir-vignette', '4'],
+      ['--ouvrir-vignette', 'deux'],
+      ['--ouvrir-vignette'],
+      // One opening at a time: which would it be?
+      ['--ouvrir', '2', '--ouvrir-vignette', '2'],
     ]) {
       const mac = machine({ served: PHOTOGRAPH })
 
@@ -618,6 +830,7 @@ describe('A reported photograph or document, on the operator’s machine (#471)'
           mimetype: 'image/jpeg',
           name: 'image.jpg',
           size: 64,
+          thumbnail: null,
         },
       ],
     }

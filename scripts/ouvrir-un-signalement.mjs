@@ -46,14 +46,22 @@
 // reprise d'une fenêtre). Il ne le confie à aucune autre application
 // qu'Aperçu, qui montre les photos et les PDF.
 //
+//	node scripts/ouvrir-un-signalement.mjs pli.json --ouvrir-vignette 2
+//
+// Une photo porte aussi la description de sa vignette quand elle en a une
+// (#496) : la conversation dessine une photo depuis sa vignette, et c'est ce
+// que la personne qui signale a vu. `--ouvrir-vignette` l'ouvre comme
+// `--ouvrir` ouvre la photo, avec le même compte et le même effacement.
+//
 // # Codes de sortie
 //
-// 0 ouvert (et, avec `--ouvrir`, montré puis effacé) ; 1 refusé (le pli ne
-// s'ouvre pas, ou le fichier ne correspond pas à son empreinte, ne s'est pas
-// téléchargé, n'a pas pu être montré, ou sa copie n'a pas pu être effacée,
-// ce que l'outil dit en la nommant) ; 2 rien à ouvrir (l'usage, un fichier
-// illisible, un message sans fichier, un compte illisible) ; 130 interrompu
-// pendant qu'un fichier était montré, sa copie effacée.
+// 0 ouvert (et, avec `--ouvrir` ou `--ouvrir-vignette`, montré puis
+// effacé) ; 1 refusé (le pli ne s'ouvre pas, ou le fichier ne correspond pas
+// à son empreinte, ne s'est pas téléchargé, n'a pas pu être montré, ou sa
+// copie n'a pas pu être effacée, ce que l'outil dit en la nommant) ; 2 rien
+// à ouvrir (l'usage, un fichier illisible, un message sans fichier ou sans
+// vignette, un compte illisible) ; 130 interrompu pendant qu'un fichier
+// était montré, sa copie effacée.
 //
 // # Tout se passe dans `lib/`, que les essais exercent
 //

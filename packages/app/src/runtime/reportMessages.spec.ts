@@ -231,6 +231,7 @@ describe('Reporting messages to the operator (#468)', () => {
         mimetype: 'image/jpeg',
         name: 'image.jpg',
         size: 12_000_000,
+        thumbnail: null,
       },
       {
         kind: 'document',
@@ -302,7 +303,90 @@ describe('Reporting messages to the operator (#468)', () => {
         mimetype: 'image/jpeg',
         name: 'image.jpg',
         size: 482_113,
+        thumbnail: null,
       },
+    ])
+  })
+
+  it('seals a photograph’s thumbnail beside it, the copy the conversation drew, with its own key, never its bytes (#496)', async () => {
+    // The conversation draws a photograph from its thumbnail when it has
+    // one: the operator is to see what the person who reports saw, so the
+    // description of the thumbnail's encrypted file goes too, as the event
+    // carried it, with its type. The service learns nothing more of it.
+    const material = {
+      v: 'v2',
+      key: {
+        kty: 'oct',
+        key_ops: ['encrypt', 'decrypt'],
+        alg: 'A256CTR',
+        k: 'qcHVMSgYg-71CauWBezXI5qkaRb0LuIy-Wx5kIaHMIA',
+        ext: true,
+      },
+      iv: 'X85+XgHN+HEAAAAAAAAAAA',
+      hashes: { sha256: 'eZjVdFJp2cSnZjB2S2BWrPCtbWRXjt0ZRkAyXvqSFw8' },
+    }
+    const thumbnailMaterial = {
+      v: 'v2',
+      key: {
+        kty: 'oct',
+        key_ops: ['encrypt', 'decrypt'],
+        alg: 'A256CTR',
+        k: 'AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8',
+        ext: true,
+      },
+      iv: 'oKGio6SlpqcAAAAAAAAAAA',
+      hashes: { sha256: 'piM3s213LABROxYZnnkExsCsjY9idjZfqVCxYxA3TRE' },
+    }
+    const photograph: TimelineEntry = {
+      eventId: '$photograph',
+      claimedSender: HIM,
+      sentAt: 1_790_000_012_000,
+      body: 'image.jpg',
+      msgtype: 'm.image',
+      image: {
+        url: 'mxc://example.org/photograph',
+        secret: JSON.stringify(material),
+        mimeType: 'image/jpeg',
+        width: 4000,
+        height: 3000,
+        size: 12_000_000,
+        thumbnail: {
+          url: 'mxc://example.org/thumbnail',
+          secret: JSON.stringify(thumbnailMaterial),
+          mimeType: 'image/jpeg',
+          width: 800,
+          height: 600,
+        },
+      },
+    }
+    const { reporting, sealed, sent } = device()
+
+    const reported = await reportMessages(reporting, {
+      ...REQUEST,
+      selected: new Set(['$photograph']),
+      timeline: [...TIMELINE, photograph],
+    })
+
+    expect(reported).toEqual({ outcome: 'sent', number: 'K7QM-4ZT2' })
+    expect(payloadOf(sealed[0]!.payload)?.messages).toEqual([
+      {
+        kind: 'photograph',
+        eventId: '$photograph',
+        sentAt: 1_790_000_012_000,
+        sender: HIM,
+        file: { ...material, url: 'mxc://example.org/photograph' },
+        mimetype: 'image/jpeg',
+        name: 'image.jpg',
+        size: 12_000_000,
+        thumbnail: {
+          file: { ...thumbnailMaterial, url: 'mxc://example.org/thumbnail' },
+          mimetype: 'image/jpeg',
+        },
+      },
+    ])
+    expect(sealed[0]!.payload.length).toBeLessThan(4096)
+    expect(sent.map(({ body }) => JSON.parse(body) as unknown)).toEqual([
+      { reason: 'harassment', sealed: 'THE-SEALED-REPORT' },
     ])
   })
 

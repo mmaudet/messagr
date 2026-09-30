@@ -12,6 +12,10 @@
 // rend une description ouvrable se dit une fois, pour l'application et pour
 // cet outil (`openingOf`).
 //
+// Une photo porte de même la description de sa vignette quand elle en a une
+// (#496), avec sa clé à elle : la conversation dessine une photo depuis sa
+// vignette. `--ouvrir-vignette` l'ouvre comme `--ouvrir` ouvre la photo.
+//
 // # Une ouverture, dans cet ordre
 //
 // 1. Elle efface d'abord ce qu'une ouverture interrompue aurait laissé
@@ -115,13 +119,13 @@ export const INTERRUPTED = 130
  */
 
 /**
- * Ouvre la photo ou le document du message `wanted` d'un signalement ouvert
- * (compté à partir de 1, comme l'outil l'affiche), dans l'ordre que dit
- * l'en-tête. Rend le code de sortie : `SEEN`, `REFUSED`, `NOTHING_TO_OPEN`
- * ou `INTERRUPTED`.
+ * Ouvre la photo ou le document du message `wanted.at` d'un signalement
+ * ouvert (compté à partir de 1, comme l'outil l'affiche), ou la vignette de
+ * sa photo quand `wanted.thumbnail`, dans l'ordre que dit l'en-tête. Rend le
+ * code de sortie : `SEEN`, `REFUSED`, `NOTHING_TO_OPEN` ou `INTERRUPTED`.
  *
  * @param {import('../../packages/app/src/runtime/reportFormat.ts').ReportPayload} report
- * @param {number} wanted
+ * @param {{ at: number, thumbnail: boolean }} wanted
  * @param {string | null} account le fichier d'identifiants que `--compte` nomme
  * @param {FilePorts} ports
  * @returns {Promise<number>}
@@ -131,22 +135,30 @@ export async function openOnDemand(report, wanted, account, ports) {
   // D'ABORD, quoi qu'il arrive ensuite.
   sweep(ports)
 
-  const message = report.messages[wanted - 1]
+  const message = report.messages[wanted.at - 1]
   if (message === undefined) {
     stderr(
-      `Ce signalement n’a pas de message ${wanted} : il en a ${report.messages.length}.`,
+      `Ce signalement n’a pas de message ${wanted.at} : il en a ${report.messages.length}.`,
     )
     return NOTHING_TO_OPEN
   }
   if (message.kind === 'text') {
     stderr(
-      `Le message ${wanted} ne porte ni photo ni document : rien à ouvrir.`,
+      `Le message ${wanted.at} ne porte ni photo ni document : rien à ouvrir.`,
+    )
+    return NOTHING_TO_OPEN
+  }
+  const copy = wanted.thumbnail ? thumbnailOf(message) : fileOf(message)
+  if (copy === null) {
+    stderr(
+      `Le message ${wanted.at} ne porte pas de vignette : rien à ouvrir.\n` +
+        `--ouvrir ${wanted.at} ouvre ${message.kind === 'photograph' ? 'la photo elle-même' : 'le document lui-même'}.`,
     )
     return NOTHING_TO_OPEN
   }
   // Toujours là : le signalement ne se lit pas quand un de ses fichiers ne
   // s'ouvre pas (`payloadOf`).
-  const opening = openingOf(message.file)
+  const opening = openingOf(copy.file)
   if (opening === null) {
     stderr('La description de ce fichier ne permet pas de l’ouvrir.')
     return REFUSED
@@ -169,35 +181,74 @@ export async function openOnDemand(report, wanted, account, ports) {
   const hash = createHash('sha256').update(ciphertext).digest()
   if (!hash.equals(Buffer.from(opening.sha256))) {
     stderr(
-      'L’empreinte ne correspond pas : ce n’est pas le fichier que l’appareil a\n' +
-        'signalé. Rien n’a été déchiffré, écrit ni montré.',
+      `L’empreinte ne correspond pas : ce n’est pas ${copy.reported}.\n` +
+        'Rien n’a été déchiffré, écrit ni montré.',
     )
     return REFUSED
   }
   stderr(
     'Téléchargé avec le compte d’exploitation ; son empreinte est celle que\n' +
-      'le signalement porte : c’est le fichier que l’appareil a signalé.',
+      `le signalement porte : c’est ${copy.reported}.`,
   )
   const decipher = createDecipheriv('aes-256-ctr', opening.key, opening.counter)
   const plaintext = Buffer.concat([
     decipher.update(ciphertext),
     decipher.final(),
   ])
-  return showThenErase(plaintext, extensionOf(message), ports)
+  return showThenErase(plaintext, copy.name, ports)
 }
 
 /**
- * Écrit `plaintext` dans un répertoire privé, le confie à Aperçu, attend
- * Entrée, puis l'efface, les interruptions écoutées depuis avant l'écriture.
+ * Ce qu'une ouverture montre d'un message qui porte un fichier : sa
+ * description, le nom de sa copie privée, et ce qu'elle est.
+ *
+ * @typedef {{ file: import('../../packages/app/src/timeline/encryptedFile.ts').EncryptedFile, name: string, reported: string }} Copy
+ */
+
+/**
+ * Le fichier du message, que `--ouvrir` ouvre.
+ *
+ * @param {import('../../packages/app/src/runtime/reportFormat.ts').ReportedFile} message
+ * @returns {Copy}
+ */
+function fileOf(message) {
+  return {
+    file: message.file,
+    name: `signalement${extensionOf(message)}`,
+    reported: 'le fichier que l’appareil a signalé',
+  }
+}
+
+/**
+ * La vignette de la photo du message, que `--ouvrir-vignette` ouvre, ou
+ * `null` quand il n'en porte pas : un document, ou une photo sans vignette.
+ *
+ * @param {import('../../packages/app/src/runtime/reportFormat.ts').ReportedFile} message
+ * @returns {Copy | null}
+ */
+function thumbnailOf(message) {
+  if (message.kind !== 'photograph' || message.thumbnail === null) return null
+  return {
+    file: message.thumbnail.file,
+    // Une vignette n'a pas de nom : son type seul dit ce qu'elle est.
+    name: `signalement-vignette${extensionOf({ mimetype: message.thumbnail.mimetype, name: null })}`,
+    reported: 'la vignette que l’appareil a signalée',
+  }
+}
+
+/**
+ * Écrit `plaintext` dans un répertoire privé sous le nom `name`, le confie à
+ * Aperçu, attend Entrée, puis l'efface, les interruptions écoutées depuis
+ * avant l'écriture.
  *
  * @param {Buffer} plaintext
- * @param {string} extension
+ * @param {string} name
  * @param {FilePorts} ports
  * @returns {Promise<number>}
  */
 async function showThenErase(
   plaintext,
-  extension,
+  name,
   { run, terminal, signals, temporary, stderr },
 ) {
   // AVANT D'ÉCRIRE : une interruption pendant qu'Aperçu s'ouvre, ou pendant
@@ -207,7 +258,7 @@ async function showThenErase(
   let outcome = SEEN
   try {
     chmodSync(directory, 0o700)
-    const path = join(directory, `signalement${extension}`)
+    const path = join(directory, name)
     writeFileSync(path, plaintext, { mode: 0o600, flag: 'wx' })
     await Promise.race([
       run('open', ['-a', 'Preview', path]),
@@ -365,7 +416,7 @@ async function downloaded(opening, operator, fetch) {
  * du type qu'il déclare quand il est simple, sinon l'extension de son nom
  * quand elle l'est ; le nom lui-même n'est pas repris.
  *
- * @param {import('../../packages/app/src/runtime/reportFormat.ts').ReportedFile} file
+ * @param {{ mimetype: string | null, name: string | null }} file
  * @returns {string}
  */
 function extensionOf(file) {

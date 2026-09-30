@@ -323,12 +323,33 @@ describe('what a report carries (#468)', () => {
     hashes: { sha256: 'eZjVdFJp2cSnZjB2S2BWrPCtbWRXjt0ZRkAyXvqSFw8' },
   }
 
-  /** A photograph this device read, as the conversation holds it. */
+  /**
+   * The key material of a thumbnail's encrypted file: a key of its own, not
+   * the photograph's (`imageEvent.ts`).
+   */
+  const THUMBNAIL_MATERIAL = {
+    v: 'v2',
+    key: {
+      kty: 'oct',
+      key_ops: ['encrypt', 'decrypt'],
+      alg: 'A256CTR',
+      k: 'AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8',
+      ext: true,
+    },
+    iv: 'oKGio6SlpqcAAAAAAAAAAA',
+    hashes: { sha256: 'piM3s213LABROxYZnnkExsCsjY9idjZfqVCxYxA3TRE' },
+  }
+
+  /**
+   * A photograph this device read, as the conversation holds it, with the
+   * thumbnail its sender made, unless `thumbnail` says otherwise.
+   */
   function photographed(
     eventId: string,
     sender: string,
     sentAt: number,
     secret = JSON.stringify(MATERIAL),
+    thumbnail: string | null = JSON.stringify(THUMBNAIL_MATERIAL),
   ): TimelineEntry {
     return {
       eventId,
@@ -343,13 +364,16 @@ describe('what a report carries (#468)', () => {
         width: 800,
         height: 600,
         size: 482_113,
-        thumbnail: {
-          url: 'mxc://x/thumbnail',
-          secret: '{"other":"key"}',
-          mimeType: 'image/jpeg',
-          width: 80,
-          height: 60,
-        },
+        thumbnail:
+          thumbnail === null
+            ? null
+            : {
+                url: `mxc://x/thumbnail-${eventId.slice(1)}`,
+                secret: thumbnail,
+                mimeType: 'image/jpeg',
+                width: 80,
+                height: 60,
+              },
       },
     }
   }
@@ -381,8 +405,8 @@ describe('what a report carries (#468)', () => {
     // #462: « Signaler » on a selection that mixes words, photographs and
     // documents of one other participant. A file goes as the address of its
     // encrypted copy on the server, its key, its counter, its hashes, its
-    // type, its name and its size: never its bytes, and never the key of
-    // its thumbnail, which the operator does not need.
+    // type, its name and its size, and a photograph with its thumbnail's
+    // (#496): never their bytes.
     const held = [
       HERS_FIRST,
       photographed('$p', HER, 1500),
@@ -410,6 +434,10 @@ describe('what a report carries (#468)', () => {
         mimetype: 'image/jpeg',
         name: 'image.jpg',
         size: 482_113,
+        thumbnail: {
+          file: { ...THUMBNAIL_MATERIAL, url: 'mxc://x/thumbnail-p' },
+          mimetype: 'image/jpeg',
+        },
       },
       {
         kind: 'document',
@@ -428,6 +456,54 @@ describe('what a report carries (#468)', () => {
         sender: HER,
         text: 'encore',
       },
+    ])
+  })
+
+  it('carries a photograph’s thumbnail, what the conversation drew of it, with its own key, and nothing for a photograph without one (#496)', () => {
+    // The conversation draws a photograph from its thumbnail when it has
+    // one (`smallestCopyOf`): the operator is to see what the person who
+    // reports saw, so the thumbnail's encrypted file goes too, as the event
+    // carried it in `info.thumbnail_file`.
+    const held = [
+      photographed('$p', HER, 1),
+      photographed('$n', HER, 2, JSON.stringify(MATERIAL), null),
+    ]
+
+    const [withOne, withNone] =
+      reportable(new Set(['$p', '$n']), held, ME)?.messages ?? []
+
+    expect(withOne).toMatchObject({
+      kind: 'photograph',
+      file: { ...MATERIAL, url: 'mxc://x/photo-p' },
+      thumbnail: {
+        file: { ...THUMBNAIL_MATERIAL, url: 'mxc://x/thumbnail-p' },
+        mimetype: 'image/jpeg',
+      },
+    })
+    expect(withNone).toMatchObject({ kind: 'photograph', thumbnail: null })
+  })
+
+  it('leaves out a thumbnail the operator could not open, and carries its photograph all the same (#496)', () => {
+    // A thumbnail that fails is not a photograph that fails (`imageEvent.ts`):
+    // the operator opens the photograph itself.
+    const held = [
+      photographed('$p', HER, 1, JSON.stringify(MATERIAL), '{"other":"key"}'),
+      photographed('$q', HER, 2, JSON.stringify(MATERIAL), 'not JSON'),
+      photographed(
+        '$r',
+        HER,
+        3,
+        JSON.stringify(MATERIAL),
+        JSON.stringify({ ...THUMBNAIL_MATERIAL, hashes: {} }),
+      ),
+    ]
+
+    expect(
+      reportable(new Set(['$p', '$q', '$r']), held, ME)?.messages,
+    ).toMatchObject([
+      { eventId: '$p', file: { url: 'mxc://x/photo-p' }, thumbnail: null },
+      { eventId: '$q', file: { url: 'mxc://x/photo-q' }, thumbnail: null },
+      { eventId: '$r', file: { url: 'mxc://x/photo-r' }, thumbnail: null },
     ])
   })
 

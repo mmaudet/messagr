@@ -100,17 +100,23 @@ import type { Sealed } from './hpke'
  *           },
  *           "mimetype": "image/jpeg",
  *           "name": "image.jpg",
- *           "size": 482113
+ *           "size": 482113,
+ *           "thumbnail": {
+ *             "file": { "v": "v2", "key": { … }, "iv": "…", "hashes": { … },
+ *                       "url": "mxc://example.org/GhIjKl" },
+ *             "mimetype": "image/jpeg"
+ *           }
  *         }
  *       ]
  *     }
  *
  * - `format`: this payload's number, 1. Another is refused, not guessed at.
- *   Photographs and documents (#471) came without changing it: every report
- *   sealed before still reads. The reader of #468, which knows only words,
- *   still reads a report of words, whose messages only gained a `kind` it
- *   does not ask for, and shows a report carrying a file as it is rather
- *   than reading it wrong.
+ *   Photographs and documents (#471), then a photograph's thumbnail (#496),
+ *   came without changing it: every report sealed before still reads. The
+ *   reader of #468, which knows only words, still reads a report of words,
+ *   whose messages only gained a `kind` it does not ask for, and shows a
+ *   report carrying a file as it is rather than reading it wrong. The
+ *   reader of #471 reads a photograph and leaves its `thumbnail` aside.
  * - `reason`: the reason's code, the same as the one bound to the seal.
  * - `reported_at`: when the report was made, in milliseconds since the
  *   epoch, by the reporting device's clock.
@@ -138,6 +144,16 @@ import type { Sealed } from './hpke'
  *     event states them, each `null` when it states none. A photograph's name
  *     is the one its sender gave for clients that cannot draw it
  *     (`image.jpg` from this application).
+ *   - A photograph's `thumbnail` too (#496), since the conversation draws a
+ *     photograph from its thumbnail when it has one (`smallestCopyOf`), and
+ *     the operator is to see what the person who reports saw: the
+ *     description of the thumbnail's own encrypted file, `file`, as the
+ *     event's `info.thumbnail_file` carried it, with its own key, and its
+ *     `mimetype` as `info.thumbnail_info` states it, or `null`. `thumbnail`
+ *     is `null` when the event has none, or one the operator could not open
+ *     (`openingOf`): a thumbnail that fails is not a photograph that fails,
+ *     and the photograph goes all the same. A photograph of #471 has no
+ *     `thumbnail`, and reads as having none. A document carries none.
  *
  * Nothing is uploaded again: the operator downloads the encrypted copy
  * already on the homeserver, checks its hash, and opens it on its own
@@ -187,11 +203,10 @@ export interface ReportedWords extends Sent {
 }
 
 /**
- * A photograph or a document a report carries: the description of its
- * encrypted file, never its bytes.
+ * What a photograph or a document a report carries has of its file: the
+ * description of its encrypted file, never its bytes.
  */
-export interface ReportedFile extends Sent {
-  readonly kind: 'photograph' | 'document'
+interface Described extends Sent {
   /** Its encrypted file, as the event carried it: `openingOf` opens it. */
   readonly file: EncryptedFile
   /** Its type, as the event states it, or `null`. */
@@ -201,6 +216,38 @@ export interface ReportedFile extends Sent {
   /** Its size in bytes, as the event states it, or `null`. */
   readonly size: number | null
 }
+
+/**
+ * A photograph's thumbnail a report carries (#496): the description of its
+ * own encrypted file, never its bytes.
+ */
+export interface ReportedThumbnail {
+  /**
+   * Its encrypted file, as `info.thumbnail_file` carried it, with a key of
+   * its own: `openingOf` opens it.
+   */
+  readonly file: EncryptedFile
+  /** Its type, as `info.thumbnail_info` states it, or `null`. */
+  readonly mimetype: string | null
+}
+
+/** A photograph a report carries. */
+export interface ReportedPhotograph extends Described {
+  readonly kind: 'photograph'
+  /**
+   * Its thumbnail, what the conversation drew of it, or `null` when the
+   * event has none, or one the operator could not open.
+   */
+  readonly thumbnail: ReportedThumbnail | null
+}
+
+/** A document a report carries. */
+export interface ReportedDocument extends Described {
+  readonly kind: 'document'
+}
+
+/** A photograph or a document a report carries. */
+export type ReportedFile = ReportedPhotograph | ReportedDocument
 
 /** A message a report carries, tagged by its `kind`. */
 export type ReportedMessage = ReportedWords | ReportedFile
@@ -313,15 +360,23 @@ function messageFields(message: ReportedMessage): object {
     sender: message.sender,
     kind: message.kind,
   }
-  return message.kind === 'text'
-    ? { ...sent, text: message.text }
-    : {
-        ...sent,
-        file: message.file,
-        mimetype: message.mimetype,
-        name: message.name,
-        size: message.size,
-      }
+  if (message.kind === 'text') return { ...sent, text: message.text }
+  const described = {
+    ...sent,
+    file: message.file,
+    mimetype: message.mimetype,
+    name: message.name,
+    size: message.size,
+  }
+  if (message.kind === 'document') return described
+  const { thumbnail } = message
+  return {
+    ...described,
+    thumbnail:
+      thumbnail === null
+        ? null
+        : { file: thumbnail.file, mimetype: thumbnail.mimetype },
+  }
 }
 
 /** What JSON gives back, read field by field. */
@@ -391,7 +446,9 @@ function messageOf(value: unknown): ReportedMessage | null {
   }
   const kind = fields.kind === undefined ? 'text' : fields.kind
   if (kind === 'text') {
-    return typeof fields.text === 'string' && fields.file === undefined
+    return typeof fields.text === 'string' &&
+      fields.file === undefined &&
+      fields.thumbnail === undefined
       ? { ...sent, kind, text: fields.text }
       : null
   }
@@ -406,14 +463,34 @@ function messageOf(value: unknown): ReportedMessage | null {
   ) {
     return null
   }
-  return {
+  const described = {
     ...sent,
-    kind,
     file,
     mimetype: fields.mimetype,
     name: fields.name,
     size: fields.size,
   }
+  if (kind === 'document') {
+    return fields.thumbnail === undefined ? { ...described, kind } : null
+  }
+  // A photograph of #471 has no `thumbnail`: it carries none.
+  if (fields.thumbnail === undefined || fields.thumbnail === null) {
+    return { ...described, kind, thumbnail: null }
+  }
+  const thumbnail = thumbnailOf(fields.thumbnail)
+  return thumbnail === null ? null : { ...described, kind, thumbnail }
+}
+
+/**
+ * A photograph's thumbnail as a payload carries it, or `null` when it is
+ * not one the format writes: its file, which must open (`openingOf`), and
+ * its type, text or `null`.
+ */
+function thumbnailOf(value: unknown): ReportedThumbnail | null {
+  const fields = value as Fields
+  const file = encryptedFileOf(fields?.file)
+  const mimetype = fields?.mimetype
+  return file !== null && stringOrNull(mimetype) ? { file, mimetype } : null
 }
 
 /**

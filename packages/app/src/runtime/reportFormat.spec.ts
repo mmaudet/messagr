@@ -12,6 +12,7 @@ import {
   payloadOf,
   REPORT_REASONS,
   reportAad,
+  type ReportedMessage,
   type ReportPayload,
   type ReportReason,
 } from './reportFormat'
@@ -30,6 +31,11 @@ function untyped(reason: string): ReportReason {
 
 function text(of: Uint8Array): string {
   return String.fromCharCode(...of)
+}
+
+/** `value` in JSON, in UTF-8: a payload as the device writes one. */
+function json(value: unknown): Uint8Array {
+  return new TextEncoder().encode(JSON.stringify(value))
 }
 
 describe('What binds a report to its reason and its reporting account', () => {
@@ -182,10 +188,6 @@ describe('What a report carries, inside the seal (#468)', () => {
         text: 'Réponds.\nMaintenant.',
       },
     ],
-  }
-
-  function json(value: unknown): Uint8Array {
-    return new TextEncoder().encode(JSON.stringify(value))
   }
 
   it('is JSON in UTF-8, laid out as the format says', () => {
@@ -499,6 +501,7 @@ describe('A photograph or a document in a report (#471)', () => {
         mimetype: 'image/jpeg',
         name: 'image.jpg',
         size: 12_000_000,
+        thumbnail: null,
       },
       {
         kind: 'document',
@@ -511,10 +514,6 @@ describe('A photograph or a document in a report (#471)', () => {
         size: null,
       },
     ],
-  }
-
-  function json(value: unknown): Uint8Array {
-    return new TextEncoder().encode(JSON.stringify(value))
   }
 
   it('writes each as the description of its encrypted file, laid out as the format says', () => {
@@ -554,6 +553,7 @@ describe('A photograph or a document in a report (#471)', () => {
         mimetype: 'image/jpeg',
         name: 'image.jpg',
         size: 12000000,
+        thumbnail: null,
       },
       {
         event_id: '$document',
@@ -603,6 +603,159 @@ describe('A photograph or a document in a report (#471)', () => {
     for (const [what, bytes] of cases) {
       expect(payloadOf(bytes), what).toBeNull()
     }
+  })
+})
+
+describe('A photograph’s thumbnail in a report (#496)', () => {
+  /**
+   * A thumbnail's encrypted file, as `info.thumbnail_file` carries one: an
+   * address and a key of its own, not the photograph's (`imageEvent.ts`).
+   */
+  const THUMBNAIL_FILE = {
+    v: 'v2',
+    key: {
+      kty: 'oct',
+      key_ops: ['encrypt', 'decrypt'],
+      alg: 'A256CTR',
+      k: 'AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8',
+      ext: true,
+    },
+    iv: 'oKGio6SlpqcAAAAAAAAAAA',
+    hashes: { sha256: 'piM3s213LABROxYZnnkExsCsjY9idjZfqVCxYxA3TRE' },
+    url: 'mxc://example.org/GhIjKl_thumbnail',
+  }
+  const PHOTOGRAPH: ReportedMessage = {
+    kind: 'photograph',
+    eventId: '$photograph',
+    sentAt: 1_790_000_010_000,
+    sender: '@bob:example.org',
+    file: ENCRYPTED_FILE,
+    mimetype: 'image/jpeg',
+    name: 'image.jpg',
+    size: 482_113,
+    thumbnail: { file: THUMBNAIL_FILE, mimetype: 'image/jpeg' },
+  }
+  const PAYLOAD: ReportPayload = {
+    reason: 'sexual_without_consent',
+    reportedAt: 1_790_000_060_000,
+    reportingAccount: '@alice:example.org',
+    reportedAccount: '@bob:example.org',
+    roomId: '!room:example.org',
+    messages: [PHOTOGRAPH],
+  }
+
+  function written(): Record<string, unknown> & {
+    messages: Record<string, unknown>[]
+  } {
+    return JSON.parse(
+      new TextDecoder().decode(payloadBytes(PAYLOAD)),
+    ) as ReturnType<typeof written>
+  }
+
+  it('writes a photograph’s thumbnail beside its file, as the description of its own encrypted file, and reads it back', () => {
+    // What the conversation showed the person who reports is the thumbnail
+    // (`smallestCopyOf`), so the operator can open it too: its address, its
+    // own key, its counter, its hashes, and its type. Never its bytes.
+    expect(written().messages).toEqual([
+      {
+        event_id: '$photograph',
+        sent_at: 1790000010000,
+        sender: '@bob:example.org',
+        kind: 'photograph',
+        file: ENCRYPTED_FILE,
+        mimetype: 'image/jpeg',
+        name: 'image.jpg',
+        size: 482113,
+        thumbnail: {
+          file: {
+            v: 'v2',
+            key: {
+              kty: 'oct',
+              key_ops: ['encrypt', 'decrypt'],
+              alg: 'A256CTR',
+              k: 'AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8',
+              ext: true,
+            },
+            iv: 'oKGio6SlpqcAAAAAAAAAAA',
+            hashes: { sha256: 'piM3s213LABROxYZnnkExsCsjY9idjZfqVCxYxA3TRE' },
+            url: 'mxc://example.org/GhIjKl_thumbnail',
+          },
+          mimetype: 'image/jpeg',
+        },
+      },
+    ])
+    expect(payloadOf(payloadBytes(PAYLOAD))).toEqual(PAYLOAD)
+    expect(payloadBytes(PAYLOAD).length).toBeLessThan(4096)
+  })
+
+  it('still reads a photograph as #471 wrote it, with no thumbnail at all', () => {
+    // Every report sealed before #496: its photographs carry no `thumbnail`,
+    // and read as having none.
+    const of471 = json({
+      format: 1,
+      reason: 'sexual_without_consent',
+      reported_at: 1790000060000,
+      reporting_account: '@alice:example.org',
+      reported_account: '@bob:example.org',
+      room_id: '!room:example.org',
+      messages: [
+        {
+          event_id: '$photograph',
+          sent_at: 1790000010000,
+          sender: '@bob:example.org',
+          kind: 'photograph',
+          file: ENCRYPTED_FILE,
+          mimetype: 'image/jpeg',
+          name: 'image.jpg',
+          size: 482113,
+        },
+      ],
+    })
+
+    expect(payloadOf(of471)?.messages).toEqual([
+      { ...PHOTOGRAPH, thumbnail: null },
+    ])
+  })
+
+  it('refuses a thumbnail it could not open, one the format does not write, or one on a document', () => {
+    const payload = written()
+    const photograph = payload.messages[0]!
+    const changed = (fields: Record<string, unknown>) =>
+      json({ ...payload, messages: [{ ...photograph, ...fields }] })
+    const cases: [string, Uint8Array][] = [
+      [
+        'a thumbnail it could not open',
+        changed({
+          thumbnail: {
+            file: { ...THUMBNAIL_FILE, hashes: {} },
+            mimetype: 'image/jpeg',
+          },
+        }),
+      ],
+      [
+        'a thumbnail without its file',
+        changed({ thumbnail: { mimetype: 'image/jpeg' } }),
+      ],
+      [
+        'a thumbnail that is only a file',
+        changed({ thumbnail: THUMBNAIL_FILE }),
+      ],
+      [
+        'a thumbnail whose type is not text',
+        changed({ thumbnail: { file: THUMBNAIL_FILE, mimetype: 7 } }),
+      ],
+      [
+        'a thumbnail without its type',
+        changed({ thumbnail: { file: THUMBNAIL_FILE } }),
+      ],
+      ['a thumbnail that is words', changed({ thumbnail: 'vignette' })],
+      ['a document with a thumbnail', changed({ kind: 'document' })],
+    ]
+    for (const [what, bytes] of cases) {
+      expect(payloadOf(bytes), what).toBeNull()
+    }
+    // Control: the same photograph, as written, reads.
+    expect(payloadOf(json(payload))).toEqual(PAYLOAD)
   })
 })
 
