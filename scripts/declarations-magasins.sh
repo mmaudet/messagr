@@ -202,9 +202,12 @@ DOC="docs/declarations-magasins.md"
 # saisie n'a pas à la refaire pour ajouter ce que le point 9 ajoute.
 #
 # CE QUE SIGNALER AJOUTE EST DÉJÀ SAISI : le porteur l'a fait le 30 septembre
-# 2026, et l'a corrigé le même jour, une case voisine ayant été cochée par
-# mégarde. `signaler` sert à le refaire plus tard, par exemple après une
-# première saisie reprise de zéro, et dit les cases voisines à laisser vides.
+# 2026, corrigé et vérifié le même jour, en quatre exports. Trois erreurs
+# avant la bonne : « Fichiers audio » → « Enregistrements audio ou vidéo »
+# cochée, « Photos » décochée, « Partagées » cochée. `signaler` sert à le
+# refaire plus tard, par exemple après une première saisie reprise de zéro :
+# il nomme ces trois cases, et fait relire l'export par
+# scripts/assert-play-data-safety.mjs, qui les voit toutes.
 
 # pas "…" — une case à NE PAS cocher, en rouge, sous celles à cocher.
 pas() { printf '  %s✗%s %s\n' "$RED" "$RESET" "$1"; }
@@ -212,7 +215,8 @@ pas() { printf '  %s✗%s %s\n' "$RED" "$RESET" "$1"; }
 # facultatif_pour_signaler — les quatre réponses, les mêmes pour chacun des
 # trois types que le signalement ajoute (point 9).
 facultatif_pour_signaler() {
-  step "Collectées ou partagées ?      →  Collectées  (non partagées)"
+  step "Collectées ou partagées ?      →  Collectées"
+  pas "Partagées                      →  ne pas cocher : rien n'est partagé"
   step "Traitées de façon éphémère ?   →  Non"
   step "Obligatoires ou facultatives ?"
   say "     →  Les utilisateurs peuvent choisir si ces données sont collectées ou non"
@@ -240,7 +244,7 @@ saisie_signaler() {
   note "La section décrit « toutes les versions actuellement disponibles sur"
   note "Google Play », et Play ne demande pas d'y tenir les canaux de test internes."
   printf '\n'
-  warn "C'est déjà fait : saisi le 30 septembre 2026, et corrigé le même jour."
+  warn "C'est déjà fait : saisi le 30 septembre 2026, corrigé et vérifié le même jour."
   say "Cette entrée sert à le refaire plus tard, par exemple après une première"
   say "saisie reprise de zéro. Elle n'ajoute que ce qui change."
   note "App Store Connect ne change pas : chez Apple, le point 8 n'ajoute aucun type."
@@ -264,11 +268,11 @@ saisie_signaler() {
   step "Fichiers et documents  →  Fichiers et documents"
   printf '\n'
   pas "Photos et vidéos       →  Vidéos"
-  pas "Fichiers audio         →  aucune de ses cases"
+  pas "Fichiers audio         →  aucune case, pas même « Enregistrements audio ou vidéo »"
   printf '\n'
-  warn "Une case voisine cochée par mégarde : c'est l'erreur de la saisie du"
-  warn "30 septembre 2026, corrigée le même jour. Relire de « Messages » à"
-  warn "« Fichiers et documents » avant de continuer."
+  warn "Une case voisine cochée par mégarde, dans « Fichiers audio » : c'est la"
+  warn "première des trois erreurs de la saisie du 30 septembre 2026. Relire de"
+  warn "« Messages » à « Fichiers et documents » avant de continuer."
   note "Pas de vidéo : l'application n'en envoie pas, et une vidéo envoyée comme"
   note "fichier est un document. Pas d'audio : il n'y a pas de message vocal."
   pause "Les trois sont cochés en plus, et ni « Vidéos » ni « Fichiers audio » ?"
@@ -306,7 +310,7 @@ saisie_signaler() {
 
   stage "Play · relire, enregistrer, envoyer"
   say "Rien d'autre ne change :"
-  step "« Contacts », « Autres actions », « Appareil ou autres ID » : ne pas y toucher."
+  step "« Contacts », « Autres actions », « ID de l'appareil ou autres ID » : ne pas y toucher."
   printf '\n'
   step "Enregistrer."
   step "« Aperçu de la fiche Play Store » : relire ce que verra une personne."
@@ -315,12 +319,28 @@ saisie_signaler() {
   step "« Envoyer »."
   pause "La déclaration est envoyée ?"
 
-  stage "Play · exporter le CSV"
+  stage "Play · exporter le CSV, et le relire contre le document"
   step "En haut à droite de la page : « Exporter au format CSV »."
-  step "Le garder : il fait foi de ce qui a été déclaré ce jour-là."
-  note "Les trois types y sont PSL_OTHER_MESSAGES, PSL_PHOTOS et PSL_FILES_AND_DOCS,"
-  note "et la finalité, PSL_FRAUD_PREVENTION_SECURITY."
-  pause "Le CSV est exporté et rangé ?"
+  ask EXPORT_PLAY "Chemin du CSV exporté :"
+  EXPORT_PLAY="${EXPORT_PLAY/#\~/$HOME}"
+  printf '\n'
+  # Le contrôle lit ses réponses attendues dans les tableaux de $DOC : il dit
+  # ce qui manque et ce qui est en trop, case par case.
+  if node scripts/assert-play-data-safety.mjs "$EXPORT_PLAY"; then
+    RELU="relu contre le document par scripts/assert-play-data-safety.mjs, sans écart"
+    printf '\n'
+    step "Le garder, daté, dans une PR :"
+    say "  docs/declarations/play-securite-des-donnees-$(date +%Y-%m-%d).csv"
+    note "C'est lui que la chaîne d'intégration relit ensuite contre $DOC."
+  else
+    RELU="relu contre le document : des écarts, à corriger dans la console"
+    printf '\n'
+    warn "L'export ne dit pas ce que dit le document. Corriger dans la console ce"
+    warn "que la liste ci-dessus nomme, « Envoyer », exporter de nouveau, puis :"
+    printf '\n      node scripts/assert-play-data-safety.mjs <nouvel export>\n\n'
+    SKIPPED+=("corriger « Sécurité des données », puis relire le nouvel export")
+  fi
+  pause "On termine ?"
 
   finish
 
@@ -332,7 +352,7 @@ saisie_signaler() {
     printf '## Ce que signaler ajoute chez Play, saisi de nouveau le %s\n\n' "$(date +%d/%m/%Y)"
     printf 'Saisie faite avec `scripts/declarations-magasins.sh signaler`, qui\n'
     printf 'déroule le point 9 de `%s`. Première saisie : le\n' "$DOC"
-    printf '30 septembre 2026, corrigée le même jour.\n\n'
+    printf '30 septembre 2026, corrigée et vérifiée le même jour.\n\n'
     printf '**Play, « Sécurité des données »** : trois types de plus, « Autres\n'
     printf 'messages via une appli », « Photos » et « Fichiers et documents »,\n'
     printf 'collectés, non partagés, non éphémères, facultatifs, pour la seule\n'
@@ -340,8 +360,9 @@ saisie_signaler() {
     printf 'utilisateur » gagne cette finalité et reste obligatoire. Ni « Vidéos »,\n'
     printf 'ni rien dans « Fichiers audio ».\n\n'
     printf "**Rien d'autre n'a changé** : « Contacts », « Autres actions »,\n"
-    printf '« Appareil ou autres ID », chiffrement en transit « Oui », suppression\n'
-    printf '« Oui ». Déclaration envoyée, CSV exporté.\n\n'
+    printf "« ID de l'appareil ou autres ID », chiffrement en transit « Oui »,\n"
+    printf 'suppression « Oui ». Déclaration envoyée.\n\n'
+    printf '**Export CSV** : %s.\n\n' "$RELU"
     printf '**App Store Connect, « App Privacy »** : rien, point 8.\n'
   } > "$RECORD"
 
