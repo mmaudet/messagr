@@ -1160,6 +1160,22 @@ pub(crate) mod test_support {
         whoami_answering(401, r#"{"errcode":"M_UNKNOWN_TOKEN"}"#).await
     }
 
+    /// A homeserver that takes every connection and never answers (#496):
+    /// what a service stuck behind its homeserver sees, a request sent and
+    /// nothing back. Each connection is held open, never closed, since a
+    /// closed one would be an answer of its own.
+    pub(crate) async fn mute_hs() -> String {
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let base = format!("http://{}", listener.local_addr().unwrap());
+        tokio::spawn(async move {
+            let mut held = Vec::new();
+            while let Ok((connection, _)) = listener.accept().await {
+                held.push(connection);
+            }
+        });
+        base
+    }
+
     /// The masking keys of these key numbers, each from its own seed: the
     /// same number is the same key in every test.
     fn masking_keys_numbered(ids: &[u32]) -> Arc<crate::masking::MaskingKeys> {

@@ -93,7 +93,7 @@ import { fileURLToPath } from 'node:url'
 
 import {
   CREDENTIALS_ENV,
-  credentialsPathIn,
+  credentialsPathFor,
   nonEmptyString,
   operatorDirectoryIn,
   parsedObject,
@@ -105,7 +105,6 @@ const HERE = dirname(fileURLToPath(import.meta.url))
 const REPOSITORY = resolve(HERE, '..')
 
 const PRIVATE_DIRECTORY = operatorDirectoryIn(homedir())
-const DEFAULT_CREDENTIALS = credentialsPathIn(homedir())
 const DEFAULT_PURPOSE = 'relecteur-apple'
 
 /** Ce que `--dry-run` décrit quand le fichier d'identifiants ne se lit pas. */
@@ -253,13 +252,16 @@ const OPTIONS_OF = {
 }
 
 /**
- * Les options d'un geste. `environment` est la valeur de
- * `MESSAGR_EXPLOITATION_IDENTIFIANTS`, ou `undefined`.
+ * Les options d'un geste. Le fichier d'identifiants est celui que
+ * `credentialsPathFor` (`compte-d-exploitation.mjs`) désigne, pour cet outil
+ * comme pour l'outil d'ouverture : celui que nomme `--compte`, sinon celui
+ * que nomme `MESSAGR_EXPLOITATION_IDENTIFIANTS` dans `environment`, sinon
+ * celui par défaut sous `home`.
  */
-export function readOptions(gesture, args, environment) {
+export function readOptions(gesture, args, environment = {}, home = homedir()) {
   const allowed = OPTIONS_OF[gesture]
+  let named = null
   const options = {
-    credentials: environment || DEFAULT_CREDENTIALS,
     purpose: DEFAULT_PURPOSE,
     statePath: null,
     ttlSeconds: DEFAULT_TTL_SECONDS,
@@ -282,7 +284,7 @@ export function readOptions(gesture, args, environment) {
     if (raw === undefined || raw.startsWith('--')) {
       return { ok: false, reason: `${flag} attend une valeur` }
     }
-    if (flag === '--compte') options.credentials = raw
+    if (flag === '--compte') named = raw
     if (flag === '--etat') options.statePath = raw
     if (flag === '--objet') {
       if (!/^[a-z0-9][a-z0-9-]{0,40}$/.test(raw)) {
@@ -314,7 +316,11 @@ export function readOptions(gesture, args, environment) {
       options.uses = count
     }
   }
-  return { ok: true, ...options }
+  return {
+    ok: true,
+    ...options,
+    credentials: credentialsPathFor(named, environment, home),
+  }
 }
 
 /**
@@ -621,8 +627,16 @@ export function explainRefusal(httpStatus, text) {
       'le service ne voit pas la conversation avec ce jeton.',
     MESSAGR_CREATION_IN_FLIGHT:
       'une création est encore en cours sous cette clé : relancez dans un instant.',
+    // Depuis #493, le service rend 401 à un appel sans jeton, à une
+    // réclamation faite au nom d'un autre compte, et à un jeton que son
+    // homeserver refuse ; il rend 503 quand ce homeserver ne lui répond pas,
+    // dans le délai qu'il lui donne compris (#496). Cet outil envoie
+    // toujours le jeton du compte et ne réclame rien : un 401 n'y peut venir
+    // que du troisième. Le self-test le relit dans le service.
     M_UNAUTHORIZED:
-      "le service n'a pas authentifié le compte : jeton refusé, ou homeserver injoignable depuis le service.",
+      "le service n'a pas authentifié le compte : son homeserver refuse ce jeton.",
+    MESSAGR_UPSTREAM:
+      "le homeserver n'a pas répondu au service, qui n'a rien fait : c'est passager, relancez la même commande dans un moment.",
   }
   return known[nonEmptyString(body?.errcode)] ?? refusalDetail(httpStatus, body)
 }
@@ -1420,8 +1434,59 @@ async function selfTest() {
     [MAX_USES, MAX_TTL_SECONDS === 30 * 86_400],
   )
 
+  // CE QUE VEUT DIRE UN REFUS DU SERVICE, relu dans le service (#493, #496) :
+  // de sa demande d'identité, seul un jeton que son homeserver refuse donne
+  // 401 M_UNAUTHORIZED, et toute autre panne 503 MESSAGR_UPSTREAM, un
+  // homeserver qui ne répond pas dans le délai compris. Le service rend
+  // aussi 401 à un appel sans jeton et à une réclamation au nom d'un autre
+  // compte, deux cas que cet outil ne produit pas.
+  const errors = readFileSync(
+    join(REPOSITORY, 'services/invitations/src/error.rs'),
+    'utf8',
+  )
+  const authentication = readFileSync(
+    join(REPOSITORY, 'services/invitations/src/auth.rs'),
+    'utf8',
+  )
+  check(
+    'le service rend 401 pour un jeton que son homeserver refuse, 503 pour le reste',
+    [
+      /AppError::Unauthenticated => \(StatusCode::UNAUTHORIZED, "M_UNAUTHORIZED"\)/.test(
+        errors,
+      ),
+      /AppError::HomeserverUnavailable => \{\s*\(StatusCode::SERVICE_UNAVAILABLE, "MESSAGR_UPSTREAM"\)/.test(
+        errors,
+      ),
+      /if cause\.is::<TokenRefused>\(\) \{\s*AppError::Unauthenticated\s*\} else \{\s*AppError::HomeserverUnavailable\s*\}/.test(
+        authentication,
+      ),
+    ],
+    [true, true, true],
+  )
+  check(
+    'et ses refus se disent ainsi',
+    [
+      explainRefusal(
+        401,
+        '{"errcode":"M_UNAUTHORIZED","error":"unauthenticated caller"}',
+      ),
+      explainRefusal(
+        503,
+        '{"errcode":"MESSAGR_UPSTREAM","error":"homeserver unavailable"}',
+      ),
+    ],
+    [
+      "le service n'a pas authentifié le compte : son homeserver refuse ce jeton.",
+      "le homeserver n'a pas répondu au service, qui n'a rien fait : c'est passager, relancez la même commande dans un moment.",
+    ],
+  )
+
   // LES OPTIONS, et les deux usages qu'on leur connaît.
-  const opts = args => readOptions('emettre', args, undefined)
+  // Un répertoire personnel d'essai : le compte par défaut s'y lit, comme
+  // `compte-d-exploitation.mjs` le dit pour l'outil d'ouverture aussi.
+  const home = '/Users/exploitant'
+  const inHome = '/Users/exploitant/.messagr-exploitation/messagr-eu.json'
+  const opts = args => readOptions('emettre', args, {}, home)
   const basics = one => [
     one.ok,
     one.ttlSeconds,
@@ -1432,7 +1497,7 @@ async function selfTest() {
   check(
     'par défaut : le relecteur, sept jours, deux usages, @exploitation',
     basics(opts([])),
-    [true, 604_800, 2, 'relecteur-apple', DEFAULT_CREDENTIALS],
+    [true, 604_800, 2, 'relecteur-apple', inHome],
   )
   check(
     'un téléphone : une heure, un usage, la racine',
@@ -1451,12 +1516,19 @@ async function selfTest() {
     [true, 3600, 1, 'pixel', '/r.json'],
   )
   check(
-    'la variable choisit le compte, l’option la surclasse',
+    'la variable choisit le compte, l’option la surclasse, une variable vide ne nomme rien',
     [
-      readOptions('etat', [], '/a.json').credentials,
-      readOptions('etat', ['--compte', '/b.json'], '/a.json').credentials,
+      readOptions('etat', [], { [CREDENTIALS_ENV]: '/a.json' }, home)
+        .credentials,
+      readOptions(
+        'etat',
+        ['--compte', '/b.json'],
+        { [CREDENTIALS_ENV]: '/a.json' },
+        home,
+      ).credentials,
+      readOptions('etat', [], { [CREDENTIALS_ENV]: '' }, home).credentials,
     ],
-    ['/a.json', '/b.json'],
+    ['/a.json', '/b.json', inHome],
   )
   check(
     'ce que les options refusent',
@@ -2317,7 +2389,7 @@ async function main(argv) {
     console.error(USAGE)
     process.exit(2)
   }
-  const options = readOptions(gesture, args, process.env[CREDENTIALS_ENV])
+  const options = readOptions(gesture, args, process.env)
   if (!options.ok) {
     console.error(`${options.reason}\n\n${USAGE}`)
     process.exit(2)

@@ -244,9 +244,10 @@ export const fr = {
   // CE QUI PART D'UNE PHOTO OU D'UN DOCUMENT (#471), dit dès que le
   // signalement en porte un : pas le fichier, mais de quoi ouvrir sa copie
   // chiffrée, qui est déjà sur le serveur. L'exploitant pourra donc le voir,
-  // et c'est ce qui doit être lu avant « Envoyer ».
+  // et c'est ce qui doit être lu avant « Envoyer ». D'une photo, sa vignette
+  // aussi (`reportFormat.ts`).
   report_what_files:
-    'Pour une photo ou un document : l’adresse de sa copie chiffrée, déjà sur le serveur, la clé qui l’ouvre, son type, son nom et sa taille. L’exploitant pourra l’ouvrir ; le fichier lui-même n’est pas envoyé une seconde fois.',
+    'Pour une photo ou un document : l’adresse de sa copie chiffrée, déjà sur le serveur, la clé qui l’ouvre, son type, son nom et sa taille ; pour une photo qui en a une, aussi l’adresse, la clé et le type de sa vignette, la petite image que la conversation affiche. L’exploitant pourra les ouvrir ; aucun fichier n’est envoyé une seconde fois.',
   // ATTRIBUÉS, ET PAR LE SERVEUR : déchiffrer un message ne dit pas qui l'a
   // écrit (ADR 0001), et l'auteur nommé est celui que le serveur lui donne.
   'report_author %@': 'Attribués par le serveur à %@',

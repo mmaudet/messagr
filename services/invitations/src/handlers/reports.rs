@@ -722,4 +722,51 @@ mod tests {
 
         assert_eq!(kept_rows(&pool).await.len(), 1);
     }
+
+    /// #496: a homeserver that takes the question and never answers held the
+    /// report with it, and the application kept « Envoi… » until its own
+    /// deadline, reading silence. Over HTTP, the service answers 503 within
+    /// the deadline it gives its homeserver, and keeps nothing.
+    #[sqlx::test(migrations = "./migrations")]
+    async fn on_the_wire_a_homeserver_that_never_answers_gives_503_within_the_deadline(
+        pool: SqlitePool,
+    ) {
+        let deadline = std::time::Duration::from_millis(300);
+        let mute = crate::handlers::discovery::test_support::mute_hs().await;
+        let st = Arc::new(AppState {
+            pool: pool.clone(),
+            mx: Arc::new(
+                crate::matrix::MatrixClient::new(mute.clone(), "token".into())
+                    .whoami_within(deadline),
+            ),
+            cfg: Config {
+                homeserver_url: mute,
+                ..Config::for_tests()
+            },
+        });
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let base = format!("http://{}", listener.local_addr().unwrap());
+        let app = crate::router(st);
+        tokio::spawn(async move { axum::serve(listener, app).await.unwrap() });
+
+        let started = std::time::Instant::now();
+        let later = reqwest::Client::new()
+            .post(format!("{base}/reports"))
+            .bearer_auth("alice")
+            .header(IDEMPOTENCY_HEADER, "report-key-1")
+            .json(&serde_json::json!({
+                "reason": "hate",
+                "sealed": BASE64.encode(&sealed_of(1, 7)),
+            }))
+            .timeout(deadline * 10)
+            .send()
+            .await
+            .expect("an answer within ten times the deadline");
+
+        assert!(started.elapsed() >= deadline);
+        assert_eq!(later.status(), StatusCode::SERVICE_UNAVAILABLE);
+        let said: serde_json::Value = later.json().await.unwrap();
+        assert_eq!(said["errcode"], "MESSAGR_UPSTREAM");
+        assert_eq!(kept_rows(&pool).await, []);
+    }
 }

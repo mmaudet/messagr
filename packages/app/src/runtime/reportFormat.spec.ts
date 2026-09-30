@@ -12,6 +12,7 @@ import {
   payloadOf,
   REPORT_REASONS,
   reportAad,
+  type ReportedMessage,
   type ReportPayload,
   type ReportReason,
 } from './reportFormat'
@@ -30,6 +31,11 @@ function untyped(reason: string): ReportReason {
 
 function text(of: Uint8Array): string {
   return String.fromCharCode(...of)
+}
+
+/** `value` in JSON, in UTF-8: a payload as the device writes one. */
+function json(value: unknown): Uint8Array {
+  return new TextEncoder().encode(JSON.stringify(value))
 }
 
 describe('What binds a report to its reason and its reporting account', () => {
@@ -184,10 +190,6 @@ describe('What a report carries, inside the seal (#468)', () => {
     ],
   }
 
-  function json(value: unknown): Uint8Array {
-    return new TextEncoder().encode(JSON.stringify(value))
-  }
-
   it('is JSON in UTF-8, laid out as the format says', () => {
     expect(JSON.parse(new TextDecoder().decode(payloadBytes(PAYLOAD)))).toEqual(
       {
@@ -340,17 +342,56 @@ describe('What opening a reported file needs, for the application and the tool a
     expect(hex(opening!.key)).toBe(NIST.key)
     expect(hex(opening!.counter)).toBe(NIST.counter)
     expect(hex(opening!.sha256)).toBe(NIST.sha256)
-    // The counter and the hash as some clients pad them.
-    expect(
-      openingOf({
-        ...ENCRYPTED_FILE,
-        iv: '8PHy8/T19vf4+fr7/P3+/w==',
-        hashes: { sha256: 'ZjExoH6exWoMfQZrvET9Tu+kuul87rJwH1PSFT6C/6U=' },
-      }),
-    ).toEqual(opening)
   })
 
-  it('opens nothing a byte short, written two ways, or addressed off a homeserver’s media', () => {
+  it('opens every form of them the application’s display opens (#496)', () => {
+    // The display decrypts through the bridge (`decryptAttachment`), which
+    // reads a description as matrix-sdk-crypto does, with ruma's base64:
+    // the key in the URL-safe alphabet, the counter and the hash in the
+    // standard one, each with its padding, part of it or none, the bits of
+    // its last character beyond its last byte ignored. Each form below was
+    // decoded apart with that configuration (base64 0.22.1, the bridge's),
+    // to the bytes of the vector. A photograph the display shows is one a
+    // report carries.
+    const opening = openingOf(ENCRYPTED_FILE)
+    const written = (fields: { k?: string; iv?: string; sha256?: string }) => ({
+      ...ENCRYPTED_FILE,
+      key: { ...ENCRYPTED_FILE.key, k: fields.k ?? ENCRYPTED_FILE.key.k },
+      iv: fields.iv ?? ENCRYPTED_FILE.iv,
+      hashes: { sha256: fields.sha256 ?? ENCRYPTED_FILE.hashes.sha256 },
+    })
+    const forms: [string, object][] = [
+      [
+        'a key padded',
+        written({ k: 'YD3rEBXKcb4rc67whX13gR81LAc7YQjXLZgQowkU3_Q=' }),
+      ],
+      ['a counter padded', written({ iv: '8PHy8/T19vf4+fr7/P3+/w==' })],
+      ['a counter padded in part', written({ iv: '8PHy8/T19vf4+fr7/P3+/w=' })],
+      [
+        'a hash padded',
+        written({ sha256: 'ZjExoH6exWoMfQZrvET9Tu+kuul87rJwH1PSFT6C/6U=' }),
+      ],
+      [
+        'a key whose last character carries bits beyond its last byte',
+        written({ k: 'YD3rEBXKcb4rc67whX13gR81LAc7YQjXLZgQowkU3_T' }),
+      ],
+      [
+        'a counter whose last character carries bits beyond its last byte',
+        written({ iv: '8PHy8/T19vf4+fr7/P3+//' }),
+      ],
+      [
+        'a hash whose last character carries bits beyond its last byte',
+        written({ sha256: 'ZjExoH6exWoMfQZrvET9Tu+kuul87rJwH1PSFT6C/6V=' }),
+      ],
+    ]
+    for (const [what, file] of forms) {
+      expect(openingOf(file), what).toEqual(opening)
+      // And what is carried is the description as the event gave it.
+      expect(encryptedFileOf(file), what).toBe(file)
+    }
+  })
+
+  it('opens nothing the display refuses: a byte short, the other alphabet, more padding than the bytes need, or addressed off a homeserver’s media', () => {
     const withKey = (k: unknown) => ({
       ...ENCRYPTED_FILE,
       key: { ...ENCRYPTED_FILE.key, k },
@@ -361,10 +402,16 @@ describe('What opening a reported file needs, for the application and the tool a
         'a key in the other alphabet',
         withKey(`${ENCRYPTED_FILE.key.k.slice(0, 42)}/`),
       ],
-      // The last character carries bits beyond the key's last byte.
+      ['a key padded twice', withKey(`${ENCRYPTED_FILE.key.k}==`)],
       [
-        'a key with bits left over',
-        withKey(`${ENCRYPTED_FILE.key.k.slice(0, 42)}R`),
+        'a key padded before its end',
+        withKey(
+          `${ENCRYPTED_FILE.key.k.slice(0, 40)}=${ENCRYPTED_FILE.key.k.slice(40)}`,
+        ),
+      ],
+      [
+        'a key ending in a space',
+        withKey(`${ENCRYPTED_FILE.key.k.slice(0, 42)} `),
       ],
       ['no key', { ...ENCRYPTED_FILE, key: undefined }],
       [
@@ -375,12 +422,30 @@ describe('What opening a reported file needs, for the application and the tool a
         'a counter in the other alphabet',
         { ...ENCRYPTED_FILE, iv: '8PHy8_T19vf4-fr7_P3-_w' },
       ],
+      [
+        'a counter padded thrice',
+        { ...ENCRYPTED_FILE, iv: '8PHy8/T19vf4+fr7/P3+/w===' },
+      ],
       ['no counter', { ...ENCRYPTED_FILE, iv: 7 }],
       [
         'a hash of 31 bytes',
         {
           ...ENCRYPTED_FILE,
           hashes: { sha256: 'ZjExoH6exWoMfQZrvET9Tu+kuul87rJwH1PSFT6C/w' },
+        },
+      ],
+      [
+        'a hash padded twice',
+        {
+          ...ENCRYPTED_FILE,
+          hashes: { sha256: 'ZjExoH6exWoMfQZrvET9Tu+kuul87rJwH1PSFT6C/6U==' },
+        },
+      ],
+      [
+        'a hash ending in a new line',
+        {
+          ...ENCRYPTED_FILE,
+          hashes: { sha256: 'ZjExoH6exWoMfQZrvET9Tu+kuul87rJwH1PSFT6C/6U\n' },
         },
       ],
       ['no hash', { ...ENCRYPTED_FILE, hashes: {} }],
@@ -409,6 +474,94 @@ describe('What opening a reported file needs, for the application and the tool a
     // Control: what opens is kept as the event gave it.
     expect(encryptedFileOf(ENCRYPTED_FILE)).toBe(ENCRYPTED_FILE)
   })
+
+  it('opens a description only where the display does: version 2, a key of AES-256-CTR for both ways, extractable, every hash in base64 (#496)', () => {
+    // The display reads the description as ruma-events 0.34 does, then
+    // matrix-sdk-crypto asks for version 2 and a SHA-256 hash. Each case
+    // below was read apart with ruma-events 0.34.0, the bridge's, and gave
+    // the verdict it is held to here.
+    const withKey = (fields: Record<string, unknown>) => ({
+      ...ENCRYPTED_FILE,
+      key: { ...ENCRYPTED_FILE.key, ...fields },
+    })
+    const withHash = (hashes: unknown) => ({
+      ...ENCRYPTED_FILE,
+      hashes: { ...ENCRYPTED_FILE.hashes, ...(hashes as object) },
+    })
+    const refused: [string, unknown][] = [
+      ['version 1', { ...ENCRYPTED_FILE, v: 'v1' }],
+      ['no version', { ...ENCRYPTED_FILE, v: undefined }],
+      ['a version that is not text', { ...ENCRYPTED_FILE, v: 2 }],
+      ['a key of another type', withKey({ kty: 'RSA' })],
+      ['a key type in capitals', withKey({ kty: 'OCT' })],
+      ['a key of no type', withKey({ kty: undefined })],
+      ['another algorithm', withKey({ alg: 'A128CTR' })],
+      ['no algorithm', withKey({ alg: undefined })],
+      ['a key that only encrypts', withKey({ key_ops: ['encrypt'] })],
+      ['a key that only decrypts', withKey({ key_ops: ['decrypt'] })],
+      [
+        'operations that are not all words',
+        withKey({ key_ops: ['encrypt', 'decrypt', 7] }),
+      ],
+      [
+        'operations that are not a list',
+        withKey({ key_ops: 'encrypt decrypt' }),
+      ],
+      ['no operations', withKey({ key_ops: undefined })],
+      ['a key that is not extractable', withKey({ ext: false })],
+      ['extractable written as text', withKey({ ext: 'true' })],
+      ['nothing said of extractable', withKey({ ext: undefined })],
+      [
+        'another hash that is not base64',
+        withHash({ sha512: 'pas du base64 !' }),
+      ],
+      ['another hash that is a number', withHash({ sha512: 7 })],
+      [
+        'another hash in the other alphabet',
+        withHash({ sha512: 'q83vEjRWeJA-_w' }),
+      ],
+      ['another hash of one character', withHash({ sha512: 'q' })],
+      [
+        'another hash padded more than it needs',
+        withHash({ sha512: 'q83vEjRWeJA==' }),
+      ],
+      [
+        'another hash padded after a whole block',
+        withHash({ sha512: 'q83v=' }),
+      ],
+      [
+        'hashes as a list',
+        {
+          ...ENCRYPTED_FILE,
+          hashes: ['ZjExoH6exWoMfQZrvET9Tu+kuul87rJwH1PSFT6C/6U'],
+        },
+      ],
+      [
+        'the SHA-256 hash under another name',
+        {
+          ...ENCRYPTED_FILE,
+          hashes: { SHA256: 'ZjExoH6exWoMfQZrvET9Tu+kuul87rJwH1PSFT6C/6U' },
+        },
+      ],
+    ]
+    for (const [what, file] of refused) {
+      expect(openingOf(file), what).toBeNull()
+    }
+    const opened: [string, object][] = [
+      [
+        'operations in another order, and one more',
+        withKey({ key_ops: ['decrypt', 'wrapKey', 'encrypt'] }),
+      ],
+      ['another hash in base64', withHash({ sha512: 'q83vEjRWeJA' })],
+      ['another hash, padded', withHash({ sha512: 'q83vEjRWeJA=' })],
+      ['another hash, empty', withHash({ sha512: '' })],
+      ['a field the display does not read', { ...ENCRYPTED_FILE, extra: 1 }],
+      ['a key field the display does not read', withKey({ extra: 1 })],
+    ]
+    for (const [what, file] of opened) {
+      expect(openingOf(file), what).toEqual(openingOf(ENCRYPTED_FILE))
+    }
+  })
 })
 
 describe('A photograph or a document in a report (#471)', () => {
@@ -436,6 +589,7 @@ describe('A photograph or a document in a report (#471)', () => {
         mimetype: 'image/jpeg',
         name: 'image.jpg',
         size: 12_000_000,
+        thumbnail: null,
       },
       {
         kind: 'document',
@@ -448,10 +602,6 @@ describe('A photograph or a document in a report (#471)', () => {
         size: null,
       },
     ],
-  }
-
-  function json(value: unknown): Uint8Array {
-    return new TextEncoder().encode(JSON.stringify(value))
   }
 
   it('writes each as the description of its encrypted file, laid out as the format says', () => {
@@ -491,6 +641,7 @@ describe('A photograph or a document in a report (#471)', () => {
         mimetype: 'image/jpeg',
         name: 'image.jpg',
         size: 12000000,
+        thumbnail: null,
       },
       {
         event_id: '$document',
@@ -540,6 +691,158 @@ describe('A photograph or a document in a report (#471)', () => {
     for (const [what, bytes] of cases) {
       expect(payloadOf(bytes), what).toBeNull()
     }
+  })
+})
+
+describe('A photograph’s thumbnail in a report (#496)', () => {
+  /**
+   * A thumbnail's encrypted file, as `info.thumbnail_file` carries one: an
+   * address and a key of its own, not the photograph's (`imageEvent.ts`).
+   */
+  const THUMBNAIL_FILE = {
+    v: 'v2',
+    key: {
+      kty: 'oct',
+      key_ops: ['encrypt', 'decrypt'],
+      alg: 'A256CTR',
+      k: 'AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8',
+      ext: true,
+    },
+    iv: 'oKGio6SlpqcAAAAAAAAAAA',
+    hashes: { sha256: 'piM3s213LABROxYZnnkExsCsjY9idjZfqVCxYxA3TRE' },
+    url: 'mxc://example.org/GhIjKl_thumbnail',
+  }
+  const PHOTOGRAPH: ReportedMessage = {
+    kind: 'photograph',
+    eventId: '$photograph',
+    sentAt: 1_790_000_010_000,
+    sender: '@bob:example.org',
+    file: ENCRYPTED_FILE,
+    mimetype: 'image/jpeg',
+    name: 'image.jpg',
+    size: 482_113,
+    thumbnail: { file: THUMBNAIL_FILE, mimetype: 'image/jpeg' },
+  }
+  const PAYLOAD: ReportPayload = {
+    reason: 'sexual_without_consent',
+    reportedAt: 1_790_000_060_000,
+    reportingAccount: '@alice:example.org',
+    reportedAccount: '@bob:example.org',
+    roomId: '!room:example.org',
+    messages: [PHOTOGRAPH],
+  }
+
+  function written(): Record<string, unknown> & {
+    messages: Record<string, unknown>[]
+  } {
+    return JSON.parse(
+      new TextDecoder().decode(payloadBytes(PAYLOAD)),
+    ) as ReturnType<typeof written>
+  }
+
+  it('writes a photograph’s thumbnail beside its file, as the description of its own encrypted file, and reads it back', () => {
+    // As « THE PAYLOAD » lays it out: its address, its own key, its counter,
+    // its hashes, and its type. Never its bytes.
+    expect(written().messages).toEqual([
+      {
+        event_id: '$photograph',
+        sent_at: 1790000010000,
+        sender: '@bob:example.org',
+        kind: 'photograph',
+        file: ENCRYPTED_FILE,
+        mimetype: 'image/jpeg',
+        name: 'image.jpg',
+        size: 482113,
+        thumbnail: {
+          file: {
+            v: 'v2',
+            key: {
+              kty: 'oct',
+              key_ops: ['encrypt', 'decrypt'],
+              alg: 'A256CTR',
+              k: 'AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8',
+              ext: true,
+            },
+            iv: 'oKGio6SlpqcAAAAAAAAAAA',
+            hashes: { sha256: 'piM3s213LABROxYZnnkExsCsjY9idjZfqVCxYxA3TRE' },
+            url: 'mxc://example.org/GhIjKl_thumbnail',
+          },
+          mimetype: 'image/jpeg',
+        },
+      },
+    ])
+    expect(payloadOf(payloadBytes(PAYLOAD))).toEqual(PAYLOAD)
+    expect(payloadBytes(PAYLOAD).length).toBeLessThan(4096)
+  })
+
+  it('still reads a photograph as #471 wrote it, with no thumbnail at all', () => {
+    // Every report sealed before #496: its photographs carry no `thumbnail`,
+    // and read as having none.
+    const of471 = json({
+      format: 1,
+      reason: 'sexual_without_consent',
+      reported_at: 1790000060000,
+      reporting_account: '@alice:example.org',
+      reported_account: '@bob:example.org',
+      room_id: '!room:example.org',
+      messages: [
+        {
+          event_id: '$photograph',
+          sent_at: 1790000010000,
+          sender: '@bob:example.org',
+          kind: 'photograph',
+          file: ENCRYPTED_FILE,
+          mimetype: 'image/jpeg',
+          name: 'image.jpg',
+          size: 482113,
+        },
+      ],
+    })
+
+    expect(payloadOf(of471)?.messages).toEqual([
+      { ...PHOTOGRAPH, thumbnail: null },
+    ])
+  })
+
+  it('refuses a thumbnail it could not open, one the format does not write, or one on a document', () => {
+    const payload = written()
+    const photograph = payload.messages[0]!
+    const changed = (fields: Record<string, unknown>) =>
+      json({ ...payload, messages: [{ ...photograph, ...fields }] })
+    const cases: [string, Uint8Array][] = [
+      [
+        'a thumbnail it could not open',
+        changed({
+          thumbnail: {
+            file: { ...THUMBNAIL_FILE, hashes: {} },
+            mimetype: 'image/jpeg',
+          },
+        }),
+      ],
+      [
+        'a thumbnail without its file',
+        changed({ thumbnail: { mimetype: 'image/jpeg' } }),
+      ],
+      [
+        'a thumbnail that is only a file',
+        changed({ thumbnail: THUMBNAIL_FILE }),
+      ],
+      [
+        'a thumbnail whose type is not text',
+        changed({ thumbnail: { file: THUMBNAIL_FILE, mimetype: 7 } }),
+      ],
+      [
+        'a thumbnail without its type',
+        changed({ thumbnail: { file: THUMBNAIL_FILE } }),
+      ],
+      ['a thumbnail that is words', changed({ thumbnail: 'vignette' })],
+      ['a document with a thumbnail', changed({ kind: 'document' })],
+    ]
+    for (const [what, bytes] of cases) {
+      expect(payloadOf(bytes), what).toBeNull()
+    }
+    // Control: the same photograph, as written, reads.
+    expect(payloadOf(json(payload))).toEqual(PAYLOAD)
   })
 })
 

@@ -36,16 +36,22 @@
 // privé et temporaire, la montre dans Aperçu, puis l'efface ; ce qu'elle ne
 // peut pas garantir est dit dans `ouvrir-un-fichier-signale.mjs`.
 //
+// Une photo porte aussi la description de sa vignette quand elle en a une
+// (`reportFormat.ts`, « THE PAYLOAD ») : l'outil montre son type et
+// l'adresse de sa copie chiffrée, et `--ouvrir-vignette` l'ouvre de même, à
+// la demande.
+//
 // # Codes de sortie
 //
-// - 0 : le signalement s'est ouvert ; avec `--ouvrir`, le fichier a été
-//   montré, puis effacé.
+// - 0 : le signalement s'est ouvert ; avec `--ouvrir` ou
+//   `--ouvrir-vignette`, le fichier a été montré, puis effacé.
 // - 1 : refusé. Le pli ne s'ouvre pas avec cette clé, ou le fichier demandé
 //   ne correspond pas à son empreinte, ne s'est pas téléchargé, n'a pas pu
 //   être montré ou vu jusqu'au bout, ou sa copie n'a pas pu être effacée, ce
 //   que l'outil dit alors en nommant le répertoire.
 // - 2 : rien à ouvrir. L'usage, un fichier illisible, un pli qui n'est pas
-//   du JSON, un message sans fichier, un compte d'exploitation illisible.
+//   du JSON, un message sans fichier, ou sans vignette quand on la demande,
+//   un compte d'exploitation illisible.
 // - 130 : interrompu pendant qu'un fichier était montré ; sa copie est
 //   effacée.
 
@@ -68,7 +74,7 @@ import { openOnDemand } from './ouvrir-un-fichier-signale.mjs'
 
 const USAGE = [
   'usage : node scripts/ouvrir-un-signalement.mjs [--cle <fichier>] [<pli.json>]',
-  '          [--ouvrir <n> [--compte <fichier>]]',
+  '          [(--ouvrir <n> | --ouvrir-vignette <n>) [--compte <fichier>]]',
   '',
   'Le pli se lit dans le fichier nommé, sinon sur l’entrée standard :',
   '  { "reason": "<motif>", "reporter": "<compte qui signale>", "sealed": "<pli>" }',
@@ -77,9 +83,10 @@ const USAGE = [
   '',
   '--ouvrir <n> ouvre, à la demande, la photo ou le document du message n :',
   'téléchargé avec le compte d’exploitation, son empreinte vérifiée, montré',
-  'puis effacé. Les identifiants du compte se lisent dans le fichier que',
-  'nomme --compte, sinon MESSAGR_EXPLOITATION_IDENTIFIANTS, sinon',
-  '~/.messagr-exploitation/messagr-eu.json.',
+  'puis effacé. --ouvrir-vignette <n> ouvre de même la vignette de sa photo,',
+  'ce que la conversation en montre. Les identifiants du compte se lisent',
+  'dans le fichier que nomme --compte, sinon MESSAGR_EXPLOITATION_IDENTIFIANTS,',
+  'sinon ~/.messagr-exploitation/messagr-eu.json.',
 ].join('\n')
 
 const DOES_NOT_OPEN = [
@@ -144,9 +151,10 @@ export function openSealedReport(secretKey, document) {
 /**
  * L'outil d'ouverture : ouvre un pli avec la clé de l'exploitant, dit le
  * motif et le compte qui signale, vérifiés, puis affiche la charge ; avec
- * `--ouvrir <n>`, ouvre ensuite la photo ou le document du message n. Rend le
- * code de sortie : 0 ouvert, 1 refusé, 2 rien à ouvrir (usage, fichier
- * illisible, message sans fichier, compte illisible).
+ * `--ouvrir <n>`, ouvre ensuite la photo ou le document du message n, et
+ * avec `--ouvrir-vignette <n>` la vignette de sa photo. Rend le code de
+ * sortie : 0 ouvert, 1 refusé, 2 rien à ouvrir (usage, fichier illisible,
+ * message sans fichier ou sans vignette, compte illisible).
  *
  * @param {string[]} argv
  * @param {OpenPorts} ports
@@ -159,9 +167,10 @@ export async function openTool(argv, ports) {
     stderr(USAGE)
     return 2
   }
-  if (options.open !== null && !/^[1-9][0-9]{0,5}$/.test(options.open)) {
+  const { opening } = options
+  if (opening !== null && !/^[1-9][0-9]{0,5}$/.test(opening.message)) {
     stderr(
-      `--ouvrir attend le numéro d’un message, tel que l’outil l’affiche.\n\n${USAGE}`,
+      `${OPTION_OF[opening.copy]} attend le numéro d’un message, tel que l’outil l’affiche.\n\n${USAGE}`,
     )
     return 2
   }
@@ -223,7 +232,7 @@ export async function openTool(argv, ports) {
       'Ce qu’il porte n’est pas un signalement au format 1 : le voici tel quel.',
     )
     stdout(displayable(new TextDecoder().decode(opened.payload), true))
-    if (options.open === null) return 0
+    if (opening === null) return 0
     stderr(
       'Rien à ouvrir : ce qu’il porte n’a pas de message que l’outil lise.',
     )
@@ -239,49 +248,72 @@ export async function openTool(argv, ports) {
     )
   }
   stdout(readable(report).join('\n'))
-  return options.open === null
+  return opening === null
     ? 0
-    : await openOnDemand(report, Number(options.open), options.account, ports)
+    : await openOnDemand(
+        report,
+        { copy: opening.copy, message: Number(opening.message) },
+        options.account,
+        ports,
+      )
 }
 
 /**
- * Ce que `argv` demande : la clé, le message à ouvrir, le compte et le pli,
- * chacun `null` quand il n'est pas nommé ; ou `null` quand `argv` ne se lit
- * pas comme l'usage le dit (une option inconnue ou répétée, une option sans
- * sa valeur, deux plis, un compte sans `--ouvrir`).
+ * L'option qui ouvre chaque copie d'un fichier signalé : le fichier du
+ * message, ou la vignette de sa photo.
+ *
+ * @type {Readonly<Record<import('./ouvrir-un-fichier-signale.mjs').Copy, string>>}
+ */
+const OPTION_OF = { file: '--ouvrir', thumbnail: '--ouvrir-vignette' }
+
+/**
+ * Ce que `argv` demande : la clé, l'ouverture (quelle copie, de quel
+ * message), le compte et le pli, chacun `null` quand il n'est pas nommé ; ou
+ * `null` quand `argv` ne se lit pas comme l'usage le dit (une option inconnue
+ * ou répétée, une option sans sa valeur, deux plis, deux ouvertures, un
+ * compte sans ouverture).
  *
  * @param {readonly string[]} argv
- * @returns {{ key: string | null, open: string | null, account: string | null, document: string | null } | null}
+ * @returns {{ key: string | null, account: string | null, opening: { copy: import('./ouvrir-un-fichier-signale.mjs').Copy, message: string } | null, document: string | null } | null}
  */
 function argumentsOf(argv) {
-  /** @type {{ key: string | null, open: string | null, account: string | null, document: string | null }} */
-  const read = { key: null, open: null, account: null, document: null }
-  /** @type {Readonly<Record<string, 'key' | 'open' | 'account'>>} */
-  const OPTIONS = { '--cle': 'key', '--ouvrir': 'open', '--compte': 'account' }
+  /** @type {{ key: string | null, account: string | null, opening: { copy: import('./ouvrir-un-fichier-signale.mjs').Copy, message: string } | null, document: string | null }} */
+  const read = { key: null, account: null, opening: null, document: null }
+  /** @type {Readonly<Record<string, 'key' | 'account'>>} */
+  const VALUES = { '--cle': 'key', '--compte': 'account' }
+  /** @type {Readonly<Record<string, import('./ouvrir-un-fichier-signale.mjs').Copy>>} */
+  const COPY_OF = Object.fromEntries(
+    Object.entries(OPTION_OF).map(([copy, option]) => [option, copy]),
+  )
   for (let at = 0; at < argv.length; at += 1) {
     const argument = argv[at]
-    const option = OPTIONS[argument]
-    if (option === undefined) {
+    const option = VALUES[argument]
+    const copy = COPY_OF[argument]
+    if (option === undefined && copy === undefined) {
       if (argument.startsWith('-') || read.document !== null) return null
       read.document = argument
       continue
     }
     const value = argv[at + 1]
-    if (value === undefined || value.startsWith('-') || read[option] !== null) {
-      return null
-    }
-    read[option] = value
+    if (value === undefined || value.startsWith('-')) return null
     at += 1
+    if (copy !== undefined) {
+      if (read.opening !== null) return null
+      read.opening = { copy, message: value }
+    } else {
+      if (read[option] !== null) return null
+      read[option] = value
+    }
   }
-  return read.account !== null && read.open === null ? null : read
+  return read.account !== null && read.opening === null ? null : read
 }
 
 /**
  * Un signalement ouvert, ligne à ligne, dans l'ordre où l'exploitant le lit.
  * Un message dont l'expéditeur n'est pas l'auteur le dit : l'application
  * n'en écrit pas, et un retrait vise l'auteur. Une photo ou un document se
- * montre par sa description, et par l'option qui l'ouvre : rien n'est
- * téléchargé sans qu'on le demande.
+ * montre par sa description, et par l'option qui l'ouvre, la vignette d'une
+ * photo de même : rien n'est téléchargé sans qu'on le demande.
  *
  * @param {import('../../packages/app/src/runtime/reportFormat.ts').ReportPayload} report
  * @returns {string[]}
@@ -316,6 +348,14 @@ function readable(report) {
       `  copie chiffrée : ${displayable(message.file.url, false)}`,
       `  pour l’ouvrir, à la demande : --ouvrir ${at + 1}`,
     )
+    if (message.kind === 'photograph' && message.thumbnail !== null) {
+      const { thumbnail } = message
+      lines.push(
+        `  vignette, ce que la conversation montre : ${displayable(thumbnail.mimetype ?? 'type non dit', false)}`,
+        `  copie chiffrée de la vignette : ${displayable(thumbnail.file.url, false)}`,
+        `  pour l’ouvrir, à la demande : --ouvrir-vignette ${at + 1}`,
+      )
+    }
   })
   return lines
 }

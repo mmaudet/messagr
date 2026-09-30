@@ -222,8 +222,8 @@
             voyage scellé, là où celui d'un lien voyage dans le lien&nbsp;;
           </li>
           <li>
-            ce que la recherche de vos contacts laisse sur votre
-            téléphone&nbsp;;
+            ce que la recherche de vos contacts et les invitations remises dans
+            Messagr laissent sur votre téléphone&nbsp;;
           </li>
           <li>
             «&nbsp;Où vos données sont traitées&nbsp;» dit aussi où part le SMS
@@ -413,8 +413,10 @@
         <li>
           pour une photo ou un document, l'adresse de sa copie chiffrée, qui
           est déjà sur le serveur, la clé qui l'ouvre, son nom, son type et sa
-          taille&nbsp;: rien n'est envoyé de nouveau, et l'exploitant ne
-          déchiffre le fichier que pour le voir, sans en garder de copie&nbsp;;
+          taille, et pour une photo qui en a une, l'adresse, la clé et le type
+          de sa vignette, la petite image que la conversation affiche&nbsp;:
+          rien n'est envoyé de nouveau, et l'exploitant ne déchiffre ces
+          fichiers que pour les voir, sans en garder de copie&nbsp;;
         </li>
         <li>
           votre compte, le motif que vous avez choisi, et l'heure du
@@ -635,37 +637,104 @@
           pas pu être activées. Elles ne portent ni contenu ni identifiant, et
           l'application ne les envoie nulle part&nbsp;;
         </li>
-        <!-- #467, #469 : deux pages du carnet chiffré de l'application.
-             La liste des comptes ignorés, telle que le serveur de messagerie
-             l'a dite en dernier et remplacée entière à chaque fois, qu'un
-             lancement lit pour cacher ce qu'un compte bloqué a écrit avant que
-             le serveur réponde (`ignoredListStore.ts`) ; et un blocage que le
-             service d'invitations n'a pas encore reçu, redit à chaque
-             lancement puis oublié (`untoldBlocksStore.ts`). -->
+        <!-- #496, décision du porteur du 30 septembre 2026 : le carnet chiffré
+             de l'application (`packages/app/src/runtime/notebook.ts`,
+             ADR 0010), comme la version qu'elle remplace le dit, avec les
+             pages que la découverte remplit : ce que la recherche a trouvé
+             (`discoveryResultsStore.ts`, #402), les comptes reconnus par le
+             carnet d'adresses (`recognizedStore.ts`, #407) et les
+             invitations remises depuis cet appareil
+             (`sentInvitationStore.ts`, #404). Une page nouvelle, c'est une
+             puce nouvelle. -->
         <li>
-          si vous avez bloqué des comptes, leur liste, telle que le serveur de
-          messagerie l'a dite en dernier, dans le carnet chiffré de
-          l'application, pour que ce qu'ils ont écrit reste caché dès le
-          lancement&nbsp;;
-        </li>
-        <li>
-          si un blocage n'a pas encore pu être dit au service d'invitations, le
-          compte bloqué, dans ce même carnet, jusqu'à ce que le service l'ait
-          reçu&nbsp;;
-        </li>
-        <li>
-          si vous cherchez vos contacts, ce que la recherche a trouvé, dans le
-          carnet chiffré de l'application&nbsp;: une empreinte de chaque
-          numéro, jamais le numéro, et le nom des fiches trouvées. Ce qu'il
-          tient d'un numéro est oublié à la recherche qui suit le départ de ce
-          numéro de votre carnet d'adresses, et le tout, quand vous retirez le
-          vôtre&nbsp;;
+          le carnet de l'application, un fichier chiffré par une seconde phrase
+          de passe aléatoire, tirée sur l'appareil et gardée dans ce même
+          trousseau, et effacé quand cet appareil quitte votre compte. Il
+          tient&nbsp;:
+          <ul>
+            <li>
+              les noms que vous donnez aux personnes, et le nom de la fiche de
+              votre carnet d'adresses par laquelle une personne a été reconnue,
+              si vous ne lui en aviez pas donné&nbsp;;
+            </li>
+            <li>
+              la liste de vos conversations, telle qu'elle s'est affichée en
+              dernier, pour qu'elle s'affiche dès le lancement&nbsp;: pour
+              chacune, qui y participe ou l'a quittée, l'heure de son dernier
+              message et qui l'a écrit, le nombre de messages non lus, et
+              <b>le dernier message que l'appareil a pu lire, en entier</b>, ou,
+              pour une photo ou un document, le texte qui le décrit, jamais le
+              fichier&nbsp;;
+            </li>
+            <li>
+              les derniers messages de chaque conversation que vous avez ouverte
+              sur cet appareil, pour la rouvrir sans réseau, tels que le serveur
+              de messagerie les a envoyés&nbsp;: chiffrés, avec qui les a écrits
+              et quand, et avec ce que le serveur transmet en clair, comme qui
+              est entré dans la conversation ou l'a quittée&nbsp;;
+            </li>
+            <li>
+              jusqu'où vous avez lu chaque conversation sur cet appareil, et
+              jusqu'où l'a lue, au plus loin, quelqu'un d'autre qui y
+              participe&nbsp;;
+            </li>
+            <li>
+              vos appels&nbsp;: avec qui, quand, dans quel sens, en vidéo ou
+              non, comment ils ont fini et combien de temps ils ont duré&nbsp;;
+            </li>
+            <li>
+              les messages que vous avez masqués «&nbsp;pour moi&nbsp;» et ceux
+              que vous gardez en favoris, par leur identifiant, avec leur
+              conversation et l'heure du geste, sans copie de ce qu'ils
+              disent&nbsp;;
+            </li>
+            <li>
+              les liens d'invitation créés sur cet appareil, avec le nom que
+              vous avez donné à qui viendrait, jusqu'à ce que la personne
+              invitée soit entrée dans la conversation ou que le lien ait
+              expiré&nbsp;;
+            </li>
+            <li>
+              les invitations que vous avez remises dans Messagr, avec le nom
+              que vous avez donné à qui viendrait, jusqu'à ce que la personne
+              invitée soit entrée, ou trente jours après leur expiration&nbsp;;
+            </li>
+            <li>
+              si vous avez bloqué des comptes, leur liste, telle que le serveur
+              de messagerie l'a dite en dernier, pour que ce qu'ils ont écrit
+              reste caché dès le lancement&nbsp;;
+            </li>
+            <li>
+              si un blocage n'a pas encore pu être dit au service
+              d'invitations, le compte bloqué et l'heure du blocage, jusqu'à ce
+              que le service l'ait reçu&nbsp;;
+            </li>
+            <li>
+              si vous cherchez vos contacts, ce que la recherche a
+              trouvé&nbsp;: une empreinte de chaque numéro, jamais le numéro, et
+              le nom des fiches trouvées. Ce qu'il tient d'un numéro est oublié
+              à la recherche qui suit le départ de ce numéro de votre carnet
+              d'adresses, et le tout, quand vous retirez le vôtre&nbsp;;
+            </li>
+            <li>
+              les comptes dont vous avez accepté une invitation remise dans
+              Messagr, quand elle venait d'un numéro que la recherche avait
+              trouvé dans votre carnet d'adresses, avec le nom que portait alors
+              sa fiche&nbsp;;
+            </li>
+          </ul>
         </li>
         <li>
           rien d'autre.
-          <b>Les messages déchiffrés ne sont pas écrits sur le disque</b>&nbsp;:
-          la conversation est reconstruite à chaque ouverture depuis le chiffré,
-          puis oubliée.
+          <b
+            >Hors du dernier message de chaque conversation, que le carnet garde
+            pour la liste, aucun message déchiffré n'est écrit sur le
+            disque</b
+          >&nbsp;: une conversation est reconstruite à chaque ouverture depuis
+          le chiffré, puis oubliée. Une photo ou un document que vous
+          enregistrez, d'un geste ou parce que vous avez choisi d'enregistrer
+          les photos reçues, va là où vous l'enregistrez, et sort alors de
+          Messagr.
         </li>
       </ul>
 

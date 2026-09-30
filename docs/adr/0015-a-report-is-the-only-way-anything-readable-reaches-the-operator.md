@@ -106,4 +106,7 @@ in, so that there is something to report and to block.
 operator's tool, on the operator's own machine, shows a reported photograph or
 document only when asked, through a temporary copy in a private directory,
 erased once seen, on an interruption or on a failure
-(`scripts/lib/ouvrir-un-fichier-signale.mjs`).
+(`scripts/lib/ouvrir-un-fichier-signale.mjs`). A reported photograph also
+goes with the key to its thumbnail's own encrypted copy, when it has one:
+the conversation draws the photograph from it, and the operator sees what the
+person reporting saw; the tool shows it the same way, on demand (#496).

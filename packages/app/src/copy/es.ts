@@ -189,7 +189,7 @@ export const es: Readonly<Record<CopyKey, string>> = {
   report_what:
     'Los mensajes elegidos, tal como usted los lee, con su autor y su hora, el identificador de la conversación y el de cada mensaje, y el momento de la denuncia. Nada más de la conversación.',
   report_what_files:
-    'Para una foto o un documento: la dirección de su copia cifrada, que ya está en el servidor, la clave que la abre, su tipo, su nombre y su tamaño. Quien explota el servicio podrá abrirlo; el archivo en sí no se envía una segunda vez.',
+    'Para una foto o un documento: la dirección de su copia cifrada, que ya está en el servidor, la clave que la abre, su tipo, su nombre y su tamaño; para una foto que tenga miniatura, también la dirección, la clave y el tipo de esa miniatura, la imagen pequeña que muestra la conversación. Quien explota el servicio podrá abrirlos; ningún archivo se envía una segunda vez.',
   'report_author %@': 'Atribuidos por el servidor a %@',
   'report_when %1$@ %2$@': '%1$@ a las %2$@',
   'report_account %@': 'Enviada en nombre de su cuenta: %@',

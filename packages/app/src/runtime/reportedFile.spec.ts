@@ -1,23 +1,33 @@
+import { execFileSync } from 'node:child_process'
 import { EventEmitter } from 'node:events'
 import {
+  closeSync,
+  createReadStream,
   existsSync,
   mkdirSync,
   mkdtempSync,
+  openSync,
   readdirSync,
   readFileSync,
   statSync,
   writeFileSync,
+  writeSync,
 } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
-import { PassThrough } from 'node:stream'
+import type { Readable } from 'node:stream'
 
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, onTestFinished } from 'vitest'
 
+import { terminalAt } from '../../../../scripts/lib/ouvrir-un-fichier-signale.mjs'
 import { openTool } from '../../../../scripts/lib/ouvrir-un-signalement.mjs'
 import type { TimelineEntry } from '../timeline/mergeTimeline'
 import { generateKeyPair } from './hpke'
-import { payloadBytes, type ReportPayload } from './reportFormat'
+import {
+  payloadBytes,
+  type ReportBinding,
+  type ReportPayload,
+} from './reportFormat'
 import { reportMessages } from './reportMessages'
 import { sealReportWithEphemeral } from './sealedReport'
 
@@ -34,9 +44,11 @@ import { sealReportWithEphemeral } from './sealedReport'
  * Enter, and erases the copy whatever happens.
  *
  * Everything the tool reaches of the machine is a double here: the
- * homeserver is a local file behind `fetch`, Preview and the terminal are
- * what the test says, and the interruptions are emitted by the test. The
- * account is a file of a home made for the test: never the real one.
+ * homeserver is a local file behind `fetch`, Preview is what the test says,
+ * the terminal is a named pipe the tool reads as it reads /dev/tty
+ * (`terminalAt`) and the test types into, and the interruptions are emitted
+ * by the test. The account is a file of a home made for the test: never the
+ * real one.
  */
 
 const FIXTURES = join(__dirname, '../../../../scripts/fixtures')
@@ -77,6 +89,35 @@ const MATERIAL = {
   },
   iv: '8PHy8/T19vf4+fr7/P3+/w',
   hashes: { sha256: 'ZjExoH6exWoMfQZrvET9Tu+kuul87rJwH1PSFT6C/6U' },
+}
+
+/**
+ * A photograph's thumbnail, sealed apart under a key of its own, as its
+ * sender seals one (`imageEvent.ts`): the ASCII of « the thumbnail the
+ * conversation drew », in AES-256-CTR under the key 000102…1f from the
+ * counter a0a1a2a3a4a5a6a7 then eight zeros. Its ciphertext was computed
+ * outside this repository, with `openssl enc -aes-256-ctr` and again with
+ * RustCrypto's `ctr`, and its hash with `openssl dgst -sha256`.
+ */
+const THUMBNAIL = {
+  plaintext:
+    '746865207468756d626e61696c2074686520636f6e766572736174696f6e2064726577',
+  ciphertext:
+    'aa141e65e99c3312ecb647c7ab9979284ceb1dd528979da3f1d305ead7c7e2788c3c99',
+}
+
+/** That thumbnail described as Matrix describes an encrypted file. */
+const THUMBNAIL_MATERIAL = {
+  v: 'v2',
+  key: {
+    kty: 'oct',
+    key_ops: ['encrypt', 'decrypt'],
+    alg: 'A256CTR',
+    k: 'AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8',
+    ext: true,
+  },
+  iv: 'oKGio6SlpqcAAAAAAAAAAA',
+  hashes: { sha256: 'piM3s213LABROxYZnnkExsCsjY9idjZfqVCxYxA3TRE' },
 }
 
 const ME = '@alice:example.org'
@@ -122,6 +163,74 @@ function homeWith(account: object | null = ACCOUNT): string {
 }
 
 /**
+ * The operator's terminal, doubled by a named pipe (#496). Like a terminal,
+ * a read there waits for the next line, and nothing ends it but a line, the
+ * end of the input, or the stream that reads being let go of. The tool
+ * reads it through `terminalAt`, as it reads /dev/tty; the test types into
+ * its other end, which it holds from the start, so that opening it never
+ * waits for a writer. Letting go of that end is the end of the input, as
+ * Ctrl-D at the start of a line is on a terminal; it is let go of once the
+ * test is over, at the latest.
+ */
+function keyboard() {
+  const path = join(mkdtempSync(join(tmpdir(), 'terminal-496-')), 'tty')
+  execFileSync('mkfifo', [path])
+  let typing: number | null = openSync(path, 'r+')
+  const unplug = () => {
+    if (typing !== null) closeSync(typing)
+    typing = null
+  }
+  onTestFinished(unplug)
+  /** Each terminal the tool opened, and when it was let go of. */
+  const opened: { readonly closed: Promise<unknown> }[] = []
+  const watched = (terminal: Readable): Readable => {
+    // Not `events.once`, which would reject on the terminal's own error.
+    opened.push({
+      closed: new Promise(resolve => terminal.once('close', resolve)),
+    })
+    return terminal
+  }
+  return {
+    open: (): Readable => watched(terminalAt(path)),
+    /**
+     * The same pipe, read by a file's read, which the end of the input
+     * ends on every system. Read by the event loop, as `terminalAt` reads
+     * /dev/tty, macOS never reports the last writer leaving a named pipe,
+     * where a terminal does report Ctrl-D: checked on the real /dev/tty,
+     * under a pseudo-terminal. Unplugged once open, so that the open never
+     * waits for a writer that has left.
+     */
+    openToItsEnd: (): Readable => {
+      const terminal = watched(createReadStream(path))
+      terminal.once('ready', unplug)
+      return terminal
+    },
+    type: (text: string) => {
+      if (typing !== null) writeSync(typing, text)
+    },
+    opened,
+  }
+}
+
+/**
+ * What became of each terminal the tool opened, a second after it
+ * returned: let go of, or still reading, waiting for a line.
+ */
+async function terminalsLeft(
+  opened: readonly { readonly closed: Promise<unknown> }[],
+): Promise<string[]> {
+  const aSecond = new Promise(resolve => setTimeout(resolve, 1000))
+  return Promise.all(
+    opened.map(({ closed }) =>
+      Promise.race([
+        closed.then(() => 'let go'),
+        aSecond.then(() => 'still reading'),
+      ]),
+    ),
+  )
+}
+
+/**
  * What the Mac is for the tool, doubled: a homeserver whose media are
  * local files, Preview, the terminal, and the interruptions.
  */
@@ -131,8 +240,13 @@ function machine(
     readonly served?: Readonly<Record<string, string>>
     /** What Preview does once handed a file. */
     readonly preview?: 'shows' | 'fails' | 'is-interrupted'
-    /** What the terminal does once asked for Enter. */
-    readonly terminal?: 'enter' | 'is-interrupted' | 'none'
+    /**
+     * What happens once the tool waits for Enter: Enter is pressed, Ctrl-C
+     * is, Ctrl-D ends the input, the tool is stopped, the terminal fails
+     * while it is read, or there is no terminal at all.
+     */
+    readonly terminal?:
+      'enter' | 'ctrl-c' | 'ctrl-d' | 'is-interrupted' | 'fails' | 'none'
     readonly home?: string
     readonly environment?: Readonly<Record<string, string>>
     readonly temporary?: string
@@ -156,6 +270,7 @@ function machine(
   const signals = new EventEmitter()
   const said: string[] = []
   const printed: string[] = []
+  const terminal = keyboard()
   const ports = {
     home: options.home ?? homeWith(),
     environment: options.environment ?? {},
@@ -194,22 +309,35 @@ function machine(
         await new Promise(() => {})
       }
     },
-    terminal: () => {
-      const tty = new PassThrough()
+    terminal: (): Readable => {
       if (options.terminal === 'none') {
-        setTimeout(() => tty.emit('error', new Error('ENXIO: /dev/tty')), 0)
-      } else if (options.terminal === 'is-interrupted') {
-        setTimeout(() => signals.emit('SIGTERM'), 0)
-      } else {
-        setTimeout(() => tty.write('\n'), 0)
+        // Nothing to open, as /dev/tty does not open without a terminal.
+        return terminalAt(join(media, 'aucun-terminal'))
       }
+      if (options.terminal === 'ctrl-d') return terminal.openToItsEnd()
+      const tty = terminal.open()
+      setTimeout(() => {
+        if (options.terminal === 'ctrl-c') signals.emit('SIGINT')
+        else if (options.terminal === 'is-interrupted') signals.emit('SIGTERM')
+        else if (options.terminal === 'fails') {
+          tty.destroy(new Error('EIO: i/o error, read'))
+        } else terminal.type('\n')
+      }, 0)
       return tty
     },
     signals,
     temporary:
       options.temporary ?? mkdtempSync(join(tmpdir(), 'ouverture-471-')),
   }
-  return { ports, asked, handed, signals, said, printed }
+  return {
+    ports,
+    asked,
+    handed,
+    signals,
+    said,
+    printed,
+    terminals: terminal.opened,
+  }
 }
 
 /** What the tool says and prints, and how it ends. */
@@ -249,6 +377,10 @@ const PAYLOAD: ReportPayload = {
       mimetype: 'image/jpeg',
       name: 'image.jpg',
       size: 64,
+      thumbnail: {
+        file: { ...THUMBNAIL_MATERIAL, url: 'mxc://example.org/thumbnail' },
+        mimetype: 'image/jpeg',
+      },
     },
     {
       kind: 'document',
@@ -265,10 +397,14 @@ const PAYLOAD: ReportPayload = {
 
 /** `payload`, sealed for the test key and written as the service exports it. */
 function sealed(payload: ReportPayload = PAYLOAD): string {
-  const binding = {
+  return sealedBytes(payloadBytes(payload), {
     reason: payload.reason,
     reporter: payload.reportingAccount,
-  }
+  })
+}
+
+/** The payload `held`, sealed for the test key, as the service exports it. */
+function sealedBytes(held: Uint8Array, binding: ReportBinding): string {
   const path = join(mkdtempSync(join(tmpdir(), 'pli-471-')), 'pli.json')
   writeFileSync(
     path,
@@ -276,7 +412,7 @@ function sealed(payload: ReportPayload = PAYLOAD): string {
       ...binding,
       sealed: sealReportWithEphemeral(
         generateKeyPair(),
-        payloadBytes(payload),
+        held,
         binding,
         TEST_KEY.public_key,
       ),
@@ -285,8 +421,56 @@ function sealed(payload: ReportPayload = PAYLOAD): string {
   return path
 }
 
+/**
+ * `entry` reported by the application as it reports (`reportMessages`), for
+ * the test key, and written as the service exports it: from the selection
+ * to what the operator opens.
+ */
+async function reportedByTheApplication(entry: TimelineEntry): Promise<string> {
+  const sent: string[] = []
+  await reportMessages(
+    {
+      whoami: async () => ME,
+      seal: (payload, binding) =>
+        sealReportWithEphemeral(
+          generateKeyPair(),
+          payload,
+          binding,
+          TEST_KEY.public_key,
+        ),
+      keyOf: () => 'report-key-1',
+      service: {
+        send: async body => {
+          sent.push(body)
+          return { status: 201, body: '{"number":"K7QM-4ZT2"}' }
+        },
+      },
+      now: () => 1_790_000_060_000,
+      after: () => new Promise(() => {}),
+    },
+    {
+      self: ME,
+      roomId: '!room:example.org',
+      reason: 'sexual_without_consent',
+      selected: new Set([entry.eventId]),
+      timeline: [entry],
+    },
+  )
+  const report = join(mkdtempSync(join(tmpdir(), 'pli-471-')), 'pli.json')
+  writeFileSync(
+    report,
+    JSON.stringify({ ...JSON.parse(sent[0]!), reporter: ME }),
+  )
+  return report
+}
+
 /** The photograph of `PAYLOAD`, served as the homeserver keeps it. */
 const PHOTOGRAPH = { [`${DOWNLOADS}/example.org/photograph`]: NIST.ciphertext }
+
+/** Its thumbnail, served as the homeserver keeps it. */
+const ITS_THUMBNAIL = {
+  [`${DOWNLOADS}/example.org/thumbnail`]: THUMBNAIL.ciphertext,
+}
 
 /** The number of listeners left on the interruptions. */
 function listening(signals: EventEmitter): number {
@@ -321,6 +505,9 @@ describe('A reported photograph or document, on the operator’s machine (#471)'
       '  photo : image.jpg (image/jpeg, 64 octets)',
       '  copie chiffrée : mxc://example.org/photograph',
       '  pour l’ouvrir, à la demande : --ouvrir 2',
+      '  vignette, ce que la conversation montre : image/jpeg',
+      '  copie chiffrée de la vignette : mxc://example.org/thumbnail',
+      '  pour l’ouvrir, à la demande : --ouvrir-vignette 2',
       '',
       'message 3 sur 3, écrit le 2026-09-21 14:13:50 UTC',
       '  événement : $document',
@@ -352,40 +539,7 @@ describe('A reported photograph or document, on the operator’s machine (#471)'
         thumbnail: null,
       },
     }
-    const sent: string[] = []
-    await reportMessages(
-      {
-        whoami: async () => ME,
-        seal: (payload, binding) =>
-          sealReportWithEphemeral(
-            generateKeyPair(),
-            payload,
-            binding,
-            TEST_KEY.public_key,
-          ),
-        keyOf: () => 'report-key-1',
-        service: {
-          send: async body => {
-            sent.push(body)
-            return { status: 201, body: '{"number":"K7QM-4ZT2"}' }
-          },
-        },
-        now: () => 1_790_000_060_000,
-        after: () => new Promise(() => {}),
-      },
-      {
-        self: ME,
-        roomId: '!room:example.org',
-        reason: 'sexual_without_consent',
-        selected: new Set(['$photograph']),
-        timeline: [photograph],
-      },
-    )
-    const report = join(mkdtempSync(join(tmpdir(), 'pli-471-')), 'pli.json')
-    writeFileSync(
-      report,
-      JSON.stringify({ ...JSON.parse(sent[0]!), reporter: ME }),
-    )
+    const report = await reportedByTheApplication(photograph)
     const mac = machine({ served: PHOTOGRAPH })
 
     const { status, said, printed } = await run(
@@ -440,6 +594,154 @@ describe('A reported photograph or document, on the operator’s machine (#471)'
     expect(readdirSync(mac.ports.temporary)).toEqual([])
   })
 
+  it('opens a photograph’s thumbnail on demand, what the conversation drew of it: its own copy, its own key, its hash checked, then erased (#496)', async () => {
+    // From the selection to the operator's screen: a photograph and its
+    // thumbnail, whose key another client wrote padded (`openingOf`),
+    // reported by the application. The tool opens the thumbnail, not the
+    // photograph.
+    const photograph: TimelineEntry = {
+      eventId: '$photograph',
+      claimedSender: HIM,
+      sentAt: 1_790_000_020_000,
+      body: 'image.jpg',
+      msgtype: 'm.image',
+      image: {
+        url: 'mxc://example.org/photograph',
+        secret: JSON.stringify(MATERIAL),
+        mimeType: 'image/jpeg',
+        width: 4,
+        height: 4,
+        size: 64,
+        thumbnail: {
+          url: 'mxc://example.org/thumbnail',
+          secret: JSON.stringify({
+            ...THUMBNAIL_MATERIAL,
+            key: {
+              ...THUMBNAIL_MATERIAL.key,
+              k: `${THUMBNAIL_MATERIAL.key.k}=`,
+            },
+          }),
+          mimeType: 'image/png',
+          width: 2,
+          height: 2,
+        },
+      },
+    }
+    const report = await reportedByTheApplication(photograph)
+    const mac = machine({ served: { ...PHOTOGRAPH, ...ITS_THUMBNAIL } })
+
+    const { status, said, printed } = await run(
+      ['--cle', TEST_KEY_FILE, report, '--ouvrir-vignette', '1'],
+      mac,
+    )
+
+    expect(status).toBe(0)
+    expect(printed).toContain(
+      '  pour l’ouvrir, à la demande : --ouvrir-vignette 1',
+    )
+    expect(mac.asked).toEqual([
+      {
+        url: `${DOWNLOADS}/example.org/thumbnail`,
+        authorization: 'Bearer jeton-d-essai-471',
+      },
+    ])
+    expect(mac.handed).toHaveLength(1)
+    const [handed] = mac.handed
+    expect(handed!.bytes).toBe(THUMBNAIL.plaintext)
+    expect(handed!.mode).toBe(0o600)
+    expect(handed!.directoryMode).toBe(0o700)
+    // Named for what it is, by the thumbnail's own type.
+    expect(handed!.args[2]!.endsWith('vignette.png')).toBe(true)
+    expect(existsSync(handed!.args[2]!)).toBe(false)
+    expect(readdirSync(mac.ports.temporary)).toEqual([])
+    expect(listening(mac.signals)).toBe(0)
+    expect(said).toContain('la vignette que l’appareil a signalée')
+  })
+
+  it('opens no thumbnail for words, a document or a photograph without one, and asks nothing (#496)', async () => {
+    const withoutOne: ReportPayload = {
+      ...PAYLOAD,
+      messages: PAYLOAD.messages.map(message =>
+        message.kind === 'photograph'
+          ? { ...message, thumbnail: null }
+          : message,
+      ),
+    }
+    for (const [what, payload, number, why] of [
+      ['words', PAYLOAD, '1', 'ne porte ni photo ni document'],
+      [
+        'a document',
+        PAYLOAD,
+        '3',
+        'ne porte pas de vignette : rien à ouvrir.\n--ouvrir 3 ouvre le document',
+      ],
+      [
+        'a photograph without a thumbnail',
+        withoutOne,
+        '2',
+        'ne porte pas de vignette : rien à ouvrir.\n--ouvrir 2 ouvre la photo',
+      ],
+    ] as const) {
+      const mac = machine({ served: { ...PHOTOGRAPH, ...ITS_THUMBNAIL } })
+
+      const { status, said } = await run(
+        ['--cle', TEST_KEY_FILE, sealed(payload), '--ouvrir-vignette', number],
+        mac,
+      )
+
+      expect(status, what).toBe(2)
+      expect(said, what).toContain(why)
+      expect(mac.asked, what).toEqual([])
+      expect(mac.handed, what).toEqual([])
+    }
+  })
+
+  it('reads a report of #471 as it was sealed, its photograph without a thumbnail, and opens that photograph (#496)', async () => {
+    // A report sealed before #496: its photograph carries no `thumbnail`.
+    const binding: ReportBinding = {
+      reason: 'sexual_without_consent',
+      reporter: ME,
+    }
+    const of471 = new TextEncoder().encode(
+      JSON.stringify({
+        format: 1,
+        reason: 'sexual_without_consent',
+        reported_at: 1790000060000,
+        reporting_account: ME,
+        reported_account: HIM,
+        room_id: '!room:example.org',
+        messages: [
+          {
+            event_id: '$photograph',
+            sent_at: 1790000020000,
+            sender: HIM,
+            kind: 'photograph',
+            file: { ...MATERIAL, url: 'mxc://example.org/photograph' },
+            mimetype: 'image/jpeg',
+            name: 'image.jpg',
+            size: 64,
+          },
+        ],
+      }),
+    )
+    const mac = machine({ served: PHOTOGRAPH })
+
+    const { status, printed } = await run(
+      ['--cle', TEST_KEY_FILE, sealedBytes(of471, binding), '--ouvrir', '1'],
+      mac,
+    )
+
+    expect(status).toBe(0)
+    expect(printed.slice(-5)).toEqual([
+      'message 1 sur 1, écrit le 2026-09-21 14:13:40 UTC',
+      '  événement : $photograph',
+      '  photo : image.jpg (image/jpeg, 64 octets)',
+      '  copie chiffrée : mxc://example.org/photograph',
+      '  pour l’ouvrir, à la demande : --ouvrir 1',
+    ])
+    expect(mac.handed.map(one => one.bytes)).toEqual([NIST.plaintext])
+  })
+
   it('refuses a file whose hash does not match, and neither decrypts, writes nor shows anything', async () => {
     // The homeserver serves other bytes than those the device described:
     // not the file that was reported.
@@ -464,6 +766,7 @@ describe('A reported photograph or document, on the operator’s machine (#471)'
     for (const [what, options, expected] of [
       ['Preview fails', { preview: 'fails' }, 1],
       ['no terminal', { terminal: 'none' }, 1],
+      ['the terminal fails while it is read', { terminal: 'fails' }, 1],
       // Between writing the copy and viewing it: Ctrl-C while Preview opens.
       ['interrupted while Preview opens', { preview: 'is-interrupted' }, 130],
       [
@@ -518,6 +821,11 @@ describe('A reported photograph or document, on the operator’s machine (#471)'
       ['--ouvrir', 'deux'],
       ['--ouvrir'],
       ['--compte', '/a.json'],
+      ['--ouvrir-vignette', '4'],
+      ['--ouvrir-vignette', 'deux'],
+      ['--ouvrir-vignette'],
+      // One opening at a time: which would it be?
+      ['--ouvrir', '2', '--ouvrir-vignette', '2'],
     ]) {
       const mac = machine({ served: PHOTOGRAPH })
 
@@ -618,6 +926,7 @@ describe('A reported photograph or document, on the operator’s machine (#471)'
           mimetype: 'image/jpeg',
           name: 'image.jpg',
           size: 64,
+          thumbnail: null,
         },
       ],
     }
@@ -631,5 +940,58 @@ describe('A reported photograph or document, on the operator’s machine (#471)'
     expect(said).toContain('pas un signalement au format 1')
     expect(mac.asked).toEqual([])
     expect(mac.handed).toEqual([])
+  })
+})
+
+describe('The tool returns once Enter, Ctrl-C or Ctrl-D is pressed (#496)', () => {
+  // It read /dev/tty through a stream whose read under way nothing cancels:
+  // once Enter or Ctrl-C was pressed, it erased the copy and said so, and
+  // then held the terminal until another line came. The terminal here is
+  // the named pipe of `keyboard`, where a read waits for a line as it does
+  // on a terminal.
+  it('returns once Enter is pressed, the copy erased, and waits for nothing more from the terminal', async () => {
+    const mac = machine({ served: PHOTOGRAPH })
+
+    const { status } = await run(
+      ['--cle', TEST_KEY_FILE, sealed(), '--ouvrir', '2'],
+      mac,
+    )
+
+    expect(status).toBe(0)
+    expect(readdirSync(mac.ports.temporary)).toEqual([])
+    expect(await terminalsLeft(mac.terminals)).toEqual(['let go'])
+  })
+
+  it('returns once Ctrl-C is pressed, the copy erased, and waits for nothing more from the terminal', async () => {
+    const mac = machine({ served: PHOTOGRAPH, terminal: 'ctrl-c' })
+
+    const { status } = await run(
+      ['--cle', TEST_KEY_FILE, sealed(), '--ouvrir', '2'],
+      mac,
+    )
+
+    expect(status).toBe(130)
+    expect(readdirSync(mac.ports.temporary)).toEqual([])
+    expect(listening(mac.signals)).toBe(0)
+    expect(await terminalsLeft(mac.terminals)).toEqual(['let go'])
+  })
+
+  it('returns once Ctrl-D ends the input, the copy erased, as after Enter', async () => {
+    // Ctrl-D at the start of a line ends what the terminal gives: no line
+    // comes, and none ever will. The tool waited for a line, an error or an
+    // interruption: none came, and under a real terminal Node, finding
+    // nothing left to run, left with code 13 before any `finally` ran, the
+    // decrypted copy still on the disk.
+    const mac = machine({ served: PHOTOGRAPH, terminal: 'ctrl-d' })
+
+    const ended = await Promise.race([
+      run(['--cle', TEST_KEY_FILE, sealed(), '--ouvrir', '2'], mac),
+      new Promise(resolve => setTimeout(() => resolve('still waiting'), 2000)),
+    ])
+
+    expect(ended).toMatchObject({ status: 0 })
+    expect(readdirSync(mac.ports.temporary)).toEqual([])
+    expect(listening(mac.signals)).toBe(0)
+    expect(await terminalsLeft(mac.terminals)).toEqual(['let go'])
   })
 })

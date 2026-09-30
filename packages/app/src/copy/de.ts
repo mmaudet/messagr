@@ -193,7 +193,7 @@ export const de: Readonly<Record<CopyKey, string>> = {
   report_what:
     'Die ausgewählten Nachrichten, so wie Sie sie lesen, mit ihrem Verfasser und ihrer Uhrzeit, der Kennung der Unterhaltung und jeder Nachricht sowie dem Zeitpunkt der Meldung. Nichts sonst aus der Unterhaltung.',
   report_what_files:
-    'Für ein Foto oder ein Dokument: die Adresse seiner verschlüsselten Kopie, die bereits auf dem Server liegt, der Schlüssel, der sie öffnet, sein Typ, sein Name und seine Größe. Der Betreiber kann es damit öffnen; die Datei selbst wird kein zweites Mal gesendet.',
+    'Für ein Foto oder ein Dokument: die Adresse seiner verschlüsselten Kopie, die bereits auf dem Server liegt, der Schlüssel, der sie öffnet, sein Typ, sein Name und seine Größe; für ein Foto mit Vorschaubild außerdem Adresse, Schlüssel und Typ dieses Vorschaubilds, des kleinen Bildes, das die Unterhaltung anzeigt. Der Betreiber kann sie damit öffnen; keine Datei wird ein zweites Mal gesendet.',
   'report_author %@': 'Laut Server verfasst von %@',
   'report_when %1$@ %2$@': '%1$@ um %2$@',
   'report_account %@': 'Gesendet im Namen Ihres Kontos: %@',

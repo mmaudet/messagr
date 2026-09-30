@@ -37,23 +37,30 @@
 // déchiffre en mémoire, et écrit UNE COPIE DÉCHIFFRÉE TEMPORAIRE : dans un
 // répertoire privé (700), un fichier que seul l'exploitant lit (600), sous le
 // répertoire temporaire du système. Il l'ouvre dans Aperçu, et l'efface dès
-// qu'on appuie sur Entrée, qu'on l'interrompt (Ctrl-C, fermeture du
-// terminal), ou qu'Aperçu ou le terminal échoue ; toute ouverture commence
-// par effacer une copie qu'une ouverture interrompue aurait laissée.
+// qu'on appuie sur Entrée ou qu'on finit l'entrée (Ctrl-D), qu'on
+// l'interrompt (Ctrl-C, fermeture du terminal), ou qu'Aperçu ou le terminal
+// échoue ; toute ouverture commence par effacer une copie qu'une ouverture
+// interrompue aurait laissée.
 //
 // Ce que l'outil ne peut pas garantir : ce qu'Aperçu ou le système gardent
 // d'un fichier qu'on leur a confié (une vignette, les documents récents, la
 // reprise d'une fenêtre). Il ne le confie à aucune autre application
 // qu'Aperçu, qui montre les photos et les PDF.
 //
+//	node scripts/ouvrir-un-signalement.mjs pli.json --ouvrir-vignette 2
+//
+// La vignette d'une photo qui en a une (`reportFormat.ts`, « THE PAYLOAD »)
+// s'ouvre comme la photo, avec le même compte et le même effacement.
+//
 // # Codes de sortie
 //
-// 0 ouvert (et, avec `--ouvrir`, montré puis effacé) ; 1 refusé (le pli ne
-// s'ouvre pas, ou le fichier ne correspond pas à son empreinte, ne s'est pas
-// téléchargé, n'a pas pu être montré, ou sa copie n'a pas pu être effacée,
-// ce que l'outil dit en la nommant) ; 2 rien à ouvrir (l'usage, un fichier
-// illisible, un message sans fichier, un compte illisible) ; 130 interrompu
-// pendant qu'un fichier était montré, sa copie effacée.
+// 0 ouvert (et, avec `--ouvrir` ou `--ouvrir-vignette`, montré puis
+// effacé) ; 1 refusé (le pli ne s'ouvre pas, ou le fichier ne correspond pas
+// à son empreinte, ne s'est pas téléchargé, n'a pas pu être montré, ou sa
+// copie n'a pas pu être effacée, ce que l'outil dit en la nommant) ; 2 rien
+// à ouvrir (l'usage, un fichier illisible, un message sans fichier ou sans
+// vignette, un compte illisible) ; 130 interrompu pendant qu'un fichier
+// était montré, sa copie effacée.
 //
 // # Tout se passe dans `lib/`, que les essais exercent
 //
@@ -71,7 +78,6 @@
 
 import { Buffer } from 'node:buffer'
 import { execFile } from 'node:child_process'
-import { createReadStream } from 'node:fs'
 import { homedir, tmpdir } from 'node:os'
 import { promisify } from 'node:util'
 
@@ -79,6 +85,7 @@ import { quietAboutTypelessModules } from './lib/typescript.mjs'
 
 quietAboutTypelessModules()
 const { openTool } = await import('./lib/ouvrir-un-signalement.mjs')
+const { terminalAt } = await import('./lib/ouvrir-un-fichier-signale.mjs')
 
 process.exitCode = await openTool(process.argv.slice(2), {
   home: homedir(),
@@ -88,7 +95,7 @@ process.exitCode = await openTool(process.argv.slice(2), {
   stdout: text => process.stdout.write(`${text}\n`),
   fetch: globalThis.fetch,
   run: promisify(execFile),
-  terminal: () => createReadStream('/dev/tty'),
+  terminal: () => terminalAt('/dev/tty'),
   signals: process,
   temporary: tmpdir(),
 })

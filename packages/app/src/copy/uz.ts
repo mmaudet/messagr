@@ -206,7 +206,7 @@ export const uz: Readonly<Record<CopyKey, string>> = {
   report_what:
     'Tanlangan xabarlar, siz ularni qanday oʻqisangiz shunday, muallifi va vaqti, suhbat va har bir xabarning identifikatori hamda shikoyat vaqti bilan. Suhbatdan boshqa hech narsa ketmaydi.',
   report_what_files:
-    'Surat yoki hujjat uchun: serverda allaqachon turgan shifrlangan nusxasining manzili, uni ochadigan kalit, turi, nomi va hajmi. Operator uni shu tarzda ocha oladi; faylning oʻzi ikkinchi marta yuborilmaydi.',
+    'Surat yoki hujjat uchun: serverda allaqachon turgan shifrlangan nusxasining manzili, uni ochadigan kalit, turi, nomi va hajmi; kichik rasmi bor surat uchun esa suhbatda koʻrinadigan oʻsha kichik rasmning manzili, kaliti va turi ham. Operator ularni shu tarzda ocha oladi; hech qaysi fayl ikkinchi marta yuborilmaydi.',
   'report_author %@': 'Server maʼlumotiga koʻra muallif: %@',
   'report_when %1$@ %2$@': '%1$@, soat %2$@',
   'report_account %@': 'Hisobingiz nomidan yuboriladi: %@',

@@ -1,16 +1,18 @@
-// Ouvrir à la demande une photo ou un document signalé, sur la machine de
-// l'exploitant (#471, ADR 0015). L'outil d'ouverture
-// (`ouvrir-un-signalement.mjs`) l'appelle pour `--ouvrir <n>`.
+// Ouvrir à la demande une photo ou un document signalé, ou la vignette d'une
+// photo, sur la machine de l'exploitant (#471, #496, ADR 0015). L'outil
+// d'ouverture (`ouvrir-un-signalement.mjs`) l'appelle pour `--ouvrir <n>` et
+// `--ouvrir-vignette <n>`.
 //
 // # Ce qu'un signalement porte d'un fichier
 //
 // Pas le fichier : la description de son fichier chiffré, tel que
-// l'événement la portait (`reportFormat.ts`). L'adresse de sa copie chiffrée
-// sur le homeserver, la clé qui l'ouvre, le compteur de départ et
-// l'empreinte SHA-256 de la copie chiffrée. Rien n'a été renvoyé depuis le
-// téléphone : la copie est celle que le serveur garde depuis l'envoi. Ce qui
-// rend une description ouvrable se dit une fois, pour l'application et pour
-// cet outil (`openingOf`).
+// l'événement la portait, et d'une photo celle de sa vignette
+// (`reportFormat.ts`, « THE PAYLOAD »). L'adresse de sa copie chiffrée sur
+// le homeserver, la clé qui l'ouvre, le compteur de départ et l'empreinte
+// SHA-256 de la copie chiffrée. Rien n'a été renvoyé depuis le téléphone : la
+// copie est celle que le serveur garde depuis l'envoi. Ce qui rend une
+// description ouvrable se dit une fois, pour l'application et pour cet outil
+// (`openingOf`).
 //
 // # Une ouverture, dans cet ordre
 //
@@ -32,9 +34,11 @@
 //    fichier en 600), sous le répertoire temporaire du système, que ni Time
 //    Machine ni Spotlight ne parcourent sur un Mac. Elle le confie à Aperçu,
 //    et attend Entrée sur le terminal.
-// 6. Elle efface la copie dès qu'on appuie sur Entrée, qu'on interrompt
-//    l'outil, ou que la visionneuse ou le terminal échoue, puis vérifie que
-//    le répertoire a disparu.
+// 6. Elle efface la copie dès qu'on appuie sur Entrée ou qu'on finit
+//    l'entrée (Ctrl-D), qu'on interrompt l'outil, ou que la visionneuse ou
+//    le terminal échoue, puis vérifie que le répertoire a disparu. Elle
+//    lâche le terminal et rend la main aussitôt, sans attendre une autre
+//    ligne (`terminalAt`, #496).
 //
 // # Ce que l'outil ne peut pas garantir
 //
@@ -51,8 +55,10 @@ import { Buffer } from 'node:buffer'
 import { createDecipheriv, createHash } from 'node:crypto'
 import {
   chmodSync,
+  closeSync,
   existsSync,
   mkdtempSync,
+  openSync,
   readdirSync,
   readFileSync,
   rmSync,
@@ -60,6 +66,7 @@ import {
 } from 'node:fs'
 import { join } from 'node:path'
 import { createInterface } from 'node:readline'
+import { ReadStream } from 'node:tty'
 
 import { openingOf } from '../../packages/app/src/runtime/reportFormat.ts'
 
@@ -88,6 +95,30 @@ export const NOTHING_TO_OPEN = 2
 export const INTERRUPTED = 130
 
 /**
+ * Le terminal où attendre Entrée, `path` (`/dev/tty`), lu comme un terminal
+ * (#496).
+ *
+ * PAS `fs.createReadStream`, qui le lisait jusque-là : il lit dans un fil à
+ * part une lecture que rien n'annule, et le détruire attend qu'elle finisse,
+ * donc qu'une autre ligne arrive. Après Entrée ou Ctrl-C, l'outil effaçait
+ * la copie, le disait, et ne rendait pas la main. Un `tty.ReadStream` lit
+ * par la boucle d'événements, et le détruire lâche le terminal aussitôt.
+ * Sans terminal (ENXIO), l'ouverture lève, et la copie est effacée.
+ *
+ * @param {string} path
+ * @returns {import('node:tty').ReadStream}
+ */
+export function terminalAt(path) {
+  const descriptor = openSync(path, 'r')
+  try {
+    return new ReadStream(descriptor)
+  } catch (cause) {
+    closeSync(descriptor)
+    throw cause
+  }
+}
+
+/**
  * `fetch`, dans la part dont une ouverture a besoin.
  *
  * @typedef {(url: string, init: { method: string, headers: Record<string, string>, signal: AbortSignal }) => Promise<{ ok: boolean, status: number, arrayBuffer: () => Promise<ArrayBuffer> }>} Fetching
@@ -108,20 +139,27 @@ export const INTERRUPTED = 130
  * @property {Readonly<Record<string, string | undefined>>} environment l'environnement, qui peut nommer le fichier d'identifiants
  * @property {Fetching} fetch pour télécharger avec le compte d'exploitation
  * @property {(command: string, args: string[]) => Promise<unknown>} run pour confier le fichier à Aperçu
- * @property {() => import('node:stream').Readable} terminal le terminal où attendre Entrée, même quand le pli vient de l'entrée standard
+ * @property {() => import('node:stream').Readable} terminal le terminal où attendre Entrée, même quand le pli vient de l'entrée standard : un flux que détruire lâche aussitôt, comme celui de `terminalAt`
  * @property {Signals} signals où arrivent les interruptions
  * @property {string} temporary le répertoire sous lequel la copie privée est écrite
  * @property {(line: string) => void} stderr ce qui s'explique
  */
 
 /**
- * Ouvre la photo ou le document du message `wanted` d'un signalement ouvert
- * (compté à partir de 1, comme l'outil l'affiche), dans l'ordre que dit
- * l'en-tête. Rend le code de sortie : `SEEN`, `REFUSED`, `NOTHING_TO_OPEN`
- * ou `INTERRUPTED`.
+ * Quelle copie d'un fichier signalé une ouverture montre : le fichier du
+ * message (`--ouvrir`), ou la vignette de sa photo (`--ouvrir-vignette`).
+ *
+ * @typedef {'file' | 'thumbnail'} Copy
+ */
+
+/**
+ * Ouvre la copie `wanted.copy` du fichier du message `wanted.message` d'un
+ * signalement ouvert (compté à partir de 1, comme l'outil l'affiche), dans
+ * l'ordre que dit l'en-tête. Rend le code de sortie : `SEEN`, `REFUSED`,
+ * `NOTHING_TO_OPEN` ou `INTERRUPTED`.
  *
  * @param {import('../../packages/app/src/runtime/reportFormat.ts').ReportPayload} report
- * @param {number} wanted
+ * @param {{ copy: Copy, message: number }} wanted
  * @param {string | null} account le fichier d'identifiants que `--compte` nomme
  * @param {FilePorts} ports
  * @returns {Promise<number>}
@@ -131,22 +169,30 @@ export async function openOnDemand(report, wanted, account, ports) {
   // D'ABORD, quoi qu'il arrive ensuite.
   sweep(ports)
 
-  const message = report.messages[wanted - 1]
+  const message = report.messages[wanted.message - 1]
   if (message === undefined) {
     stderr(
-      `Ce signalement n’a pas de message ${wanted} : il en a ${report.messages.length}.`,
+      `Ce signalement n’a pas de message ${wanted.message} : il en a ${report.messages.length}.`,
     )
     return NOTHING_TO_OPEN
   }
   if (message.kind === 'text') {
     stderr(
-      `Le message ${wanted} ne porte ni photo ni document : rien à ouvrir.`,
+      `Le message ${wanted.message} ne porte ni photo ni document : rien à ouvrir.`,
+    )
+    return NOTHING_TO_OPEN
+  }
+  const toShow = shownCopyOf(message, wanted.copy)
+  if (toShow === null) {
+    stderr(
+      `Le message ${wanted.message} ne porte pas de vignette : rien à ouvrir.\n` +
+        `--ouvrir ${wanted.message} ouvre ${message.kind === 'photograph' ? 'la photo elle-même' : 'le document lui-même'}.`,
     )
     return NOTHING_TO_OPEN
   }
   // Toujours là : le signalement ne se lit pas quand un de ses fichiers ne
   // s'ouvre pas (`payloadOf`).
-  const opening = openingOf(message.file)
+  const opening = openingOf(toShow.carried.file)
   if (opening === null) {
     stderr('La description de ce fichier ne permet pas de l’ouvrir.')
     return REFUSED
@@ -169,35 +215,68 @@ export async function openOnDemand(report, wanted, account, ports) {
   const hash = createHash('sha256').update(ciphertext).digest()
   if (!hash.equals(Buffer.from(opening.sha256))) {
     stderr(
-      'L’empreinte ne correspond pas : ce n’est pas le fichier que l’appareil a\n' +
-        'signalé. Rien n’a été déchiffré, écrit ni montré.',
+      `L’empreinte ne correspond pas : ce n’est pas ${toShow.reported}.\n` +
+        'Rien n’a été déchiffré, écrit ni montré.',
     )
     return REFUSED
   }
   stderr(
     'Téléchargé avec le compte d’exploitation ; son empreinte est celle que\n' +
-      'le signalement porte : c’est le fichier que l’appareil a signalé.',
+      `le signalement porte : c’est ${toShow.reported}.`,
   )
   const decipher = createDecipheriv('aes-256-ctr', opening.key, opening.counter)
   const plaintext = Buffer.concat([
     decipher.update(ciphertext),
     decipher.final(),
   ])
-  return showThenErase(plaintext, extensionOf(message), ports)
+  return showThenErase(plaintext, toShow.copyName, ports)
 }
 
 /**
- * Écrit `plaintext` dans un répertoire privé, le confie à Aperçu, attend
- * Entrée, puis l'efface, les interruptions écoutées depuis avant l'écriture.
+ * La copie qu'une ouverture montre du fichier d'un message : ce que le
+ * signalement en porte, le nom de sa copie privée, et ce qu'elle est.
+ *
+ * @typedef {{ carried: import('../../packages/app/src/runtime/reportFormat.ts').CarriedFile, copyName: string, reported: string }} ShownCopy
+ */
+
+/**
+ * La copie `copy` du fichier de `message`, ou `null` quand il n'en porte
+ * pas : la vignette d'un document, ou d'une photo qui n'en a pas.
+ *
+ * @param {import('../../packages/app/src/runtime/reportFormat.ts').ReportedFile} message
+ * @param {Copy} copy
+ * @returns {ShownCopy | null}
+ */
+function shownCopyOf(message, copy) {
+  if (copy === 'file') {
+    return {
+      carried: message,
+      copyName: `signalement${extensionOf(message)}`,
+      reported: 'le fichier que l’appareil a signalé',
+    }
+  }
+  if (message.kind !== 'photograph' || message.thumbnail === null) return null
+  return {
+    carried: message.thumbnail,
+    // Une vignette n'a pas de nom : son type seul dit ce qu'elle est.
+    copyName: `signalement-vignette${extensionOf({ ...message.thumbnail, name: null })}`,
+    reported: 'la vignette que l’appareil a signalée',
+  }
+}
+
+/**
+ * Écrit `plaintext` dans un répertoire privé sous le nom `copyName`, le confie à
+ * Aperçu, attend Entrée, puis l'efface, les interruptions écoutées depuis
+ * avant l'écriture.
  *
  * @param {Buffer} plaintext
- * @param {string} extension
+ * @param {string} copyName
  * @param {FilePorts} ports
  * @returns {Promise<number>}
  */
 async function showThenErase(
   plaintext,
-  extension,
+  copyName,
   { run, terminal, signals, temporary, stderr },
 ) {
   // AVANT D'ÉCRIRE : une interruption pendant qu'Aperçu s'ouvre, ou pendant
@@ -207,7 +286,7 @@ async function showThenErase(
   let outcome = SEEN
   try {
     chmodSync(directory, 0o700)
-    const path = join(directory, `signalement${extension}`)
+    const path = join(directory, copyName)
     writeFileSync(path, plaintext, { mode: 0o600, flag: 'wx' })
     await Promise.race([
       run('open', ['-a', 'Preview', path]),
@@ -275,8 +354,9 @@ function interruptionsOn(signals) {
 }
 
 /**
- * Rend la main quand une ligne arrive sur le terminal, ou qu'une
- * interruption arrive ; lève si le terminal ne se lit pas.
+ * Rend la main quand une ligne arrive sur le terminal, que l'entrée finit
+ * (Ctrl-D), ou qu'une interruption arrive ; lève si le terminal ne s'ouvre
+ * pas ou ne se lit pas.
  *
  * @param {() => import('node:stream').Readable} terminal
  * @param {Promise<void>} interrupted
@@ -289,6 +369,13 @@ async function entered(terminal, interrupted) {
     await Promise.race([
       new Promise((resolve, reject) => {
         lines.once('line', () => resolve(undefined))
+        // LA FIN DE L'ENTRÉE AUSSI (#496) : Ctrl-D en début de ligne ne
+        // donne aucune ligne, et plus rien n'arrive. Attendue seulement
+        // comme ligne, erreur ou interruption, elle laissait l'outil sans
+        // rien à faire : Node sortait en 13, avant tout `finally`, la copie
+        // déchiffrée encore sur le disque. La fermeture de l'interface suit
+        // la fin de l'entrée ; elle rend la main comme Entrée.
+        lines.once('close', () => resolve(undefined))
         // ON THE INTERFACE, NOT THE STREAM: readline hands the terminal's
         // error on to its interface, where nothing listening would throw it
         // out of the tool before the copy is erased.
@@ -297,6 +384,9 @@ async function entered(terminal, interrupted) {
       interrupted,
     ])
   } finally {
+    // DÉTRUIT, ET PAS SEULEMENT LAISSÉ : une lecture reste en cours sur le
+    // terminal, et tant qu'elle y est, l'outil ne rend pas la main (#496).
+    // Détruire un terminal ouvert par `terminalAt` la fait cesser aussitôt.
     lines.close()
     input.destroy()
   }
@@ -365,7 +455,7 @@ async function downloaded(opening, operator, fetch) {
  * du type qu'il déclare quand il est simple, sinon l'extension de son nom
  * quand elle l'est ; le nom lui-même n'est pas repris.
  *
- * @param {import('../../packages/app/src/runtime/reportFormat.ts').ReportedFile} file
+ * @param {{ mimetype: string | null, name: string | null }} file
  * @returns {string}
  */
 function extensionOf(file) {

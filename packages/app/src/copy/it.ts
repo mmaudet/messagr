@@ -187,7 +187,7 @@ export const it: Readonly<Record<CopyKey, string>> = {
   report_what:
     'I messaggi scelti, così come lei li legge, con il loro autore e il loro orario, l’identificativo della conversazione e quello di ogni messaggio, e il momento della segnalazione. Nient’altro della conversazione.',
   report_what_files:
-    'Per una foto o un documento: l’indirizzo della sua copia cifrata, che è già sul server, la chiave che la apre, il suo tipo, il suo nome e la sua dimensione. Chi gestisce il servizio potrà aprirlo; il file stesso non viene inviato una seconda volta.',
+    'Per una foto o un documento: l’indirizzo della sua copia cifrata, che è già sul server, la chiave che la apre, il suo tipo, il suo nome e la sua dimensione; per una foto che ne ha una, anche l’indirizzo, la chiave e il tipo della sua miniatura, la piccola immagine che la conversazione mostra. Chi gestisce il servizio potrà aprirli; nessun file viene inviato una seconda volta.',
   'report_author %@': 'Attribuiti dal server a %@',
   'report_when %1$@ %2$@': '%1$@ alle %2$@',
   'report_account %@': 'Inviata a nome del suo account: %@',
