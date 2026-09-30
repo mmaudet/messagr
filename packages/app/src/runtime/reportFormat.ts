@@ -506,37 +506,81 @@ const MXC = /^mxc:\/\/([A-Za-z0-9.:[\]-]+)\/([A-Za-z0-9_-]+)$/
  * before it reports a file (`reportable`, through `encryptedFileOf`) and the
  * operator's tool before it downloads one (`ouvrir-un-fichier-signale.mjs`).
  *
- * An `mxc://` address of one media; a key of 32 bytes in the URL-safe
- * alphabet of base64, as a JSON Web Key writes it; a counter of 16 bytes
- * and a SHA-256 hash of 32 bytes in its standard alphabet.
+ * An `mxc://` address of one media; a key of 32 bytes; a counter of 16
+ * bytes; a SHA-256 hash of 32 bytes.
  *
- * # EVERY FORM THE DISPLAY OPENS, AND NONE IT REFUSES (#496)
+ * # WHAT THE DISPLAY OPENS, AND NOTHING IT REFUSES (#496)
  *
- * A photograph the application shows is one it can report. The display
- * decrypts through the bridge (`decryptAttachment`), which reads a
- * description as matrix-sdk-crypto does, with ruma's base64: the URL-safe
- * alphabet for the key, the standard one for the counter and the hash, and
- * for each, its padding, part of it or none, and the bits of its last
- * character beyond its last byte ignored. So these are read the same way
- * here (`bytesOfBase64`), for the application and the tool alike: the other
- * alphabet, a byte more or less, more padding than the bytes need or a
- * space stay refused, as the display refuses them. And the tool still
- * checks the hash of what it downloads before it decrypts anything.
+ * A photograph the application shows is one it can report, and nothing the
+ * application could not show is reported. The display decrypts through the
+ * bridge (`decryptAttachment`), which reads a description as ruma-events
+ * 0.34 reads one, then asks, as matrix-sdk-crypto does, for version 2 and a
+ * SHA-256 hash. So it is read the same way here, for the application and
+ * the tool alike:
+ *
+ * - `v` is `v2`;
+ * - the JSON Web Key is `kty` `oct`, `alg` `A256CTR`, `key_ops` a list of
+ *   words holding `encrypt` and `decrypt`, `ext` `true`, and `k` 32 bytes
+ *   in the URL-safe alphabet of base64;
+ * - `iv` is 16 bytes, and `hashes.sha256` 32, in the standard alphabet;
+ * - every other hash in `hashes` is text in the standard alphabet too,
+ *   which the display reads, and refuses when it cannot, whatever it is
+ *   for;
+ * - base64 as ruma reads it (`bytesOfBase64`): with its padding, part of it
+ *   or none, and the bits of the last character beyond the last byte
+ *   ignored. The other alphabet, more padding than the bytes need, a space
+ *   or a byte more or less are refused, as the display refuses them.
+ *
+ * Fields the display does not read are left as they are. The address is the
+ * one thing read more narrowly than the display reads it (`MXC`): every
+ * address a homeserver gives passes, and nothing that could leave the path
+ * of the operator's download. And the tool still checks the hash of what it
+ * downloads before it decrypts anything.
  */
 export function openingOf(value: unknown): Opening | null {
   const fields = value as Fields
+  const jwk = fields?.key as Fields
+  const hashes = fields?.hashes as Fields
   const media = typeof fields?.url === 'string' ? MXC.exec(fields.url) : null
-  const key = bytesOfBase64((fields?.key as Fields)?.k, 32, 'url')
-  const counter = bytesOfBase64(fields?.iv, 16, 'standard')
-  const sha256 = bytesOfBase64(
-    (fields?.hashes as Fields)?.sha256,
-    32,
-    'standard',
-  )
-  if (media === null || key === null || counter === null || sha256 === null) {
+  const key = ofLength(bytesOfBase64(jwk?.k, 'url'), 32)
+  const counter = ofLength(bytesOfBase64(fields?.iv, 'standard'), 16)
+  const sha256 = ofLength(bytesOfBase64(hashes?.sha256, 'standard'), 32)
+  if (
+    media === null ||
+    key === null ||
+    counter === null ||
+    sha256 === null ||
+    fields?.v !== 'v2' ||
+    !isAesCtrKeyForBothWays(jwk) ||
+    !Object.values(hashes ?? {}).every(
+      hash => bytesOfBase64(hash, 'standard') !== null,
+    )
+  ) {
     return null
   }
   return { server: media[1]!, mediaId: media[2]!, key, counter, sha256 }
+}
+
+/**
+ * Whether `jwk` is the JSON Web Key the display takes (`openingOf`): an
+ * AES-256-CTR key that encrypts and decrypts, and says it is extractable.
+ */
+function isAesCtrKeyForBothWays(jwk: Fields): boolean {
+  const operations = jwk?.key_ops
+  return (
+    jwk?.kty === 'oct' &&
+    jwk.alg === 'A256CTR' &&
+    jwk.ext === true &&
+    Array.isArray(operations) &&
+    operations.every(operation => typeof operation === 'string') &&
+    operations.includes('encrypt') &&
+    operations.includes('decrypt')
+  )
+}
+
+/** `bytes` when they are `length` bytes, or `null`. */
+function ofLength(bytes: Uint8Array | null, length: number): Uint8Array | null {
+  return bytes?.length === length ? bytes : null
 }
 
 /**
@@ -558,39 +602,37 @@ const STANDARD_SYMBOLS =
   'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/'
 
 /**
- * The `length` bytes `text` holds in base64 of `alphabet`, as ruma reads
- * an encrypted file's for the display (`openingOf`): the characters the
- * bytes need, then their padding, whole, in part or none, the bits of the
- * last character beyond the last byte ignored. `null` for anything else.
+ * The bytes `text` holds in base64 of `alphabet`, as ruma reads an
+ * encrypted file's for the display (`openingOf`): characters of the
+ * alphabet, never one alone past a whole block, then their padding, whole,
+ * in part or none, the bits of the last character beyond the last byte
+ * ignored. `null` for anything else.
  */
 function bytesOfBase64(
   text: unknown,
-  length: number,
   alphabet: keyof typeof ALPHABETS,
 ): Uint8Array | null {
   if (typeof text !== 'string') return null
-  const characters = Math.ceil((length * 4) / 3)
-  const padding = (4 - (characters % 4)) % 4
-  const written = text.slice(0, characters)
-  const after = text.slice(characters)
+  const written = text.replace(/[=]+$/, '')
+  const padding = (4 - (written.length % 4)) % 4
   if (
-    written.length !== characters ||
+    written.length % 4 === 1 ||
     !ALPHABETS[alphabet].test(written) ||
-    !/^=*$/.test(after) ||
-    after.length > padding
+    text.length - written.length > padding
   ) {
     return null
   }
+  if (written === '') return new Uint8Array(0)
   const standard =
     alphabet === 'url' ? written.replace(/-/g, '+').replace(/_/g, '/') : written
   // The last character without the bits beyond the last byte, its lowest
   // ones: the one spelling of those bytes, which `base64Bytes` reads.
-  const beyond = characters * 6 - length * 8
+  const beyond = (written.length * 6) % 8
   const last = STANDARD_SYMBOLS.indexOf(standard.slice(-1))
   const kept = last - (last % 2 ** beyond)
-  const canonical = standard.slice(0, -1) + STANDARD_SYMBOLS[kept]
-  const bytes = base64Bytes(canonical + '='.repeat(padding))
-  return bytes?.length === length ? bytes : null
+  return base64Bytes(
+    standard.slice(0, -1) + STANDARD_SYMBOLS[kept] + '='.repeat(padding),
+  )
 }
 
 function stringOrNull(value: unknown): value is string | null {

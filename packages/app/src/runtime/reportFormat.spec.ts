@@ -474,6 +474,94 @@ describe('What opening a reported file needs, for the application and the tool a
     // Control: what opens is kept as the event gave it.
     expect(encryptedFileOf(ENCRYPTED_FILE)).toBe(ENCRYPTED_FILE)
   })
+
+  it('opens a description only where the display does: version 2, a key of AES-256-CTR for both ways, extractable, every hash in base64 (#496)', () => {
+    // The display reads the description as ruma-events 0.34 does, then
+    // matrix-sdk-crypto asks for version 2 and a SHA-256 hash. Each case
+    // below was read apart with ruma-events 0.34.0, the bridge's, and gave
+    // the verdict it is held to here.
+    const withKey = (fields: Record<string, unknown>) => ({
+      ...ENCRYPTED_FILE,
+      key: { ...ENCRYPTED_FILE.key, ...fields },
+    })
+    const withHash = (hashes: unknown) => ({
+      ...ENCRYPTED_FILE,
+      hashes: { ...ENCRYPTED_FILE.hashes, ...(hashes as object) },
+    })
+    const refused: [string, unknown][] = [
+      ['version 1', { ...ENCRYPTED_FILE, v: 'v1' }],
+      ['no version', { ...ENCRYPTED_FILE, v: undefined }],
+      ['a version that is not text', { ...ENCRYPTED_FILE, v: 2 }],
+      ['a key of another type', withKey({ kty: 'RSA' })],
+      ['a key type in capitals', withKey({ kty: 'OCT' })],
+      ['a key of no type', withKey({ kty: undefined })],
+      ['another algorithm', withKey({ alg: 'A128CTR' })],
+      ['no algorithm', withKey({ alg: undefined })],
+      ['a key that only encrypts', withKey({ key_ops: ['encrypt'] })],
+      ['a key that only decrypts', withKey({ key_ops: ['decrypt'] })],
+      [
+        'operations that are not all words',
+        withKey({ key_ops: ['encrypt', 'decrypt', 7] }),
+      ],
+      [
+        'operations that are not a list',
+        withKey({ key_ops: 'encrypt decrypt' }),
+      ],
+      ['no operations', withKey({ key_ops: undefined })],
+      ['a key that is not extractable', withKey({ ext: false })],
+      ['extractable written as text', withKey({ ext: 'true' })],
+      ['nothing said of extractable', withKey({ ext: undefined })],
+      [
+        'another hash that is not base64',
+        withHash({ sha512: 'pas du base64 !' }),
+      ],
+      ['another hash that is a number', withHash({ sha512: 7 })],
+      [
+        'another hash in the other alphabet',
+        withHash({ sha512: 'q83vEjRWeJA-_w' }),
+      ],
+      ['another hash of one character', withHash({ sha512: 'q' })],
+      [
+        'another hash padded more than it needs',
+        withHash({ sha512: 'q83vEjRWeJA==' }),
+      ],
+      [
+        'another hash padded after a whole block',
+        withHash({ sha512: 'q83v=' }),
+      ],
+      [
+        'hashes as a list',
+        {
+          ...ENCRYPTED_FILE,
+          hashes: ['ZjExoH6exWoMfQZrvET9Tu+kuul87rJwH1PSFT6C/6U'],
+        },
+      ],
+      [
+        'the SHA-256 hash under another name',
+        {
+          ...ENCRYPTED_FILE,
+          hashes: { SHA256: 'ZjExoH6exWoMfQZrvET9Tu+kuul87rJwH1PSFT6C/6U' },
+        },
+      ],
+    ]
+    for (const [what, file] of refused) {
+      expect(openingOf(file), what).toBeNull()
+    }
+    const opened: [string, object][] = [
+      [
+        'operations in another order, and one more',
+        withKey({ key_ops: ['decrypt', 'wrapKey', 'encrypt'] }),
+      ],
+      ['another hash in base64', withHash({ sha512: 'q83vEjRWeJA' })],
+      ['another hash, padded', withHash({ sha512: 'q83vEjRWeJA=' })],
+      ['another hash, empty', withHash({ sha512: '' })],
+      ['a field the display does not read', { ...ENCRYPTED_FILE, extra: 1 }],
+      ['a key field the display does not read', withKey({ extra: 1 })],
+    ]
+    for (const [what, file] of opened) {
+      expect(openingOf(file), what).toEqual(openingOf(ENCRYPTED_FILE))
+    }
+  })
 })
 
 describe('A photograph or a document in a report (#471)', () => {
