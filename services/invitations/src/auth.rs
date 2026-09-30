@@ -40,7 +40,9 @@ pub async fn authenticate(mx: &MatrixClient, headers: &HeaderMap) -> Result<Stri
 /// ([`TokenRefused`]) makes the caller unauthenticated. Any other failure of
 /// `whoami` says nothing about the token, and was answered 401 until then,
 /// which a client reads as final: it is `HomeserverUnavailable`, which tells
-/// the caller to come back, before anything is done or kept.
+/// the caller to come back, before anything is done or kept. A homeserver
+/// that never answers is one of them, once `WHOAMI_DEADLINE` has passed
+/// (#496): it no longer holds the route for as long as its caller waits.
 pub async fn authenticate_and_borrow(
     mx: &MatrixClient,
     headers: &HeaderMap,
@@ -59,8 +61,9 @@ pub async fn authenticate_and_borrow(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::handlers::discovery::test_support::whoami_answering;
+    use crate::handlers::discovery::test_support::{mute_hs, whoami_answering};
     use axum::http::HeaderMap;
+    use std::time::{Duration, Instant};
 
     #[test]
     fn extracts_a_well_formed_bearer() {
@@ -135,5 +138,26 @@ mod tests {
                 "{status} {body}"
             );
         }
+    }
+
+    /// #496: a homeserver that takes the question and never answers held the
+    /// caller for as long as the caller waited, and its 503 never came. The
+    /// deadline ends the wait: unavailable, once the deadline has passed and
+    /// well before the caller would give up.
+    #[tokio::test]
+    async fn a_homeserver_that_never_answers_is_unavailable_within_the_deadline() {
+        let deadline = Duration::from_millis(300);
+        let mx = MatrixClient::new(mute_hs().await, String::new()).whoami_within(deadline);
+
+        let started = Instant::now();
+        let answered =
+            tokio::time::timeout(deadline * 10, authenticate(&mx, &bearing("alice"))).await;
+
+        assert!(
+            matches!(answered, Ok(Err(AppError::HomeserverUnavailable))),
+            "no answer within ten times the deadline, or another answer"
+        );
+        // It is the deadline that ended it, not a refused connection.
+        assert!(started.elapsed() >= deadline);
     }
 }

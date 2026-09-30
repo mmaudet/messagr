@@ -1,3 +1,5 @@
+use std::time::Duration;
+
 use anyhow::{anyhow, Result};
 use serde_json::{json, Value};
 
@@ -235,6 +237,9 @@ pub struct MatrixClient {
     base: String,
     registration_token: String,
     http: reqwest::Client,
+    /// How long `whoami` waits for the homeserver: `WHOAMI_DEADLINE`, and
+    /// less in a test that does not wait five seconds to see it.
+    whoami_deadline: Duration,
 }
 
 pub fn next_stage(body: &Value) -> Option<String> {
@@ -259,12 +264,38 @@ pub fn next_stage(body: &Value) -> Option<String> {
 #[error("the homeserver refuses this token")]
 pub struct TokenRefused;
 
+/// How long the homeserver is given to say whose a token is (#496), from the
+/// moment `whoami` connects to the moment its answer is read.
+///
+/// `whoami` stands before everything an authenticated route does
+/// (`auth.rs`), and without a deadline a homeserver that took the question
+/// and never answered held the route for as long as its caller waited: the
+/// 503 that says « later » (`HomeserverUnavailable`) never came. Five
+/// seconds, because a homeserver answers `whoami` in milliseconds, and
+/// because the application waits longer than that for the service: ten
+/// seconds for a block or a deletion (`SERVICE_DEADLINE_MS`,
+/// `serviceDeadline.ts`), thirty for a report (`ANSWER_DEADLINE_MS`,
+/// `reportMessages.ts`). The 503 reaches it while it still waits, and it
+/// reads « later » rather than its own silence.
+pub const WHOAMI_DEADLINE: Duration = Duration::from_secs(5);
+
 impl MatrixClient {
     pub fn new(base: String, registration_token: String) -> Self {
         Self {
             base,
             registration_token,
             http: reqwest::Client::new(),
+            whoami_deadline: WHOAMI_DEADLINE,
+        }
+    }
+
+    /// The same client, its `whoami` given `deadline` rather than
+    /// `WHOAMI_DEADLINE`.
+    #[cfg(test)]
+    pub(crate) fn whoami_within(self, deadline: Duration) -> Self {
+        Self {
+            whoami_deadline: deadline,
+            ..self
         }
     }
 
@@ -434,16 +465,11 @@ impl MatrixClient {
     ///
     /// The error is [`TokenRefused`] when, and only when, the homeserver
     /// itself refuses the token (401 or 403). Anything else that keeps it
-    /// from naming an account (no answer, a 5xx, a 429, a 2xx without
-    /// `user_id`) is the homeserver not answering as one does, which says
-    /// nothing about the token (#491).
+    /// from naming an account (no answer, none within [`WHOAMI_DEADLINE`], a
+    /// 5xx, a 429, a 2xx without `user_id`) is the homeserver not answering
+    /// as one does, which says nothing about the token (#491, #496).
     pub async fn whoami(&self, token: &str) -> Result<String> {
-        let r = self
-            .http
-            .get(self.cs("/v3/account/whoami"))
-            .bearer_auth(token)
-            .send()
-            .await?;
+        let r = self.whoami_request(token).send().await?;
         let status = r.status();
         if status == reqwest::StatusCode::UNAUTHORIZED || status == reqwest::StatusCode::FORBIDDEN {
             return Err(TokenRefused.into());
@@ -465,14 +491,9 @@ impl MatrixClient {
     /// the token just handed to it useless.
     ///
     /// Same discipline as `whoami`: a 2xx response without `device_id` is an
-    /// error, never an empty string.
+    /// error, never an empty string, and so is no answer within its deadline.
     pub async fn whoami_device(&self, token: &str) -> Result<String> {
-        let r = self
-            .http
-            .get(self.cs("/v3/account/whoami"))
-            .bearer_auth(token)
-            .send()
-            .await?;
+        let r = self.whoami_request(token).send().await?;
         if !r.status().is_success() {
             return Err(anyhow!("token refused"));
         }
@@ -480,6 +501,15 @@ impl MatrixClient {
             .as_str()
             .ok_or_else(|| anyhow!("whoami response without device_id"))?
             .to_string())
+    }
+
+    /// `GET /account/whoami` for `token`, given `whoami_deadline` from the
+    /// moment it connects to the moment its body is read ([`WHOAMI_DEADLINE`]).
+    fn whoami_request(&self, token: &str) -> reqwest::RequestBuilder {
+        self.http
+            .get(self.cs("/v3/account/whoami"))
+            .bearer_auth(token)
+            .timeout(self.whoami_deadline)
     }
 
     pub async fn join_room(&self, token: &str, room: &str) -> Result<()> {
