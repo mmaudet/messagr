@@ -184,6 +184,8 @@ export const nl: Readonly<Record<CopyKey, string>> = {
   report_what_heading: 'Wat deze telefoon verlaat',
   report_what:
     'De gekozen berichten, zoals u ze leest, met hun afzender en hun tijdstip, de identificatie van het gesprek en van elk bericht, en het moment van de melding. Verder niets uit het gesprek.',
+  report_what_files:
+    'Voor een foto of een document: het adres van de versleutelde kopie, die al op de server staat, de sleutel die haar opent, het type, de naam en de grootte. De exploitant kan het zo openen; het bestand zelf wordt geen tweede keer verstuurd.',
   'report_author %@': 'Door de server toegeschreven aan %@',
   'report_when %1$@ %2$@': '%1$@ om %2$@',
   'report_account %@': 'Verstuurd namens uw account: %@',
@@ -196,6 +198,13 @@ export const nl: Readonly<Record<CopyKey, string>> = {
     'De melding is niet bevestigd: ze is misschien vertrokken, misschien niet. Opnieuw proberen verstuurt haar maar één keer.',
   report_too_long:
     'Deze berichten zijn te lang voor één melding: sluit en kies er minder.',
+  report_refused:
+    'De dienst heeft deze poging geweigerd en er niets van bewaard. Om op een andere manier te melden, schrijft u naar conformite@messagr.eu.',
+  report_not_sent: 'Er is niets verstuurd. Probeer het zo meteen opnieuw.',
+  report_unavailable:
+    'De dienst kon deze melding nu niet aannemen en heeft er niets van bewaard. Probeer het zo meteen opnieuw.',
+  report_unreportable:
+    'Een van de gekozen berichten kan niet meer worden gemeld: het is verwijderd, of het staat niet meer in dit gesprek. Sluit en kies opnieuw.',
   report_sent_title: 'Melding verstuurd',
   'report_sent_number %@': 'Meldingsnummer: %@',
   report_sent_decision:

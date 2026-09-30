@@ -99,6 +99,12 @@ export interface ReadFile {
 /** What a received image amounts to, once it has been read defensively. */
 export interface ReadImage extends ReadFile {
   /**
+   * The photograph's size in bytes, as the sender stated it, or `null` when
+   * they stated none, which Matrix allows. Nothing here draws from it; a
+   * report says it (#471).
+   */
+  readonly size: number | null
+  /**
    * The sender's own downscaled copy, when they sent one.
    *
    * `null` rather than absent: an event without a thumbnail is the common
@@ -174,6 +180,7 @@ export function readImageEvent(
 
   return {
     ...photograph,
+    size: typeof info?.size === 'number' ? info.size : null,
     // A thumbnail this application cannot read costs nothing: the photograph
     // is still there and still draws. So a malformed one is dropped rather
     // than taking the picture down with it.

@@ -193,6 +193,8 @@ export const en: Readonly<Record<CopyKey, string>> = {
   report_what_heading: 'What leaves this phone',
   report_what:
     'The messages you chose, as you read them, with their author and their time, the identifier of the conversation and of each message, and the moment of the report. Nothing else from the conversation.',
+  report_what_files:
+    'For a photo or a document: the address of its encrypted copy, already on the server, the key that opens it, its type, its name and its size. The operator will be able to open it; the file itself is not sent a second time.',
   'report_author %@': 'Attributed by the server to %@',
   'report_when %1$@ %2$@': '%1$@ at %2$@',
   'report_account %@': 'Sent in the name of your account: %@',
@@ -205,6 +207,13 @@ export const en: Readonly<Record<CopyKey, string>> = {
     'The report is not confirmed: it may have left, or not. Trying again sends it only once.',
   report_too_long:
     'These messages are too long for a single report: close, then choose fewer.',
+  report_refused:
+    'The service refused this attempt and kept nothing of it. To report another way, write to conformite@messagr.eu.',
+  report_not_sent: 'Nothing was sent. Try again in a moment.',
+  report_unavailable:
+    'The service could not take this report just now and kept nothing of it. Try again in a moment.',
+  report_unreportable:
+    'One of the messages you chose can no longer be reported: it was deleted, or it is no longer in this conversation. Close, then choose again.',
   report_sent_title: 'Report sent',
   'report_sent_number %@': 'Report number: %@',
   report_sent_decision:

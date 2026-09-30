@@ -6,6 +6,7 @@ import { join } from 'node:path'
 import { describe, expect, it, vi } from 'vitest'
 
 import * as independent from '../../../../scripts/fixtures/hpke-independant.mjs'
+import { noFileOpened } from '../../../../scripts/fixtures/sans-fichier-ouvert.mjs'
 import { readKeyFile } from '../../../../scripts/lib/cle-de-l-exploitant.mjs'
 import {
   openSealedReport,
@@ -141,6 +142,7 @@ async function run(
     stdin: async () => input,
     stderr: (line: string) => said.push(line),
     stdout: (line: string) => printed.push(line),
+    ...noFileOpened(),
   })
   return { status, said: said.join('\n'), printed }
 }
@@ -592,6 +594,7 @@ describe("The operator's opening tool, as it is run", () => {
       roomId: '!room:example.org',
       messages: [
         {
+          kind: 'text',
           eventId: '$first',
           sentAt: 1_790_000_010_000,
           sender: '@carol:example.org',

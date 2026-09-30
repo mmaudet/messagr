@@ -1135,6 +1135,31 @@ pub(crate) mod test_support {
         base
     }
 
+    /// A homeserver whose `whoami` answers `status` and `body`, whatever the
+    /// token: `401` for one that refuses every token, a `5xx` for one that
+    /// does not answer as a homeserver does (#491).
+    pub(crate) async fn whoami_answering(status: u16, body: &'static str) -> String {
+        let app = axum::Router::new().route(
+            "/_matrix/client/v3/account/whoami",
+            get(move || async move {
+                (
+                    axum::http::StatusCode::from_u16(status).unwrap(),
+                    [("content-type", "application/json")],
+                    body,
+                )
+            }),
+        );
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let base = format!("http://{}", listener.local_addr().unwrap());
+        tokio::spawn(async move { axum::serve(listener, app).await.unwrap() });
+        base
+    }
+
+    /// A homeserver that refuses every token it is shown.
+    pub(crate) async fn refusing_hs() -> String {
+        whoami_answering(401, r#"{"errcode":"M_UNKNOWN_TOKEN"}"#).await
+    }
+
     /// The masking keys of these key numbers, each from its own seed: the
     /// same number is the same key in every test.
     fn masking_keys_numbered(ids: &[u32]) -> Arc<crate::masking::MaskingKeys> {

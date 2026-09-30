@@ -241,6 +241,12 @@ export const fr = {
   report_what_heading: 'Ce qui part de ce téléphone',
   report_what:
     'Les messages choisis, tels que vous les lisez, avec leur auteur et leur heure, l’identifiant de la conversation et celui de chaque message, et le moment du signalement. Rien d’autre de la conversation.',
+  // CE QUI PART D'UNE PHOTO OU D'UN DOCUMENT (#471), dit dès que le
+  // signalement en porte un : pas le fichier, mais de quoi ouvrir sa copie
+  // chiffrée, qui est déjà sur le serveur. L'exploitant pourra donc le voir,
+  // et c'est ce qui doit être lu avant « Envoyer ».
+  report_what_files:
+    'Pour une photo ou un document : l’adresse de sa copie chiffrée, déjà sur le serveur, la clé qui l’ouvre, son type, son nom et sa taille. L’exploitant pourra l’ouvrir ; le fichier lui-même n’est pas envoyé une seconde fois.',
   // ATTRIBUÉS, ET PAR LE SERVEUR : déchiffrer un message ne dit pas qui l'a
   // écrit (ADR 0001), et l'auteur nommé est celui que le serveur lui donne.
   'report_author %@': 'Attribués par le serveur à %@',
@@ -258,6 +264,26 @@ export const fr = {
     'Le signalement n’est pas confirmé : il est peut-être parti, peut-être pas. Réessayer ne l’enverra qu’une fois.',
   report_too_long:
     'Ces messages sont trop longs pour un seul signalement : fermez, puis choisissez-en moins.',
+  // UN REFUS, ET PAS « PAS CONFIRMÉ » (#491) : le service répond 400 ou 401
+  // avant de garder quoi que ce soit, et refuserait de même un nouvel envoi.
+  // « Cet envoi », et pas « ce signalement » : un envoi précédent du même
+  // signalement, resté sans réponse, a pu être gardé, et la phrase ne dit
+  // rien de lui. Sans l'application, on signale à la même adresse (l'écran
+  // légal le dit).
+  report_refused:
+    'Le service a refusé cet envoi et n’en a rien gardé. Pour signaler autrement, écrivez à conformite@messagr.eu.',
+  // RIEN N'EST PARTI (#491) : le serveur du compte n'a pas dit à temps quel
+  // compte signale, ou ce qu'il a dit ne se scelle pas. Rien n'a été scellé
+  // ni envoyé, et renvoyer le fera partir.
+  report_not_sent: 'Rien n’est parti. Réessayez dans un moment.',
+  // LE SERVICE N'A RIEN GARDÉ (#491) : il répond 503 quand son propre
+  // homeserver ne lui dit pas qui est le compte, avant de rien garder.
+  report_unavailable:
+    'Le service n’a pas pu prendre ce signalement pour l’instant et n’en a rien gardé. Réessayez dans un moment.',
+  // UN MESSAGE CHOISI N'EST PLUS LÀ (#491) : supprimé pendant que la feuille
+  // était ouverte, ou sorti de la conversation. Rien n'est scellé ni envoyé.
+  report_unreportable:
+    'Un des messages choisis ne peut plus être signalé : il a été supprimé, ou il n’est plus dans cette conversation. Fermez, puis choisissez de nouveau.',
   report_sent_title: 'Signalement envoyé',
   'report_sent_number %@': 'Numéro de signalement : %@',
   report_sent_decision:

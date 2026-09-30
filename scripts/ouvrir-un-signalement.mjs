@@ -15,18 +15,53 @@
 //
 // Le pli est un document JSON : `{ "reason": "<motif>", "reporter": "<compte
 // qui signale>", "sealed": "<pli en base64>" }`, les autres champs étant
-// ignorés. L'export d'un pli par le service, qui reste à écrire (#473), doit
-// avoir cette forme.
-// La clé se lit dans `~/.messagr-exploitation/cle-de-l-exploitant.json`,
+// ignorés. La clé se lit dans `~/.messagr-exploitation/cle-de-l-exploitant.json`,
 // qu'écrit `scripts/cle-de-l-exploitant.mjs`, sauf `--cle`.
 //
 // Le motif et le compte qui signale, vérifiés, s'affichent sur la sortie
 // d'erreur ; la charge, seule, sur la sortie standard, les caractères de
-// contrôle écrits `\xNN`. Rien de ce qui est ouvert n'est écrit sur le disque
-// (ADR 0006). Codes de sortie : 0 ouvert, 1 refusé, 2 rien à ouvrir.
+// contrôle écrits `\xNN`. Rien de ce qu'elle porte n'est écrit sur le disque.
 //
-// Tout se passe dans `lib/ouvrir-un-signalement.mjs`, que les essais
-// exercent.
+// # Une photo ou un document, à la demande (#471)
+//
+//	node scripts/ouvrir-un-signalement.mjs pli.json --ouvrir 2
+//	node scripts/ouvrir-un-signalement.mjs pli.json --ouvrir 2 --compte <identifiants>
+//
+// Le signalement ne porte que la description du fichier chiffré. `--ouvrir`
+// efface d'abord ce qu'une ouverture interrompue aurait laissé, puis
+// télécharge la copie chiffrée du message nommé avec le compte
+// d'exploitation : le fichier que nomme `--compte`, sinon
+// `MESSAGR_EXPLOITATION_IDENTIFIANTS`, sinon
+// `~/.messagr-exploitation/messagr-eu.json`. Le jeton ne part que vers le
+// serveur de ce fichier, et ne s'affiche jamais. L'outil vérifie l'empreinte,
+// déchiffre en mémoire, et écrit UNE COPIE DÉCHIFFRÉE TEMPORAIRE : dans un
+// répertoire privé (700), un fichier que seul l'exploitant lit (600), sous le
+// répertoire temporaire du système. Il l'ouvre dans Aperçu, et l'efface dès
+// qu'on appuie sur Entrée, qu'on l'interrompt (Ctrl-C, fermeture du
+// terminal), ou qu'Aperçu ou le terminal échoue ; toute ouverture commence
+// par effacer une copie qu'une ouverture interrompue aurait laissée.
+//
+// Ce que l'outil ne peut pas garantir : ce qu'Aperçu ou le système gardent
+// d'un fichier qu'on leur a confié (une vignette, les documents récents, la
+// reprise d'une fenêtre). Il ne le confie à aucune autre application
+// qu'Aperçu, qui montre les photos et les PDF.
+//
+// # Codes de sortie
+//
+// 0 ouvert (et, avec `--ouvrir`, montré puis effacé) ; 1 refusé (le pli ne
+// s'ouvre pas, ou le fichier ne correspond pas à son empreinte, ne s'est pas
+// téléchargé, n'a pas pu être montré, ou sa copie n'a pas pu être effacée,
+// ce que l'outil dit en la nommant) ; 2 rien à ouvrir (l'usage, un fichier
+// illisible, un message sans fichier, un compte illisible) ; 130 interrompu
+// pendant qu'un fichier était montré, sa copie effacée.
+//
+// # Tout se passe dans `lib/`, que les essais exercent
+//
+// `lib/ouvrir-un-signalement.mjs` ouvre et affiche, et
+// `lib/ouvrir-un-fichier-signale.mjs` ouvre un fichier à la demande : le
+// compte, le téléchargement, l'empreinte, la copie, Aperçu, l'attente et les
+// interruptions. Ce fichier-ci ne fait que leur passer la machine :
+// l'environnement, le réseau, `open`, le terminal, les signaux du processus.
 //
 // Pour essayer, avec la clé de test et un pli scellé pour elle :
 //
@@ -35,7 +70,10 @@
 //	  scripts/fixtures/signalement-de-test.json
 
 import { Buffer } from 'node:buffer'
-import { homedir } from 'node:os'
+import { execFile } from 'node:child_process'
+import { createReadStream } from 'node:fs'
+import { homedir, tmpdir } from 'node:os'
+import { promisify } from 'node:util'
 
 import { quietAboutTypelessModules } from './lib/typescript.mjs'
 
@@ -44,9 +82,15 @@ const { openTool } = await import('./lib/ouvrir-un-signalement.mjs')
 
 process.exitCode = await openTool(process.argv.slice(2), {
   home: homedir(),
+  environment: process.env,
   stdin: readStandardInput,
   stderr: line => process.stderr.write(`${line}\n`),
   stdout: text => process.stdout.write(`${text}\n`),
+  fetch: globalThis.fetch,
+  run: promisify(execFile),
+  terminal: () => createReadStream('/dev/tty'),
+  signals: process,
+  temporary: tmpdir(),
 })
 
 /**

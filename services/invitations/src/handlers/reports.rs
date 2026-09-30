@@ -25,7 +25,7 @@
 //!
 //! The device draws an idempotency key for a report and sends it again with
 //! every new attempt of the same report, as `POST /invitations` has one
-//! (`handlers::create`, which says why a header). An answer lost after the
+//! (`idempotency`, which says why a header). An answer lost after the
 //! report was kept, then « Réessayer », finds the report the same account
 //! already sent under that key: the service answers its number, and keeps
 //! nothing more and tells the operator nothing more.
@@ -56,7 +56,7 @@ use crate::{
     auth,
     error::AppError,
     extract::Body,
-    handlers::create::{validate_idempotency_key, IDEMPOTENCY_HEADER},
+    idempotency,
     report::{Reason, ReportNumber, Reports, SealedReport},
     AppState,
 };
@@ -89,7 +89,7 @@ pub async fn report(
     Body(req): Body<ReportRequest>,
 ) -> Result<(StatusCode, Json<Reported>), AppError> {
     let reporter = auth::authenticate(&st.mx, &headers).await?;
-    let key = idempotency_key(&headers)?;
+    let key = idempotency::required(&headers, PROTECTS_A_REPORT)?;
     let reason = Reason::from_code(&req.reason).ok_or_else(|| {
         AppError::InvalidRequest("reason: not one of the eight codes of the terms".into())
     })?;
@@ -131,22 +131,11 @@ pub async fn report(
     ))
 }
 
-/// The idempotency key of a report, required: without it, an answer lost
-/// then a new attempt would keep the report twice, and tell the operator
-/// twice. The same bounds as a key of `POST /invitations`.
-fn idempotency_key(headers: &HeaderMap) -> Result<String, AppError> {
-    let key = headers
-        .get(IDEMPOTENCY_HEADER)
-        .and_then(|value| value.to_str().ok())
-        .ok_or_else(|| {
-            AppError::InvalidRequest(format!(
-                "header {IDEMPOTENCY_HEADER} is required: it keeps a report sent again from \
-                 being kept twice"
-            ))
-        })?;
-    validate_idempotency_key(key)?;
-    Ok(key.to_string())
-}
+/// What the key of a report protects, said to a caller that sent none:
+/// without it, an answer lost then a new attempt would keep the report twice,
+/// and tell the operator twice. The key itself is read as a key of
+/// `POST /invitations` is, by the one reading of both (`idempotency`).
+const PROTECTS_A_REPORT: &str = "it keeps a report sent again from being kept twice";
 
 /// A report as it is received, before it has a number.
 struct Received<'a> {
@@ -229,7 +218,10 @@ async fn sent_before(
 mod tests {
     use super::*;
     use crate::config::Config;
-    use crate::handlers::discovery::test_support::{bearer, state_from, whoami_hs, T0};
+    use crate::handlers::discovery::test_support::{
+        bearer, refusing_hs, state_from, whoami_hs, T0,
+    };
+    use crate::idempotency::HEADER as IDEMPOTENCY_HEADER;
     use crate::report::test_support::sealed_of;
     use crate::sms::test_support::{fake_ovhcloud, sms_through, Inbox, OPERATOR_NUMBER};
     use data_encoding::BASE64;
@@ -432,11 +424,19 @@ mod tests {
 
     #[sqlx::test(migrations = "./migrations")]
     async fn a_report_without_an_idempotency_key_of_the_expected_form_is_refused(pool: SqlitePool) {
+        // The key is read as a key of `POST /invitations` is, by the one
+        // reading of both (#491): the same bounds, and a caller that sent
+        // none told what it protects here.
         let (st, inbox) = service(pool.clone()).await;
         let sealed = BASE64.encode(&sealed_of(1, 7));
         let too_long = "k".repeat(201);
+        match sent(&st, bearer("alice"), "harassment", &sealed).await {
+            Err(AppError::InvalidRequest(said)) => {
+                assert!(said.contains(PROTECTS_A_REPORT), "{said}");
+            }
+            other => panic!("a report without a key must be refused, got {other:?}"),
+        }
         for (what, headers) in [
-            ("no key", bearer("alice")),
             ("seven characters", keyed("alice", "7-chars")),
             ("201 characters", keyed("alice", &too_long)),
             ("a space", keyed("alice", "report key 1")),
@@ -528,7 +528,21 @@ mod tests {
             sent(&st, no_token, "harassment", &sealed).await,
             Err(AppError::Unauthenticated)
         ));
-        // A token the homeserver does not vouch for: here, one nobody answers.
+        // A token the homeserver does not vouch for.
+        let refusing = state_from(pool.clone(), refusing_hs().await, Config::for_tests());
+        assert!(matches!(
+            sent(
+                &refusing,
+                keyed("alice", "report-key-1"),
+                "harassment",
+                &sealed
+            )
+            .await,
+            Err(AppError::Unauthenticated)
+        ));
+        // A homeserver nobody reaches says nothing of the token (#491): the
+        // report is not refused, it is to be sent again, and nothing of it
+        // is kept meanwhile.
         let unreachable = state_from(
             pool.clone(),
             "http://127.0.0.1:1".into(),
@@ -542,7 +556,7 @@ mod tests {
                 &sealed
             )
             .await,
-            Err(AppError::Unauthenticated)
+            Err(AppError::HomeserverUnavailable)
         ));
         assert_eq!(kept_rows(&pool).await, []);
         a_moment().await;
@@ -683,6 +697,28 @@ mod tests {
         assert_eq!(anonymous.status(), StatusCode::UNAUTHORIZED);
         let said: serde_json::Value = anonymous.json().await.unwrap();
         assert_eq!(said["errcode"], "M_UNAUTHORIZED");
+
+        // A service whose homeserver nobody reaches answers 503, which the
+        // application reads as « nothing kept, send it again » (#491).
+        let away = crate::router(state_from(
+            pool.clone(),
+            "http://127.0.0.1:1".into(),
+            Config::for_tests(),
+        ));
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let away_base = format!("http://{}", listener.local_addr().unwrap());
+        tokio::spawn(async move { axum::serve(listener, away).await.unwrap() });
+        let later = http
+            .post(format!("{away_base}/reports"))
+            .bearer_auth("alice")
+            .header(IDEMPOTENCY_HEADER, "report-key-2")
+            .json(&serde_json::json!({"reason": "hate", "sealed": sealed}))
+            .send()
+            .await
+            .unwrap();
+        assert_eq!(later.status(), StatusCode::SERVICE_UNAVAILABLE);
+        let said: serde_json::Value = later.json().await.unwrap();
+        assert_eq!(said["errcode"], "MESSAGR_UPSTREAM");
 
         assert_eq!(kept_rows(&pool).await.len(), 1);
     }

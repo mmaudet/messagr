@@ -62,9 +62,15 @@ function device(
       | 'unreachable'
       | 'silent'
     readonly seal?: 'refuses'
-    /** What the homeserver's whoami answers for the token, or that it does not. */
-    readonly whoami?: string | 'unanswered'
-    /** Whether the deadline for the service's answer elapses. */
+    /**
+     * What the homeserver's whoami answers for the token, or that it fails,
+     * or that it never answers.
+     */
+    readonly whoami?: string | 'unanswered' | 'silent'
+    /**
+     * Whether a deadline elapses: on the next turn of the event loop, after
+     * any port that answers at once.
+     */
     readonly deadline?: 'elapses'
   } = {},
 ) {
@@ -78,6 +84,7 @@ function device(
   const reporting: Reporting = {
     whoami: async () => {
       if (options.whoami === 'unanswered') throw new Error('network')
+      if (options.whoami === 'silent') return new Promise<string>(() => {})
       return options.whoami ?? ME
     },
     seal: (payload, binding) => {
@@ -97,7 +104,9 @@ function device(
     now: () => NOW,
     after: async ms => {
       expect(ms).toBe(ANSWER_DEADLINE_MS)
-      if (options.deadline !== 'elapses') await new Promise(() => {})
+      await new Promise(elapsed => {
+        if (options.deadline === 'elapses') setTimeout(elapsed, 0)
+      })
     },
   }
   return { reporting, sealed, sent }
@@ -120,12 +129,14 @@ describe('Reporting messages to the operator (#468)', () => {
       // were chosen in.
       messages: [
         {
+          kind: 'text',
           eventId: '$first',
           sentAt: 1_790_000_010_000,
           sender: HIM,
           text: 'Tu vas le regretter.',
         },
         {
+          kind: 'text',
           eventId: '$second',
           sentAt: 1_790_000_020_000,
           sender: HIM,
@@ -146,6 +157,97 @@ describe('Reporting messages to the operator (#468)', () => {
     ]) {
       expect(everything).not.toContain(left)
     }
+  })
+
+  it('seals a photograph and a document of the same author beside their words, each as the description of its encrypted file, never its bytes (#471)', async () => {
+    // A twelve-megabyte photograph. What reporting is handed has no way to
+    // fetch it, decrypt it or upload it (`Reporting`), and what is sealed
+    // names its address, its key and its hash: one block, for any size.
+    const material = {
+      v: 'v2',
+      key: {
+        kty: 'oct',
+        key_ops: ['encrypt', 'decrypt'],
+        alg: 'A256CTR',
+        k: 'qcHVMSgYg-71CauWBezXI5qkaRb0LuIy-Wx5kIaHMIA',
+        ext: true,
+      },
+      iv: 'X85+XgHN+HEAAAAAAAAAAA',
+      hashes: { sha256: 'eZjVdFJp2cSnZjB2S2BWrPCtbWRXjt0ZRkAyXvqSFw8' },
+    }
+    const photograph: TimelineEntry = {
+      eventId: '$photograph',
+      claimedSender: HIM,
+      sentAt: 1_790_000_012_000,
+      body: 'image.jpg',
+      msgtype: 'm.image',
+      image: {
+        url: 'mxc://example.org/photograph',
+        secret: JSON.stringify(material),
+        mimeType: 'image/jpeg',
+        width: 4000,
+        height: 3000,
+        size: 12_000_000,
+        thumbnail: null,
+      },
+    }
+    const document: TimelineEntry = {
+      eventId: '$document',
+      claimedSender: HIM,
+      sentAt: 1_790_000_014_000,
+      body: 'menaces.pdf',
+      msgtype: 'm.file',
+      document: {
+        url: 'mxc://example.org/document',
+        secret: JSON.stringify(material),
+        name: 'menaces.pdf',
+        mimeType: 'application/pdf',
+        size: 81_920,
+      },
+    }
+    const { reporting, sealed, sent } = device()
+
+    const reported = await reportMessages(reporting, {
+      ...REQUEST,
+      selected: new Set(['$document', '$first', '$photograph']),
+      timeline: [...TIMELINE, photograph, document],
+    })
+
+    expect(reported).toEqual({ outcome: 'sent', number: 'K7QM-4ZT2' })
+    expect(payloadOf(sealed[0]!.payload)?.messages).toEqual([
+      {
+        kind: 'text',
+        eventId: '$first',
+        sentAt: 1_790_000_010_000,
+        sender: HIM,
+        text: 'Tu vas le regretter.',
+      },
+      {
+        kind: 'photograph',
+        eventId: '$photograph',
+        sentAt: 1_790_000_012_000,
+        sender: HIM,
+        file: { ...material, url: 'mxc://example.org/photograph' },
+        mimetype: 'image/jpeg',
+        name: 'image.jpg',
+        size: 12_000_000,
+      },
+      {
+        kind: 'document',
+        eventId: '$document',
+        sentAt: 1_790_000_014_000,
+        sender: HIM,
+        file: { ...material, url: 'mxc://example.org/document' },
+        mimetype: 'application/pdf',
+        name: 'menaces.pdf',
+        size: 81_920,
+      },
+    ])
+    expect(sealed[0]!.payload.length).toBeLessThan(4096)
+    // And the service learns no more of a file than of words.
+    expect(sent.map(({ body }) => JSON.parse(body) as unknown)).toEqual([
+      { reason: 'harassment', sealed: 'THE-SEALED-REPORT' },
+    ])
   })
 
   it('names the reporting account exactly as the homeserver’s whoami answers, and binds the seal to it', async () => {
@@ -249,7 +351,9 @@ describe('Reporting messages to the operator (#468)', () => {
     expect(tooLong.sent).toEqual([])
   })
 
-  it('seals and sends nothing when the messages are not one other person’s words', async () => {
+  it('seals and sends nothing, and says so, when the selection is not one another person’s report can carry', async () => {
+    // Not « unconfirmed » (#491): nothing left, and sending again could not
+    // make it leave.
     for (const selected of [
       new Set(['$first', '$other']),
       new Set(['$mine']),
@@ -261,36 +365,102 @@ describe('Reporting messages to the operator (#468)', () => {
       const { reporting, sealed, sent } = device()
 
       expect(await reportMessages(reporting, { ...REQUEST, selected })).toEqual(
-        { outcome: 'unconfirmed' },
+        { outcome: 'unreportable' },
       )
       expect(sealed).toEqual([])
       expect(sent).toEqual([])
     }
   })
 
-  it('seals and sends nothing when the homeserver does not say whose account this is', async () => {
+  it('seals and sends nothing, and says so, when a message chosen was removed while the sheet was open', async () => {
+    // #491, the case the ticket names: the sheet opened on two messages, and
+    // one was removed for everyone before « Envoyer ».
+    const { reporting, sealed, sent } = device()
+    const removedMeanwhile = TIMELINE.map(entry =>
+      entry.eventId === '$second'
+        ? { ...entry, body: null, msgtype: undefined, removed: true }
+        : entry,
+    )
+
+    expect(
+      await reportMessages(reporting, {
+        ...REQUEST,
+        timeline: removedMeanwhile,
+      }),
+    ).toEqual({ outcome: 'unreportable' })
+    expect(sealed).toEqual([])
+    expect(sent).toEqual([])
+  })
+
+  it('seals and sends nothing, and says nothing left, when the homeserver does not say whose account this is', async () => {
+    // #491, the review of #493: nothing was sealed, and nothing left this
+    // device. Not « perhaps sent ».
     const { reporting, sealed, sent } = device({ whoami: 'unanswered' })
 
     expect(await reportMessages(reporting, REQUEST)).toEqual({
-      outcome: 'unconfirmed',
+      outcome: 'not-sent',
     })
     expect(sealed).toEqual([])
     expect(sent).toEqual([])
   })
 
-  it('sends nothing when the seal refuses its binding', async () => {
+  it('gives the homeserver’s whoami the send’s deadline, and says nothing left when it does not answer within it', async () => {
+    // #491: asked just before sealing, it had none, and « Envoi… » could
+    // stay on the sheet for ever.
+    const { reporting, sealed, sent } = device({
+      whoami: 'silent',
+      deadline: 'elapses',
+    })
+
+    expect(await reportMessages(reporting, REQUEST)).toEqual({
+      outcome: 'not-sent',
+    })
+    expect(sealed).toEqual([])
+    expect(sent).toEqual([])
+  })
+
+  it('sends nothing, and says so, when the seal refuses its binding', async () => {
     const { reporting, sent } = device({ seal: 'refuses' })
 
     expect(await reportMessages(reporting, REQUEST)).toEqual({
-      outcome: 'unconfirmed',
+      outcome: 'not-sent',
     })
     expect(sent).toEqual([])
   })
 
-  it('is unconfirmed when the service refuses it, cannot be reached, gives no number, or does not answer in time', async () => {
+  it('is to be sent again when the service answers 503: its homeserver did not answer, and it kept nothing', async () => {
+    // #491, the review of #493: the service answers 503 when it cannot ask
+    // its homeserver who the token is, before keeping anything
+    // (`auth.rs`). Not a refusal, which is final, nor « perhaps sent ».
+    const { reporting, sent } = device({
+      answer: { status: 503, body: '{"errcode":"MESSAGR_UPSTREAM"}' },
+    })
+
+    expect(await reportMessages(reporting, REQUEST)).toEqual({
+      outcome: 'unavailable',
+    })
+    expect(sent).toHaveLength(1)
+  })
+
+  it('is refused when the service refuses it for good: a request it will not take, or a token it does not take', async () => {
+    // #491: « pas confirmé, réessayer ne l'enverra qu'une fois » cannot be
+    // true of a refusal. The service refuses before keeping anything
+    // (`handlers/reports.rs`), and the same request would be refused again.
+    for (const answer of [
+      { status: 400, body: '{"errcode":"M_INVALID_PARAM"}' },
+      { status: 401, body: '{"errcode":"M_UNAUTHORIZED"}' },
+    ]) {
+      const { reporting, sent } = device({ answer })
+
+      expect(await reportMessages(reporting, REQUEST)).toEqual({
+        outcome: 'refused',
+      })
+      expect(sent).toHaveLength(1)
+    }
+  })
+
+  it('is unconfirmed when the service cannot be reached, gives no number, fails, or does not answer in time', async () => {
     for (const options of [
-      { answer: { status: 400, body: '{"errcode":"M_INVALID_PARAM"}' } },
-      { answer: { status: 401, body: '{"errcode":"M_UNAUTHORIZED"}' } },
       { answer: { status: 404, body: '{"errcode":"M_UNRECOGNIZED"}' } },
       { answer: { status: 500, body: '{"errcode":"M_UNKNOWN"}' } },
       { answer: { status: 201, body: '{}' } },

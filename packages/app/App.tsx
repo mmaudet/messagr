@@ -329,7 +329,12 @@ import { SelectionBar } from './src/ui/SelectionBar'
 import { PlusSheet } from './src/ui/PlusSheet'
 import { FindContacts } from './src/ui/FindContacts'
 import { RemoveSheet } from './src/ui/RemoveSheet'
-import { ReportSheet, stageAfter, type ReportStage } from './src/ui/ReportSheet'
+import { ReportSheet } from './src/ui/ReportSheet'
+import {
+  answeredSheet,
+  closingClearsTheSelection,
+  type OpenReport,
+} from './src/ui/reportStage'
 import { PickConversation } from './src/ui/PickConversation'
 import { ConversationHeader } from './src/ui/ConversationHeader'
 import { Legal } from './src/ui/Legal'
@@ -1388,24 +1393,17 @@ export function App({
    *
    * `opening` tells one sheet from the next: the sheet may close while its
    * report is being sent, and the answer that comes back afterwards belongs
-   * to no sheet on screen.
+   * to no sheet on screen (`answeredSheet`, `reportStage.ts`).
    */
-  const [reporting, setReporting] = useState<{
-    readonly opening: number
-    readonly scope: string
-    readonly eventIds: ReadonlySet<string>
-    readonly author: string
-    readonly sheet: ReportStage
-  } | null>(null)
+  const [reporting, setReporting] = useState<OpenReport | null>(null)
   const reportOpeningsRef = useRef(0)
   /**
-   * Closes the report sheet: from its own buttons, its scrim, or back. Once
-   * the report is sent, the selection mode has done what it was opened for
-   * and goes with it; otherwise the selection stays, to send again or do
-   * something else with, as the removal sheet leaves it.
+   * Closes the report sheet: from its own buttons, its scrim, or back. The
+   * selection goes with it once the report is sent, and stays otherwise
+   * (`closingClearsTheSelection`, `reportStage.ts`).
    */
   const closeReport = useCallback(() => {
-    if (reporting?.sheet.stage === 'sent') setSelected(new Set())
+    if (closingClearsTheSelection(reporting)) setSelected(new Set())
     setReporting(null)
   }, [reporting])
   /**
@@ -5915,8 +5913,10 @@ export function App({
 
         {/* SIGNALER (#468). What the sheet shows as leaving and what is
             sealed are read from the same conversation, the one on screen,
-            by the same definition (`reportable`). The messages stay in the
-            conversation: a report removes nothing. */}
+            by the same definition (`reportable`): so a message deleted
+            while the sheet is open takes « Envoyer » away at once (#491).
+            The messages stay in the conversation: a report removes
+            nothing. */}
         {reporting !== null && (
           <ReportSheet
             author={displayNameFor(
@@ -5926,8 +5926,16 @@ export function App({
             reporter={displayNameFor(selfUserId, undefined)}
             messages={
               reportable(reporting.eventIds, conversation ?? [], selfUserId)
-                ?.messages ?? []
+                ?.messages ?? null
             }
+            // A PHOTOGRAPH AS THE CONVERSATION HOLDS IT (#471): the same
+            // object from one render to the next, so it is fetched once, and
+            // its thumbnail is the one the conversation already drew.
+            picture={eventId =>
+              (conversation ?? []).find(entry => entry.eventId === eventId)
+                ?.image
+            }
+            fetch={loadImage}
             stage={reporting.sheet}
             onSend={reason => {
               const { opening, scope, eventIds } = reporting
@@ -5940,14 +5948,10 @@ export function App({
                 timeline: conversation ?? [],
               })
                 .catch(() => ({ outcome: 'unconfirmed' }) as const)
+                // TO THIS SHEET ONLY: closed meanwhile, and perhaps another
+                // opened, the answer belongs to none on screen.
                 .then(reported =>
-                  // TO THIS SHEET ONLY: closed meanwhile, and perhaps
-                  // another opened, the answer belongs to none on screen.
-                  setReporting(now =>
-                    now?.opening === opening
-                      ? { ...now, sheet: stageAfter(reported) }
-                      : now,
-                  ),
+                  setReporting(now => answeredSheet(now, opening, reported)),
                 )
             }}
             onClose={closeReport}

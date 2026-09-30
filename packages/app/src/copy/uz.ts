@@ -205,6 +205,8 @@ export const uz: Readonly<Record<CopyKey, string>> = {
   report_what_heading: 'Bu telefondan nima ketadi',
   report_what:
     'Tanlangan xabarlar, siz ularni qanday oʻqisangiz shunday, muallifi va vaqti, suhbat va har bir xabarning identifikatori hamda shikoyat vaqti bilan. Suhbatdan boshqa hech narsa ketmaydi.',
+  report_what_files:
+    'Surat yoki hujjat uchun: serverda allaqachon turgan shifrlangan nusxasining manzili, uni ochadigan kalit, turi, nomi va hajmi. Operator uni shu tarzda ocha oladi; faylning oʻzi ikkinchi marta yuborilmaydi.',
   'report_author %@': 'Server maʼlumotiga koʻra muallif: %@',
   'report_when %1$@ %2$@': '%1$@, soat %2$@',
   'report_account %@': 'Hisobingiz nomidan yuboriladi: %@',
@@ -217,6 +219,14 @@ export const uz: Readonly<Record<CopyKey, string>> = {
     'Shikoyat tasdiqlanmadi: u ketgan boʻlishi ham, ketmagan boʻlishi ham mumkin. Qayta urinish uni faqat bir marta yuboradi.',
   report_too_long:
     'Bu xabarlar bitta shikoyat uchun juda uzun: yoping va kamroq xabar tanlang.',
+  report_refused:
+    'Xizmat bu urinishni rad etdi va undan hech narsani saqlamadi. Boshqa yoʻl bilan shikoyat qilish uchun conformite@messagr.eu manziliga yozing.',
+  report_not_sent:
+    'Hech narsa yuborilmadi. Birozdan keyin qayta urinib koʻring.',
+  report_unavailable:
+    'Xizmat hozircha bu shikoyatni qabul qila olmadi va undan hech narsani saqlamadi. Birozdan keyin qayta urinib koʻring.',
+  report_unreportable:
+    'Tanlangan xabarlardan biri endi shikoyat qilinmaydi: u oʻchirilgan yoki endi bu suhbatda yoʻq. Yoping va qaytadan tanlang.',
   report_sent_title: 'Shikoyat yuborildi',
   'report_sent_number %@': 'Shikoyat raqami: %@',
   report_sent_decision:

@@ -1,4 +1,9 @@
-import type { ReportedMessage } from '../runtime/reportFormat'
+import {
+  encryptedFileOf,
+  type ReportedFile,
+  type ReportedMessage,
+} from '../runtime/reportFormat'
+import { fileOf, type EncryptedFile } from './encryptedFile'
 import type { TimelineEntry } from './mergeTimeline'
 
 /**
@@ -92,10 +97,10 @@ export function canRemoveForEveryone(
 }
 
 /**
- * The kinds of message a report carries (#468): words, as a person writes
- * them. A photograph or a document goes as the key to its encrypted copy,
- * which #471 adds; a video, a voice message, a place or a sticker is not
- * carried at all.
+ * The kinds of message a report carries as words (#468), as a person writes
+ * them. A photograph (`m.image`) or a document (`m.file`) goes as the
+ * description of its encrypted file (#471); a video, a voice message, a
+ * place or a sticker is not carried at all.
  */
 const WORDS: ReadonlySet<string> = new Set(['m.text', 'm.notice', 'm.emote'])
 
@@ -108,8 +113,8 @@ export interface Reportable {
 }
 
 /**
- * What a report of the selection would carry (#468), or `null` when the
- * selection cannot be reported, and « Signaler » is then absent.
+ * What a report of the selection would carry (#468, #471), or `null` when
+ * the selection cannot be reported, and « Signaler » is then absent.
  *
  * THE ONE DEFINITION, which the bar reads to offer « Signaler », the sheet
  * to show what leaves, and `reportMessages` to seal it: so nothing leaves
@@ -120,9 +125,20 @@ export interface Reportable {
  * it to take down a message somebody else wrote. And never this account's
  * own messages, which nobody reports to have them removed.
  *
- * WORDS ONLY (`WORDS`): a selection holding anything else is not a report
- * at all, rather than a report quietly missing it. A message this device
- * could not open, or one removed, has nothing readable to send.
+ * WORDS, PHOTOGRAPHS AND DOCUMENTS, mixed as the person chose them. Words
+ * go as the device shows them. A photograph or a document goes as the
+ * description of its encrypted file, the one its event carried
+ * (`reportFormat.ts`): the address of the encrypted copy already on the
+ * server, and what opens and checks it. Never its bytes, which this reading
+ * does not even have: nothing is downloaded, decrypted or uploaded to make
+ * a report (ADR 0006, ADR 0015). Nor its thumbnail's key, which the operator
+ * does not need.
+ *
+ * A selection holding anything else is not a report at all, rather than a
+ * report quietly missing it: a video, a voice message, a place, a sticker, a
+ * message this device could not open, one removed, or a file the operator
+ * could not open, by the one rule the operator's tool reads too
+ * (`openingOf`).
  *
  * A selected event the conversation no longer carries makes it `null` too,
  * as for removing: nothing can say what would be sent.
@@ -138,23 +154,78 @@ export function reportable(
   if (found.length !== selected.size) return null
   const messages: ReportedMessage[] = []
   for (const entry of found) {
-    if (
-      entry.claimedSender !== author ||
-      entry.body === null ||
-      entry.removed === true ||
-      entry.msgtype === undefined ||
-      !WORDS.has(entry.msgtype)
-    ) {
-      return null
-    }
-    messages.push({
-      eventId: entry.eventId,
-      sentAt: entry.sentAt,
-      sender: author,
-      text: entry.body,
-    })
+    const message =
+      entry.claimedSender === author && entry.removed !== true
+        ? reportedMessageOf(entry)
+        : null
+    if (message === null) return null
+    messages.push(message)
   }
   return { author, messages }
+}
+
+/**
+ * The message a report carries for `entry`: its words, or the description
+ * of the photograph or the document it is. `null` for anything else.
+ */
+function reportedMessageOf(entry: TimelineEntry): ReportedMessage | null {
+  const sent = {
+    eventId: entry.eventId,
+    sentAt: entry.sentAt,
+    sender: entry.claimedSender,
+  }
+  const { image, document } = entry
+  if (entry.msgtype === 'm.image' && image !== undefined) {
+    // A photograph's `body` is the name its sender gave for clients that
+    // cannot draw it (`imageEvent.ts`).
+    return fileMessageOf(sent, 'photograph', image, entry.body, image.size)
+  }
+  if (entry.msgtype === 'm.file' && document !== undefined) {
+    return fileMessageOf(
+      sent,
+      'document',
+      document,
+      document.name,
+      document.size,
+    )
+  }
+  if (
+    entry.msgtype !== undefined &&
+    WORDS.has(entry.msgtype) &&
+    entry.body !== null
+  ) {
+    return { ...sent, kind: 'text', text: entry.body }
+  }
+  return null
+}
+
+/**
+ * The message a report carries for a photograph or a document: the encrypted
+ * file its event carried, rebuilt from what the conversation kept of it
+ * (`fileOf`), its type, `name` and `size`. `null` when that file could not be
+ * opened (`encryptedFileOf`, whose rule the operator's tool reads too).
+ */
+function fileMessageOf(
+  sent: Pick<ReportedFile, 'eventId' | 'sentAt' | 'sender'>,
+  kind: ReportedFile['kind'],
+  read: {
+    readonly url: string
+    readonly secret: string
+    readonly mimeType: string | null
+  },
+  name: string | null,
+  size: number | null,
+): ReportedFile | null {
+  let file: EncryptedFile | null
+  try {
+    file = encryptedFileOf(fileOf(read))
+  } catch {
+    // A secret that is not an object: nothing could open this file.
+    return null
+  }
+  return file === null
+    ? null
+    : { ...sent, kind, file, mimetype: read.mimeType, name, size }
 }
 
 /**

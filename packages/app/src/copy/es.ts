@@ -188,6 +188,8 @@ export const es: Readonly<Record<CopyKey, string>> = {
   report_what_heading: 'Lo que sale de este teléfono',
   report_what:
     'Los mensajes elegidos, tal como usted los lee, con su autor y su hora, el identificador de la conversación y el de cada mensaje, y el momento de la denuncia. Nada más de la conversación.',
+  report_what_files:
+    'Para una foto o un documento: la dirección de su copia cifrada, que ya está en el servidor, la clave que la abre, su tipo, su nombre y su tamaño. Quien explota el servicio podrá abrirlo; el archivo en sí no se envía una segunda vez.',
   'report_author %@': 'Atribuidos por el servidor a %@',
   'report_when %1$@ %2$@': '%1$@ a las %2$@',
   'report_account %@': 'Enviada en nombre de su cuenta: %@',
@@ -200,6 +202,13 @@ export const es: Readonly<Record<CopyKey, string>> = {
     'La denuncia no está confirmada: quizá haya salido, quizá no. Volver a intentarlo solo la enviará una vez.',
   report_too_long:
     'Estos mensajes son demasiado largos para una sola denuncia: cierre y elija menos.',
+  report_refused:
+    'El servicio rechazó este envío y no guardó nada de él. Para denunciar de otro modo, escriba a conformite@messagr.eu.',
+  report_not_sent: 'No se ha enviado nada. Vuelva a intentarlo en un momento.',
+  report_unavailable:
+    'El servicio no ha podido aceptar esta denuncia por ahora y no ha guardado nada de ella. Vuelva a intentarlo en un momento.',
+  report_unreportable:
+    'Uno de los mensajes elegidos ya no se puede denunciar: se eliminó, o ya no está en esta conversación. Cierre y vuelva a elegir.',
   report_sent_title: 'Denuncia enviada',
   'report_sent_number %@': 'Número de denuncia: %@',
   report_sent_decision:

@@ -186,6 +186,8 @@ export const it: Readonly<Record<CopyKey, string>> = {
   report_what_heading: 'Ciò che lascia questo telefono',
   report_what:
     'I messaggi scelti, così come lei li legge, con il loro autore e il loro orario, l’identificativo della conversazione e quello di ogni messaggio, e il momento della segnalazione. Nient’altro della conversazione.',
+  report_what_files:
+    'Per una foto o un documento: l’indirizzo della sua copia cifrata, che è già sul server, la chiave che la apre, il suo tipo, il suo nome e la sua dimensione. Chi gestisce il servizio potrà aprirlo; il file stesso non viene inviato una seconda volta.',
   'report_author %@': 'Attribuiti dal server a %@',
   'report_when %1$@ %2$@': '%1$@ alle %2$@',
   'report_account %@': 'Inviata a nome del suo account: %@',
@@ -198,6 +200,13 @@ export const it: Readonly<Record<CopyKey, string>> = {
     'La segnalazione non è confermata: forse è partita, forse no. Riprovare la invierà una sola volta.',
   report_too_long:
     'Questi messaggi sono troppo lunghi per una sola segnalazione: chiuda e ne scelga meno.',
+  report_refused:
+    'Il servizio ha rifiutato questo invio e non ne ha conservato nulla. Per segnalare in altro modo, scriva a conformite@messagr.eu.',
+  report_not_sent: 'Non è partito nulla. Riprovi tra un momento.',
+  report_unavailable:
+    'Il servizio non ha potuto accettare questa segnalazione per ora e non ne ha conservato nulla. Riprovi tra un momento.',
+  report_unreportable:
+    'Uno dei messaggi scelti non può più essere segnalato: è stato eliminato, o non è più in questa conversazione. Chiuda e scelga di nuovo.',
   report_sent_title: 'Segnalazione inviata',
   'report_sent_number %@': 'Numero di segnalazione: %@',
   report_sent_decision:

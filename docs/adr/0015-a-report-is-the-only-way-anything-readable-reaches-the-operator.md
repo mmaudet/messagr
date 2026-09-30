@@ -101,3 +101,9 @@ The legal screen in seven languages, the privacy policy, `retention.json` and
 the store declarations change with it. The review notes describe both
 gestures, and a demonstration account writes to the reviewer once they are
 in, so that there is something to report and to block.
+
+**Amended on 30 September 2026.** ADR-0006 governs the application; the
+operator's tool, on the operator's own machine, shows a reported photograph or
+document only when asked, through a temporary copy in a private directory,
+erased once seen, on an interruption or on a failure
+(`scripts/lib/ouvrir-un-fichier-signale.mjs`).

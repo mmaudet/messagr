@@ -192,6 +192,8 @@ export const de: Readonly<Record<CopyKey, string>> = {
   report_what_heading: 'Was dieses Telefon verlässt',
   report_what:
     'Die ausgewählten Nachrichten, so wie Sie sie lesen, mit ihrem Verfasser und ihrer Uhrzeit, der Kennung der Unterhaltung und jeder Nachricht sowie dem Zeitpunkt der Meldung. Nichts sonst aus der Unterhaltung.',
+  report_what_files:
+    'Für ein Foto oder ein Dokument: die Adresse seiner verschlüsselten Kopie, die bereits auf dem Server liegt, der Schlüssel, der sie öffnet, sein Typ, sein Name und seine Größe. Der Betreiber kann es damit öffnen; die Datei selbst wird kein zweites Mal gesendet.',
   'report_author %@': 'Laut Server verfasst von %@',
   'report_when %1$@ %2$@': '%1$@ um %2$@',
   'report_account %@': 'Gesendet im Namen Ihres Kontos: %@',
@@ -204,6 +206,14 @@ export const de: Readonly<Record<CopyKey, string>> = {
     'Die Meldung ist nicht bestätigt: Sie ist vielleicht hinausgegangen, vielleicht nicht. Ein erneuter Versuch sendet sie nur einmal.',
   report_too_long:
     'Diese Nachrichten sind für eine einzige Meldung zu lang: Schließen Sie und wählen Sie weniger aus.',
+  report_refused:
+    'Der Dienst hat diesen Sendeversuch abgelehnt und nichts davon behalten. Um auf anderem Weg zu melden, schreiben Sie an conformite@messagr.eu.',
+  report_not_sent:
+    'Es wurde nichts gesendet. Versuchen Sie es gleich noch einmal.',
+  report_unavailable:
+    'Der Dienst konnte diese Meldung gerade nicht annehmen und hat nichts davon behalten. Versuchen Sie es gleich noch einmal.',
+  report_unreportable:
+    'Eine der ausgewählten Nachrichten kann nicht mehr gemeldet werden: Sie wurde gelöscht oder ist nicht mehr in dieser Unterhaltung. Schließen Sie und wählen Sie erneut aus.',
   report_sent_title: 'Meldung gesendet',
   'report_sent_number %@': 'Meldungsnummer: %@',
   report_sent_decision:

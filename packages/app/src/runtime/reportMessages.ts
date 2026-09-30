@@ -25,7 +25,11 @@ import { parsed, type Answer } from './serviceAnswer'
  * device: the report number is all the person keeps, on screen.
  *
  * What it carries is `reportable`'s, the one definition the selection bar
- * and the sheet read too: nothing leaves that was not shown.
+ * and the sheet read too: nothing leaves that was not shown. A photograph or
+ * a document is in it as the description of its encrypted file, the key to
+ * a copy already on the server, never as its bytes (#471): nothing is
+ * downloaded, decrypted, written or uploaded to make a report, and what is
+ * handed to this module could not do any of it.
  *
  * # WHAT THE SERVICE LEARNS, AND WHAT IT DOES NOT
  *
@@ -45,9 +49,23 @@ import { parsed, type Answer } from './serviceAnswer'
  *
  * Sent, with the report number the service drew. Too long, when the report
  * is more than the service takes (`MOST_PAYLOAD_BYTES`): nothing is sealed
- * or sent, and fewer messages would go. Otherwise unconfirmed: no number
- * came back, which cannot tell a report refused or never sent from one kept
- * whose answer was lost, or did not come in `ANSWER_DEADLINE_MS`.
+ * or sent, and fewer messages would go. Unreportable, when what was chosen
+ * is no longer a report `reportable` makes, a message removed while the
+ * sheet was open for one: nothing is sealed or sent. Not sent, when the
+ * homeserver's `whoami` does not name the account, or not in time, or the
+ * seal refuses what it named: nothing is sealed or sent, and it can be sent
+ * again. Refused, when the service answers 400 or 401: it refuses before
+ * keeping anything (`handlers/reports.rs`), and would refuse the same
+ * request again (#491). Unavailable, when the service answers 503: it could
+ * not ask its own homeserver who the token is, and kept nothing; it can be
+ * sent again (`auth.rs`). Otherwise unconfirmed: no number came back, which
+ * cannot tell a report never sent from one kept whose answer was lost, or
+ * that did not come in `ANSWER_DEADLINE_MS`.
+ *
+ * Each of the two requests has that deadline: the homeserver's `whoami`,
+ * asked just before sealing, as much as the service's answer. Without it,
+ * a network that takes the question and never answers keeps « Envoi… » on
+ * the sheet for ever (#491).
  *
  * Sending it again is safe either way: each report goes under an
  * idempotency key (`keysInMemory`), the same for every attempt of the same
@@ -70,7 +88,8 @@ export interface Reporting {
   readonly service: ReportService
   /**
    * The account ID exactly as the account's own homeserver answers `whoami`
-   * for its token. Throws when it does not answer, and then nothing leaves.
+   * for its token. Throws when it does not answer, and then nothing leaves,
+   * as when it has not answered within `ANSWER_DEADLINE_MS`.
    */
   readonly whoami: () => Promise<string>
   /**
@@ -104,37 +123,54 @@ export interface ReportRequest {
 export type Reported =
   | { readonly outcome: 'sent'; readonly number: string }
   | { readonly outcome: 'too-long' }
+  | { readonly outcome: 'unreportable' }
+  | { readonly outcome: 'not-sent' }
+  | { readonly outcome: 'refused' }
+  | { readonly outcome: 'unavailable' }
   | { readonly outcome: 'unconfirmed' }
 
 /**
- * How long the service is given to answer. It answers at once when it
- * answers; this is for a network that takes the request and never gives
- * anything back, which React Native's `fetch` would wait on for ever.
+ * How long the homeserver and the service are each given to answer. They
+ * answer at once when they answer; this is for a network that takes the
+ * request and never gives anything back, which React Native's `fetch` would
+ * wait on for ever.
  */
 export const ANSWER_DEADLINE_MS = 30_000
 
+/**
+ * What the service answers a request it will never take: one it does not
+ * read as a report (400), or one whose token it does not take (401). It
+ * answers them before keeping anything.
+ */
+const REFUSALS: ReadonlySet<number> = new Set([400, 401])
+
+/**
+ * What the service answers when it cannot take a request for now, and has
+ * kept nothing of it: when its own homeserver does not answer who the token
+ * is (`auth.rs`, `HomeserverUnavailable`).
+ */
+const UNAVAILABLE = 503
+
 const UNCONFIRMED: Reported = { outcome: 'unconfirmed' }
+const NOT_SENT: Reported = { outcome: 'not-sent' }
 
 /**
  * Reports what `request` selects to the operator, and answers what became
  * of it (see the module).
  *
- * Nothing is sealed when the selection is not one other participant's
- * words: the screen never offers that, and this does not rely on it.
+ * Nothing is sealed when the selection is not a report `reportable` makes:
+ * the screen offers none, and this does not rely on it.
  */
 export async function reportMessages(
   deps: Reporting,
   request: ReportRequest,
 ): Promise<Reported> {
   const carried = reportable(request.selected, request.timeline, request.self)
-  if (carried === null) return UNCONFIRMED
+  if (carried === null) return { outcome: 'unreportable' }
 
-  let reporter: string
-  try {
-    reporter = await deps.whoami()
-  } catch {
-    return UNCONFIRMED
-  }
+  // NOTHING HAS LEFT YET: the homeserver was only asked who this is.
+  const reporter = await answeredInTime(deps, deps.whoami)
+  if (reporter === null) return NOT_SENT
   const payload = payloadBytes({
     reason: request.reason,
     reportedAt: deps.now(),
@@ -149,7 +185,7 @@ export async function reportMessages(
   try {
     sealed = deps.seal(payload, { reason: request.reason, reporter })
   } catch {
-    return UNCONFIRMED
+    return NOT_SENT
   }
 
   const answer = await answeredInTime(deps, () =>
@@ -158,6 +194,10 @@ export async function reportMessages(
       deps.keyOf(sameReport(request)),
     ),
   )
+  if (answer !== null && REFUSALS.has(answer.status)) {
+    return { outcome: 'refused' }
+  }
+  if (answer?.status === UNAVAILABLE) return { outcome: 'unavailable' }
   // 201 AND A NUMBER: the service answers the one only with the other
   // (`handlers/reports.rs`), a second attempt of the same report included.
   const number = answer?.status === 201 ? parsed(answer.body)?.number : null
@@ -203,13 +243,13 @@ function sameReport(request: ReportRequest): string {
 }
 
 /**
- * The service's answer, or `null` when nothing came back: a network that
- * failed, or one that did not answer within `ANSWER_DEADLINE_MS`.
+ * The answer `request` gets, or `null` when nothing came back: a network
+ * that failed, or one that did not answer within `ANSWER_DEADLINE_MS`.
  */
-async function answeredInTime(
+async function answeredInTime<T>(
   deps: Reporting,
-  request: () => Promise<Answer>,
-): Promise<Answer | null> {
+  request: () => Promise<T>,
+): Promise<T | null> {
   try {
     return await Promise.race([
       request(),

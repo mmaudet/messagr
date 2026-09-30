@@ -14,6 +14,27 @@
  * would have had to import it from a module about pictures, or copy it.
  */
 
+/**
+ * Matrix's `EncryptedFile`, as an event carries it: where the ciphertext
+ * is, and what opens and checks it. Whatever else the event gave is kept as
+ * it gave it. What a report needs of it to be opened by the operator is
+ * `openingOf`'s to say (`reportFormat.ts`).
+ */
+export interface EncryptedFile {
+  /** The address of the ciphertext on the homeserver, `mxc://…`. */
+  readonly url: string
+  /** The JSON Web Key that opens it: AES-256-CTR, its `k` in base64url. */
+  readonly key: { readonly k: string; readonly [field: string]: unknown }
+  /** The counter the decryption starts from, in base64. */
+  readonly iv: string
+  /** Its `sha256` is the hash of the ciphertext, in base64. */
+  readonly hashes: {
+    readonly sha256: string
+    readonly [field: string]: unknown
+  }
+  readonly [field: string]: unknown
+}
+
 /** Where one sealed file went, and the key that opens it. */
 export interface Uploaded {
   readonly url: string

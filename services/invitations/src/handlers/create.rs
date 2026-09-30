@@ -4,7 +4,9 @@ use axum::{extract::State, http::HeaderMap, Json};
 use serde::{Deserialize, Serialize};
 use sqlx::Row;
 
-use crate::{auth, crypto, error::AppError, extract::Body, matrix, util::now, AppState};
+use crate::{
+    auth, crypto, error::AppError, extract::Body, idempotency, matrix, util::now, AppState,
+};
 
 pub const MAX_USES: u32 = 10;
 
@@ -15,35 +17,6 @@ pub const MAX_USES: u32 = 10;
 /// removes the reserved accounts from cleanup — they are only deactivated when
 /// their invitation expires or is revoked.
 pub const MAX_TTL_SECONDS: i64 = 30 * 86_400;
-
-/// Header carrying the idempotency key, MANDATORY on `POST /invitations`.
-///
-/// **A header, not a body field**, for three reasons drawn from the code and
-/// the incident:
-///
-/// 1. The duplicate measured on 6 August came from an **automatic HTTP-stack
-///    retry**, not a deliberate re-call from the client. What replays a
-///    request at that level — a reqwest/OkHttp interceptor, nginx's
-///    `proxy_next_upstream` — manipulates headers; that is the layer that
-///    sets the key, and it has no business knowing the body's schema or
-///    re-encoding it.
-/// 2. The key is a transport metadata, not business data: adding it to
-///    `CreateRequest` would have mixed it with `max_uses`/`ttl_seconds`, on
-///    which the MEANING of the invitation depends. `create` already receives
-///    the `HeaderMap` for authentication — no signature to change.
-/// 3. It is the conventional shape (`Idempotency-Key`), hence the one retry
-///    layers know how to set without specific code.
-///
-/// Compared in lowercase: `HeaderMap` normalises header names, so the case
-/// used by the caller is irrelevant.
-pub const IDEMPOTENCY_HEADER: &str = "idempotency-key";
-
-/// Bounds of the key. The minimum is not decorative: the key is carried by
-/// the caller and stands as a promise of uniqueness; a value like `1` or `x`
-/// would collide with their own next request and hand them the previous
-/// invitation back — a silent, inverted duplicate.
-pub const IDEMPOTENCY_KEY_MIN: usize = 8;
-pub const IDEMPOTENCY_KEY_MAX: usize = 200;
 
 /// Longest room id this service will put in a URL path.
 ///
@@ -151,44 +124,11 @@ pub fn validate_room_id(room_id: &str) -> Result<(), AppError> {
     Ok(())
 }
 
-pub fn validate_idempotency_key(key: &str) -> Result<(), AppError> {
-    let invalid = |what: &str| {
-        Err(AppError::InvalidRequest(format!(
-            "header {IDEMPOTENCY_HEADER} {what}: {IDEMPOTENCY_KEY_MIN} to \
-             {IDEMPOTENCY_KEY_MAX} visible ASCII characters, no spaces"
-        )))
-    };
-    if key.len() < IDEMPOTENCY_KEY_MIN || key.len() > IDEMPOTENCY_KEY_MAX {
-        return invalid("of invalid length");
-    }
-    if !key.bytes().all(|b| b.is_ascii_graphic()) {
-        return invalid("malformed");
-    }
-    Ok(())
-}
-
-/// Requires the idempotency key, and refuses it rather than doing without.
-///
-/// **Mandatory, not optional.** An optional key does not fix the observed
-/// defect: the measured duplicate came from a retry the caller did not know
-/// it was emitting, and a caller unaware of the key gets exactly the old
-/// behaviour back. The price of the requirement is a loud 400 on the very
-/// first call, before a single account exists; the price of silence is a
-/// pool of definitive Matrix accounts. Accounts cannot be un-created, 400s
-/// can.
-pub fn extract_idempotency_key(headers: &HeaderMap) -> Result<String, AppError> {
-    let raw = headers
-        .get(IDEMPOTENCY_HEADER)
-        .and_then(|v| v.to_str().ok())
-        .ok_or_else(|| {
-            AppError::InvalidRequest(format!(
-                "header {IDEMPOTENCY_HEADER} is required: it makes retries safe; without it, \
-                 every retry would create a new pool of definitive accounts"
-            ))
-        })?;
-    validate_idempotency_key(raw)?;
-    Ok(raw.to_string())
-}
+/// What the key protects on `POST /invitations`, said to a caller that sent
+/// none.
+pub const PROTECTS_A_POOL: &str =
+    "it makes retries safe; without it, every retry would create a new pool of definitive \
+     accounts";
 
 /// THE idempotency decision AND the ceiling, in a SINGLE SQL statement.
 ///
@@ -314,7 +254,7 @@ pub async fn create(
     Body(req): Body<CreateRequest>,
 ) -> Result<Json<CreateResponse>, AppError> {
     validate(&req)?;
-    let key = extract_idempotency_key(&headers)?;
+    let key = idempotency::required(&headers, PROTECTS_A_POOL)?;
 
     // `whoami`: the ONLY call to the homeserver that precedes the decision,
     // and it creates nothing — it is an identity read. It must come first,
@@ -630,107 +570,6 @@ mod tests {
         assert!(now().checked_add(MAX_TTL_SECONDS).is_some());
     }
 
-    /// The key alone carries the promise of uniqueness of a pool of
-    /// definitive accounts: what cannot keep it must be refused BEFORE any
-    /// network call.
-    ///
-    /// The lengths exercised here are ABSOLUTE, not expressed in terms of the
-    /// constants. An assertion written `IDEMPOTENCY_KEY_MIN - 1` only compares
-    /// the constant to itself: it survives a `MIN = 1` intact, and so would
-    /// never have said anything about the fact that a "1" key must be
-    /// refused. The exact bounds are verified AS WELL, for the off-by-one
-    /// error.
-    #[test]
-    fn the_idempotency_key_is_refused_outside_its_bounds_and_its_form() {
-        let a = |n: usize| "k".repeat(n);
-
-        // Too short to be a credible uniqueness promise: a one- or
-        // two-character key would collide with the same caller's next
-        // request, which would be handed the previous invitation back.
-        for short_key in ["1", "ab", "abcd", "short"] {
-            assert!(
-                validate_idempotency_key(short_key).is_err(),
-                "too-short key accepted: {short_key:?}"
-            );
-        }
-        // Excessive: it would end up as-is in the database, in the index and
-        // in the logs.
-        assert!(
-            validate_idempotency_key(&a(1000)).is_err(),
-            "a thousand-character key must be refused"
-        );
-        assert!(validate_idempotency_key("").is_err(), "empty key");
-
-        // The EXACT bounds, for the off-by-one error.
-        assert!(
-            validate_idempotency_key(&a(IDEMPOTENCY_KEY_MIN - 1)).is_err(),
-            "one character under the lower bound"
-        );
-        assert!(
-            validate_idempotency_key(&a(IDEMPOTENCY_KEY_MIN)).is_ok(),
-            "the EXACT lower bound must be accepted"
-        );
-        assert!(
-            validate_idempotency_key(&a(IDEMPOTENCY_KEY_MAX)).is_ok(),
-            "the EXACT upper bound must be accepted"
-        );
-        assert!(
-            validate_idempotency_key(&a(IDEMPOTENCY_KEY_MAX + 1)).is_err(),
-            "one character above the upper bound"
-        );
-
-        for malformed in [
-            "        ",        // spaces only: sufficient length, null content
-            "key with space",  // internal space
-            "key\twith\ttab",  // control character
-            "key\nwith\nlf",   // line feed: injection into the logs
-            "kéy-accented-ok", // outside ASCII
-        ] {
-            assert!(
-                validate_idempotency_key(malformed).is_err(),
-                "malformed key accepted: {malformed:?}"
-            );
-        }
-
-        // Control: the forms genuinely expected from a caller pass, without
-        // which the validation could refuse everything and the assertions
-        // above would prove nothing. A UUID v4 (36 characters) and a
-        // 32-character base32 token, like those the service generates.
-        assert!(validate_idempotency_key("6f1c9d3e-2b47-4a0e-9c11-8de5a2f30b64").is_ok());
-        assert!(validate_idempotency_key("MFRGGZDFMZTWQ2LKNRWW6ZDFMZTWQ2LK").is_ok());
-    }
-
-    /// The header is MANDATORY: its absence must produce a refusal, never a
-    /// silent fallback to a key generated by the service — which would make
-    /// every retry unique, hence duplicate the pool, i.e. the very defect
-    /// being fixed.
-    #[test]
-    fn the_idempotency_header_is_required_and_its_case_is_irrelevant() {
-        assert!(
-            extract_idempotency_key(&HeaderMap::new()).is_err(),
-            "without the header, the request must be refused"
-        );
-
-        // `HeaderMap` normalises names: the case used by the caller must not
-        // decide the fate of their account pool.
-        for name in ["Idempotency-Key", "idempotency-key", "IDEMPOTENCY-KEY"] {
-            let mut h = HeaderMap::new();
-            h.insert(name, "key-of-test-1".parse().unwrap());
-            assert_eq!(
-                extract_idempotency_key(&h).unwrap(),
-                "key-of-test-1",
-                "header not recognised under the case {name}"
-            );
-        }
-
-        let mut h = HeaderMap::new();
-        h.insert(IDEMPOTENCY_HEADER, "short".parse().unwrap());
-        assert!(
-            extract_idempotency_key(&h).is_err(),
-            "a present but invalid key must be refused, not ignored"
-        );
-    }
-
     // -----------------------------------------------------------------------
     // Scaffolding: a real migrated SQLite database, and an in-process fake
     // homeserver that COUNTS its account registrations.
@@ -897,7 +736,7 @@ mod tests {
         let mut headers = HeaderMap::new();
         headers.insert("authorization", format!("Bearer {caller}").parse().unwrap());
         if let Some(c) = key {
-            headers.insert(IDEMPOTENCY_HEADER, c.parse().unwrap());
+            headers.insert(idempotency::HEADER, c.parse().unwrap());
         }
         create(
             State(st.clone()),
@@ -1057,7 +896,7 @@ mod tests {
     #[sqlx::test(migrations = "./migrations")]
     async fn missing_or_bad_key_creates_nothing(pool: SqlitePool) {
         let (st, fake) = mount(pool.clone(), 100).await;
-        let too_long = "k".repeat(IDEMPOTENCY_KEY_MAX + 1);
+        let too_long = "k".repeat(idempotency::KEY_MAX + 1);
 
         for key in [
             None,

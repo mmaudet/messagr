@@ -265,8 +265,20 @@ describe('what a report carries (#468)', () => {
     expect(reportable(new Set(['$h2', '$h1']), held, ME)).toEqual({
       author: HER,
       messages: [
-        { eventId: '$h1', sentAt: 1000, sender: HER, text: 'salut' },
-        { eventId: '$h2', sentAt: 2000, sender: HER, text: 'encore' },
+        {
+          kind: 'text',
+          eventId: '$h1',
+          sentAt: 1000,
+          sender: HER,
+          text: 'salut',
+        },
+        {
+          kind: 'text',
+          eventId: '$h2',
+          sentAt: 2000,
+          sender: HER,
+          text: 'encore',
+        },
       ],
     })
   })
@@ -292,27 +304,163 @@ describe('what a report carries (#468)', () => {
     expect(reportable(new Set(['$m1', '$h1']), held, ME)).toBeNull()
   })
 
-  it('carries nothing but words: a video, a voice message, a place, a sticker, a photograph or a document', () => {
-    // Photographs and documents are #471's; the others are not carried at
-    // all, and a selection holding one is not a report rather than a report
-    // quietly missing it.
+  /**
+   * The key material of an encrypted file, as `readImageEvent` and
+   * `readFileEvent` hand it on: the event's `file` without its address.
+   */
+  const MATERIAL = {
+    v: 'v2',
+    key: {
+      kty: 'oct',
+      key_ops: ['encrypt', 'decrypt'],
+      alg: 'A256CTR',
+      k: 'qcHVMSgYg-71CauWBezXI5qkaRb0LuIy-Wx5kIaHMIA',
+      ext: true,
+    },
+    iv: 'X85+XgHN+HEAAAAAAAAAAA',
+    hashes: { sha256: 'eZjVdFJp2cSnZjB2S2BWrPCtbWRXjt0ZRkAyXvqSFw8' },
+  }
+
+  /** A photograph this device read, as the conversation holds it. */
+  function photographed(
+    eventId: string,
+    sender: string,
+    sentAt: number,
+    secret = JSON.stringify(MATERIAL),
+  ): TimelineEntry {
+    return {
+      eventId,
+      claimedSender: sender,
+      sentAt,
+      body: 'image.jpg',
+      msgtype: 'm.image',
+      image: {
+        url: `mxc://x/photo-${eventId.slice(1)}`,
+        secret,
+        mimeType: 'image/jpeg',
+        width: 800,
+        height: 600,
+        size: 482_113,
+        thumbnail: {
+          url: 'mxc://x/thumbnail',
+          secret: '{"other":"key"}',
+          mimeType: 'image/jpeg',
+          width: 80,
+          height: 60,
+        },
+      },
+    }
+  }
+
+  /** A document this device read, as the conversation holds it. */
+  function filed(
+    eventId: string,
+    sender: string,
+    sentAt: number,
+    secret = JSON.stringify(MATERIAL),
+  ): TimelineEntry {
+    return {
+      eventId,
+      claimedSender: sender,
+      sentAt,
+      body: 'contrat.pdf',
+      msgtype: 'm.file',
+      document: {
+        url: `mxc://x/file-${eventId.slice(1)}`,
+        secret,
+        name: 'contrat.pdf',
+        mimeType: null,
+        size: 10_240,
+      },
+    }
+  }
+
+  it('carries photographs and documents of the one other participant beside their words, each as the description of its encrypted file (#471)', () => {
+    // #462: « Signaler » on a selection that mixes words, photographs and
+    // documents of one other participant. A file goes as the address of its
+    // encrypted copy on the server, its key, its counter, its hashes, its
+    // type, its name and its size: never its bytes, and never the key of
+    // its thumbnail, which the operator does not need.
+    const held = [
+      HERS_FIRST,
+      photographed('$p', HER, 1500),
+      MY_WORDS,
+      filed('$d', HER, 1800),
+      HERS_THEN,
+    ]
+
+    expect(
+      reportable(new Set(['$h2', '$d', '$p', '$h1']), held, ME)?.messages,
+    ).toEqual([
+      {
+        kind: 'text',
+        eventId: '$h1',
+        sentAt: 1000,
+        sender: HER,
+        text: 'salut',
+      },
+      {
+        kind: 'photograph',
+        eventId: '$p',
+        sentAt: 1500,
+        sender: HER,
+        file: { ...MATERIAL, url: 'mxc://x/photo-p' },
+        mimetype: 'image/jpeg',
+        name: 'image.jpg',
+        size: 482_113,
+      },
+      {
+        kind: 'document',
+        eventId: '$d',
+        sentAt: 1800,
+        sender: HER,
+        file: { ...MATERIAL, url: 'mxc://x/file-d' },
+        mimetype: null,
+        name: 'contrat.pdf',
+        size: 10_240,
+      },
+      {
+        kind: 'text',
+        eventId: '$h2',
+        sentAt: 2000,
+        sender: HER,
+        text: 'encore',
+      },
+    ])
+  })
+
+  it('carries nothing for a photograph or a document of somebody else, or of this account', () => {
+    const held = [
+      HERS_FIRST,
+      photographed('$p', '@him:x', 1500),
+      filed('$d', ME, 1800),
+    ]
+    expect(reportable(new Set(['$h1', '$p']), held, ME)).toBeNull()
+    expect(reportable(new Set(['$h1', '$d']), held, ME)).toBeNull()
+    expect(reportable(new Set(['$d']), held, ME)).toBeNull()
+  })
+
+  it('carries nothing for a photograph or a document whose encrypted file this device cannot describe', () => {
+    // The operator could not open it: a report without it would be a report
+    // quietly missing what was chosen.
+    const held = [
+      photographed('$p', HER, 1, 'not JSON'),
+      filed('$d', HER, 2, JSON.stringify({ ...MATERIAL, key: {} })),
+      photographed('$q', HER, 3, JSON.stringify({ ...MATERIAL, hashes: {} })),
+    ]
+    for (const eventId of ['$p', '$d', '$q']) {
+      expect(reportable(new Set([eventId]), held, ME), eventId).toBeNull()
+    }
+  })
+
+  it('carries nothing of a video, a voice message, a place or a sticker', () => {
+    // Not carried at all, and a selection holding one is not a report
+    // rather than a report quietly missing it.
     const sticker: TimelineEntry = {
       eventId: '$s',
       claimedSender: HER,
       sentAt: 5,
       body: 'un chat',
-    }
-    const photograph: TimelineEntry = {
-      ...shown('$p', HER),
-      msgtype: 'm.image',
-    }
-    const document: TimelineEntry = {
-      eventId: '$d',
-      claimedSender: HER,
-      sentAt: 7,
-      body: 'contrat.pdf',
-      msgtype: 'm.file',
-      document: {} as TimelineEntry['document'],
     }
     const held = [
       HERS_FIRST,
@@ -320,10 +468,8 @@ describe('what a report carries (#468)', () => {
       wrote('$a', HER, 3, 'voix.ogg', 'm.audio'),
       wrote('$l', HER, 4, 'Ici', 'm.location'),
       sticker,
-      photograph,
-      document,
     ]
-    for (const other of ['$v', '$a', '$l', '$s', '$p', '$d']) {
+    for (const other of ['$v', '$a', '$l', '$s']) {
       expect(reportable(new Set([other]), held, ME), other).toBeNull()
       expect(reportable(new Set(['$h1', other]), held, ME), other).toBeNull()
     }
