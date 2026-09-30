@@ -6,7 +6,7 @@
     <title>Politique de confidentialité — Messagr</title>
     <meta
       name="description"
-      content="Ce que Messagr ne vous demande pas, ce que le service ne peut pas lire, et ce que le serveur voit malgré tout." />
+      content="Ce que Messagr ne vous demande pas, ce que le service ne peut pas lire, ce que le serveur voit malgré tout, et ce que signaler et bloquer révèlent." />
     <style>
       :root {
         --ground: #f7f5ef;
@@ -183,9 +183,10 @@
       <h1>Politique de confidentialité</h1>
       <p class="lead">
         Ce que Messagr ne vous demande pas, ce que le service ne peut pas lire,
-        et ce que le serveur voit malgré tout.
+        ce que le serveur voit malgré tout, et ce que signaler et bloquer
+        révèlent.
       </p>
-      <p class="stamp">Version du 26 septembre 2026</p>
+      <p class="stamp">Version du <time datetime="2026-09-30">30 septembre 2026</time></p>
       <!-- a-venir -->
 
       <!-- #412 : l'annonce de la version à venir. `build-site.sh` retire ce
@@ -201,6 +202,65 @@
       </div>
       <!-- /a-venir -->
 
+      <div class="card">
+        <!-- depuis -->
+        <!-- #467 : cette version s'applique le jour où elle est publiée, avant
+             qu'une build qui signale soit disponible : celle qu'elle remplace
+             annonce un changement avant de l'appliquer, et ce qu'elle décrit
+             ne commence qu'avec cette build. `version-a-venir.mjs publier`
+             écrit ce jour à la place de la marque, ici et en tête, et range
+             la version remplacée à son adresse datée. -->
+        <p>
+          <b>Cette version s'applique depuis le <time datetime="2026-09-30">30 septembre 2026</time>.</b>
+          La
+          <a href="/confidentialite/jusqu-au-2026-09-30/"
+            >version qu'elle remplace</a
+          >
+          reste lisible. Elle paraît avant la version de l'application qui
+          permet de signaler des messages à l'exploitant et de bloquer un
+          compte depuis une conversation&nbsp;: ce qu'elle ajoute ne commence
+          qu'avec celle-ci.
+        </p>
+        <p>Ce qui a changé&nbsp;:</p>
+        <!-- /depuis -->
+        <ul>
+          <li>
+            une section nouvelle, «&nbsp;Signaler et bloquer&nbsp;»&nbsp;: ce
+            qu'un signalement transmet, scellé pour l'exploitant seul, ce que
+            le service en garde et ce qu'il n'en apprend jamais, ce qu'un
+            blocage laisse savoir, les SMS qui préviennent l'exploitant, et
+            combien de temps chacun est gardé&nbsp;;
+          </li>
+          <li>
+            «&nbsp;Qui traite vos données&nbsp;» dit qui est l'exploitant&nbsp;;
+          </li>
+          <li>
+            «&nbsp;Ce que le service ne peut pas lire&nbsp;» dit ce qui parvient
+            lisible à l'exploitant, et à lui seul&nbsp;: ce qu'une personne
+            choisit de signaler&nbsp;;
+          </li>
+          <li>
+            «&nbsp;Ce qui reste sur votre appareil&nbsp;» dit tout ce que garde
+            le carnet chiffré de l'application, que la version qu'elle remplace
+            taisait, dont le dernier message de chaque conversation, et ce
+            qu'un blocage y laisse&nbsp;: la liste des comptes bloqués, et un
+            blocage que le service n'a pas encore reçu&nbsp;;
+          </li>
+          <li>
+            OVHcloud rejoint «&nbsp;Où vos données sont traitées&nbsp;», pour
+            les SMS de l'exploitant&nbsp;;
+          </li>
+          <li>
+            «&nbsp;Combien de temps&nbsp;» gagne les durées d'un signalement et
+            d'un blocage&nbsp;;
+          </li>
+          <li>
+            «&nbsp;Vos droits&nbsp;» dit ce qu'une demande d'accès couvre
+            désormais.
+          </li>
+        </ul>
+      </div>
+
       <h2>Qui traite vos données</h2>
       <p>
         Messagr est exploité par <b>RV Myriagone Holding</b>, dont le siège est
@@ -214,6 +274,12 @@
         RV Myriagone Holding est le responsable de ce traitement au sens du
         règlement (UE) 2016/679. Point de contact&nbsp;:
         <a href="mailto:conformite@messagr.eu">conformite@messagr.eu</a>.
+      </p>
+      <p>
+        Dans cette politique, «&nbsp;nous&nbsp;» désigne RV Myriagone Holding,
+        et «&nbsp;l'exploitant&nbsp;» aussi&nbsp;: c'est le nom que
+        l'application et les conditions générales lui donnent quand il reçoit
+        un signalement.
       </p>
 
       <h2>Ce que Messagr ne vous demande pas</h2>
@@ -267,7 +333,8 @@
       <p>
         Le contenu de vos conversations est chiffré de bout en bout&nbsp;: il
         est chiffré sur l'appareil qui l'écrit et déchiffré sur celui qui le
-        lit. Les clés ne quittent jamais les appareils.
+        lit. Les clés ne quittent jamais les appareils, à une seule exception,
+        décrite plus bas.
       </p>
       <div class="invite">
         <b
@@ -276,8 +343,23 @@
         >
         Le serveur ne détient pas les clés&nbsp;: il ne peut pas lire vos
         messages, pas davantage sur réquisition que de sa propre initiative, et
-        nous ne pourrions pas les produire si on nous les demandait.
+        nous ne pourrions pas les produire si on nous les demandait, hors ce
+        qu'une personne nous a signalé.
       </div>
+      <!-- #467, ADR 0015 : un signalement est le seul chemin par lequel un
+           contenu lisible parvient à l'exploitant, et ce qu'il lit d'une
+           conversation n'est jamais plus que ce qu'un signalement porte. -->
+      <p>
+        <b>Une seule exception&nbsp;: ce qu'une personne choisit de
+        signaler.</b> Quelqu'un qui reçoit un message peut le signaler à
+        l'exploitant&nbsp;: son téléphone le lui transmet alors, avec la clé
+        d'une photo ou d'un document signalé, scellé pour que l'exploitant seul
+        puisse l'ouvrir, sur sa machine, et non le serveur. C'est le seul
+        chemin par lequel un contenu lisible parvient à l'exploitant, et il ne
+        lit jamais d'une conversation que ce qu'un signalement porte. La
+        section «&nbsp;Signaler et bloquer&nbsp;», plus bas, dit ce qui part,
+        pour qui, et combien de temps un signalement est gardé.
+      </p>
 
       <h2>Ce que le serveur voit malgré tout</h2>
       <p>
@@ -311,6 +393,126 @@
         ne servent à aucun autre usage que l'acheminement.
       </p>
 
+      <h2>Signaler et bloquer</h2>
+      <!-- #467, ADR 0015 : chaque durée de cette section est déclarée dans
+           `deploy/messagr-eu/retention.json`, avec sa phrase exacte, et
+           `scripts/assert-retention.sh` vérifie que la politique en vigueur
+           la dit. Le numéro de signalement et la clé de l'exploitant sont
+           ceux du glossaire, section « Moderation ». -->
+      <p>
+        Rien de cette section n'arrive sans un geste&nbsp;: signaler et bloquer
+        se font dans une conversation, par la personne qui reçoit les messages,
+        et l'application dit, avant, ce que chacun fait.
+      </p>
+      <p>
+        <b>Signaler, c'est transmettre à l'exploitant ce que vous avez
+        reçu.</b> Vous sélectionnez des messages d'une même personne, puis
+        «&nbsp;Signaler&nbsp;», et vous choisissez un motif parmi ce que les
+        <a href="/conditions-generales">conditions générales</a> interdisent.
+        Avant l'envoi, l'application dit exactement ce qui part, et nomme le
+        compte au nom duquel il part&nbsp;:
+      </p>
+      <ul>
+        <li>
+          les messages choisis, tels que vous les lisez, avec leur auteur et
+          leur heure&nbsp;;
+        </li>
+        <li>
+          les identifiants qui les désignent sur le serveur, eux et la
+          conversation où ils ont été écrits, pour que l'exploitant puisse les
+          retirer&nbsp;;
+        </li>
+        <li>
+          pour une photo ou un document, l'adresse de sa copie chiffrée, qui
+          est déjà sur le serveur, la clé qui l'ouvre, son nom, son type et sa
+          taille, et pour une photo qui en a une, l'adresse, la clé et le type
+          de sa vignette, la petite image que la conversation affiche&nbsp;:
+          rien n'est envoyé de nouveau, et l'exploitant ne déchiffre ces
+          fichiers que pour les voir, sans en garder de copie&nbsp;;
+        </li>
+        <li>
+          votre compte, le motif que vous avez choisi, et l'heure du
+          signalement.
+        </li>
+      </ul>
+      <p>
+        Rien d'autre de la conversation ne part. Votre téléphone assemble le
+        signalement en mémoire, sans rien en écrire sur le disque, et n'en
+        garde rien&nbsp;: le numéro de signalement s'affiche, pour que vous
+        puissiez le citer.
+      </p>
+      <p>
+        <b>Seul l'exploitant peut l'ouvrir.</b> Avant de partir, le signalement
+        est scellé sur votre téléphone pour la clé de l'exploitant&nbsp;: sa
+        moitié publique est dans l'application, et sa moitié privée n'existe
+        que sur la machine de l'exploitant, avec une seule copie chiffrée hors
+        ligne, jamais sur le serveur. Le service qui reçoit le signalement
+        le garde sans pouvoir l'ouvrir. L'exploitant l'ouvre sur sa machine,
+        sans rien y enregistrer de ce qu'il lit.
+      </p>
+      <p>
+        <b>Ce que le service garde, et ce qu'il n'apprend jamais.</b> Il garde
+        le numéro de signalement, votre compte, le motif, le signalement
+        scellé, l'heure où il l'a reçu, et une clé que votre téléphone tire au
+        hasard pour qu'un même signalement envoyé deux fois ne compte qu'une
+        fois. Puis il garde la décision de l'exploitant, sa motivation et ses
+        dates, sans nommer le compte visé ni recopier ce qui a été dit&nbsp;:
+        le signalement est sans suite, ou la suspension de son auteur est
+        levée, ou elle est confirmée, et son compte fermé. Il n'apprend ni le
+        compte que vous signalez, ni la conversation, ni ce qui a été
+        écrit&nbsp;: tout cela reste dans le signalement scellé. Si vous
+        bloquez aussi ce compte, le service, qui apprend ce blocage, peut le
+        rapprocher de votre signalement. Et quand un signalement mène à fermer
+        un compte, les dates de la décision et de la fermeture peuvent
+        permettre, à qui détient une copie de la base, de rapprocher les deux.
+        Signaler ne prévient que l'exploitant&nbsp;: le compte signalé n'en
+        est pas averti, et l'exploitant ne lui dit pas qui l'a signalé.
+      </p>
+      <p>
+        <b>Combien de temps un signalement est gardé.</b> Son contenu,
+        c'est-à-dire le signalement scellé, est effacé six mois après la
+        décision de l'exploitant, avec la clé tirée par votre téléphone. Le
+        reste, c'est-à-dire le numéro, votre compte, le motif, la décision, sa
+        motivation et les dates, est effacé douze mois après la décision.
+        Un signalement transmis aux autorités fait exception&nbsp;: il est
+        gardé, contenu compris, tant qu'elles en ont besoin.
+      </p>
+      <p>
+        <b>Bloquer.</b> Bloquer un compte depuis une conversation fait que plus
+        rien de ce qu'il envoie ne vous parvient, que ce qu'il a déjà écrit
+        disparaît de vos écrans, et qu'il ne peut plus vous inviter. Il n'en
+        est pas averti, et un blocage ne se lève pas. Pour cela, il est gardé
+        à deux endroits&nbsp;:
+      </p>
+      <ul>
+        <li>
+          le serveur de messagerie garde, dans les données de votre compte, la
+          liste des comptes que vous avez bloqués, pour ne plus vous livrer ce
+          qu'ils envoient, tant que votre compte existe&nbsp;;
+        </li>
+        <li>
+          le service d'invitations garde qui a bloqué qui, et à quelle date,
+          tant que vos deux comptes existent.
+        </li>
+      </ul>
+      <p>
+        L'exploitant apprend ainsi qui a bloqué qui, jamais ce qui a été dit.
+      </p>
+      <p>
+        <b>Les SMS qui préviennent l'exploitant.</b> Pour que l'exploitant lise
+        un signalement dans les vingt-quatre heures que les conditions
+        générales promettent, il est prévenu par SMS des signalements reçus,
+        et, une fois par jour, du nombre de blocages faits depuis le dernier
+        décompte. Ces SMS ne portent ni contenu ni identifiant de
+        compte&nbsp;: les numéros des signalements et leurs motifs, ou un
+        nombre de blocages. OVHcloud les envoie à son numéro, pour le compte de
+        l'exploitant&nbsp;: OVH SAS, 2 rue Kellermann, 59100 Roubaix, en
+        France, est son sous-traitant pour cet envoi. Le service demande à
+        OVHcloud d'effacer chaque SMS de son historique un jour après son
+        envoi, puis chaque heure pendant un jour s'il ne l'y trouve pas
+        encore.
+      </p>
+
       <h2>Ce qui reste sur votre appareil</h2>
       <ul>
         <li>
@@ -331,11 +533,94 @@
           pas pu être activées. Elles ne portent ni contenu ni identifiant, et
           l'application ne les envoie nulle part&nbsp;;
         </li>
+        <!-- #496, décision du porteur du 30 septembre 2026 : le carnet chiffré
+             de l'application (`packages/app/src/runtime/notebook.ts`,
+             ADR 0010), un fichier de l'appareil sous une seconde phrase de
+             passe, tirée sur l'appareil et gardée dans le trousseau, jamais
+             celle du magasin de clés, et effacé quand l'appareil quitte le
+             compte (`leavingThisDevice.ts`). Chaque puce en dit une page,
+             telle que son code l'écrit : les noms donnés
+             (`givenNameStore.ts`) ; la liste des conversations
+             (`listCacheStore.ts`, l'amendement du 8 septembre 2026 de
+             l'ADR 0006), dont le dernier message n'est pas coupé
+             (`conversationList.ts`, `saidIn`) ; les derniers évènements d'une
+             conversation ouverte ici, tels que le serveur les envoie, chiffrés
+             ou non (`eventCacheStore.ts`, `eventsToBuildFrom.ts`) ; les
+             marques de lecture (`lastReadStore.ts`, `readByStore.ts`) ; les
+             appels (`callLogStore.ts`) ; les messages masqués et les favoris,
+             par leur identifiant (`hiddenStore.ts`, `favouriteStore.ts`) ;
+             les liens émis ici (`outstandingStore.ts`) ; la liste des comptes
+             ignorés (`ignoredListStore.ts`) et les blocages que le service
+             n'a pas encore reçus (`untoldBlocksStore.ts`), #467, #469. Les
+             pages de la découverte restent vides tant qu'elle est éteinte.
+             Une page nouvelle, c'est une puce nouvelle. -->
+        <li>
+          le carnet de l'application, un fichier chiffré par une seconde phrase
+          de passe aléatoire, tirée sur l'appareil et gardée dans ce même
+          trousseau, et effacé quand cet appareil quitte votre compte. Il
+          tient&nbsp;:
+          <ul>
+            <li>les noms que vous donnez aux personnes&nbsp;;</li>
+            <li>
+              la liste de vos conversations, telle qu'elle s'est affichée en
+              dernier, pour qu'elle s'affiche dès le lancement&nbsp;: pour
+              chacune, qui y participe ou l'a quittée, l'heure de son dernier
+              message et qui l'a écrit, le nombre de messages non lus, et
+              <b>le dernier message que l'appareil a pu lire, en entier</b>, ou,
+              pour une photo ou un document, le texte qui le décrit, jamais le
+              fichier&nbsp;;
+            </li>
+            <li>
+              les derniers messages de chaque conversation que vous avez ouverte
+              sur cet appareil, pour la rouvrir sans réseau, tels que le serveur
+              de messagerie les a envoyés&nbsp;: chiffrés, avec qui les a écrits
+              et quand, et avec ce que le serveur transmet en clair, comme qui
+              est entré dans la conversation ou l'a quittée&nbsp;;
+            </li>
+            <li>
+              jusqu'où vous avez lu chaque conversation sur cet appareil, et
+              jusqu'où l'a lue, au plus loin, quelqu'un d'autre qui y
+              participe&nbsp;;
+            </li>
+            <li>
+              vos appels&nbsp;: avec qui, quand, dans quel sens, en vidéo ou
+              non, comment ils ont fini et combien de temps ils ont duré&nbsp;;
+            </li>
+            <li>
+              les messages que vous avez masqués «&nbsp;pour moi&nbsp;» et ceux
+              que vous gardez en favoris, par leur identifiant, avec leur
+              conversation et l'heure du geste, sans copie de ce qu'ils
+              disent&nbsp;;
+            </li>
+            <li>
+              les liens d'invitation créés sur cet appareil, avec le nom que
+              vous avez donné à qui viendrait, jusqu'à ce que la personne
+              invitée soit entrée dans la conversation ou que le lien ait
+              expiré&nbsp;;
+            </li>
+            <li>
+              si vous avez bloqué des comptes, leur liste, telle que le serveur
+              de messagerie l'a dite en dernier, pour que ce qu'ils ont écrit
+              reste caché dès le lancement&nbsp;;
+            </li>
+            <li>
+              si un blocage n'a pas encore pu être dit au service
+              d'invitations, le compte bloqué et l'heure du blocage, jusqu'à ce
+              que le service l'ait reçu&nbsp;;
+            </li>
+          </ul>
+        </li>
         <li>
           rien d'autre.
-          <b>Les messages déchiffrés ne sont pas écrits sur le disque</b>&nbsp;:
-          la conversation est reconstruite à chaque ouverture depuis le chiffré,
-          puis oubliée.
+          <b
+            >Hors du dernier message de chaque conversation, que le carnet garde
+            pour la liste, aucun message déchiffré n'est écrit sur le
+            disque</b
+          >&nbsp;: une conversation est reconstruite à chaque ouverture depuis
+          le chiffré, puis oubliée. Une photo ou un document que vous
+          enregistrez, d'un geste ou parce que vous avez choisi d'enregistrer
+          les photos reçues, va là où vous l'enregistrez, et sort alors de
+          Messagr.
         </li>
       </ul>
 
@@ -437,7 +722,12 @@
       <h2>Où vos données sont traitées</h2>
       <p>
         Le serveur est hébergé par Hetzner Online GmbH, à Helsinki, en Finlande,
-        au sein de l'Union européenne.
+        au sein de l'Union européenne. Un signalement y est gardé scellé, et ne
+        s'ouvre que sur la machine de l'exploitant.
+      </p>
+      <p>
+        Les SMS qui préviennent l'exploitant sont envoyés par OVHcloud, en
+        France.
       </p>
       <p>
         Une exception&nbsp;: le signal qui réveille votre téléphone, décrit plus
@@ -504,6 +794,18 @@
         conservé tant que l'examen dure. Une invitation non dépensée, elle,
         expire d'elle-même et ne vaut alors plus rien.
       </p>
+      <p>
+        <b>Ce que laissent un signalement et un blocage a ses propres
+        durées</b>, dites dans «&nbsp;Signaler et bloquer&nbsp;»&nbsp;: le
+        contenu d'un signalement et la clé tirée par votre téléphone, six
+        mois après la décision de l'exploitant&nbsp;; le reste, dont ce qui a
+        été décidé, douze mois après la décision&nbsp;; un signalement transmis aux autorités, tant
+        qu'elles en ont besoin&nbsp;; qui a bloqué qui, au service
+        d'invitations, tant que vos deux comptes existent, et la liste des
+        comptes que vous avez bloqués, au serveur de messagerie, tant que votre
+        compte existe&nbsp;; un SMS qui prévient l'exploitant, jusqu'à ce
+        qu'OVHcloud l'efface de son historique.
+      </p>
 
       <h2>Ce que l'effacement peut, et ce qu'il ne peut pas</h2>
       <div class="invite">
@@ -534,9 +836,10 @@
       <div class="invite">
         <b>Une limite qu'il faut connaître avant de nous écrire.</b> Nous ne
         pouvons pas vous restituer le contenu de vos messages, parce que nous ne
-        l'avons jamais eu en clair. Une demande d'accès ou de portabilité
-        portera sur les métadonnées décrites plus haut, et sur elles seules. Le
-        contenu, lui, est déjà chez vous.
+        l'avons jamais eu en clair, hors ce qu'un signalement nous a transmis.
+        Une demande d'accès ou de portabilité portera sur les métadonnées
+        décrites plus haut et sur ce que nous gardons d'un signalement qui vous
+        concerne, et sur eux seuls. Le contenu, lui, est déjà chez vous.
       </div>
       <p>
         Vous pouvez introduire une réclamation auprès de la Commission nationale
