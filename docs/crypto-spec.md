@@ -190,7 +190,7 @@ A real private-contact-discovery protocol is required if address-book discovery 
 The protocol retained is ADR 0014: matches are made on the device, against numbers their holders have proved. Its guarantee:
 
 - the service learns the number of every findable account, which the SMS provider sees too; it keeps it only masked, but it holds the key and could recover it from what it keeps;
-- it learns how many numbers each proven number had masked, a count kept with the masked number for 30 days after that number leaves discovery;
+- it learns how many numbers each proven number had masked, a count kept with the masked number for at most 30 days after that number leaves discovery;
 - it learns who invites whom, at the moment an invitation leaves;
 - it never learns the numbers in anybody's address book, in clear or hashed, who is looking for whom, whether a search found anybody, or the name an inviter gives themselves in an invitation delivered inside Messagr.
 

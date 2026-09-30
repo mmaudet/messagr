@@ -39,6 +39,15 @@ pub struct AppState {
     pub cfg: config::Config,
 }
 
+/// The flag of every mode of the binary: the gestures on reports, the
+/// retirement of a masking key, the named deactivation. What the argument
+/// guard counts as known (`operator::known_arguments`).
+fn the_modes() -> Vec<&'static str> {
+    moderation::flags()
+        .chain([retire_key::THE_FLAG, named_deactivation::THE_FLAG])
+        .collect()
+}
+
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
     let argv: Vec<String> = std::env::args().collect();
@@ -46,10 +55,8 @@ async fn main() -> anyhow::Result<()> {
     // started (#473): the service takes none, and starting it for a mistyped
     // flag would run its sweeper and pour its log into whatever the operator
     // piped the mode into.
-    let modes: Vec<&str> = moderation::flags()
-        .chain([retire_key::THE_FLAG, named_deactivation::THE_FLAG])
-        .collect();
-    operator::known_arguments(&argv, &modes).map_err(|refusal| anyhow::anyhow!("{refusal}"))?;
+    operator::known_arguments(&argv, &the_modes())
+        .map_err(|refusal| anyhow::anyhow!("{refusal}"))?;
     // THE OPERATOR'S GESTURES ON REPORTS (#473): a command line that names
     // one badly is refused here too, before anything is read.
     let gesture = moderation::the_gesture(&argv)
@@ -190,10 +197,11 @@ async fn main() -> anyhow::Result<()> {
 /// Prints the plan and reads one line back. THE ONLY caller of stdin in this
 /// binary, and it is deliberately trivial: everything worth testing about the
 /// confirmation lives in functions that take the answer as a value.
-/// `operator::typed_back` confirms the named deactivation, the retirement of
-/// a key and the record of a termination, exactly; `moderation`'s
-/// `is_the_number` confirms the other gestures on a report (#473), in any
-/// spelling a report number is typed in.
+/// `operator::typed_back` confirms the named deactivation and the retirement
+/// of a key, exactly, case included. `moderation`'s `is_the_number` and
+/// `is_the_account` confirm the gestures on reports (#473): a report number
+/// in any spelling it is typed in, an account in any case, as the homeserver
+/// reads it.
 ///
 /// End of stdin gives `None`, which is a refusal — so a cron entry, a pipeline
 /// or a pasted runbook finds no way through.
@@ -372,6 +380,72 @@ async fn method_not_allowed() -> Response {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// Every flag `deploy/messagr-eu-invitations.md` writes after
+    /// `docker compose run --rm [-T] invitations`, as the operator types it.
+    fn the_flags_the_guide_documents() -> Vec<String> {
+        include_str!("../../../deploy/messagr-eu-invitations.md")
+            .lines()
+            .filter(|line| line.contains("compose run"))
+            .filter_map(|line| {
+                let words: Vec<&str> = line.split_whitespace().collect();
+                let after = words.iter().position(|word| *word == "invitations")? + 1;
+                let flag = words.get(after)?.trim_matches(|c| "`'\"".contains(c));
+                flag.starts_with("--").then(|| flag.to_string())
+            })
+            .collect()
+    }
+
+    /// THE ARGUMENT GUARD LETS EVERY MODE THROUGH (#473). The older modes, and
+    /// every flag the production guide tells the operator to type: a flag the
+    /// guard refused as unknown would leave a documented mode that no longer
+    /// runs, and the operator would find out on the host.
+    #[test]
+    fn every_mode_and_every_flag_the_guide_documents_passes_the_argument_guard() {
+        let modes = the_modes();
+        let line = |words: &[&str]| -> Vec<String> {
+            std::iter::once("messagr-invitations")
+                .chain(words.iter().copied())
+                .map(String::from)
+                .collect()
+        };
+        for words in [
+            vec!["--retire-masking-key", "3"],
+            vec!["--deactivate-claimed", "@x7qf2k9j:messagr.eu"],
+            vec!["--reports"],
+            vec!["--reports", "K7QM-4ZT2"],
+            vec!["--export-report", "K7QM-4ZT2"],
+            vec!["--decide-report", "K7QM-4ZT2", "lifted", "Une motivation."],
+            vec!["--hold-report", "K7QM-4ZT2"],
+            vec!["--release-report", "K7QM-4ZT2"],
+            vec!["--record-termination", "@bob:messagr.eu"],
+        ] {
+            assert_eq!(
+                operator::known_arguments(&line(&words), &modes),
+                Ok(()),
+                "{words:?}"
+            );
+        }
+
+        let documented = the_flags_the_guide_documents();
+        for anchor in [
+            "--retire-masking-key",
+            "--export-report",
+            "--record-termination",
+        ] {
+            assert!(
+                documented.iter().any(|flag| flag == anchor),
+                "{anchor} is no longer found in the guide: {documented:?}"
+            );
+        }
+        for flag in &documented {
+            assert_eq!(
+                operator::known_arguments(&line(&[flag.as_str()]), &modes),
+                Ok(()),
+                "the guide documents {flag}, which the guard refuses"
+            );
+        }
+    }
 
     /// The deletion announcement is a route, and an authenticated one (#385).
     ///

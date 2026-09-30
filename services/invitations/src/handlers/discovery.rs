@@ -527,25 +527,34 @@ pub async fn withdraw_number(
 ) -> Result<axum::http::StatusCode, AppError> {
     let user = auth::authenticate(&st.mx, &headers).await?;
     let mut conn = st.pool.acquire().await.map_err(anyhow::Error::from)?;
-    withdraw_on(&mut conn, &user, st.cfg.clock.now()).await?;
+    let now = st.cfg.clock.now();
+    withdraw_on(&mut conn, &user, now, now).await?;
     Ok(axum::http::StatusCode::NO_CONTENT)
 }
 
 /// Takes `user`'s number out of discovery at once: its entry leaves the
-/// directory, and a proof in progress goes. Its mask and the count of numbers
-/// it had masked stay thirty days, as ADR 0014 says, so that a proof of the
-/// same number by any account meanwhile finds the count again. The
-/// withdrawal does it, and the deletion of the account (#410), inside its
+/// directory, and a proof in progress goes. Its mask stays at most thirty
+/// days after that (ADR 0014, amended on 30 September 2026), and the count of
+/// numbers it had masked goes by its own days, so that a proof of the same
+/// number by any account meanwhile finds the count again (`masking_quota`).
+/// The withdrawal does it, and the deletion of the account (#410), inside its
 /// own transaction.
+///
+/// `dated` is the date the withdrawal is written with: `now` for a
+/// withdrawal, the day of `now` for a deletion, which is dated by the day
+/// (#473). A proof that had already run out before `now` keeps its end.
 pub(crate) async fn withdraw_on(
     conn: &mut sqlx::SqliteConnection,
     user: &str,
     now: i64,
+    dated: i64,
 ) -> anyhow::Result<()> {
     sqlx::query(
-        "UPDATE findable_numbers SET withdrawn_at = ?1, expires_at = MIN(expires_at, ?1) \
-         WHERE user_id = ?2 AND withdrawn_at IS NULL",
+        "UPDATE findable_numbers SET withdrawn_at = ?1, \
+         expires_at = CASE WHEN expires_at > ?2 THEN ?1 ELSE expires_at END \
+         WHERE user_id = ?3 AND withdrawn_at IS NULL",
     )
+    .bind(dated)
     .bind(now)
     .bind(user)
     .execute(&mut *conn)

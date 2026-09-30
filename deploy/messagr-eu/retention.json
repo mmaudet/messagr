@@ -37,8 +37,8 @@
     "page": "/confidentialite/a-publier/"
   },
   "decouverte_empreinte": {
-    "$note": "L'empreinte masquée d'un numéro prouvé (#392, ADR 0014), jamais le numéro, et le compteur des numéros qu'il a fait masquer (#401). Gardés tant que le compte est trouvable, puis trente jours après la sortie : retrait, expiration, remplacement, clé retirée d'un coup, suppression du compte.",
-    "duree": "trente jours après que vous cessez d'être trouvable",
+    "$note": "L'empreinte masquée d'un numéro prouvé (#392, ADR 0014), jamais le numéro, et le compteur des numéros qu'il a fait masquer (#401). Gardés tant que le compte est trouvable, puis au plus trente jours après la sortie : retrait, expiration, remplacement, clé retirée d'un coup, suppression du compte, qui est datée au jour (#473) et laisse donc l'empreinte de vingt-neuf à trente jours ; le compteur va jour par jour, pour la fenêtre de la limite (#401).",
+    "duree": "au plus trente jours après que vous cessez d'être trouvable",
     "jours": 30,
     "page": "/confidentialite/a-venir/",
     "applique_par": [

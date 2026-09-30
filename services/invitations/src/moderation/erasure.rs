@@ -108,9 +108,9 @@ mod tests {
                 .unwrap();
 
         let content = applied(&retention, "signalements_contenu");
-        assert!(content.contains(named!(erase_sealed_reports)), "{content}");
+        assert!(names(&content, named!(erase_sealed_reports)), "{content}");
         let sealed_days = format!("{} = {SEALED_KEPT_DAYS} jours", named!(SEALED_KEPT_DAYS));
-        assert!(content.contains(&sealed_days), "{sealed_days}: {content}");
+        assert!(names(&content, &sealed_days), "{sealed_days}: {content}");
         assert_eq!(
             retention["signalements_contenu"]["duree"],
             "six mois après la décision"
@@ -118,19 +118,44 @@ mod tests {
 
         let decisions = applied(&retention, "signalements_decisions");
         assert!(
-            decisions.contains(named!(erase_decided_reports)),
+            names(&decisions, named!(erase_decided_reports)),
             "{decisions}"
         );
         let record_days = format!("{} = {RECORD_KEPT_DAYS} jours", named!(RECORD_KEPT_DAYS));
         assert!(
-            decisions.contains(&record_days),
+            names(&decisions, &record_days),
             "{record_days}: {decisions}"
         );
-        assert!(decisions.contains(named!(sweep)), "{decisions}");
+        assert!(names(&decisions, named!(sweep)), "{decisions}");
         assert_eq!(
             retention["signalements_decisions"]["duree"],
             "douze mois après la décision"
         );
+    }
+
+    /// Whether `text` names `name` whole: `sweep` in `moderation::sweep`, not
+    /// in `cleanup::sweep_once`, whose own name holds it.
+    fn names(text: &str, name: &str) -> bool {
+        let a_part_of_a_name = |c: Option<char>| c.is_some_and(|c| c.is_alphanumeric() || c == '_');
+        text.match_indices(name).any(|(at, _)| {
+            !a_part_of_a_name(text[..at].chars().next_back())
+                && !a_part_of_a_name(text[at + name.len()..].chars().next())
+        })
+    }
+
+    #[test]
+    fn a_name_is_found_whole_or_not_at_all() {
+        assert!(names("par moderation::sweep, puis", "sweep"));
+        assert!(!names("par cleanup::sweep_once", "sweep"));
+        assert!(!names("the_sweep", "sweep"));
+        assert!(names(
+            "SEALED_KEPT_DAYS = 181 jours",
+            "SEALED_KEPT_DAYS = 181 jours"
+        ));
+        assert!(!names(
+            "XSEALED_KEPT_DAYS = 181 jours",
+            "SEALED_KEPT_DAYS = 181 jours"
+        ));
     }
 
     /// `months` calendar months after a date, on the same day of the month,

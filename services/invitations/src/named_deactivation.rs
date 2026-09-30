@@ -117,10 +117,15 @@ pub enum Outcome {
 /// `--deactivate-claimed=@x:h` is a near miss on the flag; landing it in this
 /// mode with zero identifiers gets it REFUSED by name (refusal 1), whereas
 /// treating it as "not the flag" would start a second service instead.
+///
+/// FROM THE COMMAND LINE, A NEAR MISS OR AN OPTION NEVER GETS HERE: `main`
+/// refuses any argument no mode takes first (`operator::known_arguments`,
+/// #473). This mode still refuses them on its own, for whatever calls it.
 pub fn selects_the_named_deactivation(argv: &[String]) -> Option<Vec<String>> {
     // Everything that is not an option is a NAMED identifier. Options are left
-    // out on purpose: `--all`, `--yes`, `--force` must arrive at refusal 1 as
-    // ZERO identifiers, and be refused for naming nobody.
+    // out on purpose: `--all`, `--yes`, `--force`, were they to get here,
+    // would arrive at refusal 1 as ZERO identifiers, and be refused for
+    // naming nobody.
     crate::operator::named_after(argv, THE_FLAG)
 }
 
