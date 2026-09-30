@@ -17,7 +17,7 @@ import type { ReadDocument } from '../timeline/fileEvent'
 import type { ReadFile } from '../timeline/imageEvent'
 import { separatorsFor, type DayMark } from '../timeline/daySeparators'
 import { platesIn, type Plate as Grouping } from '../timeline/plates'
-import type { TimelineEntry } from '../timeline/mergeTimeline'
+import { saysUnencrypted, type TimelineEntry } from '../timeline/mergeTimeline'
 import type { ReactionTally } from '../timeline/reactions'
 import { EmojiPicker } from './EmojiPicker'
 import { Document } from './Document'
@@ -647,8 +647,10 @@ function Message({
           Outside it, so it reads as a note on the message rather than as
           part of what was written, and the words in it stay as they were.
           In words, which is how a state stays legible without a colour: the
-          grey is every caption's. */}
-      {entry.unencrypted === true && (
+          grey is every caption's. Never under a removal line: the rule is
+          `saysUnencrypted`'s, and the list and the notifications read it
+          too. */}
+      {saysUnencrypted(entry) && (
         <Text
           testID={`unencrypted-${entry.eventId}`}
           style={[styles.unencrypted, { color: palette.neutral['600'] }]}>

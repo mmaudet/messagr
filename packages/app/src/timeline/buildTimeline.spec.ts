@@ -5,6 +5,7 @@ import {
   toTimelineEntries,
   type TimelineMachine,
 } from './buildTimeline'
+import { mergeTimeline } from './mergeTimeline'
 
 /**
  * The messages alone. `toTimelineEntries` now returns reactions beside them
@@ -430,5 +431,162 @@ describe('toTimelineEntries', () => {
     ])
     expect(spy).not.toHaveBeenCalled()
     spy.mockRestore()
+  })
+})
+
+describe('a message that arrived unencrypted (#461)', () => {
+  const HER = '@her:messagr.eu'
+
+  /** A message as it was written, never encrypted. */
+  const inClear = (
+    id: string,
+    ts: number,
+    content: Record<string, unknown> = { msgtype: 'm.text', body: 'en clair' },
+  ) => ({
+    type: 'm.room.message',
+    event_id: id,
+    sender: HER,
+    origin_server_ts: ts,
+    content,
+  })
+
+  /**
+   * What the homeserver serves once an event is removed for everyone: its
+   * shell, type included, and the redaction, marked or not.
+   */
+  const removedShell = (event: object, kind?: 'message') => ({
+    ...event,
+    content: {},
+    unsigned: {
+      redacted_because: {
+        type: 'm.room.redaction',
+        ...(kind === undefined ? {} : { content: { 'eu.messagr.kind': kind } }),
+      },
+    },
+  })
+
+  /** Opens each event to the content and the inner type given for it. */
+  const opening = (
+    contents: Record<string, { type: string; content: object }>,
+  ): TimelineMachine => ({
+    decryptEvent: async (_scope, rawEvent) => {
+      const id = (rawEvent as { event_id: string }).event_id
+      const opened = contents[id]
+      if (opened === undefined) throw new Error('no session')
+      return {
+        eventType: opened.type,
+        ciphertext: encode(JSON.stringify(opened.content)),
+      }
+    },
+  })
+
+  it('leaves a line where it was removed, and nothing it said', async () => {
+    // Read again once the conversation is opened: the shell keeps its type,
+    // which says a message was there, whatever the redaction says.
+    const entries = await entriesOf(machine({}), decodeUtf8, '!room:m', [
+      removedShell(inClear('$p', 1000)),
+      removedShell(inClear('$q', 2000), 'message'),
+    ])
+
+    expect(entries).toEqual([
+      {
+        eventId: '$p',
+        claimedSender: HER,
+        sentAt: 1000,
+        body: null,
+        removed: true,
+      },
+      {
+        eventId: '$q',
+        claimedSender: HER,
+        sentAt: 2000,
+        body: null,
+        removed: true,
+      },
+    ])
+  })
+
+  it('gives way to that line in a conversation read again while open', async () => {
+    // What an open conversation does on each poll that touches it: it reads
+    // the room again and merges what it read into what it shows.
+    const shown = await entriesOf(machine({}), decodeUtf8, '!room:m', [
+      inClear('$p', 1000),
+    ])
+    const readAgain = await entriesOf(machine({}), decodeUtf8, '!room:m', [
+      removedShell(inClear('$p', 1000)),
+    ])
+
+    expect(mergeTimeline(shown, readAgain)).toEqual([
+      {
+        eventId: '$p',
+        claimedSender: HER,
+        sentAt: 1000,
+        body: null,
+        removed: true,
+      },
+    ])
+  })
+
+  it('marks a photograph that arrived unencrypted, and draws no photograph for it', async () => {
+    const entries = await entriesOf(
+      opening({
+        $sealed: {
+          type: 'm.room.message',
+          content: {
+            msgtype: 'm.image',
+            body: 'photo.jpg',
+            file: { url: 'mxc://messagr.eu/sealed', v: 'v2' },
+            info: { mimetype: 'image/jpeg', w: 4, h: 3 },
+          },
+        },
+      }),
+      decodeUtf8,
+      '!room:m',
+      [
+        encrypted('$sealed', 1000),
+        inClear('$open', 2000, {
+          msgtype: 'm.image',
+          body: 'photo.jpg',
+          url: 'mxc://messagr.eu/open',
+          info: { mimetype: 'image/jpeg', w: 4, h: 3 },
+        }),
+      ],
+    )
+
+    expect(
+      entries.map(entry => [
+        entry.eventId,
+        entry.unencrypted === true,
+        entry.image !== undefined,
+      ]),
+    ).toEqual([
+      ['$sealed', false, true],
+      ['$open', true, false],
+    ])
+  })
+
+  it('keeps the mark on a message somebody reacted to', async () => {
+    const { entries, reactions } = await toTimelineEntries(
+      opening({
+        $r: {
+          type: 'm.reaction',
+          content: {
+            'm.relates_to': {
+              rel_type: 'm.annotation',
+              event_id: '$p',
+              key: '👍',
+            },
+          },
+        },
+      }),
+      decodeUtf8,
+      '!room:m',
+      [inClear('$p', 1000), encrypted('$r', 2000, '@him:messagr.eu')],
+    )
+
+    expect(entries.map(entry => [entry.eventId, entry.unencrypted])).toEqual([
+      ['$p', true],
+    ])
+    expect(reactions.map(reaction => reaction.target)).toEqual(['$p'])
   })
 })

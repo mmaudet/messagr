@@ -1,7 +1,7 @@
 import { getErrorMessage } from '../runtime/errors'
 import { logEvent } from '../runtime/log'
 import type { HttpRequester } from '../runtime/pump'
-import type { TimelineEntry } from './mergeTimeline'
+import { asRemoved, type TimelineEntry } from './mergeTimeline'
 import { leavesALine } from './redactionKind'
 import { readFileEvent } from './fileEvent'
 import { readImageEvent } from './imageEvent'
@@ -133,6 +133,17 @@ export async function toTimelineEntries(
       typeof event.origin_server_ts === 'number' ? event.origin_server_ts : 0
 
     if (event.type === 'm.room.message') {
+      // REMOVED FOR EVERYONE, IT LEAVES THE LINE ANY MESSAGE LEAVES (#461).
+      // Its shell keeps its type, and the type says a message was here: no
+      // mark on the redaction is needed to tell it from a reaction, as one
+      // is for an `m.room.encrypted` below. Without this it had no body left
+      // and left nothing, when the conversation was opened again and while
+      // it was open.
+      if (isRedacted(event)) {
+        entries.push(asRemoved({ eventId, claimedSender: sender, sentAt }))
+        continue
+      }
+
       // Never encrypted, and said so. Refusing to show it would hide
       // something that was in the room; decrypting it would fail for a
       // reason that has nothing to do with what happened.
@@ -182,13 +193,7 @@ export async function toTimelineEntries(
       if (leavesALine(event)) {
         // No `reason`: nothing went wrong. A `body` of `null` with a reason
         // is a message whose key never arrived, and this is not that.
-        entries.push({
-          eventId,
-          claimedSender: sender,
-          sentAt,
-          body: null,
-          removed: true,
-        })
+        entries.push(asRemoved({ eventId, claimedSender: sender, sentAt }))
       }
       continue
     }

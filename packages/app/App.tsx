@@ -168,7 +168,11 @@ import {
   stroke,
   type as typeScale,
 } from './src/design/tokens'
-import { mergeTimeline, type TimelineEntry } from './src/timeline/mergeTimeline'
+import {
+  asRemoved,
+  mergeTimeline,
+  type TimelineEntry,
+} from './src/timeline/mergeTimeline'
 import { makePumpHttp } from './src/runtime/pump'
 import {
   fetchJoinedMembers,
@@ -4056,14 +4060,16 @@ export function App({
                   // `/messages` still served the copy from before the
                   // redaction, and the derivation dutifully brought it back.
                   //
-                  // The re-read below still runs and still wins, so nothing
-                  // here is a claim that outlives being wrong.
+                  // THE RE-READ BELOW CANNOT REDRAW THIS LINE: a removal wins
+                  // the merge, whichever arrives first (`mergeTimeline`). So
+                  // it is built here as the re-read builds it, `asRemoved`:
+                  // who and when, and nothing the message carried. A copy of
+                  // the entry kept its photograph, its document and the
+                  // mention that it was not encrypted under the line (#461).
                   if (openScopeRef.current !== scope) continue
                   setConversation(held =>
                     (held ?? []).map(entry =>
-                      entry.eventId === eventId
-                        ? { ...entry, body: null, removed: true }
-                        : entry,
+                      entry.eventId === eventId ? asRemoved(entry) : entry,
                     ),
                   )
                 }

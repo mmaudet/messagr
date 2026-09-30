@@ -1,6 +1,11 @@
 import { describe, expect, it } from 'vitest'
 
-import { mergeTimeline, type TimelineEntry } from './mergeTimeline'
+import {
+  asRemoved,
+  mergeTimeline,
+  saysUnencrypted,
+  type TimelineEntry,
+} from './mergeTimeline'
 
 function entry(over: Partial<TimelineEntry> = {}): TimelineEntry {
   return {
@@ -134,5 +139,51 @@ describe('a removal always wins', () => {
       { eventId: '$a', claimedSender: '@her:x', sentAt: 100, body: 'oups' },
     ])
     expect(merged[0]?.removed).toBe(true)
+  })
+})
+
+describe('what a message becomes once removed', () => {
+  it('keeps who and when, and nothing it carried', () => {
+    // #461: the mention is part of what it carried. So are its words, its
+    // kind, its photograph and its document: the line says it was removed,
+    // and only that.
+    const carried = entry({
+      eventId: '$p',
+      body: 'photo.jpg',
+      msgtype: 'm.image',
+      unencrypted: true,
+      image: {
+        url: 'mxc://x/p',
+        secret: '{}',
+        mimeType: 'image/jpeg',
+        width: 4,
+        height: 3,
+        size: 10,
+        thumbnail: null,
+      },
+      document: {
+        url: 'mxc://x/d',
+        secret: '{}',
+        name: 'relevé.pdf',
+        mimeType: 'application/pdf',
+        size: 20,
+      },
+    })
+
+    expect(asRemoved(carried)).toEqual({
+      eventId: '$p',
+      claimedSender: '@someone:messagr.eu',
+      sentAt: 1000,
+      body: null,
+      removed: true,
+    })
+  })
+
+  it('never says a removed message was not encrypted', () => {
+    expect(saysUnencrypted(entry({ unencrypted: true }))).toBe(true)
+    expect(saysUnencrypted(entry())).toBe(false)
+    expect(
+      saysUnencrypted(entry({ unencrypted: true, body: null, removed: true })),
+    ).toBe(false)
   })
 })
