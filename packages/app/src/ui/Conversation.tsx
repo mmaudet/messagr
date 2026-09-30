@@ -643,6 +643,19 @@ function Message({
         </View>
       )}
 
+      {/* NOT ENCRYPTED, AND SAID UNDER THE BUBBLE (#461).
+          Outside it, so it reads as a note on the message rather than as
+          part of what was written, and the words in it stay as they were.
+          In words, which is how a state stays legible without a colour: the
+          grey is every caption's. */}
+      {entry.unencrypted === true && (
+        <Text
+          testID={`unencrypted-${entry.eventId}`}
+          style={[styles.unencrypted, { color: palette.neutral['600'] }]}>
+          {t('conversation_unencrypted')}
+        </Text>
+      )}
+
       {/* THE TIME, AND ON THIS ACCOUNT'S OWN MESSAGES THE TICKS.
           Screen 21 asks for timestamps and double read receipts, and both are
           things people read without noticing -- which is the whole argument
@@ -746,6 +759,7 @@ const styles = StyleSheet.create({
   },
   chipKey: typeScale.bodySm,
   state: { ...typeScale.caption, marginTop: space.xs },
+  unencrypted: { ...typeScale.caption, marginTop: space.xs },
   bubble: {
     paddingHorizontal: space.m,
     paddingVertical: space.s,

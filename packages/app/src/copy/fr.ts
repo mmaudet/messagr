@@ -181,6 +181,7 @@ export const fr = {
   conversation_unreadable:
     'Message illisible sur cet appareil : sa clé n’est pas arrivée.',
   conversation_removed: 'Message supprimé',
+  conversation_unencrypted: 'Ce message n’est pas chiffré.',
 
   'selection_count %1$d': '%1$d sélectionné(s)',
   selection_clear: 'Quitter la sélection',

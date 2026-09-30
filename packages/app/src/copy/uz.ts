@@ -163,6 +163,7 @@ export const uz: Readonly<Record<CopyKey, string>> = {
   conversation_unreadable:
     'Bu qurilmada oʻqib boʻlmaydi: uning kaliti yetib kelmagan.',
   conversation_removed: 'Xabar oʻchirilgan',
+  conversation_unencrypted: 'Bu xabar shifrlanmagan.',
   'selection_count %1$d': '%1$d tanlandi',
   selection_clear: 'Tanlovdan chiqish',
   selection_copy: 'Nusxalash',
