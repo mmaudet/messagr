@@ -1,5 +1,7 @@
 import { describe, expect, it, vi } from 'vitest'
 
+import { t } from '../copy'
+import { toTimelineEntries } from '../timeline/buildTimeline'
 import { lookForWhatArrived, type Looking } from './lookForWhatArrived'
 import type { HttpRequester } from './pump'
 
@@ -263,5 +265,64 @@ describe('a ringing call that carries a picture', () => {
       looking({ openCalls: async () => [invitation()] }),
     )
     expect(ringing[0]?.video).toBeUndefined()
+  })
+})
+
+describe('a message that arrived unencrypted (#461)', () => {
+  const MENTION = t('conversation_unencrypted')
+
+  /** A message as it was written, never encrypted, at `at`. */
+  const inClear = (at: number, removed = false) => ({
+    type: 'm.room.message',
+    event_id: `$${at}`,
+    sender: HER,
+    origin_server_ts: at,
+    ...(removed
+      ? {
+          content: {},
+          unsigned: { redacted_because: { type: 'm.room.redaction' } },
+        }
+      : { content: { msgtype: 'm.text', body: 'en clair' } }),
+  })
+
+  /** The conversation as a woken device derives it (`loadConversation`). */
+  const derivedFrom = (events: readonly unknown[]) => async () =>
+    (
+      await toTimelineEntries(
+        {
+          decryptEvent: async () => {
+            throw new Error('no session')
+          },
+        },
+        bytes => new TextDecoder().decode(bytes),
+        '!a:x',
+        events,
+      )
+    ).entries
+
+  it('says the mention in place of its words, under the name of who sent it', async () => {
+    const { messages } = await lookForWhatArrived(
+      looking({
+        readConversation: derivedFrom([inClear(200)]),
+        names: {
+          all: async () => new Map([[HER, 'Maria']]),
+          set: async () => true,
+        },
+      }),
+    )
+
+    expect(messages).toEqual([
+      { scope: '!a:x', shown: 'Maria', preview: MENTION, from: HER },
+    ])
+    expect(JSON.stringify(messages)).not.toContain('en clair')
+  })
+
+  it('says no mention once it is removed for everyone', async () => {
+    const { messages } = await lookForWhatArrived(
+      looking({ readConversation: derivedFrom([inClear(200, true)]) }),
+    )
+
+    expect(messages[0]?.preview).not.toBe(MENTION)
+    expect(JSON.stringify(messages)).not.toContain('en clair')
   })
 })

@@ -46,8 +46,9 @@ import type { TimelineEntry } from '../timeline/mergeTimeline'
  *
  * A message that arrived encrypted from one that arrived in clear.
  * `TimelineEntry` records which since #461 (`unencrypted`), for the mention
- * the conversation draws under such a message, and this predicate does not
- * read it. Strictly, only the first is evidence of a key. The distinction
+ * drawn under such a message, on the list's row and in a notification, and
+ * this predicate does not read it. Strictly, only the first is evidence of a
+ * key. The distinction
  * would matter in a product with unencrypted conversations, and this one has
  * none — every conversation here is encrypted, so a plaintext message is an
  * anomaly rather than a case. Written down so that the day it stops being
