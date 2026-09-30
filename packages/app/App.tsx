@@ -293,10 +293,8 @@ import {
 } from './src/runtime/block'
 import {
   listWithoutTheBlocked,
-  openAfterTheBlock,
   openConversationOf,
   scopesWithTheBlocked,
-  type AfterTheBlock,
   type WithSomebody,
 } from './src/runtime/conversationList'
 import {
@@ -355,6 +353,11 @@ import {
   type OpenPlate,
   type TheListScreen,
 } from './src/ui/overTheConversation'
+import {
+  findableAsFarAsKnown,
+  whatTheBlockWillDo,
+  type WhatTheBlockWillDo,
+} from './src/ui/blockScreen'
 import { PickConversation } from './src/ui/PickConversation'
 import { ConversationHeader } from './src/ui/ConversationHeader'
 import { Legal } from './src/ui/Legal'
@@ -399,7 +402,6 @@ import {
 } from './src/runtime/entry'
 import { deleteAccount, wayToDelete } from './src/runtime/deleteAccount'
 import {
-  isFindable,
   listNotice,
   proofJourney,
   readDiscovery,
@@ -2407,14 +2409,6 @@ export function App({
       ignored ?? new Set(),
     )
   }, [theScreen, openScope, party, derivedSummaries, ignored])
-  /**
-   * Whether this account is findable now, as far as this device knows:
-   * what a screen about a block can truthfully say of who still sees it on
-   * Messagr (#406, #469). Unknown counts as findable: telling somebody they
-   * are still seen is the cautious error of the two.
-   */
-  const findableAsFarAsKnown = () =>
-    !discovery.read || isFindable(discovery, Date.now())
   /**
    * Blocks `who`: the other person of the conversation open, from their
    * panel (#469), or the author of the messages selected, from « Bloquer
@@ -5899,16 +5893,12 @@ export function App({
   // offers the action, and it is whom the action opens the screen for.
   const blockableNow =
     selected.size > 0 ? blockable(selected, shownNow, selfNow) : null
-  // WHAT BLOCKING THE ACCOUNT OF `target` WOULD DO TO ITS CONVERSATION, for
-  // the screen that says it beforehand, from the panel or from the selection
-  // (#469, #472): the rule that closes it once the block holds, read on what
-  // this screen knows now.
-  const afterBlocking = (target: WithSomebody): AfterTheBlock =>
-    openAfterTheBlock(
-      openConversationOf(target.scope, party),
-      derivedSummaries,
-      new Set([target.other]),
-    )
+  // WHAT BLOCKING THE ACCOUNT OF `target` WOULD DO, for the screen that says
+  // it beforehand, from the panel or from the selection (#469, #472, #498):
+  // what becomes of its conversation, whether the account still reads it,
+  // and what the block does not hide. Read on what this screen knows now.
+  const foreseeing = (target: WithSomebody): WhatTheBlockWillDo =>
+    whatTheBlockWillDo(target, party, derivedSummaries, discovery, Date.now())
 
   return (
     <GestureHandlerRootView style={styles.root}>
@@ -6011,12 +6001,11 @@ export function App({
             person, in a sheet over the conversation it was opened from, and
             the same gesture. What it says the block will do to that
             conversation is read from the rule that closes it once the block
-            holds (`afterBlocking`). */}
+            holds (`foreseeing`). */}
         {blockingSender !== null && blockingSender.scope === openScope && (
           <BlockSheet
             memberId={blockingSender.other}
-            findable={findableAsFarAsKnown()}
-            after={afterBlocking(blockingSender)}
+            foreseen={foreseeing(blockingSender)}
             state={
               blocking?.who === blockingSender.other ? blocking.state : 'idle'
             }
@@ -7125,8 +7114,7 @@ export function App({
                 {party !== null && (
                   <Block
                     memberId={party.other}
-                    findable={findableAsFarAsKnown()}
-                    after={afterBlocking(party)}
+                    foreseen={foreseeing(party)}
                     state={
                       blocking?.who === party.other ? blocking.state : 'idle'
                     }
@@ -7401,7 +7389,7 @@ export function App({
               onRefuse={() => answerDelivered('refuse', deliveredOnScreen)}
               block={{
                 asking: blockingDelivered,
-                findable: findableAsFarAsKnown(),
+                findable: findableAsFarAsKnown(discovery, Date.now()),
                 onAsk: () => {
                   setDeliveredFailed(null)
                   setBlockingDelivered(true)

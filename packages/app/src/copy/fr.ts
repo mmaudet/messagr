@@ -817,14 +817,16 @@ export const fr = {
   // conversation à plusieurs, où ce panneau n'existe pas. Là, la conversation
   // reste dans la liste et seuls les messages du compte bloqué la quittent :
   // l'écran le dit à la place de « cette conversation quitte votre liste »,
-  // et dit que ce compte y lit toujours ce qu'on écrit, pour ne rien
-  // découvrir après (récit 22). Tant que l'application ne sait pas qui est
-  // dans la conversation, il ne dit ni qu'elle reste ni qu'elle part. Puis la
-  // conversation dit ce qui est fait et ce qui attend, et la liste ensuite,
-  // sans prétendre qu'une conversation l'a quittée. Et si l'on demandait de
-  // se bloquer soi-même, rien ne se fait, et l'écran dit pourquoi. « Plus »
-  // ouvre, en mots, les actions de la barre qui n'y tiennent pas : chacune y
-  // garde la taille d'une cible, et les plus rares y vont d'abord.
+  // et, tant que ce compte en est membre, dit qu'il y lit toujours ce qu'on
+  // écrit, pour ne rien découvrir après (récit 22) ; d'un compte qui l'a
+  // quittée, il ne le dit pas (#498). Tant que l'application ne sait pas qui
+  // est dans la conversation, il ne dit ni qu'elle reste ni qu'elle part.
+  // Puis la conversation dit ce qui est fait et ce qui attend, et la liste
+  // ensuite, sans prétendre qu'une conversation l'a quittée. Et si l'on
+  // demandait de se bloquer soi-même, rien ne se fait, et l'écran dit
+  // pourquoi. « Plus » ouvre, en mots, les actions de la barre qui n'y
+  // tiennent pas : chacune y garde la taille d'une cible, et les plus rares
+  // y vont d'abord.
   selection_block: 'Bloquer l’expéditeur',
   selection_more: 'Plus',
   selection_more_close: 'Fermer',
