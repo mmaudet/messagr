@@ -139,6 +139,8 @@ Avec la build qui signale, tranché, 9 :
 
 Le chiffrement en transit et la suppression se déclarent pour toute l'application, à l'étape précédente, et valent donc pour tous les types : chiffrés en transit, oui ; suppression sur demande, oui, à conformite@messagr.eu.
 
+**Ces tableaux sont lus par un contrôle.** `scripts/assert-play-data-safety.mjs` compare un export CSV de la console à ce que disent les deux de cette étape, lus dans l'ordre, un type qui revient remplaçant sa ligne, et celui de l'étape précédente. Il dit ce qui manque et ce qui est en trop, et sort en erreur au moindre écart ; un libellé qu'il ne connaît pas le fait échouer. La chaîne d'intégration lui fait relire le dernier export gardé dans `docs/declarations/` : une réponse changée ici demande une nouvelle saisie, et un nouvel export gardé.
+
 #### « ID utilisateur »
 
 - **Ce que c'est.** L'identifiant Matrix du compte, tiré au hasard à l'entrée.
@@ -547,11 +549,11 @@ Pas « Vidéos » : l'application n'envoie pas de vidéo, et une vidéo envoyée
 3. « ID utilisateur » : ajouter la finalité « Prévention des fraudes, sécurité et conformité ».
 4. Rien d'autre ne change : « Contacts », « Autres actions », « Appareil ou autres ID », le chiffrement en transit et la suppression gardent leurs réponses.
 5. Enregistrer, relire l'« Aperçu de la fiche Play Store », puis « Envoyer ».
-6. Exporter le CSV et le garder, comme à la première saisie.
+6. Exporter le CSV, le relire avec `node scripts/assert-play-data-safety.mjs <export>`, et le garder, daté, dans `docs/declarations/`.
 
-**Saisi dans la Play Console le 30 septembre 2026, et corrigé le même jour** : une case voisine avait été cochée par mégarde. Dans l'export CSV de la console, les trois types sont `PSL_OTHER_MESSAGES`, sous `PSL_DATA_TYPES_EMAIL_AND_TEXT`, `PSL_PHOTOS` et `PSL_FILES_AND_DOCS`, et la finalité est `PSL_FRAUD_PREVENTION_SECURITY`.
+**Saisi dans la Play Console le 30 septembre 2026, corrigé et vérifié le même jour.** Il a fallu quatre exports : une case voisine, « Fichiers audio » → « Enregistrements audio ou vidéo », avait été cochée, « Photos » décochée une fois, « Partagées » cochée une fois. Le dernier dit exactement ce point, et il est gardé, daté : `docs/declarations/play-securite-des-donnees-2026-09-30.csv`. À côté, `play-securite-des-donnees-avant-signaler.csv` est l'export d'avant : le dernier n'y ajoute que les seize réponses du point 9, dont trois « Non » à éphémère, et n'en retire ni n'en change aucune. Relu par `scripts/assert-play-data-safety.mjs`, le dernier ne s'écarte en rien du document, et celui d'avant n'en diffère que par ces seize réponses, qui lui manquent. Dans l'export, les trois types sont `PSL_OTHER_MESSAGES`, sous `PSL_DATA_TYPES_EMAIL_AND_TEXT`, `PSL_PHOTOS` et `PSL_FILES_AND_DOCS`, et la finalité est `PSL_FRAUD_PREVENTION_SECURITY`.
 
-`scripts/declarations-magasins.sh signaler` guide ces gestes pour une saisie refaite plus tard, dans l'ordre du formulaire (#500). Sans argument, il guide la première saisie (#321), qui ne change pas.
+`scripts/declarations-magasins.sh signaler` guide ces gestes pour une saisie refaite plus tard, dans l'ordre du formulaire, et fait relire l'export par ce contrôle (#500). Sans argument, il guide la première saisie (#321), qui ne change pas.
 
 ## Ce que la page ne dit pas encore
 
