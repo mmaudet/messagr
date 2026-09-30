@@ -74,6 +74,51 @@ mod tests {
     use super::*;
     use crate::util::{civil, day_of, days_from_civil};
 
+    /// What `retention.json` names as applying `entry`, one line a measure.
+    fn applied(retention: &serde_json::Value, entry: &str) -> String {
+        retention[entry]["applique_par"]
+            .as_array()
+            .unwrap_or_else(|| panic!("{entry}: no applique_par"))
+            .iter()
+            .map(|line| line.as_str().unwrap().to_string())
+            .collect::<Vec<_>>()
+            .join("\n")
+    }
+
+    /// `deploy/messagr-eu/retention.json` holds each duration once, and the
+    /// published policy is checked against it (`scripts/assert-retention.sh`).
+    /// Here the other half: the file names these erasures, with the days they
+    /// keep, and says the durations the policy says. A constant changed
+    /// without the file, or the file without the code, turns this red.
+    #[test]
+    fn retention_json_names_these_erasures_and_the_days_they_keep() {
+        let retention: serde_json::Value =
+            serde_json::from_str(include_str!("../../../../deploy/messagr-eu/retention.json"))
+                .unwrap();
+
+        let content = applied(&retention, "signalements_contenu");
+        assert!(content.contains("erase_sealed_reports"), "{content}");
+        assert!(
+            content.contains(&format!("SEALED_KEPT_DAYS = {SEALED_KEPT_DAYS} jours")),
+            "{content}"
+        );
+        assert_eq!(
+            retention["signalements_contenu"]["duree"],
+            "six mois après la décision"
+        );
+
+        let decisions = applied(&retention, "signalements_decisions");
+        assert!(decisions.contains("erase_decided_reports"), "{decisions}");
+        assert!(
+            decisions.contains(&format!("RECORD_KEPT_DAYS = {RECORD_KEPT_DAYS} jours")),
+            "{decisions}"
+        );
+        assert_eq!(
+            retention["signalements_decisions"]["duree"],
+            "douze mois après la décision"
+        );
+    }
+
     /// `months` calendar months after a date, on the same day of the month,
     /// or on the last day of a shorter month.
     fn months_after(year: i64, month: i64, day: i64, months: i64) -> i64 {
