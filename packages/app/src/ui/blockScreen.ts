@@ -24,7 +24,7 @@ export interface WhatTheBlockWillDo {
   readonly after: AfterTheBlock
   /**
    * Whether the account still reads that conversation, which stays: one of
-   * its members, as far as this device knows (#498).
+   * its participants, as far as this device knows (#498).
    */
   readonly stillReads: boolean
   /** Whether this account is findable, as far as this device knows. */
@@ -72,17 +72,20 @@ export function findableAsFarAsKnown(
 }
 
 /**
- * Whether the account of `target` is still in its conversation, as the row
- * last read who is (#498). Not read counts as in: telling somebody the
- * account still reads what they write is the cautious error of the two, the
- * other being to let them write for it believing it gone.
+ * Whether the account of `target` still takes part in its conversation, as
+ * the row last read its participants (#498). Not read counts as taking part:
+ * telling somebody the account still reads what they write is the cautious
+ * error of the two, the other being to let them write for it believing it
+ * gone.
  */
 function stillIn(
   target: WithSomebody,
   rows: readonly ConversationSummary[],
 ): boolean {
-  const members = rows.find(row => row.scope === target.scope)?.members
-  return members === undefined || members.includes(target.other)
+  const participants = rows.find(
+    row => row.scope === target.scope,
+  )?.participants
+  return participants === undefined || participants.includes(target.other)
 }
 
 /** One fact the screen states, as its copy keys. */

@@ -817,7 +817,7 @@ export const fr = {
   // conversation à plusieurs, où ce panneau n'existe pas. Là, la conversation
   // reste dans la liste et seuls les messages du compte bloqué la quittent :
   // l'écran le dit à la place de « cette conversation quitte votre liste »,
-  // et, tant que ce compte en est membre, dit qu'il y lit toujours ce qu'on
+  // et, tant que ce compte y participe, dit qu'il y lit toujours ce qu'on
   // écrit, pour ne rien découvrir après (récit 22) ; d'un compte qui l'a
   // quittée, il ne le dit pas (#498). Tant que l'application ne sait pas qui
   // est dans la conversation, il ne dit ni qu'elle reste ni qu'elle part.

@@ -298,6 +298,7 @@ import {
 } from './src/runtime/block'
 import {
   listWithoutTheBlocked,
+  rowsHeld,
   type WithSomebody,
 } from './src/runtime/conversationList'
 import {
@@ -670,6 +671,10 @@ export function App({
     } else {
       setOver(held => overAfterTheBlock(held, conversationRef.current, next))
     }
+    // AND THE ROWS HELD, the conversation with one of them kept for who is
+    // in it and for nothing that was said there (#498): what a derivation
+    // made before the block had read of it goes now, not at the next one.
+    setDerivedSummaries(rows => rowsHeld(rows, next))
   }
   // THE LIST EVERY SCREEN READS (#469): without the conversation with a
   // blocked account, and every other row drawn again without its messages.

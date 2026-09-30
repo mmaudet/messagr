@@ -53,20 +53,20 @@ describe('what the screen of a block says it will do (#469, #472, #498)', () => 
       whatTheBlockWillDo(
         target,
         target,
-        [row('!with-them:x', BLOCKED, { members: [ME, BLOCKED] })],
+        [row('!with-them:x', BLOCKED, { participants: [ME, BLOCKED] })],
         UNREAD,
         NOW,
       ),
     ).toEqual({ after: 'leaves', stillReads: false, findable: true })
   })
 
-  it('says a conversation of more than two stays, and that the account still reads it while it is a member', () => {
+  it('says a conversation of more than two stays, and that the account still reads it while it takes part in it', () => {
     // Said plainly, so that nothing is found out afterwards (#462, story 22).
     expect(
       whatTheBlockWillDo(
         { scope: '!three-of-us:x', other: BLOCKED },
         null,
-        [row('!three-of-us:x', null, { members: [ME, BLOCKED, FRIEND] })],
+        [row('!three-of-us:x', null, { participants: [ME, BLOCKED, FRIEND] })],
         UNREAD,
         NOW,
       ),
@@ -80,7 +80,7 @@ describe('what the screen of a block says it will do (#469, #472, #498)', () => 
       whatTheBlockWillDo(
         { scope: '!three-of-us:x', other: BLOCKED },
         null,
-        [row('!three-of-us:x', null, { members: [ME, FRIEND, HER] })],
+        [row('!three-of-us:x', null, { participants: [ME, FRIEND, HER] })],
         UNREAD,
         NOW,
       ),
@@ -90,7 +90,7 @@ describe('what the screen of a block says it will do (#469, #472, #498)', () => 
       whatTheBlockWillDo(
         { scope: '!with-a-friend:x', other: BLOCKED },
         { scope: '!with-a-friend:x', other: FRIEND },
-        [row('!with-a-friend:x', FRIEND, { members: [ME, FRIEND] })],
+        [row('!with-a-friend:x', FRIEND, { participants: [ME, FRIEND] })],
         UNREAD,
         NOW,
       ),
