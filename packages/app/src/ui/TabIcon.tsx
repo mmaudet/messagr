@@ -115,6 +115,10 @@ export type TabGlyph =
   // from a message there was nothing to draw one for. It is the shape a
   // block has had in every messenger since the first one.
   | 'block'
+  // THREE DOTS IN A ROW, for « Plus » in the selection bar (#472), which
+  // holds the actions that do not fit on it, by the same door: the shape
+  // "more" has in every system.
+  | 'more'
 
 const STROKE = {
   fill: 'none' as const,
@@ -257,6 +261,29 @@ export function TabIcon({
         <>
           <Circle cx={12} cy={12} r={8.5} stroke={tint} {...STROKE} />
           <Path d="m6 6 12 12" stroke={tint} {...STROKE} />
+        </>
+      )}
+
+      {/* Three dots, filled, at the stroke's own weight. */}
+      {glyph === 'more' && (
+        <>
+          <Circle
+            cx={5.5}
+            cy={12}
+            r={1}
+            stroke={tint}
+            {...STROKE}
+            fill={tint}
+          />
+          <Circle cx={12} cy={12} r={1} stroke={tint} {...STROKE} fill={tint} />
+          <Circle
+            cx={18.5}
+            cy={12}
+            r={1}
+            stroke={tint}
+            {...STROKE}
+            fill={tint}
+          />
         </>
       )}
 

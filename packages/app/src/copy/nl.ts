@@ -503,6 +503,8 @@ export const nl: Readonly<Record<CopyKey, string>> = {
   list_blocked_not_kept:
     'Dit account is geblokkeerd, en uw gesprek ermee is uit de lijst verdwenen: zijn berichten en oproepen bereiken u niet meer. De exploitant is niet op de hoogte gebracht, en dit apparaat kon het niet noteren om het opnieuw te proberen: een uitnodiging in Messagr van dit account kan u nog bereiken.',
   selection_block: 'Afzender blokkeren',
+  selection_more: 'Meer',
+  selection_more_close: 'Sluiten',
   block_explain_gone_stays:
     'Zijn berichten verdwijnen uit al uw gesprekken, ook de al ontvangen berichten. Dit gesprek blijft in uw lijst, zonder die berichten, en uw rechtstreekse gesprek met dit account verdwijnt eruit, als u er een hebt. U verlaat er geen: dit account ziet niets veranderen.',
   block_explain_gone_not_known:

@@ -508,6 +508,8 @@ export const en: Readonly<Record<CopyKey, string>> = {
   list_blocked_not_kept:
     'This account is blocked, and your conversation with it has left the list: its messages and calls will no longer reach you. The operator has not been told, and this device could not note it to try again: an invitation in Messagr from this account can still reach you.',
   selection_block: 'Block sender',
+  selection_more: 'More',
+  selection_more_close: 'Close',
   block_explain_gone_stays:
     'Its messages disappear from all your conversations, those already received included. This conversation stays in your list, without them, and your direct conversation with this account, if you have one, leaves it. You leave none of them: this account sees nothing change.',
   block_explain_gone_not_known:

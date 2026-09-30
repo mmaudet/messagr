@@ -821,8 +821,12 @@ export const fr = {
   // dans la conversation, il ne dit ni qu'elle reste ni qu'elle part. Puis la
   // conversation dit ce qui est fait et ce qui attend, et la liste ensuite,
   // sans prétendre qu'une conversation l'a quittée. Et si l'on demandait de
-  // se bloquer soi-même, rien ne se fait, et l'écran dit pourquoi.
+  // se bloquer soi-même, rien ne se fait, et l'écran dit pourquoi. « Plus »
+  // ouvre, en mots, les actions de la barre qui n'y tiennent pas : chacune y
+  // garde la taille d'une cible, et les plus rares y vont d'abord.
   selection_block: 'Bloquer l’expéditeur',
+  selection_more: 'Plus',
+  selection_more_close: 'Fermer',
   block_explain_gone_stays:
     'Ses messages disparaissent de toutes vos conversations, ceux déjà reçus compris. Cette conversation reste dans votre liste, sans eux, et votre conversation à deux avec ce compte, si vous en avez une, la quitte. Vous ne sortez d’aucune : ce compte ne voit rien changer.',
   block_explain_gone_not_known:

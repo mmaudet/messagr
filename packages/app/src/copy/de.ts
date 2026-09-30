@@ -516,6 +516,8 @@ export const de: Readonly<Record<CopyKey, string>> = {
   list_blocked_not_kept:
     'Dieses Konto ist blockiert, und Ihre Unterhaltung mit ihm ist aus der Liste verschwunden: Seine Nachrichten und Anrufe erreichen Sie nicht mehr. Der Betreiber wurde nicht informiert, und dieses Gerät konnte es nicht festhalten, um es erneut zu versuchen: Eine Einladung in Messagr von diesem Konto kann Sie noch erreichen.',
   selection_block: 'Absender blockieren',
+  selection_more: 'Mehr',
+  selection_more_close: 'Schließen',
   block_explain_gone_stays:
     'Seine Nachrichten verschwinden aus allen Ihren Unterhaltungen, auch die bereits empfangenen. Diese Unterhaltung bleibt ohne sie in Ihrer Liste, und Ihre Unterhaltung zu zweit mit diesem Konto verschwindet daraus, falls Sie eine haben. Sie verlassen keine davon: Dieses Konto sieht keine Veränderung.',
   block_explain_gone_not_known:

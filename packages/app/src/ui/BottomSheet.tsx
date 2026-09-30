@@ -20,6 +20,8 @@ export function BottomSheet({
   scrimTestID,
   closeLabel,
   onClose,
+  visible = true,
+  onDismiss,
   children,
 }: {
   readonly testID: string
@@ -31,16 +33,29 @@ export function BottomSheet({
    * hands a function that does nothing then.
    */
   readonly onClose: () => void
+  /**
+   * For a sheet kept mounted and hidden rather than taken away, as one must
+   * be whose choice opens another sheet: see `onDismiss`.
+   */
+  readonly visible?: boolean
+  /**
+   * Once a sheet hidden by `visible` has gone from an iPhone's screen. A
+   * sheet opened while another is still going away is one iOS may not
+   * show, so what a choice in a sheet opens waits for this there; Android
+   * never calls it, and opens it at once.
+   */
+  readonly onDismiss?: () => void
   readonly children: React.ReactNode
 }) {
   const insets = useSafeAreaInsets()
 
   return (
     <Modal
-      visible
+      visible={visible}
       transparent
       animationType="fade"
       onRequestClose={onClose}
+      onDismiss={onDismiss}
       testID={testID}>
       <View style={styles.over}>
         <Pressable

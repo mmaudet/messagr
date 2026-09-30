@@ -520,6 +520,8 @@ export const uz: Readonly<Record<CopyKey, string>> = {
   list_blocked_not_kept:
     'Bu hisob bloklandi va u bilan suhbatingiz roʻyxatdan chiqdi: uning xabarlari va qoʻngʻiroqlari endi sizga yetib kelmaydi. Operatorga xabar berilmadi va bu qurilma qayta urinish uchun buni yozib qoʻya olmadi: bu hisobdan Messagrdagi taklif sizga hali yetib kelishi mumkin.',
   selection_block: 'Joʻnatuvchini bloklash',
+  selection_more: 'Yana',
+  selection_more_close: 'Yopish',
   block_explain_gone_stays:
     'Uning xabarlari barcha suhbatlaringizdan, allaqachon olinganlari ham, yoʻqoladi. Bu suhbat ularsiz roʻyxatingizda qoladi, bu hisob bilan ikki kishilik suhbatingiz esa, agar bor boʻlsa, roʻyxatdan chiqadi. Siz hech biridan chiqmaysiz: bu hisob hech qanday oʻzgarishni koʻrmaydi.',
   block_explain_gone_not_known:

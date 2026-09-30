@@ -501,6 +501,8 @@ export const es: Readonly<Record<CopyKey, string>> = {
   list_blocked_not_kept:
     'Esta cuenta está bloqueada, y su conversación con ella ha salido de la lista: sus mensajes y sus llamadas ya no le llegarán. Quien explota el servicio no lo sabe, y este dispositivo no ha podido anotarlo para volver a intentarlo: una invitación en Messagr de esta cuenta todavía puede llegarle.',
   selection_block: 'Bloquear al remitente',
+  selection_more: 'Más',
+  selection_more_close: 'Cerrar',
   block_explain_gone_stays:
     'Sus mensajes desaparecen de todas sus conversaciones, incluidos los ya recibidos. Esta conversación sigue en su lista, sin ellos, y su conversación directa con esta cuenta, si tiene una, sale de ella. Usted no sale de ninguna: esta cuenta no ve ningún cambio.',
   block_explain_gone_not_known:
