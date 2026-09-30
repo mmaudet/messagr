@@ -72,7 +72,10 @@ export interface Arrival {
   readonly scope: string
   /** Who it is from, as this device would show them. */
   readonly shown: string
-  /** The opening of what they said. */
+  /**
+   * The opening of what they said; for a message that arrived unencrypted,
+   * the mention that says so, in place of its words (#461).
+   */
   readonly preview: string
   /**
    * Their account, which the notification carries unseen: what a block

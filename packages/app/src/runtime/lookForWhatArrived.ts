@@ -1,4 +1,6 @@
 import { offersVideo } from '../calls/sdp'
+import { t } from '../copy'
+import { saysUnencrypted } from '../timeline/mergeTimeline'
 import { displayNameFor, type GivenNames } from './givenName'
 import type { HttpRequester } from './pump'
 import { readChangedScopes, readTimelineEvents } from './syncResponse'
@@ -56,6 +58,9 @@ export interface Looking {
       readonly claimedSender: string
       readonly sentAt: number
       readonly body: string | null
+      /** Arrived unencrypted (#461): see `saysUnencrypted`. */
+      readonly unencrypted?: boolean
+      readonly removed?: boolean
     }[]
   >
   /**
@@ -200,7 +205,13 @@ export async function lookForWhatArrived(
         // A message this device cannot read is still a message that arrived.
         // It says so rather than being dropped, which is what the
         // conversation itself does with the same event.
-        preview: newest.body ?? '',
+        //
+        // ONE THAT ARRIVED UNENCRYPTED IS SAID BY THE MENTION, in place of
+        // its words, under the same name (#461): the notification never
+        // carries them.
+        preview: saysUnencrypted(newest)
+          ? t('conversation_unencrypted')
+          : (newest.body ?? ''),
         from: newest.claimedSender,
       })
     } catch {

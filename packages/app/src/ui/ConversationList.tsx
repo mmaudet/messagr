@@ -662,6 +662,11 @@ function Row({
  */
 function previewOf(summary: ConversationSummary): string {
   if (summary.departed !== undefined) return t('list_participant_left')
+  // THE LAST MESSAGE ARRIVED UNENCRYPTED (#461): the mention, in place of
+  // its opening, which the row does not keep.
+  if (summary.previewUnencrypted === true) {
+    return t('conversation_unencrypted')
+  }
   if (summary.preview !== null) return summary.preview
   if (summary.reason === 'nothing has been said yet') {
     return t('list_nothing_said')

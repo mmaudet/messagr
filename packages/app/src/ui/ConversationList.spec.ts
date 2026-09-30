@@ -461,3 +461,25 @@ describe('an account just blocked, above the list (#469, #472)', () => {
     expect(said).not.toContain(t('blocked_stays'))
   })
 })
+
+describe('a row whose last message is not encrypted (#461)', () => {
+  it('says the mention in place of its opening', () => {
+    const drawn = list({
+      summaries: [
+        conversation({
+          preview: null,
+          previewUnencrypted: true,
+          previewBy: '@someone:example.invalid',
+        }),
+      ],
+    })
+
+    const row = withId(drawn, 'first-conversation') as Drawn
+    expect(words([row])).toContain(t('conversation_unencrypted'))
+    expect(words([row])).not.toContain(t('list_unreadable'))
+  })
+
+  it('says the opening of every other row, as before', () => {
+    expect(words(list())).not.toContain(t('conversation_unencrypted'))
+  })
+})

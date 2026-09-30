@@ -1,6 +1,7 @@
 import { membershipLeaveOf } from '../calls/transport'
 import type { TimelineMachine } from '../timeline/buildTimeline'
 import { fetchRoomMessages, toTimelineEntries } from '../timeline/buildTimeline'
+import { saysUnencrypted } from '../timeline/mergeTimeline'
 import { fetchJoinedMembers, fetchJoinedRooms } from './encryptedSend'
 import { getErrorMessage } from './errors'
 import { EVERYTHING_SHOWN, shownOf, type NotShown } from './notShown'
@@ -90,6 +91,13 @@ export interface ConversationSummary {
    * `window` to be drawn again from.
    */
   readonly previewBy?: string
+  /**
+   * Set when the last message this device could read arrived unencrypted
+   * (#461): the row says the mention in place of its opening, and `preview`
+   * is `null`, since none of its words are kept. `previewBy` still says who
+   * wrote it.
+   */
+  readonly previewUnencrypted?: true
   /** Why there is no preview, when there is none. */
   readonly reason?: string
   /**
@@ -133,6 +141,8 @@ export interface RowMessage {
   readonly reason?: string
   /** Removed for everyone: a line, and no opening. */
   readonly removed?: boolean
+  /** Arrived unencrypted: the mention, and no opening (#461). */
+  readonly unencrypted?: boolean
   /**
    * Arrived after this device last looked at the conversation, from somebody
    * else: what `unread.ts` counts.
@@ -159,13 +169,23 @@ export function saidIn(
   window: readonly RowMessage[],
 ): Pick<
   ConversationSummary,
-  'preview' | 'previewBy' | 'reason' | 'lastAt' | 'unread'
+  | 'preview'
+  | 'previewBy'
+  | 'previewUnencrypted'
+  | 'reason'
+  | 'lastAt'
+  | 'unread'
 > {
   // The newest first, so the search below stops at the first readable one.
   const newest = [...window].sort((a, b) => b.sentAt - a.sentAt)
   const readable = newest.find(one => one.body !== null)
+  // ONE THAT ARRIVED UNENCRYPTED IS SAID BY THE MENTION (#461), in place of
+  // its opening: the row keeps none of its words, and the screen draws the
+  // mention from the flag.
+  const unencrypted = readable?.unencrypted === true
   return {
-    preview: readable?.body ?? null,
+    preview: unencrypted ? null : (readable?.body ?? null),
+    ...(unencrypted ? { previewUnencrypted: true as const } : {}),
     // Named separately from a missing preview, because "nothing has been
     // said" and "this device cannot read what was said" look identical on a
     // row and mean opposite things to the person reading it.
@@ -364,6 +384,8 @@ function isBare(row: ConversationSummary): boolean {
   return (
     row.preview === null &&
     row.previewBy === undefined &&
+    // The mention in place of an opening is something said too (#461).
+    row.previewUnencrypted === undefined &&
     row.reason === NOTHING_LEFT_TO_SHOW &&
     row.lastAt === 0 &&
     row.unread === 0 &&
@@ -398,6 +420,7 @@ function rowWithout(
 function whoAndWhere({
   preview: _preview,
   previewBy: _previewBy,
+  previewUnencrypted: _previewUnencrypted,
   reason: _reason,
   lastAt: _lastAt,
   unread: _unread,
@@ -405,7 +428,13 @@ function whoAndWhere({
   ...rest
 }: ConversationSummary): Omit<
   ConversationSummary,
-  'preview' | 'previewBy' | 'reason' | 'lastAt' | 'unread' | 'window'
+  | 'preview'
+  | 'previewBy'
+  | 'previewUnencrypted'
+  | 'reason'
+  | 'lastAt'
+  | 'unread'
+  | 'window'
 > {
   return rest
 }
@@ -522,6 +551,7 @@ async function summarise(
       body: entry.body,
       ...(entry.reason === undefined ? {} : { reason: entry.reason }),
       ...(entry.removed === true ? { removed: true } : {}),
+      ...(saysUnencrypted(entry) ? { unencrypted: true } : {}),
       // What `unread.ts` counts: after the mark, from somebody else.
       unread: entry.sentAt > lastReadAt && entry.claimedSender !== selfUserId,
     }))

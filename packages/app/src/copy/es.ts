@@ -145,6 +145,7 @@ export const es: Readonly<Record<CopyKey, string>> = {
   conversation_unreadable:
     'Ilegible en este dispositivo: su clave nunca llegó.',
   conversation_removed: 'Mensaje eliminado',
+  conversation_unencrypted: 'Este mensaje no está cifrado.',
 
   'selection_count %1$d': '%1$d seleccionado(s)',
   selection_clear: 'Salir de la selección',

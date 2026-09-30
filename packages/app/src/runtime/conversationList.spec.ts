@@ -49,6 +49,10 @@ function fakeHomeserver(
             sender: string
             ts: number
             plain?: string
+            /** Served as it was written, never encrypted (#461). */
+            clear?: string
+            /** Served as the homeserver serves it once removed. */
+            removed?: true
           }[]
         | 'unreadable'
     }
@@ -99,11 +103,22 @@ function fakeHomeserver(
       // `dir=b`: newest first on the wire.
       return JSON.stringify({
         chunk: [...(room.events ?? [])].reverse().map(event => ({
-          type: 'm.room.encrypted',
+          type:
+            event.clear === undefined ? 'm.room.encrypted' : 'm.room.message',
           event_id: event.id,
           sender: event.sender,
           origin_server_ts: event.ts,
-          content: { plain: event.plain },
+          ...(event.removed === true
+            ? {
+                content: {},
+                unsigned: { redacted_because: { type: 'm.room.redaction' } },
+              }
+            : {
+                content:
+                  event.clear === undefined
+                    ? { plain: event.plain }
+                    : { msgtype: 'm.text', body: event.clear },
+              }),
         })),
       })
     },
@@ -975,5 +990,151 @@ describe('what a block does to a conversation (#469, #472, #494)', () => {
       scope: '!three-of-us:x',
       other: null,
     })
+  })
+})
+
+describe('a last message that is not encrypted (#461)', () => {
+  const HER = '@her:example.org'
+  const BLOCKED = '@bothers:example.org'
+
+  it('says the mention in place of its opening, and keeps none of its words', async () => {
+    const [summary] = await fetchConversationSummaries(
+      fakeHomeserver({
+        '!a:x': {
+          events: [
+            { id: '$1', sender: HER, ts: 100, plain: 'the older one' },
+            { id: '$2', sender: HER, ts: 200, clear: 'en clair' },
+          ],
+        },
+      }),
+      ME,
+      NOTHING_READ,
+    )
+
+    expect(summary).toMatchObject({
+      preview: null,
+      previewUnencrypted: true,
+      previewBy: HER,
+      lastAt: 200,
+    })
+    expect(summary?.reason).toBeUndefined()
+    // What the row says and what the notebook keeps of it: everything but
+    // the messages it is drawn again from, which stay in memory.
+    expect(JSON.stringify({ ...summary, window: undefined })).not.toContain(
+      'en clair',
+    )
+  })
+
+  it('says the opening of the newest message again once one arrives encrypted', async () => {
+    const [summary] = await fetchConversationSummaries(
+      fakeHomeserver({
+        '!a:x': {
+          events: [
+            { id: '$1', sender: HER, ts: 100, clear: 'en clair' },
+            { id: '$2', sender: HER, ts: 200, plain: 'the newer one' },
+          ],
+        },
+      }),
+      ME,
+      NOTHING_READ,
+    )
+
+    expect(summary?.preview).toBe('the newer one')
+    expect(summary?.previewUnencrypted).toBeUndefined()
+  })
+
+  it('says it was removed, and no mention, once it is removed for everyone', async () => {
+    const [summary] = await fetchConversationSummaries(
+      fakeHomeserver({
+        '!a:x': {
+          events: [
+            {
+              id: '$1',
+              sender: HER,
+              ts: 100,
+              clear: 'en clair',
+              removed: true,
+            },
+          ],
+        },
+      }),
+      ME,
+      NOTHING_READ,
+    )
+
+    expect(summary).toMatchObject({
+      preview: null,
+      reason: 'the last message was removed',
+    })
+    expect(summary?.previewUnencrypted).toBeUndefined()
+  })
+
+  it('drops the mention with the opening when its author is blocked', async () => {
+    const derived = await fetchConversationSummaries(
+      fakeHomeserver({
+        '!three-of-us:x': {
+          members: [ME, BLOCKED, HER],
+          events: [
+            { id: '$1', sender: HER, ts: 100, plain: 'hello' },
+            { id: '$2', sender: BLOCKED, ts: 200, clear: 'en clair' },
+          ],
+        },
+      }),
+      ME,
+      NOTHING_READ,
+    )
+    // And from a row kept from an earlier launch, which has no messages to
+    // be drawn again from.
+    const kept: ConversationSummary = {
+      scope: '!kept:x',
+      other: null,
+      others: 2,
+      preview: null,
+      previewUnencrypted: true,
+      previewBy: BLOCKED,
+      lastAt: 200,
+      unread: 0,
+    }
+
+    const drawn = listWithoutTheBlocked([...derived, kept], new Set([BLOCKED]))
+
+    expect(
+      drawn.map(row => [row.scope, row.preview, row.previewUnencrypted]),
+    ).toEqual([
+      ['!kept:x', null, undefined],
+      ['!three-of-us:x', 'hello', undefined],
+    ])
+  })
+
+  it('holds the conversation with a blocked account without the mention (#498)', () => {
+    // Held for who is in it and for nothing said in it: the mention is
+    // something said, even on a row that says nothing else.
+    const withThem: ConversationSummary = {
+      scope: '!with-them:x',
+      other: BLOCKED,
+      others: 1,
+      preview: null,
+      previewUnencrypted: true,
+      previewBy: BLOCKED,
+      lastAt: 200,
+      unread: 1,
+    }
+    const onlyTheMention: ConversationSummary = {
+      scope: '!only:x',
+      other: BLOCKED,
+      others: 1,
+      preview: null,
+      previewUnencrypted: true,
+      reason: NOTHING_LEFT_TO_SHOW,
+      lastAt: 0,
+      unread: 0,
+    }
+
+    const held = rowsHeld([withThem, onlyTheMention], new Set([BLOCKED]))
+
+    expect(held.map(row => [row.scope, row.previewUnencrypted])).toEqual([
+      ['!with-them:x', undefined],
+      ['!only:x', undefined],
+    ])
   })
 })

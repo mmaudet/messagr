@@ -150,6 +150,7 @@ export const en: Readonly<Record<CopyKey, string>> = {
   conversation_empty: 'Nothing has been said here yet.',
   conversation_unreadable: 'Unreadable on this device: its key never arrived.',
   conversation_removed: 'Message deleted',
+  conversation_unencrypted: 'This message is not encrypted.',
 
   'selection_count %1$d': '%1$d selected',
   selection_clear: 'Leave selection',

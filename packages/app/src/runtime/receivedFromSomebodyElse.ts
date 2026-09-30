@@ -42,11 +42,13 @@ import type { TimelineEntry } from '../timeline/mergeTimeline'
  * and the cost is an offer made slightly early for a device that does hold a
  * key it did not create.
  *
- * # WHAT IT CANNOT TELL APART
+ * # WHAT IT DOES NOT TELL APART
  *
- * A message that arrived encrypted from one that arrived in clear:
- * `TimelineEntry` does not record which, because no screen has ever needed
- * to know. Strictly, only the first is evidence of a key. The distinction
+ * A message that arrived encrypted from one that arrived in clear.
+ * `TimelineEntry` records which since #461 (`unencrypted`), for the mention
+ * drawn under such a message, on the list's row and in a notification, and
+ * this predicate does not read it. Strictly, only the first is evidence of a
+ * key. The distinction
  * would matter in a product with unencrypted conversations, and this one has
  * none — every conversation here is encrypted, so a plaintext message is an
  * anomaly rather than a case. Written down so that the day it stops being

@@ -34,6 +34,29 @@ function fake(
   return { database, ran }
 }
 
+/**
+ * A page that keeps what is written and answers it back, column for column:
+ * what an insert names is what a select finds. `fake` above answers rows it
+ * was handed; this one is what says a row survives being kept.
+ */
+function remembering(): EncryptedDatabase {
+  let rows: Record<string, unknown>[] = []
+  return {
+    execute: async (sql, params = []) => {
+      if (sql.startsWith('DELETE')) rows = []
+      if (sql.startsWith('INSERT')) {
+        const columns = (/\(([^)]*)\) VALUES/.exec(sql)?.[1] ?? '')
+          .split(',')
+          .map(column => column.trim())
+        rows.push(
+          Object.fromEntries(columns.map((column, at) => [column, params[at]])),
+        )
+      }
+      return { rows: sql.startsWith('SELECT') ? rows : [] }
+    },
+  }
+}
+
 const ROW = {
   scope: '!a:x',
   other: '@her:x',
@@ -86,7 +109,22 @@ describe('the remembered conversation list', () => {
       },
     ])
     const insert = ran.find(one => one.sql.startsWith('INSERT'))
-    expect(insert?.params).toEqual(['!b:x', '', '', '', 0, 0, -1, '', ''])
+    expect(insert?.params).toEqual(['!b:x', '', '', '', 0, 0, -1, '', '', 0])
+  })
+
+  it('keeps a row whose last message arrived unencrypted as a row that says so (#461)', async () => {
+    // Drawn from the notebook on the next launch, before anything is asked:
+    // without the mark, that row would say it could not read the message.
+    const cache = await openListCache(remembering())
+    const said: ConversationSummary = {
+      ...SUMMARY,
+      preview: null,
+      previewBy: '@her:x',
+      previewUnencrypted: true,
+    }
+
+    expect(await cache.keep([said])).toBe(true)
+    expect(await cache.all()).toEqual([said])
   })
 
   it('keeps who wrote the opening, and nothing of the messages behind it (#469)', async () => {

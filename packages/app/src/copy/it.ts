@@ -142,6 +142,7 @@ export const it: Readonly<Record<CopyKey, string>> = {
   conversation_unreadable:
     'Illeggibile su questo dispositivo: la sua chiave non è mai arrivata.',
   conversation_removed: 'Messaggio eliminato',
+  conversation_unencrypted: 'Questo messaggio non è cifrato.',
 
   'selection_count %1$d': '%1$d selezionato/i',
   selection_clear: 'Uscire dalla selezione',

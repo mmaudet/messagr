@@ -67,6 +67,51 @@ export interface TimelineEntry {
    * identical on the wire.
    */
   readonly removed?: boolean
+  /**
+   * Whether this message was not encrypted: it arrived as an
+   * `m.room.message`, where the conversation's messages arrive as
+   * `m.room.encrypted` (#461).
+   *
+   * Set only there. A message this device decrypted never carries it, nor
+   * one it could not open, nor one removed for everyone. What is drawn from
+   * it is `saysUnencrypted`'s to decide.
+   */
+  readonly unencrypted?: boolean
+}
+
+/**
+ * Whether a message is drawn with the mention that it is not encrypted
+ * (#461): under its bubble, in place of its opening on the list's row, and
+ * in place of its words in a notification.
+ *
+ * A removed one never is, whatever its entry still carries: it is a line
+ * saying it was removed, and nothing else.
+ */
+export function saysUnencrypted(
+  entry: Pick<TimelineEntry, 'unencrypted' | 'removed'>,
+): boolean {
+  return entry.unencrypted === true && entry.removed !== true
+}
+
+/**
+ * What an entry becomes once it is removed for everyone: who sent it, when,
+ * and the line that says it was removed.
+ *
+ * Nothing it carried is kept -- its words, its kind, its photograph, its
+ * document, whether it was encrypted -- so the line is the same whichever
+ * way the removal is learnt: from this device's own gesture, or from the
+ * room read again.
+ */
+export function asRemoved(
+  entry: Pick<TimelineEntry, 'eventId' | 'claimedSender' | 'sentAt'>,
+): TimelineEntry {
+  return {
+    eventId: entry.eventId,
+    claimedSender: entry.claimedSender,
+    sentAt: entry.sentAt,
+    body: null,
+    removed: true,
+  }
 }
 
 /**

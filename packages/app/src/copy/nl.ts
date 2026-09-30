@@ -141,6 +141,7 @@ export const nl: Readonly<Record<CopyKey, string>> = {
   conversation_unreadable:
     'Onleesbaar op dit apparaat: de sleutel is nooit aangekomen.',
   conversation_removed: 'Bericht verwijderd',
+  conversation_unencrypted: 'Dit bericht is niet versleuteld.',
 
   'selection_count %1$d': '%1$d geselecteerd',
   selection_clear: 'Selectie verlaten',
