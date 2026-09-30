@@ -305,10 +305,13 @@ a copy saved by mistake. The tool refuses a report whose reason or reporting
 account is no longer what the device sealed. It shows the reporting account,
 the reported author, the conversation, and each message with its time and its
 event ID, which the takedown names; a photo or a document, the address of its
-encrypted copy on the homeserver (#471). To see one, run the same pipe with
-`--ouvrir <n>`, the number the tool gives the message: it downloads the copy
-with the operator account, shows it, and erases what it wrote once Enter is
-pressed on the terminal (`scripts/ouvrir-un-signalement.mjs` says how).
+encrypted copy on the homeserver (#471), and a photo that has a thumbnail,
+the address of the thumbnail's own copy, which is what the conversation
+shows (#496). To see one, run the same pipe with `--ouvrir <n>`, the number
+the tool gives the message, or with `--ouvrir-vignette <n>` for the thumbnail
+of its photo: it downloads the copy with the operator account, shows it, and
+erases what it wrote once Enter is pressed on the terminal
+(`scripts/ouvrir-un-signalement.mjs` says how).
 
 ### 4. Within twenty-four hours, when it shows what the terms forbid
 
@@ -327,8 +330,9 @@ From the Mac, in this order:
    l'exploitant » in its place (#476), from the fixed reason Continuwuity
    writes.
 
-2. **Erase the encrypted copy of a reported photo or document**, with the
-   address the opening tool shows:
+2. **Erase the encrypted copy of a reported photo or document**, and that
+   of a photo's thumbnail when the tool shows one, each with the address the
+   opening tool shows:
 
        scripts/admin-messagr.sh effacer-media mxc://messagr.eu/<media ID>
 

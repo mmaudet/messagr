@@ -133,7 +133,8 @@ GESTES = {
         MEDIA,
         "une adresse mxc://<serveur>/<média>, celle que l'outil d'ouverture montre",
         "Effacer du serveur la copie chiffrée {cible}, le fichier d'une photo ou d'un\n"
-        "document signalé : elle ne se télécharge plus, pour personne.",
+        "document signalé, ou la vignette d'une photo : elle ne se télécharge plus,\n"
+        "pour personne.",
         "l'adresse",
     ),
     "suspendre": (

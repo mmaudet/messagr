@@ -36,6 +36,27 @@ describe("A report the service exports, on the operator's machine", () => {
     expect(said).toContain('@alice:example.org')
   })
 
+  // Step 3 runs the same pipe with `--ouvrir <n>`, or `--ouvrir-vignette <n>`
+  // for the thumbnail of a photo (#471, #496). What the test report carries
+  // is not a report in format 1, and has no message to open: the tool reads
+  // the pipe with either option, prints what the report carries, and says
+  // there is nothing to open, without reaching a single port that opens a
+  // file.
+  it.each(['--ouvrir', '--ouvrir-vignette'])(
+    'reads the same pipe with %s, as step 3 writes it',
+    async option => {
+      const { status, said, printed } = await runTheOpeningTool(
+        ['--cle', TEST_KEY_FILE, option, '1'],
+        readFileSync(EXPORTED_FILE, 'utf8'),
+      )
+
+      expect(status).toBe(2)
+      expect(printed).toEqual(['Beauty is truth, truth beauty'])
+      expect(said).toContain('Rien à ouvrir')
+      expect(said).not.toContain('usage')
+    },
+  )
+
   it('opens from a file as well', async () => {
     const { status, printed } = await runTheOpeningTool(
       ['--cle', TEST_KEY_FILE, EXPORTED_FILE],

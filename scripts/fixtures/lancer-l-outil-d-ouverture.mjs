@@ -15,9 +15,9 @@ import { noFileOpened } from './sans-fichier-ouvert.mjs'
 /**
  * L'outil lancé avec `argv`, `input` sur son entrée standard (`null` : un
  * terminal, où personne ne tape un pli) et `home` pour répertoire personnel,
- * vide sauf mention contraire. Il n'ouvre aucune photo ni aucun document :
- * ses ports d'ouverture d'un fichier lèvent s'ils sont atteints
- * (`sans-fichier-ouvert.mjs`).
+ * vide sauf mention contraire. Il n'ouvre aucune photo, aucune vignette ni
+ * aucun document : ses ports d'ouverture d'un fichier lèvent s'ils sont
+ * atteints (`sans-fichier-ouvert.mjs`).
  *
  * @param {readonly string[]} argv
  * @param {string | null} [input]
