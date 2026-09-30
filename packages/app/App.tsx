@@ -2446,9 +2446,9 @@ export function App({
    *
    * The ignored list written, every screen draws without that account at
    * once, and the conversation open closes when the one rule says it leaves
-   * (`closeWhatTheBlockTakes`), as a conversation of two with that account
-   * does: the person is back on the list, where it is gone, and the list
-   * says so. From a conversation that stays, the person stays in it, and it
+   * (`leavesNow`, in `holdIgnored`), as a conversation of two with that
+   * account does: the person is back on the list, where it is gone, and the
+   * list says so. From a conversation that stays, the person stays in it, and it
    * says so. What the service answers comes after, and is said in the same
    * place. Not written, nothing changed, and the panel or the sheet says so
    * where the gesture was made.
