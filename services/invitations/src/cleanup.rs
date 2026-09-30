@@ -579,7 +579,7 @@ pub(crate) async fn sweep_once(st: &Arc<AppState>, now: i64) -> bool {
         purge_account_deletions(&st.pool, now).await,
         sweep_sms(st, now).await,
         sweep_discovery(st, now).await,
-        // Reports (#473): the sealed report 181 days after its decision, the
+        // Reports (#473): the sealed report 181 days after its first decision, the
         // record 365 days after, neither while held for the authorities.
         crate::moderation::sweep(&st.pool, now).await,
     ) {

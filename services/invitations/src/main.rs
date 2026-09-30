@@ -184,8 +184,11 @@ async fn main() -> anyhow::Result<()> {
 
 /// Prints the plan and reads one line back. THE ONLY caller of stdin in this
 /// binary, and it is deliberately trivial: everything worth testing about the
-/// confirmation lives in `operator::typed_back`, which takes the answer as a
-/// value, for the named deactivation and for the retirement of a key.
+/// confirmation lives in functions that take the answer as a value.
+/// `operator::typed_back` confirms the named deactivation, the retirement of
+/// a key and the record of a termination, exactly; `moderation`'s
+/// `is_the_number` confirms the other gestures on a report (#473), in any
+/// spelling a report number is typed in.
 ///
 /// End of stdin gives `None`, which is a refusal — so a cron entry, a pipeline
 /// or a pasted runbook finds no way through.

@@ -45,9 +45,9 @@
 //!
 //! The operator's termination (#473) is the one other way in, and it is not
 //! a route: typed on the host, once the homeserver has deactivated the
-//! account (`moderation`), it writes the same row through `record`, so that
-//! the purge within thirty days applies to a terminated account as to a
-//! deleted one.
+//! account after a confirmed decision (`moderation`), it writes the same row
+//! through `record`, dated by the day, so that the purge within thirty days
+//! applies to a terminated account too.
 
 use std::sync::Arc;
 
@@ -93,10 +93,10 @@ pub(crate) struct Recorded {
 /// transaction: the four things the header says.
 ///
 /// THE SAME ROW FOR A TERMINATION (#473). The account that announces its own
-/// deletion writes it through `announce`; the operator, on the host, writes
-/// it for an account the homeserver deactivated after a decision
-/// (`moderation`), so that the purge within thirty days applies to it as to
-/// any deletion. Nothing here names a report, nor tells the two apart.
+/// deletion writes it through `announce`, at the second it calls; the
+/// operator, on the host, writes it for an account the homeserver
+/// deactivated after a confirmed decision (`moderation`), at the day, so that
+/// the purge within thirty days applies to it. The row names no report.
 pub(crate) async fn record(
     pool: &sqlx::SqlitePool,
     user_id: &str,

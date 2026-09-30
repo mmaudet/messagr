@@ -1,20 +1,25 @@
 -- La décision sur un signalement, et ce qui s'efface après elle (#473, #462,
 -- ADR 0015).
 --
--- Sur l'hôte, l'exploitant note la décision (maintenue, levée, fermeture),
--- sa motivation et sa date, et retient un signalement transmis aux
--- autorités, puis lève cette retenue (`moderation`). Le ménage horaire
--- efface le pli et la clé d'idempotence 181 jours après la décision, et
--- l'enregistrement 365 jours après : jamais tant que le signalement est
--- retenu, et jamais un signalement sans décision, que la liste montre
--- toujours comme en attente.
+-- Sur l'hôte, l'exploitant note la décision, sa motivation et sa date, et
+-- retient un signalement transmis aux autorités, puis lève cette retenue
+-- (`moderation`). La décision classe le signalement sans suite
+-- (`unfounded`), lève la suspension (`lifted`) ou la confirme, et le compte
+-- est alors fermé (`confirmed`). Le ménage horaire efface le pli et la clé
+-- d'idempotence 181 jours après la première décision, et l'enregistrement
+-- 365 jours après : jamais tant que le signalement est retenu, et jamais un
+-- signalement sans décision, que la liste montre toujours comme en attente.
+-- Une seconde décision, après une contestation, remplace l'issue et la
+-- motivation de la première et garde son jour : `decided_on` ne s'écrit
+-- qu'une fois.
 --
 -- LA DATE D'UNE DÉCISION EST UN JOUR, JAMAIS UNE HEURE : minuit UTC du jour
--- où l'exploitant la note, comme celle d'une retenue. Rien sur un signalement
--- ne garde l'instant où l'exploitant était à son terminal : une fermeture,
--- enregistrée à part comme une suppression de compte (`account_deletions`,
--- 011), n'y retrouve pas son heure, et aucune colonne ne relie l'une à
--- l'autre.
+-- où l'exploitant la note, comme celle d'une retenue, et comme celle d'un
+-- compte fermé, que l'exploitant enregistre à part parmi les suppressions de
+-- compte (`account_deletions`, 011). Aucune colonne ne relie l'un à l'autre.
+-- Ce qui reste est dit dans l'ADR 0015 (amendée le 30 septembre 2026) : une
+-- copie de la base peut rapprocher par leurs dates une décision confirmée et
+-- une suppression de compte, quand les suppressions sont rares.
 --
 -- LA MOTIVATION est la décision raisonnée, jamais une citation : elle ne nomme
 -- aucun compte et ne recopie rien de ce qui a été dit. Le mode qui la note
@@ -32,7 +37,7 @@ CREATE TABLE reports_022 (
     sealed            BLOB,
     received_at       INTEGER NOT NULL,
     idempotency_key   TEXT,
-    decision          TEXT    CHECK (decision IN ('maintained', 'lifted', 'termination')),
+    decision          TEXT    CHECK (decision IN ('unfounded', 'lifted', 'confirmed')),
     motivation        TEXT,
     decided_on        INTEGER,
     held_since        INTEGER,

@@ -150,7 +150,7 @@ async fn a_decision_is_written_once_the_number_is_typed_back_on_stdin_and_never_
     let decide = [
         "--decide-report",
         "K7QM-4ZT2",
-        "maintained",
+        "lifted",
         "Le signalement montre un harcèlement répété, que les conditions interdisent.",
     ];
 
@@ -171,7 +171,7 @@ async fn a_decision_is_written_once_the_number_is_typed_back_on_stdin_and_never_
     );
     assert_eq!(
         one_value(dir.path(), "SELECT decision FROM reports").await,
-        Some("maintained".into())
+        Some("lifted".into())
     );
 }
 
@@ -198,8 +198,8 @@ fn a_gesture_named_badly_is_refused_before_anything_is_read() {
     // DATABASE_URL is missing instead.
     for args in [
         vec!["--reports=K7QM-4ZT2"],
-        vec!["--decide-report", "K7QM-4ZT2", "maintained"],
-        vec!["--hold-report", "K7QM-4ZT2", "--yes"],
+        vec!["--decide-report", "K7QM-4ZT2", "lifted"],
+        vec!["--hold-report", "K7QM-4ZT2", "ABCD-EFGH"],
     ] {
         let refused = finished(
             Command::new(BINARY)

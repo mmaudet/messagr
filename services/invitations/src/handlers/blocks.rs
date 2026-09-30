@@ -39,7 +39,7 @@ use std::sync::Arc;
 use axum::{extract::State, http::HeaderMap, http::StatusCode};
 use serde::Deserialize;
 
-use crate::{auth, error::AppError, extract::Body, named_deactivation::is_a_user_id, AppState};
+use crate::{auth, error::AppError, extract::Body, operator::is_a_user_id, AppState};
 
 /// The longest user identifier the Matrix specification allows, in bytes.
 const USER_ID_MAX_BYTES: usize = 255;
