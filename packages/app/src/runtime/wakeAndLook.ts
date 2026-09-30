@@ -97,7 +97,7 @@ export async function lookForWhatArrivedHere(): Promise<WhatWoke | null> {
       http: makePumpHttp(sessionClient),
       since: await readSyncCursor(syncCursorSecrets),
       readConversation: async scope =>
-        (await loadConversation(sessionClient, scope, session.userId)).entries,
+        (await loadConversation(sessionClient, scope)).entries,
       // The same reader the running application uses, bound to the machine
       // this wake just started. `buildTimeline` draws no bubble for
       // `m.call.*`, so the conversation above cannot answer this question --

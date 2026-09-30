@@ -811,6 +811,36 @@ export const fr = {
     'Ce compte est bloqué, et votre conversation avec lui a quitté la liste : ses messages et ses appels ne vous parviendront plus. L’exploitant n’en est pas encore informé, et d’ici là, une invitation remise dans Messagr par ce compte peut encore vous parvenir. L’application réessaiera à chaque lancement, jusqu’à ce qu’il le soit.',
   list_blocked_not_kept:
     'Ce compte est bloqué, et votre conversation avec lui a quitté la liste : ses messages et ses appels ne vous parviendront plus. L’exploitant n’en a pas été informé, et cet appareil n’a pas pu le noter pour réessayer : une invitation remise dans Messagr par ce compte peut encore vous parvenir.',
+  // « BLOQUER L'EXPÉDITEUR », DEPUIS LA SÉLECTION (#472). Le même geste et le
+  // même écran que le panneau de la personne, et la seule entrée dans une
+  // conversation à plusieurs, où ce panneau n'existe pas. Là, la conversation
+  // reste dans la liste et seuls les messages du compte bloqué la quittent :
+  // l'écran le dit à la place de « cette conversation quitte votre liste »,
+  // et dit que ce compte y lit toujours ce qu'on écrit, pour ne rien
+  // découvrir après (récit 22). Tant que l'application ne sait pas qui est
+  // dans la conversation, il ne dit ni qu'elle reste ni qu'elle part. Puis la
+  // conversation dit ce qui est fait et ce qui attend, et la liste ensuite,
+  // sans prétendre qu'une conversation l'a quittée. Et si l'on demandait de
+  // se bloquer soi-même, rien ne se fait, et l'écran dit pourquoi. « Plus »
+  // ouvre, en mots, les actions de la barre qui n'y tiennent pas : chacune y
+  // garde la taille d'une cible, et les plus rares y vont d'abord.
+  selection_block: 'Bloquer l’expéditeur',
+  selection_more: 'Plus',
+  selection_more_close: 'Fermer',
+  block_explain_gone_stays:
+    'Ses messages disparaissent de toutes vos conversations, ceux déjà reçus compris. Cette conversation reste dans votre liste, sans eux, et votre conversation à deux avec ce compte, si vous en avez une, la quitte. Vous ne sortez d’aucune : ce compte ne voit rien changer.',
+  block_explain_gone_not_known:
+    'Ses messages disparaissent de toutes vos conversations, ceux déjà reçus compris, et votre conversation à deux avec ce compte, si vous en avez une, quitte votre liste. Vous ne sortez d’aucune : ce compte ne voit rien changer.',
+  block_fact_still_reads: 'Il lit encore cette conversation',
+  block_explain_still_reads:
+    'Ce compte reste dans cette conversation, et il lit toujours ce que vous et les autres y écrivez : le blocage ne retire de vos écrans que ce qu’il écrit, lui.',
+  block_itself: 'Vous ne pouvez pas vous bloquer vous-même : rien n’a changé.',
+  blocked_stays:
+    'Ce compte est bloqué : plus rien de lui ne vous parviendra, et ce qu’il a écrit a quitté vos conversations.',
+  blocked_stays_waiting:
+    'Ce compte est bloqué, et ce qu’il a écrit a quitté vos conversations : ses messages et ses appels ne vous parviendront plus. L’exploitant n’en est pas encore informé, et d’ici là, une invitation remise dans Messagr par ce compte peut encore vous parvenir. L’application réessaiera à chaque lancement, jusqu’à ce qu’il le soit.',
+  blocked_stays_not_kept:
+    'Ce compte est bloqué, et ce qu’il a écrit a quitté vos conversations : ses messages et ses appels ne vous parviendront plus. L’exploitant n’en a pas été informé, et cet appareil n’a pas pu le noter pour réessayer : une invitation remise dans Messagr par ce compte peut encore vous parvenir.',
   invited_working: 'Un instant…',
   invited_failed:
     'Rien n’a changé : cette invitation n’a été ni rejointe ni refusée. Vous pouvez réessayer.',

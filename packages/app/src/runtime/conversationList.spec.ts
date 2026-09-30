@@ -4,6 +4,8 @@ import {
   fetchConversationSummaries,
   listWithoutTheBlocked,
   NOTHING_LEFT_TO_SHOW,
+  openAfterTheBlock,
+  openConversationOf,
   scopesWithTheBlocked,
   type ConversationListDeps,
   type ConversationSummary,
@@ -693,5 +695,137 @@ describe('the conversations with a blocked account (#469)', () => {
       '!a:x',
       '!b:x',
     ])
+  })
+})
+
+describe('what a block does to a conversation (#469, #472, #494)', () => {
+  // ONE RULE, read by the list, by the conversation open, by the screen
+  // that says what blocking will do, and by what is said once it is done:
+  // whichever device made the block.
+  const BLOCKED = '@bothers:example.org'
+  const HER = '@her:example.org'
+  const blocked = new Set([BLOCKED])
+
+  function row(
+    scope: string,
+    other: string | null,
+    extra: Partial<ConversationSummary> = {},
+  ): ConversationSummary {
+    return {
+      scope,
+      other,
+      others: other === null ? 2 : 1,
+      preview: null,
+      lastAt: 0,
+      unread: 0,
+      ...extra,
+    }
+  }
+
+  const rows = [
+    row('!with-them:x', BLOCKED),
+    row('!three-of-us:x', null),
+    row('!alone-now:x', null, { others: 0, departed: BLOCKED }),
+    row('!with-her:x', HER),
+    // Whose membership could not be read.
+    row('!unread:x', null, { others: null }),
+    row('!alone-unread:x', null, { others: 0, membershipsUnread: true }),
+  ]
+  const listed = (drawn: readonly ConversationSummary[]) =>
+    drawn.map(one => one.scope)
+
+  it('takes the conversation of two with the blocked account off the list, and off the screen', () => {
+    expect(listed(listWithoutTheBlocked(rows, blocked))).not.toContain(
+      '!with-them:x',
+    )
+    expect(
+      openAfterTheBlock(
+        { scope: '!with-them:x', other: BLOCKED },
+        rows,
+        blocked,
+      ),
+    ).toBe('leaves')
+    // Its row says so before the conversation has found its other person...
+    expect(
+      openAfterTheBlock({ scope: '!with-them:x', other: null }, rows, blocked),
+    ).toBe('leaves')
+    // ...and the conversation says so before the list has a row for it.
+    expect(
+      openAfterTheBlock({ scope: '!new:x', other: BLOCKED }, rows, blocked),
+    ).toBe('leaves')
+  })
+
+  it('takes off the one this account is alone in, when the blocked account is who left it', () => {
+    expect(listed(listWithoutTheBlocked(rows, blocked))).not.toContain(
+      '!alone-now:x',
+    )
+    expect(
+      openAfterTheBlock({ scope: '!alone-now:x', other: null }, rows, blocked),
+    ).toBe('leaves')
+  })
+
+  it('keeps a conversation of more than two in the list and open', () => {
+    // Only the blocked account's messages leave it.
+    expect(listed(listWithoutTheBlocked(rows, blocked))).toContain(
+      '!three-of-us:x',
+    )
+    expect(
+      openAfterTheBlock(
+        { scope: '!three-of-us:x', other: null },
+        rows,
+        blocked,
+      ),
+    ).toBe('stays')
+  })
+
+  it('keeps every other conversation, and every one while nobody is blocked', () => {
+    expect(
+      openAfterTheBlock({ scope: '!with-her:x', other: HER }, rows, blocked),
+    ).toBe('stays')
+    expect(
+      openAfterTheBlock({ scope: '!new:x', other: HER }, rows, blocked),
+    ).toBe('stays')
+    expect(
+      openAfterTheBlock(
+        { scope: '!with-them:x', other: BLOCKED },
+        rows,
+        new Set(),
+      ),
+    ).toBe('stays')
+    expect(listWithoutTheBlocked(rows, new Set())).toBe(rows)
+  })
+
+  it('says it does not know, and claims nothing, while nothing has said who is in it', () => {
+    // Neither a row nor the conversation's own finding.
+    expect(
+      openAfterTheBlock({ scope: '!new:x', other: null }, rows, blocked),
+    ).toBe('not known')
+    // A row whose membership could not be read knows no more, and the list
+    // keeps a row it cannot say is the one with the blocked account.
+    for (const scope of ['!unread:x', '!alone-unread:x']) {
+      expect(
+        openAfterTheBlock({ scope, other: null }, rows, blocked),
+        scope,
+      ).toBe('not known')
+      expect(listed(listWithoutTheBlocked(rows, blocked))).toContain(scope)
+    }
+  })
+
+  it('knows the other person only when it was found for the conversation open', () => {
+    // Found for the conversation open before this one, and not yet for this
+    // one: that person is not this conversation's.
+    expect(
+      openConversationOf('!with-her:x', { scope: '!with-her:x', other: HER }),
+    ).toEqual({ scope: '!with-her:x', other: HER })
+    expect(
+      openConversationOf('!three-of-us:x', {
+        scope: '!with-them:x',
+        other: BLOCKED,
+      }),
+    ).toEqual({ scope: '!three-of-us:x', other: null })
+    expect(openConversationOf('!three-of-us:x', null)).toEqual({
+      scope: '!three-of-us:x',
+      other: null,
+    })
   })
 })

@@ -94,8 +94,10 @@ describe('lookForWhatArrived', () => {
         },
       }),
     )
+    // And whose account it is, which the notification carries unseen: what
+    // a block takes it down by (#472).
     expect(found).toEqual([
-      { scope: '!a:x', shown: 'Maria', preview: 'see you at eight' },
+      { scope: '!a:x', shown: 'Maria', preview: 'see you at eight', from: HER },
     ])
   })
 

@@ -69,7 +69,7 @@ import {
   vouchForEntrant,
   type CryptoPumpReport,
   type FormMigration,
-  type ReactionTally,
+  type LooseReaction,
   type ReceiveReport,
   type RunningSyncLoop,
   type TrustReading,
@@ -228,6 +228,7 @@ import {
 import { readFavourites, type KeptMessage } from './src/runtime/readFavourites'
 import { receivedFromSomebodyElse } from './src/runtime/receivedFromSomebodyElse'
 import {
+  blockable,
   canCopy,
   canFavourite,
   canForward,
@@ -235,6 +236,7 @@ import {
   copyText,
   onlyPhotograph,
   reportable,
+  selectionWithoutTheBlocked,
   toggle,
 } from './src/timeline/selection'
 import {
@@ -281,23 +283,38 @@ import type { Plate as Grouping } from './src/timeline/plates'
 import type { EvictOutcome } from './src/runtime/evict'
 import {
   blockAccount,
+  callsWithoutTheBlocked,
   keptWithoutTheBlocked,
+  mayCall,
   noticeOf,
   readIgnored,
   sameAccounts,
   tellWhatIsWaiting,
-  type BlockNotice,
+  type BlockOnScreen,
 } from './src/runtime/block'
 import {
   listWithoutTheBlocked,
+  openAfterTheBlock,
+  openConversationOf,
   scopesWithTheBlocked,
+  type AfterTheBlock,
+  type WithSomebody,
 } from './src/runtime/conversationList'
 import {
   forgetfulIgnoredList,
   type IgnoredList,
 } from './src/runtime/ignoredListStore'
-import { shownOf } from './src/runtime/notShown'
-import { takeDownNotificationsOf } from './src/runtime/showNotification'
+import {
+  allShown,
+  reactionsShown,
+  shownOf,
+  type NotShown,
+} from './src/runtime/notShown'
+import { tallyReactions } from './src/timeline/reactions'
+import {
+  takeDownNotificationsOf,
+  takeDownWhatShows,
+} from './src/runtime/showNotification'
 import {
   forgetfulUntoldBlocks,
   type UntoldBlocks,
@@ -367,7 +384,8 @@ import {
 import { accountIdOf, stillKnown } from './src/runtime/sessionKnown'
 import { deletionMail } from './src/ui/deletionMail'
 import { Evict } from './src/ui/Evict'
-import { Block } from './src/ui/Block'
+import { Block, BlockSheet } from './src/ui/Block'
+import { BlockLine } from './src/ui/BlockLine'
 import { Vouch } from './src/ui/Vouch'
 import { currentLanguage, setCatalogue, t } from './src/copy'
 import type { Language } from './src/copy/languages'
@@ -591,9 +609,9 @@ export function App({
   const ignoredReadRef = useRef(false)
   /**
    * Holds the list the homeserver said, or the notebook's copy of it: what
-   * every screen draws from, the copy kept up to date, and the notifications
-   * this application drew for a conversation with an account now blocked
-   * taken down, whichever device made the block.
+   * every screen draws from, and the copy kept up to date. Then what a block
+   * takes down besides, whichever device made it: the notifications that
+   * show those newly blocked, and the conversation open with one of them.
    */
   const holdIgnored = (
     next: ReadonlySet<string>,
@@ -606,12 +624,63 @@ export function App({
       ignoredListRef.current.keep(next).catch(() => {})
     }
     const newly = new Set([...next].filter(account => !before.has(account)))
+    takeDownTheirNotifications(newly)
+    closeWhatTheBlockTakes(next)
+  }
+  /**
+   * The notifications this application drew that show an account now
+   * blocked: all of those of a conversation with it (#469), where a tap
+   * would open what the block took away, and, in any other, the one that
+   * shows a message it wrote or a call it placed (#472). A conversation of
+   * more than two keeps a notification that shows somebody else.
+   */
+  const takeDownTheirNotifications = (newly: ReadonlySet<string>) => {
     for (const scope of scopesWithTheBlocked(
       derivedSummariesRef.current,
       newly,
     )) {
       takeDownNotificationsOf(scope).catch(() => {})
     }
+    takeDownWhatShows(newly).catch(() => {})
+  }
+  /**
+   * THE CONVERSATION OPEN WITH AN ACCOUNT NOW BLOCKED CLOSES (#494), as the
+   * one blocked from does, whichever device made the block: left open, what
+   * is written in it would still leave. The rule is `openAfterTheBlock`, the
+   * one the list, the block's screen and what is said afterwards read.
+   *
+   * One that stays stays open, without that account's messages (#472), and
+   * without what was bound to them: its messages in the selection, its
+   * photograph full screen, and a sheet about it -- reporting its messages,
+   * or blocking it again.
+   */
+  const closeWhatTheBlockTakes = (blocked: ReadonlySet<string>) => {
+    const open = openScopeRef.current
+    if (open === null) return
+    const after = openAfterTheBlock(
+      openConversationOf(open, partyRef.current),
+      derivedSummariesRef.current,
+      blocked,
+    )
+    if (after === 'leaves') {
+      leaveTheConversation()
+      return
+    }
+    setSelected(held =>
+      selectionWithoutTheBlocked(held, conversationRef.current, blocked),
+    )
+    setOpenPlate(shown =>
+      shown === null ||
+      allShown(shown.plate.entries, { hidden: new Set(), blocked })
+        ? shown
+        : null,
+    )
+    setReporting(sheet =>
+      sheet !== null && blocked.has(sheet.author) ? null : sheet,
+    )
+    setBlockingSender(sheet =>
+      sheet !== null && blocked.has(sheet.other) ? null : sheet,
+    )
   }
   // THE LIST EVERY SCREEN READS (#469): without the conversation with a
   // blocked account, and every other row drawn again without its messages.
@@ -1280,12 +1349,10 @@ export function App({
   const readTrustRef = useRef<((scope: string, other: string) => void) | null>(
     null,
   )
-  // Reactions, grouped by the message they point at. ADR-0011: this
-  // application aggregates its own, because a server cannot aggregate what it
-  // cannot read.
-  const [reactions, setReactions] = useState<
-    ReadonlyMap<string, readonly ReactionTally[]>
-  >(new Map())
+  // Reactions, each with who sent it. ADR-0011: this application aggregates
+  // its own, because a server cannot aggregate what it cannot read, and
+  // where they are drawn (amended on 30 September 2026).
+  const [reactions, setReactions] = useState<readonly LooseReaction[]>([])
   // Whether this device publishes read receipts, and which of this account's
   // own messages somebody else has read. Off unless somebody turned it on:
   // see receiptSetting.ts.
@@ -1412,6 +1479,10 @@ export function App({
    * One function rather than three copies of the same six lines: the header
    * has two buttons now and the calls list a third, and a `place` that
    * differed between them would differ in the failure handling first.
+   *
+   * AND THE ONE PLACE A BLOCKED ACCOUNT IS NEVER CALLED FROM (#494): the
+   * screens no longer offer it, and a gesture left over from before the
+   * block, or reached by a way they did not foresee, rings nothing either.
    */
   const placeCall = (
     scope: string | null,
@@ -1420,6 +1491,13 @@ export function App({
   ) => {
     const runtime = callRuntimeRef.current
     if (runtime === null || scope === null) return
+    if (!mayCall(peerUserId, ignoredRef.current ?? new Set())) {
+      // Never the account: the log names nobody.
+      logEvent('warn', 'MESSAGR_CALL_NOT_PLACED', {
+        reason: 'the account is blocked',
+      })
+      return
+    }
     runtime.place(scope, peerUserId, wants).catch((cause: unknown) =>
       logEvent('warn', 'MESSAGR_CALL_NOT_PLACED', {
         reason: getErrorMessage(cause),
@@ -1642,10 +1720,13 @@ export function App({
   // The other person in this conversation, and the two halves of #34's
   // gesture. `party` is `null` for anything that is not a conversation of
   // two: vouching names one person, so it has nothing to offer a group.
-  const [party, setParty] = useState<{
-    readonly scope: string
-    readonly other: string
-  } | null>(null)
+  const [party, setParty] = useState<WithSomebody | null>(null)
+  // The same, for the callbacks made once: an ignored list a sync brings
+  // closes the conversation open with an account it names (#494).
+  const partyRef = useRef(party)
+  useEffect(() => {
+    partyRef.current = party
+  }, [party])
   const [vouch, setVouch] = useState<'idle' | 'working' | VouchOutcome>('idle')
   // Refs rather than state, and for one reason: the gesture's button lives
   // outside the effect that built the session, and re-rendering when a
@@ -2282,27 +2363,53 @@ export function App({
     'idle',
   )
   /**
-   * Blocking the other person from their panel (#469): whom, and how far it
-   * got. A block that holds takes the person back to the list, and the list
-   * says what is done (`blockNotice`); only a failure stays on the panel.
+   * Blocking an account, from the panel of the person (#469) or from the
+   * selection (#472): whom, and how far it got. A block that holds takes the
+   * person back to the list, or leaves them in the conversation it was made
+   * from when that one stays, and the screen they are on says what is done
+   * (`blockOnScreen`); only what did not happen stays where the gesture was
+   * made: a failure, or this account itself, which is never blocked.
    */
   const [blocking, setBlocking] = useState<{
     readonly who: string
-    readonly state: 'working' | 'failed'
+    readonly state: 'working' | 'failed' | 'itself'
   } | null>(null)
-  const [blockNotice, setBlockNotice] = useState<BlockNotice | null>(null)
+  const [blockOnScreen, setBlockOnScreen] = useState<BlockOnScreen | null>(null)
+  /**
+   * « Bloquer l'expéditeur » (#472), while its sheet is up: the conversation,
+   * and the account to block, taken from the selection when the action was
+   * pressed, as a report's messages are. `null` otherwise.
+   */
+  const [blockingSender, setBlockingSender] = useState<WithSomebody | null>(
+    null,
+  )
   /**
    * Out of the conversation open, back to the list: what the header's back
-   * arrow does, and a block that holds (#469).
+   * arrow does, a block that holds (#469), and one that arrives (#494).
    */
   const leaveTheConversation = () => {
     setOpenScope(null)
     openScopeRef.current = null
+    putDownWhatIsOverTheConversation()
+  }
+  /**
+   * Everything drawn over the conversation open, put down with it (#494),
+   * whether it is left or another opened in its place: the selection, the
+   * person and trust panels, and every sheet and viewer bound to it -- the
+   * block's, the report's, the removal's, the forward picker and the
+   * photograph full screen. Left up, each outlived its conversation: the
+   * removal sheet opened again in the next one, the others stood over the
+   * list.
+   */
+  const putDownWhatIsOverTheConversation = () => {
     setSelected(new Set())
     setTrust(null)
-    // Otherwise the next conversation opens on the person screen of the one
-    // before it.
     setPersonOpen(false)
+    setBlockingSender(null)
+    setReporting(null)
+    setRemoving(false)
+    setForwarding(null)
+    setOpenPlate(null)
   }
   /**
    * Whether this account is findable now, as far as this device knows:
@@ -2313,28 +2420,38 @@ export function App({
   const findableAsFarAsKnown = () =>
     !discovery.read || isFindable(discovery, Date.now())
   /**
-   * Blocks `who`, the other person of the conversation open, from their
-   * panel (#469). The gesture and its order are `block.ts`'s; this binds it
-   * to the session and to the screens.
+   * Blocks `who`: the other person of the conversation open, from their
+   * panel (#469), or the author of the messages selected, from « Bloquer
+   * l'expéditeur » (#472). The gesture and its order are `block.ts`'s, the
+   * same from both; this binds it to the session and to the screens.
    *
-   * The ignored list written, the person is back on the list at once, where
-   * the conversation is gone, and the list says so; what the service answers
-   * comes after, and the list says that too. Not written, nothing changed,
-   * and the panel says so where the gesture was made.
+   * The ignored list written, every screen draws without that account at
+   * once, and the conversation open closes when the one rule says it leaves
+   * (`closeWhatTheBlockTakes`), as a conversation of two with that account
+   * does: the person is back on the list, where it is gone, and the list
+   * says so. From a conversation that stays, the person stays in it, and it
+   * says so. What the service answers comes after, and is said in the same
+   * place. Not written, nothing changed, and the panel or the sheet says so
+   * where the gesture was made.
    */
-  const blockThePerson = (who: string) => {
+  const blockTheAccount = (who: string) => {
     const blockingAs = sessionClientRef.current
     const held = credentialsRef.current
     if (blockingAs === null || held === null) return
     setBlocking({ who, state: 'working' })
-    setBlockNotice(null)
+    setBlockOnScreen(null)
+    // The conversation blocked from, when the person stays in it: known once
+    // the list is written, and where what the service answers is said too.
+    let stayingIn: string | null = null
     blockAccount(
       {
         http: makePumpHttp(blockingAs),
         selfUserId: held.userId,
         nowIgnored: next => {
           // Every screen draws from it at once: the list, the rows of the
-          // other conversations, the conversations and Favoris.
+          // other conversations, the conversations, their reactions and
+          // Favoris; and the conversation open closes when it is one with
+          // that account.
           holdIgnored(next, 'the homeserver')
           // THE LIST THE NEXT LAUNCH DRAWS FIRST, kept at once as it is now
           // drawn: it is drawn before the homeserver is asked again.
@@ -2347,9 +2464,12 @@ export function App({
               listCacheRef.current.keep(listWithoutTheBlocked(rows, next)),
             )
             .catch(() => {})
-          leaveTheConversation()
+          stayingIn = openScopeRef.current
+          setBlockingSender(null)
+          // The messages selected are gone from the screen with their author.
+          setSelected(new Set())
           setBlocking(null)
-          setBlockNotice('blocked')
+          setBlockOnScreen({ notice: 'blocked', stayingIn })
           // And the homeserver asked again, which now holds that account's
           // messages back.
           refreshListRef.current?.().catch(() => {})
@@ -2371,13 +2491,17 @@ export function App({
                 told: outcome.told,
                 ...(outcome.told ? {} : { kept: outcome.kept }),
               }
-            : { blocked: false, reason: outcome.reason },
+            : {
+                blocked: false,
+                reason: 'itself' in outcome ? 'itself' : outcome.reason,
+              },
         )
         if (!outcome.blocked) {
-          setBlocking({ who, state: 'failed' })
+          setBlocking({ who, state: 'itself' in outcome ? 'itself' : 'failed' })
           return
         }
-        setBlockNotice(noticeOf(outcome))
+        const notice = noticeOf(outcome)
+        if (notice !== null) setBlockOnScreen({ notice, stayingIn })
       },
       () => setBlocking({ who, state: 'failed' }),
     )
@@ -3606,6 +3730,9 @@ export function App({
               setOpenScope(scope)
               openScopeRef.current = scope
               setConversation(null)
+              // What was over the conversation open before this one belongs
+              // to it, and does not come back over this one (#494).
+              putDownWhatIsOverTheConversation()
               // THE BACKUP DECISION IS WRITTEN AGAIN FOR THIS OPENING, even
               // unchanged. The device suite reads it after its own tap
               // (`e2e/conversation.ts`), and two openings can share a launch:
@@ -3655,8 +3782,6 @@ export function App({
                   const fresh = await loadConversation(
                     sessionClient,
                     scope,
-                    credentials.userId,
-                    undefined,
                     eventsRef.current,
                   )
                   if (!stillOpen()) return
@@ -3675,8 +3800,6 @@ export function App({
                 const fresh = await loadConversation(
                   sessionClient,
                   scope,
-                  credentials.userId,
-                  undefined,
                   eventsRef.current,
                 )
                 if (!stillOpen()) return
@@ -3762,8 +3885,6 @@ export function App({
                       await loadConversation(
                         sessionClient,
                         scope,
-                        credentials.userId,
-                        undefined,
                         eventsRef.current,
                       )
                     ).entries,
@@ -3901,8 +4022,6 @@ export function App({
                 const fresh = await loadConversation(
                   sessionClient,
                   scope,
-                  credentials.userId,
-                  undefined,
                   eventsRef.current,
                 )
                 if (openScopeRef.current !== scope) return
@@ -3964,8 +4083,6 @@ export function App({
                   const fresh = await loadConversation(
                     sessionClient,
                     scope,
-                    credentials.userId,
-                    undefined,
                     eventsRef.current,
                   )
                   setConversation(held =>
@@ -3975,7 +4092,10 @@ export function App({
                   // The tallies for the message that was pressed. Adding a
                   // reaction has landed when one of them is this key and is
                   // mine; removing one has landed when none of them is.
-                  const here = fresh.reactions.get(target) ?? []
+                  const here =
+                    tallyReactions(fresh.reactions, credentials.userId).get(
+                      target,
+                    ) ?? []
                   const landed =
                     own === null
                       ? here.some(
@@ -4042,8 +4162,6 @@ export function App({
                 const fresh = await loadConversation(
                   sessionClient,
                   scope,
-                  credentials.userId,
-                  undefined,
                   eventsRef.current,
                 )
                 if (!stillOpen()) return
@@ -4106,8 +4224,6 @@ export function App({
                 const fresh = await loadConversation(
                   sessionClient,
                   scope,
-                  credentials.userId,
-                  undefined,
                   eventsRef.current,
                 )
                 if (!stillOpen()) return
@@ -5065,13 +5181,7 @@ export function App({
                   if (open === null || !tick.changedScopes.includes(open)) {
                     return
                   }
-                  loadConversation(
-                    sessionClient,
-                    open,
-                    credentials.userId,
-                    undefined,
-                    eventsRef.current,
-                  )
+                  loadConversation(sessionClient, open, eventsRef.current)
                     .then(async fresh => {
                       // #208, ET C'EST LE SEUL ENDROIT OÙ UNE ARRIVÉE EST
                       // NOTÉE.
@@ -5770,12 +5880,37 @@ export function App({
     )
   }
 
+  // WHAT THIS DEVICE DOES NOT DRAW, NOW (#469, #494): one value, which the
+  // conversation's messages and their reactions are both drawn from, so a
+  // block takes both off in the same render.
+  const notShownNow: NotShown = { hidden, blocked: ignored ?? new Set() }
+  // THE CONVERSATION AS SHOWN, which is what the selection is made of and
+  // what « Signaler » and « Bloquer l'expéditeur » read: neither is offered
+  // on a message nobody can see, an account already blocked's included.
+  const shownNow = shownOf(conversation ?? [], notShownNow)
+  // THIS ACCOUNT, AS THE SESSION HOLDS IT (#472, #494). `selfUserId` waits
+  // for a launch that found a room, and a conversation joined after such a
+  // launch would have no messages of this account's own: both actions would
+  // be offered on them, and its reactions would not be its own.
+  const selfNow = credentialsRef.current?.userId ?? selfUserId
   // WHAT A REPORT OF THE SELECTION WOULD CARRY (#468), read once: it offers
   // « Signaler », and it is what « Signaler » opens the sheet with.
   const reportableNow =
-    selected.size > 0
-      ? reportable(selected, conversation ?? [], selfUserId)
-      : null
+    selected.size > 0 ? reportable(selected, shownNow, selfNow) : null
+  // WHOM « BLOQUER L'EXPÉDITEUR » WOULD BLOCK (#472), read once too: it
+  // offers the action, and it is whom the action opens the screen for.
+  const blockableNow =
+    selected.size > 0 ? blockable(selected, shownNow, selfNow) : null
+  // WHAT BLOCKING THE ACCOUNT OF `target` WOULD DO TO ITS CONVERSATION, for
+  // the screen that says it beforehand, from the panel or from the selection
+  // (#469, #472): the rule that closes it once the block holds, read on what
+  // this screen knows now.
+  const afterBlocking = (target: WithSomebody): AfterTheBlock =>
+    openAfterTheBlock(
+      openConversationOf(target.scope, party),
+      derivedSummaries,
+      new Set([target.other]),
+    )
 
   return (
     <GestureHandlerRootView style={styles.root}>
@@ -5872,6 +6007,24 @@ export function App({
           />
         )}
 
+        {/* BLOQUER L'EXPÉDITEUR (#472): the screen of the panel of the
+            person, in a sheet over the conversation it was opened from, and
+            the same gesture. What it says the block will do to that
+            conversation is read from the rule that closes it once the block
+            holds (`afterBlocking`). */}
+        {blockingSender !== null && blockingSender.scope === openScope && (
+          <BlockSheet
+            memberId={blockingSender.other}
+            findable={findableAsFarAsKnown()}
+            after={afterBlocking(blockingSender)}
+            state={
+              blocking?.who === blockingSender.other ? blocking.state : 'idle'
+            }
+            onBlock={() => blockTheAccount(blockingSender.other)}
+            onClose={() => setBlockingSender(null)}
+          />
+        )}
+
         {removing && openScope !== null && (
           <RemoveSheet
             count={selected.size}
@@ -5912,21 +6065,22 @@ export function App({
         )}
 
         {/* SIGNALER (#468). What the sheet shows as leaving and what is
-            sealed are read from the same conversation, the one on screen,
-            by the same definition (`reportable`): so a message deleted
-            while the sheet is open takes « Envoyer » away at once (#491).
-            The messages stay in the conversation: a report removes
-            nothing. */}
+            sealed are read from the same conversation, the one on screen as
+            it is shown, by the same definition (`reportable`) and for the
+            same account (`selfNow`) as « Signaler » was offered: so a
+            message deleted while the sheet is open takes « Envoyer » away
+            at once (#491). The messages stay in the conversation: a report
+            removes nothing. */}
         {reporting !== null && (
           <ReportSheet
             author={displayNameFor(
               reporting.author,
               names.get(reporting.author),
             )}
-            reporter={displayNameFor(selfUserId, undefined)}
+            reporter={displayNameFor(selfNow, undefined)}
             messages={
-              reportable(reporting.eventIds, conversation ?? [], selfUserId)
-                ?.messages ?? null
+              reportable(reporting.eventIds, shownNow, selfNow)?.messages ??
+              null
             }
             // A PHOTOGRAPH AS THE CONVERSATION HOLDS IT (#471): the same
             // object from one render to the next, so it is fetched once, and
@@ -5941,11 +6095,11 @@ export function App({
               const { opening, scope, eventIds } = reporting
               setReporting({ ...reporting, sheet: { stage: 'sending' } })
               reportMessages(reportDeps, {
-                self: selfUserId,
+                self: selfNow,
                 roomId: scope,
                 reason,
                 selected: eventIds,
-                timeline: conversation ?? [],
+                timeline: shownNow,
               })
                 .catch(() => ({ outcome: 'unconfirmed' }) as const)
                 // TO THIS SHEET ONLY: closed meanwhile, and perhaps another
@@ -6013,6 +6167,7 @@ export function App({
                 }
                 canFavourite={canFavourite(selected, conversation ?? [])}
                 canReport={reportableNow !== null}
+                canBlock={blockableNow !== null}
                 // EVERY one, not any: the control does one thing to the whole
                 // selection, and a mixed one has to pick a direction. Keeping
                 // is the safe half -- a mark added to something already kept
@@ -6132,6 +6287,12 @@ export function App({
                     author: reportableNow.author,
                     sheet: { stage: 'choosing' },
                   })
+                }}
+                onBlock={() => {
+                  if (openScope === null || blockableNow === null) return
+                  // What an earlier try said is not this one's to say.
+                  setBlocking(null)
+                  setBlockingSender({ scope: openScope, other: blockableNow })
                 }}
                 onRemove={() => setRemoving(true)}
               />
@@ -6264,9 +6425,13 @@ export function App({
                 {/* A row opens the CONVERSATION; the button beside it rings
                     the person back. `CallsList.tsx` says why this screen
                     carries a call button where the conversation list does
-                    not, and why it is still not a directory. */}
+                    not, and why it is still not a directory.
+
+                    WITHOUT THE CALLS OF A BLOCKED ACCOUNT (#494), which
+                    leave this screen as its messages leave the others, and
+                    take their « Rappeler » with them. */}
                 <CallsList
-                  calls={calls}
+                  calls={callsWithoutTheBlocked(calls, notShownNow.blocked)}
                   now={Date.now()}
                   shownFor={who => displayNameFor(who, names.get(who))}
                   onOpen={scope => {
@@ -6626,7 +6791,7 @@ export function App({
                     }}
                     joinedDelivered={deliveredJoined}
                     deliveredOutcome={deliveredOutcome}
-                    blocked={blockNotice}
+                    blockOnScreen={blockOnScreen}
                     names={names}
                     invitation={linkOutcome}
                     reinstalled={reinstalled}
@@ -6637,7 +6802,7 @@ export function App({
                     opening={waitingOn}
                     onOpen={scope => {
                       // Said once, on the list the block came back to.
-                      setBlockNotice(null)
+                      setBlockOnScreen(null)
                       openConversation(scope)
                     }}
                     findableNotice={listNotice(discovery, Date.now())}
@@ -6747,7 +6912,10 @@ export function App({
               sendMessage !== null && (
                 <View style={styles.block}>
                   <Conversation
-                    reactions={reactions}
+                    // TALLIED HERE, from the value the messages below are
+                    // drawn from (ADR-0011, amended on 30 September 2026),
+                    // this account's own read from the session (`selfNow`).
+                    reactions={reactionsShown(reactions, notShownNow, selfNow)}
                     read={readHere}
                     onReact={(target, key, own) =>
                       reactRef.current?.(target, key, own)
@@ -6762,10 +6930,7 @@ export function App({
                     // received before or not: that one is the account's
                     // decision, synced, and the same on every one of its
                     // devices. One filter for both (`notShown.ts`).
-                    entries={shownOf(conversation, {
-                      hidden,
-                      blocked: ignored ?? new Set(),
-                    })}
+                    entries={shownNow}
                     selected={selected}
                     // `null` is the background tap: it clears rather than
                     // toggling, which is the only way out that does not
@@ -6783,6 +6948,17 @@ export function App({
                     otherParty={party?.other}
                     onOpenPlate={(plate, at) => setOpenPlate({ plate, at })}
                   />
+                  {/* AN ACCOUNT JUST BLOCKED FROM HERE (#472), a conversation
+                    that stays: what it wrote is gone from above, and this
+                    says so, and what still waits, as the list says it of a
+                    conversation that left it. */}
+                  {blockOnScreen !== null &&
+                    blockOnScreen.stayingIn === openScope && (
+                      <BlockLine
+                        onScreen={blockOnScreen}
+                        style={styles.blockedHere}
+                      />
+                    )}
                   {/* What the passive half found, when it found anything. A
                   refusal for an untrusted sender is the one worth saying:
                   what fixes it is verifying them, and this screen is where
@@ -6950,10 +7126,11 @@ export function App({
                   <Block
                     memberId={party.other}
                     findable={findableAsFarAsKnown()}
+                    after={afterBlocking(party)}
                     state={
                       blocking?.who === party.other ? blocking.state : 'idle'
                     }
-                    onBlock={() => blockThePerson(party.other)}
+                    onBlock={() => blockTheAccount(party.other)}
                   />
                 )}
               </View>
@@ -7574,4 +7751,7 @@ const styles = StyleSheet.create({
     ...typeScale.bodySm,
     color: color.wait['700'],
   },
+  // Under the messages: the rest of what the line looks like is its own
+  // (`BlockLine.tsx`).
+  blockedHere: { marginTop: space.m },
 })

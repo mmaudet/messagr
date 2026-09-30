@@ -1,3 +1,4 @@
+import type { CallRecord } from './callLogStore'
 import { errcodeOf, getErrorMessage } from './errors'
 import type { HttpRequester } from './pump'
 import type { KeptMessage } from './readFavourites'
@@ -85,6 +86,11 @@ export interface Blocking {
 export type BlockOutcome =
   /** The ignored list was not written: nothing has changed. */
   | { readonly blocked: false; readonly reason: string }
+  /**
+   * Asked to block this account itself, which it never does: nothing has
+   * changed, and trying again would change nothing either.
+   */
+  | { readonly blocked: false; readonly itself: true }
   /** Written, off the screens, and recorded by the service. */
   | { readonly blocked: true; readonly told: true }
   /**
@@ -98,6 +104,20 @@ export type BlockOutcome =
  * waiting for the next launch, or done with nothing kept to ask again.
  */
 export type BlockNotice = 'blocked' | 'waiting' | 'not-kept'
+
+/**
+ * A block made, as the screens say it (#469, #472): how it ended, and where
+ * the person stays.
+ */
+export interface BlockOnScreen {
+  readonly notice: BlockNotice
+  /**
+   * The conversation the block was made from, when the person stays in it:
+   * one that does not leave the list (`openAfterTheBlock`). `null` when it
+   * left the list, and the person with it.
+   */
+  readonly stayingIn: string | null
+}
 
 /**
  * The list's sentence for an outcome, or `null` when nothing changed: the
@@ -114,6 +134,10 @@ export async function blockAccount(
   deps: Blocking,
   blocked: string,
 ): Promise<BlockOutcome> {
+  // NEVER THIS ACCOUNT ITSELF, whatever a screen hands this: a block does
+  // not lift, and an account that ignored itself would hide its own words
+  // on every one of its devices for good.
+  if (blocked === deps.selfUserId) return { blocked: false, itself: true }
   let ignored: ReadonlySet<string>
   try {
     ignored = await ignoredWith(deps.http, deps.selfUserId, blocked)
@@ -199,10 +223,50 @@ export function keptWithoutTheBlocked(
   kept: readonly KeptMessage[],
   blocked: ReadonlySet<string>,
 ): readonly KeptMessage[] {
-  if (blocked.size === 0) return kept
-  return kept.filter(
-    one => one.entry === null || !blocked.has(one.entry.claimedSender),
+  return withoutTheBlocked(
+    kept,
+    blocked,
+    one => one.entry?.claimedSender ?? null,
   )
+}
+
+/**
+ * The calls tab without the calls of a blocked account (#494), whichever way
+ * they went: what it wrote leaves every screen, and a row of the tab is also
+ * a « Rappeler » that would ring it.
+ */
+export function callsWithoutTheBlocked(
+  calls: readonly CallRecord[],
+  blocked: ReadonlySet<string>,
+): readonly CallRecord[] {
+  return withoutTheBlocked(calls, blocked, call => call.peerUserId)
+}
+
+/**
+ * `items` without those of a blocked account, `whose` saying which account
+ * each is of, or `null` when nothing says: the one rule of the screens that
+ * are not a conversation's (a conversation's is `notShown.ts`). The same
+ * list, handed back, when nobody is blocked.
+ */
+function withoutTheBlocked<T>(
+  items: readonly T[],
+  blocked: ReadonlySet<string>,
+  whose: (item: T) => string | null,
+): readonly T[] {
+  if (blocked.size === 0) return items
+  return items.filter(item => {
+    const account = whose(item)
+    return account === null || !blocked.has(account)
+  })
+}
+
+/**
+ * Whether a call may be placed to `peer` (#494): never to a blocked account,
+ * whatever the gesture. The homeserver holds back what that account sends,
+ * never what this one sends it, so a call placed would ring its telephone.
+ */
+export function mayCall(peer: string, blocked: ReadonlySet<string>): boolean {
+  return !blocked.has(peer)
 }
 
 /** Whether two ignored lists name the same accounts. `null` is not knowing. */

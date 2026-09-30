@@ -150,18 +150,30 @@ function registerTheWake() {
     const outcome = await wake({
       lookForWhatArrived: lookForWhatArrivedHere,
       draw: drawNotification,
+      // Each carries, unseen, the account it shows: what a block takes it
+      // down by (#472, `takeDownWhatShows`).
       describe: arrival =>
-        readNotification(arrival.scope, arrival.shown, arrival.preview),
+        readNotification(
+          arrival.scope,
+          arrival.shown,
+          arrival.preview,
+          arrival.from,
+        ),
       // A ringing telephone, which is a different notification on a
       // different channel with two answers on it. `wake.ts` draws this
       // instead of the messages when a poll carried both.
       ring: calling =>
         ringNotification(
-          ringingNotification(calling.scope, calling.shown, calling.video),
+          ringingNotification(
+            calling.scope,
+            calling.shown,
+            calling.video,
+            calling.from,
+          ),
         ),
       // A call that is over, drawn over the ring it replaces.
       missed: (calling, at) =>
-        missedNotification(calling.scope, calling.shown, at),
+        missedNotification(calling.scope, calling.shown, at, calling.from),
     })
     // The one line anybody debugging a push has. There is no screen here.
     logEvent('info', 'MESSAGR_WOKE', outcome)

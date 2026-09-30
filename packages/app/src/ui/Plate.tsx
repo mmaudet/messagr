@@ -2,7 +2,7 @@ import React from 'react'
 import { Pressable, StyleSheet, Text, View } from 'react-native'
 
 import { t } from '../copy'
-import { color, radius, space, type } from '../design/tokens'
+import { color, layout, radius, space, type } from '../design/tokens'
 import type { ShownImage } from '../runtime/receiveImage'
 import type { ReadFile } from '../timeline/imageEvent'
 import type { Plate as Grouping } from '../timeline/plates'
@@ -156,7 +156,7 @@ const styles = StyleSheet.create({
     // picture entirely, so this is the darkest ground the palette has, and
     // the count sits on it in paper.
     backgroundColor: color.brand.ink900,
-    opacity: 0.62,
+    opacity: layout.scrimOpacity,
   },
   countLabel: {
     ...type.titleLg,

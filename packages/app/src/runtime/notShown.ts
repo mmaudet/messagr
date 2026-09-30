@@ -1,9 +1,15 @@
 import type { TimelineEntry } from '../timeline/mergeTimeline'
+import {
+  tallyReactions,
+  type LooseReaction,
+  type ReactionTally,
+} from '../timeline/reactions'
 
 /**
  * What this device does not draw of a conversation, in one type and one
- * filter, wherever a conversation is drawn: in its own screen, and in the
- * list's previews and counts (`conversationList.ts`).
+ * filter, wherever a conversation is drawn: in its own screen, its messages
+ * and their reactions (`reactionsShown`), and in the list's previews and
+ * counts (`conversationList.ts`).
  *
  * Two things, of two different kinds:
  *
@@ -39,4 +45,30 @@ export function shownOf<
       !notShown.hidden.has(entry.eventId) &&
       !notShown.blocked.has(entry.claimedSender),
   )
+}
+
+/**
+ * Whether every one of `entries` is still drawn: a photograph open full
+ * screen closes when one of its own is not (#472), as a blocked account's
+ * leave the viewer with the thread.
+ */
+export function allShown(
+  entries: readonly Pick<TimelineEntry, 'eventId' | 'claimedSender'>[],
+  notShown: NotShown,
+): boolean {
+  return shownOf(entries, notShown).length === entries.length
+}
+
+/**
+ * The reactions drawn under the messages, tallied from those this device
+ * draws, by the filter the messages are drawn by and from the same value:
+ * a blocked account's leave in the same render as its messages (#494,
+ * ADR-0011 as amended on 30 September 2026).
+ */
+export function reactionsShown(
+  reactions: readonly LooseReaction[],
+  notShown: NotShown,
+  selfUserId: string,
+): ReadonlyMap<string, readonly ReactionTally[]> {
+  return tallyReactions(shownOf(reactions, notShown), selfUserId)
 }

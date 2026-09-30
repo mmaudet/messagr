@@ -106,3 +106,7 @@ while a spurious one is the phantom.
 
 `redactionKind.ts` holds the reading and the writing; `buildTimeline.ts`
 branches on it.
+
+## Amended 30 September 2026 — tallied where they are drawn
+
+`buildTimeline.ts` still reads each reaction with who sent it, but the tally happens at each draw, from the reactions the screen draws (`reactionsShown`, `notShown.ts`), so that a blocked account's reactions leave in the same render as its messages (#494).

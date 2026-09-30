@@ -497,6 +497,23 @@ export const it: Readonly<Record<CopyKey, string>> = {
     'Questo account è bloccato, e la sua conversazione con lui è uscita dall’elenco: i suoi messaggi e le sue chiamate non le arriveranno più. Chi gestisce il servizio non ne è ancora informato, e fino ad allora un invito in Messagr da questo account può ancora arrivarle. L’applicazione riproverà a ogni avvio, finché non lo sarà.',
   list_blocked_not_kept:
     'Questo account è bloccato, e la sua conversazione con lui è uscita dall’elenco: i suoi messaggi e le sue chiamate non le arriveranno più. Chi gestisce il servizio non ne è stato informato, e questo dispositivo non ha potuto annotarlo per riprovare: un invito in Messagr da questo account può ancora arrivarle.',
+  selection_block: 'Bloccare il mittente',
+  selection_more: 'Altro',
+  selection_more_close: 'Chiudere',
+  block_explain_gone_stays:
+    'I suoi messaggi scompaiono da tutte le sue conversazioni, compresi quelli già ricevuti. Questa conversazione resta nel suo elenco, senza di essi, e la sua conversazione a due con questo account, se ne ha una, ne esce. Lei non esce da nessuna: questo account non vede cambiare nulla.',
+  block_explain_gone_not_known:
+    'I suoi messaggi scompaiono da tutte le sue conversazioni, compresi quelli già ricevuti, e la sua conversazione a due con questo account, se ne ha una, esce dal suo elenco. Lei non esce da nessuna: questo account non vede cambiare nulla.',
+  block_fact_still_reads: 'Continua a leggere questa conversazione',
+  block_explain_still_reads:
+    'Questo account resta in questa conversazione e continua a leggere ciò che lei e gli altri vi scrivono: il blocco toglie dai suoi schermi soltanto ciò che scrive lui.',
+  block_itself: 'Non può bloccare il suo stesso account: non è cambiato nulla.',
+  blocked_stays:
+    'Questo account è bloccato: non le arriverà più nulla da lui, e ciò che ha scritto è uscito dalle sue conversazioni.',
+  blocked_stays_waiting:
+    'Questo account è bloccato, e ciò che ha scritto è uscito dalle sue conversazioni: i suoi messaggi e le sue chiamate non le arriveranno più. Chi gestisce il servizio non ne è ancora informato, e fino ad allora un invito in Messagr da questo account può ancora arrivarle. L’applicazione riproverà a ogni avvio, finché non lo sarà.',
+  blocked_stays_not_kept:
+    'Questo account è bloccato, e ciò che ha scritto è uscito dalle sue conversazioni: i suoi messaggi e le sue chiamate non le arriveranno più. Chi gestisce il servizio non ne è stato informato, e questo dispositivo non ha potuto annotarlo per riprovare: un invito in Messagr da questo account può ancora arrivarle.',
   invited_working: 'Un momento…',
   invited_failed:
     'Non è cambiato nulla: questo invito non è stato né accettato né rifiutato. Può riprovare.',

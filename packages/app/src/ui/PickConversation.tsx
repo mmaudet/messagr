@@ -143,7 +143,7 @@ const styles = StyleSheet.create({
     // The ink and an opacity, as `Plate.tsx` argues: the palette carries no
     // translucent value and invariant 11 forbids inventing one.
     backgroundColor: color.brand.ink900,
-    opacity: 0.62,
+    opacity: layout.scrimOpacity,
   },
   sheet: {
     backgroundColor: color.surface.paper,

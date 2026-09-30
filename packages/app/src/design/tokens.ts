@@ -4,7 +4,7 @@
 // `yarn tokens:check`, so a stale copy of this file fails the build rather
 // than drifting quietly away from the design it claims to carry.
 //
-// Source: Messagr Prototype V3.dc.html, tokens v3.5.0
+// Source: Messagr Prototype V3.dc.html, tokens v3.6.0
 
 /**
  * The spacing scale. Every margin, padding and gap comes from here.
@@ -330,6 +330,7 @@ export const layout = {
   touchTargetMin: 44,
   screenGutter: 16,
   sheetMaxHeight: '92%',
+  scrimOpacity: 0.62,
   desktopBase: {
     width: 900,
     height: 600,

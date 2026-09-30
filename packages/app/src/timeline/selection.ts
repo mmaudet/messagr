@@ -333,3 +333,54 @@ export function copyText(
     .map(entry => entry.body)
     .join('\n')
 }
+
+/**
+ * The account « Bloquer l’expéditeur » would block (#472), or `null` when
+ * the selection names no one account, and the action is then absent.
+ *
+ * ONE OTHER PARTICIPANT, WHO WROTE EVERY MESSAGE CHOSEN. A block is one
+ * relation with one account (ADR 0015): a selection mixing two people names
+ * nobody to block, and this account's own messages name nobody else. The
+ * account is the one the homeserver attributes the messages to, as for a
+ * report: the one its ignored list holds back.
+ *
+ * WHATEVER THEIR MESSAGES HOLD, unlike `reportable`. A block carries nothing,
+ * so a photograph, a message this device could not open or one removed still
+ * says who sent it.
+ *
+ * In a conversation of more than two it is the only way to block anybody:
+ * the panel of the person is for a conversation of two (#469).
+ */
+export function blockable(
+  selected: ReadonlySet<string>,
+  entries: readonly TimelineEntry[],
+  selfUserId: string,
+): string | null {
+  const found = chosen(selected, entries)
+  const author = found[0]?.claimedSender
+  if (author === undefined || author === selfUserId) return null
+  // A selected event the conversation no longer carries: nothing can say
+  // whose it is, as for removing and reporting.
+  if (found.length !== selected.size) return null
+  return found.every(entry => entry.claimedSender === author) ? author : null
+}
+
+/**
+ * The selection without the messages of `blocked` (#494): blocked meanwhile,
+ * from another device, while they were selected in a conversation that
+ * stays. They leave the screen, and nothing is offered on what nobody can
+ * see any more. The same selection, handed back, when it held none.
+ */
+export function selectionWithoutTheBlocked(
+  selected: ReadonlySet<string>,
+  entries: readonly TimelineEntry[],
+  blocked: ReadonlySet<string>,
+): ReadonlySet<string> {
+  const theirs = chosen(selected, entries).filter(entry =>
+    blocked.has(entry.claimedSender),
+  )
+  if (theirs.length === 0) return selected
+  const left = new Set(selected)
+  for (const entry of theirs) left.delete(entry.eventId)
+  return left
+}

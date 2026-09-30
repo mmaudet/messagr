@@ -502,6 +502,23 @@ export const nl: Readonly<Record<CopyKey, string>> = {
     'Dit account is geblokkeerd, en uw gesprek ermee is uit de lijst verdwenen: zijn berichten en oproepen bereiken u niet meer. De exploitant is nog niet op de hoogte, en tot dan kan een uitnodiging in Messagr van dit account u nog bereiken. De app probeert het bij elke start opnieuw, tot het lukt.',
   list_blocked_not_kept:
     'Dit account is geblokkeerd, en uw gesprek ermee is uit de lijst verdwenen: zijn berichten en oproepen bereiken u niet meer. De exploitant is niet op de hoogte gebracht, en dit apparaat kon het niet noteren om het opnieuw te proberen: een uitnodiging in Messagr van dit account kan u nog bereiken.',
+  selection_block: 'Afzender blokkeren',
+  selection_more: 'Meer',
+  selection_more_close: 'Sluiten',
+  block_explain_gone_stays:
+    'Zijn berichten verdwijnen uit al uw gesprekken, ook de al ontvangen berichten. Dit gesprek blijft in uw lijst, zonder die berichten, en uw rechtstreekse gesprek met dit account verdwijnt eruit, als u er een hebt. U verlaat er geen: dit account ziet niets veranderen.',
+  block_explain_gone_not_known:
+    'Zijn berichten verdwijnen uit al uw gesprekken, ook de al ontvangen berichten, en uw rechtstreekse gesprek met dit account verdwijnt uit uw lijst, als u er een hebt. U verlaat er geen: dit account ziet niets veranderen.',
+  block_fact_still_reads: 'Het leest dit gesprek nog',
+  block_explain_still_reads:
+    'Dit account blijft in dit gesprek en leest nog steeds wat u en de anderen erin schrijven: het blokkeren haalt alleen wat het zelf schrijft van uw schermen.',
+  block_itself: 'U kunt uzelf niet blokkeren: er is niets veranderd.',
+  blocked_stays:
+    'Dit account is geblokkeerd: er bereikt u niets meer van, en wat het schreef, is uit uw gesprekken verdwenen.',
+  blocked_stays_waiting:
+    'Dit account is geblokkeerd, en wat het schreef, is uit uw gesprekken verdwenen: zijn berichten en oproepen bereiken u niet meer. De exploitant is nog niet op de hoogte, en tot dan kan een uitnodiging in Messagr van dit account u nog bereiken. De app probeert het bij elke start opnieuw, tot het lukt.',
+  blocked_stays_not_kept:
+    'Dit account is geblokkeerd, en wat het schreef, is uit uw gesprekken verdwenen: zijn berichten en oproepen bereiken u niet meer. De exploitant is niet op de hoogte gebracht, en dit apparaat kon het niet noteren om het opnieuw te proberen: een uitnodiging in Messagr van dit account kan u nog bereiken.',
   invited_working: 'Een ogenblik…',
   invited_failed:
     'Er is niets veranderd: aan deze uitnodiging is niet deelgenomen en ze is niet geweigerd. U kunt het opnieuw proberen.',

@@ -2,7 +2,7 @@ import React from 'react'
 import { Modal, Pressable, StyleSheet, Text, View } from 'react-native'
 
 import { t } from '../copy'
-import { color, floors, radius, space, type } from '../design/tokens'
+import { color, floors, layout, radius, space, type } from '../design/tokens'
 
 /**
  * What the green "+" opens: the ways to start something with somebody (#394).
@@ -90,7 +90,7 @@ const styles = StyleSheet.create({
     // The ink and an opacity, as `RemoveSheet.tsx`: the palette carries no
     // translucent value and invariant 11 forbids inventing one.
     backgroundColor: color.brand.ink900,
-    opacity: 0.62,
+    opacity: layout.scrimOpacity,
   },
   sheet: {
     backgroundColor: color.surface.paper,

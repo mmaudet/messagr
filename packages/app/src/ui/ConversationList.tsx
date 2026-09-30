@@ -2,7 +2,7 @@ import React from 'react'
 import { Pressable, StyleSheet, Text, View } from 'react-native'
 
 import { t, type CopyKey } from '../copy'
-import type { BlockNotice } from '../runtime/block'
+import type { BlockOnScreen } from '../runtime/block'
 import type { InvitationOutcome } from '../runtime/entry'
 import {
   color,
@@ -28,6 +28,7 @@ import type { PasteSaid } from '../runtime/pastedLink'
 import type { ShareRefusal } from '../runtime/sharedIn'
 import { stampFor, type Stamp } from '../timeline/whenShown'
 import { Avatar } from './Avatar'
+import { BlockLine } from './BlockLine'
 import { NotchedButton } from './NotchedButton'
 import { PasteLink } from './PasteLink'
 import { dayOf } from './whenLabel'
@@ -91,11 +92,12 @@ export interface ConversationListProps {
    */
   readonly deliveredOutcome?: 'expired' | 'gone' | null
   /**
-   * What became of the account just blocked from the panel of the person
-   * (#469), which brought the person back here: blocked, and whether the
-   * service's record still waits. `null` when nothing is to be said.
+   * What became of the account just blocked (#469, #472): blocked, whether
+   * the service's record still waits, and whether the conversation it was
+   * blocked from left this list or stays in it (`BlockLine.tsx`). `null`
+   * when nothing is to be said.
    */
-  readonly blocked?: BlockNotice | null
+  readonly blockOnScreen?: BlockOnScreen | null
   /**
    * What became of an invitation this launch was opened with, when the
    * device already had an account. `null` when there was none. See
@@ -171,19 +173,6 @@ export interface ConversationListProps {
   readonly onProveAgain?: (() => void) | null
 }
 
-/**
- * What a block says above the list (#469), one test identifier per sentence,
- * as #276 asks: a block whose service record waits must not pass for one
- * the service has.
- */
-const BLOCKED_SAYS: Readonly<
-  Record<BlockNotice, { readonly key: CopyKey; readonly testID: string }>
-> = {
-  blocked: { key: 'list_blocked', testID: 'list-blocked' },
-  waiting: { key: 'list_blocked_waiting', testID: 'list-blocked-waiting' },
-  'not-kept': { key: 'list_blocked_not_kept', testID: 'list-blocked-not-kept' },
-}
-
 /** What each end of being findable says above the list (#398, #409). */
 const ENDED_SAYS: Readonly<
   Record<Exclude<ListNotice['notice'], 'renew'>, CopyKey>
@@ -202,7 +191,7 @@ export function ConversationList({
   onOpenDelivered = () => undefined,
   joinedDelivered = [],
   deliveredOutcome = null,
-  blocked = null,
+  blockOnScreen = null,
   invitation = null,
   reinstalled = null,
   notInYet = false,
@@ -342,11 +331,11 @@ export function ConversationList({
         </Text>
       )}
       {/* AN ACCOUNT JUST BLOCKED (#469): its conversation is gone from the
-          rows below, and this says so, and what still waits. */}
-      {blocked !== null && (
-        <Text style={styles.notice} testID={BLOCKED_SAYS[blocked].testID}>
-          {t(BLOCKED_SAYS[blocked].key)}
-        </Text>
+          rows below, and this says so, and what still waits. Or, blocked
+          from a conversation of more than two, which is still below, that
+          what it wrote is gone from them (#472). */}
+      {blockOnScreen !== null && (
+        <BlockLine onScreen={blockOnScreen} style={styles.notice} />
       )}
       {/* THE INVITATIONS DELIVERED INSIDE MESSAGR, ATOP THE LIST (#404), each
           a row of its own that opens §13.3. Their test identifiers are
