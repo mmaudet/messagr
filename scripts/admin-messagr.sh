@@ -198,6 +198,10 @@ def le_geste(arguments):
             f"seul argument.\n\n{USAGE}",
             2,
         )
+    # UNE COMMANDE VIDE NE PART PAS : elle attendrait une réponse vide, que la
+    # fin de l'entrée standard donne, et posterait « !admin » seul.
+    if not nom.strip():
+        refuser(f"Une commande vide ne part pas. Rien n'a été posté.\n\n{USAGE}", 2)
     return (
         nom,
         nom,
@@ -455,6 +459,11 @@ def essai():
         appels=[])
     cas("une commande libre en deux arguments", ["server", "version"], "server version\n",
         False, [], appels=[])
+    # Une commande vide attendrait une réponse vide, que la fin de l'entrée
+    # donne : refusée avant rien demander ni appeler.
+    for vide in ["", "   "]:
+        cas(f"une commande vide ({vide!r})", [vide], "", False, [], appels=[],
+            dit="Une commande vide ne part pas")
     cas("le compte d'exploitation ne se ferme pas", ["fermer", moi], moi + "\n", False, [])
     cas("le compte d'exploitation ne se suspend pas", ["suspendre", moi], moi + "\n",
         False, [])
