@@ -33,8 +33,7 @@
       "la purge d'un compte supprimé efface ses blocages, de part et d'autre, et jamais l'annonce de sa suppression, qui n'est pas une preuve (#406)"
     ],
     "$manque": "Cette purge est manuelle d'ici #423, et une suppression faite par courriel n'est jamais annoncée au service : l'exploitant doit penser à la table delivered_blocks.",
-    "duree": "tant que vos deux comptes existent",
-    "page": "/confidentialite/a-publier/"
+    "duree": "tant que vos deux comptes existent"
   },
   "decouverte_empreinte": {
     "$note": "L'empreinte masquée d'un numéro prouvé (#392, ADR 0014), jamais le numéro, et le compteur des numéros qu'il a fait masquer (#401). Gardés tant que le compte est trouvable, puis au plus trente jours après la sortie : retrait, expiration, remplacement, clé retirée d'un coup, suppression du compte, qui est datée au jour (#473) et laisse donc l'empreinte de vingt-neuf à trente jours ; le compteur va jour par jour, pour la fenêtre de la limite (#401).",
@@ -109,7 +108,6 @@
   "signalements_contenu": {
     "$note": "Le contenu d'un signalement (#462, ADR 0015) : ce qu'une personne a reçu et choisi de transmettre à l'exploitant, le signalement scellé sur son téléphone pour la clé de l'exploitant. Le service le garde sans pouvoir l'ouvrir, avec le numéro de signalement, le compte qui signale, le motif, l'instant de réception et la clé d'idempotence que l'appareil tire au hasard, unique avec le compte qui signale (#468), puis la décision (sans suite, suspension levée, ou suspension confirmée et compte fermé), sa motivation et ses dates (#473) ; il n'apprend ni le compte visé, ni la conversation, ni ce qui a été écrit. Le signalement scellé s'efface six mois après la décision, avec la clé d'idempotence, sauf s'il a été transmis aux autorités : il est alors gardé tant qu'elles en ont besoin. Le reste est sous « signalements_decisions ».",
     "duree": "six mois après la décision",
-    "page": "/confidentialite/a-publier/",
     "applique_par": [
       "services/invitations/src/moderation/erasure.rs : erase_sealed_reports, SEALED_KEPT_DAYS = 181 jours après le jour de la première décision (sealed_goes_on), qui ne dépassent jamais six mois du calendrier : le signalement scellé et la clé d'idempotence, jamais tant que le signalement est retenu pour les autorités (held_since), jamais sans décision (decided_on)",
       "services/invitations : moderation::sweep, par la passe horaire de cleanup::sweep_once ; une seconde décision ne déplace aucun effacement, decided_on ne s'écrivant qu'une fois",
@@ -121,7 +119,6 @@
   "signalements_decisions": {
     "$note": "Le reste d'un signalement, dont ce qui a été décidé (#462, #468, #473) : le numéro de signalement, le compte qui signale, le motif, les dates de réception et de décision, la décision (sans suite, suspension levée, ou suspension confirmée et compte fermé) et sa motivation. La clé d'idempotence est partie avec le signalement scellé. Jamais ce qui a été dit, qui est dans le signalement scellé, effacé plus tôt (« signalements_contenu »), ni le compte visé.",
     "duree": "douze mois après la décision",
-    "page": "/confidentialite/a-publier/",
     "applique_par": [
       "services/invitations/src/moderation/erasure.rs : erase_decided_reports, RECORD_KEPT_DAYS = 365 jours après le jour de la première décision (record_goes_on), qui ne dépassent jamais douze mois du calendrier ; jamais tant que le signalement est retenu pour les autorités, jamais sans décision : --reports le montre alors en attente",
       "services/invitations : moderation::sweep, par la passe horaire de cleanup::sweep_once",
@@ -135,7 +132,6 @@
     "duree": "un jour après son envoi",
     "jours": 1,
     "dit": ["ni contenu ni identifiant de compte"],
-    "page": "/confidentialite/a-publier/",
     "applique_par": [
       "services/invitations/src/alert.rs : Alert, la liste fermée de ce qui est dit à l'exploitant, et VALID_MINUTES, le jour après lequel un SMS d'alerte est à effacer (sms_history::remember)",
       "services/invitations : sms_history::erase_due, par la passe horaire de cleanup::sweep_once"
