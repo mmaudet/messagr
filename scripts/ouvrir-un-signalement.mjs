@@ -37,9 +37,10 @@
 // déchiffre en mémoire, et écrit UNE COPIE DÉCHIFFRÉE TEMPORAIRE : dans un
 // répertoire privé (700), un fichier que seul l'exploitant lit (600), sous le
 // répertoire temporaire du système. Il l'ouvre dans Aperçu, et l'efface dès
-// qu'on appuie sur Entrée, qu'on l'interrompt (Ctrl-C, fermeture du
-// terminal), ou qu'Aperçu ou le terminal échoue ; toute ouverture commence
-// par effacer une copie qu'une ouverture interrompue aurait laissée.
+// qu'on appuie sur Entrée ou qu'on finit l'entrée (Ctrl-D), qu'on
+// l'interrompt (Ctrl-C, fermeture du terminal), ou qu'Aperçu ou le terminal
+// échoue ; toute ouverture commence par effacer une copie qu'une ouverture
+// interrompue aurait laissée.
 //
 // Ce que l'outil ne peut pas garantir : ce qu'Aperçu ou le système gardent
 // d'un fichier qu'on leur a confié (une vignette, les documents récents, la

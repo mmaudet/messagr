@@ -36,10 +36,11 @@
 //    fichier en 600), sous le répertoire temporaire du système, que ni Time
 //    Machine ni Spotlight ne parcourent sur un Mac. Elle le confie à Aperçu,
 //    et attend Entrée sur le terminal.
-// 6. Elle efface la copie dès qu'on appuie sur Entrée, qu'on interrompt
-//    l'outil, ou que la visionneuse ou le terminal échoue, puis vérifie que
-//    le répertoire a disparu. Elle lâche le terminal et rend la main
-//    aussitôt, sans attendre une autre ligne (`terminalAt`, #496).
+// 6. Elle efface la copie dès qu'on appuie sur Entrée ou qu'on finit
+//    l'entrée (Ctrl-D), qu'on interrompt l'outil, ou que la visionneuse ou
+//    le terminal échoue, puis vérifie que le répertoire a disparu. Elle
+//    lâche le terminal et rend la main aussitôt, sans attendre une autre
+//    ligne (`terminalAt`, #496).
 //
 // # Ce que l'outil ne peut pas garantir
 //
@@ -354,8 +355,9 @@ function interruptionsOn(signals) {
 }
 
 /**
- * Rend la main quand une ligne arrive sur le terminal, ou qu'une
- * interruption arrive ; lève si le terminal ne s'ouvre pas ou ne se lit pas.
+ * Rend la main quand une ligne arrive sur le terminal, que l'entrée finit
+ * (Ctrl-D), ou qu'une interruption arrive ; lève si le terminal ne s'ouvre
+ * pas ou ne se lit pas.
  *
  * @param {() => import('node:stream').Readable} terminal
  * @param {Promise<void>} interrupted
@@ -368,6 +370,13 @@ async function entered(terminal, interrupted) {
     await Promise.race([
       new Promise((resolve, reject) => {
         lines.once('line', () => resolve(undefined))
+        // LA FIN DE L'ENTRÉE AUSSI (#496) : Ctrl-D en début de ligne ne
+        // donne aucune ligne, et plus rien n'arrive. Attendue seulement
+        // comme ligne, erreur ou interruption, elle laissait l'outil sans
+        // rien à faire : Node sortait en 13, avant tout `finally`, la copie
+        // déchiffrée encore sur le disque. La fermeture de l'interface suit
+        // la fin de l'entrée ; elle rend la main comme Entrée.
+        lines.once('close', () => resolve(undefined))
         // ON THE INTERFACE, NOT THE STREAM: readline hands the terminal's
         // error on to its interface, where nothing listening would throw it
         // out of the tool before the copy is erased.

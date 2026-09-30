@@ -2,6 +2,7 @@ import { execFileSync } from 'node:child_process'
 import { EventEmitter } from 'node:events'
 import {
   closeSync,
+  createReadStream,
   existsSync,
   mkdirSync,
   mkdtempSync,
@@ -163,29 +164,50 @@ function homeWith(account: object | null = ACCOUNT): string {
 
 /**
  * The operator's terminal, doubled by a named pipe (#496). Like a terminal,
- * a read there waits for the next line, and nothing ends it but a line, or
- * the stream that reads being let go of. The tool reads it through
- * `terminalAt`, as it reads /dev/tty; the test types into its other end,
- * which it holds from the start, so that opening it never waits for a
- * writer, and closes once the test is over.
+ * a read there waits for the next line, and nothing ends it but a line, the
+ * end of the input, or the stream that reads being let go of. The tool
+ * reads it through `terminalAt`, as it reads /dev/tty; the test types into
+ * its other end, which it holds from the start, so that opening it never
+ * waits for a writer. Letting go of that end is the end of the input, as
+ * Ctrl-D at the start of a line is on a terminal; it is let go of once the
+ * test is over, at the latest.
  */
 function keyboard() {
   const path = join(mkdtempSync(join(tmpdir(), 'terminal-496-')), 'tty')
   execFileSync('mkfifo', [path])
-  const typing = openSync(path, 'r+')
-  onTestFinished(() => closeSync(typing))
+  let typing: number | null = openSync(path, 'r+')
+  const unplug = () => {
+    if (typing !== null) closeSync(typing)
+    typing = null
+  }
+  onTestFinished(unplug)
   /** Each terminal the tool opened, and when it was let go of. */
   const opened: { readonly closed: Promise<unknown> }[] = []
+  const watched = (terminal: Readable): Readable => {
+    // Not `events.once`, which would reject on the terminal's own error.
+    opened.push({
+      closed: new Promise(resolve => terminal.once('close', resolve)),
+    })
+    return terminal
+  }
   return {
-    open: (): Readable => {
-      const terminal = terminalAt(path)
-      // Not `events.once`, which would reject on the terminal's own error.
-      opened.push({
-        closed: new Promise(resolve => terminal.once('close', resolve)),
-      })
+    open: (): Readable => watched(terminalAt(path)),
+    /**
+     * The same pipe, read by a file's read, which the end of the input
+     * ends on every system. Read by the event loop, as `terminalAt` reads
+     * /dev/tty, macOS never reports the last writer leaving a named pipe,
+     * where a terminal does report Ctrl-D: checked on the real /dev/tty,
+     * under a pseudo-terminal. Unplugged once open, so that the open never
+     * waits for a writer that has left.
+     */
+    openToItsEnd: (): Readable => {
+      const terminal = watched(createReadStream(path))
+      terminal.once('ready', unplug)
       return terminal
     },
-    type: (text: string) => writeSync(typing, text),
+    type: (text: string) => {
+      if (typing !== null) writeSync(typing, text)
+    },
     opened,
   }
 }
@@ -220,10 +242,11 @@ function machine(
     readonly preview?: 'shows' | 'fails' | 'is-interrupted'
     /**
      * What happens once the tool waits for Enter: Enter is pressed, Ctrl-C
-     * is, the tool is stopped, the terminal fails while it is read, or there
-     * is no terminal at all.
+     * is, Ctrl-D ends the input, the tool is stopped, the terminal fails
+     * while it is read, or there is no terminal at all.
      */
-    readonly terminal?: 'enter' | 'ctrl-c' | 'is-interrupted' | 'fails' | 'none'
+    readonly terminal?:
+      'enter' | 'ctrl-c' | 'ctrl-d' | 'is-interrupted' | 'fails' | 'none'
     readonly home?: string
     readonly environment?: Readonly<Record<string, string>>
     readonly temporary?: string
@@ -291,6 +314,7 @@ function machine(
         // Nothing to open, as /dev/tty does not open without a terminal.
         return terminalAt(join(media, 'aucun-terminal'))
       }
+      if (options.terminal === 'ctrl-d') return terminal.openToItsEnd()
       const tty = terminal.open()
       setTimeout(() => {
         if (options.terminal === 'ctrl-c') signals.emit('SIGINT')
@@ -919,7 +943,7 @@ describe('A reported photograph or document, on the operator’s machine (#471)'
   })
 })
 
-describe('The tool returns once Enter or Ctrl-C is pressed (#496)', () => {
+describe('The tool returns once Enter, Ctrl-C or Ctrl-D is pressed (#496)', () => {
   // It read /dev/tty through a stream whose read under way nothing cancels:
   // once Enter or Ctrl-C was pressed, it erased the copy and said so, and
   // then held the terminal until another line came. The terminal here is
@@ -947,6 +971,25 @@ describe('The tool returns once Enter or Ctrl-C is pressed (#496)', () => {
     )
 
     expect(status).toBe(130)
+    expect(readdirSync(mac.ports.temporary)).toEqual([])
+    expect(listening(mac.signals)).toBe(0)
+    expect(await terminalsLeft(mac.terminals)).toEqual(['let go'])
+  })
+
+  it('returns once Ctrl-D ends the input, the copy erased, as after Enter', async () => {
+    // Ctrl-D at the start of a line ends what the terminal gives: no line
+    // comes, and none ever will. The tool waited for a line, an error or an
+    // interruption: none came, and under a real terminal Node, finding
+    // nothing left to run, left with code 13 before any `finally` ran, the
+    // decrypted copy still on the disk.
+    const mac = machine({ served: PHOTOGRAPH, terminal: 'ctrl-d' })
+
+    const ended = await Promise.race([
+      run(['--cle', TEST_KEY_FILE, sealed(), '--ouvrir', '2'], mac),
+      new Promise(resolve => setTimeout(() => resolve('still waiting'), 2000)),
+    ])
+
+    expect(ended).toMatchObject({ status: 0 })
     expect(readdirSync(mac.ports.temporary)).toEqual([])
     expect(listening(mac.signals)).toBe(0)
     expect(await terminalsLeft(mac.terminals)).toEqual(['let go'])
