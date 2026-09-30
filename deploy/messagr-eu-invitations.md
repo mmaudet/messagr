@@ -346,13 +346,16 @@ From the Mac, in this order:
 
     docker compose run --rm invitations --decide-report K7QM-4ZT2 <decision> "<motivation>"
 
-- `lifted`: the report does not show what the terms forbid, or a contestation
-  cleared the account. Lift its suspension, if it was suspended, from the Mac:
-  `scripts/admin-messagr.sh lever @<author>:messagr.eu` (`!admin users
-unlock`). The account is as it was.
-- `maintained`: the report shows what the terms forbid, and what was done
-  stands.
-- `termination`: the decision confirms the suspension, and the account is
+A decision finds the report unfounded, lifts the suspension, or confirms it
+by a termination:
+
+- `unfounded` (« sans suite »): nothing in the report is forbidden. Nothing
+  was taken down, or the operator restores what it can: a suspension is
+  lifted from the Mac, `scripts/admin-messagr.sh lever @<author>:messagr.eu`
+  (`!admin users unlock`), and a message taken down does not come back.
+- `lifted` (« levée »): the takedown stands, and the suspension is lifted, as
+  above.
+- `confirmed` (« confirmée »): the suspension is confirmed, and the account is
   terminated (step 6).
 
 **The motivation is the reasoned decision, never a quotation**: what the
@@ -360,12 +363,13 @@ report shows, and which rule of the terms it breaks or does not. It copies
 nothing that was said and names no account, no conversation and no message;
 the mode refuses a motivation holding a Matrix identifier. It is one line, in
 quotes, and it is kept a year, when what was said is long erased. A decision
-keeps its day, never its hour. A new decision on the same report, after a
-contestation, replaces the previous one, and the erasures count from it.
+keeps its day, never its hour. **The erasures count from the first
+decision**: a second decision on the same report, after a contestation,
+replaces the first one's outcome and motivation, and moves neither erasure.
 
 ### 6. A termination
 
-Once the decision is `termination`, and **every reported message is taken
+Once the decision is `confirmed`, and **every reported message is taken
 down** (step 4):
 
 1. **On the Mac**: `scripts/admin-messagr.sh fermer @<author>:messagr.eu`
@@ -376,12 +380,12 @@ down** (step 4):
 
        docker compose run --rm invitations --record-termination @<author>:messagr.eu
 
-   The account joins the account deletions (#385), so that the purge within
-   thirty days applies to it as to a deletion its holder made from the
-   application; its invitations still open expire, and its number leaves
-   discovery. **Nothing in the database relates it to the report**: the
-   deletion names no report, the decision names no account, and a decision
-   keeps its day, not the second both were typed.
+   The account is recorded among the account deletions (#385), so that the
+   purge within thirty days applies to it; its invitations still open
+   expire, and its number leaves discovery. **The purge of an account's data
+   is still done by hand (#423)**, from that list, as for any deletion. The
+   row is dated by the day, like the decision, and names no report; the
+   decision names no account. What the two dates still show is said below.
 
 A device that had kept the suspension then reads that the operator closed
 the account (#477).
@@ -402,14 +406,21 @@ due.
   sealed report, the instant of reception, and the idempotency key of its
   sending. Never the reported account, the conversation or what was said,
   which only the sealed report holds.
-- From the operator (#473): the decision, its motivation and its day, and the
-  day the report was held.
-- **The sealed report and its idempotency key go 181 days after the
+- From the operator (#473): the decision, its motivation and the day of the
+  first decision, and the day the report was held.
+- **The sealed report and its idempotency key go 181 days after the first
   decision**, which never exceeds six calendar months, **and the record 365
   days after**, which never exceeds twelve; neither while the report is held,
   and neither while it has no decision. The hourly sweep does both
   (`moderation::sweep`), and its log line counts them:
   `reports: … sealed reports erased, … records erased`.
+- **What a copy of the database still shows** (ADR 0015, amended on 30
+  September 2026): a confirmed report and an account deletion recorded the
+  same day can be related by their dates, when deletions are few; and a
+  deletion dated at midnight UTC is a termination, where one announced from
+  the application carries its second. Recording the application's deletions
+  by the day as well, or a termination on another day than its decision,
+  would lessen these traces; neither is done.
 - **The dated copies of the database** that an update leaves (step 4 of
   "Updating it") hold the reports as they were, sealed reports included, and
   no sweep reaches them: delete them once the update is behind, as #416 says

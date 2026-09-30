@@ -110,3 +110,10 @@ erased once seen, on an interruption or on a failure
 goes with the key to its thumbnail's own encrypted copy, when it has one:
 the conversation draws the photograph from it, and the operator sees what the
 person reporting saw; the tool shows it the same way, on demand (#496).
+
+**Amended on 30 September 2026 (a decision and a termination, #473).** A copy
+of the service's database can relate a confirmed report to an account
+deletion by their dates, when deletions are few: both are dated by the day,
+and a termination, recorded among the account deletions at midnight UTC,
+differs from a deletion announced from the application, which carries its
+second.

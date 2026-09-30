@@ -293,8 +293,8 @@ _Avoid_: Lock and suspend (the homeserver's two mechanisms: a suspension uses
 lock), ban
 
 **Decision**:
-The operator's reasoned conclusion on a report, which confirms or lifts a
-suspension and can be contested.
+The operator's reasoned conclusion on a report: it finds the report unfounded,
+lifts the suspension, or confirms it by a termination. It can be contested.
 _Avoid_: Verdict, ruling, sanction
 
 **Termination**:
