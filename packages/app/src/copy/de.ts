@@ -516,13 +516,20 @@ export const de: Readonly<Record<CopyKey, string>> = {
   list_blocked_not_kept:
     'Dieses Konto ist blockiert, und Ihre Unterhaltung mit ihm ist aus der Liste verschwunden: Seine Nachrichten und Anrufe erreichen Sie nicht mehr. Der Betreiber wurde nicht informiert, und dieses Gerät konnte es nicht festhalten, um es erneut zu versuchen: Eine Einladung in Messagr von diesem Konto kann Sie noch erreichen.',
   selection_block: 'Absender blockieren',
-  block_explain_gone_several:
+  block_explain_gone_stays:
     'Seine Nachrichten verschwinden aus allen Ihren Unterhaltungen, auch die bereits empfangenen. Diese Unterhaltung bleibt ohne sie in Ihrer Liste, und Ihre Unterhaltung zu zweit mit diesem Konto verschwindet daraus, falls Sie eine haben. Sie verlassen keine davon: Dieses Konto sieht keine Veränderung.',
-  blocked_several:
+  block_explain_gone_not_known:
+    'Seine Nachrichten verschwinden aus allen Ihren Unterhaltungen, auch die bereits empfangenen, und Ihre Unterhaltung zu zweit mit diesem Konto verschwindet aus Ihrer Liste, falls Sie eine haben. Sie verlassen keine davon: Dieses Konto sieht keine Veränderung.',
+  block_fact_still_reads: 'Es liest diese Unterhaltung weiter',
+  block_explain_still_reads:
+    'Dieses Konto bleibt in dieser Unterhaltung und liest weiterhin, was Sie und die anderen darin schreiben: Das Blockieren entfernt von Ihren Bildschirmen nur, was es selbst schreibt.',
+  block_itself:
+    'Sie können sich nicht selbst blockieren: Nichts hat sich geändert.',
+  blocked_stays:
     'Dieses Konto ist blockiert: Von ihm erreicht Sie nichts mehr, und was es geschrieben hat, ist aus Ihren Unterhaltungen verschwunden.',
-  blocked_several_waiting:
+  blocked_stays_waiting:
     'Dieses Konto ist blockiert, und was es geschrieben hat, ist aus Ihren Unterhaltungen verschwunden: Seine Nachrichten und Anrufe erreichen Sie nicht mehr. Der Betreiber ist noch nicht informiert, und bis dahin kann Sie eine Einladung in Messagr von diesem Konto noch erreichen. Die App versucht es bei jedem Start erneut, bis es gelingt.',
-  blocked_several_not_kept:
+  blocked_stays_not_kept:
     'Dieses Konto ist blockiert, und was es geschrieben hat, ist aus Ihren Unterhaltungen verschwunden: Seine Nachrichten und Anrufe erreichen Sie nicht mehr. Der Betreiber wurde nicht informiert, und dieses Gerät konnte es nicht festhalten, um es erneut zu versuchen: Eine Einladung in Messagr von diesem Konto kann Sie noch erreichen.',
   invited_working: 'Einen Moment…',
   invited_failed:

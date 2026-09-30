@@ -508,13 +508,19 @@ export const en: Readonly<Record<CopyKey, string>> = {
   list_blocked_not_kept:
     'This account is blocked, and your conversation with it has left the list: its messages and calls will no longer reach you. The operator has not been told, and this device could not note it to try again: an invitation in Messagr from this account can still reach you.',
   selection_block: 'Block sender',
-  block_explain_gone_several:
+  block_explain_gone_stays:
     'Its messages disappear from all your conversations, those already received included. This conversation stays in your list, without them, and your direct conversation with this account, if you have one, leaves it. You leave none of them: this account sees nothing change.',
-  blocked_several:
+  block_explain_gone_not_known:
+    'Its messages disappear from all your conversations, those already received included, and your direct conversation with this account, if you have one, leaves your list. You leave none of them: this account sees nothing change.',
+  block_fact_still_reads: 'It still reads this conversation',
+  block_explain_still_reads:
+    'This account stays in this conversation, and it still reads what you and the others write in it: blocking takes off your screens only what it writes itself.',
+  block_itself: 'You cannot block yourself: nothing has changed.',
+  blocked_stays:
     'This account is blocked: nothing from it will reach you any more, and what it wrote has left your conversations.',
-  blocked_several_waiting:
+  blocked_stays_waiting:
     'This account is blocked, and what it wrote has left your conversations: its messages and calls will no longer reach you. The operator has not been told yet, and until then an invitation in Messagr from this account can still reach you. The app will try again at every launch until it is.',
-  blocked_several_not_kept:
+  blocked_stays_not_kept:
     'This account is blocked, and what it wrote has left your conversations: its messages and calls will no longer reach you. The operator has not been told, and this device could not note it to try again: an invitation in Messagr from this account can still reach you.',
   invited_working: 'One moment…',
   invited_failed:

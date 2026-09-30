@@ -2,15 +2,13 @@ import { describe, expect, it } from 'vitest'
 
 import {
   fetchConversationSummaries,
-  isOpenWithTheBlocked,
   listWithoutTheBlocked,
   NOTHING_LEFT_TO_SHOW,
+  openAfterTheBlock,
   openConversationOf,
   scopesWithTheBlocked,
-  scopesWithWordsOfTheBlocked,
   type ConversationListDeps,
   type ConversationSummary,
-  type RowMessage,
 } from './conversationList'
 import { mergeSummaries } from './mergeSummaries'
 import type { NotShown } from './notShown'
@@ -700,9 +698,10 @@ describe('the conversations with a blocked account (#469)', () => {
   })
 })
 
-describe('the conversation open, once an account is blocked (#472, #494)', () => {
-  // Whichever device made the block: this one, from the panel or the
-  // selection, or another, whose ignored list the sync brings.
+describe('what a block does to a conversation (#469, #472, #494)', () => {
+  // ONE RULE, read by the list, by the conversation open, by the screen
+  // that says what blocking will do, and by what is said once it is done:
+  // whichever device made the block.
   const BLOCKED = '@bothers:example.org'
   const HER = '@her:example.org'
   const blocked = new Set([BLOCKED])
@@ -728,66 +727,88 @@ describe('the conversation open, once an account is blocked (#472, #494)', () =>
     row('!three-of-us:x', null),
     row('!alone-now:x', null, { others: 0, departed: BLOCKED }),
     row('!with-her:x', HER),
+    // Whose membership could not be read.
+    row('!unread:x', null, { others: null }),
+    row('!alone-unread:x', null, { others: 0, membershipsUnread: true }),
   ]
+  const listed = (drawn: readonly ConversationSummary[]) =>
+    drawn.map(one => one.scope)
 
-  it('closes the conversation of two with the blocked account, which the list no longer draws', () => {
+  it('takes the conversation of two with the blocked account off the list, and off the screen', () => {
+    expect(listed(listWithoutTheBlocked(rows, blocked))).not.toContain(
+      '!with-them:x',
+    )
     expect(
-      isOpenWithTheBlocked(
+      openAfterTheBlock(
         { scope: '!with-them:x', other: BLOCKED },
         rows,
         blocked,
       ),
-    ).toBe(true)
+    ).toBe('leaves')
     // Its row says so before the conversation has found its other person...
     expect(
-      isOpenWithTheBlocked(
-        { scope: '!with-them:x', other: null },
-        rows,
-        blocked,
-      ),
-    ).toBe(true)
+      openAfterTheBlock({ scope: '!with-them:x', other: null }, rows, blocked),
+    ).toBe('leaves')
     // ...and the conversation says so before the list has a row for it.
     expect(
-      isOpenWithTheBlocked({ scope: '!new:x', other: BLOCKED }, rows, blocked),
-    ).toBe(true)
+      openAfterTheBlock({ scope: '!new:x', other: BLOCKED }, rows, blocked),
+    ).toBe('leaves')
   })
 
-  it('closes the one this account is alone in, when the blocked account is who left it', () => {
+  it('takes off the one this account is alone in, when the blocked account is who left it', () => {
+    expect(listed(listWithoutTheBlocked(rows, blocked))).not.toContain(
+      '!alone-now:x',
+    )
     expect(
-      isOpenWithTheBlocked(
-        { scope: '!alone-now:x', other: null },
-        rows,
-        blocked,
-      ),
-    ).toBe(true)
+      openAfterTheBlock({ scope: '!alone-now:x', other: null }, rows, blocked),
+    ).toBe('leaves')
   })
 
-  it('keeps a conversation of more than two open, without the blocked account’s messages', () => {
-    // The conversation stays in the list (`listWithoutTheBlocked`), so it
-    // stays on the screen too: only that account's messages leave it.
+  it('keeps a conversation of more than two in the list and open', () => {
+    // Only the blocked account's messages leave it.
+    expect(listed(listWithoutTheBlocked(rows, blocked))).toContain(
+      '!three-of-us:x',
+    )
     expect(
-      isOpenWithTheBlocked(
+      openAfterTheBlock(
         { scope: '!three-of-us:x', other: null },
         rows,
         blocked,
       ),
-    ).toBe(false)
-    expect(
-      listWithoutTheBlocked(rows, blocked).map(one => one.scope),
-    ).toContain('!three-of-us:x')
+    ).toBe('stays')
   })
 
-  it('keeps every other conversation open, and every one while nobody is blocked', () => {
+  it('keeps every other conversation, and every one while nobody is blocked', () => {
     expect(
-      isOpenWithTheBlocked({ scope: '!with-her:x', other: HER }, rows, blocked),
-    ).toBe(false)
+      openAfterTheBlock({ scope: '!with-her:x', other: HER }, rows, blocked),
+    ).toBe('stays')
     expect(
-      isOpenWithTheBlocked(
+      openAfterTheBlock({ scope: '!new:x', other: HER }, rows, blocked),
+    ).toBe('stays')
+    expect(
+      openAfterTheBlock(
         { scope: '!with-them:x', other: BLOCKED },
         rows,
         new Set(),
       ),
-    ).toBe(false)
+    ).toBe('stays')
+    expect(listWithoutTheBlocked(rows, new Set())).toBe(rows)
+  })
+
+  it('says it does not know, and claims nothing, while nothing has said who is in it', () => {
+    // Neither a row nor the conversation's own finding.
+    expect(
+      openAfterTheBlock({ scope: '!new:x', other: null }, rows, blocked),
+    ).toBe('not known')
+    // A row whose membership could not be read knows no more, and the list
+    // keeps a row it cannot say is the one with the blocked account.
+    for (const scope of ['!unread:x', '!alone-unread:x']) {
+      expect(
+        openAfterTheBlock({ scope, other: null }, rows, blocked),
+        scope,
+      ).toBe('not known')
+      expect(listed(listWithoutTheBlocked(rows, blocked))).toContain(scope)
+    }
   })
 
   it('knows the other person only when it was found for the conversation open', () => {
@@ -806,68 +827,5 @@ describe('the conversation open, once an account is blocked (#472, #494)', () =>
       scope: '!three-of-us:x',
       other: null,
     })
-  })
-})
-
-describe('the notifications that may show what a blocked account wrote (#472)', () => {
-  // A conversation's notification says what arrived last, which nothing
-  // here can read back: every conversation of more than two whose messages
-  // hold one of the blocked account's has its notification taken down. The
-  // conversation with that account has all of its own taken down already
-  // (`scopesWithTheBlocked`).
-  const BLOCKED = '@bothers:example.org'
-  const HER = '@her:example.org'
-
-  function said(sender: string): RowMessage {
-    return { sender, sentAt: 1, body: 'hello', unread: false }
-  }
-
-  it('names the conversations whose messages hold one of the blocked account’s', () => {
-    const rows: ConversationSummary[] = [
-      {
-        scope: '!they-spoke:x',
-        other: null,
-        others: 2,
-        preview: 'hello',
-        lastAt: 2,
-        unread: 0,
-        window: [said(HER), said(BLOCKED)],
-      },
-      {
-        scope: '!she-spoke:x',
-        other: null,
-        others: 2,
-        preview: 'hello',
-        lastAt: 1,
-        unread: 0,
-        window: [said(HER)],
-      },
-      // Kept from an earlier launch: only its opening says who wrote it.
-      {
-        scope: '!kept:x',
-        other: null,
-        others: 2,
-        preview: 'hello',
-        previewBy: BLOCKED,
-        lastAt: 1,
-        unread: 0,
-      },
-      // The conversation with that account, taken down whole elsewhere.
-      {
-        scope: '!with-them:x',
-        other: BLOCKED,
-        others: 1,
-        preview: 'hello',
-        lastAt: 1,
-        unread: 0,
-        window: [said(BLOCKED)],
-      },
-    ]
-
-    expect(scopesWithWordsOfTheBlocked(rows, new Set([BLOCKED]))).toEqual([
-      '!they-spoke:x',
-      '!kept:x',
-    ])
-    expect(scopesWithWordsOfTheBlocked(rows, new Set())).toEqual([])
   })
 })

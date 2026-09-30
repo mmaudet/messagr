@@ -362,20 +362,8 @@ export async function stopRinging(scope: string): Promise<void> {
  * (`scopeOfPress`).
  */
 export async function takeDownNotificationsOf(scope: string): Promise<void> {
-  await takeDownMessageNotificationOf(scope)
-  await stopRinging(scope)
-}
-
-/**
- * Takes down the message notification of a conversation of more than two
- * where a blocked account wrote (#472): it may show what that account wrote
- * last. The conversation stays, and a call ringing in it with somebody else
- * rings on.
- */
-export async function takeDownMessageNotificationOf(
-  scope: string,
-): Promise<void> {
   await notifee.cancelNotification(scope)
+  await stopRinging(scope)
 }
 
 /**

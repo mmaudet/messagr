@@ -501,13 +501,19 @@ export const es: Readonly<Record<CopyKey, string>> = {
   list_blocked_not_kept:
     'Esta cuenta está bloqueada, y su conversación con ella ha salido de la lista: sus mensajes y sus llamadas ya no le llegarán. Quien explota el servicio no lo sabe, y este dispositivo no ha podido anotarlo para volver a intentarlo: una invitación en Messagr de esta cuenta todavía puede llegarle.',
   selection_block: 'Bloquear al remitente',
-  block_explain_gone_several:
+  block_explain_gone_stays:
     'Sus mensajes desaparecen de todas sus conversaciones, incluidos los ya recibidos. Esta conversación sigue en su lista, sin ellos, y su conversación directa con esta cuenta, si tiene una, sale de ella. Usted no sale de ninguna: esta cuenta no ve ningún cambio.',
-  blocked_several:
+  block_explain_gone_not_known:
+    'Sus mensajes desaparecen de todas sus conversaciones, incluidos los ya recibidos, y su conversación directa con esta cuenta, si tiene una, sale de su lista. Usted no sale de ninguna: esta cuenta no ve ningún cambio.',
+  block_fact_still_reads: 'Sigue leyendo esta conversación',
+  block_explain_still_reads:
+    'Esta cuenta sigue en esta conversación y sigue leyendo lo que usted y los demás escriben en ella: el bloqueo solo quita de sus pantallas lo que ella misma escribe.',
+  block_itself: 'No puede bloquear su propia cuenta: nada ha cambiado.',
+  blocked_stays:
     'Esta cuenta está bloqueada: ya no le llegará nada de ella, y lo que escribió ha salido de sus conversaciones.',
-  blocked_several_waiting:
+  blocked_stays_waiting:
     'Esta cuenta está bloqueada, y lo que escribió ha salido de sus conversaciones: sus mensajes y sus llamadas ya no le llegarán. Quien explota el servicio aún no lo sabe, y hasta entonces una invitación en Messagr de esta cuenta todavía puede llegarle. La aplicación volverá a intentarlo en cada inicio, hasta que lo sepa.',
-  blocked_several_not_kept:
+  blocked_stays_not_kept:
     'Esta cuenta está bloqueada, y lo que escribió ha salido de sus conversaciones: sus mensajes y sus llamadas ya no le llegarán. Quien explota el servicio no lo sabe, y este dispositivo no ha podido anotarlo para volver a intentarlo: una invitación en Messagr de esta cuenta todavía puede llegarle.',
   invited_working: 'Un momento…',
   invited_failed:

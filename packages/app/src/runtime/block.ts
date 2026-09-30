@@ -86,6 +86,11 @@ export interface Blocking {
 export type BlockOutcome =
   /** The ignored list was not written: nothing has changed. */
   | { readonly blocked: false; readonly reason: string }
+  /**
+   * Asked to block this account itself, which it never does: nothing has
+   * changed, and trying again would change nothing either.
+   */
+  | { readonly blocked: false; readonly itself: true }
   /** Written, off the screens, and recorded by the service. */
   | { readonly blocked: true; readonly told: true }
   /**
@@ -101,14 +106,14 @@ export type BlockOutcome =
 export type BlockNotice = 'blocked' | 'waiting' | 'not-kept'
 
 /**
- * What the screens say after a block (#469, #472): how it ended, and where
+ * A block made, as the screens say it (#469, #472): how it ended, and where
  * the person stays.
  */
-export interface BlockSaid {
+export interface BlockOnScreen {
   readonly notice: BlockNotice
   /**
    * The conversation the block was made from, when the person stays in it:
-   * one of more than two, which stays in the list and open. `null` when it
+   * one that does not leave the list (`openAfterTheBlock`). `null` when it
    * left the list, and the person with it.
    */
   readonly stayingIn: string | null
@@ -132,9 +137,7 @@ export async function blockAccount(
   // NEVER THIS ACCOUNT ITSELF, whatever a screen hands this: a block does
   // not lift, and an account that ignored itself would hide its own words
   // on every one of its devices for good.
-  if (blocked === deps.selfUserId) {
-    return { blocked: false, reason: 'an account does not block itself' }
-  }
+  if (blocked === deps.selfUserId) return { blocked: false, itself: true }
   let ignored: ReadonlySet<string>
   try {
     ignored = await ignoredWith(deps.http, deps.selfUserId, blocked)

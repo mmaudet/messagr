@@ -195,16 +195,45 @@ export function byActivity(
 }
 
 /**
- * Whether a row is the conversation with a blocked account (#469): its other
- * person, or the one who left it when this account is alone in it now. A
- * conversation of more people is not: only that account's messages leave it.
+ * A conversation and one other account in it: the other person of a
+ * conversation of two, as the screen found them, or the account a gesture
+ * made in it is about.
  */
-export function isWithTheBlocked(
+export interface WithSomebody {
+  readonly scope: string
+  readonly other: string
+}
+
+/**
+ * What blocking accounts does to a conversation (#469, #472, #494): it
+ * leaves the list, and the screen with it; it stays, without what they
+ * wrote; or which of the two is not known yet, and nothing is claimed.
+ */
+export type AfterTheBlock = 'leaves' | 'stays' | 'not known'
+
+/**
+ * What blocking `blocked` does to the conversation of `row`. THE ONE RULE:
+ * the list reads it (`listWithoutTheBlocked`), and so does the conversation
+ * open (`openAfterTheBlock`), which the screen that says what a block will
+ * do and what is said once it is done read in turn.
+ *
+ * It leaves when it is the conversation with a blocked account: its other
+ * person, or the one who left it when this account is alone in it now. It
+ * stays when its row knows who is in it and it is not that: a conversation
+ * of more than two, or one with somebody else. A row whose membership could
+ * not be read does not know.
+ */
+export function rowAfterTheBlock(
   row: ConversationSummary,
   blocked: ReadonlySet<string>,
-): boolean {
+): AfterTheBlock {
   const withWhom = row.other ?? row.departed
-  return withWhom !== null && withWhom !== undefined && blocked.has(withWhom)
+  if (withWhom !== null && withWhom !== undefined && blocked.has(withWhom)) {
+    return 'leaves'
+  }
+  return row.others === null || row.membershipsUnread === true
+    ? 'not known'
+    : 'stays'
 }
 
 /**
@@ -225,61 +254,40 @@ export interface OpenConversation {
  */
 export function openConversationOf(
   scope: string,
-  found: { readonly scope: string; readonly other: string } | null,
+  found: WithSomebody | null,
 ): OpenConversation {
   return { scope, other: found?.scope === scope ? found.other : null }
 }
 
 /**
- * Whether the conversation open is one with a blocked account (#472, #494),
- * which the list no longer draws. It closes then, whichever device made the
- * block: open, what is written in it would still leave. A conversation of
- * more than two stays open, and only that account's messages leave it.
- *
- * Its row says so (`isWithTheBlocked`), which knows who left a conversation
- * this account is alone in now; before the list has a row for it, the other
- * person the conversation itself found.
+ * What blocking `blocked` does to the conversation open (#472, #494): what
+ * its row says, or, before the list has a row for it or while the row does
+ * not know, what the conversation itself found of who is in it. A
+ * conversation that leaves closes, whichever device made the block: open,
+ * what is written in it would still leave.
  */
-export function isOpenWithTheBlocked(
+export function openAfterTheBlock(
   open: OpenConversation,
   rows: readonly ConversationSummary[],
   blocked: ReadonlySet<string>,
-): boolean {
-  if (open.other !== null && blocked.has(open.other)) return true
+): AfterTheBlock {
+  if (open.other !== null && blocked.has(open.other)) return 'leaves'
   const row = rows.find(one => one.scope === open.scope)
-  return row !== undefined && isWithTheBlocked(row, blocked)
+  const said = row === undefined ? 'not known' : rowAfterTheBlock(row, blocked)
+  if (said !== 'not known') return said
+  return open.other !== null ? 'stays' : 'not known'
 }
 
-/** The conversations with a blocked account, whoever is in them now. */
+/**
+ * The conversations with a blocked account, whoever is in them now: those
+ * a block takes off the list.
+ */
 export function scopesWithTheBlocked(
   rows: readonly ConversationSummary[],
   blocked: ReadonlySet<string>,
 ): readonly string[] {
   return rows
-    .filter(row => isWithTheBlocked(row, blocked))
-    .map(row => row.scope)
-}
-
-/**
- * The other conversations whose notification may show what a blocked
- * account wrote (#472): those of more than two, which stay, whose messages
- * as this device last derived them hold one of its own, or whose opening it
- * wrote. A notification says what arrived last, which nothing here can read
- * back, so each of them goes with the block: what that account wrote leaves
- * every screen.
- */
-export function scopesWithWordsOfTheBlocked(
-  rows: readonly ConversationSummary[],
-  blocked: ReadonlySet<string>,
-): readonly string[] {
-  if (blocked.size === 0) return []
-  return rows
-    .filter(
-      row =>
-        !isWithTheBlocked(row, blocked) &&
-        ((row.previewBy !== undefined && blocked.has(row.previewBy)) ||
-          (row.window?.some(one => blocked.has(one.sender)) ?? false)),
-    )
+    .filter(row => rowAfterTheBlock(row, blocked) === 'leaves')
     .map(row => row.scope)
 }
 
@@ -301,7 +309,7 @@ export function listWithoutTheBlocked(
   let changed = false
   const drawn: ConversationSummary[] = []
   for (const row of rows) {
-    if (isWithTheBlocked(row, blocked)) {
+    if (rowAfterTheBlock(row, blocked) === 'leaves') {
       changed = true
       continue
     }

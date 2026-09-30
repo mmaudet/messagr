@@ -289,14 +289,15 @@ import {
   readIgnored,
   sameAccounts,
   tellWhatIsWaiting,
-  type BlockSaid,
+  type BlockOnScreen,
 } from './src/runtime/block'
 import {
-  isOpenWithTheBlocked,
   listWithoutTheBlocked,
+  openAfterTheBlock,
   openConversationOf,
   scopesWithTheBlocked,
-  scopesWithWordsOfTheBlocked,
+  type AfterTheBlock,
+  type WithSomebody,
 } from './src/runtime/conversationList'
 import {
   forgetfulIgnoredList,
@@ -304,10 +305,7 @@ import {
 } from './src/runtime/ignoredListStore'
 import { reactionsShown, shownOf, type NotShown } from './src/runtime/notShown'
 import { tallyReactions } from './src/timeline/reactions'
-import {
-  takeDownMessageNotificationOf,
-  takeDownNotificationsOf,
-} from './src/runtime/showNotification'
+import { takeDownNotificationsOf } from './src/runtime/showNotification'
 import {
   forgetfulUntoldBlocks,
   type UntoldBlocks,
@@ -378,7 +376,7 @@ import { accountIdOf, stillKnown } from './src/runtime/sessionKnown'
 import { deletionMail } from './src/ui/deletionMail'
 import { Evict } from './src/ui/Evict'
 import { Block, BlockSheet } from './src/ui/Block'
-import { blockSays } from './src/ui/blockSays'
+import { BlockLine } from './src/ui/BlockLine'
 import { Vouch } from './src/ui/Vouch'
 import { currentLanguage, setCatalogue, t } from './src/copy'
 import type { Language } from './src/copy/languages'
@@ -602,10 +600,9 @@ export function App({
   const ignoredReadRef = useRef(false)
   /**
    * Holds the list the homeserver said, or the notebook's copy of it: what
-   * every screen draws from, the copy kept up to date, the notifications
-   * this application drew that may show an account now blocked taken down,
-   * and the conversation open with one of them closed, whichever device made
-   * the block.
+   * every screen draws from, and the copy kept up to date. Then what a block
+   * takes down besides, whichever device made it: the notifications that
+   * show those newly blocked, and the conversation open with one of them.
    */
   const holdIgnored = (
     next: ReadonlySet<string>,
@@ -618,30 +615,38 @@ export function App({
       ignoredListRef.current.keep(next).catch(() => {})
     }
     const newly = new Set([...next].filter(account => !before.has(account)))
-    const rows = derivedSummariesRef.current
-    for (const scope of scopesWithTheBlocked(rows, newly)) {
+    takeDownTheirNotifications(newly)
+    closeWhatTheBlockTakes(next)
+  }
+  /**
+   * The notifications this application drew for a conversation with an
+   * account now blocked (#469): a tap on one would open what the block took
+   * away.
+   */
+  const takeDownTheirNotifications = (newly: ReadonlySet<string>) => {
+    for (const scope of scopesWithTheBlocked(
+      derivedSummariesRef.current,
+      newly,
+    )) {
       takeDownNotificationsOf(scope).catch(() => {})
     }
-    // AND IN A CONVERSATION OF MORE THAN TWO, which stays (#472), the one
-    // notification that may show what that account wrote last.
-    for (const scope of scopesWithWordsOfTheBlocked(rows, newly)) {
-      takeDownMessageNotificationOf(scope).catch(() => {})
-    }
-    // THE CONVERSATION OPEN WITH AN ACCOUNT NOW BLOCKED CLOSES (#494), as the
-    // one blocked from does, and from here whichever device made the block:
-    // left open, what is written in it would still leave. One of more than
-    // two stays open, without that account's messages (#472).
+  }
+  /**
+   * THE CONVERSATION OPEN WITH AN ACCOUNT NOW BLOCKED CLOSES (#494), as the
+   * one blocked from does, whichever device made the block: left open, what
+   * is written in it would still leave. One that stays stays open, without
+   * that account's messages (#472). The rule is `openAfterTheBlock`, the one
+   * the list, the block's screen and what is said afterwards read.
+   */
+  const closeWhatTheBlockTakes = (blocked: ReadonlySet<string>) => {
     const open = openScopeRef.current
-    if (
-      open !== null &&
-      isOpenWithTheBlocked(
-        openConversationOf(open, partyRef.current),
-        rows,
-        next,
-      )
-    ) {
-      leaveTheConversation()
-    }
+    if (open === null) return
+    const after = openAfterTheBlock(
+      openConversationOf(open, partyRef.current),
+      derivedSummariesRef.current,
+      blocked,
+    )
+    if (after === 'leaves') leaveTheConversation()
   }
   // THE LIST EVERY SCREEN READS (#469): without the conversation with a
   // blocked account, and every other row drawn again without its messages.
@@ -1682,10 +1687,7 @@ export function App({
   // The other person in this conversation, and the two halves of #34's
   // gesture. `party` is `null` for anything that is not a conversation of
   // two: vouching names one person, so it has nothing to offer a group.
-  const [party, setParty] = useState<{
-    readonly scope: string
-    readonly other: string
-  } | null>(null)
+  const [party, setParty] = useState<WithSomebody | null>(null)
   // The same, for the callbacks made once: an ignored list a sync brings
   // closes the conversation open with an account it names (#494).
   const partyRef = useRef(party)
@@ -2330,24 +2332,24 @@ export function App({
   /**
    * Blocking an account, from the panel of the person (#469) or from the
    * selection (#472): whom, and how far it got. A block that holds takes the
-   * person back to the list, or leaves them in the conversation of more than
-   * two it was made from, and the screen they are on says what is done
-   * (`blockSaid`); only a failure stays where the gesture was made.
+   * person back to the list, or leaves them in the conversation it was made
+   * from when that one stays, and the screen they are on says what is done
+   * (`blockOnScreen`); only what did not happen stays where the gesture was
+   * made: a failure, or this account itself, which is never blocked.
    */
   const [blocking, setBlocking] = useState<{
     readonly who: string
-    readonly state: 'working' | 'failed'
+    readonly state: 'working' | 'failed' | 'itself'
   } | null>(null)
-  const [blockSaid, setBlockSaid] = useState<BlockSaid | null>(null)
+  const [blockOnScreen, setBlockOnScreen] = useState<BlockOnScreen | null>(null)
   /**
-   * « Bloquer l'expéditeur » (#472), while its sheet is up: whom, taken from
-   * the selection when the action was pressed, as a report's messages are,
-   * and from which conversation. `null` otherwise.
+   * « Bloquer l'expéditeur » (#472), while its sheet is up: the conversation,
+   * and the account to block, taken from the selection when the action was
+   * pressed, as a report's messages are. `null` otherwise.
    */
-  const [blockingSender, setBlockingSender] = useState<{
-    readonly scope: string
-    readonly who: string
-  } | null>(null)
+  const [blockingSender, setBlockingSender] = useState<WithSomebody | null>(
+    null,
+  )
   /**
    * Out of the conversation open, back to the list: what the header's back
    * arrow does, a block that holds (#469), and one that arrives (#494).
@@ -2378,22 +2380,20 @@ export function App({
    * same from both; this binds it to the session and to the screens.
    *
    * The ignored list written, every screen draws without that account at
-   * once, and the conversation open closes when it is one with that account
-   * (`holdIgnored`): the person is back on the list, where it is gone, and
-   * the list says so. From a conversation of more than two, which stays, the
-   * person stays in it, and it says so. What the service answers comes after,
-   * and is said in the same place. Not written, nothing changed, and the
-   * panel or the sheet says so where the gesture was made.
+   * once, and the conversation open closes when the one rule says it leaves
+   * (`closeWhatTheBlockTakes`), as a conversation of two with that account
+   * does: the person is back on the list, where it is gone, and the list
+   * says so. From a conversation that stays, the person stays in it, and it
+   * says so. What the service answers comes after, and is said in the same
+   * place. Not written, nothing changed, and the panel or the sheet says so
+   * where the gesture was made.
    */
-  const blockTheAccount = (
-    who: string,
-    from: 'the panel' | 'the selection',
-  ) => {
+  const blockTheAccount = (who: string) => {
     const blockingAs = sessionClientRef.current
     const held = credentialsRef.current
     if (blockingAs === null || held === null) return
     setBlocking({ who, state: 'working' })
-    setBlockSaid(null)
+    setBlockOnScreen(null)
     // The conversation blocked from, when the person stays in it: known once
     // the list is written, and where what the service answers is said too.
     let stayingIn: string | null = null
@@ -2418,15 +2418,12 @@ export function App({
               listCacheRef.current.keep(listWithoutTheBlocked(rows, next)),
             )
             .catch(() => {})
-          // THE PANEL IS A CONVERSATION OF TWO'S, and its block goes back to
-          // the list whatever the list knows of that conversation yet.
-          if (from === 'the panel') leaveTheConversation()
           stayingIn = openScopeRef.current
           setBlockingSender(null)
           // The messages selected are gone from the screen with their author.
           setSelected(new Set())
           setBlocking(null)
-          setBlockSaid({ notice: 'blocked', stayingIn })
+          setBlockOnScreen({ notice: 'blocked', stayingIn })
           // And the homeserver asked again, which now holds that account's
           // messages back.
           refreshListRef.current?.().catch(() => {})
@@ -2448,14 +2445,17 @@ export function App({
                 told: outcome.told,
                 ...(outcome.told ? {} : { kept: outcome.kept }),
               }
-            : { blocked: false, reason: outcome.reason },
+            : {
+                blocked: false,
+                reason: 'itself' in outcome ? 'itself' : outcome.reason,
+              },
         )
         if (!outcome.blocked) {
-          setBlocking({ who, state: 'failed' })
+          setBlocking({ who, state: 'itself' in outcome ? 'itself' : 'failed' })
           return
         }
         const notice = noticeOf(outcome)
-        if (notice !== null) setBlockSaid({ notice, stayingIn })
+        if (notice !== null) setBlockOnScreen({ notice, stayingIn })
       },
       () => setBlocking({ who, state: 'failed' }),
     )
@@ -5866,6 +5866,16 @@ export function App({
   // conversation's messages and their reactions are both drawn from, so a
   // block takes both off in the same render.
   const notShownNow: NotShown = { hidden, blocked: ignored ?? new Set() }
+  // WHAT BLOCKING THE ACCOUNT OF `target` WOULD DO TO ITS CONVERSATION, for
+  // the screen that says it beforehand, from the panel or from the selection
+  // (#469, #472): the rule that closes it once the block holds, read on what
+  // this screen knows now.
+  const afterBlocking = (target: WithSomebody): AfterTheBlock =>
+    openAfterTheBlock(
+      openConversationOf(target.scope, party),
+      derivedSummaries,
+      new Set([target.other]),
+    )
 
   return (
     <GestureHandlerRootView style={styles.root}>
@@ -5964,24 +5974,18 @@ export function App({
 
         {/* BLOQUER L'EXPÉDITEUR (#472): the screen of the panel of the
             person, in a sheet over the conversation it was opened from, and
-            the same gesture. Whether that conversation stays in the list is
-            read by the rule that closes it once the block holds, so the
-            screen says what the block will do to it. */}
+            the same gesture. What it says the block will do to that
+            conversation is read from the rule that closes it once the block
+            holds (`afterBlocking`). */}
         {blockingSender !== null && blockingSender.scope === openScope && (
           <BlockSheet
-            memberId={blockingSender.who}
+            memberId={blockingSender.other}
             findable={findableAsFarAsKnown()}
-            stays={
-              !isOpenWithTheBlocked(
-                openConversationOf(blockingSender.scope, party),
-                derivedSummaries,
-                new Set([blockingSender.who]),
-              )
-            }
+            after={afterBlocking(blockingSender)}
             state={
-              blocking?.who === blockingSender.who ? blocking.state : 'idle'
+              blocking?.who === blockingSender.other ? blocking.state : 'idle'
             }
-            onBlock={() => blockTheAccount(blockingSender.who, 'the selection')}
+            onBlock={() => blockTheAccount(blockingSender.other)}
             onClose={() => setBlockingSender(null)}
           />
         )}
@@ -6252,7 +6256,7 @@ export function App({
                   if (openScope === null || blockableNow === null) return
                   // What an earlier try said is not this one's to say.
                   setBlocking(null)
-                  setBlockingSender({ scope: openScope, who: blockableNow })
+                  setBlockingSender({ scope: openScope, other: blockableNow })
                 }}
                 onRemove={() => setRemoving(true)}
               />
@@ -6751,7 +6755,7 @@ export function App({
                     }}
                     joinedDelivered={deliveredJoined}
                     deliveredOutcome={deliveredOutcome}
-                    blockSaid={blockSaid}
+                    blockOnScreen={blockOnScreen}
                     names={names}
                     invitation={linkOutcome}
                     reinstalled={reinstalled}
@@ -6762,7 +6766,7 @@ export function App({
                     opening={waitingOn}
                     onOpen={scope => {
                       // Said once, on the list the block came back to.
-                      setBlockSaid(null)
+                      setBlockOnScreen(null)
                       openConversation(scope)
                     }}
                     findableNotice={listNotice(discovery, Date.now())}
@@ -6912,16 +6916,16 @@ export function App({
                     onOpenPlate={(plate, at) => setOpenPlate({ plate, at })}
                   />
                   {/* AN ACCOUNT JUST BLOCKED FROM HERE (#472), a conversation
-                    of more than two, which stays: what it wrote is gone from
-                    above, and this says so, and what still waits, as the
-                    list says it of a conversation that left it. */}
-                  {blockSaid !== null && blockSaid.stayingIn === openScope && (
-                    <Text
-                      testID={blockSays(blockSaid).testID}
-                      style={styles.blockedHere}>
-                      {t(blockSays(blockSaid).key)}
-                    </Text>
-                  )}
+                    that stays: what it wrote is gone from above, and this
+                    says so, and what still waits, as the list says it of a
+                    conversation that left it. */}
+                  {blockOnScreen !== null &&
+                    blockOnScreen.stayingIn === openScope && (
+                      <BlockLine
+                        onScreen={blockOnScreen}
+                        style={styles.blockedHere}
+                      />
+                    )}
                   {/* What the passive half found, when it found anything. A
                   refusal for an untrusted sender is the one worth saying:
                   what fixes it is verifying them, and this screen is where
@@ -7089,10 +7093,11 @@ export function App({
                   <Block
                     memberId={party.other}
                     findable={findableAsFarAsKnown()}
+                    after={afterBlocking(party)}
                     state={
                       blocking?.who === party.other ? blocking.state : 'idle'
                     }
-                    onBlock={() => blockTheAccount(party.other, 'the panel')}
+                    onBlock={() => blockTheAccount(party.other)}
                   />
                 )}
               </View>
@@ -7713,12 +7718,7 @@ const styles = StyleSheet.create({
     ...typeScale.bodySm,
     color: color.wait['700'],
   },
-  // What a block made from here says, as the list says it: a line that
-  // explains, in the role `ConversationList.tsx` gives its own notices.
-  blockedHere: {
-    ...typeScale.caption,
-    color: color.neutral['600'],
-    marginTop: space.m,
-    paddingHorizontal: layout.screenGutter,
-  },
+  // Under the messages: the rest of what the line looks like is its own
+  // (`BlockLine.tsx`).
+  blockedHere: { marginTop: space.m },
 })

@@ -2,7 +2,7 @@ import React from 'react'
 import { Pressable, StyleSheet, Text, View } from 'react-native'
 
 import { t, type CopyKey } from '../copy'
-import type { BlockSaid } from '../runtime/block'
+import type { BlockOnScreen } from '../runtime/block'
 import type { InvitationOutcome } from '../runtime/entry'
 import {
   color,
@@ -28,7 +28,7 @@ import type { PasteSaid } from '../runtime/pastedLink'
 import type { ShareRefusal } from '../runtime/sharedIn'
 import { stampFor, type Stamp } from '../timeline/whenShown'
 import { Avatar } from './Avatar'
-import { blockSays } from './blockSays'
+import { BlockLine } from './BlockLine'
 import { NotchedButton } from './NotchedButton'
 import { PasteLink } from './PasteLink'
 import { dayOf } from './whenLabel'
@@ -94,10 +94,10 @@ export interface ConversationListProps {
   /**
    * What became of the account just blocked (#469, #472): blocked, whether
    * the service's record still waits, and whether the conversation it was
-   * blocked from left this list or stays in it (`blockSays.ts`). `null` when
-   * nothing is to be said.
+   * blocked from left this list or stays in it (`BlockLine.tsx`). `null`
+   * when nothing is to be said.
    */
-  readonly blockSaid?: BlockSaid | null
+  readonly blockOnScreen?: BlockOnScreen | null
   /**
    * What became of an invitation this launch was opened with, when the
    * device already had an account. `null` when there was none. See
@@ -191,7 +191,7 @@ export function ConversationList({
   onOpenDelivered = () => undefined,
   joinedDelivered = [],
   deliveredOutcome = null,
-  blockSaid = null,
+  blockOnScreen = null,
   invitation = null,
   reinstalled = null,
   notInYet = false,
@@ -334,10 +334,8 @@ export function ConversationList({
           rows below, and this says so, and what still waits. Or, blocked
           from a conversation of more than two, which is still below, that
           what it wrote is gone from them (#472). */}
-      {blockSaid !== null && (
-        <Text style={styles.notice} testID={blockSays(blockSaid).testID}>
-          {t(blockSays(blockSaid).key)}
-        </Text>
+      {blockOnScreen !== null && (
+        <BlockLine onScreen={blockOnScreen} style={styles.notice} />
       )}
       {/* THE INVITATIONS DELIVERED INSIDE MESSAGR, ATOP THE LIST (#404), each
           a row of its own that opens §13.3. Their test identifiers are

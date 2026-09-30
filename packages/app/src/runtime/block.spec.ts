@@ -16,8 +16,8 @@ import {
 } from './block'
 import type { CallRecord } from './callLogStore'
 import {
-  isOpenWithTheBlocked,
   listWithoutTheBlocked,
+  openAfterTheBlock,
   type ConversationSummary,
 } from './conversationList'
 import { shownOf } from './notShown'
@@ -267,14 +267,15 @@ describe('blocking an account from the panel of the person', () => {
     expect([...g.untold.held]).toEqual([])
   })
 
-  it('never blocks this account itself, and changes nothing', async () => {
+  it('never blocks this account itself, changes nothing, and says why', async () => {
     // A block does not lift: whatever a screen hands it, this account is
-    // not an account it holds back from itself (#472).
+    // not an account it holds back from itself (#472). The outcome says so,
+    // so that the screen says what is true: not « you can try again ».
     const g = gesture()
 
     const outcome = await blockAccount(g.deps, ME)
 
-    expect(outcome.blocked).toBe(false)
+    expect(outcome).toEqual({ blocked: false, itself: true })
     expect(g.log).toEqual([])
     expect(g.server.state.writes).toEqual([])
     expect(g.shown).toEqual([])
@@ -500,19 +501,19 @@ describe('the list and the conversations, derived from the homeserver’s ignore
     const blocked = ignoredInSync(sync) ?? new Set<string>()
 
     expect(
-      isOpenWithTheBlocked(
+      openAfterTheBlock(
         { scope: '!with-them:x', other: BLOCKED },
         list,
         blocked,
       ),
-    ).toBe(true)
+    ).toBe('leaves')
     expect(
-      isOpenWithTheBlocked(
+      openAfterTheBlock(
         { scope: '!three-of-us:x', other: null },
         list,
         blocked,
       ),
-    ).toBe(false)
+    ).toBe('stays')
   })
 
   it('keeps a conversation hidden once the blocked account has left it', () => {
@@ -600,12 +601,8 @@ describe('blocking the author of a selection (#472)', () => {
       '!three-of-us:x',
     ])
     expect(
-      isOpenWithTheBlocked(
-        { scope: '!three-of-us:x', other: null },
-        list,
-        shown,
-      ),
-    ).toBe(false)
+      openAfterTheBlock({ scope: '!three-of-us:x', other: null }, list, shown),
+    ).toBe('stays')
     expect(
       shownOf(received, { hidden: new Set(), blocked: shown }).map(
         one => one.eventId,
@@ -625,12 +622,8 @@ describe('blocking the author of a selection (#472)', () => {
 
     expect(listWithoutTheBlocked(list, shown)).toEqual([])
     expect(
-      isOpenWithTheBlocked(
-        { scope: '!with-them:x', other: BLOCKED },
-        list,
-        shown,
-      ),
-    ).toBe(true)
+      openAfterTheBlock({ scope: '!with-them:x', other: BLOCKED }, list, shown),
+    ).toBe('leaves')
   })
 })
 
